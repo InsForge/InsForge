@@ -17,6 +17,7 @@ import { logsRouter } from './routes/logs.js';
 import { configRouter } from './routes/config.js';
 import { docsRouter } from './routes/docs.js';
 import functionsRouter from './routes/functions.js';
+import { vaultRouter } from './routes/vault.js';
 import { errorMiddleware } from './middleware/error.js';
 import fetch from 'node-fetch';
 import { DatabaseManager } from './services/database.js';
@@ -83,6 +84,7 @@ export async function createApp() {
   apiRouter.use('/config', configRouter);
   apiRouter.use('/docs', docsRouter);
   apiRouter.use('/functions', functionsRouter);
+  apiRouter.use('/vault', vaultRouter);
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);

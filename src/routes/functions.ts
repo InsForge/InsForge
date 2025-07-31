@@ -2,10 +2,12 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { AuthRequest, verifyAdmin } from '../middleware/auth.js';
 import { DatabaseManager } from '../services/database.js';
+import { VaultService } from '../services/vault.js';
 import { DatabaseError } from 'pg';
 
 const router = Router();
 const db = DatabaseManager.getInstance();
+const vaultService = new VaultService(db);
 
 // Schema for function upload
 const functionUploadSchema = z.object({
@@ -287,6 +289,111 @@ router.delete('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => 
   } catch (error) {
     console.error('Failed to delete function:', error);
     res.status(500).json({ error: 'Failed to delete function' });
+  }
+});
+
+/**
+ * GET /api/functions/:slug/secrets
+ * List secrets associated with a function
+ */
+router.get('/:slug/secrets', verifyAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { slug } = req.params;
+    
+    // Get function by slug
+    const func = await db
+      .prepare('SELECT id FROM _edge_functions WHERE slug = ?')
+      .get(slug);
+      
+    if (!func) {
+      return res.status(404).json({ error: 'Function not found' });
+    }
+    
+    // Get associated secrets
+    const secrets = await db
+      .prepare(`
+        SELECT v.id, v.name, v.description
+        FROM _vault v
+        JOIN _function_secrets fs ON v.id = fs.vault_id
+        WHERE fs.function_id = ?
+        ORDER BY v.name
+      `)
+      .all(func.id);
+      
+    res.json(secrets);
+  } catch (error) {
+    console.error('Failed to list function secrets:', error);
+    res.status(500).json({ error: 'Failed to list function secrets' });
+  }
+});
+
+/**
+ * POST /api/functions/:slug/secrets
+ * Associate a secret with a function
+ */
+router.post('/:slug/secrets', verifyAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { slug } = req.params;
+    const { secretName } = req.body;
+    
+    if (!secretName) {
+      return res.status(400).json({ error: 'Secret name is required' });
+    }
+    
+    // Get function by slug
+    const func = await db
+      .prepare('SELECT id FROM _edge_functions WHERE slug = ?')
+      .get(slug);
+      
+    if (!func) {
+      return res.status(404).json({ error: 'Function not found' });
+    }
+    
+    // Link secret to function
+    await vaultService.linkSecretToFunction(secretName, func.id, req.user!.id);
+    
+    res.status(201).json({ 
+      success: true,
+      message: `Secret ${secretName} linked to function ${slug}` 
+    });
+  } catch (error) {
+    console.error('Failed to link secret to function:', error);
+    
+    if (error instanceof Error && error.message === 'Secret not found') {
+      return res.status(404).json({ error: 'Secret not found' });
+    }
+    
+    res.status(500).json({ error: 'Failed to link secret to function' });
+  }
+});
+
+/**
+ * DELETE /api/functions/:slug/secrets/:secretName
+ * Remove secret association from a function
+ */
+router.delete('/:slug/secrets/:secretName', verifyAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { slug, secretName } = req.params;
+    
+    // Get function by slug
+    const func = await db
+      .prepare('SELECT id FROM _edge_functions WHERE slug = ?')
+      .get(slug);
+      
+    if (!func) {
+      return res.status(404).json({ error: 'Function not found' });
+    }
+    
+    // Unlink secret from function
+    await vaultService.unlinkSecretFromFunction(secretName, func.id, req.user!.id);
+    
+    res.json({ 
+      success: true,
+      message: `Secret ${secretName} unlinked from function ${slug}` 
+    });
+  } catch (error) {
+    console.error('Failed to unlink secret from function:', error);
+    res.status(500).json({ error: 'Failed to unlink secret from function' });
   }
 });
 
