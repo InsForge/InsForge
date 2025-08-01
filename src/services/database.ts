@@ -332,6 +332,24 @@ export class DatabaseManager {
         created_by UUID REFERENCES _auth(id)
       );
 
+      -- Vault table for storing secrets
+      CREATE TABLE IF NOT EXISTS _vault (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        name VARCHAR(255) UNIQUE NOT NULL,
+        value TEXT NOT NULL, -- Encrypted
+        description TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        created_by UUID NOT NULL -- Can reference either _auth or _superuser_auth
+      );
+
+      -- Function secrets junction table
+      CREATE TABLE IF NOT EXISTS _function_secrets (
+        function_id UUID REFERENCES _edge_functions(id) ON DELETE CASCADE,
+        vault_id UUID REFERENCES _vault(id) ON DELETE CASCADE,
+        PRIMARY KEY (function_id, vault_id)
+      );
+
     `);
 
       // Create update timestamp function
@@ -355,6 +373,7 @@ export class DatabaseManager {
         '_metadata',
         '_identifies',
         '_edge_functions',
+        '_vault',
       ];
       for (const table of tables) {
         await client.query(`

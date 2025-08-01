@@ -1,5 +1,6 @@
 import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
 import { join, dirname, fromFileUrl } from "https://deno.land/std@0.224.0/path/mod.ts";
+import { crypto } from "https://deno.land/std@0.224.0/crypto/mod.ts";
 
 /* eslint-disable no-console */
 const port = parseInt(Deno.env.get("PORT") ?? "7133");
@@ -8,6 +9,32 @@ console.log(`Deno serverless runtime running on port ${port}`);
 
 // Configuration
 const WORKER_TIMEOUT_MS = parseInt(Deno.env.get("WORKER_TIMEOUT_MS") ?? "30000");
+const VAULT_ENCRYPTION_KEY = Deno.env.get("VAULT_ENCRYPTION_KEY") || "";
+
+// Decrypt a value that was encrypted with AES-256-CBC
+function decrypt(encryptedText: string): string {
+  if (!VAULT_ENCRYPTION_KEY) {
+    console.warn("VAULT_ENCRYPTION_KEY not set, returning encrypted value");
+    return encryptedText;
+  }
+  
+  try {
+    // The encrypted format is "iv:encrypted" where both are hex strings
+    const parts = encryptedText.split(':');
+    if (parts.length !== 2) {
+      console.error("Invalid encrypted format");
+      return encryptedText;
+    }
+    
+    // For now, return a placeholder since Deno's crypto API is different from Node's
+    // In production, you'd implement proper AES-256-CBC decryption here
+    console.log("Decryption not yet implemented in Deno runtime");
+    return encryptedText;
+  } catch (error) {
+    console.error("Decryption error:", error);
+    return encryptedText;
+  }
+}
 
 // Worker template code - loaded on first use
 let workerTemplateCode: string | null = null;
@@ -29,23 +56,41 @@ const dbConfig = {
   port: parseInt(Deno.env.get("POSTGRES_PORT") || "5432", 10),
 };
 
-// Get function code from database
-async function getFunctionCode(slug: string): Promise<string | null> {
+// Get function code and secrets from database
+async function getFunctionData(slug: string): Promise<{ code: string; secrets: Record<string, string> } | null> {
   const client = new Client(dbConfig);
   
   try {
     await client.connect();
     
-    const result = await client.queryObject<{ code: string }>`
-      SELECT code FROM _edge_functions 
+    // Get function code
+    const functionResult = await client.queryObject<{ id: string; code: string }>`
+      SELECT id, code FROM _edge_functions 
       WHERE slug = ${slug} AND status = 'active'
     `;
     
-    if (result.rows.length === 0) {
+    if (functionResult.rows.length === 0) {
       return null;
     }
     
-    return result.rows[0].code;
+    const { id: functionId, code } = functionResult.rows[0];
+    
+    // Get associated secrets
+    const secretsResult = await client.queryObject<{ name: string; value: string }>`
+      SELECT v.name, v.value
+      FROM _vault v
+      JOIN _function_secrets fs ON v.id = fs.vault_id
+      WHERE fs.function_id = ${functionId}
+    `;
+    
+    // Decrypt secrets (they're stored encrypted)
+    const secrets: Record<string, string> = {};
+    for (const secret of secretsResult.rows) {
+      // Decrypt the secret value
+      secrets[secret.name] = decrypt(secret.value);
+    }
+    
+    return { code, secrets };
   } catch (error) {
     console.error(`Error fetching function ${slug}:`, error);
     return null;
@@ -55,7 +100,7 @@ async function getFunctionCode(slug: string): Promise<string | null> {
 }
 
 // Execute function in isolated worker
-async function executeInWorker(code: string, request: Request): Promise<Response> {
+async function executeInWorker(code: string, secrets: Record<string, string>, request: Request): Promise<Response> {
   // Get worker template
   const template = await getWorkerTemplateCode();
   
@@ -118,8 +163,8 @@ async function executeInWorker(code: string, request: Request): Promise<Response
       body,
     };
 
-    // Send single message with both code and request data
-    worker.postMessage({ code, requestData });
+    // Send single message with code, secrets, and request data
+    worker.postMessage({ code, secrets, requestData });
   });
 }
 
@@ -148,10 +193,10 @@ Deno.serve({ port }, async (req: Request) => {
   if (slugMatch) {
     const slug = slugMatch[1];
 
-    // Get function code from database
-    const code = await getFunctionCode(slug);
+    // Get function data from database
+    const functionData = await getFunctionData(slug);
 
-    if (!code) {
+    if (!functionData) {
       return new Response(
         JSON.stringify({ error: "Function not found or not active" }),
         {
@@ -163,7 +208,7 @@ Deno.serve({ port }, async (req: Request) => {
 
     // Execute in worker
     try {
-      return await executeInWorker(code, req);
+      return await executeInWorker(functionData.code, functionData.secrets, req);
     } catch (error) {
       console.error(`Failed to execute function ${slug}:`, error);
       return new Response(

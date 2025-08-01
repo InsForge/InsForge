@@ -7,9 +7,9 @@
 /* eslint-env worker */
 /* global self, Request */
 
-// Handle the single message with both code and request data
+// Handle the single message with code, secrets, and request data
 self.onmessage = async (e) => {
-  const { code, requestData } = e.data;
+  const { code, secrets, requestData } = e.data;
   
   try {
     // Initialize function from code
@@ -34,8 +34,13 @@ self.onmessage = async (e) => {
       body: requestData.body,
     });
     
-    // Execute the function
-    const response = await functionHandler(request);
+    // Create context object with secrets
+    const context = {
+      env: secrets || {}
+    };
+    
+    // Execute the function with request and context
+    const response = await functionHandler(request, context);
     
     // Serialize and send response
     const responseData = {
