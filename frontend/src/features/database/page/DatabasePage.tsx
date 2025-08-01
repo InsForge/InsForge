@@ -542,6 +542,7 @@ export default function DatabasePage() {
                   <DatabaseDataGrid
                     data={tableData?.records || []}
                     schema={tableData?.schema}
+                    tableName={selectedTable}
                     loading={isLoadingTable && !tableData} // Only show loading when no data exists
                     isSorting={isSorting}
                     isRefreshing={isRefreshing}

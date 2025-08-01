@@ -164,6 +164,7 @@ export function UsersDataGrid({
       showSelection={true}
       showPagination={true}
       showTypeBadge={false}
+      storageKey="users"
     />
   );
 }
