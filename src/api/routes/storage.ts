@@ -1,13 +1,13 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import path from 'path';
-import { verifyApiKey, AuthRequest } from '../middleware/auth.js';
-import { AppError } from '../middleware/error.js';
-import { StorageService } from '../services/storage.js';
-import { DatabaseManager } from '../services/database.js';
-import { successResponse } from '../utils/response.js';
-import { upload, handleUploadError } from '../middleware/upload.js';
-import { ERROR_CODES } from '../types/error-constants.js';
-import { BucketInfo } from '../types/storage.js';
+import { verifyApiKey, AuthRequest } from '@/api/middleware/auth.js';
+import { AppError } from '@/api/middleware/error.js';
+import { StorageService } from '@/core/storage/storage.js';
+import { DatabaseManager } from '@/core/database/database.js';
+import { successResponse } from '@/utils/response.js';
+import { upload, handleUploadError } from '@/api/middleware/upload.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
+import { BucketInfo } from '@/types/storage.js';
 
 const router = Router();
 

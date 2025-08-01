@@ -2,8 +2,8 @@ import { Router } from 'express';
 import { readFile } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { successResponse, errorResponse } from '../utils/response.js';
-import { ERROR_CODES } from '../types/error-constants.js';
+import { successResponse, errorResponse } from '@/utils/response.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
 
 const router = Router();
 const __filename = fileURLToPath(import.meta.url);

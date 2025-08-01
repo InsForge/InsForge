@@ -1,8 +1,8 @@
 import { Router, Response, NextFunction } from 'express';
-import { DatabaseManager } from '../services/database.js';
-import { verifyUserOrAdmin, AuthRequest } from '../middleware/auth.js';
-import { successResponse, paginatedResponse } from '../utils/response.js';
-import { LogRecord, LogActionStat, LogTableStat } from '../types/logs.js';
+import { DatabaseManager } from '@/core/database/database.js';
+import { verifyUserOrAdmin, AuthRequest } from '@/api/middleware/auth.js';
+import { successResponse, paginatedResponse } from '@/utils/response.js';
+import { LogRecord, LogActionStat, LogTableStat } from '@/types/logs.js';
 
 const router = Router();
 

@@ -1,5 +1,5 @@
-import { AppError } from '../middleware/error.js';
-import { ERROR_CODES } from '../types/error-constants.js';
+import { AppError } from '@/api/middleware/error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
 
 export function validateEmail(email: string) {
   return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);

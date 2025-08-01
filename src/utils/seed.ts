@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
-import { AuthService } from '../services/auth.js';
-import { DatabaseManager } from '../services/database.js';
+import { AuthService } from '@/core/auth/auth.js';
+import { DatabaseManager } from '@/core/database/database.js';
 
 export async function seedAdmin() {
   const authService = AuthService.getInstance();

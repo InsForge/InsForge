@@ -190,3 +190,45 @@ export type DatabaseValue =
 
 // Generic database record type - used when we don't know the exact table structure
 export type DatabaseRecord = Record<string, DatabaseValue>;
+
+// Response types for table operations
+export interface CreateTableResponse {
+  message: string;
+  table_name: string;
+  columns: Array<ColumnDefinition & { sql_type: string }>;
+  auto_fields: string[];
+  nextAction: string;
+}
+
+export interface GetTableSchemaResponse {
+  table_name: string;
+  columns: Array<{
+    name: string;
+    type: string;
+    nullable: boolean;
+    primary_key: boolean;
+    unique: boolean;
+    default_value: string | null;
+    foreign_key?: ForeignKeyInfo;
+  }>;
+}
+
+export interface UpdateTableSchemaRequest {
+  add_columns?: ColumnDefinition[];
+  drop_columns?: Array<{ name: string }>;
+  rename_columns?: Record<string, string>;
+  add_fkey_columns?: ColumnDefinition[];
+  drop_fkey_columns?: Array<{ name: string }>;
+}
+
+export interface UpdateTableSchemaResponse {
+  message: string;
+  table_name: string;
+  operations: string[];
+}
+
+export interface DeleteTableResponse {
+  message: string;
+  table_name: string;
+  nextAction: string;
+}

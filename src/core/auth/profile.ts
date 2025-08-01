@@ -1,5 +1,5 @@
-import { DatabaseManager, Profile } from './database.js';
-import { UpdateProfileRequest } from '../types/profile.js';
+import { DatabaseManager, Profile } from '@/core/database/database.js';
+import { UpdateProfileRequest } from '@/types/profile.js';
 
 export class ProfileService {
   private getDb() {

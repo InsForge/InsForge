@@ -2,14 +2,14 @@ import { Pool } from 'pg';
 import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
-import { DatabaseMetadata, ColumnInfo, PrimaryKeyInfo } from '../types/database.js';
+import { DatabaseMetadata, ColumnInfo, PrimaryKeyInfo } from '@/types/database.js';
 import {
   AuthRecord,
   IdentifiesRecord,
   SuperUserAuthRecord,
   SuperUserProfileRecord,
-} from '../types/auth.js';
-import { ProfileRecord } from '../types/profile.js';
+} from '@/types/auth.js';
+import { ProfileRecord } from '@/types/profile.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

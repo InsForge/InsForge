@@ -1,8 +1,8 @@
 import multer from 'multer';
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from './error.js';
-import { ERROR_CODES } from '../types/error-constants.js';
-import { ProcessedFormData } from '../types/storage.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
+import { ProcessedFormData } from '@/types/storage.js';
 
 // Constants
 const DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB

@@ -4,9 +4,15 @@ import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { OAuth2Client } from 'google-auth-library';
 import axios from 'axios';
-import { DatabaseManager, Auth, SuperUserAuth, SuperUserProfile, Identifies } from './database.js';
-import { ProfileRecord, UserWithProfile } from '../types/profile.js';
-import { OAuthConfig, ConfigRecord } from '../types/auth.js';
+import {
+  DatabaseManager,
+  Auth,
+  SuperUserAuth,
+  SuperUserProfile,
+  Identifies,
+} from '@/core/database/database.js';
+import { ProfileRecord, UserWithProfile } from '@/types/profile.js';
+import { OAuthConfig, ConfigRecord } from '@/types/auth.js';
 import bcrypt from 'bcrypt';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';

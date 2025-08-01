@@ -77,20 +77,6 @@
   background-color: #e2e8f0;
 }
 
-.rdg-checkbox {
-  margin: 0;
-  accent-color: #3b82f6;
-}
-
-.rdg-checkbox-input {
-  margin: 0;
-}
-
-/* Header checkbox styling */
-.rdg-header-row .rdg-checkbox {
-  margin: 0;
-}
-
 /* Remove cell focus outline and use custom styling */
 .rdg-cell[aria-selected='true'] {
   outline: 2px solid #2C7FFF;
@@ -203,15 +189,6 @@
   display: none !important;
 }
 
-/* Sortable column header cursor */
-.rdg-header-row .rdg-cell[aria-sort] {
-  cursor: pointer;
-}
-
-.rdg-header-row .rdg-cell[aria-sort]:hover {
-  background-color: #e5e7eb;
-}
-
 /* Custom header renderer styling */
 .rdg-header-row .rdg-cell .sortable-header {
   display: flex;
@@ -242,9 +219,4 @@
   min-width: 45px !important;
   max-width: 45px !important;
   justify-content: center;
-}
-
-.rdg .rdg-cell[data-column-key='select-row'] input[type='checkbox'] {
-  width: 16px !important;
-  height: 16px !important;
 }

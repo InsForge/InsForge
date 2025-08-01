@@ -1,8 +1,8 @@
-import { DatabaseManager } from './database.js';
-import { ColumnSchema, TableSchema, DatabaseSchema } from '../types/database.js';
-import { StorageConfig } from '../types/storage.js';
-import { AuthConfig } from '../types/auth.js';
-import { AppMetadata } from '../types/metadata.js';
+import { DatabaseManager } from '@/core/database/database.js';
+import { ColumnSchema, TableSchema, DatabaseSchema } from '@/types/database.js';
+import { StorageConfig } from '@/types/storage.js';
+import { AuthConfig } from '@/types/auth.js';
+import { AppMetadata } from '@/types/metadata.js';
 
 export class MetadataService {
   private static instance: MetadataService;

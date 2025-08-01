@@ -1,11 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { DatabaseManager } from '../services/database.js';
-import { verifyAdmin } from '../middleware/auth.js';
-import { AppError } from '../middleware/error.js';
-import { ERROR_CODES } from '../types/error-constants.js';
-import { successResponse } from '../utils/response.js';
-import { OAuthConfig, OAuthStatus, ConfigRecord } from '../types/auth.js';
+import { DatabaseManager } from '@/core/database/database.js';
+import { verifyAdmin } from '@/api/middleware/auth.js';
+import { AppError } from '@/api/middleware/error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
+import { successResponse } from '@/utils/response.js';
+import { OAuthConfig, OAuthStatus, ConfigRecord } from '@/types/auth.js';
 
 const router = Router();
 

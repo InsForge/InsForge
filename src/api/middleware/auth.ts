@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { AuthService } from '../services/auth.js';
+import { AuthService } from '@/core/auth/auth.js';
 import { AppError } from './error.js';
-import { ERROR_CODES, NEXT_ACTION } from '../types/error-constants.js';
+import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 
 export interface AuthRequest extends Request {
   user?: {

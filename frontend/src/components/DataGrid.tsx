@@ -11,6 +11,9 @@ import { Badge } from '@/components/radix/Badge';
 import { Copy, Check, MoveUp, MoveDown, Plus, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils/utils';
 import { PaginationControls } from './PaginationControls';
+import ArrowUpIcon from '@/assets/icons/arrow_up.svg';
+import ArrowDownIcon from '@/assets/icons/arrow_down.svg';
+import Checkbox from './Checkbox';
 
 // Types
 export interface DataGridColumn {
@@ -22,6 +25,7 @@ export interface DataGridColumn {
   maxWidth?: number;
   resizable?: boolean;
   sortable?: boolean;
+  sortDescendingFirst?: boolean;
   editable?: boolean;
   primary_key?: boolean;
   renderCell?: (props: any) => React.ReactNode;
@@ -164,7 +168,6 @@ export const DefaultCellRenderers = {
     );
   },
 };
-
 // Separate IdCell component to use hooks properly
 function IdCell({ value }: { value: any }) {
   const [copied, setCopied] = useState(false);
@@ -247,7 +250,6 @@ export function SortableHeaderRenderer({
   };
 
   const nextDirection = getNextSortDirection();
-  const ArrowIcon = nextDirection === 'DESC' ? MoveDown : MoveUp;
 
   return (
     <div className="group w-full h-full flex items-center cursor-pointer">
@@ -265,15 +267,27 @@ export function SortableHeaderRenderer({
           </span>
         )}
 
-        {/* Show sort arrow only on hover if column is sortable */}
+        {/* Show sort arrow with hover effect */}
         {column.sortable && (
-          <ArrowIcon
-            className={`ml-0.5 h-4 w-4 text-zinc-500 transition-opacity ${
-              sortDirection
-                ? 'opacity-100' // Always show if currently sorted
-                : 'opacity-0 group-hover:opacity-100' // Show on hover if not sorted
-            }`}
-          />
+          <div className="relative ml-0.5 w-5 h-5">
+            {sortDirection && (
+              <div className="bg-transparent p-0.5 rounded">
+                <img
+                  src={sortDirection === 'DESC' ? ArrowDownIcon : ArrowUpIcon}
+                  alt={`Sorted ${sortDirection.toLowerCase()}`}
+                  className="h-4 w-4 text-zinc-500 transition-opacity group-hover:opacity-0"
+                />
+              </div>
+            )}
+
+            <div className="absolute inset-0 invisible group-hover:visible transition-opacity bg-slate-200 p-0.5 rounded w-5 h-5">
+              <img
+                src={nextDirection === 'DESC' ? ArrowDownIcon : ArrowUpIcon}
+                alt={`Sort ${nextDirection.toLowerCase()}`}
+                className="h-4 w-4 text-zinc-500"
+              />
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -329,42 +343,44 @@ export function DataGrid({
         maxWidth: 45,
         resizable: false,
         renderCell: ({ row, tabIndex }) => (
-          <div className="w-full h-full flex items-center justify-center">
-            <input
-              type="checkbox"
-              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-              checked={selectedRows.has(row.id)}
-              onChange={(e) => {
-                const newSelectedRows = new Set(selectedRows);
-                if (e.target.checked) {
-                  newSelectedRows.add(row.id);
-                } else {
-                  newSelectedRows.delete(row.id);
-                }
-                onSelectedRowsChange(newSelectedRows);
-              }}
-              tabIndex={tabIndex}
-            />
-          </div>
+          <Checkbox
+            checked={selectedRows.has(row.id)}
+            onChange={(checked) => {
+              const newSelectedRows = new Set(selectedRows);
+              if (checked) {
+                newSelectedRows.add(row.id);
+              } else {
+                newSelectedRows.delete(row.id);
+              }
+              onSelectedRowsChange(newSelectedRows);
+            }}
+            tabIndex={tabIndex}
+          />
         ),
-        renderHeaderCell: () => (
-          <div className="w-full h-full flex items-center justify-center">
-            <input
-              type="checkbox"
-              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-              checked={data.length > 0 && data.every((row) => selectedRows.has(row.id))}
-              onChange={(e) => {
+        renderHeaderCell: () => {
+          const selectedCount = data.filter((row) => selectedRows.has(row.id)).length;
+          const totalCount = data.length;
+          const isAllSelected = totalCount > 0 && selectedCount === totalCount;
+          const isPartiallySelected = selectedCount > 0 && selectedCount < totalCount;
+
+          return (
+            <Checkbox
+              checked={isAllSelected}
+              indeterminate={isPartiallySelected}
+              onChange={(checked) => {
                 const newSelectedRows = new Set(selectedRows);
-                if (e.target.checked) {
+                if (checked) {
+                  // Select all
                   data.forEach((row) => newSelectedRows.add(row.id));
                 } else {
+                  // Unselect all
                   data.forEach((row) => newSelectedRows.delete(row.id));
                 }
                 onSelectedRowsChange(newSelectedRows);
               }}
             />
-          </div>
-        ),
+          );
+        },
       });
     }
 
@@ -381,6 +397,7 @@ export function DataGrid({
         maxWidth: col.maxWidth,
         resizable: col.resizable !== false,
         sortable: col.sortable !== false,
+        sortDescendingFirst: col.sortDescendingFirst ?? true,
         editable: col.editable && !col.primary_key,
         renderCell: col.renderCell || DefaultCellRenderers.text,
         renderEditCell: col.renderEditCell,

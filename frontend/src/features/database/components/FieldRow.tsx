@@ -1,7 +1,7 @@
 import { Controller, UseFormReturn } from 'react-hook-form';
 import { X, Key } from 'lucide-react';
 import { Input } from '@/components/radix/Input';
-import { Checkbox } from '@/components/radix/Checkbox';
+import Checkbox from '@/components/Checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/radix/Select';
 import { FIELD_TYPES_ARRAY } from '@/lib/types/schema';
 import { fieldIcons } from '../constants';
@@ -104,7 +104,7 @@ export function FieldRow({
       <div className="flex-1 flex justify-center">
         <Checkbox
           checked={form.watch(`fields.${index}.nullable`)}
-          onCheckedChange={(checked) => form.setValue(`fields.${index}.nullable`, !!checked)}
+          onChange={(checked) => form.setValue(`fields.${index}.nullable`, !!checked)}
           disabled={isSystemField}
           className={`rounded border-zinc-700 shadow-sm data-[state=checked]:bg-zinc-600 data-[state=checked]:border-zinc-600`}
         />
@@ -114,7 +114,7 @@ export function FieldRow({
       <div className="flex-1 flex justify-center">
         <Checkbox
           checked={form.watch(`fields.${index}.unique`)}
-          onCheckedChange={(checked) => form.setValue(`fields.${index}.unique`, !!checked)}
+          onChange={(checked) => form.setValue(`fields.${index}.unique`, !!checked)}
           disabled={isSystemField}
           className={`rounded border-zinc-700 shadow-sm data-[state=checked]:bg-zinc-600 data-[state=checked]:border-zinc-600`}
         />

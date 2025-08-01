@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
-import { AuthRequest, verifyAdmin } from '../middleware/auth.js';
-import { DatabaseManager } from '../services/database.js';
+import { AuthRequest, verifyAdmin } from '@/api/middleware/auth.js';
+import { DatabaseManager } from '@/core/database/database.js';
 import { DatabaseError } from 'pg';
 
 const router = Router();

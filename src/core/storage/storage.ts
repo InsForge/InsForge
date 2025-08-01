@@ -1,9 +1,9 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { DatabaseManager } from './database.js';
-import { StorageRecord, StoredFile, BucketRecord } from '../types/storage.js';
-import { MetadataService } from './metadata.js';
+import { DatabaseManager } from '@/core/database/database.js';
+import { StorageRecord, StoredFile, BucketRecord } from '@/types/storage.js';
+import { MetadataService } from '@/core/metadata/metadata.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

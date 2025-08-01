@@ -1,11 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { ProfileService } from '../services/profile.js';
-import { AuthService } from '../services/auth.js';
-import { AppError } from '../middleware/error.js';
-import { verifyUser, AuthRequest } from '../middleware/auth.js';
-import { successResponse } from '../utils/response.js';
-import { UpdateProfileRequest } from '../types/profile.js';
-import { ERROR_CODES } from '../types/error-constants.js';
+import { ProfileService } from '@/core/auth/profile.js';
+import { AuthService } from '@/core/auth/auth.js';
+import { AppError } from '@/api/middleware/error.js';
+import { verifyUser, AuthRequest } from '@/api/middleware/auth.js';
+import { successResponse } from '@/utils/response.js';
+import { UpdateProfileRequest } from '@/types/profile.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
 
 const router = Router();
 const profileService = new ProfileService();

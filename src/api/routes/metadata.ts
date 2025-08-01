@@ -1,8 +1,8 @@
 import { Router, Response, NextFunction } from 'express';
-import { MetadataService } from '../services/metadata.js';
-import { AuthService } from '../services/auth.js';
-import { verifyUserOrApiKey, verifyUserOrAdmin, AuthRequest } from '../middleware/auth.js';
-import { successResponse } from '../utils/response.js';
+import { MetadataService } from '@/core/metadata/metadata.js';
+import { AuthService } from '@/core/auth/auth.js';
+import { verifyUserOrApiKey, verifyUserOrAdmin, AuthRequest } from '@/api/middleware/auth.js';
+import { successResponse } from '@/utils/response.js';
 
 const router = Router();
 

@@ -1,14 +1,14 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
-import { AuthService } from '../services/auth.js';
-import { DatabaseManager } from '../services/database.js';
-import { AppError } from '../middleware/error.js';
-import { verifyUserOrAdmin, verifyAdmin, AuthRequest } from '../middleware/auth.js';
-import { successResponse } from '../utils/response.js';
-import { ERROR_CODES } from '../types/error-constants.js';
-import { validateEmail } from '../utils/validations.js';
-import { UserWithProfile } from '../types/profile.js';
-import { OAuthConfig, ConfigRecord } from '../types/auth.js';
+import { AuthService } from '@/core/auth/auth.js';
+import { DatabaseManager } from '@/core/database/database.js';
+import { AppError } from '@/api/middleware/error.js';
+import { verifyUserOrAdmin, verifyAdmin, AuthRequest } from '@/api/middleware/auth.js';
+import { successResponse } from '@/utils/response.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
+import { validateEmail } from '@/utils/validations.js';
+import { UserWithProfile } from '@/types/profile.js';
+import { OAuthConfig, ConfigRecord } from '@/types/auth.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
