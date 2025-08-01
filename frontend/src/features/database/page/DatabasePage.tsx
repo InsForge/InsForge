@@ -558,6 +558,8 @@ export default function DatabasePage() {
                     onPageChange={setCurrentPage}
                     onDeleteRecord={(id) => void handleRecordDelete(id)}
                     onNewRecord={() => setShowRecordForm(true)}
+                    showEditColumn={true}
+                    onEditTable={() => handleEditTable(selectedTable)}
                   />
                 </div>
               )}

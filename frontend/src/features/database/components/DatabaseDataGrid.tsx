@@ -233,6 +233,8 @@ export function DatabaseDataGrid({
   onCellEdit,
   emptyStateTitle = 'No data available',
   emptyStateDescription,
+  showEditColumn,
+  onEditTable,
   ...props
 }: DatabaseDataGridProps) {
   const columns = useMemo(() => {
@@ -251,6 +253,8 @@ export function DatabaseDataGrid({
       emptyStateDescription={emptyStateDescription || defaultEmptyDescription}
       showSelection={true}
       showPagination={true}
+      showEditColumn={showEditColumn}
+      onEditTable={onEditTable}
     />
   );
 }

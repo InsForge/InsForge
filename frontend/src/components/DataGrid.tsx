@@ -8,7 +8,7 @@ import ReactDataGrid, {
 } from 'react-data-grid';
 import { Button } from '@/components/radix/Button';
 import { Badge } from '@/components/radix/Badge';
-import { Copy, Check, MoveUp, MoveDown } from 'lucide-react';
+import { Copy, Check, MoveUp, MoveDown, Plus, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils/utils';
 import { PaginationControls } from './PaginationControls';
 
@@ -59,6 +59,8 @@ export interface DataGridProps {
   showSelection?: boolean;
   showPagination?: boolean;
   showTypeBadge?: boolean;
+  showEditColumn?: boolean;
+  onEditTable?: () => void;
 }
 
 // Default cell renderers
@@ -74,10 +76,11 @@ export const DefaultCellRenderers = {
   boolean: ({ row, column }: any) => {
     const value = row[column.key];
     return (
-      <div className="w-full h-full flex items-center justify-start">
+      <div className="w-full h-full flex items-center justify-between group">
         <Badge variant={value ? 'default' : 'secondary'}>
           {value === null ? 'null' : value ? 'true' : 'false'}
         </Badge>
+        <ChevronDown className="h-4 w-4 text-zinc-500 group-hover:text-zinc-950 transition-colors" />
       </div>
     );
   },
@@ -308,6 +311,8 @@ export function DataGrid({
   showSelection = false,
   showPagination = true,
   showTypeBadge = true,
+  showEditColumn = false,
+  onEditTable,
 }: DataGridProps) {
   // Convert columns to react-data-grid format
   const gridColumns = useMemo(() => {
@@ -394,8 +399,49 @@ export function DataGrid({
       cols.push(gridColumn);
     });
 
+    // Add edit column if enabled (positioned at the right)
+    if (showEditColumn && onEditTable) {
+      cols.push({
+        key: 'edit-column',
+        name: '',
+        width: 60,
+        minWidth: 60,
+        maxWidth: 60,
+        resizable: false,
+        sortable: false,
+        editable: false,
+        renderHeaderCell: () => (
+          <div className="w-full h-full flex items-center justify-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-zinc-500 hover:text-black hover:bg-zinc-50"
+              onClick={onEditTable}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+        ),
+        renderCell: () => (
+          <div className="w-full h-full flex items-center justify-center">
+            {/* Empty cell content */}
+          </div>
+        ),
+      });
+    }
+
     return cols;
-  }, [columns, selectedRows, onSelectedRowsChange, data, sortColumns, showSelection]);
+  }, [
+    columns,
+    selectedRows,
+    onSelectedRowsChange,
+    data,
+    sortColumns,
+    showSelection,
+    showEditColumn,
+    onEditTable,
+    showTypeBadge,
+  ]);
 
   // Default row key getter
   const defaultRowKeyGetter = useCallback(
