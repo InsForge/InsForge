@@ -73,6 +73,14 @@ export async function createApp() {
     });
   });
 
+  // Feature flag for Better Auth migration
+  if (process.env.ENABLE_BETTER_AUTH === 'true') {
+    // Import Better Auth router dynamically to avoid loading if not enabled
+    const { default: betterAuthRouter } = await import('@/api/routes/better-auth.js');
+    apiRouter.use('/auth/v2', betterAuthRouter);
+    console.log('Better Auth enabled at /api/auth/v2');
+  }
+
   apiRouter.use('/auth', authRouter);
   apiRouter.use('/profiles', profileRouter);
   apiRouter.use('/database/tables', tablesRouter);
