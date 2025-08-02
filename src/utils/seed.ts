@@ -13,7 +13,7 @@ async function ensureFirstAdmin(adminEmail: string, adminPassword: string): Prom
 
   // Check if any admin already exists
   const existingAdmin = (await db
-    .prepare("SELECT email FROM users WHERE role = 'dashboard_user' LIMIT 1")
+    .prepare('SELECT email FROM "user" WHERE role = \'dashboard_user\' LIMIT 1')
     .get()) as { email: string };
 
   if (existingAdmin) {
@@ -30,7 +30,7 @@ async function ensureFirstAdmin(adminEmail: string, adminPassword: string): Prom
 
   if (result?.user?.id) {
     await db
-      .prepare('UPDATE users SET role = ? WHERE id = ?')
+      .prepare('UPDATE "user" SET role = ? WHERE id = ?')
       .run('dashboard_user', result.user.id);
     console.log(`✅ First admin created: ${adminEmail}`);
   }
