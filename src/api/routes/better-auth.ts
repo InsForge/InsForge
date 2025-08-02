@@ -1,15 +1,11 @@
 import { Router } from 'express';
-import { betterAuthHandler } from '@/lib/better-auth.js';
+import { toNodeHandler } from 'better-auth/node';
+import { auth } from '@/lib/better-auth.js';
 
 const router = Router();
 
-// Mount Better Auth handler at the router level
-// This will handle all Better Auth routes like:
-// - POST /signup (register)
-// - POST /signin (login)
-// - GET /user (get current user)
-// - POST /signout (logout)
-// etc.
-router.use('/', betterAuthHandler);
+// Mount Better Auth handler
+// Handles all Better Auth routes: sign-up, sign-in, token, jwks, etc.
+router.all('/*', toNodeHandler(auth));
 
 export default router;

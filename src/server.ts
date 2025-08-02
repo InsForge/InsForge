@@ -53,13 +53,25 @@ export async function createApp() {
 
   // Basic middleware
   app.use(cors());
-  app.use(express.json({ limit: '100mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use(limiter);
   app.use((req: Request, _res: Response, next: NextFunction) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
     next();
   });
+
+  // Mount Better Auth BEFORE express.json() middleware
+  // This is required as per Better Auth documentation
+  if (process.env.ENABLE_BETTER_AUTH === 'true') {
+    const { toNodeHandler } = await import('better-auth/node');
+    const { auth } = await import('@/lib/better-auth.js');
+    // Better Auth handles its own body parsing
+    app.all('/api/auth/v2/*', toNodeHandler(auth));
+    console.log('Better Auth enabled at /api/auth/v2');
+  }
+
+  // Apply JSON middleware after Better Auth
+  app.use(express.json({ limit: '100mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   // Create API router and mount all API routes under /api
   const apiRouter = express.Router();
@@ -72,14 +84,6 @@ export async function createApp() {
       timestamp: new Date().toISOString(),
     });
   });
-
-  // Feature flag for Better Auth migration
-  if (process.env.ENABLE_BETTER_AUTH === 'true') {
-    // Import Better Auth router dynamically to avoid loading if not enabled
-    const { default: betterAuthRouter } = await import('@/api/routes/better-auth.js');
-    apiRouter.use('/auth/v2', betterAuthRouter);
-    console.log('Better Auth enabled at /api/auth/v2');
-  }
 
   apiRouter.use('/auth', authRouter);
   apiRouter.use('/profiles', profileRouter);

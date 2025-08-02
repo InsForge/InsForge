@@ -229,21 +229,16 @@ export class DatabaseManager {
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
 
-      -- Single auth table with role support
+      -- Auth table (authentication only - simplified)
       CREATE TABLE IF NOT EXISTS _auth (
         id UUID PRIMARY KEY,
         email TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
-        role TEXT NOT NULL DEFAULT 'authenticated' CHECK (role IN ('authenticated', 'dashboard_user')),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
 
-      -- Create index for role-based queries
-      CREATE INDEX IF NOT EXISTS idx_auth_role ON _auth(role);
-      CREATE INDEX IF NOT EXISTS idx_auth_email ON _auth(email);
-
-      -- Profiles table (user profile data for all users)
+      -- Profiles table (user profile data)
       CREATE TABLE IF NOT EXISTS _profiles (
         id TEXT PRIMARY KEY,
         auth_id UUID UNIQUE NOT NULL REFERENCES _auth(id) ON DELETE CASCADE,
@@ -251,6 +246,24 @@ export class DatabaseManager {
         avatar_url TEXT,
         bio TEXT,
         metadata JSONB DEFAULT '{}',
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Superuser auth table (admin authentication)
+      CREATE TABLE IF NOT EXISTS _superuser_auth (
+        id UUID PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Superuser profiles table (admin profiles)
+      CREATE TABLE IF NOT EXISTS _superuser_profiles (
+        id TEXT PRIMARY KEY,
+        auth_id UUID UNIQUE NOT NULL REFERENCES _superuser_auth(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
@@ -318,6 +331,67 @@ export class DatabaseManager {
         deployed_at TIMESTAMPTZ
       );
 
+      -- Better Auth Tables (with quoted names as expected by Kysely)
+      -- User table
+      CREATE TABLE IF NOT EXISTS "user" (
+        "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "email" TEXT UNIQUE NOT NULL,
+        "emailVerified" BOOLEAN DEFAULT false,
+        "name" TEXT,
+        "image" TEXT,
+        "role" TEXT DEFAULT 'authenticated',
+        "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+        "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- Session table
+      CREATE TABLE IF NOT EXISTS "session" (
+        "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "userId" TEXT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+        "expiresAt" TIMESTAMPTZ NOT NULL,
+        "token" TEXT UNIQUE NOT NULL,
+        "ipAddress" TEXT,
+        "userAgent" TEXT,
+        "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+        "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- Account table (for OAuth and credentials)
+      CREATE TABLE IF NOT EXISTS "account" (
+        "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "userId" TEXT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+        "accountId" TEXT NOT NULL,
+        "providerId" TEXT NOT NULL,
+        "accessToken" TEXT,
+        "refreshToken" TEXT,
+        "idToken" TEXT,
+        "accessTokenExpiresAt" TIMESTAMPTZ,
+        "refreshTokenExpiresAt" TIMESTAMPTZ,
+        "scope" TEXT,
+        "password" TEXT,
+        "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+        "updatedAt" TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE("providerId", "accountId")
+      );
+
+      -- Verification table
+      CREATE TABLE IF NOT EXISTS "verification" (
+        "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "identifier" TEXT NOT NULL,
+        "value" TEXT NOT NULL,
+        "expiresAt" TIMESTAMPTZ NOT NULL,
+        "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+        "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- JWT plugin tables
+      CREATE TABLE IF NOT EXISTS "jwks" (
+        "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "publicKey" TEXT NOT NULL,
+        "privateKey" TEXT NOT NULL,
+        "createdAt" TIMESTAMPTZ DEFAULT NOW()
+      );
+
     `);
 
       // Create update timestamp function
@@ -336,6 +410,8 @@ export class DatabaseManager {
         '_config',
         '_auth',
         '_profiles',
+        '_superuser_auth',
+        '_superuser_profiles',
         '_metadata',
         '_identifies',
         '_edge_functions',
@@ -350,10 +426,21 @@ export class DatabaseManager {
 
       // Create indexes for better performance
       await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_auth_email ON _auth(email);
         CREATE INDEX IF NOT EXISTS idx_profiles_auth_id ON _profiles(auth_id);
+        CREATE INDEX IF NOT EXISTS idx_superuser_auth_email ON _superuser_auth(email);
+        CREATE INDEX IF NOT EXISTS idx_superuser_profiles_auth_id ON _superuser_profiles(auth_id);
         CREATE UNIQUE INDEX IF NOT EXISTS idx_identify_provider_id ON _identifies(provider, provider_id);
         CREATE INDEX IF NOT EXISTS idx_edge_functions_slug ON _edge_functions(slug);
         CREATE INDEX IF NOT EXISTS idx_edge_functions_status ON _edge_functions(status);
+        
+        -- Better Auth indexes
+        CREATE INDEX IF NOT EXISTS idx_user_email ON "user"("email");
+        CREATE INDEX IF NOT EXISTS idx_user_role ON "user"("role");
+        CREATE INDEX IF NOT EXISTS idx_session_userId ON "session"("userId");
+        CREATE INDEX IF NOT EXISTS idx_session_token ON "session"("token");
+        CREATE INDEX IF NOT EXISTS idx_account_userId ON "account"("userId");
+        CREATE INDEX IF NOT EXISTS idx_verification_identifier ON "verification"("identifier");
       `);
 
       // Insert initial metadata

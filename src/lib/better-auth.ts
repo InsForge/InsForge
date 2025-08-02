@@ -1,9 +1,9 @@
 import { betterAuth } from 'better-auth';
 import { jwt } from 'better-auth/plugins/jwt';
+import { bearer } from 'better-auth/plugins/bearer';
 import { Pool } from 'pg';
-import { Kysely, PostgresDialect } from 'kysely';
 
-// Create Kysely instance with PostgreSQL
+// Create PostgreSQL pool
 const pool = new Pool({
   host: process.env.POSTGRES_HOST || 'localhost',
   port: parseInt(process.env.POSTGRES_PORT || '5432'),
@@ -15,15 +15,9 @@ const pool = new Pool({
   connectionTimeoutMillis: 2000,
 });
 
-const db = new Kysely({
-  dialect: new PostgresDialect({ pool }),
-});
-
 export const auth = betterAuth({
-  database: {
-    db: db,
-    type: 'postgres',
-  },
+  database: pool,
+  basePath: '/api/auth/v2',
   emailAndPassword: {
     enabled: true,
   },
@@ -37,6 +31,7 @@ export const auth = betterAuth({
     },
   },
   plugins: [
+    bearer(),
     jwt({
       jwt: {
         expirationTime: '7d', // 7 days like current implementation
@@ -56,6 +51,3 @@ export const auth = betterAuth({
   ],
   // We'll add OAuth providers in the next PR
 });
-
-// Export handler for Express
-export const betterAuthHandler = auth.handler;
