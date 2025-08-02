@@ -9,7 +9,6 @@ interface LayoutProps {
 }
 
 export default function Layout({ children }: LayoutProps) {
-  const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // Default to expanded
   const { user, logout } = useAuth();
 
@@ -20,8 +19,6 @@ export default function Layout({ children }: LayoutProps) {
       <AppSidebar
         currentUser={user}
         onLogout={logout}
-        isMobileOpen={sidebarMobileOpen}
-        onMobileToggle={() => setSidebarMobileOpen(!sidebarMobileOpen)}
         isCollapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
@@ -29,8 +26,8 @@ export default function Layout({ children }: LayoutProps) {
       {/* Main content */}
       <div
         className={cn(
-          'flex-1 transition-all duration-300 ease-in-out overflow-y-auto',
-          sidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-[240px]',
+          'flex-1 transition-all duration-300 ease-in-out overflow-y-auto ml-18',
+          !sidebarCollapsed && '2xl:ml-[240px]',
           'mt-16'
         )}
       >

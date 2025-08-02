@@ -176,14 +176,14 @@ export function convertSchemaToColumns(
     const isEditable =
       !col.primary_key &&
       [
-        'uuid',
-        'text',
-        'integer',
-        'double precision',
-        'boolean',
-        'timestamp with time zone',
-        'jsonb',
-      ].includes(col.type);
+        ColumnType.UUID,
+        ColumnType.STRING,
+        ColumnType.INTEGER,
+        ColumnType.FLOAT,
+        ColumnType.BOOLEAN,
+        ColumnType.DATETIME,
+        ColumnType.JSON,
+      ].includes(colType);
     const isSortable = !['jsonb', 'json'].includes(col.type?.toLowerCase());
 
     const column: DataGridColumn = {
