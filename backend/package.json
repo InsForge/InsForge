@@ -8,11 +8,9 @@
   "scripts": {
     "start": "node ../dist/server.js",
     "dev": "tsx watch src/server.ts",
-    "dev:mcp": "tsx watch src/mcp/index.ts",
     "build": "tsc && tsc-alias",
     "clean": "rimraf dist",
     "prebuild": "npm run clean",
-    "mcp": "node dist/mcp/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -26,7 +24,6 @@
   "keywords": [
     "backend-as-a-service",
     "postgresql",
-    "mcp",
     "jwt"
   ],
   "dependencies": {

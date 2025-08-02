@@ -5,7 +5,6 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import {
   COLUMN_TYPES,
   ColumnDefinition,
-  ColumnType,
   ForeignKeyInfo,
   ForeignKeyRow,
   ColumnInfo,
@@ -16,6 +15,7 @@ import {
   UpdateTableSchemaResponse,
   DeleteTableResponse,
 } from '@/types/database.js';
+import { ColumnType } from '@insforge/shared-schemas';
 import { validateIdentifier } from '@/utils/validations.js';
 
 export class TablesController {

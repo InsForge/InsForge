@@ -1,14 +1,5 @@
 // Type definitions for database schema management
-
-export enum ColumnType {
-  STRING = 'string',
-  DATETIME = 'datetime',
-  INTEGER = 'integer',
-  FLOAT = 'float',
-  BOOLEAN = 'boolean',
-  UUID = 'uuid',
-  JSON = 'json',
-}
+import { ColumnType } from '@insforge/shared-schemas';
 
 // Column schema information from database
 export interface ColumnSchema {

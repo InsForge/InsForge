@@ -33,9 +33,6 @@ export class DatabaseManager {
 
   private constructor() {
     this.dataDir = process.env.DATABASE_DIR || path.join(__dirname, '../../data');
-    console.log('[DatabaseManager] Data directory:', this.dataDir);
-    console.log('[DatabaseManager] __dirname:', __dirname);
-    console.log('[DatabaseManager] Current working directory:', process.cwd());
   }
 
   static getInstance(): DatabaseManager {

@@ -4,7 +4,6 @@
     "module": "ES2022",
     "lib": ["ES2022"],
     "outDir": "../dist",
-    "rootDir": "src",
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
@@ -20,6 +19,6 @@
     "allowSyntheticDefaultImports": true,
     "types": ["node"]
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "functions/**/*"]
+  "include": ["src/**/*", "../shared-schemas/src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }
