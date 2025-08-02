@@ -331,6 +331,67 @@ export class DatabaseManager {
         deployed_at TIMESTAMPTZ
       );
 
+      -- Better Auth Tables (with quoted names as Better Auth expects)
+      -- User table
+      CREATE TABLE IF NOT EXISTS "user" (
+        "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "email" TEXT UNIQUE NOT NULL,
+        "emailVerified" BOOLEAN DEFAULT false,
+        "name" TEXT,
+        "image" TEXT,
+        "role" TEXT DEFAULT 'authenticated',
+        "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+        "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- Session table
+      CREATE TABLE IF NOT EXISTS "session" (
+        "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "userId" TEXT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+        "expiresAt" TIMESTAMPTZ NOT NULL,
+        "token" TEXT UNIQUE NOT NULL,
+        "ipAddress" TEXT,
+        "userAgent" TEXT,
+        "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+        "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- Account table (for OAuth and credentials)
+      CREATE TABLE IF NOT EXISTS "account" (
+        "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "userId" TEXT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+        "accountId" TEXT NOT NULL,
+        "providerId" TEXT NOT NULL,
+        "accessToken" TEXT,
+        "refreshToken" TEXT,
+        "idToken" TEXT,
+        "accessTokenExpiresAt" TIMESTAMPTZ,
+        "refreshTokenExpiresAt" TIMESTAMPTZ,
+        "scope" TEXT,
+        "password" TEXT,
+        "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+        "updatedAt" TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE("providerId", "accountId")
+      );
+
+      -- Verification table
+      CREATE TABLE IF NOT EXISTS "verification" (
+        "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "identifier" TEXT NOT NULL,
+        "value" TEXT NOT NULL,
+        "expiresAt" TIMESTAMPTZ NOT NULL,
+        "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+        "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- JWT plugin tables
+      CREATE TABLE IF NOT EXISTS "jwks" (
+        "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "publicKey" TEXT NOT NULL,
+        "privateKey" TEXT NOT NULL,
+        "createdAt" TIMESTAMPTZ DEFAULT NOW()
+      );
+
     `);
 
       // Create update timestamp function
@@ -372,6 +433,14 @@ export class DatabaseManager {
         CREATE UNIQUE INDEX IF NOT EXISTS idx_identify_provider_id ON _identifies(provider, provider_id);
         CREATE INDEX IF NOT EXISTS idx_edge_functions_slug ON _edge_functions(slug);
         CREATE INDEX IF NOT EXISTS idx_edge_functions_status ON _edge_functions(status);
+        
+        -- Better Auth indexes
+        CREATE INDEX IF NOT EXISTS idx_user_email ON "user"("email");
+        CREATE INDEX IF NOT EXISTS idx_user_role ON "user"("role");
+        CREATE INDEX IF NOT EXISTS idx_session_userId ON "session"("userId");
+        CREATE INDEX IF NOT EXISTS idx_session_token ON "session"("token");
+        CREATE INDEX IF NOT EXISTS idx_account_userId ON "account"("userId");
+        CREATE INDEX IF NOT EXISTS idx_verification_identifier ON "verification"("identifier");
       `);
 
       // Insert initial metadata

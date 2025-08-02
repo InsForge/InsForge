@@ -80,6 +80,8 @@ services:
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
       - APP_KEY=${APP_KEY:-}
+      # Better Auth Migration
+      - ENABLE_BETTER_AUTH=${ENABLE_BETTER_AUTH:-false}
     volumes:
       - ./package.json:/app/package.json
       - ./package-lock.json:/app/package-lock.json
