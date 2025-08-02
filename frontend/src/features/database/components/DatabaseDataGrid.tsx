@@ -20,7 +20,7 @@ function TextCellEditor({ row, column, onRowChange, onClose, onCellEdit }: any) 
     if (onCellEdit && oldValue !== newValue) {
       try {
         await onCellEdit(row.id, column.key, newValue);
-      } catch (error) {
+      } catch {
         // Edit failed silently
       }
     }
@@ -48,7 +48,9 @@ function TextCellEditor({ row, column, onRowChange, onClose, onCellEdit }: any) 
       value={value}
       onChange={(e) => setValue(e.target.value)}
       onKeyDown={handleKeyDown}
-      onBlur={handleSave}
+      onBlur={() => {
+        void handleSave();
+      }}
       className="w-full border-none outline-none bg-white focus:border-0! focus:ring-0! focus:ring-offset-0! focus:outline-none!"
       autoFocus
     />
@@ -76,7 +78,7 @@ function CustomBooleanCellEditor({ row, column, onRowChange, onClose, onCellEdit
       if (onCellEdit && row[column.key] !== value) {
         try {
           await onCellEdit(row.id, column.key, value);
-        } catch (error) {
+        } catch {
           // Edit failed silently
         }
       }
@@ -93,7 +95,7 @@ function CustomBooleanCellEditor({ row, column, onRowChange, onClose, onCellEdit
       <BooleanCellEditor
         value={row[column.key]}
         nullable={true}
-        onValueChange={handleValueChange}
+        onValueChange={(newValue) => void handleValueChange(newValue)}
         onCancel={onClose}
       />
     </div>
@@ -106,7 +108,7 @@ function CustomDateCellEditor({ row, column, onRowChange, onClose, onCellEdit }:
       if (onCellEdit && row[column.key] !== newValue) {
         try {
           await onCellEdit(row.id, column.key, newValue);
-        } catch (error) {
+        } catch {
           // Edit failed silently
         }
       }
@@ -123,7 +125,7 @@ function CustomDateCellEditor({ row, column, onRowChange, onClose, onCellEdit }:
       <DateCellEditor
         value={row[column.key]}
         nullable={true}
-        onValueChange={handleValueChange}
+        onValueChange={(newValue) => void handleValueChange(newValue)}
         onCancel={onClose}
       />
     </div>
@@ -136,7 +138,7 @@ function CustomJsonCellEditor({ row, column, onRowChange, onClose, onCellEdit }:
       if (onCellEdit && row[column.key] !== newValue) {
         try {
           await onCellEdit(row.id, column.key, newValue);
-        } catch (error) {
+        } catch {
           // Edit failed silently
         }
       }
@@ -153,7 +155,7 @@ function CustomJsonCellEditor({ row, column, onRowChange, onClose, onCellEdit }:
       <JsonCellEditor
         value={row[column.key]}
         nullable={true}
-        onValueChange={handleValueChange}
+        onValueChange={(newValue) => void handleValueChange(newValue)}
         onCancel={onClose}
       />
     </div>
@@ -225,11 +227,13 @@ export function convertSchemaToColumns(
 // Database-specific DataGrid props
 export interface DatabaseDataGridProps extends Omit<DataGridProps, 'columns'> {
   schema: any;
+  tableName?: string; // Used to generate unique storage key
 }
 
 // Specialized DataGrid for database tables
 export function DatabaseDataGrid({
   schema,
+  tableName,
   onCellEdit,
   emptyStateTitle = 'No data available',
   emptyStateDescription,
@@ -251,6 +255,7 @@ export function DatabaseDataGrid({
       emptyStateDescription={emptyStateDescription || defaultEmptyDescription}
       showSelection={true}
       showPagination={true}
+      storageKey={tableName ? `database-${tableName}` : undefined}
     />
   );
 }

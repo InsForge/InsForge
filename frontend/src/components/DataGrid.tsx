@@ -14,6 +14,7 @@ import { PaginationControls } from './PaginationControls';
 import ArrowUpIcon from '@/assets/icons/arrow_up.svg';
 import ArrowDownIcon from '@/assets/icons/arrow_down.svg';
 import Checkbox from './Checkbox';
+import { useColumnWidths } from '@/lib/hooks/useColumnWidths';
 
 // Types
 export interface DataGridColumn {
@@ -63,6 +64,8 @@ export interface DataGridProps {
   showSelection?: boolean;
   showPagination?: boolean;
   showTypeBadge?: boolean;
+  storageKey?: string; // Optional key for persisting column widths
+  minColumnWidth?: number; // Minimum width for columns in pixels (default: 100)
 }
 
 // Default cell renderers
@@ -322,7 +325,50 @@ export function DataGrid({
   showSelection = false,
   showPagination = true,
   showTypeBadge = true,
+  storageKey,
+  minColumnWidth = 100,
 }: DataGridProps) {
+  // Use column widths persistence - always call the hook but conditionally use the result
+  const [persistedColumns, updateColumnWidth] = useColumnWidths(
+    storageKey || 'default',
+    columns,
+    minColumnWidth
+  );
+  const columnsWithSavedWidths = storageKey ? persistedColumns : columns;
+
+  // Handle column resize
+  const handleColumnResize = useCallback(
+    (idx: number, width: number) => {
+      if (!storageKey) {
+        return;
+      }
+
+      // Calculate the correct column index (accounting for selection column)
+      const hasSelectionColumn =
+        showSelection && selectedRows !== undefined && onSelectedRowsChange;
+      const columnIndex = hasSelectionColumn ? idx - 1 : idx;
+
+      // Skip if this is the selection column
+      if (hasSelectionColumn && idx === 0) {
+        return;
+      }
+
+      // Find the column that was resized
+      const column = columnsWithSavedWidths[columnIndex];
+      if (column) {
+        updateColumnWidth(column.key, width);
+      }
+    },
+    [
+      storageKey,
+      columnsWithSavedWidths,
+      updateColumnWidth,
+      showSelection,
+      selectedRows,
+      onSelectedRowsChange,
+    ]
+  );
+
   // Convert columns to react-data-grid format
   const gridColumns = useMemo(() => {
     const cols: Column<any>[] = [];
@@ -380,7 +426,7 @@ export function DataGrid({
     }
 
     // Add data columns
-    columns.forEach((col) => {
+    columnsWithSavedWidths.forEach((col) => {
       const currentSort = sortColumns?.find((sort) => sort.columnKey === col.key);
       const sortDirection = currentSort?.direction;
 
@@ -413,7 +459,7 @@ export function DataGrid({
 
     return cols;
   }, [
-    columns,
+    columnsWithSavedWidths,
     selectedRows,
     onSelectedRowsChange,
     data,
@@ -450,6 +496,7 @@ export function DataGrid({
           onSelectedRowsChange={onSelectedRowsChange}
           sortColumns={sortColumns || []}
           onSortColumnsChange={onSortColumnsChange}
+          onColumnResize={handleColumnResize}
           className="h-full rdg-light fill-grid"
           headerRowHeight={52}
           rowHeight={52}

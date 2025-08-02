@@ -203,6 +203,7 @@ export interface StorageDataGridProps extends Omit<DataGridProps, 'columns'> {
   onDownload?: (file: StoredFile) => void;
   onDelete?: (file: StoredFile) => void;
   isDownloading?: (key: string) => boolean;
+  bucketName?: string; // Used to generate unique storage key
 }
 
 // Specialized DataGrid for storage files
@@ -211,6 +212,7 @@ export function StorageDataGrid({
   onDownload,
   onDelete,
   isDownloading,
+  bucketName,
   emptyStateTitle = 'No files found',
   emptyStateDescription,
   ...props
@@ -242,6 +244,7 @@ export function StorageDataGrid({
       showSelection={true}
       showPagination={true}
       rowKeyGetter={(row) => row.key}
+      storageKey={bucketName ? `storage-${bucketName}` : 'storage'}
     />
   );
 }
