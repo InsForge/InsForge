@@ -331,7 +331,7 @@ export class DatabaseManager {
         deployed_at TIMESTAMPTZ
       );
 
-      -- Better Auth Tables (with quoted names as expected by Kysely)
+      -- Better Auth Tables (with quoted names as Better Auth expects)
       -- User table
       CREATE TABLE IF NOT EXISTS "user" (
         "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
