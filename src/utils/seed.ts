@@ -2,6 +2,40 @@
 import { AuthService } from '@/core/auth/auth.js';
 import { DatabaseManager } from '@/core/database/database.js';
 
+/**
+ * Ensures exactly one admin exists in Better Auth
+ * - If no admin exists, creates/promotes the specified user
+ * - If admin already exists, does nothing
+ */
+async function ensureFirstAdmin(adminEmail: string, adminPassword: string): Promise<void> {
+  const dbManager = DatabaseManager.getInstance();
+  const db = dbManager.getDb();
+
+  // Check if any admin already exists
+  const existingAdmin = (await db
+    .prepare("SELECT email FROM users WHERE role = 'dashboard_user' LIMIT 1")
+    .get()) as { email: string };
+
+  if (existingAdmin) {
+    console.log(`✅ Admin already exists: ${existingAdmin.email}`);
+    return;
+  }
+
+  // No admin exists, create/promote one
+  const { auth } = await import('@/lib/better-auth.js');
+  // Try to create new user
+  const result = await auth.api.signUpEmail({
+    body: { email: adminEmail, password: adminPassword, name: 'Admin' },
+  });
+
+  if (result?.user?.id) {
+    await db
+      .prepare('UPDATE users SET role = ? WHERE id = ?')
+      .run('dashboard_user', result.user.id);
+    console.log(`✅ First admin created: ${adminEmail}`);
+  }
+}
+
 export async function seedAdmin() {
   const authService = AuthService.getInstance();
   const dbManager = DatabaseManager.getInstance();
@@ -11,31 +45,10 @@ export async function seedAdmin() {
 
   try {
     console.log(`\n🚀 Insforge Backend Starting...`);
-    
+
     // Handle auth based on Better Auth flag
     if (process.env.ENABLE_BETTER_AUTH === 'true') {
-      // Use Better Auth to create initial admin
-      const { auth } = await import('@/lib/better-auth.js');
-      
-      try {
-        // Try to create admin user with Better Auth
-        await auth.api.signUpEmail({
-          body: {
-            email: adminEmail,
-            password: adminPassword,
-            name: 'Admin',
-            role: 'dashboard_user', // Admin role
-          },
-        });
-        console.log(`✅ Admin account created via Better Auth: ${adminEmail}`);
-      } catch (error: any) {
-        // If email already exists, that's fine
-        if (error.message?.includes('already exists') || error.code === 'USER_ALREADY_EXISTS') {
-          console.log(`✅ Admin account already exists in Better Auth: ${adminEmail}`);
-        } else {
-          console.error('Better Auth error:', error);
-        }
-      }
+      await ensureFirstAdmin(adminEmail, adminPassword);
     } else {
       // Legacy auth flow
       let superUser = await authService.getSuperUserByEmail(adminEmail);

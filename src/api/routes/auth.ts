@@ -3,7 +3,12 @@ import crypto from 'crypto';
 import { AuthService } from '@/core/auth/auth.js';
 import { DatabaseManager } from '@/core/database/database.js';
 import { AppError } from '@/api/middleware/error.js';
-import { verifyUserOrAdmin, verifyAdmin, AuthRequest } from '@/api/middleware/auth.js';
+import {
+  verifyUserOrAdmin,
+  verifyAdmin,
+  verifyApiKey,
+  AuthRequest,
+} from '@/api/middleware/auth.js';
 import { successResponse } from '@/utils/response.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { validateEmail } from '@/utils/validations.js';

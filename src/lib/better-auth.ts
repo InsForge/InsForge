@@ -25,8 +25,8 @@ export const auth = betterAuth({
     additionalFields: {
       role: {
         type: 'string',
-        required: true,
         defaultValue: 'authenticated',
+        input: false, // Prevent users from setting their own role during signup
       },
     },
   },
@@ -36,7 +36,7 @@ export const auth = betterAuth({
       jwt: {
         expirationTime: '7d', // 7 days like current implementation
         // Custom JWT payload as per requirements
-        definePayload: async ({ user }) => {
+        definePayload: ({ user }) => {
           return {
             sub: user.id,
             email: user.email,
