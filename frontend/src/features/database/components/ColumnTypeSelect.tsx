@@ -3,7 +3,7 @@ import { Controller, Control } from 'react-hook-form';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/radix/Select';
 import { columnTypeIcons } from '../constants';
 import { TableFormSchema } from '../schema';
-import { columnTypeSchema } from '@schemas/database.schema';
+import { columnTypeSchema } from '@insforge/shared-schemas';
 
 const COLUMN_TYPES_ARRAY = columnTypeSchema.options;
 

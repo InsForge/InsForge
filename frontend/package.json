@@ -1,8 +1,8 @@
 {
   "name": "insforge-dashboard",
   "version": "1.0.0",
+  "author": "Insforge",
   "description": "Admin dashboard for Insforge backend management",
-  "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",

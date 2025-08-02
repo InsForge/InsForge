@@ -14,7 +14,7 @@ import { metadataService } from '@/features/dashboard/services/metadata.service'
 import { apiClient } from '@/lib/api/client';
 import { UseFormReturn } from 'react-hook-form';
 import { TableFormSchema, TableFormForeignKeySchema } from '../schema';
-import { ColumnSchema, OnDeleteActionSchema, OnUpdateActionSchema } from '@schemas/database.schema';
+import { ColumnSchema, OnDeleteActionSchema, OnUpdateActionSchema } from '@insforge/shared-schemas';
 import { mapDatabaseTypeToFieldType } from '@/lib/utils/utils';
 
 interface ForeignKeyPopoverProps {

@@ -8,7 +8,7 @@ import {
 import { BooleanCellEditor } from '@/features/database/components/BooleanCellEditor';
 import { DateCellEditor } from '@/features/database/components/DateCellEditor';
 import { JsonCellEditor } from '@/features/database/components/JsonCellEditor';
-import { ColumnSchema, ColumnType, TableSchema } from '@schemas/database.schema';
+import { ColumnSchema, ColumnType, TableSchema } from '@insforge/shared-schemas';
 import { mapDatabaseTypeToFieldType } from '@/lib/utils/utils';
 
 // Custom cell editors for database fields

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { columnSchema, foreignKeySchema } from '@schemas/database.schema';
+import { columnSchema, foreignKeySchema } from '@insforge/shared-schemas';
 
 // Foreign key schema
 export const tableFormForeignKeySchema = foreignKeySchema.extend({

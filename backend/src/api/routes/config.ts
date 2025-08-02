@@ -185,7 +185,7 @@ router.post('/oauth', verifyAdmin, async (req: Request, res: Response, next: Nex
           'Invalid OAuth configuration',
           400,
           ERROR_CODES.DATABASE_VALIDATION_ERROR,
-          error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')
+          error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')
         )
       );
     } else {

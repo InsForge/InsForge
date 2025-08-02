@@ -212,6 +212,9 @@ export class StorageService {
     } else {
       // Use local filesystem backend
       const baseDir = process.env.STORAGE_DIR || path.join(__dirname, '../../data/storage');
+      console.log('[StorageService] Storage directory:', baseDir);
+      console.log('[StorageService] __dirname:', __dirname);
+      console.log('[StorageService] Current working directory:', process.cwd());
       this.backend = new LocalStorageBackend(baseDir);
     }
   }

@@ -8,7 +8,7 @@ import { Calendar } from 'lucide-react';
 import { BooleanCellEditor } from './BooleanCellEditor';
 import { DateCellEditor } from './DateCellEditor';
 import { JsonCellEditor } from './JsonCellEditor';
-import { ColumnSchema, ColumnType } from '@schemas/database.schema';
+import { ColumnSchema, ColumnType } from '@insforge/shared-schemas';
 import { mapDatabaseTypeToFieldType } from '@/lib/utils/utils';
 
 // Form adapters for edit cell components

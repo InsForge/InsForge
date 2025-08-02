@@ -91,7 +91,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response) => {
     if (!validation.success) {
       return res.status(400).json({
         error: 'Invalid request',
-        details: validation.error.errors,
+        details: validation.error.issues,
       });
     }
 
@@ -189,7 +189,7 @@ router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => {
     if (!validation.success) {
       return res.status(400).json({
         error: 'Invalid request',
-        details: validation.error.errors,
+        details: validation.error.issues,
       });
     }
 

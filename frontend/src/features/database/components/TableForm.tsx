@@ -17,7 +17,7 @@ import { mapDatabaseTypeToFieldType } from '@/lib/utils/utils';
 import { useToast } from '@/lib/hooks/useToast';
 import { TableFormColumn } from './TableFormColumn';
 import { ForeignKeyPopover } from './ForeignKeyPopover';
-import { ColumnType, TableSchema } from '@schemas/database.schema';
+import { ColumnType, TableSchema } from '@insforge/shared-schemas';
 
 // System fields that cannot be modified
 const SYSTEM_FIELDS = ['id', 'created_at', 'updated_at'];

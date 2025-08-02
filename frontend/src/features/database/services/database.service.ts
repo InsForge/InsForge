@@ -1,5 +1,5 @@
 import { apiClient } from '@/lib/api/client';
-import { TableSchema, ColumnSchema } from '@schemas/database.schema';
+import { TableSchema, ColumnSchema } from '@insforge/shared-schemas';
 
 export class DatabaseService {
   // Table operations
