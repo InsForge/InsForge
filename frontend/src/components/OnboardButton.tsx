@@ -8,7 +8,7 @@ import {
   TooltipTrigger,
 } from '@/components/radix/Tooltip';
 import { CircularStepper } from '@/components/Stepper';
-import { useOnboardStep, STEP_DESCRIPTIONS } from '@/hooks/useOnboardStep';
+import { useOnboardStep, STEP_DESCRIPTIONS } from '@/lib/hooks/useOnboardStep';
 
 interface OnboardButtonProps {
   isCollapsed: boolean;
