@@ -56,25 +56,14 @@ export function useOnboardStep() {
 
     // Dispatch custom event for same-tab components
     window.dispatchEvent(new CustomEvent('onboard-step-change', { detail: step }));
-
-    // Also dispatch storage event for cross-tab communication
-    window.dispatchEvent(
-      new StorageEvent('storage', {
-        key: ONBOARD_STORAGE_KEY,
-        newValue: step.toString(),
-      })
-    );
   };
 
   const getCurrentDescription = () => STEP_DESCRIPTIONS[currentStep - 1];
-
-  // const isCompleted = currentStep === 4;
 
   return {
     currentStep,
     updateStep,
     getCurrentDescription,
-    // isCompleted,
     totalSteps: 4 as const,
   };
 }
@@ -86,13 +75,5 @@ export const updateOnboardStep = (step: OnboardStep) => {
 
     // Dispatch custom event for same-tab components
     window.dispatchEvent(new CustomEvent('onboard-step-change', { detail: step }));
-
-    // Also dispatch storage event for cross-tab communication
-    window.dispatchEvent(
-      new StorageEvent('storage', {
-        key: ONBOARD_STORAGE_KEY,
-        newValue: step.toString(),
-      })
-    );
   }
 };

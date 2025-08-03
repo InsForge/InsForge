@@ -71,7 +71,7 @@ interface LinearStepperProps {
   totalSteps: number;
   stepLabels: readonly string[];
   className?: string;
-  isCompleted?: boolean;
+  isCompleted: boolean;
 }
 
 export function LinearStepper({
@@ -79,9 +79,12 @@ export function LinearStepper({
   totalSteps,
   stepLabels,
   className,
+  isCompleted,
 }: LinearStepperProps) {
   // Calculate progress percentage
-  const progressPercentage = Math.min(((currentStep - 1) / totalSteps) * 100 + currentStep, 100);
+  const progressPercentage = isCompleted
+    ? 100
+    : Math.min(((currentStep - 1) / totalSteps) * 100 + currentStep, 100);
 
   return (
     <div className={cn('w-full space-y-3', className)}>
@@ -97,7 +100,6 @@ export function LinearStepper({
       <div className="flex justify-start items-center gap-6 w-full">
         {stepLabels.map((label, index) => {
           const stepNumber = index + 1;
-          const isCompleted = stepNumber < currentStep;
           const isCurrent = stepNumber === currentStep;
 
           return (
