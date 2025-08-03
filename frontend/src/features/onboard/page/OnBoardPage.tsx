@@ -1,12 +1,15 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/radix/Button';
-import { useOnboardStep, type OnboardStep, STEP_DESCRIPTIONS } from '@/hooks/useOnboardStep';
+import { useOnboardStep, type OnboardStep, STEP_DESCRIPTIONS } from '@/lib/hooks/useOnboardStep';
 import { LinearStepper } from '@/components/Stepper';
 import { StepContent } from '../components/StepContent';
+import { CompletionCard } from '../components/CompletionCard';
 
 export default function OnBoardPage() {
   const navigate = useNavigate();
   const { currentStep, updateStep, totalSteps } = useOnboardStep();
+  const [isCompleted, setIsCompleted] = useState(false);
 
   const handleDismiss = async () => {
     await navigate('/dashboard');
@@ -16,8 +19,7 @@ export default function OnBoardPage() {
     if (currentStep < totalSteps) {
       updateStep((currentStep + 1) as OnboardStep);
     } else if (currentStep === totalSteps) {
-      // Move to completion state (step 5)
-      updateStep(5 as OnboardStep);
+      setIsCompleted(true);
     }
   };
 
@@ -37,24 +39,19 @@ export default function OnBoardPage() {
             currentStep={currentStep}
             totalSteps={totalSteps}
             stepLabels={STEP_DESCRIPTIONS}
-            isCompleted={currentStep === totalSteps}
+            isCompleted={isCompleted}
           />
         </div>
 
         {/* Main Content Card */}
-        <div className="space-y-3">
-          <p className="text-black text-lg font-semibold">
-            {currentStep === totalSteps ? 'Setup Complete!' : STEP_DESCRIPTIONS[currentStep - 1]}
-          </p>
-          <StepContent
-            step={currentStep}
-            onNavigate={() => {
-              void navigate('/dashboard');
-            }}
-          />
+        {isCompleted ? (
+          <CompletionCard />
+        ) : (
+          <div className="space-y-3">
+            <p className="text-black text-lg font-semibold">{STEP_DESCRIPTIONS[currentStep - 1]}</p>
+            <StepContent step={currentStep} />
 
-          {/* Action Buttons */}
-          {currentStep <= totalSteps && (
+            {/* Action Buttons */}
             <div className="flex justify-between items-center">
               {/* Dismiss Button - Left */}
               <Button
@@ -81,8 +78,8 @@ export default function OnBoardPage() {
                 </Button>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
