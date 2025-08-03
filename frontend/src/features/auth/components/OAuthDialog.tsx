@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Copy, ExternalLink } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { Button } from '@/components/radix/Button';
 import { Input } from '@/components/radix/Input';
 import {
@@ -12,10 +12,10 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/radix/Dialog';
-import CheckedIcon from '@/assets/icons/checked.svg';
 import WarningIcon from '@/assets/icons/warning.svg';
 import { configService } from '@/features/auth/services/config.service';
 import { useToast } from '@/lib/hooks/useToast';
+import { CopyButton } from '@/components/CopyButton';
 
 const getCallbackUrl = () => {
   // Use backend API URL for OAuth callback
@@ -51,7 +51,6 @@ interface OAuthDialogProps {
 }
 
 export function OAuthDialog({ provider, isOpen, onClose, onSuccess }: OAuthDialogProps) {
-  const [isCopied, setIsCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,18 +103,6 @@ export function OAuthDialog({ provider, isOpen, onClose, onSuccess }: OAuthDialo
       void loadOAuthConfig();
     }
   }, [isOpen, provider, loadOAuthConfig]);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(getCallbackUrl());
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2000);
-      showToast('Callback URL copied to clipboard!', 'success');
-    } catch (error) {
-      console.error('Failed to copy to clipboard:', error);
-      showToast('Failed to copy to clipboard', 'error');
-    }
-  };
 
   const onSubmit = async (data: OAuthConfig) => {
     if (!provider) {
@@ -255,23 +242,11 @@ export function OAuthDialog({ provider, isOpen, onClose, onSuccess }: OAuthDialo
                       <code className="py-1 px-3 bg-blue-100 text-blue-800 font-mono break-all rounded-md text-sm">
                         {getCallbackUrl()}
                       </code>
-                      {isCopied ? (
-                        <div className="flex flex-row items-center px-3 w-fit h-8 rounded-md bg-transparent gap-1.5 transition-all duration-200">
-                          <img src={CheckedIcon} alt="Checked" className="h-4 w-4" />
-                          <span className="text-black font-medium text-sm">Copied</span>
-                        </div>
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="px-3 w-fit h-8 rounded-md bg-transparent border-border-gray hover:bg-[#EBEBEB] border shadow gap-1.5 transition-all duration-200"
-                          onClick={() => void handleCopy()}
-                        >
-                          <Copy className="h-4 w-4" />
-                          <span className="text-black font-medium text-sm">Copy</span>
-                        </Button>
-                      )}
+                      <CopyButton
+                        text={getCallbackUrl()}
+                        showToast={true}
+                        successMessage="Callback URL copied to clipboard!"
+                      />
                     </div>
                   </div>
 

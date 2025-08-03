@@ -20,6 +20,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/radix/Tooltip';
+import { OnboardButton } from '@/components/OnboardButton';
 
 interface AppSidebarProps {
   currentUser: any;

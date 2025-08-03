@@ -374,7 +374,7 @@ export default function DatabasePage() {
   const totalPages = Math.ceil((tableData?.totalRecords || 0) / pageSize);
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-[#f8f9fa]">
+    <div className="flex h-[calc(100vh-4rem)] bg-bg-gray">
       {/* Secondary Sidebar - Table List */}
       <TableSidebar
         tables={filteredTables}
@@ -412,7 +412,7 @@ export default function DatabasePage() {
           <>
             {/* Sticky Header Section */}
             {selectedTable && (
-              <div className="sticky top-0 z-30 bg-[#f8f9fa]">
+              <div className="sticky top-0 z-30 bg-bg-gray">
                 <div className="px-6 py-3 border-b border-border-gray h-12">
                   {/* Page Header with Breadcrumb */}
                   <div className="flex items-center justify-between">

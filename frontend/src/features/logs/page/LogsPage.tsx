@@ -49,10 +49,10 @@ export default function LogsPage() {
   }, [searchQuery]);
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-[#f8f9fa]">
+    <div className="flex h-[calc(100vh-4rem)] bg-bg-gray">
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         {/* Sticky Header Section */}
-        <div className="sticky top-0 z-30 bg-[#f8f9fa]">
+        <div className="sticky top-0 z-30 bg-bg-gray">
           <div className="px-8 pt-6 pb-4">
             {/* Page Header */}
             <div className="flex items-center justify-between">
