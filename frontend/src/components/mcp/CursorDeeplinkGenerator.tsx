@@ -1,9 +1,11 @@
 import { useMemo } from 'react';
+import CursorLogoIcon from '@/assets/icons/cursor_logo.svg';
+import { createMCPServerConfig, type PlatformType } from '@/config/mcp-agents';
 
 interface CursorDeeplinkGeneratorProps {
   apiKey?: string;
   apiBaseUrl?: string;
-  os?: 'windows' | 'macos-linux';
+  os?: PlatformType;
 }
 
 export function CursorDeeplinkGenerator({
@@ -12,24 +14,7 @@ export function CursorDeeplinkGenerator({
   os = 'macos-linux',
 }: CursorDeeplinkGeneratorProps) {
   const deeplink = useMemo(() => {
-    const env = {
-      API_KEY: apiKey || 'your-api-key-here',
-      API_BASE_URL: apiBaseUrl,
-    };
-
-    const config =
-      os === 'windows'
-        ? {
-            command: 'cmd',
-            args: ['/c', 'npx', '-y', '@insforge/insforge-mcp@latest'],
-            env,
-          }
-        : {
-            command: 'npx',
-            args: ['-y', '@insforge/insforge-mcp@latest'],
-            env,
-          };
-
+    const config = createMCPServerConfig(apiKey || '', os, apiBaseUrl);
     const configString = JSON.stringify(config);
     const base64Config = btoa(configString);
     return `cursor://anysphere.cursor-deeplink/mcp/install?name=insforge&config=${encodeURIComponent(base64Config)}`;
@@ -42,14 +27,10 @@ export function CursorDeeplinkGenerator({
   return (
     <button
       onClick={handleOpenInCursor}
-      className="inline-block"
-      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+      className="bg-black py-2 px-4 flex items-center justify-center gap-2.5 rounded-md text-white text-sm font-medium"
     >
-      <img
-        src="https://cursor.com/deeplink/mcp-install-dark.svg"
-        alt="Add to Cursor"
-        style={{ height: '28px' }}
-      />
+      <img src={CursorLogoIcon} alt="Add to Cursor" className="h-6 w-6" />
+      <span>Add to Cursor</span>
     </button>
   );
 }

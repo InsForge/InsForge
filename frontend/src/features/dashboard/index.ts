@@ -1,2 +1,2 @@
 // Components
-export { CursorDeeplinkGenerator } from './components/CursorDeeplinkGenerator';
+export { CursorDeeplinkGenerator } from '@/components/mcp/CursorDeeplinkGenerator';

@@ -11,6 +11,7 @@ import AuthenticationPage from './features/auth/page/AuthenticationPage';
 import LogsPage from './features/logs/page/LogsPage';
 import StoragePage from './features/storage/page/StoragePage';
 import MetadataPage from './features/metadata/page/MetadataPage';
+import OnBoardPage from './features/onboard/page/OnBoardPage';
 import Layout from './components/layout/Layout';
 
 const queryClient = new QueryClient({
@@ -54,6 +55,7 @@ function AppRoutes() {
                 <Route path="/dashboard/storage" element={<StoragePage />} />
                 <Route path="/dashboard/logs" element={<LogsPage />} />
                 <Route path="/dashboard/metadata" element={<MetadataPage />} />
+                <Route path="/onboard" element={<OnBoardPage />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </Layout>

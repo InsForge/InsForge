@@ -35,3 +35,7 @@ export { Checkbox } from './Checkbox';
 // Data Grid Components
 export { DataGrid, DefaultCellRenderers, SortableHeaderRenderer } from './DataGrid';
 export type { DataGridColumn, DataGridProps } from './DataGrid';
+
+// MCP Components
+export { MCPInstaller, CursorDeeplinkGenerator } from './mcp';
+export type { MCPAgent, PlatformType } from './mcp';

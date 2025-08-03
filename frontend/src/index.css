@@ -200,6 +200,10 @@
 @theme {
   --color-border-gray: #e4e4e7;
   --color-chart-blue-dark: #2c7fff;
+  --color-text-gray: #a1a1a1;
+  --color-bg-gray: #f8f9fa;
+  --color-link-blue: #2c7fff;
+  --color-bg-gray-hover: #ebebeb;
 }
 
 /* Allow natural scrolling behavior */

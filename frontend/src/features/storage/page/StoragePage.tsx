@@ -276,7 +276,7 @@ export default function StoragePage() {
   const error = bucketsError;
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-[#f8f9fa]">
+    <div className="flex h-[calc(100vh-4rem)] bg-bg-gray">
       {/* Secondary Sidebar - Bucket List */}
       <StorageSidebar
         buckets={bucketInfo}
@@ -300,7 +300,7 @@ export default function StoragePage() {
         {selectedBucket && (
           <>
             {/* Sticky Header Section */}
-            <div className="sticky top-0 z-30 bg-[#f8f9fa]">
+            <div className="sticky top-0 z-30 bg-bg-gray">
               <div className="px-6 py-3 border-b border-border-gray h-12">
                 {/* Page Header with Breadcrumb */}
                 <div className="flex items-center justify-between">

@@ -23,6 +23,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/radix/Tooltip';
+import { OnboardButton } from '@/components/OnboardButton';
 
 interface AppSidebarProps {
   currentUser: any;
@@ -200,16 +201,27 @@ export default function AppSidebar({
         )}
       >
         {/* Navigation */}
+        <div className={`hidden lg:block py-3 ${isCollapsed ? 'px-1' : 'px-3'}`}>
+          {/* Onboard Button - Desktop */}
+          <div className="hidden lg:block">
+            <OnboardButton isCollapsed={isCollapsed} />
+          </div>
+
+          {/* Onboard Button - Mobile */}
+          <div className="lg:hidden">
+            <OnboardButton isCollapsed={false} onMobileToggle={onMobileToggle} isMobile={true} />
+          </div>
+        </div>
         <ScrollArea className="flex-1 px-3 lg:px-3 py-4">
           <nav className="space-y-2">
-            {/* Desktop navigation */}
+            {/* Regular Navigation - Desktop */}
             {navigation.map((item) => (
               <div key={item.name}>
                 <NavItem item={item} />
               </div>
             ))}
 
-            {/* Mobile navigation */}
+            {/* Regular Navigation - Mobile */}
             {navigation.map((item) => (
               <div key={`mobile-${item.name}`} className="lg:hidden">
                 <MobileNavItem item={item} />
