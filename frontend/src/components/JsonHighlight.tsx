@@ -36,10 +36,19 @@ export function JsonHighlight({ json }: JsonHighlightProps) {
         }
       }
 
-      // Punctuation
-      if (/^[:,{}[\]]$/.test(token)) {
+      // Numbers
+      if (/^-?\d+(\.\d+)?$/.test(token)) {
         return (
-          <span key={index} className="text-gray-600">
+          <span key={index} className="text-purple-600">
+            {token}
+          </span>
+        );
+      }
+
+      // Booleans and null
+      if (['true', 'false', 'null'].includes(token)) {
+        return (
+          <span key={index} className="text-orange-600">
             {token}
           </span>
         );
