@@ -30,7 +30,7 @@ export const TableFormColumn = memo(function TableFormColumn({
       }`}
     >
       {/* Name */}
-      <div className="w-[280px]">
+      <div className="flex-1 min-w-[175px]">
         <div className="relative flex items-center">
           <Controller
             control={control}
@@ -39,7 +39,7 @@ export const TableFormColumn = memo(function TableFormColumn({
               <Input
                 {...field}
                 placeholder="Enter column name"
-                className={`h-10 rounded-md border-zinc-200 text-sm font-normal ${
+                className={`w-full h-10 rounded-md border-zinc-200 text-sm font-normal ${
                   isSystemColumn ? 'bg-zinc-100 text-zinc-950' : 'bg-white text-zinc-950 shadow-sm'
                 }`}
                 disabled={isSystemColumn}
@@ -54,19 +54,19 @@ export const TableFormColumn = memo(function TableFormColumn({
       </div>
 
       {/* Type */}
-      <div className="w-[200px]">
+      <div className="flex-1 min-w-[175px]">
         <ColumnTypeSelect
           control={control}
           name={`columns.${index}.type`}
           disabled={!isNewColumn}
-          className={`h-10 rounded-md border-zinc-200 text-sm font-normal ${
+          className={`w-full h-10 rounded-md border-zinc-200 text-sm font-normal ${
             isSystemColumn ? 'bg-zinc-100' : 'bg-white shadow-sm'
           }`}
         />
       </div>
 
       {/* Default Value */}
-      <div className="w-[200px]">
+      <div className="flex-1 min-w-[175px]">
         <Controller
           control={control}
           name={`columns.${index}.default_value`}
@@ -74,7 +74,7 @@ export const TableFormColumn = memo(function TableFormColumn({
             <Input
               {...field}
               placeholder="Enter default value"
-              className={`h-10 rounded-md border-zinc-200 text-sm font-normal placeholder:text-zinc-500 ${
+              className={`w-full h-10 rounded-md border-zinc-200 text-sm font-normal placeholder:text-zinc-500 ${
                 isSystemColumn ? 'bg-zinc-100' : 'bg-white shadow-sm'
               }`}
               disabled={isSystemColumn}
@@ -84,7 +84,7 @@ export const TableFormColumn = memo(function TableFormColumn({
       </div>
 
       {/* Nullable */}
-      <div className="flex-1 flex justify-center">
+      <div className="w-18 2xl:w-25 flex justify-center flex-shrink-0">
         <Controller
           control={control}
           name={`columns.${index}.nullable`}
@@ -100,7 +100,7 @@ export const TableFormColumn = memo(function TableFormColumn({
       </div>
 
       {/* Unique */}
-      <div className="flex-1 flex justify-center">
+      <div className="w-18 2xl:w-25 flex justify-center flex-shrink-0">
         <Controller
           control={control}
           name={`columns.${index}.is_unique`}
@@ -116,7 +116,7 @@ export const TableFormColumn = memo(function TableFormColumn({
       </div>
 
       {/* Delete */}
-      <div className="w-5 h-5">
+      <div className="w-5 h-5 flex-shrink-0">
         {!isSystemColumn && (
           <button
             type="button"

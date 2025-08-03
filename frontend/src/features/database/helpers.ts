@@ -1,4 +1,4 @@
-import { ColumnSchema } from '@schemas/database.schema';
+import { ColumnSchema } from '@insforge/shared-schemas';
 import { z } from 'zod';
 
 // Helper function to check if a field should be auto-generated

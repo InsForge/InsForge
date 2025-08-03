@@ -11,3 +11,4 @@ coverage/
 CLAUDE.md
 .claude/
 deno.lock
+better-auth/

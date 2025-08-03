@@ -18,9 +18,9 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@schemas/*": ["../schemas/*"]
+      "@insforge/shared-schemas": ["../shared-schemas/src/index.ts"],
     }
   },
-  "include": ["src", "src/vite-env.d.ts", "../schemas"],
+  "include": ["src", "src/vite-env.d.ts", "../shared-schemas"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

@@ -1,5 +1,5 @@
 import { Type, Calendar, Hash, Percent, ToggleLeft, Fingerprint, Code } from 'lucide-react';
-import { ColumnType } from '@schemas/database.schema';
+import { ColumnType } from '@insforge/shared-schemas';
 
 // Icon mapping for field types
 export const columnTypeIcons: Record<ColumnType, React.ComponentType<{ className?: string }>> = {

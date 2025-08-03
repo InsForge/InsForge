@@ -8,7 +8,7 @@ import {
 import { BooleanCellEditor } from '@/features/database/components/BooleanCellEditor';
 import { DateCellEditor } from '@/features/database/components/DateCellEditor';
 import { JsonCellEditor } from '@/features/database/components/JsonCellEditor';
-import { ColumnSchema, ColumnType, TableSchema } from '@schemas/database.schema';
+import { ColumnSchema, ColumnType, TableSchema } from '@insforge/shared-schemas';
 import { mapDatabaseTypeToFieldType } from '@/lib/utils/utils';
 
 // Custom cell editors for database fields
@@ -176,14 +176,14 @@ export function convertSchemaToColumns(
     const isEditable =
       !col.primary_key &&
       [
-        'uuid',
-        'text',
-        'integer',
-        'double precision',
-        'boolean',
-        'timestamp with time zone',
-        'jsonb',
-      ].includes(col.type);
+        ColumnType.UUID,
+        ColumnType.STRING,
+        ColumnType.INTEGER,
+        ColumnType.FLOAT,
+        ColumnType.BOOLEAN,
+        ColumnType.DATETIME,
+        ColumnType.JSON,
+      ].includes(colType);
     const isSortable = !['jsonb', 'json'].includes(col.type?.toLowerCase());
 
     const column: DataGridColumn = {

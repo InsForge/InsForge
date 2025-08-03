@@ -1,4 +1,4 @@
-import { ColumnType } from '@schemas/database.schema';
+import { ColumnType } from '@insforge/shared-schemas';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 

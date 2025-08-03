@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils/utils';
+import { cn, mapDatabaseTypeToFieldType } from '@/lib/utils/utils';
 
 interface TypeBadgeProps {
   type: string;
@@ -6,34 +6,6 @@ interface TypeBadgeProps {
 }
 
 export function TypeBadge({ type, className }: TypeBadgeProps) {
-  const getDisplayType = (type: string) => {
-    const lowerType = type.toLowerCase();
-
-    if (lowerType.includes('int')) {
-      return 'Int';
-    }
-    if (lowerType.includes('string') || lowerType.includes('text')) {
-      return 'String';
-    }
-    if (lowerType.includes('date') || lowerType.includes('time')) {
-      return 'Date';
-    }
-    if (lowerType.includes('bool')) {
-      return 'Boolean';
-    }
-    if (lowerType.includes('json')) {
-      return 'JSON';
-    }
-    if (lowerType.includes('uuid')) {
-      return 'UUID';
-    }
-    if (lowerType.includes('real') || lowerType.includes('float')) {
-      return 'Float';
-    }
-
-    return type;
-  };
-
   return (
     <div
       className={cn(
@@ -42,7 +14,7 @@ export function TypeBadge({ type, className }: TypeBadgeProps) {
         className
       )}
     >
-      <span className="text-xs font-normal text-zinc-500">{getDisplayType(type)}</span>
+      <span className="text-xs font-normal text-zinc-500">{mapDatabaseTypeToFieldType(type)}</span>
     </div>
   );
 }

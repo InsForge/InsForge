@@ -4,13 +4,17 @@ services:
   postgres:
     image: postgres:15.13
     container_name: insforge-postgres
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_DB=${POSTGRES_DB:-insforge}
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./docker-init/db-init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./docker-init/db/db-init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./docker-init/db/jwt.sql:/docker-entrypoint-initdb.d/02-jwt.sql
+      - ./docker-init/db/logs.sql:/docker-entrypoint-initdb.d/03-logs.sql
+      - ./docker-init/db/postgresql.conf:/etc/postgresql/postgresql.conf
     ports:
       - "5432:5432"
     networks:
@@ -32,7 +36,7 @@ services:
       PGRST_DB_URI: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
       PGRST_OPENAPI_SERVER_PROXY_URI: http://localhost:3000
       PGRST_DB_SCHEMA: public
-      PGRST_DB_ANON_ROLE: web_anon
+      PGRST_DB_ANON_ROLE: anon
       PGRST_JWT_SECRET: ${JWT_SECRET}
     ports:
       - "5430:3000"
@@ -80,18 +84,19 @@ services:
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
       - APP_KEY=${APP_KEY:-}
+      # Better Auth Migration
+      - ENABLE_BETTER_AUTH=${ENABLE_BETTER_AUTH:-false}
     volumes:
       - ./package.json:/app/package.json
-      - ./package-lock.json:/app/package-lock.json
-      - ./src:/app/src
+      - ./backend:/app/backend
       - ./frontend:/app/frontend
-      - ./schemas:/app/schemas
+      - ./shared-schemas:/app/shared-schemas
       - ./docs:/app/docs
-      - ./tsconfig.json:/app/tsconfig.json
-      - ./vitest.config.ts:/app/vitest.config.ts
       - node_modules:/app/node_modules
+      - backend_node_modules:/app/backend/node_modules
       - frontend_node_modules:/app/frontend/node_modules
-    command: sh -c "npm install && cd frontend && npm install && cd .. && npm run dev"
+      - shared_schemas_node_modules:/app/shared-schemas/node_modules
+    command: sh -c "npm install && npm run dev"
     restart: unless-stopped
     networks:
       - insforge-network
@@ -130,12 +135,107 @@ services:
     networks:
       - insforge-network
 
+  analytics:
+    container_name: insforge-analytics
+    image: supabase/logflare:1.14.2
+    restart: unless-stopped
+    ports:
+      - 4000:4000
+    # Uncomment to use Big Query backend for analytics
+    # volumes:
+    #   - type: bind
+    #     source: ${PWD}/gcloud.json
+    #     target: /opt/app/rel/logflare/bin/gcloud.json
+    #     read_only: true
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "http://localhost:4000/health"
+        ]
+      timeout: 10s
+      interval: 10s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      postgres:
+        # Disable this if you are using an external Postgres database
+        condition: service_healthy
+    environment:
+      # Basic Logflare configuration
+      LOGFLARE_NODE_HOST: 127.0.0.1
+      PHX_HTTP_PORT: 4000
+      LOGFLARE_LOG_LEVEL: warn
+      # Database connection  
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_DATABASE: _insforge
+      DB_HOSTNAME: postgres
+      DB_PORT: ${POSTGRES_PORT:-5432}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_SCHEMA: _analytics
+      # Access tokens
+      LOGFLARE_PUBLIC_ACCESS_TOKEN: ${LOGFLARE_PUBLIC_ACCESS_TOKEN}
+      LOGFLARE_PRIVATE_ACCESS_TOKEN: ${LOGFLARE_PRIVATE_ACCESS_TOKEN}
+      # Mode settings
+      LOGFLARE_SINGLE_TENANT: true
+      LOGFLARE_SUPABASE_MODE: true
+      LOGFLARE_MIN_CLUSTER_SIZE: 1
+      # Use postgres backend
+      POSTGRES_BACKEND_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:${POSTGRES_PORT:-5432}/_insforge
+      POSTGRES_BACKEND_SCHEMA: _analytics
+      LOGFLARE_FEATURE_FLAG_OVERRIDE: multibackend=true
+      # Uncomment to use Big Query backend for analytics
+      # GOOGLE_PROJECT_ID: ${GOOGLE_PROJECT_ID}
+      # GOOGLE_PROJECT_NUMBER: ${GOOGLE_PROJECT_NUMBER}
+    networks:
+      - insforge-network
+
+  vector:
+    container_name: insforge-vector
+    image: timberio/vector:0.28.1-alpine
+    restart: unless-stopped
+    volumes:
+      - ./docker-init/logs/vector.yml:/etc/vector/vector.yml:ro,z
+      - ${DOCKER_SOCKET_LOCATION}:/var/run/docker.sock:ro,z
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://vector:7135/health"
+        ]
+      timeout: 5s
+      interval: 5s
+      retries: 3
+    depends_on:
+      analytics:
+        condition: service_healthy
+    environment:
+      LOGFLARE_PUBLIC_ACCESS_TOKEN: ${LOGFLARE_PUBLIC_ACCESS_TOKEN}
+    command:
+      [
+        "--config",
+        "/etc/vector/vector.yml"
+      ]
+    security_opt:
+      - "label=disable"
+    networks:
+      - insforge-network
+
 volumes:
   postgres-data:
     driver: local
   node_modules:
     driver: local
+  backend_node_modules:
+    driver: local
   frontend_node_modules:
+    driver: local
+  shared_schemas_node_modules:
     driver: local
   deno_cache:
     driver: local

@@ -1,0 +1,180 @@
+api:
+  enabled: true
+  address: 0.0.0.0:7135
+
+sources:
+  docker_host:
+    type: docker_logs
+    exclude_containers:
+      - insforge-vector
+      - insforge-analytics
+    include_containers:
+      - insforge
+      - insforge-deno
+      - insforge-postgrest
+      - insforge-postgres
+
+transforms:
+  project_logs:
+    type: remap
+    inputs:
+      - docker_host
+    source: |-
+      .project = "default"
+      .event_message = del(.message)
+      .appname = del(.container_name)
+      del(.container_created_at)
+      del(.container_id)
+      del(.source_type)
+      del(.stream)
+      del(.label)
+      del(.image)
+      del(.host)
+      del(.stream)
+  router:
+    type: route
+    inputs:
+      - project_logs
+    route:
+      insforge: '.appname == "insforge"'
+      deno: '.appname == "insforge-deno"'
+      rest: '.appname == "insforge-postgrest"'
+      db: '.appname == "insforge-postgres"'
+      realtime: '.appname == "insforge-realtime"'
+  # PostgREST logs are structured so we separate timestamp from message using regex
+  rest_logs:
+    type: remap
+    inputs:
+      - router.rest
+    source: |-
+      parsed, err = parse_regex(.event_message, r'^(?P<time>.*): (?P<msg>.*)$')
+      if err == null {
+          .event_message = parsed.msg
+          .timestamp = to_timestamp!(parsed.time)
+          .metadata.host = .project
+      }
+  # InsForge logs are structured so we parse the severity level using regex (ignore time because it has no date)
+  insforge_logs:
+    type: remap
+    inputs:
+      - router.insforge
+    source: |-
+      .metadata.project = del(.project)
+      .metadata.external_id = .metadata.project
+      parsed, err = parse_regex(.event_message, r'^(?P<time>\d+:\d+:\d+\.\d+) \[(?P<level>\w+)\] (?P<msg>.*)$')
+      if err == null {
+          .event_message = parsed.msg
+          .metadata.level = parsed.level
+      }
+  realtime_logs:
+    type: remap
+    inputs:
+      - router.realtime
+    source: |-
+      .metadata.project = del(.project)
+      .metadata.external_id = .metadata.project
+      parsed, err = parse_regex(.event_message, r'^(?P<time>\d+:\d+:\d+\.\d+) \[(?P<level>\w+)\] (?P<msg>.*)$')
+      if err == null {
+          .event_message = parsed.msg
+          .metadata.level = parsed.level
+      }
+  deno_logs:
+    type: remap
+    inputs:
+      - router.deno
+    source: |-
+      parsed, err = parse_regex(.event_message, r'^(?P<time>.*): (?P<msg>.*)$')
+      if err == null {
+          .event_message = parsed.msg
+          .timestamp = to_timestamp!(parsed.time)
+          .metadata.host = .project
+      }
+  # Postgres logs some messages to stderr which we map to warning severity level
+  db_logs:
+    type: remap
+    inputs:
+      - router.db
+    source: |-
+      .metadata.host = "db-default"
+      .metadata.parsed.timestamp = .timestamp
+
+      parsed, err = parse_regex(.event_message, r'.*(?P<level>INFO|NOTICE|WARNING|ERROR|LOG|FATAL|PANIC?):.*', numeric_groups: true)
+
+      if err != null || parsed == null {
+        .metadata.parsed.error_severity = "info"
+      }
+      if parsed != null {
+       .metadata.parsed.error_severity = parsed.level
+      }
+      if .metadata.parsed.error_severity == "info" {
+          .metadata.parsed.error_severity = "log"
+      }
+      
+      # Safely handle null values before upcase
+      if .metadata.parsed.error_severity != null {
+          .metadata.parsed.error_severity = upcase!(.metadata.parsed.error_severity)
+      } else {
+          .metadata.parsed.error_severity = "LOG"
+      }
+
+sinks:
+  logflare_insforge:
+    type: 'http'
+    inputs:
+      - insforge_logs
+    encoding:
+      codec: 'json'
+    method: 'post'
+    request:
+      retry_max_duration_secs: 10
+      headers:
+        x-api-key: ${LOGFLARE_PUBLIC_ACCESS_TOKEN?LOGFLARE_PUBLIC_ACCESS_TOKEN is required}
+    uri: 'http://insforge-analytics:4000/api/logs?source_name=cloudflare.logs.prod'
+  logflare_deno:
+    type: 'http'
+    inputs:
+      - deno_logs
+    encoding:
+      codec: 'json'
+    method: 'post'
+    request:
+      retry_max_duration_secs: 10
+      headers:
+        x-api-key: ${LOGFLARE_PUBLIC_ACCESS_TOKEN?LOGFLARE_PUBLIC_ACCESS_TOKEN is required}
+    uri: 'http://insforge-analytics:4000/api/logs?source_name=deno-relay-logs'
+  logflare_realtime:
+    type: 'http'
+    inputs:
+      - realtime_logs
+    encoding:
+      codec: 'json'
+    method: 'post'
+    request:
+      retry_max_duration_secs: 10
+      headers:
+        x-api-key: ${LOGFLARE_PUBLIC_ACCESS_TOKEN?LOGFLARE_PUBLIC_ACCESS_TOKEN is required}
+    uri: 'http://insforge-analytics:4000/api/logs?source_name=realtime.logs.prod'
+  logflare_rest:
+    type: 'http'
+    inputs:
+      - rest_logs
+    encoding:
+      codec: 'json'
+    method: 'post'
+    request:
+      retry_max_duration_secs: 10
+      headers:
+        x-api-key: ${LOGFLARE_PUBLIC_ACCESS_TOKEN?LOGFLARE_PUBLIC_ACCESS_TOKEN is required}
+    uri: 'http://insforge-analytics:4000/api/logs?source_name=postgREST.logs.prod'
+  logflare_db:
+    type: 'http'
+    inputs:
+      - db_logs
+    encoding:
+      codec: 'json'
+    method: 'post'
+    request:
+      retry_max_duration_secs: 10
+      headers:
+        x-api-key: ${LOGFLARE_PUBLIC_ACCESS_TOKEN?LOGFLARE_PUBLIC_ACCESS_TOKEN is required}
+    uri: 'http://insforge-analytics:4000/api/logs?source_name=postgres.logs'
