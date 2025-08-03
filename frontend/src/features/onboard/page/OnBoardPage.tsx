@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/radix/Button';
 import { useOnboardStep, type OnboardStep, STEP_DESCRIPTIONS } from '@/lib/hooks/useOnboardStep';
 import { LinearStepper } from '@/components/Stepper';
@@ -8,8 +8,19 @@ import { CompletionCard } from '../components/CompletionCard';
 
 export default function OnBoardPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { currentStep, updateStep, totalSteps } = useOnboardStep();
   const [isCompleted, setIsCompleted] = useState(false);
+
+  // Handle reinstall with step parameter
+  useEffect(() => {
+    const stepParam = searchParams.get('step');
+    if (stepParam === '1') {
+      updateStep(1);
+      setIsCompleted(false);
+      setSearchParams({});
+    }
+  }, [searchParams, setSearchParams, updateStep]);
 
   const handleDismiss = async () => {
     await navigate('/dashboard');
