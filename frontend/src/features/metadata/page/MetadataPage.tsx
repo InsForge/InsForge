@@ -29,7 +29,7 @@ export default function MetadataPage() {
 
   if (error) {
     return (
-      <main className="min-h-screen bg-[#f8f9fa]">
+      <main className="min-h-screen bg-bg-gray">
         <div className="px-8 pt-6 pb-4">
           <div className="flex items-center">
             <nav className="flex items-center text-[22px] font-semibold">
@@ -53,9 +53,9 @@ export default function MetadataPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f8f9fa]">
+    <main className="min-h-screen bg-bg-gray">
       {/* Header */}
-      <div className="sticky top-0 z-30 bg-[#f8f9fa] border-b border-gray-200">
+      <div className="sticky top-0 z-30 bg-bg-gray border-b border-gray-200">
         <div className="px-8 pt-6 pb-4">
           <div className="flex items-center">
             <nav className="flex items-center text-[22px] font-semibold">
@@ -121,7 +121,7 @@ export default function MetadataPage() {
 
 function MetadataSkeleton() {
   return (
-    <main className="min-h-screen bg-[#f8f9fa]">
+    <main className="min-h-screen bg-bg-gray">
       <div className="px-8 pt-6 pb-4">
         <div className="flex items-center">
           <nav className="flex items-center text-[22px] font-semibold">
