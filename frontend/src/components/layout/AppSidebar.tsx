@@ -10,6 +10,7 @@ import {
   PanelRightOpen,
   BookOpen,
   ExternalLink,
+  Rocket,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/utils';
 import { Button } from '@/components/radix/Button';
@@ -21,6 +22,7 @@ import {
   TooltipTrigger,
 } from '@/components/radix/Tooltip';
 import { OnboardButton } from '@/components/OnboardButton';
+import { useOnboardingCompletion } from '@/lib/hooks/useOnboardingCompletion';
 
 interface AppSidebarProps {
   currentUser: any;
@@ -61,9 +63,26 @@ export default function AppSidebar({
   onToggleCollapse,
 }: AppSidebarProps) {
   const location = useLocation();
+  const { isCompleted } = useOnboardingCompletion();
+
+  // Add reinstall navigation item when onboarding is completed
+  const dynamicNavigation = isCompleted
+    ? [
+        ...navigation,
+        {
+          name: 'Reinstall',
+          href: '/onboard?step=1',
+          icon: Rocket,
+        },
+      ]
+    : navigation;
 
   const NavItem = ({ item, onClick }: { item: NavigationProps; onClick?: () => void }) => {
-    const isActive = location.pathname === item.href;
+    // Special handling for Reinstall button: only compare pathname, ignore search params
+    const isActive =
+      item.name === 'Reinstall'
+        ? location.pathname === '/onboard'
+        : location.pathname === item.href;
 
     const buttonContent = (
       <Button
@@ -133,15 +152,17 @@ export default function AppSidebar({
         isCollapsed ? 'w-[72px]' : 'w-[240px]'
       )}
     >
-      <div className={`py-3 ${isCollapsed ? 'px-1' : 'px-3'}`}>
-        <div className="hidden lg:block">
-          <OnboardButton isCollapsed={isCollapsed} />
+      {!isCompleted && (
+        <div className={`py-3 ${isCollapsed ? 'px-1' : 'px-3'}`}>
+          <div className="hidden lg:block">
+            <OnboardButton isCollapsed={isCollapsed} />
+          </div>
         </div>
-      </div>
+      )}
       {/* Navigation */}
       <ScrollArea className="flex-1 px-3 py-4">
         <nav className="space-y-2">
-          {navigation.map((item) => (
+          {dynamicNavigation.map((item) => (
             <div key={item.name}>
               <NavItem item={item} />
             </div>

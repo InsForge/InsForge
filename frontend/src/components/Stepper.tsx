@@ -100,13 +100,14 @@ export function LinearStepper({
       <div className="flex justify-start items-center gap-6 w-full">
         {stepLabels.map((label, index) => {
           const stepNumber = index + 1;
+          const stepIsCompleted = stepNumber < currentStep || isCompleted;
           const isCurrent = stepNumber === currentStep;
 
           return (
             <div key={stepNumber} className="flex flex-row items-start justify-start gap-1 w-full">
               {/* Step Number */}
               <div className="w-5 h-5 flex items-center justify-center">
-                {isCompleted ? (
+                {stepIsCompleted ? (
                   <img src={CheckedIcon} alt="checked" className="w-5 h-5" />
                 ) : isCurrent ? (
                   <img src={activeStep} alt="active" className="w-5 h-5" />
@@ -119,7 +120,7 @@ export function LinearStepper({
               <span
                 className={cn(
                   'text-sm text-center transition-colors duration-300',
-                  isCompleted || isCurrent ? 'text-zinc-950' : 'text-zinc-500'
+                  stepIsCompleted || isCurrent ? 'text-zinc-950' : 'text-zinc-500'
                 )}
               >
                 {label}

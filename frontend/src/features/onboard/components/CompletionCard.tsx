@@ -1,9 +1,17 @@
 import { Button } from '@/components/radix/Button';
 import CheckedIcon from '@/assets/icons/checked.svg';
 import { useNavigate } from 'react-router-dom';
+import { useOnboardingCompletion } from '@/lib/hooks/useOnboardingCompletion';
+import { useEffect } from 'react';
 
 export function CompletionCard() {
   const navigate = useNavigate();
+  const { markAsCompleted } = useOnboardingCompletion();
+
+  // Mark as completed when this component is mounted
+  useEffect(() => {
+    markAsCompleted();
+  }, [markAsCompleted]);
 
   const handleNavigate = () => {
     navigate('/dashboard');
