@@ -10,7 +10,7 @@ import {
   PanelRightOpen,
   BookOpen,
   ExternalLink,
-  Rocket,
+  RotateCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/utils';
 import { Button } from '@/components/radix/Button';
@@ -73,7 +73,7 @@ export default function AppSidebar({
         {
           name: 'Reinstall',
           href: '/onboard?step=1',
-          icon: Rocket,
+          icon: RotateCw,
         },
       ]
     : navigation;
