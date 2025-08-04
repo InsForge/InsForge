@@ -3,13 +3,12 @@ import { CopyButton } from './CopyButton';
 
 interface CodeBlockProps {
   code: string;
-  language?: string;
   className?: string;
   showCopy?: boolean;
   onCopy?: (code: string) => void;
 }
 
-export function CodeBlock({ code, language, className, showCopy = true, onCopy }: CodeBlockProps) {
+export function CodeBlock({ code, className, showCopy = true, onCopy }: CodeBlockProps) {
   return (
     <div
       className={cn(
