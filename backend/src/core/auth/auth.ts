@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { OAuth2Client } from 'google-auth-library';
 import axios from 'axios';
+import { jwtVerify, createRemoteJWKSet } from 'jose';
 import {
   DatabaseManager,
   Auth,
@@ -63,6 +64,7 @@ export class AuthService {
   private oauthConfig: OAuthConfig | null = null;
   private configLoadTime: number = 0;
   private CONFIG_CACHE_TTL = 60000; // 1 minute cache
+  private betterAuthJWKS: ReturnType<typeof createRemoteJWKSet> | null = null;
 
   private constructor() {
     // Log environment variables only once during initialization
@@ -223,6 +225,56 @@ export class AuthService {
 
   verifyToken(token: string): TokenPayload {
     return jwt.verify(token, JWT_SECRET) as TokenPayload;
+  }
+
+  /**
+   * Verify Better Auth user session token by:
+   * 1. Exchange session token for JWT via /api/auth/v2/token
+   * 2. Verify JWT signature using JWKS
+   * 3. Return validated payload
+   */
+  async verifyBetterAuthUserSessionToken(sessionToken: string): Promise<TokenPayload> {
+    try {
+      // 1. Exchange session token for JWT
+      const baseURL = process.env.API_BASE_URL;
+      if (!baseURL) {
+        throw new Error('API_BASE_URL environment variable is not set');
+      }
+      const tokenResponse = await axios.get('/api/auth/v2/token', {
+        headers: {
+          Authorization: `Bearer ${sessionToken}`,
+        },
+        baseURL,
+      });
+
+      if (!tokenResponse.data || !tokenResponse.data.token) {
+        throw new Error('Failed to get JWT from Better Auth');
+      }
+
+      const jwtToken = tokenResponse.data.token;
+
+      // 2. Get JWKS for verification (cached)
+      if (!this.betterAuthJWKS) {
+        const jwksUrl = new URL(`${baseURL}/api/auth/v2/jwks`);
+        this.betterAuthJWKS = createRemoteJWKSet(jwksUrl);
+      }
+
+      // 3. Verify JWT signature (supports EdDSA)
+      const { payload } = await jwtVerify(jwtToken, this.betterAuthJWKS);
+
+      // 4. Convert to TokenPayload format
+      return {
+        sub: payload.sub as string,
+        email: payload.email as string,
+        type: (payload.type as 'user' | 'admin') || 'user',
+        role: payload.role as string,
+      };
+    } catch (error) {
+      logger.error('Better Auth token verification failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new Error('Invalid Better Auth token');
+    }
   }
 
   generateApiKey(): string {

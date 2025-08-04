@@ -2,8 +2,9 @@
 
 ## Overview
 
-Insforge uses JWT tokens for user authentication and API keys for database access. 
-**Note** Store JWT access tokens in local storage after successful login/register for persistent authentication.
+Insforge uses JWT tokens for authentication. Store tokens in localStorage after login.
+**MCP Testing**: Use `x-api-key` header
+**Production**: Use `Authorization: Bearer <token>` header
 
 ## Base URL
 `http://localhost:7130`
@@ -11,125 +12,80 @@ Insforge uses JWT tokens for user authentication and API keys for database acces
 ## User Authentication
 
 ### Register New User
-**POST** `/api/auth/register`
+**POST** `/api/auth/v2/sign-up/email`
 
-Request:
-```json
-{
-  "email": "user@example.com",
-  "password": "securepassword"
-}
-```
+Body: `{"email": "user@example.com", "password": "password", "name": "User Name"}`
 
-Response:
-```json
-{
-  "user": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "name": "user",
-    "avatarUrl": null,
-    "bio": null
-  },
-  "accessToken": "jwt-token",
-  "message": "Registration successful",
-  "nextActions": "You can use this access token to access other endpoints (always add it to HTTP Header 'Authorization', then send requests). Please keep it safe."
-}
-```
-
-Example curl:
-```bash
-curl -X POST http://localhost:7130/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "password": "securepassword"
-  }'
-```
+Returns: `{"token": "...", "user": {"id": "...", "email": "...", "name": "...", "emailVerified": false, "createdAt": "...", "updatedAt": "..."}}`
 
 ### Login User  
-**POST** `/api/auth/login`
+**POST** `/api/auth/v2/sign-in/email`
+
+Body: `{"email": "user@example.com", "password": "password"}`
+
+Returns: `{"token": "...", "user": {"id": "...", "email": "...", "name": "...", "emailVerified": false, "createdAt": "...", "updatedAt": "..."}}`
+
+### Get Current User
+**GET** `/api/auth/v2/me` 
+
+Headers: `Authorization: Bearer <token>`
+
+Returns: `{"user": {"id": "...", "email": "...", "type": "user", "role": "authenticated"}}`
+
+**Note**: Returns LIMITED fields (id, email, type, role). For full user data including name/image, query `/api/database/records/user?id=eq.<user_id>`
+
+**Common errors:**
+- `401` with `"code": "MISSING_AUTHORIZATION_HEADER"` → No token provided
+- `401` with `"code": "INVALID_TOKEN"` → Token expired or invalid
+
+## Admin Authentication
+
+### Admin Login
+**POST** `/api/auth/v2/admin/sign-in`
 
 Request:
 ```json
 {
-  "email": "user@example.com",
-  "password": "securepassword"
+  "email": "admin@example.com",
+  "password": "change-this-password"
 }
 ```
 
 Response:
 ```json
 {
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "name": "user",
-    "avatarUrl": null,
-    "bio": null
-  },
-  "accessToken": "jwt-token",
-  "message": "Login successful",
-  "nextActions": "Use the access token in the Authorization header for subsequent requests"
-}
-```
-
-Example curl:
-```bash
-curl -X POST http://localhost:7130/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "password": "securepassword"
-  }'
-```
-
-### Get Current User
-**GET** `/api/auth/me`
-
-Headers: `Authorization: Bearer <jwt-token>`
-
-Returns basic user information from JWT token (no database lookup required).
-
-Response:
-```json
-{
-  "user": {
-    "id": "user-uuid",
-    "email": "user@example.com",
-    "name": "user",
-    "avatarUrl": null,
-    "bio": null
+    "id": "admin-id",
+    "email": "admin@example.com",
+    "name": "Administrator",
+    "role": "project_admin"
   }
 }
 ```
 
 Example curl:
 ```bash
-curl -X GET http://localhost:7130/api/auth/me \
-  -H "Authorization: Bearer <jwt-token>"
+curl -X POST http://localhost:7130/api/auth/v2/admin/sign-in \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"change-this-password"}'
 ```
-
 
 ## Error Response Format
 
 All error responses follow this format:
 ```json
 {
-  "error": "ERROR_CODE",
-  "message": "Human-readable error message",
-  "statusCode": 400,
-  "nextActions": "Suggested action to resolve the error"
+  "code": "ERROR_CODE",
+  "message": "Human-readable error message"
 }
 ```
 
 Example error:
 ```json
 {
-  "error": "INVALID_CREDENTIALS",
-  "message": "Invalid email or password",
-  "statusCode": 401,
-  "nextActions": "Please check your credentials and try again"
+  "code": "INVALID_EMAIL",
+  "message": "Please provide a valid email"
 }
 ```
 
@@ -138,73 +94,117 @@ Example error:
 Insforge supports Google and GitHub OAuth when configured with environment variables.
 
 OAuth workflow:
-1. End user clicks the OAuth login button and redirects to Google/GitHub platform (redirect link obtained from InsForge backend);
-2. After successful user authorization, Google/GitHub redirects to InsForge backend;
-3. InsForge backend generates JWT access token and other authentication info, then redirects to the application page;
+1. End user clicks the OAuth login button and gets redirect URL from InsForge backend
+2. After successful user authorization, Google/GitHub redirects to InsForge backend
+3. InsForge backend generates session token and redirects to the application page
 
 Prerequisites:
-1. Create Google or GitHub OAuth Application, fill in appropriate information, and obtain Client ID and Client Secret;
-2. Configure each platform's Client ID/Client Secret in InsForge backend(via Environment Variables or dashboard);
+1. Create Google or GitHub OAuth Application and obtain Client ID and Client Secret
+2. Configure each platform's Client ID/Client Secret in InsForge backend (via Environment Variables)
 
 ### OAuth Endpoints
-#### Get Google platform authentication link:
-**GET** `/api/auth/v1/google-auth?redirectUrl=your_application_endpoint`
 
-`redirectUrl` is MUST provided by the application.
+#### Social Login (Google/GitHub)
+**POST** `/api/auth/v2/sign-in/social`
 
-Response:
+Request:
 ```json
 {
-  "authUrl": "https://accounts.google.com/o/oauth2/v2/auth?client_id={your_client_id}&redirect_uri=hfa&scope=user%3Aemail&state=eyJ9",
-  "message": "Redirect the user to the authUrl for Google authentication",
-  "nextActions": "After authentication, user will be redirected back with auth code"
+  "provider": "google",
+  "callbackURL": "http://localhost:7131/dashboard",
+  "errorCallbackURL": "http://localhost:7131/login?error=oauth",
+  "disableRedirect": true
+}
+```
+
+Parameters:
+- `provider`: "google" or "github" (required)
+- `callbackURL`: Where to redirect after successful login (required)
+- `errorCallbackURL`: Where to redirect on error (optional)
+- `disableRedirect`: Return URL instead of auto-redirecting (optional)
+
+Response (when disableRedirect: true):
+```json
+{
+  "url": "https://accounts.google.com/o/oauth2/auth?client_id=...",
+  "redirect": false
 }
 ```
 
 Example curl:
 ```bash
-curl -X GET "http://localhost:7130/api/auth/v1/google-auth?redirectUrl=http://localhost:3000/callback"
+curl -X POST http://localhost:7130/api/auth/v2/sign-in/social \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider": "google",
+    "callbackURL": "http://localhost:7131/dashboard",
+    "disableRedirect": true
+  }'
 ```
 
-#### Get GitHub platform authentication link:
-**GET** `/api/auth/v1/github-auth?redirectUrl=your_application_endpoint`
+#### OAuth Callback
+The OAuth provider will redirect to:
+- Google: `http://localhost:7130/api/auth/v2/callback/google`
+- GitHub: `http://localhost:7130/api/auth/v2/callback/github`
 
-`redirectUrl` is MUST provided by the application.
-
-Response:
-```json
-{
-  "authUrl": "https://github.com/login/oauth/authorize?client_id={your_client_id}&redirect_uri=hfa&scope=user%3Aemail&state=eyJ9",
-  "message": "Redirect the user to the authUrl for GitHub authentication",
-  "nextActions": "After authentication, user will be redirected back with auth code"
-}
-```
-
-Example curl:
-```bash
-curl -X GET "http://localhost:7130/api/auth/v1/github-auth?redirectUrl=http://localhost:3000/callback"
-```
-
-#### OAuth Result callback:
-**GET** `redirectUrl?accessToken={jwt-token}&userId={current_user_id}&email={current_user_email}&name={current_user_name}`
-
-The user login result will callback to the redirectUrl with authentication information.
-Similar to the login endpoint (`/api/auth/login`), the application frontend should persist this JWT accessToken to local storage and include it in subsequent requests (`Authorization` Header)
+After processing, Better Auth redirects to your specified `callbackURL` with the user session.
 
 ## Built-in Auth Tables
 
-System-managed tables (use Auth API, not database API):
-- **_auth** - User credentials
-- **_identities** - OAuth logins  
-- **_profiles** - User profile data
+### User Table (Read-Only)
+The `user` table is **system-managed**:
+- **✅ READ** via: `GET /api/database/records/user`
+- **❌ NO WRITE** - use Auth API instead
+- **✅ Foreign keys allowed**
+- Schema: `id`, `email`, `name`, `image`, `emailVerified`, `createdAt`, `updatedAt`
 
-## API Key Management
+Example - Create table with user reference:
+```json
+{
+  "table_name": "posts",
+  "columns": [
+    {
+      "name": "title",
+      "type": "string",
+      "nullable": false,
+      "is_unique": false
+    },
+    {
+      "name": "user_id",
+      "type": "string",
+      "nullable": false,
+      "is_unique": false,
+      "foreign_key": {
+        "reference_table": "user",
+        "reference_column": "id",
+        "on_delete": "CASCADE",
+        "on_update": "CASCADE"
+      }
+    }
+  ]
+}
+```
 
-API keys are managed through the admin dashboard. Each project has one API key that provides full database access.
+### Hidden System Tables
+These tables are managed by Better Auth and not visible in metadata:
+- **session** - Active user sessions
+- **account** - OAuth provider connections
+- **verification** - Email verification tokens
+- **jwks** - JSON Web Key Sets
 
-## Important Notes
+## Headers Summary
 
-1. JWT access tokens expire - handle token refresh in your application
-2. API keys don't expire but can be regenerated
-3. Admin user is created on first run (check logs for credentials)
-4. OAuth requires GOOGLE_CLIENT_ID/SECRET or GITHUB_CLIENT_ID/SECRET env vars
+| API Type | Header Required |
+|----------|----------------|
+| Auth endpoints | None |
+| Database/Storage | `Authorization: Bearer <token>` |
+| MCP testing only | `x-api-key: <key>` |
+
+## Critical Notes
+
+1. `/api/auth/v2/me` returns `{"user": {...}}` - nested, not root level
+2. `/api/auth/v2/me` only has: id, email, type, role (no name/image)
+3. Full user data: `GET /api/database/records/user?id=eq.<id>`
+4. POST requires `[{...}]` array format always
+5. Auth endpoints: no headers needed
+6. Database/Storage: `Authorization: Bearer <token>`

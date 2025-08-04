@@ -3,4 +3,5 @@
  */
 
 // Better Auth system tables that should be hidden from database UI
-export const BETTER_AUTH_SYSTEM_TABLES = ['user', 'session', 'account', 'verification', 'jwks'];
+// Note: 'user' table is intentionally excluded to allow it to be visible for referencing
+export const BETTER_AUTH_SYSTEM_TABLES = ['session', 'account', 'verification', 'jwks', 'user'];

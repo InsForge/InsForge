@@ -70,7 +70,7 @@ export class MetadataService {
   }
 
   async updateDatabaseMetadata(): Promise<void> {
-    // Get all tables excluding system tables (those starting with _) except _auth, and logs
+    // Get all tables excluding system tables (those starting with _) and logs
     // Also exclude Better Auth system tables
     const allTables = (await this.db
       .prepare(
@@ -79,9 +79,11 @@ export class MetadataService {
       FROM information_schema.tables 
       WHERE table_schema = 'public' 
       AND table_type = 'BASE TABLE'
-      AND (table_name NOT LIKE '\\_%' OR table_name = '_auth')
+      AND table_name NOT LIKE '\\_%'
       AND table_name != 'logs'
-      AND table_name NOT IN (${BETTER_AUTH_SYSTEM_TABLES.map((t) => `'${t}'`).join(', ')})
+      AND table_name NOT IN (${BETTER_AUTH_SYSTEM_TABLES.filter((t) => t !== 'user')
+        .map((t) => `'${t}'`)
+        .join(', ')})
       ORDER BY table_name
     `
       )

@@ -83,6 +83,13 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
       },
     };
 
+    // Use PostgREST-compatible token if available
+    // This is set by the auth middleware for Better Auth tokens
+    const postgrestToken = (req as AuthRequest & { postgrestToken?: string }).postgrestToken;
+    if (postgrestToken) {
+      axiosConfig.headers.authorization = `Bearer ${postgrestToken}`;
+    }
+
     // Add body for methods that support it
     if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
       axiosConfig.data = req.body;

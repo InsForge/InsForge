@@ -26,6 +26,16 @@ The `insforge/` directory is the BaaS platform. Your app should live elsewhere:
 └── my-app/        # ← Your new app (work here)
 ```
 
+## 🚨 System Tables
+
+### User Table (Read-Only)
+The `user` table is a **system-managed table** from Better Auth:
+- **CANNOT BE MODIFIED** through database API - use Auth API instead
+- **CAN BE REFERENCED** by other tables with foreign keys (e.g., `user_id`)
+- Contains: id, email, name, emailVerified, createdAt, updatedAt
+- To create/update users: Use `/api/auth/v2/*` endpoints
+- To query users: Use `/api/database/records/user` (read-only)
+
 ## 🚨 CRUD Operations - PostgREST NOT RESTful
 ### PostgREST Database API Behavior
 
@@ -52,10 +62,9 @@ The `insforge/` directory is the BaaS platform. Your app should live elsewhere:
 ## Auth Operations:
 
 ### 🚨 IMPORTANT: Correct Auth Endpoints
-- **✅ CORRECT**: Use `/api/auth/me` to check current user
-- **❌ WRONG**: There is NO `/api/auth/profile` endpoint - this does not exist!
+- **✅ CORRECT**: Use `/api/auth/v2/me` to check current user
 - After successful authentication, redirect to your application's main page
-- Store JWT access tokens and include as `Authorization: Bearer {access_token}` header for all authenticated requests
+- Store session tokens (for users) or JWT tokens (for admins) and include as `Authorization: Bearer {token}` header for authenticated requests
 
 ### Regular API Response Format
 
@@ -69,7 +78,7 @@ The `insforge/` directory is the BaaS platform. Your app should live elsewhere:
 // Examples:
 // Single object: { id: "1", name: "John" }
 // Array: [{ id: "1" }, { id: "2" }]
-// Auth response: { user: {...}, access_token: "..." }
+// Auth response: { user: {...}, token: "..." }
 
 // PostgREST Edge Cases (successful but empty):
 // POST without Prefer header: []
@@ -143,14 +152,12 @@ curl -X POST http://localhost:PORT/api/database/records/comments \
   -d "[{\"content\": \"Great post!\"}]"  # Bash may escape the !
 
 # Example: Complete user journey
-curl -X POST http://localhost:PORT/api/auth/register \
+curl -X POST http://localhost:PORT/api/auth/v2/sign-up/email \
   -H "Content-Type: application/json" \
-  -H "x-api-key: YOUR_API_KEY" \
-  -d '{"email":"test@example.com","password":"pass123"}' | jq .
+  -d '{"email":"test@example.com","password":"pass123","name":"Test User"}' | jq .
 
-# Extract access token from response and test authenticated endpoints
-TOKEN="<access-token-from-response>"
-curl http://localhost:PORT/api/auth/me \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "x-api-key: YOUR_API_KEY" | jq .
+# Extract token from response and test authenticated endpoints
+TOKEN="<token-from-response>"
+curl http://localhost:PORT/api/auth/v2/me \
+  -H "Authorization: Bearer $TOKEN" | jq .
 ```
