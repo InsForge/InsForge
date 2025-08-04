@@ -73,7 +73,7 @@ export default function LoginPage() {
         {/* Login Card */}
         <Card>
           <Form {...form}>
-            <form onSubmit={() => void form.onSubmit()}>
+            <form onSubmit={(e) => void form.onSubmit(e)}>
               <CardHeader>
                 <CardTitle>Sign In</CardTitle>
                 <CardDescription>Enter your admin credentials to continue</CardDescription>
