@@ -7,51 +7,55 @@ import RooLogoIcon from '@/assets/icons/roo_code_logo.svg';
 export interface MCPAgent {
   id: string;
   displayName: string;
-  installCommand?: string;
+  installCommand?: (apiBaseUrl?: string) => string;
   logo?: string;
   description?: string;
 }
 
 export type PlatformType = 'macos-linux' | 'windows';
 
+// Helper to get the API base URL
+const getApiBaseUrl = (apiBaseUrl?: string) =>
+  apiBaseUrl || import.meta.env.VITE_API_BASE_URL || 'http://localhost:7130';
+
 export const MCP_AGENTS: MCPAgent[] = [
   {
     id: 'cursor',
     displayName: 'Cursor',
-    installCommand:
-      'npx @insforge/install --client cursor --env API_KEY=YOUR_API_KEY --env API_BASE_URL=http://localhost:7130',
+    installCommand: (apiBaseUrl?: string) =>
+      `npx @insforge/install --client cursor --env API_KEY=YOUR_API_KEY --env API_BASE_URL=${getApiBaseUrl(apiBaseUrl)}`,
     logo: CursorLogoIcon,
     description: 'AI-powered code editor with built-in MCP support',
   },
   {
     id: 'claude',
     displayName: 'Claude Code',
-    installCommand:
-      'npx @insforge/install --client claude-code --env API_KEY=YOUR_API_KEY --env API_BASE_URL=http://localhost:7130',
+    installCommand: (apiBaseUrl?: string) =>
+      `npx @insforge/install --client claude-code --env API_KEY=YOUR_API_KEY --env API_BASE_URL=${getApiBaseUrl(apiBaseUrl)}`,
     logo: ClaudeLogoIcon,
     description: "Anthropic's Claude with MCP integration",
   },
   {
     id: 'windsurf',
     displayName: 'Windsurf',
-    installCommand:
-      'npx @insforge/install --client windsurf --env API_KEY=YOUR_API_KEY --env API_BASE_URL=http://localhost:7130',
+    installCommand: (apiBaseUrl?: string) =>
+      `npx @insforge/install --client windsurf --env API_KEY=YOUR_API_KEY --env API_BASE_URL=${getApiBaseUrl(apiBaseUrl)}`,
     logo: WindsurfLogoIcon,
     description: 'Next-generation AI development environment',
   },
   {
     id: 'cline',
     displayName: 'Cline',
-    installCommand:
-      'npx @insforge/install --client cline --env API_KEY=YOUR_API_KEY --env API_BASE_URL=http://localhost:7130',
+    installCommand: (apiBaseUrl?: string) =>
+      `npx @insforge/install --client cline --env API_KEY=YOUR_API_KEY --env API_BASE_URL=${getApiBaseUrl(apiBaseUrl)}`,
     logo: ClineLogoIcon,
     description: 'Intelligent coding assistant with MCP support',
   },
   {
     id: 'roo',
     displayName: 'Roo Code',
-    installCommand:
-      'npx @insforge/install --client roocode --env API_KEY=YOUR_API_KEY --env API_BASE_URL=http://localhost:7130',
+    installCommand: (apiBaseUrl?: string) =>
+      `npx @insforge/install --client roocode --env API_KEY=YOUR_API_KEY --env API_BASE_URL=${getApiBaseUrl(apiBaseUrl)}`,
     logo: RooLogoIcon,
     description: 'Smart code completion and assistance tool',
   },
