@@ -24,8 +24,8 @@ export function CompletionCard() {
           <img src={CheckedIcon} alt="Checked" className="w-10 h-10" />
           <p className="text-lg font-semibold text-black">You are all set!</p>
           <p className="text-zinc-500 text-sm">
-            You&apos;ve successfully set up InsForge with your AI agent. You&apos;re now ready to
-            start building amazing applications!
+            Your AI agent is now full-stack — powered by <b>InsForge</b>.
+            <br /> Let&apos;s build something <b>real</b>.
           </p>
         </div>
         <Button

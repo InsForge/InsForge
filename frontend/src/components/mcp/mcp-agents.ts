@@ -25,7 +25,7 @@ export const MCP_AGENTS: MCPAgent[] = [
   },
   {
     id: 'claude',
-    displayName: 'Claude',
+    displayName: 'Claude Code',
     installCommand:
       'npx @insforge/install --client claude-code --env API_KEY=YOUR_API_KEY --env API_BASE_URL=http://localhost:7130',
     logo: ClaudeLogoIcon,

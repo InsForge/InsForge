@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/radix/Tabs';
 import { Alert, AlertDescription } from '@/components/radix/Alert';
 import { JsonHighlight } from '@/components/JsonHighlight';
 import { CursorDeeplinkGenerator } from './CursorDeeplinkGenerator';
-import { MCP_AGENTS, createMCPConfig, type MCPAgent, type PlatformType } from '@/config/mcp-agents';
+import { MCP_AGENTS, createMCPConfig, type MCPAgent, type PlatformType } from '@/components/mcp/mcp-agents';
 import { metadataService } from '@/features/dashboard/services/metadata.service';
 
 interface MCPInstallerProps {
