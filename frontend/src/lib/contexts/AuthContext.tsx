@@ -84,10 +84,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const currentUser = await checkAuthStatus();
         if (currentUser) {
           // Invalidate queries that depend on authentication
-          queryClient.invalidateQueries({ queryKey: ['apiKey'] });
-          queryClient.invalidateQueries({ queryKey: ['metadata'] });
-          queryClient.invalidateQueries({ queryKey: ['users'] });
-          queryClient.invalidateQueries({ queryKey: ['tables'] });
+          void queryClient.invalidateQueries({ queryKey: ['apiKey'] });
+          void queryClient.invalidateQueries({ queryKey: ['metadata'] });
+          void queryClient.invalidateQueries({ queryKey: ['users'] });
+          void queryClient.invalidateQueries({ queryKey: ['tables'] });
           return true;
         }
         return false;
@@ -100,7 +100,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   );
 
   const logout = useCallback(() => {
-    authService.logout();
+    void authService.logout();
     setUser(null);
     setIsAuthenticated(false);
     setError(null);
@@ -112,7 +112,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Check auth status on mount
   useEffect(() => {
-    checkAuthStatus();
+    void checkAuthStatus();
   }, [checkAuthStatus]);
 
   // Removed periodic auth refresh - it was causing unnecessary unmounts

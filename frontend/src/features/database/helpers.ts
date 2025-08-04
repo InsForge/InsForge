@@ -1,4 +1,4 @@
-import { ColumnSchema } from '@insforge/shared-schemas';
+import { ColumnSchema, ColumnType } from '@insforge/shared-schemas';
 import { z } from 'zod';
 
 // Helper function to check if a field should be auto-generated
@@ -51,37 +51,37 @@ export function buildDynamicSchema(columns: ColumnSchema[]) {
     }
 
     switch (column.type) {
-      case 'STRING':
+      case ColumnType.STRING:
         fieldSchema = z.string();
         if (!column.nullable) {
           fieldSchema = fieldSchema.min(1, `${column.name} is required`);
         }
         break;
-      case 'INTEGER':
+      case ColumnType.INTEGER:
         fieldSchema = z.number().int();
         if (column.nullable) {
           fieldSchema = fieldSchema.nullable().optional();
         }
         break;
-      case 'FLOAT':
+      case ColumnType.FLOAT:
         fieldSchema = z.number();
         if (column.nullable) {
           fieldSchema = fieldSchema.nullable().optional();
         }
         break;
-      case 'BOOLEAN':
+      case ColumnType.BOOLEAN:
         fieldSchema = z.boolean();
         if (column.nullable) {
           fieldSchema = fieldSchema.nullable().optional();
         }
         break;
-      case 'DATETIME':
+      case ColumnType.DATETIME:
         fieldSchema = z.string(); // ISO date string
         if (column.nullable) {
           fieldSchema = fieldSchema.optional();
         }
         break;
-      case 'JSON':
+      case ColumnType.JSON:
         fieldSchema = z.string(); // JSON string
         if (column.nullable) {
           fieldSchema = fieldSchema.optional();
@@ -118,11 +118,11 @@ export function getInitialValues(columns: ColumnSchema[]): Record<string, any> {
 
     // Set default values based on type
     switch (column.type) {
-      case 'BOOLEAN':
+      case ColumnType.BOOLEAN:
         values[column.name] = column.nullable ? null : false;
         break;
-      case 'INTEGER':
-      case 'FLOAT':
+      case ColumnType.INTEGER:
+      case ColumnType.FLOAT:
         values[column.name] = column.nullable ? undefined : 0;
         break;
       default:

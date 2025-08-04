@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AuthRequest, verifyAdmin } from '@/api/middleware/auth.js';
 import { DatabaseManager } from '@/core/database/database.js';
 import { DatabaseError } from 'pg';
+import logger from '@/utils/logger.js';
 
 const router = Router();
 const db = DatabaseManager.getInstance();
@@ -45,7 +46,10 @@ router.get('/', verifyAdmin, async (req: AuthRequest, res: Response) => {
 
     res.json(functions);
   } catch (error) {
-    console.error('Failed to list functions:', error);
+    logger.error('Failed to list functions', {
+      error: error instanceof Error ? error.message : String(error),
+      operation: 'listFunctions',
+    });
     res.status(500).json({ error: 'Failed to list functions' });
   }
 });
@@ -76,7 +80,11 @@ router.get('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => {
 
     res.json(func);
   } catch (error) {
-    console.error('Failed to get function:', error);
+    logger.error('Failed to get function', {
+      error: error instanceof Error ? error.message : String(error),
+      operation: 'getFunction',
+      slug: req.params.slug,
+    });
     res.status(500).json({ error: 'Failed to get function' });
   }
 });
@@ -152,15 +160,17 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response) => {
       .get(id);
 
     // Log function creation for audit purposes, this is required before finishing serverless function completely
-    // eslint-disable-next-line no-console
-    console.log(`Function ${name} (${slug}) created by ${req.user?.email}`);
+    logger.info(`Function ${name} (${slug}) created by ${req.user?.email}`);
 
     res.status(201).json({
       success: true,
       function: created,
     });
   } catch (error) {
-    console.error('Failed to create function:', error);
+    logger.error('Failed to create function', {
+      error: error instanceof Error ? error.message : String(error),
+      operation: 'createFunction',
+    });
 
     // PostgreSQL unique constraint error
     if (error instanceof DatabaseError && error.code === '23505') {
@@ -248,16 +258,19 @@ router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => {
       )
       .get(slug);
 
-    // Log function creation for audit purposes, this is required before finishing serverless function completely
-    // eslint-disable-next-line no-console
-    console.log(`Function ${slug} updated by ${req.user?.email}`);
+    // Log function update for audit purposes, this is required before finishing serverless function completely
+    logger.info(`Function ${slug} updated by ${req.user?.email}`);
 
     res.json({
       success: true,
       function: updated,
     });
   } catch (error) {
-    console.error('Failed to update function:', error);
+    logger.error('Failed to update function', {
+      error: error instanceof Error ? error.message : String(error),
+      operation: 'updateFunction',
+      slug: req.params.slug,
+    });
     res.status(500).json({ error: 'Failed to update function' });
   }
 });
@@ -276,16 +289,19 @@ router.delete('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => 
       return res.status(404).json({ error: 'Function not found' });
     }
 
-    // Log function creation for audit purposes, this is required before finishing serverless function completely
-    // eslint-disable-next-line no-console
-    console.log(`Function ${slug} deleted by ${req.user?.email}`);
+    // Log function deletion for audit purposes, this is required before finishing serverless function completely
+    logger.info(`Function ${slug} deleted by ${req.user?.email}`);
 
     res.json({
       success: true,
       message: `Function ${slug} deleted successfully`,
     });
   } catch (error) {
-    console.error('Failed to delete function:', error);
+    logger.error('Failed to delete function', {
+      error: error instanceof Error ? error.message : String(error),
+      operation: 'deleteFunction',
+      slug: req.params.slug,
+    });
     res.status(500).json({ error: 'Failed to delete function' });
   }
 });

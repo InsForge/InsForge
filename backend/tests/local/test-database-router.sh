@@ -12,8 +12,8 @@ echo "🧪 Testing database router..."
 
 # Configuration
 API_BASE="$TEST_API_BASE"
-TEST_EMAIL="$ADMIN_EMAIL"
-TEST_PASSWORD="$ADMIN_PASSWORD"
+TEST_EMAIL="$TEST_ADMIN_EMAIL"
+TEST_PASSWORD="$TEST_ADMIN_PASSWORD"
 AUTH_TOKEN=""
 
 # Dynamic table name to avoid conflicts
@@ -81,27 +81,25 @@ create_table_response=$(curl -s -X POST "$API_BASE/database/tables" \
     -H "Content-Type: application/json" \
     -d '{
         "table_name": "'$TEST_TABLE'",
+        "rls_enabled": false,
         "columns":[
   {
     "name": "name",
     "type": "string",
     "nullable": true,
-    "unique": false,
-    "default_value": null
+    "is_unique": false
   },
   {
     "name": "price",
     "type": "float",
     "nullable": true,
-    "unique": false,
-    "default_value": null
+    "is_unique": false
   },
   {
     "name": "category",
     "type": "string",
     "nullable": true,
-    "unique": false,
-    "default_value": null
+    "is_unique": false
   }
 ] 
     }')

@@ -1,5 +1,6 @@
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
+import { BETTER_AUTH_SYSTEM_TABLES } from './constants.js';
 
 export function validateEmail(email: string) {
   return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
@@ -63,7 +64,8 @@ export function isValidIdentifier(identifier: string): boolean {
  */
 export function validateTableName(tableName: string): boolean {
   validateIdentifier(tableName, 'table');
-  // Additional check: prevent access to system tables
+
+  // Prevent access to system tables (starting with _)
   if (tableName.startsWith('_')) {
     throw new AppError(
       'Access to system tables is not allowed',
@@ -72,6 +74,17 @@ export function validateTableName(tableName: string): boolean {
       'System tables (starting with _) cannot be accessed directly'
     );
   }
+
+  // Prevent access to Better Auth system tables
+  if (BETTER_AUTH_SYSTEM_TABLES.includes(tableName.toLowerCase())) {
+    throw new AppError(
+      'Access to authentication system tables is not allowed',
+      403,
+      ERROR_CODES.FORBIDDEN,
+      'Authentication system tables cannot be accessed directly'
+    );
+  }
+
   return true;
 }
 

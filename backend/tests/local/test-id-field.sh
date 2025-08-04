@@ -110,10 +110,11 @@ create_response=$(curl -s -w "\n%{http_code}" -X POST "$API_URL/database/tables"
   -H "Content-Type: application/json" \
   -d "{
     \"table_name\": \"$TEST_TABLE\",
+    \"rls_enabled\": false,
     \"columns\": [
-      {\"name\": \"title\", \"type\": \"string\", \"nullable\": false},
-      {\"name\": \"description\", \"type\": \"string\", \"nullable\": true},
-      {\"name\": \"status\", \"type\": \"string\", \"nullable\": false}
+      {\"name\": \"title\", \"type\": \"string\", \"nullable\": false, \"is_unique\": false},
+      {\"name\": \"description\", \"type\": \"string\", \"nullable\": true, \"is_unique\": false},
+      {\"name\": \"status\", \"type\": \"string\", \"nullable\": false, \"is_unique\": false}
     ]
   }")
 

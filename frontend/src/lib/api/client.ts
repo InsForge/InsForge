@@ -28,6 +28,10 @@ export class ApiClient {
     localStorage.removeItem('insforge_token');
   }
 
+  getToken() {
+    return this.token;
+  }
+
   setApiKey(apiKey: string) {
     this.apiKey = apiKey;
     localStorage.setItem('insforge_api_key', apiKey);

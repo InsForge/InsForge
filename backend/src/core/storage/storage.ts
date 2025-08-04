@@ -12,6 +12,7 @@ import {
   ListObjectsV2Command,
   DeleteObjectsCommand,
 } from '@aws-sdk/client-s3';
+import logger from '@/utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -119,7 +120,11 @@ class S3StorageBackend implements StorageBackend {
     try {
       await this.s3Client.send(command);
     } catch (error) {
-      console.error('S3 Upload error:', error);
+      logger.error('S3 Upload error', {
+        error: error instanceof Error ? error.message : String(error),
+        bucket,
+        key: s3Key,
+      });
       throw error;
     }
   }

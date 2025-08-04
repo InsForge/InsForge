@@ -28,7 +28,7 @@ export function useUsers(options: UseUsersOptions = {}) {
     refetch,
   } = useQuery({
     queryKey: ['users', currentPage, searchQuery],
-    queryFn: async () => {
+    queryFn: () => {
       const params = new URLSearchParams({
         limit: pageSize.toString(),
         offset: ((currentPage - 1) * pageSize).toString(),

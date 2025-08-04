@@ -22,7 +22,13 @@ transforms:
     source: |-
       .project = "default"
       .event_message = del(.message)
-      .appname = del(.container_name)
+      # Remove leading slash from container name if present
+      container = to_string!(del(.container_name))
+      if starts_with(container, "/") {
+          .appname = slice!(container, 1)
+      } else {
+          .appname = container
+      }
       del(.container_created_at)
       del(.container_id)
       del(.source_type)
@@ -41,38 +47,73 @@ transforms:
       rest: '.appname == "insforge-postgrest"'
       db: '.appname == "insforge-postgres"'
       realtime: '.appname == "insforge-realtime"'
-  # PostgREST logs are structured so we separate timestamp from message using regex
+  # PostgREST logs with proper parsing
   rest_logs:
     type: remap
     inputs:
       - router.rest
     source: |-
-      parsed, err = parse_regex(.event_message, r'^(?P<time>.*): (?P<msg>.*)$')
-      if err == null {
+      # .metadata.host = .project
+      # Parse PostgREST log format: DD/Mon/YYYY:HH:MM:SS +ZZZZ: message
+      parsed, err = parse_regex(.event_message, r'^(?P<time>\d{2}/\w{3}/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4}): (?P<msg>.*)$')
+
+      if err == null && parsed != null {
           .event_message = parsed.msg
-          .timestamp = to_timestamp!(parsed.time)
-          .metadata.host = .project
+          .metadata.level = "info"
+      } else {
+          # If parsing fails, keep original message
+          .metadata.level = "info"
       }
-  # InsForge logs are structured so we parse the severity level using regex (ignore time because it has no date)
+  # InsForge logs are structured JSON, parse and handle both request logs and application logs
   insforge_logs:
     type: remap
     inputs:
       - router.insforge
     source: |-
-      .metadata.project = del(.project)
-      .metadata.external_id = .metadata.project
-      parsed, err = parse_regex(.event_message, r'^(?P<time>\d+:\d+:\d+\.\d+) \[(?P<level>\w+)\] (?P<msg>.*)$')
+      # Remove the [backend] prefix if present
+      .event_message = replace!(.event_message, r'^\[backend\] ', "")
+      
+      req, err = parse_json(.event_message)
       if err == null {
-          .event_message = parsed.msg
-          .metadata.level = parsed.level
+          # Set timestamp from log
+          if req.timestamp != null {
+              .timestamp = to_timestamp!(req.timestamp)
+          }
+          
+          # Set log level
+          .level = req.level
+          
+          # Check if this is a request log (has duration field)
+          if req.duration != null {
+              # Flatten request log fields to top level
+              .user_agent = req.userAgent
+              .ip = req.ip
+              .method = req.method
+              .path = req.path
+              .protocol = "HTTP/1.1"
+              .status_code = req.status
+              .size = req.size
+              .duration = req.duration
+              # Format as nginx-style log line
+              .event_message = join!([req.method, req.path, to_string!(req.status), to_string!(req.size), req.duration, "-", req.ip, "-", req.userAgent], " ")
+              .log_type = "request"
+          } else {
+              # This is an application log
+              .event_message = join!([req.level, req.message], " - ")
+              .log_type = "application"
+              if req.error != null {
+                  .error = req.error
+              }
+              if req.stack != null {
+                  .stack = req.stack
+              }
+          }
       }
   realtime_logs:
     type: remap
     inputs:
       - router.realtime
     source: |-
-      .metadata.project = del(.project)
-      .metadata.external_id = .metadata.project
       parsed, err = parse_regex(.event_message, r'^(?P<time>\d+:\d+:\d+\.\d+) \[(?P<level>\w+)\] (?P<msg>.*)$')
       if err == null {
           .event_message = parsed.msg
@@ -87,33 +128,32 @@ transforms:
       if err == null {
           .event_message = parsed.msg
           .timestamp = to_timestamp!(parsed.time)
-          .metadata.host = .project
+          # .metadata.host = .project
       }
-  # Postgres logs some messages to stderr which we map to warning severity level
+  # Postgres logs with proper parsing
   db_logs:
     type: remap
     inputs:
       - router.db
     source: |-
-      .metadata.host = "db-default"
-      .metadata.parsed.timestamp = .timestamp
+      # .metadata.host = "db-default"
+      # Parse PostgreSQL log format: YYYY-MM-DD HH:MM:SS.SSS TZ [PID] LEVEL: message
+      parsed, err = parse_regex(.event_message, r'^(?P<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) (?P<tz>\w+) \[(?P<pid>\d+)\] (?P<level>LOG|ERROR|WARNING|INFO|NOTICE|FATAL|PANIC|STATEMENT|DETAIL): (?P<msg>.*)$')
 
-      parsed, err = parse_regex(.event_message, r'.*(?P<level>INFO|NOTICE|WARNING|ERROR|LOG|FATAL|PANIC?):.*', numeric_groups: true)
+      if err == null && parsed != null {
+          .metadata.parsed.pid = parsed.pid
+          .metadata.parsed.error_severity = upcase!(parsed.level)
+          .event_message = parsed.msg
 
-      if err != null || parsed == null {
-        .metadata.parsed.error_severity = "info"
-      }
-      if parsed != null {
-       .metadata.parsed.error_severity = parsed.level
-      }
-      if .metadata.parsed.error_severity == "info" {
-          .metadata.parsed.error_severity = "log"
-      }
-      
-      # Safely handle null values before upcase
-      if .metadata.parsed.error_severity != null {
-          .metadata.parsed.error_severity = upcase!(.metadata.parsed.error_severity)
+          # Normalize STATEMENT and DETAIL to appropriate log levels
+          if .metadata.parsed.error_severity == "STATEMENT" {
+              .metadata.parsed.error_severity = "INFO"
+          }
+          if .metadata.parsed.error_severity == "DETAIL" {
+              .metadata.parsed.error_severity = "INFO"
+          }
       } else {
+          # If parsing fails, keep original message and set default severity
           .metadata.parsed.error_severity = "LOG"
       }
 

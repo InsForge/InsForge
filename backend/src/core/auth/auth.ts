@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
@@ -14,6 +13,7 @@ import {
 import { ProfileRecord, UserWithProfile } from '@/types/profile.js';
 import { OAuthConfig, ConfigRecord } from '@/types/auth.js';
 import bcrypt from 'bcrypt';
+import logger from '@/utils/logger.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
 const JWT_EXPIRES_IN = '7d';
@@ -66,9 +66,10 @@ export class AuthService {
 
   private constructor() {
     // Log environment variables only once during initialization
-    console.log('AuthService initialized - OAuth configuration:');
-    console.log('- Google OAuth:', GOOGLE_CLIENT_ID ? 'Configured' : 'Not configured');
-    console.log('- GitHub OAuth:', GITHUB_CLIENT_ID ? 'Configured' : 'Not configured');
+    logger.info('AuthService initialized - OAuth configuration', {
+      googleOAuth: GOOGLE_CLIENT_ID ? 'Configured' : 'Not configured',
+      githubOAuth: GITHUB_CLIENT_ID ? 'Configured' : 'Not configured',
+    });
 
     this.googleClient = new OAuth2Client(
       GOOGLE_CLIENT_ID,
@@ -127,7 +128,9 @@ export class AuthService {
         return row as ConfigRecord;
       });
     } catch (error) {
-      console.error('Failed to load OAuth config from database:', error);
+      logger.error('Failed to load OAuth config from database', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       // Return default config on error
       configRows = [];
     }
@@ -162,13 +165,16 @@ export class AuthService {
           try {
             value = JSON.parse(row.value);
           } catch (parseError) {
-            console.error(`Failed to parse JSON for ${row.key}:`, parseError);
+            logger.error('Failed to parse JSON for config key', {
+              key: row.key,
+              error: parseError instanceof Error ? parseError.message : String(parseError),
+            });
             continue; // Skip this config entry
           }
 
           // Validate parsed value is an object
           if (typeof value !== 'object' || !value) {
-            console.error(`Invalid config value for ${row.key}: expected object`);
+            logger.error(`Invalid config value for ${row.key}: expected object`);
             continue;
           }
 
@@ -178,7 +184,10 @@ export class AuthService {
           config[provider].enabled = typeof value.enabled === 'boolean' ? value.enabled : false;
         }
       } catch (e) {
-        console.error('Failed to process OAuth config row:', row.key, e);
+        logger.error('Failed to process OAuth config row', {
+          key: row.key,
+          error: e instanceof Error ? e.message : String(e),
+        });
       }
     }
 
@@ -341,7 +350,9 @@ export class AuthService {
 
       auth = result as Auth | null;
     } catch (error) {
-      console.error('Failed to authenticate user:', error);
+      logger.error('Failed to authenticate user', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw new Error(`Database error during authentication: ${error}`);
     }
 
@@ -381,7 +392,9 @@ export class AuthService {
 
       auth = result as SuperUserAuth | null;
     } catch (error) {
-      console.error('Failed to authenticate superuser:', error);
+      logger.error('Failed to authenticate superuser', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw new Error(`Database error during superuser authentication: ${error}`);
     }
 
@@ -698,14 +711,13 @@ export class AuthService {
       throw new Error('Google OAuth Redirect URI environment variable is not set');
     }
 
-    console.log('Google OAuth Config:', {
+    logger.info('Google OAuth Config', {
       clientId: config.google.clientId ? 'SET' : 'NOT SET',
       clientSecret: config.google.clientSecret ? 'SET' : 'NOT SET',
       redirectUri: config.google.redirectUri,
       enabled: config.google.enabled,
+      state: state,
     });
-
-    console.log('State parameter:', state);
 
     const authUrlOptions: {
       access_type: string;
@@ -764,7 +776,7 @@ export class AuthService {
     if (this.processedCodes.has(code)) {
       const cachedTokens = this.tokenCache.get(code);
       if (cachedTokens) {
-        console.log('Returning cached tokens for already processed code.');
+        logger.info('Returning cached tokens for already processed code');
         return cachedTokens;
       }
       throw new Error('Authorization code is currently being processed.');
@@ -844,7 +856,9 @@ export class AuthService {
 
       identify = result as Identifies | null;
     } catch (error) {
-      console.error('Failed to query identifies table:', error);
+      logger.error('Failed to query identifies table', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw new Error(`Database error while checking existing user: ${error}`);
     }
 
@@ -1073,7 +1087,9 @@ export class AuthService {
       }
 
       if (!access_token) {
-        console.error('GitHub OAuth response did not contain access_token:', response.data);
+        logger.error('GitHub OAuth response did not contain access_token', {
+          response: response.data,
+        });
         throw new Error('Failed to get access token from GitHub');
       }
 

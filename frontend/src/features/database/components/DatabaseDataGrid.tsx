@@ -9,7 +9,6 @@ import { BooleanCellEditor } from '@/features/database/components/BooleanCellEdi
 import { DateCellEditor } from '@/features/database/components/DateCellEditor';
 import { JsonCellEditor } from '@/features/database/components/JsonCellEditor';
 import { ColumnSchema, ColumnType, TableSchema } from '@insforge/shared-schemas';
-import { mapDatabaseTypeToFieldType } from '@/lib/utils/utils';
 
 // Custom cell editors for database fields
 function TextCellEditor({ row, column, onRowChange, onClose, onCellEdit }: any) {
@@ -172,7 +171,6 @@ export function convertSchemaToColumns(
   }
 
   return schema.columns.map((col: ColumnSchema) => {
-    const colType = mapDatabaseTypeToFieldType(col.type);
     const isEditable =
       !col.primary_key &&
       [
@@ -183,7 +181,7 @@ export function convertSchemaToColumns(
         ColumnType.BOOLEAN,
         ColumnType.DATETIME,
         ColumnType.JSON,
-      ].includes(colType);
+      ].includes(col.type);
     const isSortable = !['jsonb', 'json'].includes(col.type?.toLowerCase());
 
     const column: DataGridColumn = {
@@ -201,17 +199,17 @@ export function convertSchemaToColumns(
     if (col.name === 'id') {
       column.renderCell = DefaultCellRenderers.id;
       column.editable = false;
-    } else if (colType === ColumnType.BOOLEAN) {
+    } else if (col.type === ColumnType.BOOLEAN) {
       column.renderCell = DefaultCellRenderers.boolean;
       column.renderEditCell = (props: any) => (
         <CustomBooleanCellEditor {...props} onCellEdit={onCellEdit} />
       );
-    } else if (colType === ColumnType.DATETIME) {
+    } else if (col.type === ColumnType.DATETIME) {
       column.renderCell = DefaultCellRenderers.date;
       column.renderEditCell = (props: any) => (
         <CustomDateCellEditor {...props} onCellEdit={onCellEdit} />
       );
-    } else if (colType === ColumnType.JSON) {
+    } else if (col.type === ColumnType.JSON) {
       column.renderCell = DefaultCellRenderers.json;
       column.renderEditCell = (props: any) => (
         <CustomJsonCellEditor {...props} onCellEdit={onCellEdit} />

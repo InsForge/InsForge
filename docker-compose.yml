@@ -41,7 +41,10 @@ services:
     ports:
       - "5430:3000"
     depends_on:
-      - postgres
+      vector:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     networks:
       - insforge-network
 
@@ -50,6 +53,8 @@ services:
     container_name: insforge
     working_dir: /app
     depends_on:
+      vector:
+        condition: service_healthy
       postgres:
         condition: service_healthy
     ports:
@@ -57,6 +62,7 @@ services:
       - "7131:7131"
     environment:
       - PORT=7130
+      - PROJECT_ROOT=/app
       - API_BASE_URL=http://localhost:7130
       - VITE_API_BASE_URL=http://localhost:7130
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
@@ -86,6 +92,7 @@ services:
       - APP_KEY=${APP_KEY:-}
       # Better Auth Migration
       - ENABLE_BETTER_AUTH=${ENABLE_BETTER_AUTH:-false}
+      - VITE_ENABLE_BETTER_AUTH=${ENABLE_BETTER_AUTH:-false}
     volumes:
       - ./package.json:/app/package.json
       - ./backend:/app/backend

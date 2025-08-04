@@ -16,6 +16,7 @@ export interface UserRecord {
   name?: string | null;
   emailVerified?: boolean;
   createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface AdminCredentials {
@@ -200,6 +201,40 @@ export class BetterAuthAdminService {
   }
 
   /**
+   * Get a single user by ID
+   */
+  public async getUser(userId: string): Promise<UserRecord> {
+    if (!userId) {
+      throw new APIError('BAD_REQUEST', {
+        message: 'User ID is required',
+      });
+    }
+
+    const db = this.getDb();
+
+    const user = (await db
+      .prepare(
+        'SELECT id, email, name, "emailVerified", "createdAt", "updatedAt" FROM "user" WHERE id = ? LIMIT 1'
+      )
+      .get(userId)) as UserRecord | null;
+
+    if (!user) {
+      throw new APIError('NOT_FOUND', {
+        message: 'User not found',
+      });
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name || null,
+      emailVerified: user.emailVerified,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
+  }
+
+  /**
    * Lists all users (excluding admin)
    */
   public async listUsers(
@@ -214,7 +249,7 @@ export class BetterAuthAdminService {
     // Get all users
     const users = (await db
       .prepare(
-        'SELECT id, email, name, "emailVerified", "createdAt" FROM "user" ORDER BY "createdAt" DESC LIMIT ? OFFSET ?'
+        'SELECT id, email, name, "emailVerified", "createdAt", "updatedAt" FROM "user" ORDER BY "createdAt" DESC LIMIT ? OFFSET ?'
       )
       .all(limit, offset)) as UserRecord[];
 
@@ -228,17 +263,62 @@ export class BetterAuthAdminService {
         id: user.id,
         email: user.email,
         name: user.name || null,
-        emailVerified: user.emailVerified || false,
-        createdAt: user.createdAt,
+        identities: [], // TODO: Query account table for OAuth providers when implemented
+        provider_type: 'Email', // TODO: Set to 'Social' if user has OAuth identities
+        created_at: user.createdAt,
+        updated_at: user.updatedAt,
       })),
       total: regularUsers.length,
     };
   }
 
   /**
-   * Checks if Better Auth is enabled
+   * Bulk delete users
    */
-  public static isEnabled(): boolean {
-    return process.env.ENABLE_BETTER_AUTH === 'true';
+  public async bulkDeleteUsers(userIds: string[]): Promise<{ deletedCount: number }> {
+    if (!userIds || userIds.length === 0) {
+      throw new APIError('BAD_REQUEST', {
+        message: 'No user IDs provided',
+      });
+    }
+
+    const db = this.getDb();
+
+    // Filter out admin user to prevent self-deletion
+    const adminUser = (await db
+      .prepare('SELECT id FROM "user" WHERE email = ? LIMIT 1')
+      .get(this.adminEmail)) as UserRecord | null;
+
+    const idsToDelete = userIds.filter((id) => !adminUser || id !== adminUser.id);
+
+    if (idsToDelete.length === 0) {
+      return { deletedCount: 0 };
+    }
+
+    // Create placeholders for the IN clause
+    const placeholders = idsToDelete.map(() => '?').join(',');
+
+    // Delete users and their sessions
+    await db.prepare('BEGIN TRANSACTION').run();
+    try {
+      // Delete sessions first (foreign key constraint)
+      await db
+        .prepare(`DELETE FROM "session" WHERE "userId" IN (${placeholders})`)
+        .run(...idsToDelete);
+
+      // Delete users
+      const result = await db
+        .prepare(`DELETE FROM "user" WHERE id IN (${placeholders})`)
+        .run(...idsToDelete);
+
+      await db.prepare('COMMIT').run();
+
+      return { deletedCount: result.changes || 0 };
+    } catch {
+      await db.prepare('ROLLBACK').run();
+      throw new APIError('INTERNAL_SERVER_ERROR', {
+        message: 'Failed to delete users',
+      });
+    }
   }
 }

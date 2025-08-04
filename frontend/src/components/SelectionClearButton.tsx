@@ -6,7 +6,11 @@ interface SelectionClearButtonProps {
   onClear: () => void;
 }
 
-export function SelectionClearButton({ selectedCount, itemType, onClear }: SelectionClearButtonProps) {
+export function SelectionClearButton({
+  selectedCount,
+  itemType,
+  onClear,
+}: SelectionClearButtonProps) {
   const isPlural = selectedCount > 1;
   const displayText = `${selectedCount} ${isPlural ? `${itemType}s` : itemType} selected`;
 

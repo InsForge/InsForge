@@ -1,35 +1,5 @@
 // Type definitions for database schema management
-import { ColumnType } from '@insforge/shared-schemas';
-
-// Column schema information from database
-export interface ColumnSchema {
-  name: string;
-  type: string;
-  nullable: boolean;
-  default_value?: string;
-  primary_key?: boolean;
-  is_unique?: boolean;
-  foreign_key?: {
-    table: string;
-    column: string;
-    on_delete?: string;
-    on_update?: string;
-  };
-}
-
-// Table schema including columns and statistics
-export interface TableSchema {
-  name: string;
-  columns: ColumnSchema[];
-  record_count?: number | string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-// Database schema containing all tables
-export interface DatabaseSchema {
-  tables: TableSchema[];
-}
+import { ColumnType, ColumnSchema, ForeignKeySchema } from '@insforge/shared-schemas';
 
 // Database metadata format returned by getDatabaseMetadata
 export interface DatabaseMetadata {
@@ -116,34 +86,10 @@ export interface ForeignKeyDefinition {
   on_update?: 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION';
 }
 
-export interface ColumnDefinition {
-  name: string;
-  type: ColumnType;
-  nullable: boolean;
-  is_unique?: boolean;
-  default_value?: string;
-  foreign_key?: {
-    table: string;
-    column: string;
-    on_delete?: 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION';
-    on_update?: 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION';
-  };
-}
-
-export interface CreateTableRequest {
-  table_name: string;
-  columns: ColumnDefinition[];
-  rls_decl?: boolean; // Use RLS policies for this table
-}
-
 // Type definition for foreign key information
-export interface ForeignKeyInfo {
+export type ForeignKeyInfo = ForeignKeySchema & {
   constraint_name: string;
-  reference_table: string;
-  reference_column: string;
-  on_delete: string;
-  on_update: string;
-}
+};
 
 // Type definition for foreign key row from database
 export interface ForeignKeyRow {
@@ -181,45 +127,3 @@ export type DatabaseValue =
 
 // Generic database record type - used when we don't know the exact table structure
 export type DatabaseRecord = Record<string, DatabaseValue>;
-
-// Response types for table operations
-export interface CreateTableResponse {
-  message: string;
-  table_name: string;
-  columns: Array<ColumnDefinition & { sql_type: string }>;
-  auto_fields: string[];
-  nextAction: string;
-}
-
-export interface GetTableSchemaResponse {
-  table_name: string;
-  columns: Array<{
-    name: string;
-    type: string;
-    nullable: boolean;
-    primary_key: boolean;
-    is_unique: boolean;
-    default_value: string | null;
-    foreign_key?: ForeignKeyInfo;
-  }>;
-}
-
-export interface UpdateTableSchemaRequest {
-  add_columns?: ColumnDefinition[];
-  drop_columns?: Array<{ name: string }>;
-  rename_columns?: Record<string, string>;
-  add_fkey_columns?: ColumnDefinition[];
-  drop_fkey_columns?: Array<{ name: string }>;
-}
-
-export interface UpdateTableSchemaResponse {
-  message: string;
-  table_name: string;
-  operations: string[];
-}
-
-export interface DeleteTableResponse {
-  message: string;
-  table_name: string;
-  nextAction: string;
-}

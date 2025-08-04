@@ -9,7 +9,6 @@ import { BooleanCellEditor } from './BooleanCellEditor';
 import { DateCellEditor } from './DateCellEditor';
 import { JsonCellEditor } from './JsonCellEditor';
 import { ColumnSchema, ColumnType } from '@insforge/shared-schemas';
-import { mapDatabaseTypeToFieldType } from '@/lib/utils/utils';
 
 // Form adapters for edit cell components
 interface FormBooleanEditorProps {
@@ -220,9 +219,8 @@ export function FormField({ field, form, tableName }: FormFieldProps) {
   // TODO: This is a mess, we need to clean it up. To fix in future.
   const renderField = () => {
     // Infer frontend type from field name and SQLite type
-    const fieldType = mapDatabaseTypeToFieldType(field.type);
 
-    switch (fieldType) {
+    switch (field.type) {
       case ColumnType.BOOLEAN:
         return (
           <>
@@ -253,7 +251,7 @@ export function FormField({ field, form, tableName }: FormFieldProps) {
                 <Input
                   id={`${tableName}-${field.name}`}
                   type="number"
-                  step={fieldType === ColumnType.FLOAT ? '0.01' : '1'}
+                  step={field.type === ColumnType.FLOAT ? '0.01' : '1'}
                   value={formField.value ?? ''}
                   onChange={(e) => {
                     const value = e.target.value;
@@ -262,7 +260,7 @@ export function FormField({ field, form, tableName }: FormFieldProps) {
                       formField.onChange(field.nullable ? null : 0);
                     } else {
                       const numValue =
-                        fieldType === ColumnType.INTEGER ? parseInt(value, 10) : parseFloat(value);
+                        field.type === ColumnType.INTEGER ? parseInt(value, 10) : parseFloat(value);
                       formField.onChange(isNaN(numValue) ? (field.nullable ? null : 0) : numValue);
                     }
                   }}

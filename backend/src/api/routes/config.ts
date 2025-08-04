@@ -6,6 +6,7 @@ import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
 import { OAuthConfig, OAuthStatus, ConfigRecord } from '@/types/auth.js';
+import logger from '@/utils/logger.js';
 
 const router = Router();
 
@@ -57,7 +58,9 @@ router.get('/oauth', verifyAdmin, async (req: Request, res: Response, next: Next
         return row as ConfigRecord;
       });
     } catch (error) {
-      console.error('Failed to load OAuth config:', error);
+      logger.error('Failed to load OAuth config', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw new AppError(
         'Failed to load OAuth configuration',
         500,
@@ -229,7 +232,9 @@ router.get('/oauth/status', async (req: Request, res: Response, next: NextFuncti
         return row as ConfigRecord;
       });
     } catch (error) {
-      console.error('Failed to load OAuth status:', error);
+      logger.error('Failed to load OAuth status', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw new AppError('Failed to load OAuth status', 500, ERROR_CODES.AUTH_OAUTH_CONFIG_ERROR);
     }
 
@@ -269,7 +274,9 @@ router.get('/oauth/status', async (req: Request, res: Response, next: NextFuncti
 
         googleEnabledConfig = result as { value: string } | null;
       } catch (error) {
-        console.error('Failed to check Google OAuth status:', error);
+        logger.error('Failed to check Google OAuth status', {
+          error: error instanceof Error ? error.message : String(error),
+        });
         // Continue with default behavior on error
         googleEnabledConfig = null;
       }
@@ -302,7 +309,9 @@ router.get('/oauth/status', async (req: Request, res: Response, next: NextFuncti
 
         githubEnabledConfig = result as { value: string } | null;
       } catch (error) {
-        console.error('Failed to check GitHub OAuth status:', error);
+        logger.error('Failed to check GitHub OAuth status', {
+          error: error instanceof Error ? error.message : String(error),
+        });
         // Continue with default behavior on error
         githubEnabledConfig = null;
       }

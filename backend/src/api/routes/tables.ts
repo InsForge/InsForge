@@ -4,7 +4,7 @@ import { TablesController } from '@/controllers/TablesController.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
-import { CreateTableRequest, UpdateTableSchemaRequest } from '@/types/database.js';
+import { createTableRequestSchema, updateTableSchemaRequest } from '@insforge/shared-schemas';
 
 const router = Router();
 const tablesController = new TablesController();
@@ -25,21 +25,18 @@ router.get('/', async (_req: AuthRequest, res: Response, next: NextFunction) => 
 // Create a new table
 router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const requestData: CreateTableRequest = req.body;
-    const { table_name, columns, rls_decl } = requestData;
-
-    // Validate required fields
-    if (!table_name || !columns || !Array.isArray(columns)) {
+    const validation = createTableRequestSchema.safeParse(req.body);
+    if (!validation.success) {
       throw new AppError(
-        'table_name and columns array are required',
+        validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.MISSING_FIELD,
-        'table_name and columns array are required. Please check the request body, table_name and columns are required'
+        ERROR_CODES.INVALID_INPUT,
+        'Please check the request body, it must conform with the CreateTableRequest schema.'
       );
     }
 
-    const use_RLS = rls_decl !== undefined ? rls_decl : true;
-    const result = await tablesController.createTable(table_name, columns, use_RLS);
+    const { table_name, columns, rls_enabled } = validation.data;
+    const result = await tablesController.createTable(table_name, columns, rls_enabled);
     successResponse(res, result, 201);
   } catch (error) {
     next(error);
@@ -61,23 +58,18 @@ router.get('/:table/schema', async (req: AuthRequest, res: Response, next: NextF
 router.patch('/:table', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { table } = req.params;
-    const operations: UpdateTableSchemaRequest = req.body;
 
-    if (
-      !operations.add_columns &&
-      !operations.drop_columns &&
-      !operations.rename_columns &&
-      !operations.add_fkey_columns &&
-      !operations.drop_fkey_columns
-    ) {
+    const validation = updateTableSchemaRequest.safeParse(req.body);
+    if (!validation.success) {
       throw new AppError(
-        'At least one operation (add_columns, drop_columns, rename_columns, add_fkey_columns, drop_fkey_columns) is required',
+        validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
-        ERROR_CODES.MISSING_FIELD,
-        'Please check the request body, at least one operation(add_columns, drop_columns, rename_columns, add_fkey_columns, drop_fkey_columns) is required'
+        ERROR_CODES.INVALID_INPUT,
+        'Please check the request body, it must conform with the UpdateTableRequest schema.'
       );
     }
 
+    const operations = validation.data;
     const result = await tablesController.updateTableSchema(table, operations);
     successResponse(res, result);
   } catch (error) {

@@ -1,4 +1,4 @@
-import { cn, mapDatabaseTypeToFieldType } from '@/lib/utils/utils';
+import { cn } from '@/lib/utils/utils';
 
 interface TypeBadgeProps {
   type: string;
@@ -14,7 +14,7 @@ export function TypeBadge({ type, className }: TypeBadgeProps) {
         className
       )}
     >
-      <span className="text-xs font-normal text-zinc-500">{mapDatabaseTypeToFieldType(type)}</span>
+      <span className="text-xs font-normal text-zinc-500">{type}</span>
     </div>
   );
 }

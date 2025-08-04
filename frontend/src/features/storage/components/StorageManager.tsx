@@ -127,6 +127,7 @@ export function StorageManager({
         document.body.removeChild(a);
       } catch (error) {
         showToast('Download failed', 'error');
+        console.error(error);
       } finally {
         setDownloadingFiles((prev) => {
           const next = new Set(prev);
@@ -190,7 +191,7 @@ export function StorageManager({
 
   if (objectsError) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="p-6">
         <ErrorState error={objectsError} />
       </div>
     );

@@ -1,38 +1,62 @@
 import { apiClient } from '@/lib/api/client';
 
+// Check if Better Auth is enabled via environment variable
+const ENABLE_BETTER_AUTH = import.meta.env.VITE_ENABLE_BETTER_AUTH === 'true';
+
 export interface User {
   id: string;
   email: string;
+  name?: string;
   created_at: string;
   updated_at: string;
+  role?: string;
 }
 
 export class AuthService {
   async login(email: string, password: string) {
-    const data = await apiClient.request('/auth/admin/login', {
+    const endpoint = ENABLE_BETTER_AUTH ? '/auth/v2/admin/sign-in' : '/auth/admin/login';
+
+    const data = await apiClient.request(endpoint, {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
 
-    if (data.access_token) {
-      apiClient.setToken(data.access_token);
+    // Set token in apiClient
+    const token = ENABLE_BETTER_AUTH ? data.token : data.access_token;
+    if (token) {
+      apiClient.setToken(token);
+    }
+
+    // Return unified format for Better Auth, pass through for legacy
+    if (ENABLE_BETTER_AUTH) {
+      return {
+        access_token: data.token,
+        user: {
+          ...data.user,
+          created_at: data.user.createdAt || data.user.created_at,
+          updated_at: data.user.updatedAt || data.user.updated_at,
+        },
+      };
     }
 
     return data;
   }
 
   async getCurrentUser() {
-    return apiClient.request('/auth/me');
+    // Both Better Auth and legacy use /me endpoint
+    const endpoint = ENABLE_BETTER_AUTH ? '/auth/v2/me' : '/auth/me';
+    const response = await apiClient.request(endpoint);
+    return response.user;
   }
 
-  async logout() {
+  logout() {
     apiClient.clearToken();
   }
 
   // User management
   async getUsers(queryParams: string = '', searchQuery?: string) {
-    // Users are managed through the auth API, not tables
-    let url = '/auth/users';
+    // Build URL based on auth type
+    let url = ENABLE_BETTER_AUTH ? '/auth/v2/admin/users' : '/auth/users';
     const params = new URLSearchParams(queryParams);
 
     if (searchQuery && searchQuery.trim()) {
@@ -44,7 +68,8 @@ export class AuthService {
     }
 
     const data = await apiClient.request(url);
-    // Adapt to backend pagination return structure
+
+    // Both auth types return the same format
     return {
       records: data?.users || [],
       total: data?.total || 0,
@@ -52,35 +77,47 @@ export class AuthService {
   }
 
   async getUser(id: string) {
-    // Individual user fetching not supported by backend
-    // Would need to fetch all users and filter
-    const allUsers = await this.getUsers();
-    const user = allUsers.records.find((u: any) => u.id === id);
-    if (!user) {
-      throw new Error('User not found');
+    if (ENABLE_BETTER_AUTH) {
+      // Better Auth now supports fetching individual users
+      return await apiClient.request(`/auth/v2/admin/users/${id}`);
+    } else {
+      // Legacy auth doesn't support individual user fetching
+      // Need to fetch all users and filter
+      const allUsers = await this.getUsers();
+      const user = allUsers.records.find((u: User) => u.id === id);
+      if (!user) {
+        throw new Error('User not found');
+      }
+      return user;
     }
-    return user;
   }
 
   async register(email: string, password: string, name?: string, id?: string) {
-    return apiClient.request('/auth/register', {
+    const endpoint = ENABLE_BETTER_AUTH ? '/auth/v2/sign-up/email' : '/auth/register';
+    const body = ENABLE_BETTER_AUTH ? { email, password, name } : { email, password, name, id };
+
+    return apiClient.request(endpoint, {
       method: 'POST',
-      body: JSON.stringify({ email, password, name, id }),
+      body: JSON.stringify(body),
     });
   }
 
   async bulkDeleteUsers(userIds: string[]) {
-    return apiClient.request('/auth/users/bulk-delete', {
+    const endpoint = ENABLE_BETTER_AUTH
+      ? '/auth/v2/admin/users/bulk-delete'
+      : '/auth/users/bulk-delete';
+
+    return apiClient.request(endpoint, {
       method: 'DELETE',
       body: JSON.stringify({ userIds }),
     });
   }
-
-  // These operations are not implemented in the backend yet
-  // The backend would need to add:
-  // - PATCH /api/auth/users/:id for updating user email
-  // - DELETE /api/auth/users/:id for deleting users
-  // Profile updates go through /api/profile/me or /api/profile/:id
 }
+
+// These operations are not implemented in the backend yet
+// The backend would need to add:
+// PATCH /api/auth/users/:id for updating user email
+//  DELETE /api/auth/users/:id for deleting users
+// Profile updates go through /api/profile/me or /api/profile/:id
 
 export const authService = new AuthService();

@@ -46,29 +46,29 @@ main_test() {
     
     # Setup tables
     test_fk "POST" "/database/tables" \
-        "{\"table_name\":\"$USERS_TABLE\",\"columns\":[{\"name\":\"name\",\"type\":\"string\",\"nullable\":false}]}" \
+        "{\"table_name\":\"$USERS_TABLE\",\"rls_enabled\":false,\"columns\":[{\"name\":\"name\",\"type\":\"string\",\"nullable\":false,\"is_unique\":false}]}" \
         "Create users table" 201
     
     test_fk "POST" "/database/tables" \
-        "{\"table_name\":\"$POSTS_TABLE\",\"columns\":[{\"name\":\"author_id\",\"type\":\"uuid\",\"nullable\":true}]}" \
+        "{\"table_name\":\"$POSTS_TABLE\",\"rls_enabled\":false,\"columns\":[{\"name\":\"author_id\",\"type\":\"uuid\",\"nullable\":true,\"is_unique\":false}]}" \
         "Create posts table" 201
     
     # Test our error handling
     test_fk "PATCH" "/database/tables/$POSTS_TABLE" \
-        "{\"add_fkey_columns\":[{\"name\":\"author_id\",\"foreign_key\":{\"table\":\"fake_table\",\"column\":\"id\"}}]}" \
+        "{\"add_fkey_columns\":[{\"name\":\"author_id\",\"foreign_key\":{\"reference_table\":\"fake_table\",\"reference_column\":\"id\",\"on_delete\":\"CASCADE\",\"on_update\":\"CASCADE\"}}]}" \
         "Non-existent table → 400" 400
     
     test_fk "PATCH" "/database/tables/$POSTS_TABLE" \
-        "{\"add_fkey_columns\":[{\"name\":\"author_id\",\"foreign_key\":{\"table\":\"$USERS_TABLE\",\"column\":\"name\"}}]}" \
+        "{\"add_fkey_columns\":[{\"name\":\"author_id\",\"foreign_key\":{\"reference_table\":\"$USERS_TABLE\",\"reference_column\":\"name\",\"on_delete\":\"CASCADE\",\"on_update\":\"CASCADE\"}}]}" \
         "Type mismatch → 400" 400
     
     test_fk "PATCH" "/database/tables/$POSTS_TABLE" \
-        "{\"add_columns\":[{\"name\":\"cat_id\",\"type\":\"uuid\",\"nullable\":true,\"foreign_key\":{\"table\":\"fake_cats\",\"column\":\"id\"}}]}" \
+        "{\"add_columns\":[{\"name\":\"cat_id\",\"type\":\"uuid\",\"nullable\":true,\"is_unique\":false,\"foreign_key\":{\"reference_table\":\"fake_cats\",\"reference_column\":\"id\",\"on_delete\":\"CASCADE\",\"on_update\":\"CASCADE\"}}]}" \
         "New column with non-existent table → 400" 400
     
     # Valid FK should work
     test_fk "PATCH" "/database/tables/$POSTS_TABLE" \
-        "{\"add_fkey_columns\":[{\"name\":\"author_id\",\"foreign_key\":{\"table\":\"$USERS_TABLE\",\"column\":\"id\"}}]}" \
+        "{\"add_fkey_columns\":[{\"name\":\"author_id\",\"foreign_key\":{\"reference_table\":\"$USERS_TABLE\",\"reference_column\":\"id\",\"on_delete\":\"CASCADE\",\"on_update\":\"CASCADE\"}}]}" \
         "Valid FK constraint → 200" 200
     
     # Summary

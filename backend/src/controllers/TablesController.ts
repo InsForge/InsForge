@@ -2,21 +2,28 @@ import { DatabaseManager } from '@/core/database/database.js';
 import { MetadataService } from '@/core/metadata/metadata.js';
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
+import { BETTER_AUTH_SYSTEM_TABLES } from '@/utils/constants.js';
 import {
   COLUMN_TYPES,
-  ColumnDefinition,
-  ForeignKeyInfo,
   ForeignKeyRow,
   ColumnInfo,
   PrimaryKeyInfo,
+  ForeignKeyInfo,
+} from '@/types/database.js';
+import {
+  ColumnSchema,
+  ColumnType,
   CreateTableResponse,
   GetTableSchemaResponse,
   UpdateTableSchemaRequest,
   UpdateTableSchemaResponse,
   DeleteTableResponse,
-} from '@/types/database.js';
-import { ColumnType } from '@insforge/shared-schemas';
+  OnDeleteActionSchema,
+  OnUpdateActionSchema,
+  ForeignKeySchema,
+} from '@insforge/shared-schemas';
 import { validateIdentifier } from '@/utils/validations.js';
+import { convertSqlTypeToColumnType } from '@/utils/helpers';
 
 export class TablesController {
   private dbManager: DatabaseManager;
@@ -40,6 +47,7 @@ export class TablesController {
         WHERE table_schema = 'public' 
         AND table_type = 'BASE TABLE'
         AND table_name NOT LIKE '\\_%'
+        AND table_name NOT IN (${BETTER_AUTH_SYSTEM_TABLES.map((t) => `'${t}'`).join(', ')})
       `
       )
       .all();
@@ -52,7 +60,7 @@ export class TablesController {
    */
   async createTable(
     table_name: string,
-    columns: ColumnDefinition[],
+    columns: ColumnSchema[],
     use_RLS = true
   ): Promise<CreateTableResponse> {
     // Validate table name
@@ -70,8 +78,8 @@ export class TablesController {
     // Filter out reserved fields with matching types, throw error for mismatched types
     const validatedColumns = this.validateReservedFields(columns);
 
-    // Validate remaining columns
-    validatedColumns.forEach((col: ColumnDefinition, index: number) => {
+    // Validate remaining columns - only need to validate column names since Zod handles type validation
+    validatedColumns.forEach((col: ColumnSchema, index: number) => {
       // Validate column name
       try {
         validateIdentifier(col.name, 'column');
@@ -85,27 +93,6 @@ export class TablesController {
           );
         }
         throw error;
-      }
-
-      // Validate column type
-      if (!col.type || !(col.type in COLUMN_TYPES)) {
-        throw new AppError(
-          `Invalid type at index ${index}: ${col.type}. Allowed types: ${Object.keys(COLUMN_TYPES).join(', ')}`,
-          400,
-          ERROR_CODES.DATABASE_VALIDATION_ERROR,
-          'Please check the column type, it must be one of the allowed types: ' +
-            Object.keys(COLUMN_TYPES).join(', ')
-        );
-      }
-
-      // Validate nullable is boolean
-      if (typeof col.nullable !== 'boolean') {
-        throw new AppError(
-          `Column 'nullable' must be a boolean at index ${index}`,
-          400,
-          ERROR_CODES.DATABASE_VALIDATION_ERROR,
-          `Column 'nullable' must be a boolean at index ${index}. Please check the column nullable, it must be a boolean.`
-        );
       }
     });
 
@@ -135,7 +122,7 @@ export class TablesController {
 
     // Map columns to SQL with proper type conversion
     const columnDefs = validatedColumns
-      .map((col: ColumnDefinition) => {
+      .map((col: ColumnSchema) => {
         const fieldType = COLUMN_TYPES[col.type];
         const sqlType = fieldType.sqlType;
 
@@ -308,19 +295,23 @@ export class TablesController {
 
     const uniqueSet = new Set(uniqueColumns.map((u: { column_name: string }) => u.column_name));
 
+    // Get row count
+    const { row_count } = await db.prepare(`SELECT COUNT(*) as row_count FROM ${table}`).get();
+
     return {
       table_name: table,
       columns: columns.map((col: ColumnInfo) => ({
         name: col.column_name,
-        type: col.data_type,
+        type: convertSqlTypeToColumnType(col.data_type),
         nullable: col.is_nullable === 'YES',
         primary_key: pkSet.has(col.column_name),
         is_unique: pkSet.has(col.column_name) || uniqueSet.has(col.column_name),
-        default_value: col.column_default,
+        default_value: col.column_default ?? undefined,
         ...(foreignKeyMap.has(col.column_name) && {
           foreign_key: foreignKeyMap.get(col.column_name),
         }),
       })),
+      record_count: row_count,
     };
   }
 
@@ -341,21 +332,6 @@ export class TablesController {
         403,
         ERROR_CODES.DATABASE_FORBIDDEN,
         'System tables cannot be modified. System tables are prefixed with underscore.'
-      );
-    }
-
-    if (
-      !add_columns &&
-      !drop_columns &&
-      !rename_columns &&
-      !add_fkey_columns &&
-      !drop_fkey_columns
-    ) {
-      throw new AppError(
-        'At least one operation (add_columns, drop_columns, rename_columns, add_fkey_columns, drop_fkey_columns) is required',
-        400,
-        ERROR_CODES.MISSING_FIELD,
-        'Please check the request body, at least one operation(add_columns, drop_columns, rename_columns, add_fkey_columns, drop_fkey_columns) is required'
       );
     }
 
@@ -585,13 +561,13 @@ export class TablesController {
     return `"${identifier.replace(/"/g, '""')}"`;
   }
 
-  private validateReservedFields(columns: ColumnDefinition[]): ColumnDefinition[] {
+  private validateReservedFields(columns: ColumnSchema[]): ColumnSchema[] {
     const reservedFields = {
       id: ColumnType.UUID,
       created_at: ColumnType.DATETIME,
       updated_at: ColumnType.DATETIME,
     };
-    return columns.filter((col: ColumnDefinition) => {
+    return columns.filter((col: ColumnSchema) => {
       const reservedType = reservedFields[col.name as keyof typeof reservedFields];
       if (reservedType) {
         // If it's a reserved field name
@@ -613,7 +589,7 @@ export class TablesController {
   }
 
   private generateFkeyConstraintStatement(
-    col: ColumnDefinition,
+    col: { name: string; foreign_key?: ForeignKeySchema },
     include_source_column: boolean = true
   ) {
     if (!col.foreign_key) {
@@ -621,14 +597,14 @@ export class TablesController {
     }
     // Store foreign_key in a const to avoid repeated non-null assertions
     const fk = col.foreign_key;
-    const constraintName = `fk_${col.name}_${fk.table}_${fk.column}`;
+    const constraintName = `fk_${col.name}_${fk.reference_table}_${fk.reference_column}`;
     const onDelete = fk.on_delete || 'RESTRICT';
     const onUpdate = fk.on_update || 'RESTRICT';
 
     if (include_source_column) {
-      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} FOREIGN KEY (${this.quoteIdentifier(col.name)}) REFERENCES ${this.quoteIdentifier(fk.table)}(${this.quoteIdentifier(fk.column)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
+      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} FOREIGN KEY (${this.quoteIdentifier(col.name)}) REFERENCES ${this.quoteIdentifier(fk.reference_table)}(${this.quoteIdentifier(fk.reference_column)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
     } else {
-      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} REFERENCES ${this.quoteIdentifier(fk.table)}(${this.quoteIdentifier(fk.column)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
+      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} REFERENCES ${this.quoteIdentifier(fk.reference_table)}(${this.quoteIdentifier(fk.reference_column)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
     }
   }
 
@@ -667,8 +643,8 @@ export class TablesController {
         constraint_name: fk.constraint_name,
         reference_table: fk.foreign_table,
         reference_column: fk.foreign_column,
-        on_delete: fk.on_delete,
-        on_update: fk.on_update,
+        on_delete: fk.on_delete as OnDeleteActionSchema,
+        on_update: fk.on_update as OnUpdateActionSchema,
       });
     });
     return foreignKeyMap;
@@ -692,22 +668,7 @@ export class TablesController {
 
     if (add_fkey_columns && Array.isArray(add_fkey_columns)) {
       for (const col of add_fkey_columns) {
-        if (!col.name) {
-          throw new AppError(
-            'Source Column name are required',
-            400,
-            ERROR_CODES.MISSING_FIELD,
-            'Please check the request body, column name are required'
-          );
-        }
-        if (!col.foreign_key || !col.foreign_key.table || !col.foreign_key.column) {
-          throw new AppError(
-            'Target table/column are required',
-            400,
-            ERROR_CODES.MISSING_FIELD,
-            'Please check the request body, target table/column are required.'
-          );
-        }
+        // Zod already validates that name and foreign_key fields are present
         if (foreignKeyMap.has(col.name)) {
           throw new AppError(
             `Foreigh Key on Column(${col.name}) already exists`,
@@ -721,9 +682,7 @@ export class TablesController {
 
     if (drop_fkey_columns && Array.isArray(drop_fkey_columns)) {
       for (const col of drop_fkey_columns) {
-        if (!col.name) {
-          throw new AppError('Column name are required', 400, ERROR_CODES.MISSING_FIELD);
-        }
+        // Zod already validates that name is present
         if (!columnSet.has(col.name)) {
           throw new AppError(
             `Column(${col.name}) not found`,
@@ -746,9 +705,7 @@ export class TablesController {
     // First, validate and simulate drop columns (these happen first)
     if (drop_columns && Array.isArray(drop_columns)) {
       for (const col of drop_columns) {
-        if (!col.name) {
-          throw new AppError('Column name are required', 400, ERROR_CODES.MISSING_FIELD);
-        }
+        // Zod already validates that name is present
         if (!workingColumnSet.has(col.name)) {
           throw new AppError(
             `Column(${col.name}) not found`,
@@ -764,20 +721,7 @@ export class TablesController {
 
     if (add_columns && Array.isArray(add_columns)) {
       for (const col of add_columns) {
-        if (!col.name || !col.type) {
-          throw new AppError('Column name and type are required', 400, ERROR_CODES.MISSING_FIELD);
-        }
-
-        const fieldType = COLUMN_TYPES[col.type as ColumnType];
-        if (!fieldType) {
-          throw new AppError(
-            `Invalid column type: ${col.type}`,
-            400,
-            ERROR_CODES.DATABASE_VALIDATION_ERROR,
-            'Please check the column type, it must be one of the allowed types: ' +
-              Object.keys(COLUMN_TYPES).join(', ')
-          );
-        }
+        // Zod already validates column name, type, and that type is valid
 
         if (workingColumnSet.has(col.name)) {
           throw new AppError(
@@ -794,9 +738,7 @@ export class TablesController {
 
     if (rename_columns && typeof rename_columns === 'object') {
       for (const [oldName, newName] of Object.entries(rename_columns)) {
-        if (!oldName || !newName) {
-          throw new AppError('Old name and new name are required', 400, ERROR_CODES.MISSING_FIELD);
-        }
+        // Zod validates that rename_columns is a record of strings
         if (!workingColumnSet.has(oldName)) {
           throw new AppError(
             `Column(${oldName}) not found`,

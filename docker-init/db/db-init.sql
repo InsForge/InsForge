@@ -16,10 +16,10 @@ GRANT USAGE ON SCHEMA public TO project_admin;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO project_admin;
 
 -- Grant permissions to roles
--- anon: read-only access
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
+-- NOTICE: The anon role is intended for unauthenticated users, so it should only have read access.
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT SELECT ON TABLES TO anon;
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public

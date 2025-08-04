@@ -15,7 +15,6 @@ import { apiClient } from '@/lib/api/client';
 import { UseFormReturn } from 'react-hook-form';
 import { TableFormSchema, TableFormForeignKeySchema } from '../schema';
 import { ColumnSchema, OnDeleteActionSchema, OnUpdateActionSchema } from '@insforge/shared-schemas';
-import { mapDatabaseTypeToFieldType } from '@/lib/utils/utils';
 
 interface ForeignKeyPopoverProps {
   form: UseFormReturn<TableFormSchema>;
@@ -230,8 +229,7 @@ export function ForeignKeyPopover({
 
                           return (
                             <SelectItem key={col.name} value={col.name} disabled={isDisabled}>
-                              {col.name} ({mapDatabaseTypeToFieldType(col.type)}){' '}
-                              {col.is_unique && ' (unique)'}
+                              {col.name} ({col.type}) {col.is_unique && ' (unique)'}
                             </SelectItem>
                           );
                         });

@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
@@ -23,7 +22,7 @@ import { StorageService } from '@/core/storage/storage.js';
 import { MetadataService } from '@/core/metadata/metadata.js';
 import { WebSocketService } from '@/core/websocket/websocket.js';
 import { seedAdmin } from '@/utils/seed.js';
-// import { EtcdServiceRegistry } from '@/utils/etcd-service-registry.js';
+import logger from '@/utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -61,8 +60,42 @@ export async function createApp() {
   // Basic middleware
   app.use(cors());
   app.use(limiter);
-  app.use((req: Request, _res: Response, next: NextFunction) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const startTime = Date.now();
+    const originalSend = res.send;
+    const originalJson = res.json;
+
+    // Track response size
+    let responseSize = 0;
+
+    // Override send method
+    res.send = function (data: any) {
+      if (data) {
+        responseSize = Buffer.byteLength(typeof data === 'string' ? data : JSON.stringify(data));
+      }
+      return originalSend.call(this, data);
+    };
+    // Override json method
+    res.json = function (data: any) {
+      if (data) {
+        responseSize = Buffer.byteLength(JSON.stringify(data));
+      }
+      return originalJson.call(this, data);
+    };
+    // Log after response is finished
+    res.on('finish', () => {
+      const duration = Date.now() - startTime;
+      logger.info('HTTP Request', {
+        method: req.method,
+        path: req.path,
+        status: res.statusCode,
+        size: responseSize,
+        duration: `${duration}ms`,
+        ip: req.ip || req.socket.remoteAddress,
+        userAgent: req.headers['user-agent'],
+        timestamp: new Date().toISOString(),
+      });
+    });
     next();
   });
 
@@ -73,7 +106,7 @@ export async function createApp() {
     const { auth } = await import('@/lib/better-auth.js');
     // Better Auth handles its own body parsing
     app.all('/api/auth/v2/*', toNodeHandler(auth));
-    console.log('Better Auth enabled at /api/auth/v2');
+    logger.info('Better Auth enabled at /api/auth/v2');
   }
 
   // Apply JSON middleware after Better Auth
@@ -136,7 +169,10 @@ export async function createApp() {
 
       res.status(response.status).send(await response.text());
     } catch (error) {
-      console.error('Failed to execute function:', error);
+      logger.error('Failed to execute function', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       res.status(502).json({ error: 'Failed to execute function' });
     }
   });
@@ -176,14 +212,17 @@ async function initializeServer() {
   try {
     const app = await createApp();
     const server = app.listen(PORT, () => {
-      console.log(`Backend API service listening on port ${PORT}`);
+      logger.info(`Backend API service listening on port ${PORT}`);
     });
 
     // Initialize WebSocket service
     const wsService = WebSocketService.getInstance();
     wsService.initialize(server);
   } catch (error) {
-    console.error('Failed to initialize server:', error);
+    logger.error('Failed to initialize server', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     process.exit(1);
   }
 }
@@ -191,7 +230,7 @@ async function initializeServer() {
 void initializeServer();
 
 function cleanup() {
-  console.log('Shutting down gracefully...');
+  logger.info('Shutting down gracefully...');
   process.exit(0);
 }
 

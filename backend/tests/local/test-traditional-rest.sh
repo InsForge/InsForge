@@ -111,9 +111,10 @@ if echo "$auth_response" | grep -q '"access_token"'; then
         -H "Content-Type: application/json" \
         -d "{
             \"table_name\": \"$TABLE_NAME\",
+            \"rls_enabled\": false,
             \"columns\": [
-                {\"name\": \"id\", \"type\": \"uuid\", \"nullable\": false, \"default_value\": \"gen_random_uuid()\"},
-                {\"name\": \"title\", \"type\": \"string\", \"nullable\": false}
+                {\"name\": \"id\", \"type\": \"uuid\", \"nullable\": false, \"is_unique\": false, \"default_value\": \"gen_random_uuid()\"},
+                {\"name\": \"title\", \"type\": \"string\", \"nullable\": false, \"is_unique\": false}
             ]
         }")
     

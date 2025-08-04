@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
-import { ColumnSchema } from '@/features/database/schema';
+import { ColumnSchema } from '@insforge/shared-schemas';
 
 interface SchemaResponse {
   table_name: string;

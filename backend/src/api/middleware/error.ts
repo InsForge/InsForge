@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { DatabaseError } from 'pg';
 import { errorResponse } from '@/utils/response.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
+import logger from '@/utils/logger.js';
 
 export class AppError extends Error {
   constructor(
@@ -138,7 +139,10 @@ function getErrorStatus(err: unknown): number | undefined {
 export function errorMiddleware(err: unknown, _req: Request, res: Response, _next: NextFunction) {
   // Only log non-authentication errors or unexpected errors
   if (!(err instanceof AppError && err.statusCode === 401)) {
-    console.error('Error:', err);
+    logger.error('Error occurred', {
+      error: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+    });
   }
 
   // Handle known AppError instances

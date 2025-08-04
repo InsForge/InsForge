@@ -1,8 +1,12 @@
 import { Router } from 'express';
 import { readFile } from 'fs/promises';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { successResponse, errorResponse } from '@/utils/response.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const router = Router();
 
@@ -28,7 +32,9 @@ router.get('/:docType', async (req, res, next) => {
     }
 
     // Read the documentation file
-    const filePath = path.resolve(process.cwd(), 'docs', docFileName);
+    // PROJECT_ROOT is set in the docker-compose.yml file to point to the InsForge directory
+    const projectRoot = process.env.PROJECT_ROOT || path.resolve(__dirname, '../../../..');
+    const filePath = path.join(projectRoot, 'docs', docFileName);
     const content = await readFile(filePath, 'utf-8');
 
     // Traditional REST: return documentation directly

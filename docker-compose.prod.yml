@@ -37,7 +37,10 @@ services:
     ports:
       - "5430:3000"
     depends_on:
-      - postgres
+      vector:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     networks:
       - insforge-network
 
@@ -49,11 +52,14 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      vector:
+        condition: service_healthy
     ports:
       - "7130:7130"
       - "7131:7131"
     environment:
       - PORT=7130
+      - PROJECT_ROOT=/app
       - API_BASE_URL=http://localhost:7130
       - VITE_API_BASE_URL=http://localhost:7130
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}

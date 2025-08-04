@@ -9,6 +9,7 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { validateEmail } from '@/utils/validations.js';
 import { UserWithProfile } from '@/types/profile.js';
 import { OAuthConfig, ConfigRecord } from '@/types/auth.js';
+import logger from '@/utils/logger.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -309,7 +310,9 @@ router.get('/v1/google-auth', async (req: Request, res: Response, next: NextFunc
       auth_url: authUrl,
     });
   } catch (error) {
-    console.error('Google OAuth error:', error);
+    logger.error('Google OAuth error', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     if (error instanceof Error && error.message.includes('environment variable is not set')) {
       next(
         new AppError(
@@ -341,7 +344,9 @@ router.get('/v1/github-auth', async (req: Request, res: Response, next: NextFunc
     const authUrl = await authService.generateGitHubAuthUrl(state || undefined);
     successResponse(res, { auth_url: authUrl });
   } catch (error) {
-    console.error('GitHub OAuth error:', error);
+    logger.error('GitHub OAuth error', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     if (error instanceof Error && error.message.includes('environment variable is not set')) {
       next(
         new AppError(
@@ -375,7 +380,9 @@ router.get('/v1/callback', async (req: Request, res: Response, next: NextFunctio
           provider = stateData.provider;
         }
       } catch (error) {
-        console.error('Failed to parse state parameter:', error);
+        logger.error('Failed to parse state parameter', {
+          error: error instanceof Error ? error.message : String(error),
+        });
         // Fallback to default redirect
       }
     }
@@ -492,7 +499,10 @@ router.get('/v1/callback', async (req: Request, res: Response, next: NextFunctio
       // Redirect to the final URL
       return res.redirect(redirectUrl.toString());
     } catch (error) {
-      console.error(`Error processing ${provider} token:`, error);
+      logger.error('Error processing OAuth token', {
+        provider,
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw new AppError(
         `Failed to verify ${provider} token, cause: ${error}`,
         401,
@@ -500,7 +510,9 @@ router.get('/v1/callback', async (req: Request, res: Response, next: NextFunctio
       );
     }
   } catch (error) {
-    console.error('Error in OAuth callback:', error);
+    logger.error('Error in OAuth callback', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     next(error);
   }
 });
@@ -552,13 +564,16 @@ router.get(
           try {
             value = JSON.parse(config.value);
           } catch (parseError) {
-            console.error(`Failed to parse JSON for ${config.key}:`, parseError);
+            logger.error('Failed to parse JSON for config key', {
+              key: config.key,
+              error: parseError instanceof Error ? parseError.message : String(parseError),
+            });
             return; // Skip this config entry
           }
 
           // Validate parsed value is an object
           if (typeof value !== 'object' || !value) {
-            console.error(`Invalid config value for ${config.key}: expected object`);
+            logger.error(`Invalid config value for ${config.key}: expected object`);
             return;
           }
 
@@ -576,7 +591,10 @@ router.get(
             };
           }
         } catch (e) {
-          console.error('Failed to process OAuth config:', config.key, e);
+          logger.error('Failed to process OAuth config', {
+            key: config.key,
+            error: e instanceof Error ? e.message : String(e),
+          });
         }
       });
 

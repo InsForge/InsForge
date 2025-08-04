@@ -3,6 +3,8 @@ import { ColumnSchema, TableSchema, DatabaseSchema } from '@/types/database.js';
 import { StorageConfig } from '@/types/storage.js';
 import { AuthConfig } from '@/types/auth.js';
 import { AppMetadata } from '@/types/metadata.js';
+import logger from '@/utils/logger.js';
+import { BETTER_AUTH_SYSTEM_TABLES } from '@/utils/constants.js';
 
 export class MetadataService {
   private static instance: MetadataService;
@@ -62,6 +64,7 @@ export class MetadataService {
 
   async updateDatabaseMetadata(): Promise<void> {
     // Get all tables excluding system tables (those starting with _) except _auth, and logs
+    // Also exclude Better Auth system tables
     const allTables = (await this.db
       .prepare(
         `
@@ -71,6 +74,7 @@ export class MetadataService {
       AND table_type = 'BASE TABLE'
       AND (table_name NOT LIKE '\\_%' OR table_name = '_auth')
       AND table_name != 'logs'
+      AND table_name NOT IN (${BETTER_AUTH_SYSTEM_TABLES.map((t) => `'${t}'`).join(', ')})
       ORDER BY table_name
     `
       )
@@ -231,10 +235,10 @@ export class MetadataService {
         }
       } catch (error) {
         // Handle any unexpected errors
-        console.warn(
-          `Warning: Could not get record count for table ${table.name}:`,
-          error instanceof Error ? error.message : 'Unknown error'
-        );
+        logger.warn('Could not get record count for table', {
+          table: table.name,
+          error: error instanceof Error ? error.message : String(error),
+        });
         recordCount = 0;
       }
 
@@ -365,7 +369,9 @@ export class MetadataService {
       // PostgreSQL returns size in bytes, convert to GB
       return (result?.size || 0) / (1024 * 1024 * 1024);
     } catch (error) {
-      console.error('Error getting database size:', error);
+      logger.error('Error getting database size', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return 0;
     }
   }
@@ -385,7 +391,9 @@ export class MetadataService {
       // Convert bytes to GB
       return (result?.total_size || 0) / (1024 * 1024 * 1024);
     } catch (error) {
-      console.error('Error getting storage size:', error);
+      logger.error('Error getting storage size', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return 0;
     }
   }

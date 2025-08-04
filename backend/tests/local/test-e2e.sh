@@ -116,10 +116,11 @@ response=$(curl -s -w "\n%{http_code}" -X POST "$TEST_API_BASE/database/tables" 
   -H "Content-Type: application/json" \
   -d "{
     \"table_name\": \"$TEST_TABLE\",
+    \"rls_enabled\": false,
     \"columns\": [
-      {\"name\": \"title\", \"type\": \"string\", \"nullable\": false},
-      {\"name\": \"completed\", \"type\": \"boolean\", \"nullable\": false, \"default_value\": \"false\"},
-      {\"name\": \"user_id\", \"type\": \"uuid\", \"nullable\": false}
+      {\"name\": \"title\", \"type\": \"string\", \"nullable\": false, \"is_unique\": false},
+      {\"name\": \"completed\", \"type\": \"boolean\", \"nullable\": false, \"is_unique\": false, \"default_value\": \"false\"},
+      {\"name\": \"user_id\", \"type\": \"uuid\", \"nullable\": false, \"is_unique\": false}
     ]
   }")
 test_endpoint "Create table" "$response" "201"
