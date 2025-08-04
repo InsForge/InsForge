@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import CursorLogoIcon from '@/assets/icons/cursor_logo.svg';
-import { createMCPServerConfig, type PlatformType } from '@/config/mcp-agents';
+import { createMCPServerConfig, type PlatformType } from '@/components/mcp/mcp-agents';
 
 interface CursorDeeplinkGeneratorProps {
   apiKey?: string;

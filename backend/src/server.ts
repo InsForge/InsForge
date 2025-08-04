@@ -20,6 +20,7 @@ import fetch from 'node-fetch';
 import { DatabaseManager } from '@/core/database/database.js';
 import { StorageService } from '@/core/storage/storage.js';
 import { MetadataService } from '@/core/metadata/metadata.js';
+import { WebSocketService } from '@/core/websocket/websocket.js';
 import { seedAdmin } from '@/utils/seed.js';
 import logger from '@/utils/logger.js';
 
@@ -210,9 +211,13 @@ const PORT = parseInt(process.env.PORT || '7130');
 async function initializeServer() {
   try {
     const app = await createApp();
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       logger.info(`Backend API service listening on port ${PORT}`);
     });
+
+    // Initialize WebSocket service
+    const wsService = WebSocketService.getInstance();
+    wsService.initialize(server);
   } catch (error) {
     logger.error('Failed to initialize server', {
       error: error instanceof Error ? error.message : String(error),
