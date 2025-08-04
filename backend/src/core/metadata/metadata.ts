@@ -71,7 +71,7 @@ export class MetadataService {
 
   async updateDatabaseMetadata(): Promise<void> {
     // Get all tables excluding system tables (those starting with _) and logs
-    // Also exclude Better Auth system tables
+    // Also exclude Better Auth system tables, except for user table
     const allTables = (await this.db
       .prepare(
         `
