@@ -15,38 +15,20 @@ export function useOnboardingCompletion() {
       }
     };
 
-    const handleCustomEvent = (event: CustomEvent) => {
-      if (typeof event.detail === 'boolean') {
-        setIsCompleted(event.detail);
-      }
-    };
-
+    // Only listen to storage events from other tabs/windows
     window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('onboarding-completion-change', handleCustomEvent as EventListener);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener(
-        'onboarding-completion-change',
-        handleCustomEvent as EventListener
-      );
     };
   }, []);
 
   const markAsCompleted = () => {
-    setIsCompleted(true);
     localStorage.setItem(ONBOARDING_COMPLETION_KEY, 'true');
-
-    // Dispatch custom event for same-tab components
-    window.dispatchEvent(new CustomEvent('onboarding-completion-change', { detail: true }));
   };
 
   const resetCompletion = () => {
-    setIsCompleted(false);
     localStorage.setItem(ONBOARDING_COMPLETION_KEY, 'false');
-
-    // Dispatch custom event for same-tab components
-    window.dispatchEvent(new CustomEvent('onboarding-completion-change', { detail: false }));
   };
 
   return {
@@ -59,7 +41,4 @@ export function useOnboardingCompletion() {
 // Export utility function for direct usage
 export const markOnboardingAsCompleted = () => {
   localStorage.setItem(ONBOARDING_COMPLETION_KEY, 'true');
-
-  // Dispatch custom event for same-tab components
-  window.dispatchEvent(new CustomEvent('onboarding-completion-change', { detail: true }));
 };

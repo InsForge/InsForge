@@ -13,14 +13,14 @@ export function CompletionCard() {
     markAsCompleted();
   }, [markAsCompleted]);
 
-  const handleNavigate = () => {
-    navigate('/dashboard');
+  const handleNavigate = async () => {
+    await navigate('/dashboard');
   };
 
   return (
     <div className="bg-white py-8 px-6 rounded-xl border border-border-gray">
       <div className="flex flex-col items-center justify-center gap-8">
-        <div className="flex flex-col items-center justify-center gap-4">
+        <div className="flex flex-col items-center justify-center gap-4 text-center">
           <img src={CheckedIcon} alt="Checked" className="w-10 h-10" />
           <p className="text-lg font-semibold text-black">You are all set!</p>
           <p className="text-zinc-500 text-sm">
@@ -31,7 +31,7 @@ export function CompletionCard() {
         <Button
           variant="default"
           className="px-4 py-2 h-10 text-sm font-medium"
-          onClick={handleNavigate}
+          onClick={() => void handleNavigate()}
         >
           Go to Dashboard
         </Button>
