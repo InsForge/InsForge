@@ -4,12 +4,13 @@ import { ClockIcon } from 'lucide-react';
 import CheckedIcon from '@/assets/icons/checked.svg';
 import { useEffect, useState } from 'react';
 
+const httpUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:7130';
+const wsUrl = `${httpUrl.replace(/^http/, 'ws')}/ws/onboarding`;
+
 export function Step3() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [waitingForResponse, setWaitingForResponse] = useState(false);
 
-  // Get WebSocket URL from current location
-  const wsUrl = `ws://localhost:7130/ws/onboarding`;
   const { mcpConnected, connect, disconnect } = useWebSocket(wsUrl);
 
   // Connect to WebSocket on mount
