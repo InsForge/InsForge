@@ -54,7 +54,8 @@ export class WebSocketService {
       });
 
       // Handle errors
-      ws.on('error', () => {
+      ws.on('error', (error) => {
+        console.error('WebSocket client error:', error);
         this.clients.delete(ws);
       });
     });
