@@ -22,13 +22,22 @@ export class WebSocketService {
   }
 
   initialize(server: Server): void {
+    console.log('[WebSocketService] initializing on HTTP server…');
     this.wss = new WebSocketServer({
       server,
       path: '/ws/onboarding',
     });
 
+    server.on('upgrade', (_req, _socket, _head) => {
+      // Log upgrade request details
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[WebSocketService] HTTP Upgrade requested');
+      }
+    });
+
     this.wss.on('connection', (ws: WebSocket) => {
       // Add client to the set
+      console.log('[WebSocketService] 🎉 New WS connection! total clients:', this.clients.size + 1);
       this.clients.add(ws);
 
       // Send welcome message
@@ -59,11 +68,18 @@ export class WebSocketService {
         this.clients.delete(ws);
       });
     });
+
+    this.wss.on('listening', () =>
+      console.log('[WebSocketService] WSS is listening on /ws/onboarding')
+    );
+
+    this.wss.on('error', (err) => console.error('[WebSocketService] WSS error:', err));
   }
 
   private handleClientMessage(ws: WebSocket, message: any): void {
     // Handle ping/pong for connection health
     if (message.type === 'ping') {
+      console.log('ping');
       this.sendToClient(ws, {
         type: 'pong',
         timestamp: Date.now(),

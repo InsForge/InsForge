@@ -6,7 +6,12 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/radix/Tabs';
 import { Alert, AlertDescription } from '@/components/radix/Alert';
 import { JsonHighlight } from '@/components/JsonHighlight';
 import { CursorDeeplinkGenerator } from './CursorDeeplinkGenerator';
-import { MCP_AGENTS, createMCPConfig, type MCPAgent, type PlatformType } from '@/components/mcp/mcp-agents';
+import {
+  MCP_AGENTS,
+  createMCPConfig,
+  type MCPAgent,
+  type PlatformType,
+} from '@/components/mcp/mcp-agents';
 import { metadataService } from '@/features/dashboard/services/metadata.service';
 
 interface MCPInstallerProps {
@@ -77,7 +82,7 @@ export function MCPInstaller({ className, defaultAgent = 'cursor' }: MCPInstalle
 
           {/* Command Block */}
           <CodeBlock
-            code={selectedAgent.installCommand || ''}
+            code={selectedAgent.installCommand?.() || ''}
             className="bg-slate-50 w-full font-normal text-blue-800"
           />
         </div>
