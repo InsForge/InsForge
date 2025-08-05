@@ -3,7 +3,7 @@ import { Server } from 'http';
 
 export interface WebSocketMessage {
   type: string;
-  payload?: any;
+  payload?: unknown;
   timestamp: number;
 }
 
@@ -22,32 +22,20 @@ export class WebSocketService {
   }
 
   initialize(server: Server): void {
-    console.log('[WebSocketService] initializing on HTTP server…');
     this.wss = new WebSocketServer({
       server,
       path: '/ws/onboarding',
     });
 
-    server.on('upgrade', (_req, _socket, _head) => {
-      // Log upgrade request details
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[WebSocketService] HTTP Upgrade requested');
-      }
-    });
-
     this.wss.on('connection', (ws: WebSocket) => {
-      // Add client to the set
-      console.log('[WebSocketService] 🎉 New WS connection! total clients:', this.clients.size + 1);
       this.clients.add(ws);
 
-      // Send welcome message
       this.sendToClient(ws, {
         type: 'connection_established',
         payload: { message: 'WebSocket connection established' },
         timestamp: Date.now(),
       });
 
-      // Handle client messages
       ws.on('message', (data: Buffer) => {
         try {
           const message = JSON.parse(data.toString());
@@ -57,29 +45,18 @@ export class WebSocketService {
         }
       });
 
-      // Handle client disconnect
       ws.on('close', () => {
         this.clients.delete(ws);
       });
 
-      // Handle errors
-      ws.on('error', (error) => {
-        console.error('WebSocket client error:', error);
+      ws.on('error', () => {
         this.clients.delete(ws);
       });
     });
-
-    this.wss.on('listening', () =>
-      console.log('[WebSocketService] WSS is listening on /ws/onboarding')
-    );
-
-    this.wss.on('error', (err) => console.error('[WebSocketService] WSS error:', err));
   }
 
-  private handleClientMessage(ws: WebSocket, message: any): void {
-    // Handle ping/pong for connection health
+  private handleClientMessage(ws: WebSocket, message: { type: string; timestamp?: number }): void {
     if (message.type === 'ping') {
-      console.log('ping');
       this.sendToClient(ws, {
         type: 'pong',
         timestamp: Date.now(),
@@ -93,7 +70,6 @@ export class WebSocketService {
     }
   }
 
-  // Public method to broadcast backend connection success
   broadcastBackendConnectionSuccess(): void {
     const message: WebSocketMessage = {
       type: 'backend_connection_success',
@@ -108,16 +84,8 @@ export class WebSocketService {
     this.broadcast(message);
   }
 
-  // Alias for backward compatibility
-  broadcastMCPConnectionSuccess(): void {
-    this.broadcastBackendConnectionSuccess();
-  }
-
-  // Broadcast message to all connected clients
   private broadcast(message: WebSocketMessage): void {
     const messageStr = JSON.stringify(message);
-
-    // Remove disconnected clients and send to active ones
     const disconnectedClients: WebSocket[] = [];
 
     this.clients.forEach((ws) => {
@@ -128,18 +96,15 @@ export class WebSocketService {
       }
     });
 
-    // Clean up disconnected clients
     disconnectedClients.forEach((ws) => {
       this.clients.delete(ws);
     });
   }
 
-  // Get connection status
   getConnectionCount(): number {
     return this.clients.size;
   }
 
-  // Close all connections
   close(): void {
     if (this.wss) {
       this.wss.close();

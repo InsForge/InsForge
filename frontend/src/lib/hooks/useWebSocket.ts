@@ -2,17 +2,15 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 
 export interface WebSocketMessage {
   type: string;
-  payload?: any;
+  payload?: unknown;
   timestamp: number;
 }
 
 export interface UseWebSocketReturn {
   isConnected: boolean;
   backendConnected: boolean;
-  mcpConnected: boolean; // Alias for backward compatibility
   connectionError: string | null;
   connect: () => void;
-  disconnect: () => void;
   sendMessage: (message: WebSocketMessage) => void;
 }
 
@@ -25,7 +23,6 @@ export function useWebSocket(url: string): UseWebSocketReturn {
 
   const connect = useCallback(() => {
     try {
-      // Clear any existing timeout
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
@@ -38,7 +35,6 @@ export function useWebSocket(url: string): UseWebSocketReturn {
         setIsConnected(true);
         setConnectionError(null);
 
-        // Send ping to maintain connection
         ws.send(
           JSON.stringify({
             type: 'ping',
@@ -59,12 +55,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
               setBackendConnected(true);
               break;
 
-            case 'mcp_connection_success':
-              setBackendConnected(true);
-              break;
-
             case 'pong':
-              // Handle pong response
               break;
 
             default:
@@ -74,18 +65,13 @@ export function useWebSocket(url: string): UseWebSocketReturn {
         }
       };
 
-      ws.onclose = (event) => {
+      ws.onclose = () => {
         setIsConnected(false);
         wsRef.current = null;
-
-        // Only attempt reconnection if it wasn't a manual close
-        if (event.code !== 1000) {
-          setConnectionError('Connection lost. Attempting to reconnect...');
-          // Auto-reconnect after 3 seconds
-          reconnectTimeoutRef.current = setTimeout(() => {
-            connect();
-          }, 3000);
-        }
+        setConnectionError('Connection lost. Attempting to reconnect...');
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connect();
+        }, 3000);
       };
 
       ws.onerror = (error) => {
@@ -99,21 +85,6 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     }
   }, [url]);
 
-  const disconnect = useCallback(() => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
-    }
-
-    if (wsRef.current) {
-      wsRef.current.close(1000, 'Manual disconnect');
-      wsRef.current = null;
-    }
-    setIsConnected(false);
-    setBackendConnected(false);
-    setConnectionError(null);
-  }, []);
-
   const sendMessage = useCallback((message: WebSocketMessage) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(message));
@@ -124,17 +95,20 @@ export function useWebSocket(url: string): UseWebSocketReturn {
 
   useEffect(() => {
     return () => {
-      disconnect();
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
     };
-  }, [disconnect]);
+  }, []);
 
   return {
     isConnected,
     backendConnected,
-    mcpConnected: backendConnected, // Alias for backward compatibility
     connectionError,
     connect,
-    disconnect,
     sendMessage,
   };
 }
