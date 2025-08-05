@@ -50,8 +50,8 @@ The `user` table is **protected** by Better Auth:
 
 ### 🚨 IMPORTANT: Correct Auth Endpoints
 - **✅ CORRECT**: Use `/api/auth/v2/me` to check current user
-- After successful authentication, redirect to your application's main page
-- Store session tokens (for users) or JWT tokens (for admins) and include as `Authorization: Bearer {token}` header for authenticated requests
+- `/api/auth/v2/me` returns `{"user": {...}}` - nested structure
+- Store tokens and include as `Authorization: Bearer {token}` header
 
 ### Regular API Response Format
 
