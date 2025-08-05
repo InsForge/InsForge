@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/radix/Button';
-import { useOnboardStep, type OnboardStep, STEP_DESCRIPTIONS } from '@/lib/hooks/useOnboardStep';
+import {
+  useOnboardStep,
+  type OnboardStep,
+  STEP_DESCRIPTIONS,
+} from '@/lib/contexts/OnboardStepContext';
 import { LinearStepper } from '@/components/Stepper';
 import { StepContent } from '../components/StepContent';
 import { CompletionCard } from '../components/CompletionCard';
