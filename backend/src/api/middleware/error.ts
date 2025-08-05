@@ -29,16 +29,16 @@ const POSTGRES_ERROR_HANDLERS: Record<
     const fieldName = fieldMatch ? fieldMatch[1] : 'field';
     return {
       code: ERROR_CODES.ALREADY_EXISTS,
-      message: `A record with this ${fieldName} already exists.`,
+      message: err.message,
       statusCode: 409,
       nextAction: NEXT_ACTION.CHECK_UNIQUE_FIELD(fieldName),
     };
   },
-  '23503': () => {
+  '23503': (err) => {
     // foreign_key_violation
     return {
       code: ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION,
-      message: 'Referenced record does not exist.',
+      message: err.message,
       statusCode: 400,
       nextAction: NEXT_ACTION.CHECK_REFERENCE_EXISTS,
     };
@@ -48,15 +48,15 @@ const POSTGRES_ERROR_HANDLERS: Record<
     const column = err.column || '';
     return {
       code: ERROR_CODES.MISSING_FIELD,
-      message: `The ${column} field is required and cannot be empty.`,
+      message: err.message,
       statusCode: 400,
       nextAction: NEXT_ACTION.FILL_REQUIRED_FIELD(column),
     };
   },
-  '42P01': () => ({
+  '42P01': (err) => ({
     // undefined_table
     code: ERROR_CODES.DATABASE_VALIDATION_ERROR,
-    message: 'Table not found',
+    message: err.message,
     statusCode: 400,
     nextAction: NEXT_ACTION.CHECK_TABLE_EXISTS,
   }),
@@ -72,24 +72,24 @@ const POSTGRES_ERROR_HANDLERS: Record<
       nextAction: NEXT_ACTION.REMOVE_DUPLICATE_COLUMN(columnName),
     };
   },
-  '42703': () => ({
+  '42703': (err) => ({
     // undefined_column
     code: ERROR_CODES.DATABASE_VALIDATION_ERROR,
-    message: 'Column does not exist',
+    message: err.message,
     statusCode: 400,
     nextAction: NEXT_ACTION.CHECK_COLUMN_EXISTS,
   }),
-  '42830': () => ({
+  '42830': (err) => ({
     // invalid_foreign_key
     code: ERROR_CODES.DATABASE_VALIDATION_ERROR,
-    message: 'Invalid foreign key constraint',
+    message: err.message,
     statusCode: 400,
     nextAction: NEXT_ACTION.CHECK_UNIQUE_CONSTRAINT,
   }),
-  '42804': () => ({
+  '42804': (err) => ({
     // datatype_mismatch
     code: ERROR_CODES.DATABASE_VALIDATION_ERROR,
-    message: 'Foreign key constraint cannot be created due to incompatible column types',
+    message: err.message,
     statusCode: 400,
     nextAction: NEXT_ACTION.CHECK_DATATYPE_MATCH,
   }),
@@ -156,7 +156,7 @@ export function errorMiddleware(err: unknown, _req: Request, res: Response, _nex
     return errorResponse(
       res,
       ERROR_CODES.INVALID_INPUT,
-      'Invalid JSON format',
+      err.message,
       400,
       'Please ensure your request body contains valid JSON'
     );
