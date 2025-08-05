@@ -13,14 +13,9 @@ import { useOnboardStep, STEP_DESCRIPTIONS } from '@/lib/contexts/OnboardStepCon
 interface OnboardButtonProps {
   isCollapsed: boolean;
   onMobileToggle?: () => void;
-  isMobile?: boolean;
 }
 
-export function OnboardButton({
-  isCollapsed,
-  onMobileToggle,
-  isMobile = false,
-}: OnboardButtonProps) {
+export function OnboardButton({ isCollapsed, onMobileToggle }: OnboardButtonProps) {
   const location = useLocation();
   const { currentStep, totalSteps } = useOnboardStep();
 
@@ -35,11 +30,9 @@ export function OnboardButton({
       variant="ghost"
       className={cn(
         'relative transition-all duration-200 ease-in-out group border-2 rounded-lg',
-        isMobile
-          ? 'w-full h-16 justify-start px-4 gap-3'
-          : isCollapsed
-            ? 'w-16 h-16 py-3 px-3.5 justify-center'
-            : 'w-full h-16 justify-start px-4 gap-3',
+        isCollapsed
+          ? 'w-16 h-16 py-3 px-3.5 justify-center'
+          : 'w-full h-16 justify-start px-4 gap-3',
         isActive
           ? 'border-zinc-900 bg-zinc-900 hover:bg-zinc-900'
           : 'border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300',
@@ -53,7 +46,7 @@ export function OnboardButton({
         size={40}
         isActive={isActive}
       />
-      {(isMobile || !isCollapsed) && (
+      {!isCollapsed && (
         <div className="flex flex-col items-start">
           <span
             className={cn(
@@ -75,14 +68,6 @@ export function OnboardButton({
       )}
     </Button>
   );
-
-  if (isMobile) {
-    return (
-      <Link to="/onboard" className="block lg:hidden">
-        {buttonContent}
-      </Link>
-    );
-  }
 
   return (
     <TooltipProvider delayDuration={300}>
