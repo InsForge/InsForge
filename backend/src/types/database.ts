@@ -126,4 +126,4 @@ export type DatabaseValue =
   | { [key: string]: DatabaseValue }; // jsonB type
 
 // Generic database record type - used when we don't know the exact table structure
-export type DatabaseRecord = Record<string, DatabaseValue>;
+export type iDatabaseRecord = Record<string, DatabaseValue>;

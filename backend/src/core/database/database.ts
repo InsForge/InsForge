@@ -3,7 +3,6 @@ import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { DatabaseMetadata, ColumnInfo, PrimaryKeyInfo } from '@/types/database.js';
-import { BETTER_AUTH_SYSTEM_TABLES } from '@insforge/shared-schemas';
 import {
   AuthRecord,
   IdentifiesRecord,
@@ -338,9 +337,9 @@ export class DatabaseManager {
         deployed_at TIMESTAMPTZ
       );
 
-      -- Better Auth Tables (with quoted names as Better Auth expects)
+      -- Better Auth Tables
       -- User table
-      CREATE TABLE IF NOT EXISTS "user" (
+      CREATE TABLE IF NOT EXISTS _user (
         "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         "email" TEXT UNIQUE NOT NULL,
         "emailVerified" BOOLEAN DEFAULT false,
@@ -351,9 +350,9 @@ export class DatabaseManager {
       );
 
       -- Session table
-      CREATE TABLE IF NOT EXISTS "session" (
+      CREATE TABLE IF NOT EXISTS _session (
         "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-        "userId" TEXT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+        "userId" TEXT NOT NULL REFERENCES _user("id") ON DELETE CASCADE,
         "expiresAt" TIMESTAMPTZ NOT NULL,
         "token" TEXT UNIQUE NOT NULL,
         "ipAddress" TEXT,
@@ -363,9 +362,9 @@ export class DatabaseManager {
       );
 
       -- Account table (for OAuth and credentials)
-      CREATE TABLE IF NOT EXISTS "account" (
+      CREATE TABLE IF NOT EXISTS _account (
         "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-        "userId" TEXT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+        "userId" TEXT NOT NULL REFERENCES _user("id") ON DELETE CASCADE,
         "accountId" TEXT NOT NULL,
         "providerId" TEXT NOT NULL,
         "accessToken" TEXT,
@@ -381,7 +380,7 @@ export class DatabaseManager {
       );
 
       -- Verification table
-      CREATE TABLE IF NOT EXISTS "verification" (
+      CREATE TABLE IF NOT EXISTS _verification (
         "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         "identifier" TEXT NOT NULL,
         "value" TEXT NOT NULL,
@@ -391,7 +390,7 @@ export class DatabaseManager {
       );
 
       -- JWT plugin tables
-      CREATE TABLE IF NOT EXISTS "jwks" (
+      CREATE TABLE IF NOT EXISTS _jwks (
         "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
         "publicKey" TEXT NOT NULL,
         "privateKey" TEXT NOT NULL,
@@ -441,11 +440,11 @@ export class DatabaseManager {
         CREATE INDEX IF NOT EXISTS idx_edge_functions_status ON _edge_functions(status);
         
         -- Better Auth indexes
-        CREATE INDEX IF NOT EXISTS idx_user_email ON "user"("email");
-        CREATE INDEX IF NOT EXISTS idx_session_userId ON "session"("userId");
-        CREATE INDEX IF NOT EXISTS idx_session_token ON "session"("token");
-        CREATE INDEX IF NOT EXISTS idx_account_userId ON "account"("userId");
-        CREATE INDEX IF NOT EXISTS idx_verification_identifier ON "verification"("identifier");
+        CREATE INDEX IF NOT EXISTS idx_user_email ON _user("email");
+        CREATE INDEX IF NOT EXISTS idx_session_userId ON _session("userId");
+        CREATE INDEX IF NOT EXISTS idx_session_token ON _session("token");
+        CREATE INDEX IF NOT EXISTS idx_account_userId ON _account("userId");
+        CREATE INDEX IF NOT EXISTS idx_verification_identifier ON _verification("identifier");
       `);
 
       // Insert initial metadata
@@ -574,7 +573,6 @@ export class DatabaseManager {
         WHERE table_schema = 'public' 
         AND table_type = 'BASE TABLE'
         AND (table_name NOT LIKE '\\_%' OR table_name = '_auth')
-        AND table_name NOT IN (${BETTER_AUTH_SYSTEM_TABLES.map((t) => `'${t}'`).join(', ')})
       `);
 
       const metadata: DatabaseMetadata = {

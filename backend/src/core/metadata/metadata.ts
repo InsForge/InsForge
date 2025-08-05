@@ -10,7 +10,6 @@ import { StorageConfig } from '@/types/storage.js';
 import { AuthConfig } from '@/types/auth.js';
 import { AppMetadata } from '@/types/metadata.js';
 import logger from '@/utils/logger.js';
-import { BETTER_AUTH_SYSTEM_TABLES } from '@insforge/shared-schemas';
 import { convertSqlTypeToColumnType } from '@/utils/helpers';
 
 export class MetadataService {
@@ -79,11 +78,8 @@ export class MetadataService {
       FROM information_schema.tables 
       WHERE table_schema = 'public' 
       AND table_type = 'BASE TABLE'
-      AND table_name NOT LIKE '\\_%'
+      AND (table_name NOT LIKE '\\_%' OR table_name = '_user')
       AND table_name != 'logs'
-      AND table_name NOT IN (${BETTER_AUTH_SYSTEM_TABLES.filter((t) => t !== 'user')
-        .map((t) => `'${t}'`)
-        .join(', ')})
       ORDER BY table_name
     `
       )

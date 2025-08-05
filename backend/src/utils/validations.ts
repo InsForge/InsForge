@@ -1,6 +1,5 @@
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
-import { BETTER_AUTH_SYSTEM_TABLES } from '@insforge/shared-schemas';
 
 export function validateEmail(email: string) {
   return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
@@ -66,39 +65,31 @@ export function isValidIdentifier(identifier: string): boolean {
 export function validateTableName(tableName: string, operation?: 'READ' | 'WRITE'): boolean {
   validateIdentifier(tableName, 'table');
 
-  // Prevent access to system tables (starting with _)
+  // Special handling for _user table (Better Auth) - check this BEFORE general _ check
+  if (tableName.toLowerCase() === '_user') {
+    // _user table allows read-only access for foreign key references
+    if (operation === 'READ') {
+      return true; // Allow read access to _user table
+    }
+
+    // Provide specific error for write operations on _user table
+    if (operation === 'WRITE') {
+      throw new AppError(
+        'Cannot modify _user table - use Auth API instead',
+        403,
+        ERROR_CODES.FORBIDDEN,
+        'Use /api/auth/v2/* endpoints to create or update users'
+      );
+    }
+  }
+
+  // Prevent access to all other system tables (starting with _)
   if (tableName.startsWith('_')) {
     throw new AppError(
       'Access to system tables is not allowed',
       403,
       ERROR_CODES.FORBIDDEN,
       'System tables (starting with _) cannot be accessed directly'
-    );
-  }
-
-  // Special handling for Better Auth system tables
-  if (BETTER_AUTH_SYSTEM_TABLES.includes(tableName.toLowerCase())) {
-    // User table allows read-only access
-    if (tableName.toLowerCase() === 'user' && operation === 'READ') {
-      return true; // Allow read access to user table
-    }
-    
-    // Provide specific error for write operations on user table
-    if (tableName.toLowerCase() === 'user' && operation === 'WRITE') {
-      throw new AppError(
-        'Cannot modify user table - use Auth API instead',
-        403,
-        ERROR_CODES.FORBIDDEN,
-        'Use /api/auth/v2/* endpoints to create or update users'
-      );
-    }
-    
-    // Block all other Better Auth system tables
-    throw new AppError(
-      'Access to authentication system tables is not allowed',
-      403,
-      ERROR_CODES.FORBIDDEN,
-      'Authentication system tables cannot be accessed directly'
     );
   }
 

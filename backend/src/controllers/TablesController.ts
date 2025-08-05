@@ -2,7 +2,6 @@ import { DatabaseManager } from '@/core/database/database.js';
 import { MetadataService } from '@/core/metadata/metadata.js';
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
-import { BETTER_AUTH_SYSTEM_TABLES } from '@insforge/shared-schemas';
 import {
   COLUMN_TYPES,
   ForeignKeyRow,
@@ -47,7 +46,6 @@ export class TablesController {
         WHERE table_schema = 'public' 
         AND table_type = 'BASE TABLE'
         AND table_name NOT LIKE '\\_%'
-        AND table_name NOT IN (${[...BETTER_AUTH_SYSTEM_TABLES].map((t) => `'${t}'`).join(', ')})
       `
       )
       .all();

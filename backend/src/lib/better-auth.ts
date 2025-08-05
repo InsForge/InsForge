@@ -1,7 +1,6 @@
 import { betterAuth } from 'better-auth';
 import { jwt } from 'better-auth/plugins/jwt';
 import { bearer } from 'better-auth/plugins/bearer';
-import { google, github } from 'better-auth/social-providers';
 import { Pool } from 'pg';
 import { customAuthPlugin } from './custom-auth-plugin';
 
@@ -23,6 +22,22 @@ export const auth = betterAuth({
   // Trust all origins for OAuth callbacks. This is a temporary solution to allow OAuth callbacks from any origin.
   // in the future we should allow users to specify the allowed origins in the config
   trustedOrigins: ['*'],
+  // Use underscore-prefixed table names to match system table convention
+  user: {
+    modelName: '_user',
+  },
+  session: {
+    modelName: '_session',
+  },
+  account: {
+    modelName: '_account',
+  },
+  verification: {
+    modelName: '_verification',
+  },
+  jwks: {
+    modelName: '_jwks',
+  },
   emailAndPassword: {
     enabled: true,
   },

@@ -138,7 +138,7 @@ export class BetterAuthAdminService {
 
     // Check if already exists
     const existingUser = (await db
-      .prepare('SELECT id, email, name FROM "user" WHERE email = ? LIMIT 1')
+      .prepare('SELECT id, email, name FROM _user WHERE email = ? LIMIT 1')
       .get(email)) as UserRecord | null;
 
     if (existingUser) {
@@ -182,7 +182,7 @@ export class BetterAuthAdminService {
 
     // Try to find admin in DB (may not exist for virtual admin)
     const user = (await db
-      .prepare('SELECT id, email, name FROM "user" WHERE email = ? LIMIT 1')
+      .prepare('SELECT id, email, name FROM _user WHERE email = ? LIMIT 1')
       .get(email)) as UserRecord | null;
 
     // Generate JWT for either DB user or virtual admin
@@ -214,7 +214,7 @@ export class BetterAuthAdminService {
 
     const user = (await db
       .prepare(
-        'SELECT id, email, name, "emailVerified", "createdAt", "updatedAt" FROM "user" WHERE id = ? LIMIT 1'
+        'SELECT id, email, name, "emailVerified", "createdAt", "updatedAt" FROM _user WHERE id = ? LIMIT 1'
       )
       .get(userId)) as UserRecord | null;
 
@@ -249,7 +249,7 @@ export class BetterAuthAdminService {
     // Get all users
     const users = (await db
       .prepare(
-        'SELECT id, email, name, "emailVerified", "createdAt", "updatedAt" FROM "user" ORDER BY "createdAt" DESC LIMIT ? OFFSET ?'
+        'SELECT id, email, name, "emailVerified", "createdAt", "updatedAt" FROM _user ORDER BY "createdAt" DESC LIMIT ? OFFSET ?'
       )
       .all(limit, offset)) as UserRecord[];
 
@@ -264,7 +264,7 @@ export class BetterAuthAdminService {
       userIds.length > 0
         ? ((await db
             .prepare(
-              `SELECT "userId", "providerId" FROM account WHERE "userId" IN (${userIds
+              `SELECT "userId", "providerId" FROM _account WHERE "userId" IN (${userIds
                 .map(() => '?')
                 .join(', ')})`
             )
@@ -315,7 +315,7 @@ export class BetterAuthAdminService {
 
     // Filter out admin user to prevent self-deletion
     const adminUser = (await db
-      .prepare('SELECT id FROM "user" WHERE email = ? LIMIT 1')
+      .prepare('SELECT id FROM _user WHERE email = ? LIMIT 1')
       .get(this.adminEmail)) as UserRecord | null;
 
     const idsToDelete = userIds.filter((id) => !adminUser || id !== adminUser.id);
@@ -332,12 +332,12 @@ export class BetterAuthAdminService {
     try {
       // Delete sessions first (foreign key constraint)
       await db
-        .prepare(`DELETE FROM "session" WHERE "userId" IN (${placeholders})`)
+        .prepare(`DELETE FROM _session WHERE "userId" IN (${placeholders})`)
         .run(...idsToDelete);
 
       // Delete users
       const result = await db
-        .prepare(`DELETE FROM "user" WHERE id IN (${placeholders})`)
+        .prepare(`DELETE FROM _user WHERE id IN (${placeholders})`)
         .run(...idsToDelete);
 
       await db.prepare('COMMIT').run();
