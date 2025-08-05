@@ -28,7 +28,7 @@ export const MCP_AGENTS: MCPAgent[] = [
     description: 'AI-powered code editor with built-in MCP support',
   },
   {
-    id: 'claude',
+    id: 'claude_code',
     displayName: 'Claude Code',
     logo: ClaudeLogoIcon,
     description: "Anthropic's Claude with MCP integration",
