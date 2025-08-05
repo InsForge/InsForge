@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { DatabaseMetadata, ColumnInfo, PrimaryKeyInfo } from '@/types/database.js';
-import { BETTER_AUTH_SYSTEM_TABLES } from '@/utils/constants.js';
+import { BETTER_AUTH_SYSTEM_TABLES } from '@insforge/shared-schemas';
 import {
   AuthRecord,
   IdentifiesRecord,

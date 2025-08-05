@@ -23,9 +23,12 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
     const { tableName } = req.params;
     const wildcardPath = req.params[0] || '';
 
-    // Validate table name (includes check for system tables)
+    // Validate table name with operation type
+    const method = req.method.toUpperCase();
+    const operation = method === 'GET' ? 'READ' : 'WRITE';
+    
     try {
-      validateTableName(tableName);
+      validateTableName(tableName, operation);
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
@@ -34,7 +37,6 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
     }
 
     // Process request body for POST/PATCH/PUT operations
-    const method = req.method.toUpperCase();
     if (['POST', 'PATCH', 'PUT'].includes(method) && req.body && typeof req.body === 'object') {
       const columnTypeMap = await DatabaseManager.getColumnTypeMap(tableName);
       if (Array.isArray(req.body)) {

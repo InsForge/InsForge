@@ -45,16 +45,21 @@ Before ANY database operation, call `get-backend-metadata` to get the current da
 - Frequently check `get-instructions` and `get-backend-metadata`
 - Always define explicit table schemas (no assumptions)
 - Every table gets auto ID, created_at, updated_at fields
-- **Database operations require BOTH**: API key (x-api-key header) AND JWT token (Authorization: Bearer header)
+- **Database operations require**: JWT token (Authorization: Bearer header)
+- **API keys (x-api-key) are ONLY for MCP testing**, not for production applications
 - File uploads work automatically with multipart/form-data
 
 ## Authentication Requirements
 
-### Database Operations Need Two Headers:
-1. **API Key**: `x-api-key: your-api-key` - Provides API access
-2. **JWT Token**: `Authorization: Bearer your-jwt-token` - Authenticates the user
+### Database Operations Need Authentication Token:
+1. **JWT Token**: `Authorization: Bearer your-jwt-token` - Authenticates the user
 
-Without both headers, you'll get "permission denied" errors when trying to insert, update, or delete records.
+**Important Note about API Keys:**
+- The `x-api-key` header is ONLY used for MCP (Model Context Protocol) testing
+- Production applications should NEVER use API keys
+- Always use JWT tokens from user/admin authentication for real applications
+
+Without the Bearer token, you'll get "permission denied" errors when trying to insert, update, or delete records.
 
 ### Getting Authentication:
 ```bash
@@ -65,23 +70,24 @@ curl -X POST http://localhost:7130/api/auth/v2/admin/sign-in \
 
 # Response includes token: {"token": "eyJ...", "user": {...}}
 
-# 2. Use both headers for database operations
+# 2. Use the auth token for database operations
 curl -X POST http://localhost:7130/api/database/records/products \
-  -H "x-api-key: your-api-key" \
   -H "Authorization: Bearer eyJ..." \
   -H "Content-Type: application/json" \
   -d '[{"name": "Product", "price": 99.99}]'
 ```
-
 ## System Tables
 
-### User Table (Read-Only)
-The `user` table is a **system-managed table** from Better Auth that contains user accounts:
-- **CANNOT BE MODIFIED** through database API - use Auth API instead
-- **CAN BE REFERENCED** by other tables (e.g., `user_id` foreign keys)
-- Contains columns: id, email, name, emailVerified, createdAt, updatedAt
-- To create/update users, use `/api/auth/v2/*` endpoints
-- To query users, use `/api/database/records/user` (read-only)
+### User Table (Read-Only Access)
+The `user` table is a **system-managed table** from Better Auth:
+- **✅ CAN READ** via `GET /api/database/records/user`
+- **❌ CANNOT MODIFY** through database API - use Auth API instead
+- **✅ CAN REFERENCE** by other tables using `user_id` foreign keys
+
+To work with users:
+- Read users: `GET /api/database/records/user`
+- Create/update users: Use `/api/auth/v2/*` endpoints
+- Store additional data: Create your own `user_profiles` table
 
 ## Example: Comment Upvoting Feature
 
@@ -97,7 +103,7 @@ The `user` table is a **system-managed table** from Better Auth that contains us
 After creating or modifying any API endpoint, always test it with curl to verify it works correctly:
 
 ```bash
-# Example: Test creating a record (requires both API key and JWT token)
+# Example: Test creating a record (requires JWT token)
 curl -X POST http://localhost:7130/api/database/records/posts \
   -H "x-api-key: your-api-key" \
   -H "Authorization: Bearer your-jwt-token" \

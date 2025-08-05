@@ -175,7 +175,7 @@ export async function verifyUserOrAdmin(req: AuthRequest, res: Response, next: N
         payload = await authService.verifyBetterAuthUserSessionToken(token);
         isBetterAuthToken = true;
       } catch {
-        // Fall back to legacy auth (direct JWT verification)
+        // Fall back to legacy auth (direct JWT verification), this is used for admin auth
         payload = authService.verifyToken(token);
       }
     } else {
@@ -183,7 +183,7 @@ export async function verifyUserOrAdmin(req: AuthRequest, res: Response, next: N
       payload = authService.verifyToken(token);
     }
 
-    // Validate token type
+    // Validate token type, this will get deleted and changed to "role"
     if (payload.type !== 'user' && payload.type !== 'admin') {
       throw new AppError(
         'Invalid token type',
@@ -204,7 +204,7 @@ export async function verifyUserOrAdmin(req: AuthRequest, res: Response, next: N
           sub: payload.sub,
           email: payload.email,
           type: payload.type,
-          role: payload.type === 'admin' ? 'project_admin' : 'authenticated',
+          role: payload.role,
         },
         process.env.JWT_SECRET || '',
         { algorithm: 'HS256', expiresIn: '7d' }

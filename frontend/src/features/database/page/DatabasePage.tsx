@@ -25,6 +25,7 @@ import { DatabaseDataGrid } from '@/features/database/components/DatabaseDataGri
 import { SearchInput, SelectionClearButton } from '@/components';
 import { SortColumn } from 'react-data-grid';
 import { convertValueForColumn } from '@/lib/utils/database-utils';
+import { BETTER_AUTH_SYSTEM_TABLES } from '@insforge/shared-schemas';
 
 export default function DatabasePage() {
   // Load selected table from localStorage on mount
@@ -178,7 +179,9 @@ export default function DatabasePage() {
     () =>
       metadata?.tables
         ? Object.fromEntries(
-            Object.entries(metadata.tables).filter(([name]) => !name.startsWith('_'))
+            Object.entries(metadata.tables).filter(
+              ([name]) => !name.startsWith('_') && !BETTER_AUTH_SYSTEM_TABLES.includes(name)
+            )
           )
         : {},
     [metadata?.tables]
@@ -187,7 +190,9 @@ export default function DatabasePage() {
   // Auto-select first table (excluding system tables)
   useEffect(() => {
     if (metadata) {
-      const tableNames = Object.keys(metadata.tables).filter((name) => !name.startsWith('_'));
+      const tableNames = Object.keys(metadata.tables).filter(
+        (name) => !name.startsWith('_') && !BETTER_AUTH_SYSTEM_TABLES.includes(name)
+      );
 
       if (selectedTable && !tableNames.includes(selectedTable)) {
         setSelectedTable(null);

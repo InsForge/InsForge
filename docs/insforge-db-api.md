@@ -3,7 +3,8 @@
 ## API Basics
 
 **Base URL:** `http://localhost:7130`
-**Authentication:** All requests require `x-api-key` header
+**Authentication:** All requests require authentication token (`Authorization: Bearer <token>` header)
+**Note:** The `x-api-key` header is only used for MCP testing and should not be used in production applications
 **Critical:** Always call `get-backend-metadata` first to understand current database structure
 **Critical:** POST body must be arrays `[{...}]`, query filters `?field=eq.value`, add header `Prefer: return=representation` to return created data - follows PostgREST design (not traditional REST)
 
@@ -40,22 +41,12 @@ Query parameters:
 - `order` - Sort by field (e.g., `createdAt.desc`)
 - PostgREST filters: `field=eq.value`, `field=gt.value`, etc.
 
-Response format:
-```json
-[
-  {
-    "id": "248373e1-0aea-45ce-8844-5ef259203749",
-    "name": "John Doe",
-    "createdAt": "2025-07-18T05:37:24.338Z",
-    "updatedAt": "2025-07-18T05:37:24.338Z"
-  }
-]
-```
+Response: Array of records with auto-generated `id`, `created_at`, `updated_at` fields
 
-Example curl:
+Example:
 ```bash
-curl -X GET "http://localhost:7130/api/database/records/users?limit=10&order=createdAt.desc" \
-  -H "x-api-key: YOUR_API_KEY"
+curl -X GET "http://localhost:7130/api/database/records/users?limit=10" \
+  -H "Authorization: Bearer TOKEN"
 ```
 
 ### Create Records
@@ -109,27 +100,13 @@ Response format (WITH `Prefer: return=representation` header):
 ]
 ```
 
-Example curl (returns empty array):
+Example:
 ```bash
 curl -X POST http://localhost:7130/api/database/records/users \
-  -H "x-api-key: YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '[{
-    "name": "John Doe",
-    "email": "john@example.com"
-  }]'
-```
-
-Example curl (returns created record):
-```bash
-curl -X POST http://localhost:7130/api/database/records/users \
-  -H "x-api-key: YOUR_API_KEY" \
+  -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -H "Prefer: return=representation" \
-  -d '[{
-    "name": "John Doe",
-    "email": "john@example.com"
-  }]'
+  -d '[{"name": "John Doe", "email": "john@example.com"}]'
 ```
 
 ### Update Record
@@ -166,25 +143,13 @@ Response format (WITH `Prefer: return=representation` header):
 ]
 ```
 
-Example curl (returns empty array):
+Example:
 ```bash
-curl -X PATCH "http://localhost:7130/api/database/records/users?id=eq.123e4567-e89b-12d3-a456-426614174000" \
-  -H "x-api-key: YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Jane Doe"
-  }'
-```
-
-Example curl (returns updated record):
-```bash
-curl -X PATCH "http://localhost:7130/api/database/records/users?id=eq.123e4567-e89b-12d3-a456-426614174000" \
-  -H "x-api-key: YOUR_API_KEY" \
+curl -X PATCH "http://localhost:7130/api/database/records/users?id=eq.UUID" \
+  -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -H "Prefer: return=representation" \
-  -d '{
-    "name": "Jane Doe"
-  }'
+  -d '{"name": "Jane Doe"}'
 ```
 
 ### Delete Record
@@ -218,18 +183,10 @@ Response format (WITH `Prefer: return=representation` header):
 []
 ```
 
-Example curl (no response body):
+Example:
 ```bash
-curl -X DELETE "http://localhost:7130/api/database/records/users?id=eq.123e4567-e89b-12d3-a456-426614174000" \
-  -H "x-api-key: YOUR_API_KEY" \
-  -H "Content-Type: application/json"
-```
-
-Example curl (returns deleted record or empty array):
-```bash
-curl -X DELETE "http://localhost:7130/api/database/records/users?id=eq.123e4567-e89b-12d3-a456-426614174000" \
-  -H "x-api-key: YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
+curl -X DELETE "http://localhost:7130/api/database/records/users?id=eq.UUID" \
+  -H "Authorization: Bearer TOKEN" \
   -H "Prefer: return=representation"
 ```
 
@@ -256,6 +213,52 @@ Example error:
 }
 ```
 
+## 🚨 Critical: User Table is Read-Only
+
+**The `user` table has limited access:**
+- **✅ READ**: `GET /api/database/records/user` - Works!
+- **❌ WRITE**: POST/PUT/PATCH/DELETE returns `403 FORBIDDEN`
+- **Solution**: For additional user data, create `user_profiles` table:
+```json
+{
+  "table_name": "user_profiles",
+  "columns": [
+    {"name": "user_id", "type": "string", "nullable": false, "is_unique": true,
+     "foreign_key": {"reference_table": "user", "reference_column": "id", 
+                     "on_delete": "CASCADE", "on_update": "CASCADE"}},
+    {"name": "bio", "type": "string", "nullable": true},
+    {"name": "avatar_url", "type": "string", "nullable": true}
+  ]
+}
+```
+
+## 🚨 Critical: Always Include user_id
+
+**Every user-related table MUST include user_id field from localStorage:**
+
+```javascript
+// Frontend: Get user_id from localStorage after login
+const userId = localStorage.getItem('user_id');
+```
+
+```bash
+# ❌ WRONG - Missing user_id
+curl -X POST http://localhost:7130/api/database/records/comments \
+  -H "Authorization: Bearer TOKEN" \
+  -d '[{"content": "Great post"}]'
+
+# ✅ CORRECT - Includes user_id
+curl -X POST http://localhost:7130/api/database/records/comments \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Prefer: return=representation" \
+  -d '[{"content": "Great post!", "user_id": "user-uuid-from-localStorage"}]'
+```
+
+**Required for all user-related operations:**
+- Creating posts, comments, likes, follows
+- Any table with a `user_id` foreign key
+- Without it, your INSERT will fail with missing field error
+
 ## Important Rules
 
 1. **Auto-Generated Fields**
@@ -265,9 +268,12 @@ Example error:
 
 2. **System Tables**
    - Tables prefixed with `_` are system tables
-   - Auth tables (`auth`, `profiles`, `identities`) - use Auth API only
+   - Better Auth tables (`user`, `session`, `account`) - use Auth API only
+   - **`user` table is PROTECTED** - cannot query via database API
 
 3. **Remember**
    - Schema changes use MCP tools
    - Record operations use REST API
-   - All operations need API key authentication
+   - All operations need authentication token (Bearer token)
+   - API keys (`x-api-key`) are only for MCP testing, not for production use
+   - Always include `user_id` in user-related tables

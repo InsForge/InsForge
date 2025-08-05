@@ -10,7 +10,7 @@ import { StorageConfig } from '@/types/storage.js';
 import { AuthConfig } from '@/types/auth.js';
 import { AppMetadata } from '@/types/metadata.js';
 import logger from '@/utils/logger.js';
-import { BETTER_AUTH_SYSTEM_TABLES } from '@/utils/constants.js';
+import { BETTER_AUTH_SYSTEM_TABLES } from '@insforge/shared-schemas';
 import { convertSqlTypeToColumnType } from '@/utils/helpers';
 
 export class MetadataService {
