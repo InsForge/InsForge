@@ -8,7 +8,7 @@ import {
   TooltipTrigger,
 } from '@/components/radix/Tooltip';
 import { CircularStepper } from '@/components/Stepper';
-import { useOnboardStep, STEP_DESCRIPTIONS } from '@/lib/hooks/useOnboardStep';
+import { useOnboardStep, STEP_DESCRIPTIONS } from '@/lib/contexts/OnboardStepContext';
 
 interface OnboardButtonProps {
   isCollapsed: boolean;
@@ -25,7 +25,7 @@ export function OnboardButton({
   const { currentStep, totalSteps } = useOnboardStep();
 
   const isActive = location.pathname === '/onboard';
-  
+
   // Limit displayed step to totalSteps for the sidebar
   const displayStep = Math.min(currentStep, totalSteps);
   const currentDescription = STEP_DESCRIPTIONS[displayStep - 1];

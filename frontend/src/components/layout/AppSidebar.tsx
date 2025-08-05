@@ -78,10 +78,7 @@ export default function AppSidebar({
     : navigation;
 
   const NavItem = ({ item, onClick }: { item: NavigationProps; onClick?: () => void }) => {
-    // Special handling for Reinstall button: only compare pathname, ignore search params
-    const hrefPath = item.href.split('?')[0];
-
-    const isActive = location.pathname === hrefPath;
+    const isActive = location.pathname.split('?')[0] === item.href;
 
     const buttonContent = (
       <Button

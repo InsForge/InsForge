@@ -13,6 +13,7 @@ import StoragePage from './features/storage/page/StoragePage';
 import MetadataPage from './features/metadata/page/MetadataPage';
 import OnBoardPage from './features/onboard/page/OnBoardPage';
 import Layout from './components/layout/Layout';
+import { OnboardStepProvider } from './lib/contexts/OnboardStepContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,7 +31,9 @@ function App() {
       <AuthErrorBoundary>
         <AuthProvider>
           <ToastProvider>
-            <AppRoutes />
+            <OnboardStepProvider>
+              <AppRoutes />
+            </OnboardStepProvider>
           </ToastProvider>
         </AuthProvider>
       </AuthErrorBoundary>
