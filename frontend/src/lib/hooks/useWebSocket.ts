@@ -68,7 +68,6 @@ export function useWebSocket(url: string): UseWebSocketReturn {
               break;
 
             default:
-              console.log('Unknown message type:', message.type);
           }
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
