@@ -9,6 +9,7 @@ import { CursorDeeplinkGenerator } from './CursorDeeplinkGenerator';
 import {
   MCP_AGENTS,
   createMCPConfig,
+  GenerateInstallCommand,
   type MCPAgent,
   type PlatformType,
 } from '@/components/mcp/mcp-agents';
@@ -82,7 +83,7 @@ export function MCPInstaller({ className, defaultAgent = 'cursor' }: MCPInstalle
 
           {/* Command Block */}
           <CodeBlock
-            code={selectedAgent.installCommand?.() || ''}
+            code={GenerateInstallCommand(selectedAgent, apiKey || '')}
             className="bg-slate-50 w-full font-normal text-blue-800"
           />
         </div>

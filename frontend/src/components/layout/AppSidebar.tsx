@@ -78,7 +78,7 @@ export default function AppSidebar({
     : navigation;
 
   const NavItem = ({ item, onClick }: { item: NavigationProps; onClick?: () => void }) => {
-    const isActive = location.pathname.split('?')[0] === item.href;
+    const isActive = location.pathname === item.href.split('?')[0];
 
     const buttonContent = (
       <Button

@@ -16,7 +16,7 @@ export function CodeBlock({ code, className, showCopy = true, onCopy }: CodeBloc
         className
       )}
     >
-      <div className="flex-1">
+      <div className="flex-1 max-w-4/5">
         <code>{code}</code>
       </div>
       {showCopy && <CopyButton text={code} onCopy={onCopy} />}
