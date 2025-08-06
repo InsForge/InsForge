@@ -65,7 +65,7 @@ export function BucketFormDialog({
 
   const editBucketMutation = useMutation({
     mutationFn: ({ name, isPublic }: { name: string; isPublic: boolean }) =>
-      storageService.editBucket(name, { public: isPublic }),
+      storageService.editBucket(name, { isPublic: isPublic }),
     onSuccess: () => {
       onSuccess();
       showToast('Bucket updated successfully', 'success');

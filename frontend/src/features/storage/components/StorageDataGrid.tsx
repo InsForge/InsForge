@@ -3,7 +3,7 @@ import { DataGrid, type DataGridColumn, type DataGridProps } from '@/components/
 import { Button } from '@/components/radix/Button';
 import { Download, Eye, Trash2, Image, FileText, Music, Video, Archive, File } from 'lucide-react';
 import { formatDistance } from 'date-fns';
-import { type StoredFile } from '@/features/storage/services/storage.service';
+import { StorageFileSchema } from '@insforge/shared-schemas';
 
 // Custom cell renderers for storage files
 const FileNameRenderer = ({ row, column }: any) => {
@@ -92,9 +92,9 @@ const UploadedAtRenderer = ({ row, column }: any) => {
 
 // Convert storage files data to DataGrid columns
 export function createStorageColumns(
-  onPreview?: (file: StoredFile) => void,
-  onDownload?: (file: StoredFile) => void,
-  onDelete?: (file: StoredFile) => void,
+  onPreview?: (file: StorageFileSchema) => void,
+  onDownload?: (file: StorageFileSchema) => void,
+  onDelete?: (file: StorageFileSchema) => void,
   isDownloading?: (key: string) => boolean
 ): DataGridColumn[] {
   const columns: DataGridColumn[] = [
@@ -115,7 +115,7 @@ export function createStorageColumns(
       renderCell: FileSizeRenderer,
     },
     {
-      key: 'mime_type',
+      key: 'mimeType',
       name: 'Type',
       width: '1fr',
       resizable: true,
@@ -199,9 +199,9 @@ export function createStorageColumns(
 
 // Storage-specific DataGrid props
 export interface StorageDataGridProps extends Omit<DataGridProps, 'columns'> {
-  onPreview?: (file: StoredFile) => void;
-  onDownload?: (file: StoredFile) => void;
-  onDelete?: (file: StoredFile) => void;
+  onPreview?: (file: StorageFileSchema) => void;
+  onDownload?: (file: StorageFileSchema) => void;
+  onDelete?: (file: StorageFileSchema) => void;
   isDownloading?: (key: string) => boolean;
 }
 

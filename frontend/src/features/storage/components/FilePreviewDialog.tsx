@@ -4,12 +4,13 @@ import { Dialog, DialogContent } from '@/components/radix/Dialog';
 import { Button } from '@/components/radix/Button';
 import { Badge } from '@/components/radix/Badge';
 import { LoadingState } from '@/components';
-import { storageService, type StoredFile } from '@/features/storage/services/storage.service';
+import { storageService } from '@/features/storage/services/storage.service';
+import { StorageFileSchema } from '@insforge/shared-schemas';
 
 interface FilePreviewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  file: StoredFile | null;
+  file: StorageFileSchema | null;
   bucket: string;
 }
 
@@ -36,7 +37,7 @@ export function FilePreviewDialog({ open, onOpenChange, file, bucket }: FilePrev
 
       try {
         const fileBucket = file.bucket || bucket;
-        const blob = await storageService.downloadFile(fileBucket, file.key);
+        const blob = await storageService.downloadObject(fileBucket, file.key);
 
         // Validate blob
         if (!blob || blob.size === 0) {
@@ -122,11 +123,11 @@ export function FilePreviewDialog({ open, onOpenChange, file, bucket }: FilePrev
     }
 
     // Show empty preview template for non-previewable files or errors
-    if (!isPreviewable(file.mime_type) || error || !previewUrl) {
+    if (!isPreviewable(file.mimeType) || error || !previewUrl) {
       return <div className="bg-gray-200 w-full h-full min-h-[400px] rounded" />;
     }
 
-    const mimeType = file.mime_type || '';
+    const mimeType = file.mimeType || '';
     const fileName = file.key.split('/').pop() || file.key;
 
     if (mimeType.startsWith('image/')) {
@@ -206,9 +207,9 @@ export function FilePreviewDialog({ open, onOpenChange, file, bucket }: FilePrev
                 <h2 className="text-base font-semibold text-zinc-950 leading-6">{fileName}</h2>
                 <div className="flex items-center gap-1.5 mt-1.5">
                   <span className="text-sm text-zinc-500">{formatFileSize(file.size)}</span>
-                  {file.mime_type && (
+                  {file.mimeType && (
                     <Badge variant="outline" className="text-xs font-normal px-2.5 py-0.5">
-                      {file.mime_type}
+                      {file.mimeType}
                     </Badge>
                   )}
                 </div>

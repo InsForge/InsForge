@@ -79,9 +79,9 @@ admin_login_response=$(curl -s -X POST "$API_BASE/auth/admin/login" \
     -H "Content-Type: application/json" \
     -d '{"email":"'$TEST_ADMIN_EMAIL'","password":"'$TEST_ADMIN_PASSWORD'"}')
 
-if echo "$admin_login_response" | grep -q '"access_token"'; then
+if echo "$admin_login_response" | grep -q '"accessToken"'; then
     print_success "Admin login success"
-    ADMIN_TOKEN=$(echo "$admin_login_response" | jq -r '.access_token')
+    ADMIN_TOKEN=$(echo "$admin_login_response" | jq -r '.accessToken')
     echo "Admin token obtained: ${ADMIN_TOKEN:0:20}..."
 else
     print_fail "Admin login failed"

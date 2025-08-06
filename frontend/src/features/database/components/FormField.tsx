@@ -198,10 +198,12 @@ function FieldLabel({
   children?: React.ReactNode;
 }) {
   return (
-    <Label htmlFor={`${tableName}-${field.name}`} className="flex items-center gap-2.5 mb-3">
+    <Label htmlFor={`${tableName}-${field.columnName}`} className="flex items-center gap-2.5 mb-3">
       <span>
-        {field.name}
-        {!field.nullable && field.name !== 'id' && <span className="text-red-500 ml-1">*</span>}
+        {field.columnName}
+        {!field.isNullable && field.columnName !== 'id' && (
+          <span className="text-red-500 ml-1">*</span>
+        )}
       </span>
       <TypeBadge type={field.type} />
       {children}
@@ -227,11 +229,11 @@ export function FormField({ field, form, tableName }: FormFieldProps) {
             <FieldLabel field={field} tableName={tableName} />
             <Controller
               control={control}
-              name={field.name}
+              name={field.columnName}
               render={({ field: formField }) => (
                 <FormBooleanEditor
                   value={formField.value}
-                  nullable={field.nullable}
+                  nullable={field.isNullable}
                   onChange={formField.onChange}
                 />
               )}
@@ -246,10 +248,10 @@ export function FormField({ field, form, tableName }: FormFieldProps) {
             <FieldLabel field={field} tableName={tableName} />
             <Controller
               control={control}
-              name={field.name}
+              name={field.columnName}
               render={({ field: formField }) => (
                 <Input
-                  id={`${tableName}-${field.name}`}
+                  id={`${tableName}-${field.columnName}`}
                   type="number"
                   step={field.type === ColumnType.FLOAT ? '0.01' : '1'}
                   value={formField.value ?? ''}
@@ -257,14 +259,16 @@ export function FormField({ field, form, tableName }: FormFieldProps) {
                     const value = e.target.value;
                     if (value === '') {
                       // Handle empty value based on nullability
-                      formField.onChange(field.nullable ? null : 0);
+                      formField.onChange(field.isNullable ? null : 0);
                     } else {
                       const numValue =
                         field.type === ColumnType.INTEGER ? parseInt(value, 10) : parseFloat(value);
-                      formField.onChange(isNaN(numValue) ? (field.nullable ? null : 0) : numValue);
+                      formField.onChange(
+                        isNaN(numValue) ? (field.isNullable ? null : 0) : numValue
+                      );
                     }
                   }}
-                  placeholder={field.nullable ? 'Optional' : 'Required'}
+                  placeholder={field.isNullable ? 'Optional' : 'Required'}
                 />
               )}
             />
@@ -277,12 +281,12 @@ export function FormField({ field, form, tableName }: FormFieldProps) {
             <FieldLabel field={field} tableName={tableName} />
             <Controller
               control={control}
-              name={field.name}
+              name={field.columnName}
               render={({ field: formField }) => (
                 <FormDateEditor
                   value={formField.value}
                   type="datetime"
-                  nullable={field.nullable}
+                  nullable={field.isNullable}
                   onChange={formField.onChange}
                 />
               )}
@@ -296,11 +300,11 @@ export function FormField({ field, form, tableName }: FormFieldProps) {
             <FieldLabel field={field} tableName={tableName} />
             <Controller
               control={control}
-              name={field.name}
+              name={field.columnName}
               render={({ field: formField }) => (
                 <FormJsonEditor
                   value={formField.value}
-                  nullable={field.nullable}
+                  nullable={field.isNullable}
                   onChange={formField.onChange}
                 />
               )}
@@ -313,9 +317,9 @@ export function FormField({ field, form, tableName }: FormFieldProps) {
           <>
             <FieldLabel field={field} tableName={tableName} />
             <Input
-              id={`${tableName}-${field.name}`}
+              id={`${tableName}-${field.columnName}`}
               type="text"
-              {...register(field.name)}
+              {...register(field.columnName)}
               placeholder="Auto-generated if empty"
             />
           </>
@@ -327,10 +331,10 @@ export function FormField({ field, form, tableName }: FormFieldProps) {
           <>
             <FieldLabel field={field} tableName={tableName} />
             <Input
-              id={`${tableName}-${field.name}`}
-              type={field.name === 'password' ? 'password' : 'text'}
-              {...register(field.name)}
-              placeholder={field.nullable ? 'Optional' : 'Required'}
+              id={`${tableName}-${field.columnName}`}
+              type={field.columnName === 'password' ? 'password' : 'text'}
+              {...register(field.columnName)}
+              placeholder={field.isNullable ? 'Optional' : 'Required'}
             />
           </>
         );
@@ -340,9 +344,9 @@ export function FormField({ field, form, tableName }: FormFieldProps) {
   return (
     <div className="space-y-2">
       {renderField()}
-      {errors[field.name] && (
+      {errors[field.columnName] && (
         <p className="text-sm text-red-500">
-          {(errors[field.name] as any)?.message || `${field.name} is required`}
+          {(errors[field.columnName] as any)?.message || `${field.columnName} is required`}
         </p>
       )}
     </div>

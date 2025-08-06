@@ -17,13 +17,25 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO project_admin;
 
 -- Grant permissions to roles
 -- NOTICE: The anon role is intended for unauthenticated users, so it should only have read access.
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon;
+  GRANT SELECT ON TABLES TO anon;
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO authenticated;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
+  GRANT SELECT ON TABLES TO authenticated;
+
+GRANT INSERT ON ALL TABLES IN SCHEMA public TO authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT INSERT ON TABLES TO authenticated;
+
+GRANT UPDATE ON ALL TABLES IN SCHEMA public TO authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT UPDATE ON TABLES TO authenticated;
+
+GRANT DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT DELETE ON TABLES TO authenticated;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO project_admin;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
@@ -41,9 +53,10 @@ BEGIN
   FOR obj IN SELECT * FROM pg_event_trigger_ddl_commands() WHERE command_tag = 'CREATE TABLE'
   LOOP
     -- Extract schema and table name from object_identity
+    -- Handle quoted identifiers by removing quotes
     SELECT INTO table_schema, table_name
       split_part(obj.object_identity, '.', 1),
-      split_part(obj.object_identity, '.', 2);
+      trim(both '"' from split_part(obj.object_identity, '.', 2));
     -- Check if RLS is enabled on the table
     SELECT INTO has_rls
       rowsecurity
@@ -81,9 +94,10 @@ BEGIN
   FOR obj IN SELECT * FROM pg_event_trigger_ddl_commands() WHERE command_tag = 'ALTER TABLE'
   LOOP
     -- Extract schema and table name
+    -- Handle quoted identifiers by removing quotes
     SELECT INTO table_schema, table_name
       split_part(obj.object_identity, '.', 1),
-      split_part(obj.object_identity, '.', 2);
+      trim(both '"' from split_part(obj.object_identity, '.', 2));
     -- Check if table has RLS enabled and no policies yet
     IF EXISTS (
       SELECT 1 FROM pg_tables

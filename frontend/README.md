@@ -47,7 +47,7 @@ The dashboard communicates with the Insforge backend via REST API:
 - `POST /api/database/tables` - Create new table with schema
 - `DELETE /api/database/tables/:tablename` - Delete table
 - `GET /api/database/tables/:tablename/schema` - Get table schema
-- `PATCH /api/database/tables/:tablename` - Modify table schema
+- `PATCH /api/database/tables/:tablename/schema` - Modify table schema
 
 ### Record Operations
 - `GET /api/database/records/:tablename` - Query records (supports pagination)
@@ -56,9 +56,15 @@ The dashboard communicates with the Insforge backend via REST API:
 - `DELETE /api/database/records/:tablename?id=eq.:id` - Delete specific record
 
 ### Storage
-- `POST /api/storage/upload` - Upload files
-- `GET /api/storage/files/:id` - Download file
-- `DELETE /api/storage/files/:id` - Delete file
+- `GET /api/storage/buckets` - List all buckets
+- `POST /api/storage/buckets` - Create new bucket
+- `PATCH /api/storage/buckets/:bucketName` - Update bucket
+- `DELETE /api/storage/buckets/:bucketName` - Delete bucket
+- `GET /api/storage/buckets/:bucketName/objects` - List objects in bucket
+- `PUT /api/storage/buckets/:bucketName/objects/:objectKey` - Upload object with specific key
+- `POST /api/storage/buckets/:bucketName/objects` - Upload object with auto-generated key
+- `GET /api/storage/buckets/:bucketName/objects/:objectKey` - Download object
+- `DELETE /api/storage/buckets/:bucketName/objects/:objectKey` - Delete object
 
 ### Metadata & Logs
 - `GET /api/metadata` - Get system metadata and statistics

@@ -7,8 +7,8 @@ export interface User {
   id: string;
   email: string;
   name?: string;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
   role?: string;
 }
 
@@ -22,7 +22,7 @@ export class AuthService {
     });
 
     // Set token in apiClient
-    const token = ENABLE_BETTER_AUTH ? data.token : data.access_token;
+    const token = ENABLE_BETTER_AUTH ? data.token : data.accessToken;
     if (token) {
       apiClient.setToken(token);
     }
@@ -30,11 +30,11 @@ export class AuthService {
     // Return unified format for Better Auth, pass through for legacy
     if (ENABLE_BETTER_AUTH) {
       return {
-        access_token: data.token,
+        accessToken: data.token,
         user: {
           ...data.user,
-          created_at: data.user.createdAt || data.user.created_at,
-          updated_at: data.user.updatedAt || data.user.updated_at,
+          createdAt: data.user.createdAt || data.user.createdAt,
+          updatedAt: data.user.updatedAt || data.user.updatedAt,
         },
       };
     }

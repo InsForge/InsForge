@@ -1,84 +1,96 @@
 import { z } from "zod";
 import { columnSchema, foreignKeySchema, tableSchema } from "./database.schema";
 
-export const createTableRequestSchema = z.object({
-  table_name: z.string().min(1, "table_name cannot be empty"),
-  columns: z.array(columnSchema).min(1, "At least one column is required"),
-  rls_enabled: z.boolean().default(true),
-});
+export const createTableRequestSchema = tableSchema
+  .pick({
+    tableName: true,
+    columns: true,
+  })
+  .extend({
+    rlsEnabled: z.boolean().default(true),
+  });
 
 export const createTableResponseSchema = tableSchema
   .pick({
-    table_name: true,
+    tableName: true,
     columns: true,
   })
   .extend({
     message: z.string(),
-    auto_fields: z.array(z.string()),
-    nextAction: z.string(),
+    autoFields: z.array(z.string()),
+    nextActions: z.string(),
   });
 
 export const getTableSchemaResponseSchema = tableSchema;
 
-export const updateTableSchemaRequest = z
-  .object({
-    add_columns: z.array(columnSchema).optional(),
-    drop_columns: z
-      .array(
-        z.object({
-          name: z.string().min(1, "Column name is required for drop operation"),
-        })
-      )
-      .optional(),
-    rename_columns: z
-      .record(
-        z.string().min(1, "Old column name cannot be empty"),
-        z.string().min(1, "New column name cannot be empty")
-      )
-      .optional(),
-    add_fkey_columns: z
-      .array(
-        z.object({
-          name: z
-            .string()
-            .min(1, "Column name is required for adding foreign key"),
-          foreign_key: foreignKeySchema,
-        })
-      )
-      .optional(),
-    drop_fkey_columns: z
-      .array(
-        z.object({
-          name: z
-            .string()
-            .min(1, "Column name is required for dropping foreign key"),
-        })
-      )
-      .optional(),
-  })
+// Base schema without refinement - for MCP tool definition
+export const updateTableSchemaBase = z.object({
+  addColumns: z.array(columnSchema).optional(),
+  dropColumns: z
+    .array(
+      z.object({
+        columnName: z.string().min(1, "Column name is required for drop operation"),
+      })
+    )
+    .optional(),
+  renameColumns: z
+    .record(
+      z
+        .string()
+        .min(1, "Old column name cannot be empty")
+        .max(64, "Old column name must be less than 64 characters"),
+      z
+        .string()
+        .min(1, "New column name cannot be empty")
+        .max(64, "New column name must be less than 64 characters")
+    )
+    .optional(),
+  addFkeyColumns: z
+    .array(
+      z.object({
+        columnName: z
+          .string()
+          .min(1, "Column name is required for adding foreign key"),
+        foreignKey: foreignKeySchema,
+      })
+    )
+    .optional(),
+  dropFkeyColumns: z
+    .array(
+      z.object({
+        columnName: z
+          .string()
+          .min(1, "Column name is required for dropping foreign key"),
+      })
+    )
+    .optional(),
+});
+
+// Full schema with refinement - for validation
+export const updateTableSchemaRequest = updateTableSchemaBase
   .refine(
     (data) =>
-      data.add_columns ||
-      data.drop_columns ||
-      data.rename_columns ||
-      data.add_fkey_columns ||
-      data.drop_fkey_columns,
+      data.addColumns ||
+      data.dropColumns ||
+      data.renameColumns ||
+      data.addFkeyColumns ||
+      data.dropFkeyColumns,
     {
       message:
-        "At least one operation (add_columns, drop_columns, rename_columns, add_fkey_columns, drop_fkey_columns) is required. Please check the request body.",
+        "At least one operation (addColumns, dropColumns, renameColumns, addFkeyColumns, dropFkeyColumns) is required. Please check the request body.",
     }
   );
 
 export const updateTableSchemaResponse = z.object({
   message: z.string(),
-  table_name: z.string(),
+  tableName: z.string(),
   operations: z.array(z.string()),
 });
 
 export const deleteTableResponse = z.object({
   message: z.string(),
-  table_name: z.string(),
-  nextAction: z.string(),
+  tableName: z.string(),
+  nextActions: z.string(),
 });
 
 export type CreateTableRequest = z.infer<typeof createTableRequestSchema>;

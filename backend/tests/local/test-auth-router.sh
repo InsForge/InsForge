@@ -65,9 +65,9 @@ register_response=$(curl -s -X POST "$API_BASE/auth/register" \
     -H "Content-Type: application/json" \
     -d '{"email":"'$USER_EMAIL'","password":"'$USER_PASS'","name":"'$USER_NAME'"}')
 
-if echo "$register_response" | grep -q '"access_token"'; then
+if echo "$register_response" | grep -q '"accessToken"'; then
     print_success "Register success"
-    AUTH_TOKEN=$(echo "$register_response" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+    AUTH_TOKEN=$(echo "$register_response" | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4)
 else
     print_fail "Register failed"
     echo "Response: $register_response"
@@ -81,9 +81,9 @@ login_response=$(curl -s -X POST "$API_BASE/auth/login" \
     -H "Content-Type: application/json" \
     -d '{"email":"'$USER_EMAIL'","password":"'$USER_PASS'"}')
 
-if echo "$login_response" | grep -q '"access_token"'; then
+if echo "$login_response" | grep -q '"accessToken"'; then
     print_success "Login success"
-    AUTH_TOKEN=$(echo "$login_response" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+    AUTH_TOKEN=$(echo "$login_response" | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4)
 else
     print_fail "Login failed"
     echo "Response: $login_response"

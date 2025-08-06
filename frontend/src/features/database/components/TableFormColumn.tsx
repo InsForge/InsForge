@@ -34,7 +34,7 @@ export const TableFormColumn = memo(function TableFormColumn({
         <div className="relative flex items-center">
           <Controller
             control={control}
-            name={`columns.${index}.name`}
+            name={`columns.${index}.columnName`}
             render={({ field }) => (
               <Input
                 {...field}
@@ -47,7 +47,7 @@ export const TableFormColumn = memo(function TableFormColumn({
             )}
           />
           {/* Show key icon only for the first preset field in create mode (which is the system id) */}
-          {isSystemColumn && column.name === 'id' && (
+          {isSystemColumn && column.columnName === 'id' && (
             <Key className="absolute left-[35px] top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
           )}
         </div>
@@ -69,7 +69,7 @@ export const TableFormColumn = memo(function TableFormColumn({
       <div className="flex-1 min-w-[175px]">
         <Controller
           control={control}
-          name={`columns.${index}.default_value`}
+          name={`columns.${index}.defaultValue`}
           render={({ field }) => (
             <Input
               {...field}
@@ -87,7 +87,7 @@ export const TableFormColumn = memo(function TableFormColumn({
       <div className="w-18 2xl:w-25 flex justify-center flex-shrink-0">
         <Controller
           control={control}
-          name={`columns.${index}.nullable`}
+          name={`columns.${index}.isNullable`}
           render={({ field }) => (
             <Checkbox
               checked={field.value}
@@ -103,7 +103,7 @@ export const TableFormColumn = memo(function TableFormColumn({
       <div className="w-18 2xl:w-25 flex justify-center flex-shrink-0">
         <Controller
           control={control}
-          name={`columns.${index}.is_unique`}
+          name={`columns.${index}.isUnique`}
           render={({ field }) => (
             <Checkbox
               checked={field.value}

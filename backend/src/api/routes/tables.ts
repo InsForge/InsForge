@@ -1,5 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
-import { verifyUserOrApiKey, AuthRequest } from '@/api/middleware/auth.js';
+import { verifyAdmin, verifyUser, AuthRequest } from '@/api/middleware/auth.js';
 import { TablesController } from '@/controllers/TablesController.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/api/middleware/error.js';
@@ -10,10 +10,10 @@ const router = Router();
 const tablesController = new TablesController();
 
 // All table routes accept either JWT token or API key authentication
-router.use(verifyUserOrApiKey);
+// router.use(verifyAdmin);
 
 // List all tables
-router.get('/', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/', verifyUser, async (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const tables = await tablesController.listTables();
     successResponse(res, tables);
@@ -23,7 +23,7 @@ router.get('/', async (_req: AuthRequest, res: Response, next: NextFunction) => 
 });
 
 // Create a new table
-router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const validation = createTableRequestSchema.safeParse(req.body);
     if (!validation.success) {
@@ -35,8 +35,8 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
       );
     }
 
-    const { table_name, columns, rls_enabled } = validation.data;
-    const result = await tablesController.createTable(table_name, columns, rls_enabled);
+    const { tableName, columns, rlsEnabled } = validation.data;
+    const result = await tablesController.createTable(tableName, columns, rlsEnabled);
     successResponse(res, result, 201);
   } catch (error) {
     next(error);
@@ -44,10 +44,10 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
 });
 
 // Get table schema
-router.get('/:table/schema', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/:tableName/schema', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { table } = req.params;
-    const schema = await tablesController.getTableSchema(table);
+    const { tableName } = req.params;
+    const schema = await tablesController.getTableSchema(tableName);
     successResponse(res, schema);
   } catch (error) {
     next(error);
@@ -55,9 +55,9 @@ router.get('/:table/schema', async (req: AuthRequest, res: Response, next: NextF
 });
 
 // Update table schema
-router.patch('/:table', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.patch('/:tableName/schema', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { table } = req.params;
+    const { tableName } = req.params;
 
     const validation = updateTableSchemaRequest.safeParse(req.body);
     if (!validation.success) {
@@ -70,7 +70,7 @@ router.patch('/:table', async (req: AuthRequest, res: Response, next: NextFuncti
     }
 
     const operations = validation.data;
-    const result = await tablesController.updateTableSchema(table, operations);
+    const result = await tablesController.updateTableSchema(tableName, operations);
     successResponse(res, result);
   } catch (error) {
     next(error);
@@ -78,10 +78,10 @@ router.patch('/:table', async (req: AuthRequest, res: Response, next: NextFuncti
 });
 
 // Delete a table
-router.delete('/:table', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.delete('/:tableName', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { table } = req.params;
-    const result = await tablesController.deleteTable(table);
+    const { tableName } = req.params;
+    const result = await tablesController.deleteTable(tableName);
     successResponse(res, result);
   } catch (error) {
     next(error);

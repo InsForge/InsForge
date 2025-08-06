@@ -1,13 +1,14 @@
 import { Router, Response, NextFunction } from 'express';
 import { DatabaseManager } from '@/core/database/database.js';
-import { verifyUserOrAdmin, AuthRequest } from '@/api/middleware/auth.js';
+import { AnalyticsManager } from '@/core/analytics/analytics.js';
+import { AuthRequest, verifyAdmin } from '@/api/middleware/auth.js';
 import { successResponse, paginatedResponse } from '@/utils/response.js';
-import { LogRecord, LogActionStat, LogTableStat } from '@/types/logs.js';
+import { LogRecord, LogActionStat, LogTableStat, AnalyticsLogResponse } from '@/types/logs.js';
 
 const router = Router();
 
 // All logs routes require admin authentication
-router.use(verifyUserOrAdmin);
+router.use(verifyAdmin);
 
 // GET /logs - List activity logs
 router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -136,6 +137,87 @@ router.delete('/', async (req: AuthRequest, res: Response, next: NextFunction) =
       message: 'Logs cleared successfully',
       deleted: result.changes,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Analytics logs routes
+// GET /logs/analytics/sources - List all log sources
+router.get('/analytics/sources', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const analyticsManager = AnalyticsManager.getInstance();
+    const sources = await analyticsManager.getLogSources();
+
+    successResponse(res, sources);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /logs/analytics/stats - Get statistics for all log sources
+router.get('/analytics/stats', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const analyticsManager = AnalyticsManager.getInstance();
+    const stats = await analyticsManager.getLogSourceStats();
+
+    successResponse(res, stats);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /logs/analytics/search - Search across all logs or specific source
+router.get('/analytics/search', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { q, source, limit = 100, offset = 0 } = req.query;
+
+    if (!q || typeof q !== 'string') {
+      return res.status(400).json({
+        error: 'MISSING_QUERY',
+        message: 'Search query parameter (q) is required',
+        statusCode: 400,
+      });
+    }
+
+    const analyticsManager = AnalyticsManager.getInstance();
+    const result = await analyticsManager.searchLogs(
+      q,
+      source as string | undefined,
+      Number(limit),
+      Number(offset)
+    );
+
+    paginatedResponse(res, result.logs, result.total, Number(limit), Number(offset));
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /logs/analytics/:source - Get logs from specific source
+router.get('/analytics/:source', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { source } = req.params;
+    const { limit = 100, before_timestamp, start_time, end_time } = req.query;
+
+    const analyticsManager = AnalyticsManager.getInstance();
+    const result = await analyticsManager.getLogsBySource(
+      source,
+      Number(limit),
+      before_timestamp as string | undefined,
+      start_time as string | undefined,
+      end_time as string | undefined
+    );
+
+    const response: AnalyticsLogResponse = {
+      source,
+      logs: result.logs,
+      total: result.total,
+      page: 1, // Not applicable for timestamp-based pagination
+      pageSize: Number(limit),
+    };
+
+    successResponse(res, response);
   } catch (error) {
     next(error);
   }

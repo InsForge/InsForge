@@ -1,10 +1,17 @@
 import { DatabaseManager } from '@/core/database/database.js';
-import { ColumnSchema, TableSchema, DatabaseSchema } from '@/types/database.js';
+import {
+  ColumnSchema,
+  TableSchema,
+  DatabaseSchema,
+  OnDeleteActionSchema,
+  OnUpdateActionSchema,
+} from '@insforge/shared-schemas';
 import { StorageConfig } from '@/types/storage.js';
 import { AuthConfig } from '@/types/auth.js';
 import { AppMetadata } from '@/types/metadata.js';
 import logger from '@/utils/logger.js';
 import { BETTER_AUTH_SYSTEM_TABLES } from '@/utils/constants.js';
+import { convertSqlTypeToColumnType } from '@/utils/helpers';
 
 export class MetadataService {
   private static instance: MetadataService;
@@ -133,32 +140,15 @@ export class MetadataService {
 
       const columnMetadata: ColumnSchema[] = columns.map((col) => {
         // Map PostgreSQL types to our type system
-        let type = col.type.toUpperCase();
-        if (type === 'TEXT' || type.startsWith('VARCHAR') || type.startsWith('CHAR')) {
-          type = 'string';
-        } else if (type === 'INTEGER' || type === 'BIGINT' || type === 'SMALLINT') {
-          type = 'integer';
-        } else if (type === 'DOUBLE PRECISION' || type === 'REAL' || type === 'NUMERIC') {
-          type = 'float';
-        } else if (type === 'BOOLEAN') {
-          type = 'boolean';
-        } else if (type === 'TIMESTAMPTZ' || type.startsWith('TIMESTAMPTZ')) {
-          type = 'datetime';
-        } else if (type === 'UUID') {
-          type = 'uuid';
-        } else if (type === 'JSONB' || type === 'JSON') {
-          type = 'json';
-        } else if (type === 'BYTEA') {
-          type = 'blob';
-        }
+        const type = convertSqlTypeToColumnType(col.type);
 
         const column: ColumnSchema = {
-          name: col.name,
+          columnName: col.name,
           type: type,
-          nullable: col.is_nullable === 'YES',
-          default_value: col.dflt_value || undefined,
-          primary_key: col.is_primary_key,
-          is_unique: col.is_unique,
+          isNullable: col.is_nullable === 'YES',
+          defaultValue: col.dflt_value || undefined,
+          isPrimaryKey: col.is_primary_key,
+          isUnique: col.is_unique,
         };
 
         return column;
@@ -199,13 +189,13 @@ export class MetadataService {
 
       // Map foreign keys to columns
       for (const fk of foreignKeys) {
-        const column = columnMetadata.find((col) => col.name === fk.from_column);
+        const column = columnMetadata.find((col) => col.columnName === fk.from_column);
         if (column) {
-          column.foreign_key = {
-            table: fk.foreign_table,
-            column: fk.foreign_column,
-            on_delete: fk.on_delete,
-            on_update: fk.on_update,
+          column.foreignKey = {
+            referenceTable: fk.foreign_table,
+            referenceColumn: fk.foreign_column,
+            onDelete: fk.on_delete as OnDeleteActionSchema,
+            onUpdate: fk.on_update as OnUpdateActionSchema,
           };
         }
       }
@@ -229,7 +219,7 @@ export class MetadataService {
 
         if (tableExists?.exists) {
           const countResult = (await this.db
-            .prepare(`SELECT COUNT(*) as count FROM ${table.name}`)
+            .prepare(`SELECT COUNT(*) as count FROM "${table.name}"`)
             .get()) as { count: number } | null;
           recordCount = countResult?.count || 0;
         }
@@ -243,9 +233,9 @@ export class MetadataService {
       }
 
       tableMetadata.push({
-        name: table.name,
+        tableName: table.name,
         columns: columnMetadata,
-        record_count: recordCount,
+        recordCount: recordCount,
       });
     }
 
@@ -280,7 +270,7 @@ export class MetadataService {
     const buckets = storageBuckets.map((b) => ({
       name: b.name,
       public: b.public,
-      created_at: b.created_at,
+      createdAt: b.created_at,
     }));
 
     const storageMetadata: StorageConfig = { buckets };
@@ -338,13 +328,13 @@ export class MetadataService {
       }
     > = {};
     for (const table of database.tables) {
-      tables[table.name] = {
+      tables[table.tableName] = {
         record_count:
-          typeof table.record_count === 'number'
-            ? table.record_count
-            : parseInt(String(table.record_count || '0'), 10) || 0,
-        created_at: table.created_at,
-        updated_at: table.updated_at,
+          typeof table.recordCount === 'number'
+            ? table.recordCount
+            : parseInt(String(table.recordCount || '0'), 10) || 0,
+        created_at: table.createdAt,
+        updated_at: table.updatedAt,
       };
     }
 

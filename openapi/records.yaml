@@ -1,79 +1,67 @@
 openapi: 3.0.3
 info:
   title: Insforge Records API
-  version: 1.0.0
+  version: 2.0.0
+  description: PostgREST-style database record operations
 
 paths:
-  /api/database/{table}:
+  /api/database/records/{tableName}:
     get:
-      summary: List records
+      summary: Query Records
+      description: Query records from a table with filtering, sorting, and pagination
       security:
         - bearerAuth: []
         - apiKey: []
       parameters:
-        - name: table
+        - name: tableName
           in: path
           required: true
           schema:
             type: string
+          description: Name of the table to query
+          example: users
         - name: limit
           in: query
           schema:
             type: integer
             default: 100
+            minimum: 1
+            maximum: 1000
+          description: Maximum number of records to return
         - name: offset
           in: query
           schema:
             type: integer
             default: 0
-      parameters:
-        - name: table
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 100
-          description: Number of records to return
-        - name: offset
-          in: query
-          schema:
-            type: integer
-            default: 0
-          description: Number of records to skip
+            minimum: 0
+          description: Number of records to skip for pagination
         - name: order
           in: query
           schema:
             type: string
-          description: Sort order (e.g., "created_at.desc")
+          description: Sort order (e.g., "createdAt.desc", "name.asc")
+          example: createdAt.desc
         - name: select
           in: query
           schema:
             type: string
           description: Comma-separated list of columns to return
+          example: id,name,email
+        # PostgREST-style filters
+        - name: field
+          in: query
+          schema:
+            type: string
+          description: Filter by field value (e.g., "?status=eq.active", "?age=gt.18")
+          example: status=eq.active
       responses:
         '200':
-          description: List of records with pagination
+          description: List of records
           headers:
             X-Total-Count:
               schema:
                 type: integer
-              description: Total number of records in the table
-            X-Page:
-              schema:
-                type: integer
-              description: Current page number (calculated from offset/limit)
-            X-Page-Size:
-              schema:
-                type: integer
-              description: Number of items per page (limit)
-            X-Total-Pages:
-              schema:
-                type: integer
-              description: Total number of pages
+              description: Total number of records matching the query
             Content-Range:
               schema:
                 type: string
@@ -86,16 +74,16 @@ paths:
                   type: object
                   additionalProperties: true
               example:
-                - id: "123e4567-e89b-12d3-a456-426614174000"
-                  title: "First Post"
-                  content: "This is the content"
-                  created_at: "2024-01-01T00:00:00Z"
-                  updated_at: "2024-01-01T00:00:00Z"
-                - id: "223e4567-e89b-12d3-a456-426614174001"
-                  title: "Second Post"
-                  content: "More content here"
-                  created_at: "2024-01-02T00:00:00Z"
-                  updated_at: "2024-01-02T00:00:00Z"
+                - id: "248373e1-0aea-45ce-8844-5ef259203749"
+                  name: "John Doe"
+                  email: "john@example.com"
+                  createdAt: "2025-07-18T05:37:24.338Z"
+                  updatedAt: "2025-07-18T05:37:24.338Z"
+                - id: "348373e1-0aea-45ce-8844-5ef259203750"
+                  name: "Jane Smith"
+                  email: "jane@example.com"
+                  createdAt: "2025-07-19T08:15:10.123Z"
+                  updatedAt: "2025-07-19T08:15:10.123Z"
         '404':
           description: Table not found
           content:
@@ -106,88 +94,87 @@ paths:
                 error: "TABLE_NOT_FOUND"
                 message: "Table 'nonexistent' does not exist"
                 statusCode: 404
-                nextAction: "Check table name and try again"
+                nextActions: "Check table name and try again"
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "INVALID_QUERY"
+                message: "Invalid filter syntax"
+                statusCode: 400
+                nextActions: "Check PostgREST filter documentation"
 
     post:
-      summary: Create records
+      summary: Create Records
+      description: Create one or more records. Request body MUST be an array.
       security:
         - bearerAuth: []
         - apiKey: []
       parameters:
-        - name: table
+        - name: tableName
           in: path
           required: true
           schema:
             type: string
+          description: Name of the table
+          example: users
+        - name: Prefer
+          in: header
+          schema:
+            type: string
+            enum: ["return=representation"]
+          description: Include to return created records in response (otherwise returns empty array)
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - records
-              properties:
-                records:
-                  type: array
-                  items:
-                    type: object
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                files:
-                  type: array
-                  items:
-                    type: string
-                    format: binary
-                data:
-                  type: string
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+              minItems: 1
+            example:
+              - name: "John Doe"
+                email: "john@example.com"
+                age: 30
       responses:
         '201':
           description: Records created
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  ids:
-                    type: array
-                    items:
-                      type: string
-                    description: IDs of created records
-                  records:
-                    type: array
-                    items:
-                      type: object
-                      additionalProperties: true
-                    description: Full created records with all fields
-              example:
-                ids: 
-                  - "123e4567-e89b-12d3-a456-426614174000"
-                  - "223e4567-e89b-12d3-a456-426614174001"
-                records:
-                  - id: "123e4567-e89b-12d3-a456-426614174000"
-                    title: "New Post"
-                    content: "Content here"
-                    created_at: "2024-01-21T10:30:00Z"
-                    updated_at: "2024-01-21T10:30:00Z"
-                  - id: "223e4567-e89b-12d3-a456-426614174001"
-                    title: "Another Post"
-                    content: "More content"
-                    created_at: "2024-01-21T10:30:00Z"
-                    updated_at: "2024-01-21T10:30:00Z"
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+              examples:
+                without_prefer:
+                  summary: Response without Prefer header
+                  value: []
+                with_prefer:
+                  summary: Response with Prefer: return=representation
+                  value:
+                    - id: "248373e1-0aea-45ce-8844-5ef259203749"
+                      name: "John Doe"
+                      email: "john@example.com"
+                      age: 30
+                      createdAt: "2025-07-18T05:37:24.338Z"
+                      updatedAt: "2025-07-18T05:37:24.338Z"
         '400':
-          description: Bad request
+          description: Invalid input
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 error: "VALIDATION_ERROR"
-                message: "Missing required field: title"
+                message: "Invalid field type: expected integer for 'age'"
                 statusCode: 400
-                nextAction: "Include all required fields in the request"
+                nextActions: "Ensure field types match the table schema"
         '404':
           description: Table not found
           content:
@@ -196,92 +183,49 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 error: "TABLE_NOT_FOUND"
-                message: "Table 'posts' does not exist"
+                message: "Table 'nonexistent' does not exist"
                 statusCode: 404
-                nextAction: "Create the table first using /api/tables endpoint"
-
-  /api/database/{table}?id=eq.{id}:
-    get:
-      summary: Get single record
-      security:
-        - bearerAuth: []
-        - apiKey: []
-      parameters:
-        - name: table
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Record details
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  additionalProperties: true
-                description: Array with single record (PostgREST compatibility)
-              example:
-                - id: "123e4567-e89b-12d3-a456-426614174000"
-                  title: "First Post"
-                  content: "This is the content"
-                  author_id: "user-123"
-                  created_at: "2024-01-01T00:00:00Z"
-                  updated_at: "2024-01-21T10:30:00Z"
-        '404':
-          description: Record not found
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                description: Empty array when record not found
-              example: []
+                nextActions: "Create the table first"
 
     patch:
-      summary: Update record
+      summary: Update Records
+      description: Update records matching query filters
       security:
         - bearerAuth: []
         - apiKey: []
       parameters:
-        - name: table
+        - name: tableName
           in: path
           required: true
           schema:
             type: string
+          description: Name of the table
+          example: users
         - name: id
-          in: path
-          required: true
+          in: query
           schema:
             type: string
+          description: Filter records by ID (e.g., "?id=eq.123e4567-e89b-12d3-a456-426614174000")
+          example: eq.123e4567-e89b-12d3-a456-426614174000
+        - name: Prefer
+          in: header
+          schema:
+            type: string
+            enum: ["return=representation"]
+          description: Include to return updated records in response
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                files:
-                  type: array
-                  items:
-                    type: string
-                    format: binary
-                data:
-                  type: string
+              additionalProperties: true
+            example:
+              name: "Jane Doe"
+              email: "jane.doe@example.com"
       responses:
         '200':
-          description: Record updated
+          description: Records updated
           content:
             application/json:
               schema:
@@ -289,56 +233,70 @@ paths:
                 items:
                   type: object
                   additionalProperties: true
-                description: Array with updated record (PostgREST compatibility)
-              example:
-                - id: "123e4567-e89b-12d3-a456-426614174000"
-                  title: "Updated Post Title"
-                  content: "Updated content"
-                  author_id: "user-123"
-                  created_at: "2024-01-01T00:00:00Z"
-                  updated_at: "2024-01-21T11:00:00Z"
+              examples:
+                without_prefer:
+                  summary: Response without Prefer header
+                  value: []
+                with_prefer:
+                  summary: Response with Prefer: return=representation
+                  value:
+                    - id: "123e4567-e89b-12d3-a456-426614174000"
+                      name: "Jane Doe"
+                      email: "jane.doe@example.com"
+                      createdAt: "2025-01-01T00:00:00Z"
+                      updatedAt: "2025-01-21T11:00:00Z"
         '404':
-          description: Record not found
+          description: No records found to update
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error: "RECORD_NOT_FOUND"
-                message: "Record with id '123' not found in table 'posts'"
-                statusCode: 404
-                nextAction: "Check the record ID and try again"
+                type: array
+                items:
+                  type: object
+              example: []
         '400':
-          description: Bad request
+          description: Invalid input
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 error: "VALIDATION_ERROR"
-                message: "Invalid field type: expected integer for 'view_count'"
+                message: "Invalid field type"
                 statusCode: 400
-                nextAction: "Ensure field types match the table schema"
+                nextActions: "Check field types match table schema"
 
     delete:
-      summary: Delete record
+      summary: Delete Records
+      description: Delete records matching query filters
       security:
         - bearerAuth: []
         - apiKey: []
       parameters:
-        - name: table
+        - name: tableName
           in: path
           required: true
           schema:
             type: string
+          description: Name of the table
+          example: users
         - name: id
-          in: path
-          required: true
+          in: query
           schema:
             type: string
+          description: Filter records by ID (e.g., "?id=eq.123e4567-e89b-12d3-a456-426614174000")
+          example: eq.123e4567-e89b-12d3-a456-426614174000
+        - name: Prefer
+          in: header
+          schema:
+            type: string
+            enum: ["return=representation"]
+          description: Include to return deleted records in response
       responses:
+        '204':
+          description: Records deleted (without Prefer header)
         '200':
-          description: Record deleted
+          description: Records deleted (with Prefer header)
           content:
             application/json:
               schema:
@@ -346,25 +304,17 @@ paths:
                 items:
                   type: object
                   additionalProperties: true
-                description: Array with deleted record (PostgREST compatibility)
-              example:
-                - id: "123e4567-e89b-12d3-a456-426614174000"
-                  title: "Deleted Post"
-                  content: "This was deleted"
-                  author_id: "user-123"
-                  created_at: "2024-01-01T00:00:00Z"
-                  updated_at: "2024-01-21T10:30:00Z"
-        '404':
-          description: Record not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error: "RECORD_NOT_FOUND"
-                message: "Record with id '123' not found in table 'posts'"
-                statusCode: 404
-                nextAction: "Check the record ID and try again"
+              examples:
+                records_deleted:
+                  summary: Records were deleted
+                  value:
+                    - id: "123e4567-e89b-12d3-a456-426614174000"
+                      name: "Deleted User"
+                      createdAt: "2025-01-01T00:00:00Z"
+                      updatedAt: "2025-01-21T11:00:00Z"
+                no_records:
+                  summary: No records found to delete
+                  value: []
 
 components:
   securitySchemes:
@@ -374,8 +324,8 @@ components:
     apiKey:
       type: apiKey
       in: header
-      name: X-API-Key
-  
+      name: x-api-key
+
   schemas:
     ErrorResponse:
       type: object
@@ -387,12 +337,38 @@ components:
         error:
           type: string
           description: Error code for programmatic handling
+          example: "VALIDATION_ERROR"
         message:
           type: string
           description: Human-readable error message
+          example: "Invalid input data"
         statusCode:
           type: integer
           description: HTTP status code
-        nextAction:
+          example: 400
+        nextActions:
           type: string
           description: Suggested action to resolve the error
+          example: "Check the request body format"
+
+    Record:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Auto-generated UUID
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when record was created
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when record was last updated
+      additionalProperties: true
+      description: Base record structure with system fields
+
+security:
+  - bearerAuth: []
+  - apiKey: []

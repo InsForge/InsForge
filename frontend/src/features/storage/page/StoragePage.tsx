@@ -66,34 +66,35 @@ export default function StoragePage() {
     queryFn: async () => {
       const stats: Record<
         string,
-        { file_count: number; total_size: number; public: boolean; created_at?: string }
+        { fileCount: number; totalSize: number; public: boolean; createdAt?: string }
       > = {};
       const currentBuckets = buckets;
       const promises = currentBuckets.map(async (bucket) => {
         try {
           const result = await storageService.listObjects(bucket.name, { limit: 1000 });
-          const objects = result.data.objects;
+          const objects = result.objects;
           const totalSize = objects.reduce((sum, file) => sum + file.size, 0);
           return {
             bucketName: bucket.name,
             stats: {
-              file_count: result.meta.pagination.total,
-              total_size: totalSize,
+              fileCount: result.pagination.total,
+              totalSize: totalSize,
               public: bucket.public,
-              created_at: bucket.created_at,
+              createdAt: bucket.createdAt,
             },
           };
-        } catch (error: any) {
-          if (error.response?.status === 404) {
+        } catch (error) {
+          if (error) {
+            console.error(error);
             return null;
           }
           return {
             bucketName: bucket.name,
             stats: {
-              file_count: 0,
-              total_size: 0,
+              fileCount: 0,
+              totalSize: 0,
               public: bucket.public,
-              created_at: bucket.created_at,
+              createdAt: bucket.createdAt,
             },
           };
         }
@@ -119,7 +120,7 @@ export default function StoragePage() {
   const uploadMutation = useMutation({
     mutationFn: async ({ bucket, file }: { bucket: string; file: File }) => {
       const key = file.name;
-      return await storageService.uploadFile(bucket, key, file);
+      return await storageService.uploadObject(bucket, key, file);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['storage'] });
@@ -165,7 +166,7 @@ export default function StoragePage() {
 
     if (shouldDelete) {
       try {
-        await Promise.all(fileKeys.map((key) => storageService.deleteFile(selectedBucket, key)));
+        await Promise.all(fileKeys.map((key) => storageService.deleteObject(selectedBucket, key)));
         void queryClient.invalidateQueries({ queryKey: ['storage'] });
         setSelectedFiles(new Set());
         showToast(`${fileKeys.length} files deleted successfully`, 'success');
@@ -422,7 +423,7 @@ export default function StoragePage() {
 
               <StorageManager
                 bucketName={selectedBucket}
-                fileCount={bucketStats?.[selectedBucket]?.file_count || 0}
+                fileCount={bucketStats?.[selectedBucket]?.fileCount || 0}
                 searchQuery={searchQuery}
                 selectedFiles={selectedFiles}
                 onSelectedFilesChange={setSelectedFiles}

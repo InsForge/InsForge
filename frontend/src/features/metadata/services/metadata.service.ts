@@ -4,22 +4,22 @@ export interface ColumnMetadata {
   name: string;
   type: string;
   nullable: boolean;
-  default_value?: string;
-  primary_key?: boolean;
-  foreign_key?: {
+  defaultValue?: string;
+  isPrimaryKey?: boolean;
+  foreignKey?: {
     table: string;
     column: string;
-    on_delete?: string;
-    on_update?: string;
+    onDelete?: string;
+    onUpdate?: string;
   };
 }
 
 export interface TableMetadata {
   name: string;
   columns: ColumnMetadata[];
-  record_count?: number;
-  created_at?: string;
-  updated_at?: string;
+  recordCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface DatabaseMetadata {
@@ -36,7 +36,7 @@ export interface StorageMetadata {
   buckets: Array<{
     name: string;
     public: boolean;
-    created_at?: string;
+    createdAt?: string;
   }>;
 }
 

@@ -7,7 +7,7 @@ export interface ErrorResponse {
   error: string;
   message: string;
   statusCode: number;
-  nextAction?: string;
+  nextActions?: string;
 }
 
 export interface PaginationMeta {
@@ -29,13 +29,13 @@ export function errorResponse(
   error: string,
   message: string,
   statusCode: number = 500,
-  nextAction?: string
+  nextActions?: string
 ) {
   const response: ErrorResponse = {
     error,
     message,
     statusCode,
-    nextAction,
+    nextActions,
   };
 
   return res.status(statusCode).json(response);

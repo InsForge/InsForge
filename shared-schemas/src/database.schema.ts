@@ -23,31 +23,45 @@ export const onDeleteActionSchema = z.enum([
   "NO ACTION",
 ]);
 
-export const columnTypeSchema = z.enum(ColumnType);
+export const columnTypeSchema = z.enum([
+  ColumnType.STRING,
+  ColumnType.DATETIME,
+  ColumnType.INTEGER,
+  ColumnType.FLOAT,
+  ColumnType.BOOLEAN,
+  ColumnType.UUID,
+  ColumnType.JSON,
+]);
 
 export const foreignKeySchema = z.object({
-  reference_table: z.string().min(1, "Target table cannot be empty"),
-  reference_column: z.string().min(1, "Target column cannot be empty"),
-  on_delete: onDeleteActionSchema,
-  on_update: onUpdateActionSchema,
+  referenceTable: z.string().min(1, "Target table cannot be empty"),
+  referenceColumn: z.string().min(1, "Target column cannot be empty"),
+  onDelete: onDeleteActionSchema,
+  onUpdate: onUpdateActionSchema,
 });
 
 export const columnSchema = z.object({
-  name: z.string().min(1, "Column name cannot be empty"),
+  columnName: z
+    .string()
+    .min(1, "Column name cannot be empty")
+    .max(64, "Column name must be less than 64 characters"),
   type: columnTypeSchema,
-  nullable: z.boolean(),
-  default_value: z.string().optional(),
-  primary_key: z.boolean().optional(),
-  is_unique: z.boolean(),
-  foreign_key: foreignKeySchema.optional(),
+  defaultValue: z.string().optional(),
+  isPrimaryKey: z.boolean().optional(),
+  isNullable: z.boolean(),
+  isUnique: z.boolean(),
+  foreignKey: foreignKeySchema.optional(),
 });
 
 export const tableSchema = z.object({
-  table_name: z.string().min(1, "Table name cannot be empty"),
-  columns: z.array(columnSchema),
-  record_count: z.number().default(0),
-  created_at: z.string().optional(),
-  updated_at: z.string().optional(),
+  tableName: z
+    .string()
+    .min(1, "Table name cannot be empty")
+    .max(64, "Table name must be less than 64 characters"),
+  columns: z.array(columnSchema).min(1, "At least one column is required"),
+  recordCount: z.number().default(0),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
 });
 
 export const databaseSchema = z.object({

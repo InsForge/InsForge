@@ -58,7 +58,7 @@ paths:
                           name:
                             type: string
                             description: From profile record
-                          avatar_url:
+                          avatarUrl:
                             type: string
                             nullable: true
                           bio:
@@ -115,7 +115,7 @@ paths:
                             type: string
                           name:
                             type: string
-                          avatar_url:
+                          avatarUrl:
                             type: string
                             nullable: true
                           bio:
@@ -196,7 +196,7 @@ paths:
     get:
       summary: Get Google OAuth authorization URL
       parameters:
-        - name: redirect_url
+        - name: redirectUrl
           in: query
           required: false
           schema:
@@ -216,14 +216,14 @@ paths:
                   data:
                     type: object
                     properties:
-                      auth_url:
+                      authUrl:
                         type: string
 
   /api/auth/v1/github-auth:
     get:
       summary: Get GitHub OAuth authorization URL
       parameters:
-        - name: redirect_url
+        - name: redirectUrl
           in: query
           required: false
           schema:
@@ -243,7 +243,7 @@ paths:
                   data:
                     type: object
                     properties:
-                      auth_url:
+                      authUrl:
                         type: string
 
   /api/auth/v1/callback:
@@ -306,10 +306,10 @@ paths:
                           type: string
                         status:
                           type: string
-                        created_at:
+                        createdAt:
                           type: string
                           format: date-time
-                        updated_at:
+                        updatedAt:
                           type: string
                           format: date-time
 
@@ -334,13 +334,13 @@ components:
         email:
           type: string
           format: email
-        password_hash:
+        passwordHash:
           type: string
           description: SHA256 hash of password
-        created_at:
+        createdAt:
           type: string
           format: date-time
-        updated_at:
+        updatedAt:
           type: string
           format: date-time
     
@@ -350,7 +350,7 @@ components:
         id:
           type: string
           format: uuid
-        auth_id:
+        authId:
           type: string
           format: uuid
           description: Foreign key to auth table
@@ -365,10 +365,10 @@ components:
         metadata:
           type: object
           description: JSONB field for flexible data
-        created_at:
+        createdAt:
           type: string
           format: date-time
-        updated_at:
+        updatedAt:
           type: string
           format: date-time
     
@@ -391,7 +391,7 @@ components:
           type: integer
           description: HTTP status code
           example: 400
-        nextAction:
+        nextActions:
           type: string
           description: Suggested action to resolve the error
           example: "Please use a different email address"

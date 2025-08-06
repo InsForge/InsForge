@@ -1,0 +1,38 @@
+{
+  "name": "@insforge/insforge-mcp",
+  "version": "1.0.31",
+  "description": "MCP (Model Context Protocol) server for Insforge backend-as-a-service",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "insforge-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "clean": "rimraf dist",
+    "prebuild": "npm run clean"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "insforge",
+    "backend-as-a-service"
+  ],
+  "author": "Insforge",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@insforge/shared-schemas": "1.0.0",
+    "@modelcontextprotocol/sdk": "^1.15.1",
+    "commander": "^14.0.0",
+    "node-fetch": "^3.3.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "rimraf": "^5.0.5",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}

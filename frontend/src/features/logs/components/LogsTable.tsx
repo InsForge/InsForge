@@ -3,9 +3,10 @@ import { ChevronRight, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/radix/Button';
 import { Badge } from '@/components/radix/Badge';
 import { PaginationControls } from '@/components/PaginationControls';
+import { LogEntry } from '../services/logs.service';
 
 interface LogsTableProps {
-  logs: any[];
+  logs: LogEntry[];
   schema?: any;
   loading?: boolean;
   searchQuery?: string;
@@ -132,7 +133,7 @@ export function LogsTable({
               </tr>
             ) : (
               filteredLogs.map((log) => {
-                const isExpanded = expandedRows.has(log.id);
+                const isExpanded = expandedRows.has(String(log.id));
                 let details = null;
 
                 try {
@@ -159,7 +160,7 @@ export function LogsTable({
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => toggleRowExpansion(log.id)}
+                            onClick={() => toggleRowExpansion(String(log.id))}
                             className="h-8 px-3 text-[13px]"
                           >
                             {isExpanded ? (

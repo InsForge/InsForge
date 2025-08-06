@@ -1,6 +1,6 @@
 // Application metadata type definitions
 
-import { DatabaseSchema } from './database.js';
+import { DatabaseSchema } from '@insforge/shared-schemas';
 import { StorageConfig } from './storage.js';
 import { AuthConfig } from './auth.js';
 

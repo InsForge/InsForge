@@ -1,7 +1,8 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Folder } from 'lucide-react';
-import { storageService, type StoredFile } from '@/features/storage/services/storage.service';
+import { storageService } from '@/features/storage/services/storage.service';
+import { StorageFileSchema } from '@insforge/shared-schemas';
 import { LoadingState, ErrorState, EmptyState } from '@/components';
 import { StorageDataGrid } from './StorageDataGrid';
 import { FilePreviewDialog } from './FilePreviewDialog';
@@ -29,7 +30,7 @@ export function StorageManager({
 }: StorageManagerProps) {
   const queryClient = useQueryClient();
   const [downloadingFiles, setDownloadingFiles] = useState<Set<string>>(new Set());
-  const [previewFile, setPreviewFile] = useState<StoredFile | null>(null);
+  const [previewFile, setPreviewFile] = useState<StorageFileSchema | null>(null);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
   const { showToast } = useToast();
@@ -66,14 +67,14 @@ export function StorageManager({
 
   // Calculate pagination from backend response
   const totalPages = useMemo(() => {
-    const total = objectsData?.meta?.pagination?.total || fileCount;
+    const total = objectsData?.pagination?.total || fileCount;
     return Math.ceil(total / pageSize);
-  }, [objectsData?.meta?.pagination?.total, fileCount, pageSize]);
+  }, [objectsData?.pagination?.total, fileCount, pageSize]);
 
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: ({ bucket, key }: { bucket: string; key: string }) =>
-      storageService.deleteFile(bucket, key),
+      storageService.deleteObject(bucket, key),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['storage'] });
     },
@@ -82,14 +83,14 @@ export function StorageManager({
   // No need for client-side filtering - backend handles search
   // Just apply sorting
   const processedFiles = useMemo(() => {
-    let files = objectsData?.data?.objects || [];
+    let files = objectsData?.objects || [];
 
     // Apply sorting
     if (sortColumns.length > 0) {
       const sortColumn = sortColumns[0];
       files = [...files].sort((a, b) => {
-        const aValue = a[sortColumn.columnKey as keyof StoredFile];
-        const bValue = b[sortColumn.columnKey as keyof StoredFile];
+        const aValue = a[sortColumn.columnKey as keyof StorageFileSchema];
+        const bValue = b[sortColumn.columnKey as keyof StorageFileSchema];
 
         if (aValue === bValue) {
           return 0;
@@ -107,14 +108,14 @@ export function StorageManager({
     }
 
     return files;
-  }, [objectsData?.data?.objects, sortColumns]);
+  }, [objectsData?.objects, sortColumns]);
 
   // Handlers
   const handleDownload = useCallback(
-    async (file: StoredFile) => {
+    async (file: StorageFileSchema) => {
       setDownloadingFiles((prev) => new Set(prev).add(file.key));
       try {
-        const blob = await storageService.downloadFile(bucketName, file.key);
+        const blob = await storageService.downloadObject(bucketName, file.key);
 
         // Create download link
         const url = window.URL.createObjectURL(blob);
@@ -139,13 +140,13 @@ export function StorageManager({
     [bucketName, showToast]
   );
 
-  const handlePreview = useCallback((file: StoredFile) => {
+  const handlePreview = useCallback((file: StorageFileSchema) => {
     setPreviewFile(file);
     setShowPreviewDialog(true);
   }, []);
 
   const handleDelete = useCallback(
-    async (file: StoredFile) => {
+    async (file: StorageFileSchema) => {
       const confirmOptions = {
         title: 'Delete File',
         description: 'Are you sure you want to delete this file? This action cannot be undone.',
@@ -205,7 +206,7 @@ export function StorageManager({
           loading={objectsLoading}
           isRefreshing={isRefreshing}
           searchQuery={searchQuery}
-          totalRecords={objectsData?.meta?.pagination?.total || fileCount}
+          totalRecords={objectsData?.pagination?.total || fileCount}
           selectedRows={selectedFiles}
           onSelectedRowsChange={onSelectedFilesChange}
           sortColumns={sortColumns}

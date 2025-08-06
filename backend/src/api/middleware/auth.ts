@@ -36,47 +36,20 @@ function setRequestUser(
 }
 
 export function verifyUser(req: AuthRequest, res: Response, next: NextFunction) {
-  try {
-    const token = extractBearerToken(req.headers.authorization);
-    if (!token) {
-      throw new AppError(
-        'No token provided',
-        401,
-        ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-        NEXT_ACTION.CHECK_TOKEN
-      );
-    }
-
-    const payload = authService.verifyToken(token);
-    if (payload.type !== 'user') {
-      throw new AppError(
-        'Invalid token type',
-        401,
-        ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-        NEXT_ACTION.CHECK_TOKEN
-      );
-    }
-
-    setRequestUser(req, payload);
-    next();
-  } catch (error) {
-    if (error instanceof AppError) {
-      next(error);
-    } else {
-      next(
-        new AppError(
-          'Invalid token',
-          401,
-          ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-          NEXT_ACTION.CHECK_TOKEN
-        )
-      );
-    }
+  const apiKey = req.headers['x-api-key'] as string;
+  if (apiKey) {
+    return verifyApiKey(req, res, next);
+  } else {
+    return verifyToken(req, res, next);
   }
 }
 
 export function verifyAdmin(req: AuthRequest, res: Response, next: NextFunction) {
   try {
+    const apiKey = req.headers['x-api-key'] as string;
+    if (apiKey) {
+      return verifyApiKey(req, res, next);
+    }
     const token = extractBearerToken(req.headers.authorization);
     if (!token) {
       throw new AppError(
@@ -145,7 +118,7 @@ export async function verifyApiKey(req: AuthRequest, res: Response, next: NextFu
   }
 }
 
-export function verifyUserOrAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+export function verifyToken(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const token = extractBearerToken(req.headers.authorization);
     if (!token) {
@@ -185,22 +158,22 @@ export function verifyUserOrAdmin(req: AuthRequest, res: Response, next: NextFun
   }
 }
 
-export async function verifyUserOrApiKey(req: AuthRequest, res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization;
-  const apiKey = req.headers['x-api-key'] as string;
+// export async function verifyUserOrApiKey(req: AuthRequest, res: Response, next: NextFunction) {
+//   const authHeader = req.headers.authorization;
+//   const apiKey = req.headers['x-api-key'] as string;
 
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    return verifyUserOrAdmin(req, res, next);
-  } else if (apiKey) {
-    return verifyApiKey(req, res, next);
-  } else {
-    next(
-      new AppError(
-        'No authentication provided',
-        401,
-        ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-        NEXT_ACTION.CHECK_TOKEN
-      )
-    );
-  }
-}
+//   if (authHeader && authHeader.startsWith('Bearer ')) {
+//     return verifyUserOrAdmin(req, res, next);
+//   } else if (apiKey) {
+//     return verifyApiKey(req, res, next);
+//   } else {
+//     next(
+//       new AppError(
+//         'No authentication provided',
+//         401,
+//         ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+//         NEXT_ACTION.CHECK_TOKEN
+//       )
+//     );
+//   }
+// }

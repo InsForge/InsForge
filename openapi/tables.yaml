@@ -6,7 +6,7 @@ info:
 paths:
   /api/tables/field-types:
     get:
-      summary: Get available field types
+      summary: Get Available Field Types
       security:
         - bearerAuth: []
         - apiKey: []
@@ -52,7 +52,7 @@ paths:
 
   /api/tables:
     get:
-      summary: List tables
+      summary: List Tables
       security:
         - bearerAuth: []
         - apiKey: []
@@ -72,7 +72,7 @@ paths:
                 - "categories"
 
     post:
-      summary: Create table
+      summary: Create Table
       security:
         - bearerAuth: []
         - apiKey: []
@@ -83,10 +83,10 @@ paths:
             schema:
               type: object
               required:
-                - table_name
+                - tableName
                 - columns
               properties:
-                table_name:
+                tableName:
                   type: string
                 columns:
                   type: array
@@ -108,14 +108,14 @@ paths:
                         type: boolean
                       defaultValue:
                         type: string
-                      foreign_key:
+                      foreignKey:
                         type: object
                         properties:
                           table:
                             type: string
                           column:
                             type: string
-                          on_delete:
+                          onDelete:
                             type: string
                             enum: [CASCADE, SET NULL, NO ACTION, RESTRICT]
                             default: NO ACTION
@@ -133,7 +133,7 @@ paths:
                     type: string
               example:
                 message: "Table created successfully"
-                table_name: "posts"
+                tableName: "posts"
         '400':
           description: Bad request
           content:
@@ -144,7 +144,7 @@ paths:
                 error: "VALIDATION_ERROR"
                 message: "Table name already exists"
                 statusCode: 400
-                nextAction: "Choose a different table name"
+                nextActions: "Choose a different table name"
         '422':
           description: Unprocessable entity
           content:
@@ -155,16 +155,16 @@ paths:
                 error: "INVALID_FIELD_TYPE"
                 message: "Invalid field type: 'text'. Valid types are: string, integer, float, boolean, datetime, uuid, json, file"
                 statusCode: 422
-                nextAction: "Use one of the valid field types"
+                nextActions: "Use one of the valid field types"
 
-  /api/tables/{table}/schema:
+  /api/tables/{tableName}/schema:
     get:
-      summary: Get table schema
+      summary: Get Table Schema
       security:
         - bearerAuth: []
         - apiKey: []
       parameters:
-        - name: table
+        - name: tableName
           in: path
           required: true
           schema:
@@ -195,9 +195,9 @@ paths:
                         default:
                           type: string
                           nullable: true
-                        is_primary_key:
+                        isPrimaryKey:
                           type: boolean
-                        foreign_key:
+                        foreignKey:
                           type: object
                           nullable: true
                           properties:
@@ -208,29 +208,29 @@ paths:
                             on_delete:
                               type: string
               example:
-                table_name: "posts"
+                tableName: "posts"
                 columns:
                   - name: "id"
                     type: "uuid"
                     nullable: false
                     unique: true
                     default: "gen_random_uuid()"
-                    is_primary_key: true
-                    foreign_key: null
+                    isPrimaryKey: true
+                    foreignKey: null
                   - name: "title"
                     type: "string"
                     nullable: false
                     unique: false
                     default: null
-                    is_primary_key: false
-                    foreign_key: null
-                  - name: "user_id"
+                    isPrimaryKey: false
+                    foreignKey: null
+                  - name: "userId"
                     type: "uuid"
                     nullable: false
                     unique: false
                     default: null
-                    is_primary_key: false
-                    foreign_key:
+                    isPrimaryKey: false
+                    foreignKey:
                       table: "users"
                       column: "id"
                       on_delete: "CASCADE"
@@ -244,16 +244,14 @@ paths:
                 error: "TABLE_NOT_FOUND"
                 message: "Table 'nonexistent' does not exist"
                 statusCode: 404
-                nextAction: "Check table name and try again"
-
-  /api/tables/{table}:
+                nextActions: "Check table name and try again"
     patch:
-      summary: Modify table schema
+      summary: Update Table Schema
       security:
         - bearerAuth: []
         - apiKey: []
       parameters:
-        - name: table
+        - name: tableName
           in: path
           required: true
           schema:
@@ -265,7 +263,7 @@ paths:
             schema:
               type: object
               properties:
-                add_columns:
+                addColumns:
                   type: array
                   items:
                     type: object
@@ -276,13 +274,13 @@ paths:
                         type: string
                       nullable:
                         type: boolean
-                      default_value:
+                      defaultValue:
                         type: string
-                drop_columns:
+                dropColumns:
                   type: array
                   items:
                     type: string
-                rename_columns:
+                renameColumns:
                   type: object
                   additionalProperties:
                     type: string
@@ -301,25 +299,25 @@ paths:
                   modifications:
                     type: object
                     properties:
-                      added_columns:
+                      addedColumns:
                         type: array
                         items:
                           type: string
-                      dropped_columns:
+                      droppedColumns:
                         type: array
                         items:
                           type: string
-                      renamed_columns:
+                      renamedColumns:
                         type: object
                         additionalProperties:
                           type: string
               example:
                 message: "Table modified successfully"
-                table_name: "posts"
+                tableName: "posts"
                 modifications:
-                  added_columns: ["published_at"]
-                  dropped_columns: ["draft"]
-                  renamed_columns:
+                  addedColumns: ["published_at"]
+                  droppedColumns: ["draft"]
+                  renamedColumns:
                     content: "body"
         '400':
           description: Bad request
@@ -331,15 +329,16 @@ paths:
                 error: "COLUMN_EXISTS"
                 message: "Column 'title' already exists in table 'posts'"
                 statusCode: 400
-                nextAction: "Choose a different column name or drop it first"
+                nextActions: "Choose a different column name or drop it first"
 
+  /api/tables/{tableName}:
     delete:
-      summary: Delete table
+      summary: Delete Table
       security:
         - bearerAuth: []
         - apiKey: []
       parameters:
-        - name: table
+        - name: tableName
           in: path
           required: true
           schema:
@@ -358,7 +357,7 @@ paths:
                     type: string
               example:
                 message: "Table deleted successfully"
-                table_name: "posts"
+                tableName: "posts"
         '404':
           description: Table not found
           content:
@@ -369,7 +368,7 @@ paths:
                 error: "TABLE_NOT_FOUND"
                 message: "Table 'nonexistent' does not exist"
                 statusCode: 404
-                nextAction: "Check table name and try again"
+                nextActions: "Check table name and try again"
 
 components:
   securitySchemes:
@@ -398,6 +397,6 @@ components:
         statusCode:
           type: integer
           description: HTTP status code
-        nextAction:
+        nextActions:
           type: string
           description: Suggested action to resolve the error

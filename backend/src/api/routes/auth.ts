@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { AuthService } from '@/core/auth/auth.js';
 import { DatabaseManager } from '@/core/database/database.js';
 import { AppError } from '@/api/middleware/error.js';
-import { verifyUserOrAdmin, verifyAdmin, AuthRequest } from '@/api/middleware/auth.js';
+import { verifyAdmin, verifyUser, verifyToken, AuthRequest } from '@/api/middleware/auth.js';
 import { successResponse } from '@/utils/response.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { validateEmail } from '@/utils/validations.js';
@@ -86,12 +86,12 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
           id: userWithProfile.id,
           email: userWithProfile.email,
           name: userWithProfile.profile.name,
-          avatar_url: userWithProfile.profile.avatar_url,
+          avatarUrl: userWithProfile.profile.avatarUrl,
           bio: userWithProfile.profile.bio,
         },
-        access_token: token,
+        accessToken: token,
         message: 'User registered successfully',
-        nextAction:
+        nextActions:
           'You can use this token to access other endpoints (always add it to HTTP Header "Authorization", then send requests). Please keep it safe.',
       },
       201
@@ -134,12 +134,12 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
         id: userWithProfile.id,
         email: userWithProfile.email,
         name: userWithProfile.profile.name,
-        avatar_url: userWithProfile.profile.avatar_url,
+        avatarUrl: userWithProfile.profile.avatarUrl,
         bio: userWithProfile.profile.bio,
       },
-      access_token: token,
+      accessToken: token,
       message: 'Login successful',
-      nextAction:
+      nextActions:
         'You can use this token to access other endpoints (always add it to HTTP Header "Authorization", then send requests). Please keep it safe.',
     });
   } catch (error) {
@@ -183,9 +183,9 @@ router.post('/admin/login', async (req: Request, res: Response, next: NextFuncti
         email: superuser.email,
         role: 'admin',
       },
-      access_token: token,
+      accessToken: token,
       message: 'Admin login successful',
-      nextAction:
+      nextActions:
         'You can use this token to access admin endpoints (always add it to HTTP Header "Authorization", then send requests). Please keep it safe.',
     });
   } catch (error) {
@@ -193,7 +193,7 @@ router.post('/admin/login', async (req: Request, res: Response, next: NextFuncti
   }
 });
 
-router.get('/me', verifyUserOrAdmin, (req: AuthRequest, res: Response) => {
+router.get('/me', verifyToken, (req: AuthRequest, res: Response) => {
   successResponse(res, {
     user: req.user,
   });
@@ -215,12 +215,12 @@ router.get('/users', verifyAdmin, async (req: AuthRequest, res: Response, next: 
         email: user.email,
         name: user.profile.name,
         status: user.profile.metadata?.status || 'active',
-        avatar_url: user.profile.avatar_url,
+        avatarUrl: user.profile.avatarUrl,
         bio: user.profile.bio,
         identities: user.identities,
-        provider_type: user.identities.length > 0 ? 'Social' : 'Email',
-        created_at: user.created_at,
-        updated_at: user.updated_at,
+        providerType: user.identities.length > 0 ? 'Social' : 'Email',
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
       })),
       total,
     });
@@ -232,7 +232,7 @@ router.get('/users', verifyAdmin, async (req: AuthRequest, res: Response, next: 
 // Admin endpoint to bulk delete users
 router.delete(
   '/users/bulk-delete',
-  verifyUserOrAdmin,
+  verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       // Only admins can delete users
@@ -289,13 +289,13 @@ router.delete(
 // Get Google OAuth authorization URL
 router.get('/v1/google-auth', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { redirect_url } = req.query;
+    const { redirectUrl } = req.query;
 
     // Create state parameter with client redirect URL and provider info
     let state = null;
-    if (redirect_url) {
+    if (redirectUrl) {
       const stateData = {
-        client_redirect_uri: redirect_url,
+        client_redirect_uri: redirectUrl,
         provider: 'google',
         csrf_token: crypto.randomBytes(32).toString('hex'), // Generate random CSRF token
         // TODO: need to save and verify the csrf_token and client_redirect_uri
@@ -307,7 +307,7 @@ router.get('/v1/google-auth', async (req: Request, res: Response, next: NextFunc
     const authUrl = await authService.generateGoogleAuthUrl(state || undefined);
 
     successResponse(res, {
-      auth_url: authUrl,
+      authUrl: authUrl,
     });
   } catch (error) {
     logger.error('Google OAuth error', {
@@ -331,18 +331,18 @@ router.get('/v1/google-auth', async (req: Request, res: Response, next: NextFunc
 // Get GitHub OAuth authorization URL
 router.get('/v1/github-auth', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { redirect_url } = req.query;
+    const { redirectUrl } = req.query;
     let state = null;
-    if (redirect_url) {
+    if (redirectUrl) {
       const stateData = {
-        client_redirect_uri: redirect_url,
+        client_redirect_uri: redirectUrl,
         provider: 'github',
         csrf_token: crypto.randomBytes(32).toString('hex'),
       };
       state = Buffer.from(JSON.stringify(stateData)).toString('base64');
     }
     const authUrl = await authService.generateGitHubAuthUrl(state || undefined);
-    successResponse(res, { auth_url: authUrl });
+    successResponse(res, { authUrl: authUrl });
   } catch (error) {
     logger.error('GitHub OAuth error', {
       error: error instanceof Error ? error.message : String(error),
@@ -491,7 +491,7 @@ router.get('/v1/callback', async (req: Request, res: Response, next: NextFunctio
 
       // Create URL with our JWT token and user info
       const redirectUrl = new URL(clientRedirectUri);
-      redirectUrl.searchParams.set('access_token', generatedToken);
+      redirectUrl.searchParams.set('accessToken', generatedToken);
       redirectUrl.searchParams.set('user_id', userWithProfile.id);
       redirectUrl.searchParams.set('email', userWithProfile.email);
       redirectUrl.searchParams.set('name', userWithProfile.profile.name);
@@ -520,7 +520,7 @@ router.get('/v1/callback', async (req: Request, res: Response, next: NextFunctio
 // OAuth configuration endpoints
 router.get(
   '/oauth/config',
-  verifyUserOrAdmin,
+  verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       if (req.user?.type !== 'admin') {
@@ -607,7 +607,7 @@ router.get(
 
 router.post(
   '/oauth/config',
-  verifyUserOrAdmin,
+  verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       if (req.user?.type !== 'admin') {

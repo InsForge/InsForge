@@ -81,7 +81,7 @@ interface ErrorResponse {
   error: string;      // Error code (e.g., "NOT_FOUND")
   message: string;    // Human-readable message
   statusCode: number; // HTTP status code
-  nextAction?: string; // Optional guidance
+  nextActions?: string; // Optional guidance
 }
 
 // Pagination Headers (for list endpoints)

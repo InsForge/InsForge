@@ -45,7 +45,7 @@ export class ApiClient {
     this.onAuthError = handler;
   }
 
-  async request(
+  request(
     endpoint: string,
     options: RequestInit & {
       returnFullResponse?: boolean;

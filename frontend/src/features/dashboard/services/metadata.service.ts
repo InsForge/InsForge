@@ -12,21 +12,21 @@ export class MetadataService {
   async fetchApiKey() {
     const data = await apiClient.request('/metadata/api-key');
     // data is already unwrapped by request method
-    if (data.api_key) {
-      apiClient.setApiKey(data.api_key);
+    if (data.apiKey) {
+      apiClient.setApiKey(data.apiKey);
     }
-    return data.api_key;
+    return data.apiKey;
   }
 
   // Get database metadata for dashboard
-  async getAppMetadata(): Promise<AppMetadata> {
+  getAppMetadata(): Promise<AppMetadata> {
     return apiClient.request('/metadata/database', {
       headers: apiClient.withApiKey(),
     });
   }
 
   // Get full metadata (new structured format)
-  async getFullMetadata() {
+  getFullMetadata() {
     return apiClient.request('/metadata', {
       headers: apiClient.withApiKey(),
     });
@@ -38,7 +38,7 @@ export class MetadataService {
       const metadata = await this.getAppMetadata();
       const tableNames = Object.keys(metadata.tables);
       const totalRecords = Object.values(metadata.tables).reduce(
-        (sum, table) => sum + table.record_count,
+        (sum, table) => sum + table.recordCount,
         0
       );
 

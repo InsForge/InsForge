@@ -1,4 +1,3 @@
-import React from 'react';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/radix/Button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/radix/Alert';

@@ -75,29 +75,29 @@ paths:
                       properties:
                         name:
                           type: string
-                        record_count:
+                        recordCount:
                           type: integer
-                  total_tables:
+                  totalTables:
                     type: integer
-                  total_records:
+                  totalRecords:
                     type: integer
-                  database_size:
+                  databaseSize:
                     type: string
-                  last_updated:
+                  lastUpdated:
                     type: string
                     format: date-time
               example:
                 tables:
                   - name: "users"
-                    record_count: 1234
+                    recordCount: 1234
                   - name: "posts"
-                    record_count: 5678
+                    recordCount: 5678
                   - name: "comments"
-                    record_count: 9012
-                total_tables: 15
-                total_records: 16924
-                database_size: "125 MB"
-                last_updated: "2024-01-21T10:30:00Z"
+                    recordCount: 9012
+                totalTables: 15
+                totalRecords: 16924
+                databaseSize: "125 MB"
+                lastUpdated: "2024-01-21T10:30:00Z"
         '401':
           description: Unauthorized
           content:
@@ -124,10 +124,10 @@ paths:
               schema:
                 type: object
                 properties:
-                  api_key:
+                  apiKey:
                     type: string
               example:
-                api_key: "ins_1234567890abcdef1234567890abcdef"
+                apiKey: "ins_1234567890abcdef1234567890abcdef"
         '403':
           description: Forbidden
           content:

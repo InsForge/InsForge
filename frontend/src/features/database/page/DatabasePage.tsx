@@ -21,7 +21,6 @@ import {
 } from '@/components/radix/Tooltip';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
-import { useTableSchema } from '@/lib/hooks/useTableSchema';
 import { DatabaseDataGrid } from '@/features/database/components/DatabaseDataGrid';
 import { SearchInput, SelectionClearButton } from '@/components';
 import { SortColumn } from 'react-data-grid';
@@ -354,8 +353,18 @@ export default function DatabasePage() {
 
   const error = metadataError || tableError;
 
-  // Fetch schema for selected table (for AddRecordSheet)
-  const { data: schemaData } = useTableSchema(selectedTable || '');
+  // Fetch schema for selected table
+  const { data: schemaData } = useQuery({
+    queryKey: ['table-schema', selectedTable],
+    queryFn: async () => {
+      if (!selectedTable) {
+        return undefined;
+      }
+      return await databaseService.getTableSchema(selectedTable);
+    },
+    enabled: !!selectedTable && !!apiKey,
+    staleTime: 30 * 1000, // 30 seconds
+  });
 
   // Fetch schema for editing table
   const { data: editingTableSchema } = useQuery({

@@ -44,8 +44,8 @@ get_admin_token() {
         -H "Content-Type: application/json" \
         -d "{\"email\":\"$TEST_ADMIN_EMAIL\",\"password\":\"$TEST_ADMIN_PASSWORD\"}")
     
-    if echo "$response" | grep -q '"access_token"'; then
-        echo "$response" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4
+    if echo "$response" | grep -q '"accessToken"'; then
+        echo "$response" | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4
     else
         echo ""
     fi
@@ -209,7 +209,7 @@ cleanup_test_data() {
             print_info "Deleting test buckets..."
             for bucket in "${TEST_BUCKETS_CREATED[@]}"; do
                 print_info "  - Deleting bucket: $bucket"
-                delete_response=$(curl -s -w "\n%{http_code}" -X DELETE "$TEST_API_BASE/storage/$bucket" \
+                delete_response=$(curl -s -w "\n%{http_code}" -X DELETE "$TEST_API_BASE/storage/buckets/$bucket" \
                     -H "x-api-key: $api_key" 2>/dev/null || echo "500")
                 status=$(echo "$delete_response" | tail -n 1)
                 if [ "$status" -ge 200 ] && [ "$status" -lt 300 ]; then

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { RefreshCw, Copy, Info } from 'lucide-react';
+import { RefreshCw, Info } from 'lucide-react';
 import { metadataService } from '../services/metadata.service';
 import { Skeleton } from '@/components/radix/Skeleton';
 import { Button } from '@/components/radix/Button';
@@ -11,11 +11,8 @@ import {
   TooltipTrigger,
 } from '@/components/radix/Tooltip';
 import { JsonHighlight } from '@/components';
-import { useToast } from '@/lib/hooks/useToast';
 
 export default function MetadataPage() {
-  const { showToast } = useToast();
-
   const {
     data: metadata,
     isLoading,
@@ -28,19 +25,6 @@ export default function MetadataPage() {
 
   const handleRefresh = () => {
     void refetchMetadata();
-  };
-
-  const handleCopy = async () => {
-    if (!metadata) {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(metadata, null, 2));
-      showToast('Metadata copied to clipboard!', 'success');
-    } catch (err) {
-      showToast('Failed to copy to clipboard', 'error');
-    }
   };
 
   if (error) {
@@ -120,8 +104,8 @@ export default function MetadataPage() {
               {!metadata && (
                 <Alert className="border-yellow-200 bg-yellow-50 mb-4">
                   <AlertDescription className="text-yellow-800">
-                    No metadata available. Please ensure the backend is running and you're logged in
-                    as an admin.
+                    No metadata available. Please ensure the backend is running and you&apos;re
+                    logged in as an admin.
                   </AlertDescription>
                 </Alert>
               )}

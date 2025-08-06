@@ -2,13 +2,15 @@ import { Router, Response, NextFunction } from 'express';
 import { MetadataService } from '@/core/metadata/metadata.js';
 import { AuthService } from '@/core/auth/auth.js';
 import { WebSocketService } from '@/core/websocket/websocket.js';
-import { verifyUserOrApiKey, verifyUserOrAdmin, AuthRequest } from '@/api/middleware/auth.js';
+import { verifyAdmin, AuthRequest } from '@/api/middleware/auth.js';
 import { successResponse } from '@/utils/response.js';
 
 const router = Router();
 
+router.use(verifyAdmin);
+
 // Get full metadata (default endpoint)
-router.get('/', verifyUserOrApiKey, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const metadataService = MetadataService.getInstance();
     const metadata = await metadataService.getFullMetadata();
@@ -24,36 +26,28 @@ router.get('/', verifyUserOrApiKey, async (req: AuthRequest, res: Response, next
 });
 
 // Get database metadata for frontend dashboard
-router.get(
-  '/database',
-  verifyUserOrApiKey,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const metadataService = MetadataService.getInstance();
-      await metadataService.updateDatabaseMetadata();
-      const databaseMetadata = await metadataService.getDatabaseMetadata();
+router.get('/database', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const metadataService = MetadataService.getInstance();
+    await metadataService.updateDatabaseMetadata();
+    const databaseMetadata = await metadataService.getDatabaseMetadata();
 
-      successResponse(res, databaseMetadata);
-    } catch (error) {
-      next(error);
-    }
+    successResponse(res, databaseMetadata);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 // Get API key (admin only)
-router.get(
-  '/api-key',
-  verifyUserOrAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const authService = AuthService.getInstance();
-      const apiKey = await authService.initializeApiKey();
+router.get('/api-key', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const authService = AuthService.getInstance();
+    const apiKey = await authService.initializeApiKey();
 
-      successResponse(res, { api_key: apiKey });
-    } catch (error) {
-      next(error);
-    }
+    successResponse(res, { apiKey: apiKey });
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 export { router as metadataRouter };

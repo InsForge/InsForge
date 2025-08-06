@@ -9,7 +9,7 @@ export class AppError extends Error {
     public message: string,
     public statusCode: number = 500,
     public code: string,
-    public nextAction?: string
+    public nextActions?: string
   ) {
     super(message);
     this.name = 'AppError';
@@ -19,7 +19,12 @@ export class AppError extends Error {
 // PostgreSQL error code handlers
 const POSTGRES_ERROR_HANDLERS: Record<
   string,
-  (err: DatabaseError) => { code: string; message: string; statusCode: number; nextAction?: string }
+  (err: DatabaseError) => {
+    code: string;
+    message: string;
+    statusCode: number;
+    nextActions?: string;
+  }
 > = {
   // Integrity constraint violations
   '23505': (err) => {
@@ -29,18 +34,18 @@ const POSTGRES_ERROR_HANDLERS: Record<
     const fieldName = fieldMatch ? fieldMatch[1] : 'field';
     return {
       code: ERROR_CODES.ALREADY_EXISTS,
-      message: `A record with this ${fieldName} already exists.`,
+      message: err.message,
       statusCode: 409,
-      nextAction: NEXT_ACTION.CHECK_UNIQUE_FIELD(fieldName),
+      nextActions: NEXT_ACTION.CHECK_UNIQUE_FIELD(fieldName),
     };
   },
-  '23503': () => {
+  '23503': (err) => {
     // foreign_key_violation
     return {
       code: ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION,
-      message: 'Referenced record does not exist.',
+      message: err.message,
       statusCode: 400,
-      nextAction: NEXT_ACTION.CHECK_REFERENCE_EXISTS,
+      nextActions: NEXT_ACTION.CHECK_REFERENCE_EXISTS,
     };
   },
   '23502': (err) => {
@@ -48,17 +53,17 @@ const POSTGRES_ERROR_HANDLERS: Record<
     const column = err.column || '';
     return {
       code: ERROR_CODES.MISSING_FIELD,
-      message: `The ${column} field is required and cannot be empty.`,
+      message: err.message,
       statusCode: 400,
-      nextAction: NEXT_ACTION.FILL_REQUIRED_FIELD(column),
+      nextActions: NEXT_ACTION.FILL_REQUIRED_FIELD(column),
     };
   },
-  '42P01': () => ({
+  '42P01': (err) => ({
     // undefined_table
     code: ERROR_CODES.DATABASE_VALIDATION_ERROR,
-    message: 'Table not found',
+    message: err.message,
     statusCode: 400,
-    nextAction: NEXT_ACTION.CHECK_TABLE_EXISTS,
+    nextActions: NEXT_ACTION.CHECK_TABLE_EXISTS,
   }),
   '42701': (err) => {
     // duplicate_column
@@ -67,38 +72,38 @@ const POSTGRES_ERROR_HANDLERS: Record<
     const columnName = columnMatch ? columnMatch[1] : '';
     return {
       code: ERROR_CODES.DATABASE_VALIDATION_ERROR,
-      message: message || 'Duplicate column in table definition',
+      message: err.message,
       statusCode: 400,
-      nextAction: NEXT_ACTION.REMOVE_DUPLICATE_COLUMN(columnName),
+      nextActions: NEXT_ACTION.REMOVE_DUPLICATE_COLUMN(columnName),
     };
   },
-  '42703': () => ({
+  '42703': (err) => ({
     // undefined_column
     code: ERROR_CODES.DATABASE_VALIDATION_ERROR,
-    message: 'Column does not exist',
+    message: err.message,
     statusCode: 400,
-    nextAction: NEXT_ACTION.CHECK_COLUMN_EXISTS,
+    nextActions: NEXT_ACTION.CHECK_COLUMN_EXISTS,
   }),
-  '42830': () => ({
+  '42830': (err) => ({
     // invalid_foreign_key
     code: ERROR_CODES.DATABASE_VALIDATION_ERROR,
-    message: 'Invalid foreign key constraint',
+    message: err.message,
     statusCode: 400,
-    nextAction: NEXT_ACTION.CHECK_UNIQUE_CONSTRAINT,
+    nextActions: NEXT_ACTION.CHECK_UNIQUE_CONSTRAINT,
   }),
-  '42804': () => ({
+  '42804': (err) => ({
     // datatype_mismatch
     code: ERROR_CODES.DATABASE_VALIDATION_ERROR,
-    message: 'Foreign key constraint cannot be created due to incompatible column types',
+    message: err.message,
     statusCode: 400,
-    nextAction: NEXT_ACTION.CHECK_DATATYPE_MATCH,
+    nextActions: NEXT_ACTION.CHECK_DATATYPE_MATCH,
   }),
 };
 
 // Handle database-specific errors
 function handleDatabaseError(
   err: DatabaseError
-): { code: string; message: string; statusCode: number; nextAction?: string } | null {
+): { code: string; message: string; statusCode: number; nextActions?: string } | null {
   // Check PostgreSQL error codes
   if (err.code && POSTGRES_ERROR_HANDLERS[err.code]) {
     return POSTGRES_ERROR_HANDLERS[err.code](err);
@@ -148,7 +153,7 @@ export function errorMiddleware(err: unknown, _req: Request, res: Response, _nex
   // Handle known AppError instances
   if (err instanceof AppError) {
     const errorCode = err.code || getErrorCode(err.statusCode);
-    return errorResponse(res, errorCode, err.message, err.statusCode, err.nextAction);
+    return errorResponse(res, errorCode, err.message, err.statusCode, err.nextActions);
   }
 
   // Handle SyntaxError from JSON.parse
@@ -156,7 +161,7 @@ export function errorMiddleware(err: unknown, _req: Request, res: Response, _nex
     return errorResponse(
       res,
       ERROR_CODES.INVALID_INPUT,
-      'Invalid JSON format',
+      err.message,
       400,
       'Please ensure your request body contains valid JSON'
     );
@@ -171,7 +176,7 @@ export function errorMiddleware(err: unknown, _req: Request, res: Response, _nex
         dbError.code,
         dbError.message,
         dbError.statusCode,
-        dbError.nextAction
+        dbError.nextActions
       );
     }
   }
@@ -186,7 +191,7 @@ export function errorMiddleware(err: unknown, _req: Request, res: Response, _nex
     return errorResponse(
       res,
       ERROR_CODES.INVALID_INPUT,
-      'Invalid JSON in request body',
+      err.message || 'Invalid JSON in request body',
       400,
       'Please ensure your request body contains valid JSON'
     );

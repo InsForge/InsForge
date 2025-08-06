@@ -28,7 +28,7 @@ export interface DataGridColumn {
   sortable?: boolean;
   sortDescendingFirst?: boolean;
   editable?: boolean;
-  primary_key?: boolean;
+  isPrimaryKey?: boolean;
   renderCell?: (props: any) => React.ReactNode;
   renderEditCell?: (props: any) => React.ReactNode;
   renderHeaderCell?: (props: any) => React.ReactNode;
@@ -364,7 +364,7 @@ export function DataGrid({
         resizable: col.resizable !== false,
         sortable: col.sortable !== false,
         sortDescendingFirst: col.sortDescendingFirst ?? true,
-        editable: col.editable && !col.primary_key,
+        editable: col.editable && !col.isPrimaryKey,
         renderCell: col.renderCell || DefaultCellRenderers.text,
         renderEditCell: col.renderEditCell,
         renderHeaderCell:

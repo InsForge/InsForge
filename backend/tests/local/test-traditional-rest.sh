@@ -64,7 +64,7 @@ response=$(curl -s "$API_BASE/auth/me")
 test_response_format "Error format" "$response" '"error":"AUTH_INVALID_CREDENTIALS"'
 test_response_format "Message field" "$response" '"message":"No token provided"'
 test_response_format "Status code field" "$response" '"statusCode":401'
-test_response_format "NextAction field" "$response" '"nextAction":"'
+test_response_format "NextAction field" "$response" '"nextActions":"'
 
 # 3. Test Login Endpoint (Missing Credentials)
 print_info "3. Testing Login Endpoint (Missing Credentials)"
@@ -80,6 +80,8 @@ response=$(curl -s "$API_BASE/nonexistent")
 test_response_format "404 error" "$response" '"statusCode":404'
 test_response_format "Not found message" "$response" '"error":"NOT_FOUND"'
 
+ADMIN_TOKEN=$(get_admin_token)
+
 # 5. Test with Authentication
 print_info "5. Creating test user for authenticated tests"
 auth_response=$(curl -s -X POST "$API_BASE/auth/register" \
@@ -91,8 +93,8 @@ auth_response=$(curl -s -X POST "$API_BASE/auth/register" \
     }")
 
 # Check if registration was successful
-if echo "$auth_response" | grep -q '"access_token"'; then
-    AUTH_TOKEN=$(echo "$auth_response" | grep -o '"access_token":"[^"]*' | cut -d'"' -f4)
+if echo "$auth_response" | grep -q '"accessToken"'; then
+    AUTH_TOKEN=$(echo "$auth_response" | grep -o '"accessToken":"[^"]*' | cut -d'"' -f4)
     print_success "User registered successfully"
     register_test_user "$TEST_USER_EMAIL"
     
@@ -107,21 +109,21 @@ if echo "$auth_response" | grep -q '"access_token"'; then
     print_info "7. Testing Create Table (Success Response)"
     TABLE_NAME="test_rest_table_$(date +%s)"
     response=$(curl -s -X POST "$API_BASE/database/tables" \
-        -H "Authorization: Bearer $AUTH_TOKEN" \
+        -H "Authorization: Bearer $ADMIN_TOKEN" \
         -H "Content-Type: application/json" \
         -d "{
-            \"table_name\": \"$TABLE_NAME\",
-            \"rls_enabled\": false,
+            \"tableName\": \"$TABLE_NAME\",
+            \"rlsEnabled\": false,
             \"columns\": [
-                {\"name\": \"id\", \"type\": \"uuid\", \"nullable\": false, \"is_unique\": false, \"default_value\": \"gen_random_uuid()\"},
-                {\"name\": \"title\", \"type\": \"string\", \"nullable\": false, \"is_unique\": false}
+                {\"columnName\": \"id\", \"type\": \"uuid\", \"isNullable\": false, \"isUnique\": false, \"defaultValue\": \"gen_random_uuid()\"},
+                {\"columnName\": \"title\", \"type\": \"string\", \"isNullable\": false, \"isUnique\": false}
             ]
         }")
     
-    if echo "$response" | grep -q '"table_name"'; then
+    if echo "$response" | grep -q '"tableName"'; then
         print_success "Table created"
         register_test_table "$TABLE_NAME"
-        test_response_format "Direct object response" "$response" "\"table_name\":\"$TABLE_NAME\""
+        test_response_format "Direct object response" "$response" "\"tableName\":\"$TABLE_NAME\""
         test_response_format "No success wrapper" "$response" '"success":true' "true"
     else
         print_fail "Table creation failed"
@@ -133,7 +135,7 @@ if echo "$auth_response" | grep -q '"access_token"'; then
     print_info "8. Testing Pagination Headers"
     # Use -I for headers, but we need both headers and body
     full_response=$(curl -s -i "$API_BASE/logs?limit=10" \
-        -H "Authorization: Bearer $AUTH_TOKEN")
+        -H "Authorization: Bearer $ADMIN_TOKEN")
     
     # Extract headers (everything before empty line)
     headers=$(echo "$full_response" | awk 'BEGIN{RS="\r\n\r\n"} NR==1')
@@ -150,8 +152,25 @@ fi
 
 # 9. Test Storage API (requires API key)
 print_info "9. Testing Storage API Format"
+# First get admin token if we don't have it
+if [ -z "$AUTH_TOKEN" ]; then
+    admin_token=$(get_admin_token)
+else
+    admin_token="$AUTH_TOKEN"
+fi
+
 API_KEY=$(get_admin_api_key)
+
+# If that fails, try to get it via the API endpoint
+if [ -z "$API_KEY" ] && [ -n "$admin_token" ]; then
+    api_key_response=$(curl -s "$API_BASE/metadata/api-key" \
+        -H "Authorization: Bearer $admin_token")
+    API_KEY=$(echo "$api_key_response" | grep -o '"apiKey":"[^"]*' | cut -d'"' -f4)
+fi
+
+# Export for cleanup
 if [ -n "$API_KEY" ]; then
+    export INSFORGE_API_KEY="$API_KEY"
     # List buckets
     response=$(curl -s "$API_BASE/storage/buckets" \
         -H "x-api-key: $API_KEY")
@@ -162,13 +181,13 @@ if [ -n "$API_KEY" ]; then
     response=$(curl -s -X POST "$API_BASE/storage/buckets" \
         -H "Content-Type: application/json" \
         -H "x-api-key: $API_KEY" \
-        -d "{\"bucket\": \"$BUCKET_NAME\", \"public\": true}")
+        -d "{\"bucketName\": \"$BUCKET_NAME\", \"isPublic\": true}")
     
-    if echo "$response" | grep -q '"bucket"'; then
+    if echo "$response" | grep -q '"bucketName"'; then
         print_success "Bucket created"
         register_test_bucket "$BUCKET_NAME"
         test_response_format "Success message field" "$response" '"message":"Bucket created successfully"'
-        test_response_format "NextAction guidance" "$response" '"nextAction":'
+        test_response_format "NextAction guidance" "$response" '"nextActions":'
     else
         print_fail "Bucket creation failed"
         echo "Response: $response"

@@ -13,7 +13,7 @@
 
 1. **get-backend-metadata** - Get current database structure (always start here)
 2. **create-table** - Create new table with explicit schema
-3. **modify-table** - Alter existing table schema  
+3. **update-table-schema** - Alter existing table schema  
 4. **delete-table** - Remove table completely
 5. **get-table-schema** - Get specific table structure
 
@@ -29,15 +29,15 @@
 ## Record Operations (Use REST API)
 
 ### Base URL
-`/api/database/records/:tablename`
+`/api/database/records/:tableName`
 
 ### Query Records
-**GET** `/api/database/records/:tablename`
+**GET** `/api/database/records/:tableName`
 
 Query parameters:
 - `limit` - Maximum records (default: 100)
 - `offset` - Skip records for pagination
-- `order` - Sort by field (e.g., `created_at.desc`)
+- `order` - Sort by field (e.g., `createdAt.desc`)
 - PostgREST filters: `field=eq.value`, `field=gt.value`, etc.
 
 Response format:
@@ -46,20 +46,20 @@ Response format:
   {
     "id": "248373e1-0aea-45ce-8844-5ef259203749",
     "name": "John Doe",
-    "created_at": "2025-07-18T05:37:24.338Z",
-    "updated_at": "2025-07-18T05:37:24.338Z"
+    "createdAt": "2025-07-18T05:37:24.338Z",
+    "updatedAt": "2025-07-18T05:37:24.338Z"
   }
 ]
 ```
 
 Example curl:
 ```bash
-curl -X GET "http://localhost:7130/api/database/records/users?limit=10&order=created_at.desc" \
+curl -X GET "http://localhost:7130/api/database/records/users?limit=10&order=createdAt.desc" \
   -H "x-api-key: YOUR_API_KEY"
 ```
 
 ### Create Records
-**POST** `/api/database/records/:tablename`
+**POST** `/api/database/records/:tableName`
 
 **CRITICAL**: Request body MUST be an array, even for single records!
 
@@ -103,8 +103,8 @@ Response format (WITH `Prefer: return=representation` header):
     "id": "248373e1-0aea-45ce-8844-5ef259203749",
     "name": "John Doe",
     "email": "john@example.com",
-    "created_at": "2025-07-18T05:37:24.338Z",
-    "updated_at": "2025-07-18T05:37:24.338Z"
+    "createdAt": "2025-07-18T05:37:24.338Z",
+    "updatedAt": "2025-07-18T05:37:24.338Z"
   }
 ]
 ```
@@ -133,7 +133,7 @@ curl -X POST http://localhost:7130/api/database/records/users \
 ```
 
 ### Update Record
-**PATCH** `/api/database/records/:tablename?id=eq.uuid`
+**PATCH** `/api/database/records/:tableName?id=eq.uuid`
 
 **⚠️ IMPORTANT: Default Response Behavior**
 - **By default, PATCH requests return an empty array `[]`**
@@ -160,8 +160,8 @@ Response format (WITH `Prefer: return=representation` header):
   {
     "id": "123e4567-e89b-12d3-a456-426614174000",
     "field1": "new_value",
-    "created_at": "2025-01-01T00:00:00Z",
-    "updated_at": "2025-01-21T11:00:00Z"
+    "createdAt": "2025-01-01T00:00:00Z",
+    "updatedAt": "2025-01-21T11:00:00Z"
   }
 ]
 ```
@@ -188,7 +188,7 @@ curl -X PATCH "http://localhost:7130/api/database/records/users?id=eq.123e4567-e
 ```
 
 ### Delete Record
-**DELETE** `/api/database/records/:tablename?id=eq.uuid`
+**DELETE** `/api/database/records/:tableName?id=eq.uuid`
 
 **⚠️ IMPORTANT: Delete Behavior**
 - **Without `Prefer: return=representation`**: Returns `204 No Content` (no body)
@@ -209,8 +209,8 @@ Response format (WITH `Prefer: return=representation` header):
   {
     "id": "123e4567-e89b-12d3-a456-426614174000",
     "name": "Deleted User",
-    "created_at": "2025-01-01T00:00:00Z",
-    "updated_at": "2025-01-21T11:00:00Z"
+    "createdAt": "2025-01-01T00:00:00Z",
+    "updatedAt": "2025-01-21T11:00:00Z"
   }
 ]
 
@@ -242,7 +242,7 @@ All error responses follow this format:
   "error": "ERROR_CODE",
   "message": "Human-readable error message",
   "statusCode": 400,
-  "nextAction": "Suggested action to resolve the error"
+  "nextActions": "Suggested action to resolve the error"
 }
 ```
 
@@ -252,7 +252,7 @@ Example error:
   "error": "TABLE_NOT_FOUND",
   "message": "Table 'nonexistent' does not exist",
   "statusCode": 404,
-  "nextAction": "Check table name and try again"
+  "nextActions": "Check table name and try again"
 }
 ```
 
@@ -260,8 +260,8 @@ Example error:
 
 1. **Auto-Generated Fields**
    - `id` - UUID primary key (auto-generated)
-   - `created_at` - Timestamp (auto-set)
-   - `updated_at` - Timestamp (auto-updated)
+   - `createdAt` - Timestamp (auto-set)
+   - `updatedAt` - Timestamp (auto-updated)
 
 2. **System Tables**
    - Tables prefixed with `_` are system tables

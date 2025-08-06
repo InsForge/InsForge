@@ -30,3 +30,4 @@ export const mapDatabaseTypeToFieldType = (dbType: string): ColumnType => {
       return ColumnType.STRING;
   }
 };
+

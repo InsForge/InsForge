@@ -47,7 +47,7 @@ AUTH_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/api/auth/admin/lo
 
 HTTP_CODE=$(echo "$AUTH_RESPONSE" | tail -n1)
 BODY=$(echo "$AUTH_RESPONSE" | sed '$d')
-TOKEN=$(echo $BODY | grep -o '"access_token":"[^"]*' | cut -d'"' -f4)
+TOKEN=$(echo $BODY | grep -o '"accessToken":"[^"]*' | cut -d'"' -f4)
 
 if [ "$HTTP_CODE" = "200" ] && [ -n "$TOKEN" ]; then
     test_pass "Admin login"

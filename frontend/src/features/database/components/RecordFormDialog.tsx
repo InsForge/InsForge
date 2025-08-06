@@ -70,7 +70,7 @@ export function RecordFormDialog({
   }, [editingRecord, displayFields, schema, form, initialValues]);
 
   const createRecordMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: (data: any) => {
       return databaseService.createRecord(tableName, data);
     },
     onSuccess: () => {
@@ -90,7 +90,7 @@ export function RecordFormDialog({
   });
 
   const updateRecordMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: (data: any) => {
       return databaseService.updateRecord(tableName, editingRecord.id, data);
     },
     onSuccess: () => {
@@ -138,7 +138,7 @@ export function RecordFormDialog({
           <ScrollArea className="h-full max-h-[540px] overflow-auto">
             <div className="px-6 py-6 space-y-6">
               {displayFields.map((field) => (
-                <FormField key={field.name} field={field} form={form} tableName={tableName} />
+                <FormField key={field.columnName} field={field} form={form} tableName={tableName} />
               ))}
             </div>
           </ScrollArea>

@@ -4,7 +4,7 @@ import { TableListSkeleton } from './TableListSkeleton';
 import { TableEmptyState } from './TableEmptyState';
 
 interface TableInfo {
-  record_count: number;
+  recordCount: number;
 }
 
 interface TableSidebarProps {

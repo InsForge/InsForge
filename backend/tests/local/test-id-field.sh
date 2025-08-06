@@ -109,12 +109,12 @@ create_response=$(curl -s -w "\n%{http_code}" -X POST "$API_URL/database/tables"
   -H "Authorization: Bearer $admin_token" \
   -H "Content-Type: application/json" \
   -d "{
-    \"table_name\": \"$TEST_TABLE\",
-    \"rls_enabled\": false,
+    \"tableName\": \"$TEST_TABLE\",
+    \"rlsEnabled\": false,
     \"columns\": [
-      {\"name\": \"title\", \"type\": \"string\", \"nullable\": false, \"is_unique\": false},
-      {\"name\": \"description\", \"type\": \"string\", \"nullable\": true, \"is_unique\": false},
-      {\"name\": \"status\", \"type\": \"string\", \"nullable\": false, \"is_unique\": false}
+      {\"columnName\": \"title\", \"type\": \"string\", \"isNullable\": false, \"isUnique\": false},
+      {\"columnName\": \"description\", \"type\": \"string\", \"isNullable\": true, \"isUnique\": false},
+      {\"columnName\": \"status\", \"type\": \"string\", \"isNullable\": false, \"isUnique\": false}
     ]
   }")
 

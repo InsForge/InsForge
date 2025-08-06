@@ -9,7 +9,7 @@ import {
 
 export class DatabaseService {
   // Table operations
-  async getTables(): Promise<string[]> {
+  async listTables(): Promise<string[]> {
     const data = await apiClient.request('/database/tables', {
       headers: apiClient.withApiKey(),
     });
@@ -24,7 +24,7 @@ export class DatabaseService {
   }
 
   createTable(tableName: string, columns: ColumnSchema[]) {
-    const body: CreateTableRequest = { table_name: tableName, columns, rls_enabled: true };
+    const body: CreateTableRequest = { tableName: tableName, columns, rlsEnabled: true };
     return apiClient.request('/database/tables', {
       method: 'POST',
       headers: apiClient.withApiKey({
@@ -41,11 +41,11 @@ export class DatabaseService {
     });
   }
 
-  modifyTable(
+  updateTableSchema(
     tableName: string,
     operations: UpdateTableSchemaRequest
   ): Promise<UpdateTableSchemaResponse | void> {
-    return apiClient.request(`/database/tables/${tableName}`, {
+    return apiClient.request(`/database/tables/${tableName}/schema`, {
       method: 'PATCH',
       headers: apiClient.withApiKey({
         'Content-Type': 'application/json',
@@ -77,7 +77,7 @@ export class DatabaseService {
           const type = col.type.toLowerCase();
           return type === 'text' || type === 'varchar' || type.includes('character varying');
         })
-        .map((col: ColumnSchema) => col.name);
+        .map((col: ColumnSchema) => col.columnName);
 
       if (textColumns.length > 0) {
         // Create PostgREST OR filter for text columns

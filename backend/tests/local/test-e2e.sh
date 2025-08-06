@@ -17,6 +17,9 @@ USER_ID=""
 TEST_TABLE="test_todos_$(date +%s)"
 TEST_BUCKET="test-bucket-$(date +%s)"
 
+# Export API_KEY so cleanup can use it
+export INSFORGE_API_KEY=""
+
 # Register test resources for cleanup
 register_test_user "$TEST_EMAIL"
 register_test_table "$TEST_TABLE"
@@ -59,7 +62,7 @@ response=$(curl -s -w "\n%{http_code}" -X POST "$TEST_API_BASE/auth/register" \
 test_endpoint "User registration" "$response" "201"
 
 # Extract token from response
-USER_TOKEN=$(echo "$response" | sed '$d' | grep -o '"access_token":"[^"]*' | grep -o '[^"]*$')
+USER_TOKEN=$(echo "$response" | sed '$d' | grep -o '"accessToken":"[^"]*' | grep -o '[^"]*$')
 USER_ID=$(echo "$response" | sed '$d' | grep -o '"id":"[^"]*' | grep -o '[^"]*$')
 
 if [ -z "$USER_TOKEN" ]; then
@@ -85,12 +88,31 @@ response=$(curl -s -w "\n%{http_code}" "$TEST_API_BASE/profiles/me" \
   -H "Authorization: Bearer $USER_TOKEN")
 test_endpoint "Get profile" "$response" "200"
 
+# Get admin token for table operations and API key
+admin_token=$(get_admin_token)
+if [ -z "$admin_token" ]; then
+    print_fail "Could not get admin token for table operations"
+else
+    print_success "Got admin token for table operations"
+fi
+
 # 5. Get API Key
 print_info "5. Getting API Key"
+# First try environment variable or docker logs
 API_KEY=$(get_admin_api_key)
+
+# If that fails, try to get it via the API endpoint
+if [ -z "$API_KEY" ] && [ -n "$admin_token" ]; then
+    api_key_response=$(curl -s "$TEST_API_BASE/metadata/api-key" \
+        -H "Authorization: Bearer $admin_token")
+    API_KEY=$(echo "$api_key_response" | grep -o '"apiKey":"[^"]*' | cut -d'"' -f4)
+fi
+
 if [ -n "$API_KEY" ]; then
     print_success "Got API key"
     echo "API Key: ${API_KEY:0:20}..."
+    # Export for cleanup
+    export INSFORGE_API_KEY="$API_KEY"
 else
     print_fail "Failed to get API key - remaining tests will be skipped"
 fi
@@ -101,26 +123,18 @@ if [ -z "$API_KEY" ]; then
     exit 0
 fi
 
-# Get admin token for table operations
-admin_token=$(get_admin_token)
-if [ -z "$admin_token" ]; then
-    print_fail "Could not get admin token for table operations"
-else
-    print_success "Got admin token for table operations"
-fi
-
 # 6. Test Create Table
 print_info "6. Testing Create Table"
 response=$(curl -s -w "\n%{http_code}" -X POST "$TEST_API_BASE/database/tables" \
   -H "Authorization: Bearer $admin_token" \
   -H "Content-Type: application/json" \
   -d "{
-    \"table_name\": \"$TEST_TABLE\",
-    \"rls_enabled\": false,
+    \"tableName\": \"$TEST_TABLE\",
+    \"rlsEnabled\": false,
     \"columns\": [
-      {\"name\": \"title\", \"type\": \"string\", \"nullable\": false, \"is_unique\": false},
-      {\"name\": \"completed\", \"type\": \"boolean\", \"nullable\": false, \"is_unique\": false, \"default_value\": \"false\"},
-      {\"name\": \"user_id\", \"type\": \"uuid\", \"nullable\": false, \"is_unique\": false}
+      {\"columnName\": \"title\", \"type\": \"string\", \"isNullable\": false, \"isUnique\": false},
+      {\"columnName\": \"completed\", \"type\": \"boolean\", \"isNullable\": false, \"isUnique\": false, \"defaultValue\": \"false\"},
+      {\"columnName\": \"user_id\", \"type\": \"uuid\", \"isNullable\": false, \"isUnique\": false}
     ]
   }")
 test_endpoint "Create table" "$response" "201"
@@ -141,11 +155,14 @@ response=$(curl -s -w "\n%{http_code}" -X POST "$TEST_API_BASE/database/records/
 test_endpoint "Insert record" "$response" "201"
 
 # Extract record ID
-# The response is an array, so we need to parse it differently
-RECORD_ID=$(echo "$response" | sed '$d' | jq -r '.[0].id' 2>/dev/null || echo "")
+# PostgREST returns an empty array on successful insert, so we need to query the table
+sleep 1  # Give PostgREST time to sync
+query_response=$(curl -s "$TEST_API_BASE/database/records/$TEST_TABLE?limit=1&order=created_at.desc" \
+  -H "Authorization: Bearer $admin_token")
+RECORD_ID=$(echo "$query_response" | jq -r '.[0].id' 2>/dev/null || echo "")
 if [ -z "$RECORD_ID" ] || [ "$RECORD_ID" == "null" ]; then
     # Try alternative parsing
-    RECORD_ID=$(echo "$response" | sed '$d' | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+    RECORD_ID=$(echo "$query_response" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
 fi
 echo "Record ID: $RECORD_ID"
 
@@ -164,7 +181,7 @@ if [ -n "$RECORD_ID" ]; then
       -d '{
         "completed": true
       }')
-    test_endpoint "Update record" "$response" "200"
+    test_endpoint "Update record" "$response" "204"
 else
     print_info "9. Skipping Update Record test - no record ID"
 fi
@@ -175,22 +192,22 @@ response=$(curl -s -w "\n%{http_code}" -X POST "$TEST_API_BASE/storage/buckets" 
   -H "x-api-key: $API_KEY" \
   -H "Content-Type: application/json" \
   -d "{
-    \"bucket\": \"$TEST_BUCKET\",
-    \"public\": false
+    \"bucketName\": \"$TEST_BUCKET\",
+    \"isPublic\": false
   }")
 test_endpoint "Create bucket" "$response" "201"
 
 # 11. Test Upload File
 print_info "11. Testing Upload File"
 echo "Test file content" > /tmp/test-upload.txt
-response=$(curl -s -w "\n%{http_code}" -X PUT "$TEST_API_BASE/storage/$TEST_BUCKET/test-file.txt" \
+response=$(curl -s -w "\n%{http_code}" -X PUT "$TEST_API_BASE/storage/buckets/$TEST_BUCKET/objects/test-file.txt" \
   -H "x-api-key: $API_KEY" \
   -F "file=@/tmp/test-upload.txt")
 test_endpoint "Upload file" "$response" "201"
 
 # 12. Test Download File
 print_info "12. Testing Download File"
-response=$(curl -s -w "\n%{http_code}" "$TEST_API_BASE/storage/$TEST_BUCKET/test-file.txt" \
+response=$(curl -s -w "\n%{http_code}" "$TEST_API_BASE/storage/buckets/$TEST_BUCKET/objects/test-file.txt" \
   -H "x-api-key: $API_KEY" \
   -o /tmp/test-download.txt)
 test_endpoint "Download file" "$response" "200"
@@ -213,10 +230,16 @@ if [ -n "$RECORD_ID" ]; then
     print_info "13. Testing Delete Record"
     response=$(curl -s -w "\n%{http_code}" -X DELETE "$TEST_API_BASE/database/records/$TEST_TABLE?id=eq.$RECORD_ID" \
       -H "Authorization: Bearer $admin_token")
-    test_endpoint "Delete record" "$response" "200"
+    test_endpoint "Delete record" "$response" "204"
 else
     print_info "13. Skipping Delete Record test - no record ID"
 fi
+
+# 14. Test Delete File
+print_info "14. Testing Delete File"
+response=$(curl -s -w "\n%{http_code}" -X DELETE "$TEST_API_BASE/storage/buckets/$TEST_BUCKET/objects/test-file.txt" \
+  -H "x-api-key: $API_KEY")
+test_endpoint "Delete file" "$response" "200"
 
 # Clean up temp files
 rm -f /tmp/test-upload.txt

@@ -66,8 +66,8 @@ login_response=$(curl -s -X POST "$API_BASE/auth/admin/login" \
         \"password\": \"$TEST_PASSWORD\"
     }")
 
-if echo "$login_response" | grep -q '"access_token"'; then
-    AUTH_TOKEN=$(echo "$login_response" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+if echo "$login_response" | grep -q '"accessToken"'; then
+    AUTH_TOKEN=$(echo "$login_response" | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4)
     print_success "Login successful"
 else
     print_fail "Login failed"
@@ -80,26 +80,26 @@ create_table_response=$(curl -s -X POST "$API_BASE/database/tables" \
     -H "Authorization: Bearer $AUTH_TOKEN" \
     -H "Content-Type: application/json" \
     -d '{
-        "table_name": "'$TEST_TABLE'",
-        "rls_enabled": false,
+        "tableName": "'$TEST_TABLE'",
+        "rlsEnabled": false,
         "columns":[
   {
-    "name": "name",
+    "columnName": "name",
     "type": "string",
-    "nullable": true,
-    "is_unique": false
+    "isNullable": true,
+    "isUnique": false
   },
   {
-    "name": "price",
+    "columnName": "price",
     "type": "float",
-    "nullable": true,
-    "is_unique": false
+    "isNullable": true,
+    "isUnique": false
   },
   {
-    "name": "category",
+    "columnName": "category",
     "type": "string",
-    "nullable": true,
-    "is_unique": false
+    "isNullable": true,
+    "isUnique": false
   }
 ] 
     }')

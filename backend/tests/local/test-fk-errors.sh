@@ -8,7 +8,13 @@ source "$SCRIPT_DIR/../test-config.sh"
 print_blue "🔗 Testing FK error handling..."
 
 API_BASE="$TEST_API_BASE"
-API_KEY="$INSFORGE_API_KEY"
+
+# Get admin token for table operations
+ADMIN_TOKEN=$(get_admin_token)
+if [ -z "$ADMIN_TOKEN" ]; then
+    print_fail "Could not get admin token"
+    exit 1
+fi
 
 # Dynamic table names
 USERS_TABLE="users_$(date +%s)"
@@ -28,7 +34,7 @@ test_fk() {
     print_info "Test $TOTAL_TESTS: $desc"
     
     response=$(curl -s -w "\n%{http_code}" -X "$method" "$API_BASE$endpoint" \
-        -H "x-api-key: $API_KEY" -H "Content-Type: application/json" ${data:+-d "$data"})
+        -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" ${data:+-d "$data"})
     
     status=$(echo "$response" | tail -n 1)
     
@@ -46,29 +52,29 @@ main_test() {
     
     # Setup tables
     test_fk "POST" "/database/tables" \
-        "{\"table_name\":\"$USERS_TABLE\",\"rls_enabled\":false,\"columns\":[{\"name\":\"name\",\"type\":\"string\",\"nullable\":false,\"is_unique\":false}]}" \
+        "{\"tableName\":\"$USERS_TABLE\",\"rlsEnabled\":false,\"columns\":[{\"columnName\":\"name\",\"type\":\"string\",\"isNullable\":false,\"isUnique\":false}]}" \
         "Create users table" 201
     
     test_fk "POST" "/database/tables" \
-        "{\"table_name\":\"$POSTS_TABLE\",\"rls_enabled\":false,\"columns\":[{\"name\":\"author_id\",\"type\":\"uuid\",\"nullable\":true,\"is_unique\":false}]}" \
+        "{\"tableName\":\"$POSTS_TABLE\",\"rlsEnabled\":false,\"columns\":[{\"columnName\":\"author_id\",\"type\":\"uuid\",\"isNullable\":true,\"isUnique\":false}]}" \
         "Create posts table" 201
     
     # Test our error handling
-    test_fk "PATCH" "/database/tables/$POSTS_TABLE" \
-        "{\"add_fkey_columns\":[{\"name\":\"author_id\",\"foreign_key\":{\"reference_table\":\"fake_table\",\"reference_column\":\"id\",\"on_delete\":\"CASCADE\",\"on_update\":\"CASCADE\"}}]}" \
+    test_fk "PATCH" "/database/tables/$POSTS_TABLE/schema" \
+        "{\"addFkeyColumns\":[{\"columnName\":\"author_id\",\"foreignKey\":{\"referenceTable\":\"fake_table\",\"referenceColumn\":\"id\",\"onDelete\":\"CASCADE\",\"onUpdate\":\"CASCADE\"}}]}" \
         "Non-existent table → 400" 400
     
-    test_fk "PATCH" "/database/tables/$POSTS_TABLE" \
-        "{\"add_fkey_columns\":[{\"name\":\"author_id\",\"foreign_key\":{\"reference_table\":\"$USERS_TABLE\",\"reference_column\":\"name\",\"on_delete\":\"CASCADE\",\"on_update\":\"CASCADE\"}}]}" \
+    test_fk "PATCH" "/database/tables/$POSTS_TABLE/schema" \
+        "{\"addFkeyColumns\":[{\"columnName\":\"author_id\",\"foreignKey\":{\"referenceTable\":\"$USERS_TABLE\",\"referenceColumn\":\"name\",\"onDelete\":\"CASCADE\",\"onUpdate\":\"CASCADE\"}}]}" \
         "Type mismatch → 400" 400
     
-    test_fk "PATCH" "/database/tables/$POSTS_TABLE" \
-        "{\"add_columns\":[{\"name\":\"cat_id\",\"type\":\"uuid\",\"nullable\":true,\"is_unique\":false,\"foreign_key\":{\"reference_table\":\"fake_cats\",\"reference_column\":\"id\",\"on_delete\":\"CASCADE\",\"on_update\":\"CASCADE\"}}]}" \
+    test_fk "PATCH" "/database/tables/$POSTS_TABLE/schema" \
+        "{\"addColumns\":[{\"columnName\":\"cat_id\",\"type\":\"uuid\",\"isNullable\":true,\"isUnique\":false,\"foreignKey\":{\"referenceTable\":\"fake_cats\",\"referenceColumn\":\"id\",\"onDelete\":\"CASCADE\",\"onUpdate\":\"CASCADE\"}}]}" \
         "New column with non-existent table → 400" 400
     
     # Valid FK should work
-    test_fk "PATCH" "/database/tables/$POSTS_TABLE" \
-        "{\"add_fkey_columns\":[{\"name\":\"author_id\",\"foreign_key\":{\"reference_table\":\"$USERS_TABLE\",\"reference_column\":\"id\",\"on_delete\":\"CASCADE\",\"on_update\":\"CASCADE\"}}]}" \
+    test_fk "PATCH" "/database/tables/$POSTS_TABLE/schema" \
+        "{\"addFkeyColumns\":[{\"columnName\":\"author_id\",\"foreignKey\":{\"referenceTable\":\"$USERS_TABLE\",\"referenceColumn\":\"id\",\"onDelete\":\"CASCADE\",\"onUpdate\":\"CASCADE\"}}]}" \
         "Valid FK constraint → 200" 200
     
     # Summary
@@ -83,11 +89,6 @@ main_test() {
 }
 
 # Check requirements
-if [ -z "$INSFORGE_API_KEY" ]; then
-    print_fail "INSFORGE_API_KEY required"
-    exit 1
-fi
-
 if ! curl -s "$API_BASE/health" > /dev/null; then
     print_fail "Server not running at $API_BASE"  
     exit 1

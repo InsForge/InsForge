@@ -621,7 +621,7 @@ export class DatabaseManager {
 
         // Get row count
         const countResult = await client.query(
-          `SELECT COUNT(*) as count FROM ${quoteIdentifier(table.table_name)}`
+          `SELECT COUNT(*) as count FROM "${quoteIdentifier(table.table_name)}"`
         );
 
         metadata.tables[table.table_name] = {

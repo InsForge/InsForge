@@ -2,7 +2,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { DatabaseManager } from '@/core/database/database.js';
-import { StorageRecord, StoredFile, BucketRecord } from '@/types/storage.js';
+import { StorageRecord, BucketRecord } from '@/types/storage.js';
+import { StorageFileSchema } from '@insforge/shared-schemas';
 import { MetadataService } from '@/core/metadata/metadata.js';
 import {
   S3Client,
@@ -246,7 +247,11 @@ export class StorageService {
     }
   }
 
-  async putObject(bucket: string, key: string, file: Express.Multer.File): Promise<StoredFile> {
+  async putObject(
+    bucket: string,
+    key: string,
+    file: Express.Multer.File
+  ): Promise<StorageFileSchema> {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
@@ -299,7 +304,7 @@ export class StorageService {
   async getObject(
     bucket: string,
     key: string
-  ): Promise<{ file: Buffer; metadata: StoredFile } | null> {
+  ): Promise<{ file: Buffer; metadata: StorageFileSchema } | null> {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
@@ -364,7 +369,7 @@ export class StorageService {
     limit: number = 100,
     offset: number = 0,
     searchQuery?: string
-  ): Promise<{ objects: StoredFile[]; total: number }> {
+  ): Promise<{ objects: StorageFileSchema[]; total: number }> {
     this.validateBucketName(bucket);
 
     const db = DatabaseManager.getInstance().getDb();

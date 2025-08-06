@@ -58,7 +58,7 @@ export default function LogsPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <nav className="flex items-center text-[22px] font-semibold">
-                  <span className="text-gray-900">Logs</span>
+                  <span className="text-gray-900">Audit Logs</span>
                 </nav>
 
                 {/* Separator */}

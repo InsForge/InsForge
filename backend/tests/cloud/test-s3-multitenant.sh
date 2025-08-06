@@ -40,7 +40,7 @@ echo "1. Creating test bucket..."
 curl -X POST "$BASE_URL/storage/buckets" \
   -H "Content-Type: application/json" \
   -H "x-api-key: $API_KEY" \
-  -d '{"bucket": "test-bucket", "public": true}' | jq .
+  -d '{"bucketName": "test-bucket", "isPublic": true}' | jq .
 
 echo ""
 
@@ -88,7 +88,7 @@ echo "7. Making bucket private..."
 curl -X PATCH "$BASE_URL/storage/buckets/test-bucket" \
   -H "Content-Type: application/json" \
   -H "x-api-key: $API_KEY" \
-  -d '{"public": false}' | jq .
+  -d '{"isPublic": false}' | jq .
 
 echo ""
 

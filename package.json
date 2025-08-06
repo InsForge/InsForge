@@ -6,7 +6,8 @@
   "workspaces": [
     "backend",
     "frontend",
-    "shared-schemas"
+    "shared-schemas",
+    "mcp"
   ],
   "scripts": {
     "dev": "concurrently -n \"backend,frontend\" -c \"cyan,magenta\" \"npm run dev:backend\" \"npm run dev:frontend\"",

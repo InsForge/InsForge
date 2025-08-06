@@ -82,14 +82,14 @@ export class TablesController {
     validatedColumns.forEach((col: ColumnSchema, index: number) => {
       // Validate column name
       try {
-        validateIdentifier(col.name, 'column');
+        validateIdentifier(col.columnName, 'column');
       } catch (error) {
         if (error instanceof AppError) {
           throw new AppError(
             `Invalid column name at index ${index}: ${error.message}`,
             error.statusCode,
             error.code,
-            error.nextAction
+            error.nextActions
           );
         }
         throw error;
@@ -128,10 +128,10 @@ export class TablesController {
 
         // Handle default values
         let defaultClause = '';
-        if (col.default_value) {
+        if (col.defaultValue) {
           // User-specified default
-          defaultClause = `DEFAULT '${col.default_value}'`;
-        } else if (fieldType.defaultValue && !col.nullable) {
+          defaultClause = `DEFAULT '${col.defaultValue}'`;
+        } else if (fieldType.defaultValue && !col.isNullable) {
           // Type-specific default for non-nullable fields
           if (fieldType.defaultValue === 'gen_random_uuid()' && ColumnType.UUID) {
             // PostgreSQL UUID generation
@@ -143,16 +143,16 @@ export class TablesController {
           }
         }
 
-        const nullable = col.nullable ? '' : 'NOT NULL';
-        const unique = col.is_unique ? 'UNIQUE' : '';
+        const nullable = col.isNullable ? '' : 'NOT NULL';
+        const unique = col.isUnique ? 'UNIQUE' : '';
 
-        return `${this.quoteIdentifier(col.name)} ${sqlType} ${nullable} ${unique} ${defaultClause}`.trim();
+        return `${this.quoteIdentifier(col.columnName)} ${sqlType} ${nullable} ${unique} ${defaultClause}`.trim();
       })
       .join(', ');
 
     // Prepare foreign key constraints
     const foreignKeyConstraints = validatedColumns
-      .filter((col) => col.foreign_key)
+      .filter((col) => col.foreignKey)
       .map((col) => this.generateFkeyConstraintStatement(col, true))
       .join(', ');
 
@@ -210,13 +210,13 @@ export class TablesController {
 
     return {
       message: 'table created successfully',
-      table_name,
+      tableName: table_name,
       columns: validatedColumns.map((col) => ({
         ...col,
         sql_type: COLUMN_TYPES[col.type].sqlType,
       })),
-      auto_fields: ['id', 'created_at', 'updated_at'],
-      nextAction: 'you can now use the table with the POST /api/database/tables/{table} endpoint',
+      autoFields: ['id', 'created_at', 'updated_at'],
+      nextActions: 'you can now use the table with the POST /api/database/tables/{table} endpoint',
     };
   }
 
@@ -296,22 +296,22 @@ export class TablesController {
     const uniqueSet = new Set(uniqueColumns.map((u: { column_name: string }) => u.column_name));
 
     // Get row count
-    const { row_count } = await db.prepare(`SELECT COUNT(*) as row_count FROM ${table}`).get();
+    const { row_count } = await db.prepare(`SELECT COUNT(*) as row_count FROM "${table}"`).get();
 
     return {
-      table_name: table,
+      tableName: table,
       columns: columns.map((col: ColumnInfo) => ({
-        name: col.column_name,
+        columnName: col.column_name,
         type: convertSqlTypeToColumnType(col.data_type),
-        nullable: col.is_nullable === 'YES',
-        primary_key: pkSet.has(col.column_name),
-        is_unique: pkSet.has(col.column_name) || uniqueSet.has(col.column_name),
-        default_value: col.column_default ?? undefined,
+        isNullable: col.is_nullable === 'YES',
+        isPrimaryKey: pkSet.has(col.column_name),
+        isUnique: pkSet.has(col.column_name) || uniqueSet.has(col.column_name),
+        defaultValue: col.column_default ?? undefined,
         ...(foreignKeyMap.has(col.column_name) && {
-          foreign_key: foreignKeyMap.get(col.column_name),
+          foreignKey: foreignKeyMap.get(col.column_name),
         }),
       })),
-      record_count: row_count,
+      recordCount: row_count,
     };
   }
 
@@ -322,8 +322,7 @@ export class TablesController {
     table: string,
     operations: UpdateTableSchemaRequest
   ): Promise<UpdateTableSchemaResponse> {
-    const { add_columns, drop_columns, rename_columns, add_fkey_columns, drop_fkey_columns } =
-      operations;
+    const { addColumns, dropColumns, renameColumns, addFkeyColumns, dropFkeyColumns } = operations;
 
     // Prevent modification of system tables
     if (table.startsWith('_')) {
@@ -377,7 +376,7 @@ export class TablesController {
 
     // Validate all operations before executing
     this.validateTableOperations(
-      { add_columns, drop_columns, rename_columns, add_fkey_columns, drop_fkey_columns },
+      { addColumns, dropColumns, renameColumns, addFkeyColumns, dropFkeyColumns },
       columnSet,
       workingColumnSet,
       foreignKeyMap,
@@ -388,25 +387,25 @@ export class TablesController {
 
     // Execute operations
     // Drop columns first (to avoid conflicts with renames)
-    if (drop_columns && Array.isArray(drop_columns)) {
-      for (const col of drop_columns) {
+    if (dropColumns && Array.isArray(dropColumns)) {
+      for (const col of dropColumns) {
         await db
           .prepare(
             `
               ALTER TABLE ${this.quoteIdentifier(table)} 
-              DROP COLUMN ${this.quoteIdentifier(col.name)}
+              DROP COLUMN ${this.quoteIdentifier(col.columnName)}
             `
           )
           .exec();
 
-        completedOperations.push(`Dropped column: ${col.name}`);
+        completedOperations.push(`Dropped column: ${col.columnName}`);
       }
     }
 
     // Add new columns
-    if (add_columns && Array.isArray(add_columns)) {
+    if (addColumns && Array.isArray(addColumns)) {
       // Validate and filter reserved fields
-      const columnsToAdd = this.validateReservedFields(add_columns);
+      const columnsToAdd = this.validateReservedFields(addColumns);
 
       for (const col of columnsToAdd) {
         const fieldType = COLUMN_TYPES[col.type as ColumnType];
@@ -415,19 +414,19 @@ export class TablesController {
           sqlType = 'UUID';
         }
 
-        const nullable = col.nullable !== false ? '' : 'NOT NULL';
+        const nullable = col.isNullable !== false ? '' : 'NOT NULL';
         let defaultClause = '';
 
-        if (col.default_value !== undefined) {
-          defaultClause = `DEFAULT ${col.default_value}`;
-        } else if (col.nullable === false && fieldType.defaultValue) {
+        if (col.defaultValue !== undefined) {
+          defaultClause = `DEFAULT ${col.defaultValue}`;
+        } else if (col.isNullable === false && fieldType.defaultValue) {
           if (fieldType.defaultValue === 'gen_random_uuid()' && ColumnType.UUID) {
             defaultClause = 'DEFAULT gen_random_uuid()';
           } else {
             defaultClause = `DEFAULT ${fieldType.defaultValue}`;
           }
         }
-        if (col.foreign_key) {
+        if (col.foreignKey) {
           // Add foreign key constraint
           const fkeyConstraints = this.generateFkeyConstraintStatement(col, false);
           if (fkeyConstraints) {
@@ -439,18 +438,18 @@ export class TablesController {
           .prepare(
             `
               ALTER TABLE ${this.quoteIdentifier(table)} 
-              ADD COLUMN ${this.quoteIdentifier(col.name)} ${sqlType} ${nullable} ${defaultClause}
+              ADD COLUMN ${this.quoteIdentifier(col.columnName)} ${sqlType} ${nullable} ${defaultClause}
             `
           )
           .exec();
 
-        completedOperations.push(`Added column: ${col.name}`);
+        completedOperations.push(`Added column: ${col.columnName}`);
       }
     }
 
     // Rename columns
-    if (rename_columns && typeof rename_columns === 'object') {
-      for (const [oldName, newName] of Object.entries(rename_columns)) {
+    if (renameColumns && typeof renameColumns === 'object') {
+      for (const [oldName, newName] of Object.entries(renameColumns)) {
         await db
           .prepare(
             `
@@ -465,8 +464,8 @@ export class TablesController {
     }
 
     // Add foreign key constraints
-    if (add_fkey_columns && Array.isArray(add_fkey_columns)) {
-      for (const col of add_fkey_columns) {
+    if (addFkeyColumns && Array.isArray(addFkeyColumns)) {
+      for (const col of addFkeyColumns) {
         const fkeyConstraint = this.generateFkeyConstraintStatement(col, true);
         await db
           .prepare(
@@ -477,14 +476,14 @@ export class TablesController {
           )
           .exec();
 
-        completedOperations.push(`Added foreign key constraint on column: ${col.name}`);
+        completedOperations.push(`Added foreign key constraint on column: ${col.columnName}`);
       }
     }
 
     // Drop foreign key constraints
-    if (drop_fkey_columns && Array.isArray(drop_fkey_columns)) {
-      for (const col of drop_fkey_columns) {
-        const constraintName = foreignKeyMap.get(col.name)?.constraint_name;
+    if (dropFkeyColumns && Array.isArray(dropFkeyColumns)) {
+      for (const col of dropFkeyColumns) {
+        const constraintName = foreignKeyMap.get(col.columnName)?.constraint_name;
         if (constraintName) {
           await db
             .prepare(
@@ -495,7 +494,7 @@ export class TablesController {
             )
             .exec();
 
-          completedOperations.push(`Dropped foreign key constraint on column: ${col.name}`);
+          completedOperations.push(`Dropped foreign key constraint on column: ${col.columnName}`);
         }
       }
     }
@@ -514,7 +513,7 @@ export class TablesController {
 
     return {
       message: 'table schema updated successfully',
-      table_name: table,
+      tableName: table,
       operations: completedOperations,
     };
   }
@@ -550,8 +549,8 @@ export class TablesController {
 
     return {
       message: 'table deleted successfully',
-      table_name: table,
-      nextAction:
+      tableName: table,
+      nextActions:
         'table deleted successfully, you can create a new table with the POST /api/database/tables endpoint',
     };
   }
@@ -568,7 +567,7 @@ export class TablesController {
       updated_at: ColumnType.DATETIME,
     };
     return columns.filter((col: ColumnSchema) => {
-      const reservedType = reservedFields[col.name as keyof typeof reservedFields];
+      const reservedType = reservedFields[col.columnName as keyof typeof reservedFields];
       if (reservedType) {
         // If it's a reserved field name
         if (col.type === reservedType) {
@@ -577,7 +576,7 @@ export class TablesController {
         } else {
           // Type doesn't match - throw error
           throw new AppError(
-            `Column '${col.name}' is a reserved field that requires type '${reservedType}', but got '${col.type}'`,
+            `Column '${col.columnName}' is a reserved field that requires type '${reservedType}', but got '${col.type}'`,
             400,
             ERROR_CODES.DATABASE_VALIDATION_ERROR,
             'Please check the column name and type, id/created_at/updated_at are reserved fields and cannot be used as column names'
@@ -589,22 +588,22 @@ export class TablesController {
   }
 
   private generateFkeyConstraintStatement(
-    col: { name: string; foreign_key?: ForeignKeySchema },
+    col: { columnName: string; foreignKey?: ForeignKeySchema },
     include_source_column: boolean = true
   ) {
-    if (!col.foreign_key) {
+    if (!col.foreignKey) {
       return '';
     }
     // Store foreign_key in a const to avoid repeated non-null assertions
-    const fk = col.foreign_key;
-    const constraintName = `fk_${col.name}_${fk.reference_table}_${fk.reference_column}`;
-    const onDelete = fk.on_delete || 'RESTRICT';
-    const onUpdate = fk.on_update || 'RESTRICT';
+    const fk = col.foreignKey;
+    const constraintName = `fk_${col.columnName}_${fk.referenceTable}_${fk.referenceColumn}`;
+    const onDelete = fk.onDelete || 'RESTRICT';
+    const onUpdate = fk.onUpdate || 'RESTRICT';
 
     if (include_source_column) {
-      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} FOREIGN KEY (${this.quoteIdentifier(col.name)}) REFERENCES ${this.quoteIdentifier(fk.reference_table)}(${this.quoteIdentifier(fk.reference_column)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
+      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} FOREIGN KEY (${this.quoteIdentifier(col.columnName)}) REFERENCES ${this.quoteIdentifier(fk.referenceTable)}(${this.quoteIdentifier(fk.referenceColumn)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
     } else {
-      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} REFERENCES ${this.quoteIdentifier(fk.reference_table)}(${this.quoteIdentifier(fk.reference_column)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
+      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} REFERENCES ${this.quoteIdentifier(fk.referenceTable)}(${this.quoteIdentifier(fk.referenceColumn)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
     }
   }
 
@@ -641,104 +640,97 @@ export class TablesController {
     foreignKeys.forEach((fk: ForeignKeyRow) => {
       foreignKeyMap.set(fk.from_column, {
         constraint_name: fk.constraint_name,
-        reference_table: fk.foreign_table,
-        reference_column: fk.foreign_column,
-        on_delete: fk.on_delete as OnDeleteActionSchema,
-        on_update: fk.on_update as OnUpdateActionSchema,
+        referenceTable: fk.foreign_table,
+        referenceColumn: fk.foreign_column,
+        onDelete: fk.on_delete as OnDeleteActionSchema,
+        onUpdate: fk.on_update as OnUpdateActionSchema,
       });
     });
     return foreignKeyMap;
   }
 
   private validateTableOperations(
-    operations: {
-      add_columns?: unknown;
-      drop_columns?: unknown;
-      rename_columns?: unknown;
-      add_fkey_columns?: unknown;
-      drop_fkey_columns?: unknown;
-    },
+    operations: UpdateTableSchemaRequest,
     columnSet: Set<string>,
     workingColumnSet: Set<string>,
     foreignKeyMap: Map<string, ForeignKeyInfo>,
     table: string
   ) {
-    const { add_columns, drop_columns, rename_columns, add_fkey_columns, drop_fkey_columns } =
-      operations;
+    const { addColumns, dropColumns, renameColumns, addFkeyColumns, dropFkeyColumns } = operations;
 
-    if (add_fkey_columns && Array.isArray(add_fkey_columns)) {
-      for (const col of add_fkey_columns) {
+    if (addFkeyColumns && Array.isArray(addFkeyColumns)) {
+      for (const col of addFkeyColumns) {
         // Zod already validates that name and foreign_key fields are present
-        if (foreignKeyMap.has(col.name)) {
+        if (foreignKeyMap.has(col.columnName)) {
           throw new AppError(
-            `Foreigh Key on Column(${col.name}) already exists`,
+            `Foreigh Key on Column(${col.columnName}) already exists`,
             400,
             ERROR_CODES.DATABASE_VALIDATION_ERROR,
-            `Foreigh Key on Column(${col.name}) already exists. Please check the schema with GET /api/database/tables/${table}/schema endpoint.`
+            `Foreigh Key on Column(${col.columnName}) already exists. Please check the schema with GET /api/database/tables/${table}/schema endpoint.`
           );
         }
       }
     }
 
-    if (drop_fkey_columns && Array.isArray(drop_fkey_columns)) {
-      for (const col of drop_fkey_columns) {
+    if (dropFkeyColumns && Array.isArray(dropFkeyColumns)) {
+      for (const col of dropFkeyColumns) {
         // Zod already validates that name is present
-        if (!columnSet.has(col.name)) {
+        if (!columnSet.has(col.columnName)) {
           throw new AppError(
-            `Column(${col.name}) not found`,
+            `Column(${col.columnName}) not found`,
             404,
             ERROR_CODES.DATABASE_NOT_FOUND,
-            `Column(${col.name}) not found. Please check the schema with GET /api/tables/${table}/schema endpoint.`
+            `Column(${col.columnName}) not found. Please check the schema with GET /api/tables/${table}/schema endpoint.`
           );
         }
-        if (!foreignKeyMap.has(col.name)) {
+        if (!foreignKeyMap.has(col.columnName)) {
           throw new AppError(
-            `Foreign Key Constraint on Column(${col.name}) not found`,
+            `Foreign Key Constraint on Column(${col.columnName}) not found`,
             404,
             ERROR_CODES.DATABASE_NOT_FOUND,
-            `Foreign Key Constraint on Column(${col.name}) not found. Please check the schema with GET /api/tables/${table}/schema endpoint.`
+            `Foreign Key Constraint on Column(${col.columnName}) not found. Please check the schema with GET /api/tables/${table}/schema endpoint.`
           );
         }
       }
     }
 
     // First, validate and simulate drop columns (these happen first)
-    if (drop_columns && Array.isArray(drop_columns)) {
-      for (const col of drop_columns) {
+    if (dropColumns && Array.isArray(dropColumns)) {
+      for (const col of dropColumns) {
         // Zod already validates that name is present
-        if (!workingColumnSet.has(col.name)) {
+        if (!workingColumnSet.has(col.columnName)) {
           throw new AppError(
-            `Column(${col.name}) not found`,
+            `Column(${col.columnName}) not found`,
             404,
             ERROR_CODES.DATABASE_NOT_FOUND,
-            `Column(${col.name}) not found. Please check the schema with GET /api/database/tables/${table}/schema endpoint.`
+            `Column(${col.columnName}) not found. Please check the schema with GET /api/database/tables/${table}/schema endpoint.`
           );
         }
         // Remove from working set to simulate the drop
-        workingColumnSet.delete(col.name);
+        workingColumnSet.delete(col.columnName);
       }
     }
 
-    if (add_columns && Array.isArray(add_columns)) {
-      for (const col of add_columns) {
+    if (addColumns && Array.isArray(addColumns)) {
+      for (const col of addColumns) {
         // Zod already validates column name, type, and that type is valid
 
-        if (workingColumnSet.has(col.name)) {
+        if (workingColumnSet.has(col.columnName)) {
           throw new AppError(
-            `Column(${col.name}) already exists`,
+            `Column(${col.columnName}) already exists`,
             400,
             ERROR_CODES.DATABASE_VALIDATION_ERROR,
-            `Column(${col.name}) already exists. Please check the schema with GET /api/database/tables/${table}/schema endpoint.`
+            `Column(${col.columnName}) already exists. Please check the schema with GET /api/database/tables/${table}/schema endpoint.`
           );
         }
         // Add to working set to simulate the add
-        workingColumnSet.add(col.name);
+        workingColumnSet.add(col.columnName);
       }
     }
 
-    if (rename_columns && typeof rename_columns === 'object') {
-      for (const [oldName, newName] of Object.entries(rename_columns)) {
-        // Zod validates that rename_columns is a record of strings
+    if (renameColumns && typeof renameColumns === 'object') {
+      for (const [oldName, newName] of Object.entries(renameColumns)) {
+        // Zod validates that renameColumns is a record of strings
         if (!workingColumnSet.has(oldName)) {
           throw new AppError(
             `Column(${oldName}) not found`,

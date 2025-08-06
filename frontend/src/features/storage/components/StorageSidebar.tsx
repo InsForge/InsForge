@@ -4,8 +4,8 @@ import { BucketListSkeleton } from './BucketListSkeleton';
 import { BucketEmptyState } from './BucketEmptyState';
 
 interface BucketInfo {
-  file_count: number;
-  total_size: number;
+  fileCount: number;
+  totalSize: number;
 }
 
 interface StorageSidebarProps {

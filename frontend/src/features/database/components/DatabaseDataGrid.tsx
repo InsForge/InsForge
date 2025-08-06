@@ -172,7 +172,7 @@ export function convertSchemaToColumns(
 
   return schema.columns.map((col: ColumnSchema) => {
     const isEditable =
-      !col.primary_key &&
+      !col.isPrimaryKey &&
       [
         ColumnType.UUID,
         ColumnType.STRING,
@@ -185,18 +185,18 @@ export function convertSchemaToColumns(
     const isSortable = !['jsonb', 'json'].includes(col.type?.toLowerCase());
 
     const column: DataGridColumn = {
-      key: col.name,
-      name: col.name,
+      key: col.columnName,
+      name: col.columnName,
       type: col.type,
       width: 'minmax(200px, 1fr)',
       resizable: true,
       sortable: isSortable,
       editable: isEditable,
-      primary_key: col.primary_key,
+      isPrimaryKey: col.isPrimaryKey,
     };
 
     // Set custom renderers based on column type
-    if (col.name === 'id') {
+    if (col.columnName === 'id') {
       column.renderCell = DefaultCellRenderers.id;
       column.editable = false;
     } else if (col.type === ColumnType.BOOLEAN) {

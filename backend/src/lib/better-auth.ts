@@ -1,6 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { jwt } from 'better-auth/plugins/jwt';
 import { bearer } from 'better-auth/plugins/bearer';
+import { google, github } from 'better-auth/social-providers';
 import { Pool } from 'pg';
 import { customAuthPlugin } from './custom-auth-plugin';
 
@@ -19,12 +20,27 @@ const pool = new Pool({
 export const auth = betterAuth({
   database: pool,
   basePath: '/api/auth/v2',
-  advanced: {
-    // disable Cross-Site Request Forgery, if we need to enable it we must add trustedOrigins for domains
-    disableCSRFCheck: true,
-  },
+  // Trust all origins for OAuth callbacks. This is a temporary solution to allow OAuth callbacks from any origin.
+  // in the future we should allow users to specify the allowed origins in the config
+  trustedOrigins: ['*'],
   emailAndPassword: {
     enabled: true,
+  },
+  socialProviders: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID || '',
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      redirectURI:
+        process.env.GOOGLE_REDIRECT_URI || 'http://localhost:7130/api/auth/v2/callback/google',
+      enabled: !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET,
+    },
+    github: {
+      clientId: process.env.GITHUB_CLIENT_ID || '',
+      clientSecret: process.env.GITHUB_CLIENT_SECRET || '',
+      redirectURI:
+        process.env.GITHUB_REDIRECT_URI || 'http://localhost:7130/api/auth/v2/callback/github',
+      enabled: !!process.env.GITHUB_CLIENT_ID && !!process.env.GITHUB_CLIENT_SECRET,
+    },
   },
   plugins: [
     bearer(),
@@ -44,5 +60,4 @@ export const auth = betterAuth({
       },
     }),
   ],
-  // We'll add OAuth providers in the next PR
 });

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Skeleton } from '@/components/radix/Skeleton';
 
 export function BucketListSkeleton() {

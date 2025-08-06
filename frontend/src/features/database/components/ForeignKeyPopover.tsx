@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from '@/components/radix/Select';
 import { metadataService } from '@/features/dashboard/services/metadata.service';
-import { apiClient } from '@/lib/api/client';
+import { databaseService } from '@/features/database/services/database.service';
 import { UseFormReturn } from 'react-hook-form';
 import { TableFormSchema, TableFormForeignKeySchema } from '../schema';
 import { ColumnSchema, OnDeleteActionSchema, OnUpdateActionSchema } from '@insforge/shared-schemas';
@@ -37,10 +37,10 @@ export function ForeignKeyPopover({
 }: ForeignKeyPopoverProps) {
   const [newForeignKey, setNewForeignKey] = useState<TableFormForeignKeySchema>({
     columnName: '',
-    reference_table: '',
-    reference_column: '',
-    on_delete: 'NO ACTION',
-    on_update: 'NO ACTION',
+    referenceTable: '',
+    referenceColumn: '',
+    onDelete: 'NO ACTION',
+    onUpdate: 'NO ACTION',
   });
 
   const columns = form.watch('columns');
@@ -50,19 +50,19 @@ export function ForeignKeyPopover({
     if (open && initialValue) {
       setNewForeignKey({
         columnName: initialValue.columnName,
-        reference_table: initialValue.reference_table,
-        reference_column: initialValue.reference_column,
-        on_delete: initialValue.on_delete,
-        on_update: initialValue.on_update,
+        referenceTable: initialValue.referenceTable,
+        referenceColumn: initialValue.referenceColumn,
+        onDelete: initialValue.onDelete,
+        onUpdate: initialValue.onUpdate,
       });
     } else if (!open) {
       // Reset when closing
       setNewForeignKey({
         columnName: '',
-        reference_table: '',
-        reference_column: '',
-        on_delete: 'NO ACTION',
-        on_update: 'NO ACTION',
+        referenceTable: '',
+        referenceColumn: '',
+        onDelete: 'NO ACTION',
+        onUpdate: 'NO ACTION',
       });
     }
   }, [open, initialValue]);
@@ -80,40 +80,30 @@ export function ForeignKeyPopover({
 
   // Get columns for selected reference table
   const { data: referenceTableSchema } = useQuery({
-    queryKey: ['schema', newForeignKey.reference_table],
+    queryKey: ['table-schema', newForeignKey.referenceTable],
     queryFn: async () => {
-      if (!newForeignKey.reference_table) {
+      if (!newForeignKey.referenceTable) {
         return null;
       }
-      const response = await apiClient.request(
-        `/database/tables/${newForeignKey.reference_table}/schema`,
-        {
-          headers: apiClient.withApiKey(),
-        }
-      );
-      return response;
+      return await databaseService.getTableSchema(newForeignKey.referenceTable);
     },
-    enabled: !!newForeignKey.reference_table && open,
+    enabled: !!newForeignKey.referenceTable && open,
   });
 
   // Calculate if the button should be enabled
   const isAddButtonEnabled = Boolean(
-    newForeignKey.columnName && newForeignKey.reference_table && newForeignKey.reference_column
+    newForeignKey.columnName && newForeignKey.referenceTable && newForeignKey.referenceColumn
   );
 
   const handleAddForeignKey = () => {
-    if (
-      newForeignKey.columnName &&
-      newForeignKey.reference_table &&
-      newForeignKey.reference_column
-    ) {
+    if (newForeignKey.columnName && newForeignKey.referenceTable && newForeignKey.referenceColumn) {
       onAddForeignKey(newForeignKey);
       setNewForeignKey({
         columnName: '',
-        reference_table: '',
-        reference_column: '',
-        on_delete: 'NO ACTION',
-        on_update: 'NO ACTION',
+        referenceTable: '',
+        referenceColumn: '',
+        onDelete: 'NO ACTION',
+        onUpdate: 'NO ACTION',
       });
       onOpenChange(false);
     }
@@ -122,10 +112,10 @@ export function ForeignKeyPopover({
   const handleCancelAddForeignKey = () => {
     setNewForeignKey({
       columnName: '',
-      reference_table: '',
-      reference_column: '',
-      on_delete: 'NO ACTION',
-      on_update: 'NO ACTION',
+      referenceTable: '',
+      referenceColumn: '',
+      onDelete: 'NO ACTION',
+      onUpdate: 'NO ACTION',
     });
     onOpenChange(false);
   };
@@ -162,10 +152,10 @@ export function ForeignKeyPopover({
                 </SelectTrigger>
                 <SelectContent>
                   {columns
-                    .filter((col) => col.name)
+                    .filter((col) => col.columnName)
                     .map((col, index) => (
-                      <SelectItem key={col.name || index} value={col.name}>
-                        {col.name} ({col.type})
+                      <SelectItem key={col.columnName || index} value={col.columnName}>
+                        {col.columnName} ({col.type})
                       </SelectItem>
                     ))}
                 </SelectContent>
@@ -176,12 +166,12 @@ export function ForeignKeyPopover({
             <div className="flex flex-col gap-3">
               <Label className="text-sm font-medium">Reference Table</Label>
               <Select
-                value={newForeignKey.reference_table}
+                value={newForeignKey.referenceTable}
                 onValueChange={(value) => {
                   setNewForeignKey((prev) => ({
                     ...prev,
-                    reference_table: value,
-                    reference_column: '', // Reset column when table changes
+                    referenceTable: value,
+                    referenceColumn: '', // Reset column when table changes
                   }));
                 }}
               >
@@ -199,14 +189,14 @@ export function ForeignKeyPopover({
             </div>
 
             {/* Reference Column selector - only shown after table is selected */}
-            {newForeignKey.reference_table && (
+            {newForeignKey.referenceTable && (
               <div className="flex flex-col gap-3">
                 <Label className="text-sm font-medium">Reference Column</Label>
                 <Select
-                  key={`column-select-${newForeignKey.reference_table}`}
-                  value={newForeignKey.reference_column}
+                  key={`column-select-${newForeignKey.referenceTable}`}
+                  value={newForeignKey.referenceColumn}
                   onValueChange={(value) =>
-                    setNewForeignKey((prev) => ({ ...prev, reference_column: value }))
+                    setNewForeignKey((prev) => ({ ...prev, referenceColumn: value }))
                   }
                 >
                   <SelectTrigger className="h-10 border-zinc-200 shadow-sm">
@@ -225,11 +215,15 @@ export function ForeignKeyPopover({
                           //   !sourceType || col.type.toLowerCase() === sourceType.toLowerCase();
 
                           //Disable if not a valid reference or types don't match
-                          const isDisabled = !col.is_unique; //|| !typesMatch; This is not working because FieldType and Schema Column Type are incompatible
+                          const isDisabled = !col.isUnique; //|| !typesMatch; This is not working because FieldType and Schema Column Type are incompatible
 
                           return (
-                            <SelectItem key={col.name} value={col.name} disabled={isDisabled}>
-                              {col.name} ({col.type}) {col.is_unique && ' (unique)'}
+                            <SelectItem
+                              key={col.columnName}
+                              value={col.columnName}
+                              disabled={isDisabled}
+                            >
+                              {col.columnName} ({col.type}) {col.isUnique && ' (unique)'}
                             </SelectItem>
                           );
                         });
@@ -250,11 +244,11 @@ export function ForeignKeyPopover({
             <div className="flex flex-col gap-3">
               <Label className="text-sm font-medium">On Update</Label>
               <Select
-                value={newForeignKey.on_update}
+                value={newForeignKey.onUpdate}
                 onValueChange={(value) =>
                   setNewForeignKey((prev) => ({
                     ...prev,
-                    on_update: value as OnUpdateActionSchema,
+                    onUpdate: value as OnUpdateActionSchema,
                   }))
                 }
               >
@@ -273,11 +267,11 @@ export function ForeignKeyPopover({
             <div className="flex flex-col gap-3">
               <Label className="text-sm font-medium">On Delete</Label>
               <Select
-                value={newForeignKey.on_delete}
+                value={newForeignKey.onDelete}
                 onValueChange={(value) =>
                   setNewForeignKey((prev) => ({
                     ...prev,
-                    on_delete: value as OnDeleteActionSchema,
+                    onDelete: value as OnDeleteActionSchema,
                   }))
                 }
               >

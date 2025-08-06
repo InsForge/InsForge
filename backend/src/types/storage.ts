@@ -1,39 +1,15 @@
 // Storage-related type definitions
+import { StorageFileSchema, StorageBucketSchema } from '@insforge/shared-schemas';
 
 // Base storage record from database
-export interface StorageRecord {
-  bucket: string;
-  key: string;
-  size: number;
-  mime_type: string | null;
-  uploaded_at: string;
-}
-
-// Storage record with computed URL field
-export interface StoredFile extends StorageRecord {
-  url: string;
-}
+export type StorageRecord = Omit<StorageFileSchema, 'url'>;
 
 // Bucket record from _storage_buckets table
-export interface BucketRecord {
-  name: string;
-  public: boolean;
-}
-
-// Bucket info returned by API (includes created_at)
-export interface BucketInfo {
-  name: string;
-  public: boolean;
-  created_at: string;
-}
+export type BucketRecord = Omit<StorageBucketSchema, 'created_at'>;
 
 // Storage configuration
 export interface StorageConfig {
-  buckets: Array<{
-    name: string;
-    public: boolean;
-    created_at?: string;
-  }>;
+  buckets: StorageBucketSchema[];
 }
 
 // Form field types for file uploads

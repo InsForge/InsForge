@@ -28,12 +28,12 @@ Response:
     "id": "uuid",
     "email": "user@example.com",
     "name": "user",
-    "avatar_url": null,
+    "avatarUrl": null,
     "bio": null
   },
-  "access_token": "jwt-token",
+  "accessToken": "jwt-token",
   "message": "Registration successful",
-  "nextAction": "You can use this access token to access other endpoints (always add it to HTTP Header 'Authorization', then send requests). Please keep it safe."
+  "nextActions": "You can use this access token to access other endpoints (always add it to HTTP Header 'Authorization', then send requests). Please keep it safe."
 }
 ```
 
@@ -65,12 +65,12 @@ Response:
     "id": "uuid",
     "email": "user@example.com",
     "name": "user",
-    "avatar_url": null,
+    "avatarUrl": null,
     "bio": null
   },
-  "access_token": "jwt-token",
+  "accessToken": "jwt-token",
   "message": "Login successful",
-  "nextAction": "Use the access token in the Authorization header for subsequent requests"
+  "nextActions": "Use the access token in the Authorization header for subsequent requests"
 }
 ```
 
@@ -98,7 +98,7 @@ Response:
     "id": "user-uuid",
     "email": "user@example.com",
     "name": "user",
-    "avatar_url": null,
+    "avatarUrl": null,
     "bio": null
   }
 }
@@ -119,7 +119,7 @@ All error responses follow this format:
   "error": "ERROR_CODE",
   "message": "Human-readable error message",
   "statusCode": 400,
-  "nextAction": "Suggested action to resolve the error"
+  "nextActions": "Suggested action to resolve the error"
 }
 ```
 
@@ -129,7 +129,7 @@ Example error:
   "error": "INVALID_CREDENTIALS",
   "message": "Invalid email or password",
   "statusCode": 401,
-  "nextAction": "Please check your credentials and try again"
+  "nextActions": "Please check your credentials and try again"
 }
 ```
 
@@ -148,48 +148,48 @@ Prerequisites:
 
 ### OAuth Endpoints
 #### Get Google platform authentication link:
-**GET** `/api/auth/v1/google-auth?redirect_url=your_application_endpoint`
+**GET** `/api/auth/v1/google-auth?redirectUrl=your_application_endpoint`
 
-`redirect_url` is MUST provided by the application.
+`redirectUrl` is MUST provided by the application.
 
 Response:
 ```json
 {
-  "auth_url": "https://accounts.google.com/o/oauth2/v2/auth?client_id={your_client_id}&redirect_uri=hfa&scope=user%3Aemail&state=eyJ9",
-  "message": "Redirect the user to the auth_url for Google authentication",
-  "nextAction": "After authentication, user will be redirected back with auth code"
+  "authUrl": "https://accounts.google.com/o/oauth2/v2/auth?client_id={your_client_id}&redirect_uri=hfa&scope=user%3Aemail&state=eyJ9",
+  "message": "Redirect the user to the authUrl for Google authentication",
+  "nextActions": "After authentication, user will be redirected back with auth code"
 }
 ```
 
 Example curl:
 ```bash
-curl -X GET "http://localhost:7130/api/auth/v1/google-auth?redirect_url=http://localhost:3000/callback"
+curl -X GET "http://localhost:7130/api/auth/v1/google-auth?redirectUrl=http://localhost:3000/callback"
 ```
 
 #### Get GitHub platform authentication link:
-**GET** `/api/auth/v1/github-auth?redirect_url=your_application_endpoint`
+**GET** `/api/auth/v1/github-auth?redirectUrl=your_application_endpoint`
 
-`redirect_url` is MUST provided by the application.
+`redirectUrl` is MUST provided by the application.
 
 Response:
 ```json
 {
-  "auth_url": "https://github.com/login/oauth/authorize?client_id={your_client_id}&redirect_uri=hfa&scope=user%3Aemail&state=eyJ9",
-  "message": "Redirect the user to the auth_url for GitHub authentication",
-  "nextAction": "After authentication, user will be redirected back with auth code"
+  "authUrl": "https://github.com/login/oauth/authorize?client_id={your_client_id}&redirect_uri=hfa&scope=user%3Aemail&state=eyJ9",
+  "message": "Redirect the user to the authUrl for GitHub authentication",
+  "nextActions": "After authentication, user will be redirected back with auth code"
 }
 ```
 
 Example curl:
 ```bash
-curl -X GET "http://localhost:7130/api/auth/v1/github-auth?redirect_url=http://localhost:3000/callback"
+curl -X GET "http://localhost:7130/api/auth/v1/github-auth?redirectUrl=http://localhost:3000/callback"
 ```
 
 #### OAuth Result callback:
-**GET** `redirect_url?access_token={jwt-token}&user_id={current_user_id}&email={current_user_email}&name={current_user_name}`
+**GET** `redirectUrl?accessToken={jwt-token}&userId={current_user_id}&email={current_user_email}&name={current_user_name}`
 
-The user login result will callback to the redirect_url with authentication information.
-Similar to the login endpoint (`/api/auth/login`), the application frontend should persist this JWT access_token to local storage and include it in subsequent requests (`Authorization` Header)
+The user login result will callback to the redirectUrl with authentication information.
+Similar to the login endpoint (`/api/auth/login`), the application frontend should persist this JWT accessToken to local storage and include it in subsequent requests (`Authorization` Header)
 
 ## Built-in Auth Tables
 

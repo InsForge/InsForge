@@ -39,7 +39,7 @@ paths:
                 error: "PROFILE_NOT_FOUND"
                 message: "Profile not found for the current user"
                 statusCode: 404
-                nextAction: "Create a profile first"
+                nextActions: "Create a profile first"
     
     patch:
       summary: Update current user's profile
@@ -96,7 +96,7 @@ paths:
                 error: "PROFILE_NOT_FOUND"
                 message: "Profile not found for the current user"
                 statusCode: 404
-                nextAction: "Create a profile first"
+                nextActions: "Create a profile first"
         '400':
           description: Bad request
           content:
@@ -107,7 +107,7 @@ paths:
                 error: "VALIDATION_ERROR"
                 message: "Invalid URL format for avatar_url"
                 statusCode: 400
-                nextAction: "Provide a valid URL for the avatar"
+                nextActions: "Provide a valid URL for the avatar"
 
   /api/profiles/search:
     get:
@@ -178,7 +178,7 @@ paths:
                 error: "MISSING_QUERY"
                 message: "Search query parameter 'q' is required"
                 statusCode: 400
-                nextAction: "Provide a search query"
+                nextActions: "Provide a search query"
 
   /api/profiles/{userId}:
     get:
@@ -216,7 +216,7 @@ paths:
                 error: "USER_NOT_FOUND"
                 message: "User with ID 'auth-999' not found"
                 statusCode: 404
-                nextAction: "Check the user ID and try again"
+                nextActions: "Check the user ID and try again"
 
 components:
   securitySchemes:
@@ -293,6 +293,6 @@ components:
         statusCode:
           type: integer
           description: HTTP status code
-        nextAction:
+        nextActions:
           type: string
           description: Suggested action to resolve the error
