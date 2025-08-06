@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Copy } from 'lucide-react';
 import { Button } from '@/components/radix/Button';
 import { cn } from '@/lib/utils/utils';
-import { useToast } from '@/lib/hooks/useToast';
 import CheckedIcon from '@/assets/icons/checked.svg';
 
 interface CopyButtonProps {
@@ -15,7 +14,6 @@ interface CopyButtonProps {
   copiedText?: string;
   copyText?: string;
   disabled?: boolean;
-  showToast?: boolean;
   successMessage?: string;
 }
 
@@ -29,11 +27,8 @@ export function CopyButton({
   copiedText = 'Copied',
   copyText = 'Copy',
   disabled = false,
-  showToast = false,
-  successMessage = 'Copied to clipboard!',
 }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
-  const { showToast: displayToast } = useToast();
 
   const handleCopy = async () => {
     if (disabled) {
@@ -45,18 +40,12 @@ export function CopyButton({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
 
-      if (showToast) {
-        displayToast(successMessage, 'success');
-      }
-
       if (onCopy) {
         onCopy(text);
       }
-    } catch {
+    } catch (error) {
       // Failed to copy text
-      if (showToast) {
-        displayToast('Failed to copy to clipboard', 'error');
-      }
+      console.error(error);
     }
   };
 

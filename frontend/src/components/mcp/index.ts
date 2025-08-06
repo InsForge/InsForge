@@ -1,4 +1,4 @@
-export { MCPInstaller } from './MCPInstaller';
+export { McpInstaller } from './McpInstaller';
 export { CursorDeeplinkGenerator } from './CursorDeeplinkGenerator';
-export type { MCPAgent, PlatformType } from '@/components/mcp/mcp-agents';
-export { MCP_AGENTS, createMCPConfig, createMCPServerConfig } from '@/components/mcp/mcp-agents';
+export type { MCPAgent, PlatformType } from '@/components/mcp/mcp-helper';
+export { MCP_AGENTS, createMCPConfig, createMCPServerConfig } from '@/components/mcp/mcp-helper';

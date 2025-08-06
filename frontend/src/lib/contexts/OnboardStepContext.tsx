@@ -1,12 +1,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-export type OnboardStep = 1 | 2 | 3 | 4;
+export enum OnboardStep {
+  InstallNodeJS = 1,
+  InstallInsForge = 2,
+  TestConnection = 3,
+  StartUsing = 4
+}
 
 interface OnboardContextValue {
   currentStep: OnboardStep;
   updateStep: (step: OnboardStep) => void;
   getCurrentDescription: () => string;
-  totalSteps: 4;
+  totalSteps: OnboardStep.StartUsing;
 }
 
 const ONBOARD_STORAGE_KEY = 'insforge_onboard_step';
@@ -23,15 +28,14 @@ export function OnboardStepProvider({ children }: { children: React.ReactNode })
   const [currentStep, setCurrentStep] = useState<OnboardStep>(() => {
     const saved = localStorage.getItem(ONBOARD_STORAGE_KEY);
     const n = saved ? parseInt(saved, 10) : NaN;
-    return n >= 1 && n <= 4 ? (n as OnboardStep) : 1;
+    return (n >= OnboardStep.InstallNodeJS && n <= OnboardStep.StartUsing) ? (n as OnboardStep) : OnboardStep.InstallNodeJS;
   });
 
-  // Cross-tab updates
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key === ONBOARD_STORAGE_KEY && e.newValue) {
         const n = parseInt(e.newValue, 10) as OnboardStep;
-        if (n >= 1 && n <= 4) {
+        if (n >= OnboardStep.InstallNodeJS && n <= OnboardStep.StartUsing) {
           setCurrentStep(n);
         }
       }
@@ -41,7 +45,7 @@ export function OnboardStepProvider({ children }: { children: React.ReactNode })
   }, []);
 
   const updateStep = (step: OnboardStep) => {
-    if (step < 1 || step > 4) {
+    if (step < OnboardStep.InstallNodeJS || step > OnboardStep.StartUsing) {
       return;
     }
     setCurrentStep(step);
@@ -52,7 +56,7 @@ export function OnboardStepProvider({ children }: { children: React.ReactNode })
 
   return (
     <OnboardContext.Provider
-      value={{ currentStep, updateStep, getCurrentDescription, totalSteps: 4 }}
+      value={{ currentStep, updateStep, getCurrentDescription, totalSteps: OnboardStep.StartUsing }}
     >
       {children}
     </OnboardContext.Provider>

@@ -7,11 +7,11 @@ import { useEffect, useState } from 'react';
 const httpUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:7130';
 const wsUrl = `${httpUrl.replace(/^http/, 'ws')}/ws/onboarding`;
 
-export function Step3() {
+export function TestConnectionStep() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [waitingForResponse, setWaitingForResponse] = useState(false);
 
-  const { mcpConnected, connect, disconnect } = useWebSocket(wsUrl);
+  const { backendConnected, connect, disconnect } = useWebSocket(wsUrl);
 
   // Connect to WebSocket on mount
   useEffect(() => {
@@ -23,10 +23,10 @@ export function Step3() {
 
   // Show success message when backend connects
   useEffect(() => {
-    if (mcpConnected) {
+    if (backendConnected) {
       setShowSuccess(true);
     }
-  }, [mcpConnected]);
+  }, [backendConnected]);
 
   return (
     <div className="space-y-6 bg-white py-8 px-6 rounded-xl border border-border-gray">

@@ -32,7 +32,7 @@ export default function LoginPage() {
 
   // Determine where to redirect based on onboarding completion status
   const getRedirectPath = useCallback(() => {
-    return isCompleted ? '/dashboard' : '/onboard';
+    return isCompleted ? '/dashboard' : '/dashboard/onboard';
   }, [isCompleted]);
 
   const form = useStandardForm<LoginFormData>({
