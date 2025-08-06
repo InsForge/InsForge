@@ -42,7 +42,7 @@ export default function DatabasePage() {
   const [isSorting, setIsSorting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const { confirm, ConfirmDialogProps } = useConfirm();
+  const { confirm, confirmDialogProps } = useConfirm();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
 
@@ -586,7 +586,7 @@ export default function DatabasePage() {
       )}
 
       {/* Confirm Dialog */}
-      <ConfirmDialog {...ConfirmDialogProps} />
+      <ConfirmDialog {...confirmDialogProps} />
     </div>
   );
 }

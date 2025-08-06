@@ -77,6 +77,20 @@ This is a monorepo containing:
 - Use TanStack Query for server state management
 - Keep components focused and single-purpose
 
+#### Naming Conventions
+- **Variables, parameters, properties, and functions**: Use camelCase
+  - Examples: `userName`, `getUserData()`, `isLoading`
+- **React components and TypeScript types/interfaces**: Use PascalCase
+  - Examples: `UserProfileDialog`, `interface User`, `type TableSchema`
+- **Constants and Enum members**: Use UPPER_CASE
+  - Examples: `const API_BASE_URL`, `enum Status { ACTIVE, INACTIVE }`
+- **File naming**:
+  - Components: `PascalCase.tsx` (e.g., `DataGrid.tsx`)
+  - Hooks: `use` + `PascalCase.ts` (e.g., `useAuth.ts`)
+  - Services: `camelCase.service.ts` (e.g., `auth.service.ts`)
+  - Utils: `kebab-case.ts` or `camelCase.ts` (e.g., `database-utils.ts`)
+- **No snake_case**: Avoid snake_case except in SQL queries and external APIs
+
 ### Code Style
 - Use single quotes for strings
 - Include semicolons at the end of statements

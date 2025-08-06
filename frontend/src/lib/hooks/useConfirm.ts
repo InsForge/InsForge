@@ -37,7 +37,7 @@ export function useConfirm() {
 
   return {
     confirm,
-    ConfirmDialogProps: {
+    confirmDialogProps: {
       open: isOpen,
       onOpenChange: (open: boolean) => {
         if (!open) {

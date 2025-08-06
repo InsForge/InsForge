@@ -34,7 +34,7 @@ export function StorageManager({
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
   const { showToast } = useToast();
-  const { confirm, ConfirmDialogProps } = useConfirm();
+  const { confirm, confirmDialogProps } = useConfirm();
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -222,7 +222,7 @@ export function StorageManager({
       </div>
 
       {/* Confirm Dialog */}
-      <ConfirmDialog {...ConfirmDialogProps} />
+      <ConfirmDialog {...confirmDialogProps} />
 
       {/* File Preview Dialog */}
       <FilePreviewDialog

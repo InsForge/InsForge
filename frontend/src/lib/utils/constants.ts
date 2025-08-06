@@ -32,7 +32,7 @@ export const STAT_COLORS = {
 } as const;
 
 // Storage keys
-export const STORAGE_KEYS = {
-  AUTH_TOKEN: 'auth_token',
-  USER_PREFERENCES: 'user_preferences',
-} as const;
+export enum StorageKeys {
+  AUTH_TOKEN = 'auth_token',
+  USER_PREFERENCES = 'user_preferences',
+}

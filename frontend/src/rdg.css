@@ -79,7 +79,7 @@
 
 /* Remove cell focus outline and use custom styling */
 .rdg-cell[aria-selected='true'] {
-  outline: 2px solid #2C7FFF;
+  outline: 2px solid #2c7fff;
 }
 
 /* Editor cell styling */

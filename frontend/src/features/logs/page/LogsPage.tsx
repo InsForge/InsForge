@@ -19,7 +19,7 @@ export default function LogsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 50;
-  const { confirm, ConfirmDialogProps } = useConfirm();
+  const { confirm, confirmDialogProps } = useConfirm();
 
   // Fetch logs with pagination
   const {
@@ -135,7 +135,7 @@ export default function LogsPage() {
       </div>
 
       {/* Confirm Dialog */}
-      <ConfirmDialog {...ConfirmDialogProps} />
+      <ConfirmDialog {...confirmDialogProps} />
     </div>
   );
 }

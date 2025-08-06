@@ -1,0 +1,66 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+**/dist/
+build/
+**/build/
+.next/
+**/.next/
+
+# Coverage
+coverage/
+**/coverage/
+
+# Turbo
+.turbo/
+**/.turbo/
+
+# Public assets
+public/
+**/public/
+
+# Lock files
+package-lock.json
+**/package-lock.json
+yarn.lock
+**/yarn.lock
+pnpm-lock.yaml
+**/pnpm-lock.yaml
+
+# Generated files
+*.min.js
+*.min.css
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+
+# Git
+.git/
+.gitignore
+
+# File types to ignore
+*.md
+*.yaml
+*.yml
+*.json
+
+# Folders to ignore
+docs/
+examples/
+openapi/

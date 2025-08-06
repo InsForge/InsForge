@@ -3,7 +3,6 @@ import {
   Home,
   Database,
   UserRoundCog,
-  Logs,
   Activity,
   HardDrive,
   Info,

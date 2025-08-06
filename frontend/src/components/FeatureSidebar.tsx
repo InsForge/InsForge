@@ -41,7 +41,7 @@ export function FeatureSidebar<T extends FeatureItem>({
   newItemTooltip = 'Add new',
   editLabel = 'Edit',
   deleteLabel = 'Delete',
-  icon: Icon,
+  icon,
   filterItems,
   renderSkeleton,
   renderEmptyState,
@@ -99,7 +99,7 @@ export function FeatureSidebar<T extends FeatureItem>({
               <FeatureSidebarItem
                 key={itemName}
                 name={itemName}
-                icon={Icon}
+                icon={icon}
                 isSelected={selectedItem === itemName}
                 onClick={() => onItemSelect(itemName)}
                 onEdit={onEditItem ? () => onEditItem(itemName) : undefined}

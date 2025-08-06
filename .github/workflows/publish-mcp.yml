@@ -1,0 +1,112 @@
+name: Publish MCP Package
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'mcp/**'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (test without publishing)'
+        required: false
+        default: false
+        type: boolean
+      force_publish:
+        description: 'Force publish even if version unchanged'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  check-and-publish:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+          cache-dependency-path: mcp/package-lock.json
+
+      - name: Check if version changed
+        id: version-check
+        run: |
+          cd mcp
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          git show HEAD~1:mcp/package.json > /tmp/prev-package.json 2>/dev/null || echo "{}" > /tmp/prev-package.json
+          PREV_VERSION=$(node -p "try { require('/tmp/prev-package.json').version } catch { 'none' }")
+          
+          echo "Current version: $CURRENT_VERSION"
+          echo "Previous version: $PREV_VERSION"
+          
+          # Check if force publish is enabled or version changed
+          if [ "${{ inputs.force_publish }}" == "true" ] || [ "$CURRENT_VERSION" != "$PREV_VERSION" ]; then
+            echo "Version changed from $PREV_VERSION to $CURRENT_VERSION OR force publish enabled"
+            echo "version_changed=true" >> $GITHUB_OUTPUT
+            echo "new_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "Version unchanged"
+            echo "version_changed=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # Set dry run flag
+          if [ "${{ inputs.dry_run }}" == "true" ]; then
+            echo "DRY RUN MODE ENABLED"
+            echo "is_dry_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_dry_run=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install dependencies
+        if: steps.version-check.outputs.version_changed == 'true'
+        run: |
+          cd mcp
+          npm ci
+
+      - name: Build package
+        if: steps.version-check.outputs.version_changed == 'true'
+        run: |
+          cd mcp
+          npm run build
+
+      - name: Publish to npm (or Dry Run)
+        if: steps.version-check.outputs.version_changed == 'true'
+        run: |
+          cd mcp
+          if [ "${{ steps.version-check.outputs.is_dry_run }}" == "true" ]; then
+            echo "🔍 DRY RUN: Would publish @insforge/insforge-mcp version $(node -p "require('./package.json').version")"
+            npm publish --dry-run --access public
+          else
+            echo "📦 Publishing @insforge/insforge-mcp to npm..."
+            npm publish --access public
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        if: steps.version-check.outputs.version_changed == 'true' && steps.version-check.outputs.is_dry_run != 'true'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: mcp-v${{ steps.version-check.outputs.new_version }}
+          release_name: '@insforge/insforge-mcp v${{ steps.version-check.outputs.new_version }}'
+          body: |
+            Published @insforge/insforge-mcp version ${{ steps.version-check.outputs.new_version }} to npm.
+            
+            Install with:
+            ```bash
+            npm install @insforge/insforge-mcp@${{ steps.version-check.outputs.new_version }}
+            ```
+          draft: false
+          prerelease: false
+

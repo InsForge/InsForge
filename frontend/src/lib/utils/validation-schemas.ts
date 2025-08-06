@@ -18,8 +18,6 @@ export const dateSchema = z
   .or(z.date())
   .transform((val) => new Date(val));
 
-export const uuidSchema = z.uuid('Invalid UUID format');
-
 // Common form schemas
 export const loginFormSchema = z.object({
   email: emailSchema,

@@ -42,7 +42,7 @@ export default function StoragePage() {
     name: null,
     isPublic: false,
   });
-  const { confirm, ConfirmDialogProps } = useConfirm();
+  const { confirm, confirmDialogProps } = useConfirm();
   const { showToast } = useToast();
   const { showUploadToast, updateUploadProgress, cancelUpload } = useUploadToast();
   const queryClient = useQueryClient();
@@ -459,7 +459,7 @@ export default function StoragePage() {
       />
 
       {/* Confirm Dialog */}
-      <ConfirmDialog {...ConfirmDialogProps} />
+      <ConfirmDialog {...confirmDialogProps} />
     </div>
   );
 }
