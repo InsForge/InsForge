@@ -17,7 +17,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
 
     // Trigger WebSocket event to notify frontend that MCP is connected
     const wsService = WebSocketService.getInstance();
-    wsService.broadcastMCPConnectionSuccess();
+    wsService.broadcastBackendConnectionSuccess();
 
     successResponse(res, metadata);
   } catch (error) {

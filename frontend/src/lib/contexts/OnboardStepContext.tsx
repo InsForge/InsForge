@@ -50,7 +50,7 @@ export function OnboardStepProvider({ children }: { children: React.ReactNode })
 
   return (
     <OnboardContext.Provider
-      value={{ currentStep, updateStep, getCurrentDescription, totalSteps: Object.keys(OnboardStep).length }}
+      value={{ currentStep, updateStep, getCurrentDescription, totalSteps: Object.keys(OnboardStep).filter(key => !isNaN(Number(key))).length }}
     >
       {children}
     </OnboardContext.Provider>
