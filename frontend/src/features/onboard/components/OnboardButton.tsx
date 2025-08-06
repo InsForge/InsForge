@@ -34,7 +34,7 @@ export function OnboardButton({ isCollapsed }: OnboardButtonProps) {
               className={cn(
                 'relative transition-all duration-200 ease-in-out group border-2 rounded-lg',
                 isCollapsed
-                  ? 'w-16 h-16 py-3 px-3.5 justify-center'
+                  ? 'w-16 h-16 py-3 px-2.5 justify-center'
                   : 'w-full h-16 justify-start px-4 gap-3',
                 isActive
                   ? 'border-zinc-900 bg-zinc-900 hover:bg-zinc-900'
