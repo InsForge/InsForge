@@ -1,17 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-
-export enum OnboardStep {
-  InstallNodeJS = 1,
-  InstallInsForge = 2,
-  TestConnection = 3,
-  StartUsing = 4
-}
+import { OnboardStep } from '@/features/onboard/types';
 
 interface OnboardContextValue {
   currentStep: OnboardStep;
   updateStep: (step: OnboardStep) => void;
   getCurrentDescription: () => string;
-  totalSteps: OnboardStep.StartUsing;
+  totalSteps: number;
 }
 
 const ONBOARD_STORAGE_KEY = 'insforge_onboard_step';
@@ -28,14 +22,14 @@ export function OnboardStepProvider({ children }: { children: React.ReactNode })
   const [currentStep, setCurrentStep] = useState<OnboardStep>(() => {
     const saved = localStorage.getItem(ONBOARD_STORAGE_KEY);
     const n = saved ? parseInt(saved, 10) : NaN;
-    return (n >= OnboardStep.InstallNodeJS && n <= OnboardStep.StartUsing) ? (n as OnboardStep) : OnboardStep.InstallNodeJS;
+    return (n >= OnboardStep.INSTALL_NODEJS && n <= OnboardStep.FINAL_SETUP) ? (n as OnboardStep) : OnboardStep.INSTALL_NODEJS;
   });
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key === ONBOARD_STORAGE_KEY && e.newValue) {
         const n = parseInt(e.newValue, 10) as OnboardStep;
-        if (n >= OnboardStep.InstallNodeJS && n <= OnboardStep.StartUsing) {
+        if (n >= OnboardStep.INSTALL_NODEJS && n <= OnboardStep.FINAL_SETUP) {
           setCurrentStep(n);
         }
       }
@@ -45,7 +39,7 @@ export function OnboardStepProvider({ children }: { children: React.ReactNode })
   }, []);
 
   const updateStep = (step: OnboardStep) => {
-    if (step < OnboardStep.InstallNodeJS || step > OnboardStep.StartUsing) {
+    if (step < OnboardStep.INSTALL_NODEJS || step > OnboardStep.FINAL_SETUP) {
       return;
     }
     setCurrentStep(step);
@@ -56,7 +50,7 @@ export function OnboardStepProvider({ children }: { children: React.ReactNode })
 
   return (
     <OnboardContext.Provider
-      value={{ currentStep, updateStep, getCurrentDescription, totalSteps: OnboardStep.StartUsing }}
+      value={{ currentStep, updateStep, getCurrentDescription, totalSteps: Object.keys(OnboardStep).length }}
     >
       {children}
     </OnboardContext.Provider>
