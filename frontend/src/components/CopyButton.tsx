@@ -14,7 +14,6 @@ interface CopyButtonProps {
   copiedText?: string;
   copyText?: string;
   disabled?: boolean;
-  successMessage?: string;
 }
 
 export function CopyButton({
