@@ -40,14 +40,29 @@ print_blue() {
 
 # Function to login as admin and get token
 get_admin_token() {
-    local response=$(curl -s -X POST "$TEST_API_BASE/auth/admin/login" \
-        -H "Content-Type: application/json" \
-        -d "{\"email\":\"$TEST_ADMIN_EMAIL\",\"password\":\"$TEST_ADMIN_PASSWORD\"}")
-    
-    if echo "$response" | grep -q '"accessToken"'; then
-        echo "$response" | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4
+    # Check if Better Auth is enabled
+    if [ "$ENABLE_BETTER_AUTH" = "true" ]; then
+        # Use Better Auth admin endpoint
+        local response=$(curl -s -X POST "$TEST_API_BASE/auth/v2/admin/sign-in" \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$TEST_ADMIN_EMAIL\",\"password\":\"$TEST_ADMIN_PASSWORD\"}")
+        
+        if echo "$response" | grep -q '"token"'; then
+            echo "$response" | grep -o '"token":"[^"]*"' | cut -d'"' -f4
+        else
+            echo ""
+        fi
     else
-        echo ""
+        # Use legacy auth endpoint
+        local response=$(curl -s -X POST "$TEST_API_BASE/auth/admin/login" \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$TEST_ADMIN_EMAIL\",\"password\":\"$TEST_ADMIN_PASSWORD\"}")
+        
+        if echo "$response" | grep -q '"access_token"'; then
+            echo "$response" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4
+        else
+            echo ""
+        fi
     fi
 }
 
@@ -109,6 +124,58 @@ register_test_user() {
 register_test_bucket() {
     local bucket_name=$1
     TEST_BUCKETS_CREATED+=("$bucket_name")
+}
+
+# Function to register a user with Better Auth or legacy auth
+register_user() {
+    local email=$1
+    local password=$2
+    local name=${3:-"Test User"}
+    
+    if [ "$ENABLE_BETTER_AUTH" = "true" ]; then
+        # Use Better Auth registration
+        curl -s -X POST "$TEST_API_BASE/auth/v2/sign-up/email" \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$email\",\"password\":\"$password\",\"name\":\"$name\"}"
+    else
+        # Use legacy auth registration
+        curl -s -X POST "$TEST_API_BASE/auth/register" \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$email\",\"password\":\"$password\",\"name\":\"$name\"}"
+    fi
+}
+
+# Function to login a user with Better Auth or legacy auth
+login_user() {
+    local email=$1
+    local password=$2
+    
+    if [ "$ENABLE_BETTER_AUTH" = "true" ]; then
+        # Use Better Auth login
+        curl -s -X POST "$TEST_API_BASE/auth/v2/sign-in/email" \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$email\",\"password\":\"$password\"}"
+    else
+        # Use legacy auth login
+        curl -s -X POST "$TEST_API_BASE/auth/login" \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$email\",\"password\":\"$password\"}"
+    fi
+}
+
+# Function to get user profile with auth token
+get_user_profile() {
+    local token=$1
+    
+    if [ "$ENABLE_BETTER_AUTH" = "true" ]; then
+        # Use Better Auth profile endpoint
+        curl -s -X GET "$TEST_API_BASE/auth/v2/me" \
+            -H "Authorization: Bearer $token"
+    else
+        # Use legacy auth profile endpoint
+        curl -s -X GET "$TEST_API_BASE/auth/me" \
+            -H "Authorization: Bearer $token"
+    fi
 }
 
 # Function to delete a table

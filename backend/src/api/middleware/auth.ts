@@ -207,6 +207,7 @@ export async function verifyUserOrAdmin(req: AuthRequest, res: Response, next: N
           role: payload.role,
         },
         process.env.JWT_SECRET || '',
+        // TODO: Add a way to configure the token expiration time and refresh token
         { algorithm: 'HS256', expiresIn: '7d' }
       );
       (req as Request & { postgrestToken: string }).postgrestToken = postgrestToken;

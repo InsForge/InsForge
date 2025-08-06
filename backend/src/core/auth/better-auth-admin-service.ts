@@ -150,7 +150,7 @@ export class BetterAuthAdminService {
     // Create admin user using raw SQL since we're in the auth service
     const userId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
     await db
-      .prepare('INSERT INTO "user" (id, email, name, "emailVerified") VALUES (?, ?, ?, ?)')
+      .prepare('INSERT INTO _user (id, email, name, "emailVerified") VALUES (?, ?, ?, ?)')
       .run(userId, email, name, true);
 
     const token = this.generateAdminJWT(userId, email);

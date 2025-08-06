@@ -75,17 +75,14 @@ test_endpoint() {
 
 # 1. Admin login to get token
 print_blue "🔑 Admin login..."
-admin_login_response=$(curl -s -X POST "$API_BASE/auth/admin/login" \
-    -H "Content-Type: application/json" \
-    -d '{"email":"'$TEST_ADMIN_EMAIL'","password":"'$TEST_ADMIN_PASSWORD'"}')
+ADMIN_TOKEN=$(get_admin_token)
 
-if echo "$admin_login_response" | grep -q '"accessToken"'; then
+if [ -n "$ADMIN_TOKEN" ]; then
     print_success "Admin login success"
-    ADMIN_TOKEN=$(echo "$admin_login_response" | jq -r '.accessToken')
     echo "Admin token obtained: ${ADMIN_TOKEN:0:20}..."
 else
     print_fail "Admin login failed"
-    echo "Response: $admin_login_response"
+    echo "Could not obtain admin token"
 fi
 
 echo ""

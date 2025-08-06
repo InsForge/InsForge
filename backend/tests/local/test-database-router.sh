@@ -59,19 +59,26 @@ test_endpoint() {
 
 # 1. Login to get token
 echo "🔑 Logging in to get authentication token..."
-login_response=$(curl -s -X POST "$API_BASE/auth/admin/login" \
-    -H "Content-Type: application/json" \
-    -d "{
-        \"email\": \"$TEST_EMAIL\",
-        \"password\": \"$TEST_PASSWORD\"
-    }")
+AUTH_TOKEN=$(get_admin_token)
 
-if echo "$login_response" | grep -q '"accessToken"'; then
-    AUTH_TOKEN=$(echo "$login_response" | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4)
+if [ -n "$AUTH_TOKEN" ]; then
     print_success "Login successful"
 else
     print_fail "Login failed"
     echo "Please ensure the service is running and admin account exists"
+fi
+
+# Get API key for database operations
+API_KEY=""
+if [ -n "$AUTH_TOKEN" ]; then
+    api_key_response=$(curl -s "$API_BASE/metadata/api-key" \
+        -H "Authorization: Bearer $AUTH_TOKEN")
+    if echo "$api_key_response" | grep -q '"apiKey"'; then
+        API_KEY=$(echo "$api_key_response" | grep -o '"apiKey":"[^"]*"' | cut -d'"' -f4)
+        print_success "API key obtained"
+    else
+        print_fail "Failed to get API key"
+    fi
 fi
 
 # 2. Create test table

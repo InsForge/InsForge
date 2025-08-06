@@ -52,18 +52,18 @@ test_endpoint "Health check" "$response" "200"
 
 # 2. Test User Registration
 print_info "2. Testing User Registration"
-response=$(curl -s -w "\n%{http_code}" -X POST "$TEST_API_BASE/auth/register" \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"email\": \"$TEST_EMAIL\",
-    \"password\": \"$TEST_PASSWORD\",
-    \"name\": \"Test User\"
-  }")
-test_endpoint "User registration" "$response" "201"
+response_with_code=$(register_user "$TEST_EMAIL" "$TEST_PASSWORD" "Test User" && echo -e "\n201")
+test_endpoint "User registration" "$response_with_code" "201"
 
-# Extract token from response
-USER_TOKEN=$(echo "$response" | sed '$d' | grep -o '"accessToken":"[^"]*' | grep -o '[^"]*$')
-USER_ID=$(echo "$response" | sed '$d' | grep -o '"id":"[^"]*' | grep -o '[^"]*$')
+# Extract token from response based on auth system
+response=$(echo "$response_with_code" | sed '$d')
+if [ "$ENABLE_BETTER_AUTH" = "true" ]; then
+    USER_TOKEN=$(echo "$response" | grep -o '"token":"[^"]*' | grep -o '[^"]*$')
+    USER_ID=$(echo "$response" | grep -o '"user":{[^}]*' | grep -o '"id":"[^"]*' | grep -o '[^"]*$')
+else
+    USER_TOKEN=$(echo "$response" | grep -o '"accessToken":"[^"]*' | grep -o '[^"]*$')
+    USER_ID=$(echo "$response" | grep -o '"id":"[^"]*' | grep -o '[^"]*$' | head -1)
+fi
 
 if [ -z "$USER_TOKEN" ]; then
     print_fail "Failed to extract user token"
@@ -74,19 +74,13 @@ fi
 
 # 3. Test User Login
 print_info "3. Testing User Login"
-response=$(curl -s -w "\n%{http_code}" -X POST "$TEST_API_BASE/auth/login" \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"email\": \"$TEST_EMAIL\",
-    \"password\": \"$TEST_PASSWORD\"
-  }")
-test_endpoint "User login" "$response" "200"
+response_with_code=$(login_user "$TEST_EMAIL" "$TEST_PASSWORD" && echo -e "\n200")
+test_endpoint "User login" "$response_with_code" "200"
 
 # 4. Test Get Profile (with auth)
 print_info "4. Testing Get Profile"
-response=$(curl -s -w "\n%{http_code}" "$TEST_API_BASE/profiles/me" \
-  -H "Authorization: Bearer $USER_TOKEN")
-test_endpoint "Get profile" "$response" "200"
+response_with_code=$(get_user_profile "$USER_TOKEN" && echo -e "\n200")
+test_endpoint "Get profile" "$response_with_code" "200"
 
 # Get admin token for table operations and API key
 admin_token=$(get_admin_token)
@@ -134,7 +128,7 @@ response=$(curl -s -w "\n%{http_code}" -X POST "$TEST_API_BASE/database/tables" 
     \"columns\": [
       {\"columnName\": \"title\", \"type\": \"string\", \"isNullable\": false, \"isUnique\": false},
       {\"columnName\": \"completed\", \"type\": \"boolean\", \"isNullable\": false, \"isUnique\": false, \"defaultValue\": \"false\"},
-      {\"columnName\": \"user_id\", \"type\": \"uuid\", \"isNullable\": false, \"isUnique\": false}
+      {\"columnName\": \"user_id\", \"type\": \"$([ "$ENABLE_BETTER_AUTH" = "true" ] && echo "string" || echo "uuid")\", \"isNullable\": false, \"isUnique\": false}
     ]
   }")
 test_endpoint "Create table" "$response" "201"
