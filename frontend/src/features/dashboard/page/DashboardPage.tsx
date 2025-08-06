@@ -3,7 +3,7 @@ import { metadataService } from '@/features/dashboard/services/metadata.service'
 import { authService } from '@/features/auth/services/auth.service';
 import { Card, CardContent } from '@/components/radix/Card';
 import { Skeleton } from '@/components/radix/Skeleton';
-import { MCPInstaller } from '@/components/mcp';
+import { McpInstaller } from '@/components/mcp';
 
 export default function DashboardPage() {
   const {
@@ -85,7 +85,7 @@ export default function DashboardPage() {
           </div>
 
           {/* MCP Configuration Section */}
-          <MCPInstaller />
+          <McpInstaller />
         </div>
       </div>
     </main>

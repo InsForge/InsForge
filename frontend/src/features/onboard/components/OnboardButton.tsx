@@ -18,7 +18,7 @@ export function OnboardButton({ isCollapsed }: OnboardButtonProps) {
   const location = useLocation();
   const { currentStep, totalSteps } = useOnboardStep();
 
-  const isActive = location.pathname === '/onboard';
+  const isActive = location.pathname === '/dashboard/onboard';
 
   // Limit displayed step to totalSteps for the sidebar
   const displayStep = Math.min(currentStep, totalSteps);
@@ -28,7 +28,7 @@ export function OnboardButton({ isCollapsed }: OnboardButtonProps) {
     <TooltipProvider delayDuration={300}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Link to="/onboard" className="block">
+          <Link to="/dashboard/onboard" className="block">
             <Button
               variant="ghost"
               className={cn(

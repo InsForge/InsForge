@@ -1,2 +1,3 @@
-export { default as OnBoardPage } from './page/OnBoardPage';
+export { OnboardStep } from './types';
 export { StepContent } from './components/StepContent';
+export { TestConnectionStep } from './components/TestConnectionStep';

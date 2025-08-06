@@ -12,15 +12,15 @@ import {
   GenerateInstallCommand,
   type MCPAgent,
   type PlatformType,
-} from '@/components/mcp/mcp-agents';
+} from '@/components/mcp/mcp-helper';
 import { metadataService } from '@/features/dashboard/services/metadata.service';
 
-interface MCPInstallerProps {
+interface McpInstallerProps {
   className?: string;
   defaultAgent?: string;
 }
 
-export function MCPInstaller({ className, defaultAgent = 'cursor' }: MCPInstallerProps) {
+export function McpInstaller({ className, defaultAgent = 'cursor' }: McpInstallerProps) {
   const [selectedAgent, setSelectedAgent] = useState<MCPAgent>(() => {
     return MCP_AGENTS.find((agent) => agent.id === defaultAgent) || MCP_AGENTS[0];
   });

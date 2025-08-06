@@ -244,8 +244,6 @@ export function OAuthDialog({ provider, isOpen, onClose, onSuccess }: OAuthDialo
                       </code>
                       <CopyButton
                         text={getCallbackUrl()}
-                        showToast={true}
-                        successMessage="Callback URL copied to clipboard!"
                       />
                     </div>
                   </div>

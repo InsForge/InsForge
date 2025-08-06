@@ -11,6 +11,7 @@ export interface UseWebSocketReturn {
   backendConnected: boolean;
   connectionError: string | null;
   connect: () => void;
+  disconnect: () => void;
   sendMessage: (message: WebSocketMessage) => void;
 }
 
@@ -85,6 +86,25 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     }
   }, [url]);
 
+  const disconnect = useCallback(() => {
+    // Clear any pending reconnection attempts
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
+    // Close the WebSocket connection
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+
+    // Reset connection states
+    setIsConnected(false);
+    setBackendConnected(false);
+    setConnectionError(null);
+  }, []);
+
   const sendMessage = useCallback((message: WebSocketMessage) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(message));
@@ -109,6 +129,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     backendConnected,
     connectionError,
     connect,
+    disconnect,
     sendMessage,
   };
 }
