@@ -123,36 +123,19 @@ export class BetterAuthAdminService {
   }
 
   /**
-   * Registers admin user in database
+   * Registers admin user (validates environment credentials only, no DB storage)
    */
-  public async registerAdmin(credentials: AdminCredentials & { name?: string }): Promise<{
+  public registerAdmin(credentials: AdminCredentials & { name?: string }): {
     token: string;
     user: { id: string; email: string; name: string; role: string };
-  }> {
+  } {
     const { email, password, name = 'Administrator' } = credentials;
 
     // Validate credentials match environment
     this.validateAdminCredentials(email, password);
 
-    const db = this.getDb();
-
-    // Check if already exists
-    const existingUser = (await db
-      .prepare('SELECT id, email, name FROM _user WHERE email = ? LIMIT 1')
-      .get(email)) as UserRecord | null;
-
-    if (existingUser) {
-      throw new APIError('CONFLICT', {
-        message: 'Admin user already exists',
-      });
-    }
-
-    // Create admin user using raw SQL since we're in the auth service
-    const userId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-    await db
-      .prepare('INSERT INTO _user (id, email, name, "emailVerified") VALUES (?, ?, ?, ?)')
-      .run(userId, email, name, true);
-
+    // Generate a consistent admin ID (no DB storage needed)
+    const userId = 'admin';
     const token = this.generateAdminJWT(userId, email);
 
     return {
@@ -167,34 +150,27 @@ export class BetterAuthAdminService {
   }
 
   /**
-   * Signs in admin user
+   * Signs in admin user (validates against environment variables only)
    */
-  public async signInAdmin(credentials: AdminCredentials): Promise<{
+  public signInAdmin(credentials: AdminCredentials): {
     token: string;
     user: { id: string; email: string; name: string; role: string };
-  }> {
+  } {
     const { email, password } = credentials;
 
-    // Validate credentials
+    // Validate credentials against environment variables
     this.validateAdminCredentials(email, password);
 
-    const db = this.getDb();
-
-    // Try to find admin in DB (may not exist for virtual admin)
-    const user = (await db
-      .prepare('SELECT id, email, name FROM _user WHERE email = ? LIMIT 1')
-      .get(email)) as UserRecord | null;
-
-    // Generate JWT for either DB user or virtual admin
-    const userId = user?.id || `admin-${Date.now()}`;
+    // Generate JWT for admin (no DB lookup needed)
+    const userId = 'admin';
     const token = this.generateAdminJWT(userId, this.adminEmail);
 
     return {
       token,
       user: {
-        id: user?.id || 'admin',
+        id: userId,
         email: this.adminEmail,
-        name: user?.name || 'Administrator',
+        name: 'Administrator',
         role: 'project_admin',
       },
     };
