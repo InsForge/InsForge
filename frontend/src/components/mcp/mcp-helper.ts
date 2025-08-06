@@ -14,7 +14,7 @@ export interface MCPAgent {
 export type PlatformType = 'macos-linux' | 'windows';
 
 // Helper to get the API base URL
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:7130';
 
 export const GenerateInstallCommand = (agent: MCPAgent, apiKey: string) => {
   return `npx @insforge/install --client ${agent.id} --env API_KEY=${apiKey} --env API_BASE_URL=${apiBaseUrl}`;
