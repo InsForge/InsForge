@@ -1,0 +1,87 @@
+name: E2E Tests
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: e2e-${{ github.ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: run-e2e
+    if: >
+      github.event_name == 'pull_request' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       contains(github.event.comment.body, 'verify-test'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+
+    steps:
+      - name: Checkout code (default)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve PR head for comment trigger
+        if: github.event_name == 'issue_comment'
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.issue.number;
+            const pr = await github.pulls.get({ owner, repo, pull_number });
+            core.setOutput('repo', pr.data.head.repo.full_name);
+            core.setOutput('sha', pr.data.head.sha);
+
+      - name: Checkout PR head (comment trigger)
+        if: github.event_name == 'issue_comment'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.pr.outputs.repo }}
+          ref: ${{ steps.pr.outputs.sha }}
+          fetch-depth: 0
+
+      - name: Configure Docker env
+        run: echo "DOCKER_SOCKET_LOCATION=/var/run/docker.sock" >> $GITHUB_ENV
+
+      - name: Start stack
+        run: docker compose up -d
+
+      - name: Wait for API healthy
+        run: |
+          for i in {1..60}; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:7130/api/health || true)
+            if [ "$code" = "200" ]; then echo "API is healthy"; break; fi
+            echo "Waiting for API... ($i/60)"
+            sleep 5
+          done
+          if [ "$code" != "200" ]; then
+            docker compose logs --no-color | tail -n 800
+            exit 1
+          fi
+
+      - name: Run E2E
+        run: bash backend/tests/local/test-e2e.sh
+        env:
+          TEST_API_BASE: http://localhost:7130/api
+          ADMIN_EMAIL: admin@example.com
+          ADMIN_PASSWORD: change-this-password
+
+      - name: Dump container logs on failure
+        if: failure()
+        run: docker compose logs --no-color | tail -n 1200
+
+      - name: Teardown
+        if: always()
+        run: docker compose down -v
