@@ -4,8 +4,11 @@ import { bearer } from 'better-auth/plugins/bearer';
 import { Pool } from 'pg';
 import { customAuthPlugin } from './custom-auth-plugin';
 
+// Shared secret for JWT signing - ensures tokens work across instance reloads
+export const BETTER_AUTH_SECRET = process.env.BETTER_AUTH_SECRET || 'insforge-secret-key-2024-stable';
+
 // Create PostgreSQL pool
-const pool = new Pool({
+export const pool = new Pool({
   host: process.env.POSTGRES_HOST || 'localhost',
   port: parseInt(process.env.POSTGRES_PORT || '5432'),
   database: process.env.POSTGRES_DB || 'insforge',
@@ -17,6 +20,7 @@ const pool = new Pool({
 });
 
 export const auth = betterAuth({
+  secret: BETTER_AUTH_SECRET, // Use shared secret for JWT consistency
   database: pool,
   basePath: '/api/auth/v2',
   advanced: {

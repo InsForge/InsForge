@@ -20,7 +20,7 @@ import { CopyButton } from '@/components/CopyButton';
 const getCallbackUrl = () => {
   // Use backend API URL for OAuth callback
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:7130';
-  return `${apiBaseUrl}/api/auth/v1/callback`;
+  return `${apiBaseUrl}/api/auth/v2/callback`;
 };
 
 // OAuth provider configuration schema
@@ -53,6 +53,7 @@ interface OAuthDialogProps {
 export function OAuthDialog({ provider, isOpen, onClose, onSuccess }: OAuthDialogProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [reloading, setReloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
 
@@ -126,9 +127,20 @@ export function OAuthDialog({ provider, isOpen, onClose, onSuccess }: OAuthDialo
 
       await configService.updateOAuthConfig(transformedData as OAuthConfig);
 
-      // Show success message
-      const configType = useSharedKeys ? 'shared keys' : 'custom OAuth credentials';
-      showToast(`${provider.name} ${configType} updated successfully!`, 'success');
+      // Reload OAuth configuration to apply changes
+      setReloading(true);
+      try {
+        await configService.reloadOAuthConfig();
+        // Show success message only after both save and reload succeed
+        const configType = useSharedKeys ? 'shared keys' : 'custom OAuth credentials';
+        showToast(`${provider.name} ${configType} updated and applied successfully!`, 'success');
+      } catch (reloadError) {
+        // Config was saved but reload failed
+        showToast('Configuration saved but failed to apply. Please try again.', 'warning');
+        console.error('Failed to reload OAuth:', reloadError);
+      } finally {
+        setReloading(false);
+      }
 
       // Call success callback if provided
       if (onSuccess) {
@@ -153,7 +165,7 @@ export function OAuthDialog({ provider, isOpen, onClose, onSuccess }: OAuthDialo
 
   // Determine if the update button should be disabled
   const isUpdateDisabled = () => {
-    if (saving) {
+    if (saving || reloading) {
       return true;
     }
     if (useSharedKeys) {
@@ -287,7 +299,7 @@ export function OAuthDialog({ provider, isOpen, onClose, onSuccess }: OAuthDialo
                 disabled={isUpdateDisabled()}
                 className="py-2 px-4 text-sm font-medium"
               >
-                {saving ? 'Saving...' : 'Update'}
+                {saving ? 'Saving...' : reloading ? 'Reloading...' : 'Update'}
               </Button>
             </DialogFooter>
           </>

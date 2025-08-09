@@ -16,6 +16,7 @@ const oauthProviderSchema = z.object({
   clientSecret: z.string().optional(),
   redirectUri: z.string().url().optional().or(z.literal('')),
   enabled: z.boolean(),
+  useSharedKeys: z.boolean().optional(),
 });
 
 const oauthConfigSchema = z.object({
@@ -75,12 +76,14 @@ router.get('/oauth', verifyAdmin, async (req: Request, res: Response, next: Next
         clientSecret: '',
         redirectUri: '',
         enabled: false,
+        useSharedKeys: false,
       },
       github: {
         clientId: '',
         clientSecret: '',
         redirectUri: '',
         enabled: false,
+        useSharedKeys: false,
       },
     };
 
@@ -97,6 +100,8 @@ router.get('/oauth', verifyAdmin, async (req: Request, res: Response, next: Next
           providerConfig.clientSecret = row.value;
         } else if (field === 'redirectUri') {
           providerConfig.redirectUri = row.value;
+        } else if (field === 'useSharedKeys') {
+          providerConfig.useSharedKeys = row.value === 'true';
         }
       }
     }
@@ -325,6 +330,38 @@ router.get('/oauth/status', async (req: Request, res: Response, next: NextFuncti
     successResponse(res, status);
   } catch (error) {
     next(error);
+  }
+});
+
+// Reload OAuth configuration without server restart
+router.post('/oauth/reload', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    logger.info('OAuth reload requested');
+    
+    // Dynamic import to get the reload function
+    const { reloadAuth } = await import('@/lib/auth-reloader.js');
+    const result = await reloadAuth();
+    
+    logger.info('OAuth configuration reloaded', result.config);
+    
+    successResponse(res, {
+      message: 'OAuth configuration reloaded successfully',
+      config: {
+        google: { enabled: result.config.google.enabled },
+        github: { enabled: result.config.github.enabled },
+      },
+    });
+  } catch (error) {
+    logger.error('Failed to reload OAuth configuration', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    next(
+      new AppError(
+        'Failed to reload OAuth configuration',
+        500,
+        ERROR_CODES.AUTH_OAUTH_CONFIG_ERROR
+      )
+    );
   }
 });
 

@@ -65,6 +65,7 @@ export interface OAuthProviderConfig {
   clientId: string;
   clientSecret: string;
   redirectUri?: string;
+  useSharedKeys?: boolean;
 }
 
 // OAuth configuration for all providers
