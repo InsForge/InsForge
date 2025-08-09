@@ -52,8 +52,11 @@ jobs:
           ref: ${{ steps.pr.outputs.sha }}
           fetch-depth: 0
 
-      - name: Configure Docker env
-        run: echo "DOCKER_SOCKET_LOCATION=/var/run/docker.sock" >> $GITHUB_ENV
+      - name: Configure CI env
+        run: |
+          echo "DOCKER_SOCKET_LOCATION=/var/run/docker.sock" >> $GITHUB_ENV
+          echo "LOGFLARE_PUBLIC_ACCESS_TOKEN=ci-token" >> $GITHUB_ENV
+          echo "JWT_SECRET=dev-secret-change-in-production" >> $GITHUB_ENV
 
       - name: Start stack
         run: docker compose up -d
