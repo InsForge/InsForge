@@ -153,7 +153,29 @@ The OAuth provider will redirect to:
 - Google: `http://localhost:7130/api/auth/v2/callback/google`
 - GitHub: `http://localhost:7130/api/auth/v2/callback/github`
 
-After processing, Better Auth redirects to your specified `callbackURL` with the user session.
+After processing, Better Auth redirects to your specified `callbackURL` with a session cookie.
+
+#### Get Session (Required for OAuth)
+**GET** `/api/auth/v2/get-session`
+
+Retrieves session data from cookie after OAuth redirect.
+
+Headers: Must include `credentials: 'include'` to send cookies
+
+Returns: `{ session: { token, userId }, user: { id, email, name } }` or `null`
+
+```javascript
+// In your OAuth callback handler:
+const response = await fetch('http://localhost:7130/api/auth/v2/get-session', {
+  credentials: 'include'  // Required for cookie
+});
+
+const data = await response.json();
+if (data?.session) {
+  localStorage.setItem('auth_token', data.session.token);
+  localStorage.setItem('user_id', data.user.id);
+}
+```
 
 ## Built-in Auth Tables
 

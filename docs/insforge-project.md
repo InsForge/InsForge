@@ -74,9 +74,13 @@ The `user` table is **protected** by Better Auth:
 - **Register**: `POST /api/auth/v2/sign-up/email` - Create new user account
 - **Login**: `POST /api/auth/v2/sign-in/email` - Authenticate existing user
 - **Current User**: `GET /api/auth/v2/me` - Get authenticated user info
+- **Get Session** (OAuth): `GET /api/auth/v2/get-session` - Get session from cookie (use `credentials: 'include'`)
 - `/api/auth/v2/me` returns `{"user": {...}}` - nested structure
 - Store tokens and include as `Authorization: Bearer {session-token}` header
 - **Note**: Login returns a session token (not JWT) - backend converts it automatically
+
+### OAuth Implementation Note
+After OAuth redirect, call `/api/auth/v2/get-session` with `credentials: 'include'` to retrieve session from cookie. Better Auth doesn't pass tokens in URL params.
 
 ### Regular API Response Format
 
