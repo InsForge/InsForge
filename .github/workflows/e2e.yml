@@ -60,6 +60,8 @@ jobs:
 
       - name: Start stack
         run: docker compose up -d
+        env:
+          JWT_SECRET: dev-secret-change-in-production
 
       - name: Wait for API healthy
         run: |
