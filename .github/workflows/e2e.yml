@@ -56,12 +56,12 @@ jobs:
         run: |
           echo "DOCKER_SOCKET_LOCATION=/var/run/docker.sock" >> $GITHUB_ENV
           echo "LOGFLARE_PUBLIC_ACCESS_TOKEN=ci-token" >> $GITHUB_ENV
-          echo "JWT_SECRET=dev-secret-change-in-production" >> $GITHUB_ENV
+          echo "JWT_SECRET=your-secret-key-here-must-be-32-char-or-above" >> $GITHUB_ENV
 
       - name: Start stack
         run: docker compose up -d
         env:
-          JWT_SECRET: dev-secret-change-in-production
+          JWT_SECRET: your-secret-key-here-must-be-32-char-or-above
 
       - name: Wait for API healthy
         run: |
