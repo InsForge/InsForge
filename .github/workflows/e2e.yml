@@ -76,8 +76,8 @@ jobs:
             exit 1
           fi
 
-      - name: Run E2E
-        run: bash backend/tests/local/test-e2e.sh
+      - name: Run E2E Tests
+        run: npm run test:e2e
         env:
           TEST_API_BASE: http://localhost:7130/api
           ADMIN_EMAIL: admin@example.com
