@@ -39,7 +39,7 @@ fi
 
 # Export for cleanup
 if [ -n "$api_key" ]; then
-    export INSFORGE_API_KEY="$api_key"
+    export ACCESS_API_KEY="$api_key"
     print_success "API key obtained for storage operations"
 else
     print_fail "Could not get API key for storage operations"

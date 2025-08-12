@@ -42,7 +42,7 @@ router.get('/database', async (req: AuthRequest, res: Response, next: NextFuncti
 router.get('/api-key', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const authService = AuthService.getInstance();
-    const apiKey = await authService.initializeApiKey();
+    const apiKey = authService.getApiKey();
 
     successResponse(res, { apiKey: apiKey });
   } catch (error) {

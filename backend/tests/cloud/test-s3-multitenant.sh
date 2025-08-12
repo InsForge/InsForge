@@ -18,7 +18,7 @@ fi
 # Source test configuration
 source "$SCRIPT_DIR/../test-config.sh"
 
-API_KEY="${INSFORGE_API_KEY:-your-api-key-here}"
+API_KEY="${ACCESS_API_KEY:-}"
 # Use TEST_API_BASE if set, otherwise default to localhost
 if [ -n "$TEST_API_BASE" ]; then
     # TEST_API_BASE already includes /api

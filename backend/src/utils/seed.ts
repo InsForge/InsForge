@@ -27,8 +27,9 @@ export async function seedAdmin(): Promise<void> {
     // Validate admin credentials are configured
     await ensureFirstAdmin(adminEmail, adminPassword);
 
-    // Initialize API key
-    const apiKey = await authService.initializeApiKey();
+    // Verify API key is configured
+    const apiKey = authService.getApiKey();
+    logger.info('✅ API key configured from environment');
 
     // Get database stats
     const tableCount = await dbManager.getUserTableCount();

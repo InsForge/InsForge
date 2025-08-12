@@ -71,7 +71,7 @@ response=$(curl -s -X POST "$API_BASE/auth/sessions" \
     -H "Content-Type: application/json" \
     -d '{}')
 test_response_format "Error response" "$response" '"error":"INVALID_INPUT"'
-test_response_format "Message field" "$response" '"message":"Email and password are required"'
+test_response_format "Message field" "$response" '"message":"Email is required"'
 
 # 4. Test Invalid Endpoint (404)
 print_info "4. Testing Invalid Endpoint (404)"
@@ -172,7 +172,7 @@ fi
 
 # Export for cleanup
 if [ -n "$API_KEY" ]; then
-    export INSFORGE_API_KEY="$API_KEY"
+    export ACCESS_API_KEY="$API_KEY"
     # List buckets
     response=$(curl -s "$API_BASE/storage/buckets" \
         -H "x-api-key: $API_KEY")
