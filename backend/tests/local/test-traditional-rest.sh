@@ -71,7 +71,7 @@ response=$(curl -s -X POST "$API_BASE/auth/sessions" \
     -H "Content-Type: application/json" \
     -d '{}')
 test_response_format "Error response" "$response" '"error":"INVALID_INPUT"'
-test_response_format "Message field" "$response" '"message":"Email is required"'
+test_response_format "Message field" "$response" '"message":"email: Required, password: Required"'
 
 # 4. Test Invalid Endpoint (404)
 print_info "4. Testing Invalid Endpoint (404)"

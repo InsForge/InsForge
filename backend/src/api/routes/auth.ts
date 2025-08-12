@@ -29,7 +29,7 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
     const validationResult = createUserRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
       throw new AppError(
-        validationResult.error.errors[0]?.message || 'Invalid input',
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
         ERROR_CODES.INVALID_INPUT
       );
@@ -50,7 +50,7 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
     const validationResult = createSessionRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
       throw new AppError(
-        validationResult.error.errors[0]?.message || 'Invalid input',
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
         ERROR_CODES.INVALID_INPUT
       );
@@ -71,7 +71,7 @@ router.post('/admin/sessions', async (req: Request, res: Response, next: NextFun
     const validationResult = createAdminSessionRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
       throw new AppError(
-        validationResult.error.errors[0]?.message || 'Invalid input',
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
         ERROR_CODES.INVALID_INPUT
       );
@@ -250,7 +250,7 @@ router.delete('/users', verifyAdmin, async (req: Request, res: Response, next: N
     const validationResult = deleteUsersRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
       throw new AppError(
-        validationResult.error.errors[0]?.message || 'Invalid input',
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
         ERROR_CODES.INVALID_INPUT
       );
