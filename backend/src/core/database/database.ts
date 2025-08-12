@@ -488,6 +488,22 @@ export class DatabaseManager {
     }
   }
 
+  // Store the API key in the config table
+  async setApiKey(apiKey: string): Promise<void> {
+    await this.prepare(
+      'INSERT INTO _config (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value'
+    ).run('api_key', apiKey);
+  }
+
+  // Get the API key from the config table
+  async getApiKey(): Promise<string | null> {
+    const result = (await this.prepare('SELECT value FROM _config WHERE key = ?').get(
+      'api_key'
+    )) as { value: string } | null;
+
+    return result?.value || null;
+  }
+
   async getUserTableCount(): Promise<number> {
     const client = await this.pool.connect();
     try {

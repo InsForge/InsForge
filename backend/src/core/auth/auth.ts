@@ -638,29 +638,51 @@ export class AuthService {
   }
 
   /**
-   * Verify API key against environment variable
-   * No async needed since we're not querying database
+   * Generate a new API key
+   */
+  generateApiKey(): string {
+    return crypto.randomBytes(32).toString('hex');
+  }
+
+  /**
+   * Verify API key against database
    */
   async verifyApiKey(apiKey: string): Promise<boolean> {
     if (!apiKey) {
       return false;
     }
-    const envApiKey = process.env.ACCESS_API_KEY;
-    if (!envApiKey) {
-      logger.error('ACCESS_API_KEY environment variable is not set');
-      return false;
-    }
-    return envApiKey === apiKey;
+    const dbManager = DatabaseManager.getInstance();
+    const storedApiKey = await dbManager.getApiKey();
+    return storedApiKey === apiKey;
   }
 
   /**
-   * Get API key from environment
+   * Initialize API key on startup
+   * Seeds from environment variable if database is empty
    */
-  getApiKey(): string {
-    const apiKey = process.env.ACCESS_API_KEY;
-    if (!apiKey || apiKey.trim() === '') {
-      throw new Error('ACCESS_API_KEY environment variable is required but not set');
+  async initializeApiKey(): Promise<string> {
+    const dbManager = DatabaseManager.getInstance();
+    let apiKey = await dbManager.getApiKey();
+
+    if (!apiKey) {
+      // Check if ACCESS_API_KEY is provided via environment
+      const envApiKey = process.env.ACCESS_API_KEY;
+      
+      if (envApiKey && envApiKey.trim() !== '') {
+        // Use the provided API key from environment
+        apiKey = envApiKey;
+        await dbManager.setApiKey(apiKey);
+        logger.info('✅ API key initialized from ACCESS_API_KEY environment variable');
+      } else {
+        // Generate a new API key if none provided
+        apiKey = this.generateApiKey();
+        await dbManager.setApiKey(apiKey);
+        logger.info('✅ API key generated and stored');
+      }
+    } else {
+      logger.info('✅ API key exists in database');
     }
+
     return apiKey;
   }
 
