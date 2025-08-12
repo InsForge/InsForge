@@ -89,7 +89,11 @@ services:
       - AWS_REGION=${AWS_REGION:-}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      # Multi-tenant Cloud Configuration
+      - DEPLOYMENT_ID=${DEPLOYMENT_ID:-}
+      - PROJECT_ID=${PROJECT_ID:-}
       - APP_KEY=${APP_KEY:-}
+      - ACCESS_API_KEY=${ACCESS_API_KEY:-}
     volumes:
       - ./package.json:/app/package.json
       - ./backend:/app/backend

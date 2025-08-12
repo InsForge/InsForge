@@ -44,9 +44,9 @@ if [ -z "$ADMIN_EMAIL" ] || [ -z "$ADMIN_PASSWORD" ]; then
 fi
 
 # Check if API key is set
-if [ -z "$INSFORGE_API_KEY" ]; then
-    echo -e "${YELLOW}Warning: INSFORGE_API_KEY not set. Some tests may be skipped.${NC}"
-    echo "Set with: export INSFORGE_API_KEY=your_api_key"
+if [ -z "$ACCESS_API_KEY" ]; then
+    echo -e "${YELLOW}Warning: ACCESS_API_KEY not set. Some tests may fail.${NC}"
+    echo "Set with: export ACCESS_API_KEY=your_api_key"
     echo ""
 fi
 

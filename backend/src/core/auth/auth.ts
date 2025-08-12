@@ -645,7 +645,7 @@ export class AuthService {
   }
 
   /**
-   * Verify API key against stored key
+   * Verify API key against database
    */
   async verifyApiKey(apiKey: string): Promise<boolean> {
     if (!apiKey) {
@@ -658,17 +658,29 @@ export class AuthService {
 
   /**
    * Initialize API key on startup
+   * Seeds from environment variable if database is empty
    */
   async initializeApiKey(): Promise<string> {
     const dbManager = DatabaseManager.getInstance();
     let apiKey = await dbManager.getApiKey();
 
     if (!apiKey) {
-      apiKey = this.generateApiKey();
-      await dbManager.setApiKey(apiKey);
-      logger.info('✅ API key generated');
+      // Check if ACCESS_API_KEY is provided via environment
+      const envApiKey = process.env.ACCESS_API_KEY;
+      
+      if (envApiKey && envApiKey.trim() !== '') {
+        // Use the provided API key from environment
+        apiKey = envApiKey;
+        await dbManager.setApiKey(apiKey);
+        logger.info('✅ API key initialized from ACCESS_API_KEY environment variable');
+      } else {
+        // Generate a new API key if none provided
+        apiKey = this.generateApiKey();
+        await dbManager.setApiKey(apiKey);
+        logger.info('✅ API key generated and stored');
+      }
     } else {
-      logger.info('✅ API key exists');
+      logger.info('✅ API key exists in database');
     }
 
     return apiKey;
