@@ -18,6 +18,7 @@ import {
   type GetCurrentSessionResponse,
   type ListUsersResponse,
   type DeleteUsersResponse,
+  exchangeAdminSessionRequestSchema,
 } from '@insforge/shared-schemas';
 
 const router = Router();
@@ -59,6 +60,27 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
     const { email, password } = validationResult.data;
     const result: CreateSessionResponse = await authService.login(email, password);
     
+    successResponse(res, result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/auth/admin/sessions/exchange - Create admin session
+router.post('/admin/sessions/exchange', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const validationResult = exchangeAdminSessionRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      throw new AppError(
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const { token } = validationResult.data;
+    const result: CreateAdminSessionResponse = await authService.adminLoginWithAuthorizationToken(token);
+
     successResponse(res, result);
   } catch (error) {
     next(error);

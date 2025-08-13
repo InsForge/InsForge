@@ -3,6 +3,11 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import axios from 'axios';
 import { OAuth2Client } from 'google-auth-library';
+import jwksClient from 'jwks-client';
+import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { DatabaseManager } from '@/core/database/database.js';
 import logger from '@/utils/logger.js';
 import type {
@@ -13,7 +18,7 @@ import type {
   TokenPayloadSchema,
 } from '@insforge/shared-schemas';
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = () => process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = '7d';
 
 /**
@@ -29,7 +34,20 @@ export class AuthService {
   private tokenCache: Map<string, { access_token: string; id_token: string }>;
 
   private constructor() {
-    if (!JWT_SECRET) {
+    // Load .env file if not already loaded
+    if (!process.env.JWT_SECRET) {
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = path.dirname(__filename);
+      const envPath = path.resolve(__dirname, '../../../../.env');
+      if (fs.existsSync(envPath)) {
+        dotenv.config({ path: envPath });
+      } else {
+        logger.warn('No .env file found, using default environment variables.');
+        dotenv.config();
+      }
+    }
+
+    if (!process.env.JWT_SECRET) {
       throw new Error('JWT_SECRET environment variable is required');
     }
     
@@ -150,7 +168,7 @@ export class AuthService {
    * Generate JWT token for users and admins
    */
   generateToken(payload: TokenPayloadSchema): string {
-    return jwt.sign(payload, JWT_SECRET!, {
+    return jwt.sign(payload, JWT_SECRET()!, {
       algorithm: 'HS256',
       expiresIn: JWT_EXPIRES_IN,
     });
@@ -161,7 +179,7 @@ export class AuthService {
    */
   verifyToken(token: string): TokenPayloadSchema {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET!) as TokenPayloadSchema;
+      const decoded = jwt.verify(token, JWT_SECRET()!) as TokenPayloadSchema;
       return {
         sub: decoded.sub,
         email: decoded.email,
@@ -244,6 +262,81 @@ export class AuthService {
       },
       accessToken
     };
+  }
+
+  /**
+   * Admin login with authorization token (validates JWT from external issuer)
+   */
+  async adminLoginWithAuthorizationToken(token: string): Promise<CreateAdminSessionResponse> {
+    try {
+      // Create JWKS client to fetch public keys
+      const client = jwksClient({
+        jwksUri: 'https://api.insforge.dev/.well-known/jwks.json',
+        requestHeaders: {}, // Optional
+        timeout: 30000, // Defaults to 30s
+      });
+
+      // Get signing key function
+      const getKey = (header: any, callback: (err: any, key?: string) => void) => {
+        client.getSigningKey(header.kid, (err: any, key: any) => {
+          if (err) {
+            logger.error('Failed to get signing key:', err);
+            return callback(err);
+          }
+          // Handle different key types from jwks-client
+          let signingKey;
+          if (key.getPublicKey) {
+            signingKey = key.getPublicKey();
+          } else if (key.publicKey) {
+            signingKey = key.publicKey;
+          } else if (key.rsaPublicKey) {
+            signingKey = key.rsaPublicKey;
+          } else {
+            return callback(new Error('Unable to extract public key from JWKS'));
+          }
+          callback(null, signingKey);
+        });
+      };
+
+      // Verify the token with the public key
+      const decoded = await new Promise<any>((resolve, reject) => {
+        jwt.verify(token, getKey, {
+          algorithms: ['RS256', 'RS384', 'RS512', 'ES256', 'ES384', 'ES512'],
+        }, (err, decoded) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(decoded);
+          }
+        });
+      });
+
+      // If verification succeeds, extract user info and generate internal token
+      const adminId = '00000000-0000-0000-0000-000000000001';
+      const email = decoded.email || decoded.sub || 'admin@insforge.local';
+
+      // Generate internal access token
+      const accessToken = this.generateToken({
+        sub: adminId,
+        email,
+        role: 'project_admin'
+      });
+
+      return {
+        user: {
+          id: adminId,
+          email: email,
+          name: 'Administrator',
+          emailVerified: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        },
+        accessToken
+      };
+    } catch (error) {
+      logger.error('Admin token verification failed:', error);
+      throw new Error('Invalid admin credentials');
+    }
   }
 
   /**

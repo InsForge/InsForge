@@ -48,7 +48,8 @@
     "uuid": "^9.0.1",
     "winston": "^3.17.0",
     "ws": "^8.18.3",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "jwks-client": "^2.0.5"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",

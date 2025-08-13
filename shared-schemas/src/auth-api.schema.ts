@@ -42,6 +42,10 @@ export const createSessionRequestSchema = z.object({
  */
 export const createAdminSessionRequestSchema = createSessionRequestSchema;
 
+export const exchangeAdminSessionRequestSchema = z.object({
+  token: z.string(),
+});
+
 /**
  * GET /api/auth/users - List users (query parameters)
  */
