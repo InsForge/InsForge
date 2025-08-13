@@ -93,7 +93,7 @@ function CustomBooleanCellEditor({ row, column, onRowChange, onClose, onCellEdit
     <div className="w-full h-full">
       <BooleanCellEditor
         value={row[column.key]}
-        nullable={true}
+        nullable={column.isNullable}
         onValueChange={handleValueChange}
         onCancel={onClose}
       />
@@ -126,7 +126,7 @@ function CustomDateCellEditor({ row, column, onRowChange, onClose, onCellEdit }:
     <div className="w-full h-full">
       <DateCellEditor
         value={row[column.key]}
-        nullable={true}
+        nullable={column.isNullable}
         onValueChange={handleValueChange}
         onCancel={onClose}
       />
@@ -156,7 +156,7 @@ function CustomJsonCellEditor({ row, column, onRowChange, onClose, onCellEdit }:
     <div className="w-full h-full">
       <JsonCellEditor
         value={row[column.key]}
-        nullable={true}
+        nullable={column.isNullable}
         onValueChange={handleValueChange}
         onCancel={onClose}
       />
@@ -196,6 +196,7 @@ export function convertSchemaToColumns(
       sortable: isSortable,
       editable: isEditable,
       isPrimaryKey: col.isPrimaryKey,
+      isNullable: col.isNullable,
     };
 
     // Set custom renderers based on column type

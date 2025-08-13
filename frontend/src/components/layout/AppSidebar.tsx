@@ -50,7 +50,7 @@ const navigation: NavigationProps[] = [
 const bottomNavigation = [
   {
     name: 'Documentation',
-    href: 'https://github.com/InsForge/InsForge',
+    href: 'https://docs.insforge.dev',
     icon: BookOpen,
     external: true,
   },
