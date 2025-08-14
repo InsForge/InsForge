@@ -1,3 +1,8 @@
+x-awslogs-options: &awslogs-options
+  awslogs-region: ${AWS_REGION}
+  awslogs-create-group: "true"
+  awslogs-group: /insforge/${PROJECT_ID}
+
 services:
   postgres:
     image: postgres:15.13
@@ -22,6 +27,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    logging:
+      driver: awslogs
+      options:
+        <<: *awslogs-options
+        awslogs-stream: ${HOSTNAME_OVERRIDE}-postgres
 
   postgrest:
     image: postgrest/postgrest:v12.2.12
@@ -45,6 +55,11 @@ services:
         condition: service_healthy
     networks:
       - insforge-network
+    logging:
+      driver: awslogs
+      options:
+        <<: *awslogs-options
+        awslogs-stream: ${HOSTNAME_OVERRIDE}-postgrest
 
   insforge:
     build:
@@ -92,6 +107,11 @@ services:
     restart: unless-stopped
     networks:
       - insforge-network
+    logging:
+      driver: awslogs
+      options:
+        <<: *awslogs-options
+        awslogs-stream: ${HOSTNAME_OVERRIDE}-insforge
   
   # Deno service disabled for now
   # deno:
@@ -183,6 +203,11 @@ services:
       # GOOGLE_PROJECT_NUMBER: ${GOOGLE_PROJECT_NUMBER}
     networks:
       - insforge-network
+    logging:
+      driver: awslogs
+      options:
+        <<: *awslogs-options
+        awslogs-stream: ${HOSTNAME_OVERRIDE}-analytics
 
   vector:
     container_name: insforge-vector
@@ -218,6 +243,11 @@ services:
       - "label=disable"
     networks:
       - insforge-network
+    logging:
+      driver: awslogs
+      options:
+        <<: *awslogs-options
+        awslogs-stream: ${HOSTNAME_OVERRIDE}-vector
 
 volumes:
   postgres-data:
