@@ -60,7 +60,10 @@ const fetchDocumentation = async (docType: string): Promise<string> => {
 
     // Traditional REST format - data returned directly as { type, content }
     if (result && typeof result === 'object' && 'content' in result) {
-      return result.content;
+      // Replace localhost:7130 with the actual API_BASE_URL in documentation
+      let content = result.content;
+      content = content.replace(/http:\/\/localhost:7130/g, API_BASE_URL);
+      return content;
     }
 
     throw new Error('Invalid response format from documentation endpoint');
