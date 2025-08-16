@@ -21,7 +21,7 @@ npm-debug.log*
 .git/
 .gitignore
 *.md
-docs/
+!docs/**  # Include all files in docs folder
 tests/
 *.test.ts
 *.test.tsx

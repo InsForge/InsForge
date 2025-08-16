@@ -89,15 +89,11 @@ class S3StorageBackend implements StorageBackend {
   ) {}
 
   initialize(): void {
+    // On EC2: Use IAM roles attached to the instance for S3 permissions
+    // The SDK will automatically use the instance's IAM role credentials
+    // No explicit AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY needed, unless for testing
     this.s3Client = new S3Client({
       region: this.region,
-      credentials:
-        process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
-          ? {
-              accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-              secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-            }
-          : undefined,
     });
   }
 

@@ -112,7 +112,7 @@ Build your next todo app, Instagram clone, or online platform in seconds!
 
 ## Contributing
 
-**Contributing**: If you're interested in contributing, you can check our guide here [CONTRIBUTING.MD](CONTRIBUTING.MD). We truly appreciate pull requests, all types of help are appreciated!
+**Contributing**: If you're interested in contributing, you can check our guide here [CONTRIBUTING.md](CONTRIBUTING.md). We truly appreciate pull requests, all types of help are appreciated!
 
 **Support**: If you need any type of help support, we're responsive on our [Discord channel](https://discord.gg/MPxwj5xVvW), and also feel free to email us [info@insforge.dev](mailto:info@insforge.dev) too!
 

@@ -16,6 +16,10 @@ RUN npm ci --production=false
 # Copy source code
 COPY . .
 
+# Build arguments for Vite environment variables
+ARG VITE_API_BASE_URL
+
+# Build frontend with the API URL baked in
 RUN npm run build
 
 # Expose ports

@@ -247,7 +247,7 @@ export default function AnalyticsLogsPage() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-[#f8f9fa]">
+    <div className="flex h-full bg-[#f8f9fa]">
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         {/* Sticky Header Section */}
         <div className="sticky top-0 z-30 bg-[#f8f9fa]">

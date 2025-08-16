@@ -18,6 +18,7 @@ import {
   type GetCurrentSessionResponse,
   type ListUsersResponse,
   type DeleteUsersResponse,
+  exchangeAdminSessionRequestSchema,
 } from '@insforge/shared-schemas';
 
 const router = Router();
@@ -34,10 +35,10 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
         ERROR_CODES.INVALID_INPUT
       );
     }
-    
+
     const { email, password, name } = validationResult.data;
     const result: CreateUserResponse = await authService.register(email, password, name);
-    
+
     successResponse(res, result);
   } catch (error) {
     next(error);
@@ -55,18 +56,51 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
         ERROR_CODES.INVALID_INPUT
       );
     }
-    
+
     const { email, password } = validationResult.data;
     const result: CreateSessionResponse = await authService.login(email, password);
-    
+
     successResponse(res, result);
   } catch (error) {
     next(error);
   }
 });
 
-// POST /api/auth/admin/sessions - Create admin session  
-router.post('/admin/sessions', async (req: Request, res: Response, next: NextFunction) => {
+// POST /api/auth/admin/sessions/exchange - Create admin session
+router.post('/admin/sessions/exchange', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const validationResult = exchangeAdminSessionRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      throw new AppError(
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const { code } = validationResult.data;
+    const result: CreateAdminSessionResponse =
+      await authService.adminLoginWithAuthorizationCode(code);
+
+    successResponse(res, result);
+  } catch (error) {
+    if (error instanceof AppError) {
+      next(error);
+    } else {
+      // Convert other errors (like JWT verification errors) to 400
+      next(
+        new AppError(
+          'Failed to exchange admin session' + (error instanceof Error ? `: ${error.message}` : ''),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        )
+      );
+    }
+  }
+});
+
+// POST /api/auth/admin/sessions - Create admin session
+router.post('/admin/sessions', (req: Request, res: Response, next: NextFunction) => {
   try {
     const validationResult = createAdminSessionRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
@@ -76,10 +110,10 @@ router.post('/admin/sessions', async (req: Request, res: Response, next: NextFun
         ERROR_CODES.INVALID_INPUT
       );
     }
-    
+
     const { email, password } = validationResult.data;
-    const result: CreateAdminSessionResponse = await authService.adminLogin(email, password);
-    
+    const result: CreateAdminSessionResponse = authService.adminLogin(email, password);
+
     successResponse(res, result);
   } catch (error) {
     next(error);
@@ -91,31 +125,23 @@ router.get('/sessions/current', async (req: Request, res: Response, next: NextFu
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new AppError(
-        'No token provided',
-        401,
-        ERROR_CODES.AUTH_INVALID_CREDENTIALS
-      );
+      throw new AppError('No token provided', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
     }
-    
+
     const token = authHeader.substring(7);
     const payload = authService.verifyToken(token);
-    
+
     const response: GetCurrentSessionResponse = {
       user: {
         id: payload.sub,
         email: payload.email,
-        role: payload.role
-      }
+        role: payload.role,
+      },
     };
-    
+
     res.json(response);
   } catch (error) {
-    next(new AppError(
-      'Invalid token',
-      401,
-      ERROR_CODES.AUTH_INVALID_CREDENTIALS
-    ));
+    next(new AppError('Invalid token', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS));
   }
 });
 
@@ -123,12 +149,10 @@ router.get('/sessions/current', async (req: Request, res: Response, next: NextFu
 router.get('/users', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const queryValidation = listUsersRequestSchema.safeParse(req.query);
-    const queryParams = queryValidation.success 
-      ? queryValidation.data 
-      : req.query;
+    const queryParams = queryValidation.success ? queryValidation.data : req.query;
     const { limit = '10', offset = '0', search } = queryParams || {};
     const db = authService.getDb();
-    
+
     let query = `
       SELECT 
         u.id, 
@@ -138,28 +162,45 @@ router.get('/users', verifyAdmin, async (req: Request, res: Response, next: Next
         u.created_at, 
         u.updated_at,
         u.password,
-        a.provider
+        STRING_AGG(a.provider, ',') as providers
       FROM _user u
       LEFT JOIN _account a ON u.id = a.user_id
     `;
     const params: any[] = [];
-    
+
     if (search) {
       query += ' WHERE u.email LIKE ? OR u.name LIKE ?';
       params.push(`%${search}%`, `%${search}%`);
     }
-    
-    query += ' ORDER BY u.created_at DESC LIMIT ? OFFSET ?';
+
+    query += ' GROUP BY u.id ORDER BY u.created_at DESC LIMIT ? OFFSET ?';
     params.push(parseInt(limit as string), parseInt(offset as string));
-    
+
     const dbUsers = await db.prepare(query).all(...params);
-    
+
     // Simple transformation - just format the provider as identities
     const users = dbUsers.map((dbUser: any) => {
-      // If provider exists from _account table, use it; otherwise check if they have email auth
-      const provider = dbUser.provider || (dbUser.password ? 'email' : null);
-      const identities = provider ? [{ provider }] : [];
+      const identities = [];
+      const providers: string[] = [];
       
+      // Add social providers if any
+      if (dbUser.providers) {
+        dbUser.providers.split(',').forEach((provider: string) => {
+          identities.push({ provider });
+          providers.push(provider);
+        });
+      }
+      
+      // Add email provider if password exists
+      if (dbUser.password) {
+        identities.push({ provider: 'email' });
+        providers.push('email');
+      }
+      
+      // Use first provider to determine type: 'email' or 'social'
+      const firstProvider = providers[0];
+      const provider_type = firstProvider === 'email' ? 'email' : 'social';
+
       // Return snake_case for frontend compatibility
       return {
         id: dbUser.id,
@@ -169,10 +210,10 @@ router.get('/users', verifyAdmin, async (req: Request, res: Response, next: Next
         created_at: dbUser.created_at,
         updated_at: dbUser.updated_at,
         identities: identities,
-        provider_type: dbUser.provider ? 'social' : 'email'
+        provider_type: provider_type,
       };
     });
-    
+
     let countQuery = 'SELECT COUNT(*) as count FROM _user';
     const countParams: any[] = [];
     if (search) {
@@ -180,12 +221,12 @@ router.get('/users', verifyAdmin, async (req: Request, res: Response, next: Next
       countParams.push(`%${search}%`, `%${search}%`);
     }
     const { count } = await db.prepare(countQuery).get(...countParams);
-    
+
     const response: ListUsersResponse = {
       users,
-      total: count
+      total: count,
     };
-    
+
     res.json(response);
   } catch (error) {
     next(error);
@@ -193,22 +234,23 @@ router.get('/users', verifyAdmin, async (req: Request, res: Response, next: Next
 });
 
 // GET /api/auth/users/:id - Get specific user (admin only)
-router.get('/users/:userId', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    // Validate userId path parameter directly
-    const userIdValidation = userIdSchema.safeParse(req.params.userId);
-    if (!userIdValidation.success) {
-      throw new AppError(
-        'Invalid user ID format',
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
-    
-    const userId = userIdValidation.data;
-    const db = authService.getDb();
-    
-    const dbUser = await db.prepare(`
+router.get(
+  '/users/:userId',
+  verifyAdmin,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Validate userId path parameter directly
+      const userIdValidation = userIdSchema.safeParse(req.params.userId);
+      if (!userIdValidation.success) {
+        throw new AppError('Invalid user ID format', 400, ERROR_CODES.INVALID_INPUT);
+      }
+
+      const userId = userIdValidation.data;
+      const db = authService.getDb();
+
+      const dbUser = await db
+        .prepare(
+          `
       SELECT 
         u.id, 
         u.email, 
@@ -216,33 +258,60 @@ router.get('/users/:userId', verifyAdmin, async (req: Request, res: Response, ne
         u.email_verified, 
         u.created_at, 
         u.updated_at,
-        a.provider
+        u.password,
+        STRING_AGG(a.provider, ',') as providers
       FROM _user u
       LEFT JOIN _account a ON u.id = a.user_id
       WHERE u.id = ?
-    `).get(userId);
-    
-    if (!dbUser) {
-      throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
+      GROUP BY u.id
+    `
+        )
+        .get(userId);
+
+      if (!dbUser) {
+        throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
+      }
+
+      // Simple transformation - just format the provider as identities
+      const identities = [];
+      const providers: string[] = [];
+      
+      // Add social providers if any
+      if (dbUser.providers) {
+        dbUser.providers.split(',').forEach((provider: string) => {
+          identities.push({ provider });
+          providers.push(provider);
+        });
+      }
+      
+      // Add email provider if password exists
+      if (dbUser.password) {
+        identities.push({ provider: 'email' });
+        providers.push('email');
+      }
+      
+      // Use first provider to determine type: 'email' or 'social'
+      const firstProvider = providers[0];
+      const provider_type = firstProvider === 'email' ? 'email' : 'social';
+
+      // Return snake_case for frontend compatibility
+      const user = {
+        id: dbUser.id,
+        email: dbUser.email,
+        name: dbUser.name,
+        email_verified: dbUser.email_verified,
+        created_at: dbUser.created_at,
+        updated_at: dbUser.updated_at,
+        identities: identities,
+        provider_type: provider_type,
+      };
+
+      res.json(user);
+    } catch (error) {
+      next(error);
     }
-    
-    // Return snake_case for frontend compatibility
-    const user = {
-      id: dbUser.id,
-      email: dbUser.email,
-      name: dbUser.name,
-      email_verified: dbUser.email_verified,
-      created_at: dbUser.created_at,
-      updated_at: dbUser.updated_at,
-      identities: dbUser.provider || 'email',  // Show 'email' or 'google'/'github'
-      provider_type: dbUser.provider ? 'social' : 'email'
-    };
-    
-    res.json(user);
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // DELETE /api/auth/users - Delete users (batch operation, admin only)
 router.delete('/users', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
@@ -255,21 +324,19 @@ router.delete('/users', verifyAdmin, async (req: Request, res: Response, next: N
         ERROR_CODES.INVALID_INPUT
       );
     }
-    
+
     const { userIds } = validationResult.data;
-    
+
     const db = authService.getDb();
     const placeholders = userIds.map(() => '?').join(',');
-    
-    await db.prepare(
-      `DELETE FROM _user WHERE id IN (${placeholders})`
-    ).run(...userIds);
-    
+
+    await db.prepare(`DELETE FROM _user WHERE id IN (${placeholders})`).run(...userIds);
+
     const response: DeleteUsersResponse = {
       message: 'Users deleted successfully',
-      deletedCount: userIds.length
+      deletedCount: userIds.length,
     };
-    
+
     res.json(response);
   } catch (error) {
     next(error);
@@ -280,44 +347,56 @@ router.delete('/users', verifyAdmin, async (req: Request, res: Response, next: N
 router.get('/oauth/google', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { redirectUrl } = req.query;
-    
-    const state = redirectUrl ? Buffer.from(JSON.stringify({
-      provider: 'google',
-      redirectUrl: redirectUrl as string
-    })).toString('base64') : undefined;
-    
+
+    const state = redirectUrl
+      ? Buffer.from(
+          JSON.stringify({
+            provider: 'google',
+            redirectUrl: redirectUrl as string,
+          })
+        ).toString('base64')
+      : undefined;
+
     const authUrl = await authService.generateGoogleAuthUrl(state);
-    
+
     res.json({ authUrl });
   } catch (error) {
     logger.error('Google OAuth error', { error });
-    next(new AppError(
-      'Google OAuth is not properly configured. Please check environment variables: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI',
-      500,
-      ERROR_CODES.AUTH_OAUTH_CONFIG_ERROR
-    ));
+    next(
+      new AppError(
+        'Google OAuth is not properly configured. Please check environment variables: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI',
+        500,
+        ERROR_CODES.AUTH_OAUTH_CONFIG_ERROR
+      )
+    );
   }
 });
 
 router.get('/oauth/github', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { redirectUrl } = req.query;
-    
-    const state = redirectUrl ? Buffer.from(JSON.stringify({
-      provider: 'github',
-      redirectUrl: redirectUrl as string
-    })).toString('base64') : undefined;
-    
+
+    const state = redirectUrl
+      ? Buffer.from(
+          JSON.stringify({
+            provider: 'github',
+            redirectUrl: redirectUrl as string,
+          })
+        ).toString('base64')
+      : undefined;
+
     const authUrl = await authService.generateGitHubAuthUrl(state);
-    
+
     res.json({ authUrl });
   } catch (error) {
     logger.error('GitHub OAuth error', { error });
-    next(new AppError(
-      'GitHub OAuth is not properly configured. Please check environment variables: GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_REDIRECT_URI',
-      500,
-      ERROR_CODES.AUTH_OAUTH_CONFIG_ERROR
-    ));
+    next(
+      new AppError(
+        'GitHub OAuth is not properly configured. Please check environment variables: GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_REDIRECT_URI',
+        500,
+        ERROR_CODES.AUTH_OAUTH_CONFIG_ERROR
+      )
+    );
   }
 });
 
@@ -325,9 +404,9 @@ router.get('/oauth/:provider/callback', async (req: Request, res: Response, next
   try {
     const { provider } = req.params;
     const { code, state, token } = req.query;
-    
+
     let redirectUrl = '/';
-    
+
     if (state) {
       try {
         const stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
@@ -336,81 +415,85 @@ router.get('/oauth/:provider/callback', async (req: Request, res: Response, next
         // Invalid state
       }
     }
-    
+
     if (!['google', 'github'].includes(provider)) {
       throw new AppError('Invalid provider', 400, ERROR_CODES.INVALID_INPUT);
     }
-    
+
     let result;
-    
+
     if (provider === 'google') {
       let id_token: string;
-      
+
       if (token) {
         id_token = token as string;
       } else if (code) {
         const tokens = await authService.exchangeCodeToTokenByGoogle(code as string);
         id_token = tokens.id_token;
       } else {
-        throw new AppError('No authorization code or token provided', 400, ERROR_CODES.INVALID_INPUT);
+        throw new AppError(
+          'No authorization code or token provided',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
       }
-      
+
       const googleUserInfo = await authService.verifyGoogleToken(id_token);
       result = await authService.findOrCreateGoogleUser(googleUserInfo);
-      
     } else if (provider === 'github') {
       if (!code) {
         throw new AppError('No authorization code provided', 400, ERROR_CODES.INVALID_INPUT);
       }
-      
+
       const accessToken = await authService.exchangeGitHubCodeForToken(code as string);
       const githubUserInfo = await authService.getGitHubUserInfo(accessToken);
       result = await authService.findOrCreateGitHubUser(githubUserInfo);
     }
-    
+
     // Create URL with JWT token and user info (like the working example)
     const finalRedirectUrl = new URL(redirectUrl);
     finalRedirectUrl.searchParams.set('access_token', result!.accessToken);
     finalRedirectUrl.searchParams.set('user_id', result!.user.id);
     finalRedirectUrl.searchParams.set('email', result!.user.email);
     finalRedirectUrl.searchParams.set('name', result!.user.name || '');
-    
-    logger.info('OAuth callback successful, redirecting with token', { 
+
+    logger.info('OAuth callback successful, redirecting with token', {
       redirectUrl: finalRedirectUrl.toString(),
       hasAccessToken: !!result!.accessToken,
-      userId: result!.user.id
+      userId: result!.user.id,
     });
-    
+
     // Redirect directly to the app with token in URL
     return res.redirect(finalRedirectUrl.toString());
-    
   } catch (error) {
-    logger.error('OAuth callback error', { 
+    logger.error('OAuth callback error', {
       error: error instanceof Error ? error.message : error,
       stack: error instanceof Error ? error.stack : undefined,
       provider: req.params.provider,
       hasCode: !!req.query.code,
       hasState: !!req.query.state,
-      hasToken: !!req.query.token
+      hasToken: !!req.query.token,
     });
-    
+
     // Redirect to app with error message
     const { state } = req.query;
-    const redirectUrl = state ? (() => {
-      try {
-        const stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
-        return stateData.redirectUrl || '/';
-      } catch {
-        return '/';
-      }
-    })() : '/';
-    
+    const redirectUrl = state
+      ? (() => {
+          try {
+            const stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
+            return stateData.redirectUrl || '/';
+          } catch {
+            return '/';
+          }
+        })()
+      : '/';
+
     const errorMessage = error instanceof Error ? error.message : 'OAuth authentication failed';
-    
+
     // Redirect with error in URL parameters
     const errorRedirectUrl = new URL(redirectUrl);
     errorRedirectUrl.searchParams.set('error', errorMessage);
-    
+
     return res.redirect(errorRedirectUrl.toString());
   }
 });

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '@/core/auth/auth.js';
 import { AppError } from './error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
+import { verifyCloudToken } from '@/utils/cloud-token.js';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -11,6 +12,7 @@ export interface AuthRequest extends Request {
   };
   authenticated?: boolean;
   apiKey?: string;
+  projectId?: string;
 }
 
 const authService = AuthService.getInstance();
@@ -31,6 +33,7 @@ function setRequestUser(req: AuthRequest, payload: { sub: string; email: string;
     role: payload.role,
   };
 }
+
 
 /**
  * Verifies user authentication (accepts both user and admin tokens)
@@ -167,6 +170,46 @@ export async function verifyToken(req: AuthRequest, _res: Response, next: NextFu
       next(
         new AppError(
           'Invalid token',
+          401,
+          ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+          NEXT_ACTION.CHECK_TOKEN
+        )
+      );
+    }
+  }
+}
+
+/**
+ * Verifies JWT token from cloud backend (api.insforge.dev)
+ * Validates signature using JWKS and checks project_id claim
+ */
+export async function verifyCloudBackend(req: AuthRequest, _res: Response, next: NextFunction) {
+  try {
+    const token = extractBearerToken(req.headers.authorization);
+    if (!token) {
+      throw new AppError(
+        'No authorization token provided',
+        401,
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+        NEXT_ACTION.CHECK_TOKEN
+      );
+    }
+
+    // Use helper function to verify cloud token
+    const { projectId } = await verifyCloudToken(token);
+
+    // Set project_id on request for use in route handlers
+    req.projectId = projectId;
+    req.authenticated = true;
+
+    next();
+  } catch (error) {
+    if (error instanceof AppError) {
+      next(error);
+    } else {
+      next(
+        new AppError(
+          'Invalid cloud backend token',
           401,
           ERROR_CODES.AUTH_INVALID_CREDENTIALS,
           NEXT_ACTION.CHECK_TOKEN

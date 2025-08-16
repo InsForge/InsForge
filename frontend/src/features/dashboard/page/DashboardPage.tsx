@@ -32,9 +32,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-bg-gray">
-      {/* Header */}
-
+    <main className="h-full bg-bg-gray">
       {/* Main Content - Centered with max width */}
       <div className="px-8 py-8 flex justify-center">
         <div className="w-full max-w-[1032px]">

@@ -29,6 +29,7 @@ export interface DataGridColumn {
   sortDescendingFirst?: boolean;
   editable?: boolean;
   isPrimaryKey?: boolean;
+  isNullable?: boolean;
   renderCell?: (props: any) => React.ReactNode;
   renderEditCell?: (props: any) => React.ReactNode;
   renderHeaderCell?: (props: any) => React.ReactNode;

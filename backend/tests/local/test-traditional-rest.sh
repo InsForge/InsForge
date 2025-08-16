@@ -172,7 +172,7 @@ fi
 
 # Export for cleanup
 if [ -n "$API_KEY" ]; then
-    export INSFORGE_API_KEY="$API_KEY"
+    export ACCESS_API_KEY="$API_KEY"
     # List buckets
     response=$(curl -s "$API_BASE/storage/buckets" \
         -H "x-api-key: $API_KEY")

@@ -54,23 +54,12 @@ get_admin_token() {
 
 # Function to get admin API key
 get_admin_api_key() {
-    # Check if API key is provided via environment variable
-    if [ -n "$INSFORGE_API_KEY" ]; then
-        echo "$INSFORGE_API_KEY"
-        return
+    # Only use ACCESS_API_KEY environment variable
+    if [ -n "$ACCESS_API_KEY" ]; then
+        echo "$ACCESS_API_KEY"
+    else
+        echo ""
     fi
-    
-    # Try to get API key from Docker logs as fallback
-    if command -v docker >/dev/null 2>&1; then
-        local api_key=$(docker logs insforge 2>&1 | grep "YOUR API KEY:" | tail -1 | grep -o 'ik_[a-zA-Z0-9]*' || echo "")
-        if [ -n "$api_key" ]; then
-            echo "$api_key"
-            return
-        fi
-    fi
-    
-    # Otherwise, return empty
-    echo ""
 }
 
 # Check if required tools are installed

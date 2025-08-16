@@ -46,7 +46,7 @@ export const MCP_AGENTS: MCPAgent[] = [
     description: 'Intelligent coding assistant with MCP support',
   },
   {
-    id: 'roo',
+    id: 'roocode',
     displayName: 'Roo Code',
     logo: RooLogoIcon,
     description: 'Smart code completion and assistance tool',

@@ -298,6 +298,7 @@ export default function DatabasePage() {
         void queryClient.invalidateQueries({ queryKey: ['tables'] });
         void queryClient.invalidateQueries({ queryKey: ['table', tableName] });
         void queryClient.invalidateQueries({ queryKey: ['table-schema', tableName] });
+        void queryClient.invalidateQueries({ queryKey: ['database-metadata-visualizer'] });
       } catch (error: any) {
         const errorMessage =
           error.response?.data?.error?.message || error.message || 'Failed to delete table';
@@ -428,7 +429,7 @@ export default function DatabasePage() {
   const totalPages = Math.ceil((tableData?.totalRecords || 0) / pageSize);
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-bg-gray">
+    <div className="flex h-full bg-bg-gray">
       {/* Secondary Sidebar - Table List */}
       <TableSidebar
         tables={filteredTables}

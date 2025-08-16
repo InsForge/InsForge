@@ -11,11 +11,7 @@ import { z } from 'zod';
 
 export const userIdSchema = z.string().uuid('Invalid user ID format');
 
-export const emailSchema = z
-  .string()
-  .email('Invalid email format')
-  .toLowerCase()
-  .trim();
+export const emailSchema = z.string().email('Invalid email format').toLowerCase().trim();
 
 export const passwordSchema = z
   .string()
@@ -76,4 +72,4 @@ export type EmailSchema = z.infer<typeof emailSchema>;
 export type PasswordSchema = z.infer<typeof passwordSchema>;
 export type RoleSchema = z.infer<typeof roleSchema>;
 export type UserSchema = z.infer<typeof userSchema>;
-export type TokenPayloadSchema = z.infer<typeof tokenPayloadSchema>;  
+export type TokenPayloadSchema = z.infer<typeof tokenPayloadSchema>;

@@ -13,8 +13,8 @@ This directory contains all test scripts for the Insforge backend.
 Set these before running tests:
 
 ```bash
-# Required for storage tests
-export INSFORGE_API_KEY="your_api_key_here"
+# Required for API authentication
+export ACCESS_API_KEY="your_api_key_here"
 
 # Optional - defaults shown
 export ADMIN_EMAIL="admin@example.com"

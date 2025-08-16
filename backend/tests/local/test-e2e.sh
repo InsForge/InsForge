@@ -18,7 +18,7 @@ TEST_TABLE="test_todos_$(date +%s)"
 TEST_BUCKET="test-bucket-$(date +%s)"
 
 # Export API_KEY so cleanup can use it
-export INSFORGE_API_KEY=""
+export ACCESS_API_KEY=""
 
 # Register test resources for cleanup
 register_test_user "$TEST_EMAIL"
@@ -101,7 +101,7 @@ if [ -n "$API_KEY" ]; then
     print_success "Got API key"
     echo "API Key: ${API_KEY:0:20}..."
     # Export for cleanup
-    export INSFORGE_API_KEY="$API_KEY"
+    export ACCESS_API_KEY="$API_KEY"
 else
     print_fail "Failed to get API key - remaining tests will be skipped"
 fi

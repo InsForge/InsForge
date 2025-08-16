@@ -60,7 +60,7 @@ export default function AppHeader({ currentUser, onLogout }: AppHeaderProps) {
   };
 
   return (
-    <div className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-border-gray z-50 flex items-center justify-between px-6">
+    <div className="h-16 w-full bg-white border-b border-border-gray z-50 flex items-center justify-between px-6">
       {/* Logo */}
       <div className="px-2 py-3">
         <img src={InsForgeIcon} alt="Insforge Logo" className="h-6 w-auto" />

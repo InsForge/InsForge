@@ -224,6 +224,7 @@ export function TableForm({
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ['metadata'] });
       void queryClient.invalidateQueries({ queryKey: ['tables'] });
+      void queryClient.invalidateQueries({ queryKey: ['database-metadata-visualizer'] });
 
       showToast('Table created successfully!', 'success');
 
@@ -354,6 +355,7 @@ export function TableForm({
     onSuccess: (_, data) => {
       void queryClient.invalidateQueries({ queryKey: ['metadata'] });
       void queryClient.invalidateQueries({ queryKey: ['tables'] });
+      void queryClient.invalidateQueries({ queryKey: ['database-metadata-visualizer'] });
 
       // Invalidate all table data queries for this table (with all parameter combinations)
       void queryClient.invalidateQueries({ queryKey: ['table', editTable?.tableName] });

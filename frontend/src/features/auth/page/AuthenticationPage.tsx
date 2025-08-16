@@ -56,7 +56,7 @@ export default function AuthenticationPage() {
   ];
 
   return (
-    <div className="h-[calc(100vh-4rem)] bg-slate-50 flex flex-col overflow-hidden">
+    <div className="h-full bg-slate-50 flex flex-col overflow-hidden">
       {/* Tab Navigation */}
       <div className="h-12 flex items-center gap-6 px-6 border-b border-border-gray relative">
         {authSections.map((section) => (

@@ -34,9 +34,7 @@ router.get('/oauth', verifyAdmin, async (req: Request, res: Response, next: Next
     try {
       const rows = await db
         .getDb()
-        .prepare(
-          `SELECT key, value FROM _config WHERE key LIKE 'auth.oauth.provider.%'`
-        )
+        .prepare(`SELECT key, value FROM _config WHERE key LIKE 'auth.oauth.provider.%'`)
         .all();
 
       if (!Array.isArray(rows)) {
@@ -70,14 +68,16 @@ router.get('/oauth', verifyAdmin, async (req: Request, res: Response, next: Next
       google: {
         clientId: '',
         clientSecret: '',
-        redirectUri: process.env.GOOGLE_REDIRECT_URI || 'http://localhost:7130/api/auth/oauth/google/callback',
+        redirectUri:
+          process.env.GOOGLE_REDIRECT_URI || 'http://localhost:7130/api/auth/oauth/google/callback',
         enabled: false,
         useSharedKeys: false,
       },
       github: {
         clientId: '',
         clientSecret: '',
-        redirectUri: process.env.GITHUB_REDIRECT_URI || 'http://localhost:7130/api/auth/oauth/github/callback',
+        redirectUri:
+          process.env.GITHUB_REDIRECT_URI || 'http://localhost:7130/api/auth/oauth/github/callback',
         enabled: false,
         useSharedKeys: false,
       },
@@ -86,9 +86,13 @@ router.get('/oauth', verifyAdmin, async (req: Request, res: Response, next: Next
     // Process JSON config values (matching auth.ts format)
     for (const row of configRows) {
       try {
-        const provider = row.key === 'auth.oauth.provider.google' ? 'google' : 
-                        row.key === 'auth.oauth.provider.github' ? 'github' : null;
-        
+        const provider =
+          row.key === 'auth.oauth.provider.google'
+            ? 'google'
+            : row.key === 'auth.oauth.provider.github'
+              ? 'github'
+              : null;
+
         if (provider && config[provider]) {
           const value = JSON.parse(row.value);
           config[provider].clientId = value.clientId || '';
@@ -128,14 +132,15 @@ router.post('/oauth', verifyAdmin, async (req: Request, res: Response, next: Nex
       // Update config values as JSON (matching auth.ts format)
       for (const [provider, config] of Object.entries(validatedData)) {
         const key = `auth.oauth.provider.${provider}`;
-        
+
         // Get existing config to preserve unmasked secrets
-        const existing = await db.getDb().prepare(
-          'SELECT value FROM _config WHERE key = ?'
-        ).get(key);
-        
+        const existing = await db
+          .getDb()
+          .prepare('SELECT value FROM _config WHERE key = ?')
+          .get(key);
+
         let finalConfig = { ...config };
-        
+
         if (existing && existing.value) {
           try {
             const existingConfig = JSON.parse(existing.value);
@@ -147,10 +152,10 @@ router.post('/oauth', verifyAdmin, async (req: Request, res: Response, next: Nex
             // If parse fails, use new config as-is
           }
         }
-        
+
         // Store as JSON
         const configJson = JSON.stringify(finalConfig);
-        
+
         await db
           .getDb()
           .prepare(
@@ -163,9 +168,9 @@ router.post('/oauth', verifyAdmin, async (req: Request, res: Response, next: Nex
       await db.getDb().exec('COMMIT');
 
       // AuthService will automatically reload config within 1 minute due to cache TTL
-      successResponse(res, { 
+      successResponse(res, {
         message: 'OAuth configuration updated successfully',
-        note: 'Configuration will be active within 1 minute (cache refresh)'
+        note: 'Configuration will be active within 1 minute (cache refresh)',
       });
     } catch (error) {
       await db.getDb().exec('ROLLBACK');
@@ -197,9 +202,7 @@ router.get('/oauth/status', async (req: Request, res: Response, next: NextFuncti
     try {
       const rows = await db
         .getDb()
-        .prepare(
-          `SELECT key, value FROM _config WHERE key LIKE 'auth.oauth.provider.%'`
-        )
+        .prepare(`SELECT key, value FROM _config WHERE key LIKE 'auth.oauth.provider.%'`)
         .all();
 
       if (!Array.isArray(rows)) {
@@ -232,9 +235,13 @@ router.get('/oauth/status', async (req: Request, res: Response, next: NextFuncti
     // Check database JSON config
     for (const row of configRows) {
       try {
-        const provider = row.key === 'auth.oauth.provider.google' ? 'google' :
-                        row.key === 'auth.oauth.provider.github' ? 'github' : null;
-        
+        const provider =
+          row.key === 'auth.oauth.provider.google'
+            ? 'google'
+            : row.key === 'auth.oauth.provider.github'
+              ? 'github'
+              : null;
+
         if (provider && status[provider]) {
           const config = JSON.parse(row.value);
           // Only mark as enabled if we have valid credentials
@@ -254,20 +261,24 @@ router.get('/oauth/status', async (req: Request, res: Response, next: NextFuncti
 
 // Force reload OAuth configuration (admin only)
 // Note: Not really needed since AuthService auto-reloads every minute
-router.post('/oauth/reload', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    logger.info('OAuth reload requested - config will refresh on next request');
-    
-    // AuthService automatically reloads config from DB with 1-minute cache
-    // No action needed here, just inform the admin
-    
-    successResponse(res, {
-      message: 'OAuth configuration cache cleared',
-      note: 'New configuration will be loaded on next OAuth request'
-    });
-  } catch (error) {
-    next(error);
+router.post(
+  '/oauth/reload',
+  verifyAdmin,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      logger.info('OAuth reload requested - config will refresh on next request');
+
+      // AuthService automatically reloads config from DB with 1-minute cache
+      // No action needed here, just inform the admin
+
+      successResponse(res, {
+        message: 'OAuth configuration cache cleared',
+        note: 'New configuration will be loaded on next OAuth request',
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 export { router as configRouter };

@@ -254,9 +254,7 @@ export function OAuthDialog({ provider, isOpen, onClose, onSuccess }: OAuthDialo
                       <code className="py-1 px-3 bg-blue-100 text-blue-800 font-mono break-all rounded-md text-sm">
                         {getCallbackUrl()}
                       </code>
-                      <CopyButton
-                        text={getCallbackUrl()}
-                      />
+                      <CopyButton text={getCallbackUrl()} />
                     </div>
                   </div>
 

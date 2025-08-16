@@ -50,6 +50,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:7130}
     container_name: insforge
     depends_on:
       postgres:
@@ -62,8 +64,8 @@ services:
     environment:
       - PORT=7130
       - PROJECT_ROOT=/app
-      - API_BASE_URL=http://localhost:7130
-      - VITE_API_BASE_URL=http://localhost:7130
+      - API_BASE_URL=${API_BASE_URL:-}
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-}
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-change-this-password}
@@ -86,9 +88,11 @@ services:
       # Storage Configuration
       - AWS_S3_BUCKET=${AWS_S3_BUCKET:-}
       - AWS_REGION=${AWS_REGION:-}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      # Multi-tenant Cloud Configuration
+      - DEPLOYMENT_ID=${DEPLOYMENT_ID:-}
+      - PROJECT_ID=${PROJECT_ID:-}
       - APP_KEY=${APP_KEY:-}
+      - ACCESS_API_KEY=${ACCESS_API_KEY:-}
     restart: unless-stopped
     networks:
       - insforge-network

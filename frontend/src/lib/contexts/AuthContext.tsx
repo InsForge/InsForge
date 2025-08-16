@@ -15,7 +15,8 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
+  loginWithPassword: (email: string, password: string) => Promise<boolean>;
+  loginWithAuthorizationCode: (token: string) => Promise<boolean>;
   logout: () => void;
   refreshAuth: () => Promise<void>;
   error: Error | null;
@@ -76,11 +77,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
-  const login = useCallback(
+  const loginWithPassword = useCallback(
     async (email: string, password: string): Promise<boolean> => {
       try {
         setError(null);
-        await authService.login(email, password);
+        await authService.loginWithPassword(email, password);
         const currentUser = await checkAuthStatus();
         if (currentUser) {
           // Invalidate queries that depend on authentication
@@ -93,6 +94,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return false;
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Login failed'));
+        return false;
+      }
+    },
+    [checkAuthStatus, queryClient]
+  );
+
+  const loginWithAuthorizationCode = useCallback(
+    async (token: string): Promise<boolean> => {
+      try {
+        setError(null);
+        await authService.loginWithAuthorizationCode(token);
+        const currentUser = await checkAuthStatus();
+        if (currentUser) {
+          // Invalidate queries that depend on authentication
+          void queryClient.invalidateQueries({ queryKey: ['apiKey'] });
+          void queryClient.invalidateQueries({ queryKey: ['metadata'] });
+          void queryClient.invalidateQueries({ queryKey: ['users'] });
+          void queryClient.invalidateQueries({ queryKey: ['tables'] });
+          return true;
+        }
+        return false;
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error('Authorization code exchange failed'));
         return false;
       }
     },
@@ -122,7 +146,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     user,
     isAuthenticated,
     isLoading,
-    login,
+    loginWithPassword,
+    loginWithAuthorizationCode,
     logout,
     refreshAuth,
     error,

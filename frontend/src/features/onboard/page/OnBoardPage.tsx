@@ -1,11 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/radix/Button';
-import {
-  useOnboardStep,
-  type OnboardStep,
-  STEP_DESCRIPTIONS,
-} from '@/lib/contexts/OnboardStepContext';
+import { useOnboardStep, STEP_DESCRIPTIONS } from '@/lib/contexts/OnboardStepContext';
+import { type OnboardStep } from '../types';
 import { LinearStepper } from '@/components/Stepper';
 import { StepContent } from '../components/StepContent';
 import { CompletionCard } from '../components/CompletionCard';
@@ -45,7 +42,7 @@ export default function OnBoardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-bg-gray">
+    <div className="h-full bg-bg-gray">
       <div className="container max-w-[1080px] mx-auto px-6 py-12">
         {/* Header with Linear Stepper */}
         <div className="mb-12 space-y-3">

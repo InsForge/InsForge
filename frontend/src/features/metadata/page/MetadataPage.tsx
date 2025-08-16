@@ -53,7 +53,7 @@ export default function MetadataPage() {
   }
 
   return (
-    <main className="min-h-screen bg-bg-gray">
+    <main className="h-full bg-bg-gray">
       {/* Header */}
       <div className="sticky top-0 z-30 bg-bg-gray border-b border-gray-200">
         <div className="px-8 pt-6 pb-4">

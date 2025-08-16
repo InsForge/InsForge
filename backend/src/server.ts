@@ -14,6 +14,7 @@ import { logsRouter } from '@/api/routes/logs.js';
 import { configRouter } from '@/api/routes/config.js';
 import { docsRouter } from '@/api/routes/docs.js';
 import functionsRouter from '@/api/routes/functions.js';
+import { usageRouter } from '@/api/routes/usage.js';
 import { errorMiddleware } from '@/api/middleware/error.js';
 import fetch from 'node-fetch';
 import { DatabaseManager } from '@/core/database/database.js';
@@ -62,10 +63,12 @@ export async function createApp() {
   });
 
   // Basic middleware
-  app.use(cors({
-    origin: true, // Allow all origins (matches Better Auth's trustedOrigins: ['*'])
-    credentials: true // Allow cookies/credentials
-  }));
+  app.use(
+    cors({
+      origin: true, // Allow all origins (matches Better Auth's trustedOrigins: ['*'])
+      credentials: true, // Allow cookies/credentials
+    })
+  );
   app.use(limiter);
   app.use((req: Request, res: Response, next: NextFunction) => {
     const startTime = Date.now();
@@ -139,7 +142,8 @@ export async function createApp() {
   apiRouter.use('/config', configRouter);
   apiRouter.use('/docs', docsRouter);
   apiRouter.use('/functions', functionsRouter);
-
+  apiRouter.use('/usage', usageRouter);
+  
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);
 
@@ -187,6 +191,9 @@ export async function createApp() {
   // Check if frontend build exists
   if (fs.existsSync(frontendPath)) {
     // Catch all handler for SPA routes
+    app.get('/cloud*', (_req: Request, res: Response) => {
+      res.sendFile(path.join(frontendPath, 'index.html'));
+    });
     app.get('/dashboard*', (_req: Request, res: Response) => {
       res.sendFile(path.join(frontendPath, 'index.html'));
     });

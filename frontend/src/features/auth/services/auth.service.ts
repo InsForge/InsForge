@@ -10,10 +10,28 @@ export interface User {
 }
 
 export class AuthService {
-  async login(email: string, password: string) {
+  async loginWithPassword(email: string, password: string) {
     const data = await apiClient.request('/auth/admin/sessions', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
+    });
+
+    // Set token in apiClient
+    if (data.accessToken) {
+      apiClient.setToken(data.accessToken);
+    }
+
+    // Return unified format
+    return {
+      accessToken: data.accessToken,
+      user: data.user,
+    };
+  }
+
+  async loginWithAuthorizationCode(code: string) {
+    const data = await apiClient.request('/auth/admin/sessions/exchange', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
     });
 
     // Set token in apiClient
@@ -72,7 +90,7 @@ export class AuthService {
       method: 'POST',
       body: JSON.stringify({ email, password, name }),
     });
-    
+
     return response;
   }
 

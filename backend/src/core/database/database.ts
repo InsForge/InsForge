@@ -2,19 +2,10 @@ import { Pool } from 'pg';
 import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
-import { DatabaseMetadata, ColumnInfo, PrimaryKeyInfo } from '@/types/database.js';
 import logger from '@/utils/logger.js';
-import { convertSqlTypeToColumnType } from '@/utils/helpers';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Helper function to quote identifiers for SQL
-function quoteIdentifier(identifier: string): string {
-  return `"${identifier.replace(/"/g, '""')}"`;
-}
-
-// Using Better Auth for authentication
 
 export class DatabaseManager {
   private static instance: DatabaseManager;
@@ -107,21 +98,21 @@ export class DatabaseManager {
     // Google OAuth configuration
     const googleClientId = process.env.GOOGLE_CLIENT_ID;
     const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const googleRedirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:7130/api/auth/oauth/google/callback';
+    const googleRedirectUri =
+      process.env.GOOGLE_REDIRECT_URI || 'http://localhost:7130/api/auth/oauth/google/callback';
 
     if (googleClientId && googleClientSecret) {
       const googleConfig = {
         enabled: true,
         clientId: googleClientId,
         clientSecret: googleClientSecret,
-        redirectUri: googleRedirectUri // THIS WAS MISSING - CRITICAL!
+        redirectUri: googleRedirectUri, // THIS WAS MISSING - CRITICAL!
       };
 
       // Check if config already exists
-      const existing = await client.query(
-        'SELECT value FROM _config WHERE key = $1',
-        ['auth.oauth.provider.google']
-      );
+      const existing = await client.query('SELECT value FROM _config WHERE key = $1', [
+        'auth.oauth.provider.google',
+      ]);
 
       if (existing.rows.length === 0) {
         // Insert new config if it doesn't exist
@@ -134,7 +125,11 @@ export class DatabaseManager {
         // Update if existing config is incomplete
         try {
           const existingValue = JSON.parse(existing.rows[0].value);
-          if (!existingValue.clientId || !existingValue.clientSecret || !existingValue.redirectUri) {
+          if (
+            !existingValue.clientId ||
+            !existingValue.clientSecret ||
+            !existingValue.redirectUri
+          ) {
             await client.query(
               `UPDATE _config SET value = $1, updated_at = CURRENT_TIMESTAMP WHERE key = $2`,
               [JSON.stringify(googleConfig), 'auth.oauth.provider.google']
@@ -149,21 +144,21 @@ export class DatabaseManager {
     // GitHub OAuth configuration
     const githubClientId = process.env.GITHUB_CLIENT_ID;
     const githubClientSecret = process.env.GITHUB_CLIENT_SECRET;
-    const githubRedirectUri = process.env.GITHUB_REDIRECT_URI || 'http://localhost:7130/api/auth/oauth/github/callback';
+    const githubRedirectUri =
+      process.env.GITHUB_REDIRECT_URI || 'http://localhost:7130/api/auth/oauth/github/callback';
 
     if (githubClientId && githubClientSecret) {
       const githubConfig = {
         enabled: true,
         clientId: githubClientId,
         clientSecret: githubClientSecret,
-        redirectUri: githubRedirectUri // THIS WAS MISSING - CRITICAL!
+        redirectUri: githubRedirectUri, // THIS WAS MISSING - CRITICAL!
       };
 
       // Check if config already exists
-      const existing = await client.query(
-        'SELECT value FROM _config WHERE key = $1',
-        ['auth.oauth.provider.github']
-      );
+      const existing = await client.query('SELECT value FROM _config WHERE key = $1', [
+        'auth.oauth.provider.github',
+      ]);
 
       if (existing.rows.length === 0) {
         // Insert new config if it doesn't exist
@@ -176,7 +171,11 @@ export class DatabaseManager {
         // Update if existing config is incomplete
         try {
           const existingValue = JSON.parse(existing.rows[0].value);
-          if (!existingValue.clientId || !existingValue.clientSecret || !existingValue.redirectUri) {
+          if (
+            !existingValue.clientId ||
+            !existingValue.clientSecret ||
+            !existingValue.redirectUri
+          ) {
             await client.query(
               `UPDATE _config SET value = $1, updated_at = CURRENT_TIMESTAMP WHERE key = $2`,
               [JSON.stringify(githubConfig), 'auth.oauth.provider.github']
@@ -247,6 +246,7 @@ export class DatabaseManager {
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
 
+      -- Storage files table
       CREATE TABLE IF NOT EXISTS _storage (
         bucket TEXT NOT NULL,
         key TEXT NOT NULL,
@@ -257,6 +257,16 @@ export class DatabaseManager {
         FOREIGN KEY (bucket) REFERENCES _storage_buckets(name) ON DELETE CASCADE
       );
 
+      -- MCP usage tracking table
+      CREATE TABLE IF NOT EXISTS _mcp_usage (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        tool_name VARCHAR(255) NOT NULL,
+        success BOOLEAN DEFAULT true,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      -- Index for efficient date range queries
+      CREATE INDEX IF NOT EXISTS idx_mcp_usage_created_at ON _mcp_usage(created_at DESC);
 
       -- Edge functions
       CREATE TABLE IF NOT EXISTS _edge_functions (
@@ -339,7 +349,6 @@ export class DatabaseManager {
     } finally {
       client.release();
     }
-    
   }
 
   // PostgreSQL-specific prepare method that returns a query object similar to better-sqlite3

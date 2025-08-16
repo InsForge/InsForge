@@ -34,7 +34,10 @@ export class ConfigService {
     return apiClient.request('/config/oauth/status');
   }
 
-  async reloadOAuthConfig(): Promise<{ message: string; config: { google: { enabled: boolean }; github: { enabled: boolean } } }> {
+  async reloadOAuthConfig(): Promise<{
+    message: string;
+    config: { google: { enabled: boolean }; github: { enabled: boolean } };
+  }> {
     return apiClient.request('/config/oauth/reload', {
       method: 'POST',
     });

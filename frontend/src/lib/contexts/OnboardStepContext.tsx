@@ -22,7 +22,9 @@ export function OnboardStepProvider({ children }: { children: React.ReactNode })
   const [currentStep, setCurrentStep] = useState<OnboardStep>(() => {
     const saved = localStorage.getItem(ONBOARD_STORAGE_KEY);
     const n = saved ? parseInt(saved, 10) : NaN;
-    return (n >= OnboardStep.INSTALL_NODEJS && n <= OnboardStep.FINAL_SETUP) ? (n as OnboardStep) : OnboardStep.INSTALL_NODEJS;
+    return n >= OnboardStep.INSTALL_NODEJS && n <= OnboardStep.FINAL_SETUP
+      ? (n as OnboardStep)
+      : OnboardStep.INSTALL_NODEJS;
   });
 
   useEffect(() => {

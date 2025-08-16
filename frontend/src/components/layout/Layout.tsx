@@ -16,25 +16,24 @@ export default function Layout({ children }: LayoutProps) {
   const is2xl = useMediaQuery('(min-width: 1536px)');
 
   return (
-    <div className="h-screen bg-gray-50 flex">
+    <div className="h-screen bg-gray-50 flex flex-col">
       <AppHeader currentUser={user} onLogout={logout} />
-
-      <AppSidebar
-        currentUser={user}
-        onLogout={logout}
-        isCollapsed={is2xl ? sidebarCollapsed : !isHovering}
-        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-        onMouseEnter={() => setIsHovering(true)}
-        onMouseLeave={() => setIsHovering(false)}
-      />
 
       {/* Main content */}
       <div
         className={cn(
-          'flex-1 transition-all duration-300 ease-in-out overflow-y-auto mt-16 ml-18',
+          'flex-1 transition-all duration-300 ease-in-out overflow-y-auto ml-18',
           !sidebarCollapsed && '2xl:ml-60'
         )}
       >
+        <AppSidebar
+          currentUser={user}
+          onLogout={logout}
+          isCollapsed={is2xl ? sidebarCollapsed : !isHovering}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+          onMouseEnter={() => setIsHovering(true)}
+          onMouseLeave={() => setIsHovering(false)}
+        />
         {children}
       </div>
     </div>

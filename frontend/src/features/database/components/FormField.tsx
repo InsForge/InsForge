@@ -66,8 +66,8 @@ interface FormDateEditorProps {
 function FormDateEditor({ value, type = 'datetime', nullable, onChange }: FormDateEditorProps) {
   const [showEditor, setShowEditor] = useState(false);
 
-  const handleValueChange = (newValue: string) => {
-    if (newValue === 'null') {
+  const handleValueChange = (newValue: string | null) => {
+    if (newValue === 'null' || newValue === null) {
       onChange(null);
     } else {
       onChange(newValue);

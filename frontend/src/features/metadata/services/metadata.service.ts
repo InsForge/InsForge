@@ -1,23 +1,24 @@
 import { apiClient } from '@/lib/api/client';
 
 export interface ColumnMetadata {
-  name: string;
+  columnName: string;
   type: string;
-  nullable: boolean;
+  isNullable: boolean;
   defaultValue?: string;
   isPrimaryKey?: boolean;
+  isUnique?: boolean;
   foreignKey?: {
-    table: string;
-    column: string;
+    referenceTable: string;
+    referenceColumn: string;
     onDelete?: string;
     onUpdate?: string;
   };
 }
 
 export interface TableMetadata {
-  name: string;
+  tableName: string;
   columns: ColumnMetadata[];
-  recordCount?: number;
+  recordCount?: string;
   createdAt?: string;
   updatedAt?: string;
 }

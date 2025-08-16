@@ -268,7 +268,7 @@ export default tseslint.config(
           varsIgnorePattern: '^_',
         },
       ],
-      
+
       // General rules
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'no-debugger': 'error',
@@ -278,7 +278,7 @@ export default tseslint.config(
       'no-var': 'error',
       eqeqeq: ['error', 'always'],
       curly: ['error', 'all'],
-      
+
       // Prettier integration
       'prettier/prettier': 'error',
     },

@@ -41,6 +41,7 @@
     "express-rate-limit": "^7.1.5",
     "form-data": "^4.0.3",
     "google-auth-library": "^10.1.0",
+    "jose": "^6.0.12",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.1",
     "node-fetch": "^3.3.2",

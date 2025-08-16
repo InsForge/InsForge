@@ -1,5 +1,5 @@
-import { useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useCallback, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Database, Lock, Mail } from 'lucide-react';
 import {
   Card,
@@ -27,8 +27,11 @@ import { loginFormSchema, LoginFormData } from '@/lib/utils/validation-schemas';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login, isAuthenticated } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { loginWithPassword, loginWithAuthorizationCode, isAuthenticated } = useAuth();
   const { isCompleted } = useOnboardingCompletion();
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // Determine where to redirect based on onboarding completion status
   const getRedirectPath = useCallback(() => {
@@ -42,7 +45,7 @@ export default function LoginPage() {
       password: 'change-this-password',
     },
     onSubmit: async (data) => {
-      const success = await login(data.email, data.password);
+      const success = await loginWithPassword(data.email, data.password);
 
       if (success) {
         void navigate(getRedirectPath(), { replace: true });
@@ -51,6 +54,65 @@ export default function LoginPage() {
       }
     },
   });
+
+  // Handle authorization token exchange
+  useEffect(() => {
+    const authorizationCode = searchParams.get('authorizationCode');
+
+    if (authorizationCode && !isAuthenticating && !isAuthenticated) {
+      setIsAuthenticating(true);
+      setAuthError(null);
+
+      // Clear the token from URL to prevent reuse
+      setSearchParams({}, { replace: true });
+
+      // Exchange the authorization code for an access token
+      loginWithAuthorizationCode(authorizationCode)
+        .then((success) => {
+          if (success) {
+            // Notify parent of success
+            if (window.parent !== window) {
+              window.parent.postMessage({
+                type: 'AUTH_SUCCESS',
+              });
+            }
+          } else {
+            setAuthError(
+              'Failed to authenticate with authorization code. Please try again or use email/password.'
+            );
+            if (window.parent !== window) {
+              window.parent.postMessage({
+                type: 'AUTH_ERROR',
+                message: 'Authorization code validation failed',
+              });
+            }
+          }
+        })
+        .catch((error) => {
+          console.error('Authorization code exchange failed:', error);
+          setAuthError(
+            'Authentication failed. The authorization code may have expired or already been used.'
+          );
+          if (window.parent !== window) {
+            window.parent.postMessage({
+              type: 'AUTH_ERROR',
+              message: 'Authorization code validation failed',
+            });
+          }
+        })
+        .finally(() => {
+          setIsAuthenticating(false);
+        });
+    }
+  }, [
+    searchParams,
+    setSearchParams,
+    loginWithAuthorizationCode,
+    navigate,
+    getRedirectPath,
+    isAuthenticating,
+    isAuthenticated,
+  ]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -72,80 +134,99 @@ export default function LoginPage() {
 
         {/* Login Card */}
         <Card>
-          <Form {...form}>
-            <form onSubmit={(e) => void form.onSubmit(e)}>
-              <CardHeader>
-                <CardTitle>Sign In</CardTitle>
-                <CardDescription>Enter your admin credentials to continue</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                          <Input
-                            {...field}
-                            type="email"
-                            placeholder="admin@example.com"
-                            className="pl-10"
-                            autoComplete="email"
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                          <Input
-                            {...field}
-                            type="password"
-                            placeholder="Enter your password"
-                            className="pl-10"
-                            autoComplete="current-password"
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {form.submitError && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{form.submitError}</AlertDescription>
-                  </Alert>
-                )}
-              </CardContent>
-              <CardFooter className="flex flex-col space-y-4">
-                <ButtonWithLoading
-                  type="submit"
-                  className="w-full"
-                  loading={form.isSubmitting}
-                  disabled={form.isSubmitting}
-                >
-                  Sign in
-                </ButtonWithLoading>
-                <p className="text-xs text-center text-muted-foreground">
-                  Use the credentials configured in your .env file
+          {isAuthenticating ? (
+            <CardContent className="py-12">
+              <div className="text-center space-y-4">
+                <div className="animate-pulse">
+                  <Database className="h-12 w-12 text-primary mx-auto mb-4" />
+                </div>
+                <p className="text-lg font-medium">Authenticating...</p>
+                <p className="text-sm text-muted-foreground">
+                  Please wait while we verify your identity
                 </p>
-              </CardFooter>
-            </form>
-          </Form>
+              </div>
+            </CardContent>
+          ) : (
+            <Form {...form}>
+              <form onSubmit={(e) => void form.onSubmit(e)}>
+                <CardHeader>
+                  <CardTitle>Sign In</CardTitle>
+                  <CardDescription>Enter your admin credentials to continue</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {authError && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{authError}</AlertDescription>
+                    </Alert>
+                  )}
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              {...field}
+                              type="email"
+                              placeholder="admin@example.com"
+                              className="pl-10"
+                              autoComplete="email"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              {...field}
+                              type="password"
+                              placeholder="Enter your password"
+                              className="pl-10"
+                              autoComplete="current-password"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {form.submitError && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{form.submitError}</AlertDescription>
+                    </Alert>
+                  )}
+                </CardContent>
+                <CardFooter className="flex flex-col space-y-4">
+                  <ButtonWithLoading
+                    type="submit"
+                    className="w-full"
+                    loading={form.isSubmitting}
+                    disabled={form.isSubmitting}
+                  >
+                    Sign in
+                  </ButtonWithLoading>
+                  <p className="text-xs text-center text-muted-foreground">
+                    Use the credentials configured in your .env file
+                  </p>
+                </CardFooter>
+              </form>
+            </Form>
+          )}
         </Card>
 
         {/* Footer */}

@@ -317,7 +317,7 @@ export default function StoragePage() {
   const error = bucketsError;
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-bg-gray">
+    <div className="flex h-full bg-bg-gray">
       {/* Secondary Sidebar - Bucket List */}
       <StorageSidebar
         buckets={bucketInfo}
