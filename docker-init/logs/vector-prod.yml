@@ -1,0 +1,228 @@
+api:
+  enabled: true
+  address: 0.0.0.0:7135
+
+sources:
+  docker_host:
+    type: docker_logs
+    exclude_containers:
+      - insforge-vector
+      - insforge-analytics
+    include_containers:
+      - insforge
+      - insforge-deno
+      - insforge-postgrest
+      - insforge-postgres
+
+transforms:
+  project_logs:
+    type: remap
+    inputs:
+      - docker_host
+    source: |-
+      .project = "default"
+      .event_message = del(.message)
+      # Remove leading slash from container name if present
+      container = to_string!(del(.container_name))
+      if starts_with(container, "/") {
+          .appname = slice!(container, 1)
+      } else {
+          .appname = container
+      }
+      del(.container_created_at)
+      del(.container_id)
+      del(.source_type)
+      del(.stream)
+      del(.label)
+      del(.image)
+      del(.host)
+      del(.stream)
+  router:
+    type: route
+    inputs:
+      - project_logs
+    route:
+      insforge: '.appname == "insforge"'
+      deno: '.appname == "insforge-deno"'
+      rest: '.appname == "insforge-postgrest"'
+      db: '.appname == "insforge-postgres"'
+      realtime: '.appname == "insforge-realtime"'
+  # PostgREST logs with proper parsing
+  rest_logs:
+    type: remap
+    inputs:
+      - router.rest
+    source: |-
+      # .metadata.host = .project
+      # Parse PostgREST log format: DD/Mon/YYYY:HH:MM:SS +ZZZZ: message
+      parsed, err = parse_regex(.event_message, r'^(?P<time>\d{2}/\w{3}/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4}): (?P<msg>.*)$')
+
+      if err == null && parsed != null {
+          .event_message = parsed.msg
+          .metadata.level = "info"
+      } else {
+          # If parsing fails, keep original message
+          .metadata.level = "info"
+      }
+  # InsForge logs are structured JSON, parse and handle both request logs and application logs
+  insforge_logs:
+    type: remap
+    inputs:
+      - router.insforge
+    source: |-
+      # Remove the [backend] prefix if present
+      .event_message = replace!(.event_message, r'^\[backend\] ', "")
+      
+      req, err = parse_json(.event_message)
+      if err == null {
+          # Set timestamp from log
+          if req.timestamp != null {
+              .timestamp = to_timestamp!(req.timestamp)
+          }
+          
+          # Set log level
+          .level = req.level
+          
+          # Check if this is a request log (has duration field)
+          if req.duration != null {
+              # Flatten request log fields to top level
+              .user_agent = req.userAgent
+              .ip = req.ip
+              .method = req.method
+              .path = req.path
+              .protocol = "HTTP/1.1"
+              .status_code = req.status
+              .size = req.size
+              .duration = req.duration
+              # Format as nginx-style log line
+              .event_message = join!([req.method, req.path, to_string!(req.status), to_string!(req.size), req.duration, "-", req.ip, "-", req.userAgent], " ")
+              .log_type = "request"
+          } else {
+              # This is an application log
+              .event_message = join!([req.level, req.message], " - ")
+              .log_type = "application"
+              if req.error != null {
+                  .error = req.error
+              }
+              if req.stack != null {
+                  .stack = req.stack
+              }
+          }
+      }
+  realtime_logs:
+    type: remap
+    inputs:
+      - router.realtime
+    source: |-
+      parsed, err = parse_regex(.event_message, r'^(?P<time>\d+:\d+:\d+\.\d+) \[(?P<level>\w+)\] (?P<msg>.*)$')
+      if err == null {
+          .event_message = parsed.msg
+          .metadata.level = parsed.level
+      }
+  deno_logs:
+    type: remap
+    inputs:
+      - router.deno
+    source: |-
+      parsed, err = parse_regex(.event_message, r'^(?P<time>.*): (?P<msg>.*)$')
+      if err == null {
+          .event_message = parsed.msg
+          .timestamp = to_timestamp!(parsed.time)
+          # .metadata.host = .project
+      }
+  # Postgres logs with proper parsing
+  db_logs:
+    type: remap
+    inputs:
+      - router.db
+    source: |-
+      # .metadata.host = "db-default"
+      # Parse PostgreSQL log format: YYYY-MM-DD HH:MM:SS.SSS TZ [PID] LEVEL: message
+      parsed, err = parse_regex(.event_message, r'^(?P<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) (?P<tz>\w+) \[(?P<pid>\d+)\] (?P<level>LOG|ERROR|WARNING|INFO|NOTICE|FATAL|PANIC|STATEMENT|DETAIL): (?P<msg>.*)$')
+
+      if err == null && parsed != null {
+          .metadata.parsed.pid = parsed.pid
+          .metadata.parsed.error_severity = upcase!(parsed.level)
+          .event_message = parsed.msg
+
+          # Normalize STATEMENT and DETAIL to appropriate log levels
+          if .metadata.parsed.error_severity == "STATEMENT" {
+              .metadata.parsed.error_severity = "INFO"
+          }
+          if .metadata.parsed.error_severity == "DETAIL" {
+              .metadata.parsed.error_severity = "INFO"
+          }
+      } else {
+          # If parsing fails, keep original message and set default severity
+          .metadata.parsed.error_severity = "LOG"
+      }
+
+sinks:
+  file_insforge:
+    type: 'file'
+    inputs:
+      - insforge_logs
+    path: '/logs/insforge.log'
+    encoding:
+      codec: 'json'
+    compression: 'gzip'
+  file_deno:
+    type: 'file'
+    inputs:
+      - deno_logs
+    path: '/logs/deno.log'
+    encoding:
+      codec: 'json'
+    compression: 'gzip'
+  file_realtime:
+    type: 'file'
+    inputs:
+      - realtime_logs
+    path: '/logs/realtime.log'
+    encoding:
+      codec: 'json'
+    compression: 'gzip'
+  file_rest:
+    type: 'file'
+    inputs:
+      - rest_logs
+    path: '/logs/postgrest.log'
+    encoding:
+      codec: 'json'
+    compression: 'gzip'
+  file_db:
+    type: 'file'
+    inputs:
+      - db_logs
+    path: '/logs/postgres.log'
+    encoding:
+      codec: 'json'
+    compression: 'gzip'
+  # CloudWatch structured sinks (Vector -> CloudWatch). Use distinct stream names to avoid conflicts
+  cw_insforge:
+    type: aws_cloudwatch_logs
+    inputs:
+      - insforge_logs
+    region: ${AWS_REGION}
+    group_name: /insforge/${PROJECT_ID}
+    stream_name: ${HOSTNAME_OVERRIDE}-insforge-vector
+    encoding:
+      codec: json
+  cw_rest:
+    type: aws_cloudwatch_logs
+    inputs:
+      - rest_logs
+    region: ${AWS_REGION}
+    group_name: /insforge/${PROJECT_ID}
+    stream_name: ${HOSTNAME_OVERRIDE}-postgrest-vector
+    encoding:
+      codec: json
+  cw_db:
+    type: aws_cloudwatch_logs
+    inputs:
+      - db_logs
+    region: ${AWS_REGION}
+    group_name: /insforge/${PROJECT_ID}
+    stream_name: ${HOSTNAME_OVERRIDE}-postgres-vector
+    encoding:
+      codec: json

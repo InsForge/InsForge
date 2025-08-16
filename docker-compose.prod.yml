@@ -28,9 +28,6 @@ services:
     container_name: insforge-postgrest
     restart: unless-stopped
     environment:
-      #POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      #POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      #POSTGRES_DB: ${POSTGRES_DB:-insforge}
       PGRST_DB_URI: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
       PGRST_OPENAPI_SERVER_PROXY_URI: http://localhost:3000
       PGRST_DB_SCHEMA: public
@@ -47,14 +44,14 @@ services:
       - insforge-network
 
   insforge:
-    build:
-      context: .
-      dockerfile: Dockerfile
     container_name: insforge
+    image: ghcr.io/insforge/insforge-oss:v0.1.3
+    working_dir: /app
+    restart: unless-stopped
     depends_on:
-      postgres:
-        condition: service_healthy
       vector:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     ports:
       - "7130:7130"
@@ -62,8 +59,8 @@ services:
     environment:
       - PORT=7130
       - PROJECT_ROOT=/app
-      - API_BASE_URL=http://localhost:7130
-      - VITE_API_BASE_URL=http://localhost:7130
+      - API_BASE_URL=${VITE_API_BASE_URL:-}
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-}
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-change-this-password}
@@ -74,113 +71,61 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGREST_BASE_URL=http://postgrest:3000
-      # Deno Runtime URL (disabled)
-      # - DENO_RUNTIME_URL=http://deno:7133
+      # Deno Runtime URL
+      - DENO_RUNTIME_URL=http://deno:7133
       # OAuth Configuration
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
-      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:7130/api/auth/oauth/google/callback}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:7130/api/auth/v1/callback}
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
-      - GITHUB_REDIRECT_URI=${GITHUB_REDIRECT_URI:-http://localhost:7130/api/auth/oauth/github/callback}
+      - GITHUB_REDIRECT_URI=${GITHUB_REDIRECT_URI:-http://localhost:7130/api/auth/v1/callback}
       # Storage Configuration
       - AWS_S3_BUCKET=${AWS_S3_BUCKET:-}
       - AWS_REGION=${AWS_REGION:-}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      # Multi-tenant Cloud Configuration
+      - DEPLOYMENT_ID=${DEPLOYMENT_ID:-}
+      - PROJECT_ID=${PROJECT_ID:-}
       - APP_KEY=${APP_KEY:-}
-    restart: unless-stopped
+      - ACCESS_API_KEY=${ACCESS_API_KEY:-}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET:-}
+      - AWS_INSTANCE_PROFILE_NAME=${AWS_INSTANCE_PROFILE_NAME}
     networks:
       - insforge-network
-  
-  # Deno service disabled for now
-  # deno:
-  #   image: denoland/deno:alpine-2.0.6
-  #   container_name: insforge-deno
-  #   working_dir: /app
-  #   depends_on:
-  #     - postgres
-  #     - postgrest
-  #   ports:
-  #     - "7133:7133"
-  #   environment:
-  #     - DENO_ENV=${DENO_ENV:-development}
-  #     - DENO_DIR=/deno-dir
-  #     # PostgreSQL connection
-  #     - POSTGRES_HOST=postgres
-  #     - POSTGRES_PORT=5432
-  #     - POSTGRES_DB=${POSTGRES_DB:-insforge}
-  #     - POSTGRES_USER=${POSTGRES_USER:-postgres}
-  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-  #     - POSTGREST_BASE_URL=http://postgrest:3000
-  #   volumes:
-  #     - ./functions:/app/functions
-  #     - deno_cache:/deno-dir
-  #   command: >
-  #     sh -c "
-  #       echo 'Downloading Deno dependencies...' &&
-  #       deno cache functions/server.ts &&
-  #       echo 'Starting Deno server...' &&
-  #       # Minimal permissions: net (server), env (config), read (worker template only)
-  #       deno run --allow-net --allow-env --allow-read=./functions/worker-template.js --watch functions/server.ts
-  #     "
-  #   restart: unless-stopped
-  #   networks:
-  #     - insforge-network
-  
-  analytics:
-    container_name: insforge-analytics
-    image: supabase/logflare:1.14.2
-    restart: unless-stopped
-    ports:
-      - 4000:4000
-    # Uncomment to use Big Query backend for analytics
-    # volumes:
-    #   - type: bind
-    #     source: ${PWD}/gcloud.json
-    #     target: /opt/app/rel/logflare/bin/gcloud.json
-    #     read_only: true
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "curl",
-          "http://localhost:4000/health"
-        ]
-      timeout: 10s
-      interval: 10s
-      retries: 5
-      start_period: 30s
+
+  deno:
+    image: denoland/deno:alpine-2.0.6
+    container_name: insforge-deno
+    working_dir: /app
     depends_on:
-      postgres:
-        # Disable this if you are using an external Postgres database
-        condition: service_healthy
+      - postgres
+      - postgrest
+    ports:
+      - "7133:7133"
     environment:
-      # Basic Logflare configuration
-      LOGFLARE_NODE_HOST: 127.0.0.1
-      PHX_HTTP_PORT: 4000
-      LOGFLARE_LOG_LEVEL: warn
-      # Database connection
-      DB_USERNAME: ${POSTGRES_USER:-postgres}
-      DB_DATABASE: _insforge
-      DB_HOSTNAME: postgres
-      DB_PORT: ${POSTGRES_PORT:-5432}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      DB_SCHEMA: _analytics
-      # Access tokens
-      LOGFLARE_PUBLIC_ACCESS_TOKEN: ${LOGFLARE_PUBLIC_ACCESS_TOKEN}
-      LOGFLARE_PRIVATE_ACCESS_TOKEN: ${LOGFLARE_PRIVATE_ACCESS_TOKEN}
-      # Mode settings
-      LOGFLARE_SINGLE_TENANT: true
-      LOGFLARE_SUPABASE_MODE: true
-      LOGFLARE_MIN_CLUSTER_SIZE: 1
-      # Use postgres backend
-      POSTGRES_BACKEND_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:${POSTGRES_PORT:-5432}/_insforge
-      POSTGRES_BACKEND_SCHEMA: _analytics
-      LOGFLARE_FEATURE_FLAG_OVERRIDE: multibackend=true
-      # Uncomment to use Big Query backend for analytics
-      # GOOGLE_PROJECT_ID: ${GOOGLE_PROJECT_ID}
-      # GOOGLE_PROJECT_NUMBER: ${GOOGLE_PROJECT_NUMBER}
+      - DENO_ENV=${DENO_ENV:-development}
+      - DENO_DIR=/deno-dir
+      # PostgreSQL connection
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-insforge}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGREST_BASE_URL=http://postgrest:3000
+    volumes:
+      - ./functions:/app/functions
+      - deno_cache:/deno-dir
+    command: >
+      sh -c "
+        echo 'Downloading Deno dependencies...' &&
+        deno cache functions/server.ts &&
+        echo 'Starting Deno server...' &&
+        # Minimal permissions: net (server), env (config), read (worker template only)
+        deno run --allow-net --allow-env --allow-read=./functions/worker-template.js --watch functions/server.ts
+      "
+    restart: unless-stopped
     networks:
       - insforge-network
 
@@ -204,11 +149,11 @@ services:
       timeout: 5s
       interval: 5s
       retries: 3
-    depends_on:
-      analytics:
-        condition: service_healthy
     environment:
       LOGFLARE_PUBLIC_ACCESS_TOKEN: ${LOGFLARE_PUBLIC_ACCESS_TOKEN}
+      AWS_REGION: ${AWS_REGION}
+      PROJECT_ID: ${PROJECT_ID}
+      HOSTNAME_OVERRIDE: ${HOSTNAME_OVERRIDE}
     command:
       [
         "--config",
@@ -222,8 +167,8 @@ services:
 volumes:
   postgres-data:
     driver: local
-  # deno_cache:
-  #   driver: local
+  deno_cache:
+    driver: local
 
 networks:
   insforge-network:
