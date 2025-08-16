@@ -400,6 +400,82 @@ router.get('/oauth/github', async (req: Request, res: Response, next: NextFuncti
   }
 });
 
+router.get(
+  '/oauth/shared/callback/:state',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { state } = req.params;
+      const { success, error, payload } = req.query;
+
+      if (!state) {
+        logger.warn('Shared OAuth callback called without state parameter');
+        throw new AppError('State parameter is required', 400, ERROR_CODES.INVALID_INPUT);
+      }
+
+      let redirectUrl: string;
+      let provider: string;
+      try {
+        const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
+        redirectUrl = stateData.redirectUrl || '/';
+        provider = stateData.provider || '';
+      } catch {
+        logger.warn('Invalid state parameter', { state });
+        throw new AppError('Invalid state parameter', 400, ERROR_CODES.INVALID_INPUT);
+      }
+
+      if (!['google', 'github'].includes(provider)) {
+        logger.warn('Invalid provider in state', { provider });
+        throw new AppError('Invalid provider in state', 400, ERROR_CODES.INVALID_INPUT);
+      }
+      if (!redirectUrl) {
+        throw new AppError('Redirect URL is required', 400, ERROR_CODES.INVALID_INPUT);
+      }
+
+      if (success !== 'true') {
+        const errorMessage = error || 'OAuth authentication failed';
+        logger.warn('Shared OAuth callback failed', { error: errorMessage, provider });
+        return res.redirect(`${redirectUrl}?error=${encodeURIComponent(String(errorMessage))}`);
+      }
+      if (!payload) {
+        throw new AppError('No payload provided in callback', 400, ERROR_CODES.INVALID_INPUT);
+      }
+
+      const payloadData = JSON.parse(Buffer.from(payload as string, 'base64').toString('utf8'));
+      let result;
+      if (provider === 'google') {
+        // Handle Google OAuth payload
+        const googleUserInfo = {
+          sub: payloadData.providerId,
+          email: payloadData.email,
+          name: payloadData.name || '',
+          userName: payloadData.userName || '',
+          picture: payloadData.avatar || '',
+        };
+        result = await authService.findOrCreateGoogleUser(googleUserInfo);
+      } else if (provider === 'github') {
+        // Handle GitHub OAuth payload
+        const githubUserInfo = {
+          id: payloadData.providerId,
+          email: payloadData.email,
+          name: payloadData.name || '',
+          avatar_url: payloadData.avatar || '',
+        };
+        result = await authService.findOrCreateGitHubUser(githubUserInfo);
+      }
+
+      const finalRedirectUrl = new URL(redirectUrl);
+      finalRedirectUrl.searchParams.set('access_token', result!.accessToken);
+      finalRedirectUrl.searchParams.set('user_id', result!.user.id);
+      finalRedirectUrl.searchParams.set('email', result!.user.email);
+      finalRedirectUrl.searchParams.set('name', result!.user.name || '');
+      res.redirect(finalRedirectUrl.toString());
+    } catch (error) {
+      logger.error('Shared OAuth callback error', { error });
+      next(error);
+    }
+  }
+);
+
 router.get('/oauth/:provider/callback', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { provider } = req.params;

@@ -79,8 +79,20 @@ export class AuthService {
    * Load OAuth configuration from database - NO CACHING, always fresh
    */
   private async loadOAuthConfig(): Promise<{
-    google: { clientId: string; clientSecret: string; redirectUri: string; enabled: boolean };
-    github: { clientId: string; clientSecret: string; redirectUri: string; enabled: boolean };
+    google: {
+      clientId: string;
+      clientSecret: string;
+      redirectUri: string;
+      enabled: boolean;
+      useSharedKeys: boolean;
+    };
+    github: {
+      clientId: string;
+      clientSecret: string;
+      redirectUri: string;
+      enabled: boolean;
+      useSharedKeys: boolean;
+    };
   }> {
     let configRows: any[];
     try {
@@ -93,6 +105,10 @@ export class AuthService {
       configRows = [];
     }
 
+    const enableSharedKeys =
+      process.env.AWS_INSTANCE_PROFILE_NAME &&
+      process.env.AWS_INSTANCE_PROFILE_NAME.trim().length > 0;
+
     const config = {
       google: {
         clientId: '',
@@ -100,6 +116,7 @@ export class AuthService {
         redirectUri:
           process.env.GOOGLE_REDIRECT_URI || 'http://localhost:7130/api/auth/oauth/google/callback',
         enabled: false,
+        useSharedKeys: enableSharedKeys, // can be overridden by DB
       },
       github: {
         clientId: '',
@@ -107,6 +124,7 @@ export class AuthService {
         redirectUri:
           process.env.GITHUB_REDIRECT_URI || 'http://localhost:7130/api/auth/oauth/github/callback',
         enabled: false,
+        useSharedKeys: enableSharedKeys, // can be overridden by DB
       },
     };
 
@@ -126,6 +144,7 @@ export class AuthService {
           config[provider].clientSecret = value.clientSecret || '';
           config[provider].redirectUri = value.redirectUri || config[provider].redirectUri;
           config[provider].enabled = value.enabled || false;
+          config[provider].useSharedKeys = value.useSharedKeys || enableSharedKeys;
         }
       } catch (e) {
         logger.error('Failed to parse OAuth config', { key: row.key, error: e });
@@ -133,8 +152,16 @@ export class AuthService {
     }
 
     logger.debug('OAuth config loaded from database', {
-      google: { enabled: config.google.enabled, hasClientId: !!config.google.clientId },
-      github: { enabled: config.github.enabled, hasClientId: !!config.github.clientId },
+      google: {
+        enabled: config.google.enabled,
+        hasClientId: !!config.google.clientId,
+        useSharedKeys: config.google.useSharedKeys,
+      },
+      github: {
+        enabled: config.github.enabled,
+        hasClientId: !!config.github.clientId,
+        useSharedKeys: config.github.useSharedKeys,
+      },
     });
 
     return config;
@@ -471,6 +498,35 @@ export class AuthService {
   async generateGoogleAuthUrl(state?: string): Promise<string> {
     const config = await this.loadOAuthConfig(); // Always fresh from DB
 
+    if (config.google.useSharedKeys) {
+      if (!state) {
+        logger.warn('Shared Google OAuth called without state parameter');
+        throw new Error('State parameter is required for shared Google OAuth');
+      }
+      // Use shared keys if configured
+      const cloudHost = process.env.CLOUD_API_HOST || 'https://api.insforge.dev';
+      const selfHost = process.env.API_BASE_URL || 'http://localhost:7130';
+      const redirectUri = `${selfHost}/api/auth/oauth/shared/callback/${encodeURIComponent(state)}`;
+      const authUrl = await fetch(
+        `${cloudHost}/auth/v1/shared/google?redirect_uri=${encodeURIComponent(redirectUri)}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      if (!authUrl.ok) {
+        logger.error('Failed to fetch Google auth URL:', {
+          status: authUrl.status,
+          statusText: authUrl.statusText,
+        });
+        throw new Error(`Failed to fetch Google auth URL: ${authUrl.statusText}`);
+      }
+      const responseData = (await authUrl.json()) as { auth_url?: string; url?: string };
+      return responseData.auth_url || responseData.url || '';
+    }
+
     if (!config.google.clientId || !config.google.clientSecret) {
       throw new Error('Google OAuth not configured');
     }
@@ -498,6 +554,40 @@ export class AuthService {
    */
   async generateGitHubAuthUrl(state?: string): Promise<string> {
     const config = await this.loadOAuthConfig(); // Always fresh from DB
+    logger.debug('GitHub OAuth Config (fresh from DB):', {
+      clientId: config.github.clientId ? 'SET' : 'NOT SET',
+      enabled: config.github.enabled,
+      useSharedKeys: config.github.useSharedKeys,
+    });
+
+    if (config.github.useSharedKeys) {
+      if (!state) {
+        logger.warn('Shared GitHub OAuth called without state parameter');
+        throw new Error('State parameter is required for shared GitHub OAuth');
+      }
+      // Use shared keys if configured
+      const cloudHost = process.env.CLOUD_API_HOST || 'https://api.insforge.dev';
+      const selfHost = process.env.API_BASE_URL || 'http://localhost:7130';
+      const redirectUri = `${selfHost}/api/auth/oauth/shared/callback/${encodeURIComponent(state)}`;
+      const authUrl = await fetch(
+        `${cloudHost}/auth/v1/shared/github?redirect_uri=${encodeURIComponent(redirectUri)}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      if (!authUrl.ok) {
+        logger.error('Failed to fetch GitHub auth URL:', {
+          status: authUrl.status,
+          statusText: authUrl.statusText,
+        });
+        throw new Error(`Failed to fetch GitHub auth URL: ${authUrl.statusText}`);
+      }
+      const responseData = (await authUrl.json()) as { auth_url?: string; url?: string };
+      return responseData.auth_url || responseData.url || '';
+    }
 
     if (!config.github.clientId || !config.github.clientSecret) {
       throw new Error('GitHub OAuth not configured');

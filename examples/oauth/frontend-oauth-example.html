@@ -149,13 +149,13 @@
                 showStatus('Getting Google authorization link...', 'info');
                 redirect_url = 'http://localhost/'; // window.location.href
                 // Get authorization URL
-                const response = await fetch(`${API_BASE}/auth/v1/google-auth?redirect_url=${encodeURIComponent(redirect_url)}`);
+                const response = await fetch(`${API_BASE}/auth/oauth/google?redirectUrl=${encodeURIComponent(redirect_url)}`);
                 const data = await response.json();
                 
-                if (data.success) {
+                if (data.authUrl) {
                     showStatus('Redirecting to Google authorization page...', 'info');
                     // Redirect to Google authorization page
-                    window.location.href = data.data.auth_url;
+                    window.location.href = data.authUrl;
                 } else {
                     throw new Error(data.error?.message || 'Failed to get authorization link');
                 }
@@ -177,12 +177,13 @@
                 
                 showStatus('Getting GitHub authorization link...', 'info');
                 redirect_url = 'http://localhost/';
-                const response = await fetch(`${API_BASE}/auth/v1/github-auth?redirect_url=${encodeURIComponent(redirect_url)}`);
+                const response = await fetch(`${API_BASE}/auth/oauth/github?redirectUrl=${encodeURIComponent(redirect_url)}`);
                 const data = await response.json();
-                
-                if (data.success) {
+                console.log('GitHub OAuth response:', data);
+
+                if (data.authUrl) {
                     showStatus('Redirecting to GitHub authorization page...', 'info');
-                    window.location.href = data.data.auth_url;
+                    window.location.href = data.authUrl;
                 } else {
                     throw new Error(data.error?.message || 'Failed to get authorization link');
                 }
