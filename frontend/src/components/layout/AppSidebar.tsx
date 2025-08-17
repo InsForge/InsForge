@@ -86,7 +86,9 @@ export default function AppSidebar({
         variant={isActive ? 'default' : 'ghost'}
         className={cn(
           'w-full h-12 relative transition-all duration-200 ease-in-out',
-          isActive ? 'bg-zinc-950 text-white' : 'hover:bg-zinc-100 text-black'
+          isActive
+            ? 'bg-zinc-950 dark:bg-emerald-300 text-white dark:text-black'
+            : 'hover:bg-zinc-100 dark:hover:bg-neutral-600 text-black dark:text-white'
         )}
         onClick={onClick}
       >
@@ -121,7 +123,7 @@ export default function AppSidebar({
     <aside
       {...props}
       className={cn(
-        'fixed left-0 z-40 bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out',
+        'fixed left-0 z-40 bg-white dark:bg-neutral-800 border-r border-gray-200 dark:border-neutral-700 flex flex-col transition-all duration-300 ease-in-out',
         'top-16 bottom-0',
         isCollapsed ? 'w-18' : 'w-60',
         props.className
@@ -148,7 +150,7 @@ export default function AppSidebar({
           <div key={item.name}>
             <Button
               variant="ghost"
-              className="w-full h-12 relative transition-all duration-200 ease-in-out border border-gray-200 rounded-md hover:bg-zinc-100 text-black"
+              className="w-full h-12 relative transition-all duration-200 ease-in-out border border-gray-200 dark:border-neutral-500 rounded-md hover:bg-zinc-100 dark:hover:bg-neutral-600 text-black dark:text-white"
               onClick={() => window.open(item.href, '_blank')}
             >
               <div className="absolute left-3.5 h-5 w-5">
@@ -170,7 +172,7 @@ export default function AppSidebar({
         <div className="hidden 2xl:block">
           <Button
             variant="ghost"
-            className="w-full h-12 relative transition-all duration-200 ease-in-out hover:bg-zinc-100"
+            className="w-full h-12 relative transition-all duration-200 ease-in-out hover:bg-zinc-100 dark:hover:bg-neutral-600 text-black dark:text-white"
             onClick={onToggleCollapse}
           >
             <div className="absolute left-3.5 h-5 w-5">

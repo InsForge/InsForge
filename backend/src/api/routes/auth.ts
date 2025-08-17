@@ -182,7 +182,7 @@ router.get('/users', verifyAdmin, async (req: Request, res: Response, next: Next
     const users = dbUsers.map((dbUser: any) => {
       const identities = [];
       const providers: string[] = [];
-      
+
       // Add social providers if any
       if (dbUser.providers) {
         dbUser.providers.split(',').forEach((provider: string) => {
@@ -190,13 +190,13 @@ router.get('/users', verifyAdmin, async (req: Request, res: Response, next: Next
           providers.push(provider);
         });
       }
-      
+
       // Add email provider if password exists
       if (dbUser.password) {
         identities.push({ provider: 'email' });
         providers.push('email');
       }
-      
+
       // Use first provider to determine type: 'email' or 'social'
       const firstProvider = providers[0];
       const provider_type = firstProvider === 'email' ? 'email' : 'social';
@@ -275,7 +275,7 @@ router.get(
       // Simple transformation - just format the provider as identities
       const identities = [];
       const providers: string[] = [];
-      
+
       // Add social providers if any
       if (dbUser.providers) {
         dbUser.providers.split(',').forEach((provider: string) => {
@@ -283,13 +283,13 @@ router.get(
           providers.push(provider);
         });
       }
-      
+
       // Add email provider if password exists
       if (dbUser.password) {
         identities.push({ provider: 'email' });
         providers.push('email');
       }
-      
+
       // Use first provider to determine type: 'email' or 'social'
       const firstProvider = providers[0];
       const provider_type = firstProvider === 'email' ? 'email' : 'social';

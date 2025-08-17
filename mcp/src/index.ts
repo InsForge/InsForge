@@ -499,73 +499,76 @@ server.tool(
     tableName: z.string().describe('Name of the table to modify'),
     ...updateTableSchemaRequestSchema.shape,
   },
-  withUsageTracking('modify-table', async ({
-    apiKey,
-    tableName,
-    addColumns,
-    dropColumns,
-    updateColumns,
-    addForeignKeys,
-    dropForeignKeys,
-    renameTable,
-  }) => {
-    try {
-      const actualApiKey = getApiKey(apiKey);
-      const requestBody: UpdateTableSchemaRequest = {};
+  withUsageTracking(
+    'modify-table',
+    async ({
+      apiKey,
+      tableName,
+      addColumns,
+      dropColumns,
+      updateColumns,
+      addForeignKeys,
+      dropForeignKeys,
+      renameTable,
+    }) => {
+      try {
+        const actualApiKey = getApiKey(apiKey);
+        const requestBody: UpdateTableSchemaRequest = {};
 
-      // Preprocess addColumns to format default values
-      if (addColumns) {
-        requestBody.addColumns = preprocessColumnDefaults(addColumns);
-      }
+        // Preprocess addColumns to format default values
+        if (addColumns) {
+          requestBody.addColumns = preprocessColumnDefaults(addColumns);
+        }
 
-      if (dropColumns) {
-        requestBody.dropColumns = dropColumns;
-      }
-      if (updateColumns) {
-        requestBody.updateColumns = updateColumns;
-      }
-      if (addForeignKeys) {
-        requestBody.addForeignKeys = addForeignKeys;
-      }
-      if (dropForeignKeys) {
-        requestBody.dropForeignKeys = dropForeignKeys;
-      }
-      if (renameTable) {
-        requestBody.renameTable = renameTable;
-      }
+        if (dropColumns) {
+          requestBody.dropColumns = dropColumns;
+        }
+        if (updateColumns) {
+          requestBody.updateColumns = updateColumns;
+        }
+        if (addForeignKeys) {
+          requestBody.addForeignKeys = addForeignKeys;
+        }
+        if (dropForeignKeys) {
+          requestBody.dropForeignKeys = dropForeignKeys;
+        }
+        if (renameTable) {
+          requestBody.renameTable = renameTable;
+        }
 
-      const response = await fetch(`${API_BASE_URL}/api/database/tables/${tableName}/schema`, {
-        method: 'PATCH',
-        headers: {
-          'x-api-key': actualApiKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      const result = await handleApiResponse(response);
-
-      return await addBackgroundContext({
-        content: [
-          {
-            type: 'text',
-            text: formatSuccessMessage('Table modified', result),
+        const response = await fetch(`${API_BASE_URL}/api/database/tables/${tableName}/schema`, {
+          method: 'PATCH',
+          headers: {
+            'x-api-key': actualApiKey,
+            'Content-Type': 'application/json',
           },
-        ],
-      });
-    } catch (error) {
-      const errMsg = error instanceof Error ? error.message : 'Unknown error occurred';
-      return await addBackgroundContext({
-        content: [
-          {
-            type: 'text',
-            text: `Error modifying table: ${errMsg}`,
-          },
-        ],
-        isError: true,
-      });
+          body: JSON.stringify(requestBody),
+        });
+
+        const result = await handleApiResponse(response);
+
+        return await addBackgroundContext({
+          content: [
+            {
+              type: 'text',
+              text: formatSuccessMessage('Table modified', result),
+            },
+          ],
+        });
+      } catch (error) {
+        const errMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+        return await addBackgroundContext({
+          content: [
+            {
+              type: 'text',
+              text: `Error modifying table: ${errMsg}`,
+            },
+          ],
+          isError: true,
+        });
+      }
     }
-  })
+  )
 );
 
 // Get table schema
@@ -710,39 +713,44 @@ server.tool(
 );
 
 // List storage buckets
-server.tool('list-buckets', 'Lists all storage buckets', {}, withUsageTracking('list-buckets', async () => {
-  try {
-    // This endpoint doesn't require authentication in the current implementation
-    const response = await fetch(`${API_BASE_URL}/api/storage/buckets`, {
-      method: 'GET',
-      headers: {
-        'x-api-key': getApiKey(), // Still need API key for protected endpoint
-      },
-    });
-
-    const result = await handleApiResponse(response);
-
-    return await addBackgroundContext({
-      content: [
-        {
-          type: 'text',
-          text: formatSuccessMessage('Buckets retrieved', result),
+server.tool(
+  'list-buckets',
+  'Lists all storage buckets',
+  {},
+  withUsageTracking('list-buckets', async () => {
+    try {
+      // This endpoint doesn't require authentication in the current implementation
+      const response = await fetch(`${API_BASE_URL}/api/storage/buckets`, {
+        method: 'GET',
+        headers: {
+          'x-api-key': getApiKey(), // Still need API key for protected endpoint
         },
-      ],
-    });
-  } catch (error) {
-    const errMsg = error instanceof Error ? error.message : 'Unknown error occurred';
-    return await addBackgroundContext({
-      content: [
-        {
-          type: 'text',
-          text: `Error listing buckets: ${errMsg}`,
-        },
-      ],
-      isError: true,
-    });
-  }
-}));
+      });
+
+      const result = await handleApiResponse(response);
+
+      return await addBackgroundContext({
+        content: [
+          {
+            type: 'text',
+            text: formatSuccessMessage('Buckets retrieved', result),
+          },
+        ],
+      });
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+      return await addBackgroundContext({
+        content: [
+          {
+            type: 'text',
+            text: `Error listing buckets: ${errMsg}`,
+          },
+        ],
+        isError: true,
+      });
+    }
+  })
+);
 
 // Delete storage bucket
 server.tool(

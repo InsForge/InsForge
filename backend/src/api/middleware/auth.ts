@@ -34,7 +34,6 @@ function setRequestUser(req: AuthRequest, payload: { sub: string; email: string;
   };
 }
 
-
 /**
  * Verifies user authentication (accepts both user and admin tokens)
  */

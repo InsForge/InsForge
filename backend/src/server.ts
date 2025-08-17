@@ -143,7 +143,7 @@ export async function createApp() {
   apiRouter.use('/docs', docsRouter);
   apiRouter.use('/functions', functionsRouter);
   apiRouter.use('/usage', usageRouter);
-  
+
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);
 

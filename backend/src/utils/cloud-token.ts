@@ -6,12 +6,12 @@ import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
  * Helper function to verify cloud backend JWT token
  * Validates JWT tokens from api.insforge.dev using JWKS
  */
-export async function verifyCloudToken(token: string): Promise<{ projectId: string; payload: any }> {
+export async function verifyCloudToken(
+  token: string
+): Promise<{ projectId: string; payload: any }> {
   // Create JWKS endpoint for remote key set
   const JWKS = createRemoteJWKSet(
-    new URL(
-      (process.env.CLOUD_API_HOST || 'https://api.insforge.dev') + '/.well-known/jwks.json'
-    )
+    new URL((process.env.CLOUD_API_HOST || 'https://api.insforge.dev') + '/.well-known/jwks.json')
   );
 
   // Verify the token with jose
@@ -22,7 +22,7 @@ export async function verifyCloudToken(token: string): Promise<{ projectId: stri
   // Verify project_id matches if configured
   const tokenProjectId = (payload as any).projectId;
   const expectedProjectId = process.env.PROJECT_ID;
-  
+
   if (expectedProjectId && tokenProjectId !== expectedProjectId) {
     throw new AppError(
       'Project ID mismatch',
@@ -34,6 +34,6 @@ export async function verifyCloudToken(token: string): Promise<{ projectId: stri
 
   return {
     projectId: tokenProjectId || expectedProjectId || 'local',
-    payload
+    payload,
   };
 }

@@ -9,11 +9,14 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/radix/Avatar';
 import { Separator } from '@/components/radix/Separator';
 import { cn } from '@/lib/utils/utils';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { useTheme } from '@/lib/contexts/ThemeContext';
 
 // Import SVG icons
 import DiscordIcon from '@/assets/icons/discord.svg';
-import InsForgeIcon from '@/assets/icons/insforge.svg';
 import GitHubIcon from '@/assets/icons/github.svg';
+import InsForgeLogoLight from '@/assets/insforge_light.svg';
+import InsForgeLogoDark from '@/assets/insforge_dark.svg';
 
 interface AppHeaderProps {
   currentUser: any;
@@ -21,6 +24,7 @@ interface AppHeaderProps {
 }
 
 export default function AppHeader({ currentUser, onLogout }: AppHeaderProps) {
+  const { resolvedTheme } = useTheme();
   const [currentEmojiIndex, setCurrentEmojiIndex] = useState(0);
   const emojis = ['🙏', '🥺', '🫵'];
 
@@ -60,10 +64,14 @@ export default function AppHeader({ currentUser, onLogout }: AppHeaderProps) {
   };
 
   return (
-    <div className="h-16 w-full bg-white border-b border-border-gray z-50 flex items-center justify-between px-6">
+    <div className="h-16 w-full bg-white dark:bg-neutral-800 border-b border-border-gray dark:border-neutral-700 z-50 flex items-center justify-between px-6">
       {/* Logo */}
       <div className="px-2 py-3">
-        <img src={InsForgeIcon} alt="Insforge Logo" className="h-6 w-auto" />
+        <img
+          src={resolvedTheme === 'light' ? InsForgeLogoLight : InsForgeLogoDark}
+          alt="Insforge Logo"
+          className="h-8 w-auto"
+        />
       </div>
 
       {/* Social Links */}
@@ -93,11 +101,14 @@ export default function AppHeader({ currentUser, onLogout }: AppHeaderProps) {
           <p className="text-sm text-white mr-1.5">Ask us anything</p>
         </a>
         <Separator className="h-6 mx-1" orientation="vertical" />
+        {/* Theme Toggle */}
+        <ThemeToggle />
+        <Separator className="h-6 mx-1" orientation="vertical" />
         {/* User Profile */}
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
-            <button className="w-50 flex items-center gap-3 hover:bg-zinc-100 rounded-[8px] pr-3 transition-all duration-200 group">
-              <Avatar className="h-10 w-10 ring-2 ring-white shadow-sm">
+            <button className="w-50 flex items-center gap-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[8px] pr-3 transition-all duration-200 group">
+              <Avatar className="h-10 w-10 ring-2 ring-white dark:ring-gray-700 shadow-sm">
                 <AvatarImage src={currentUser?.avatar} />
                 <AvatarFallback
                   className={cn(
@@ -109,10 +120,14 @@ export default function AppHeader({ currentUser, onLogout }: AppHeaderProps) {
                 </AvatarFallback>
               </Avatar>
               <div className="text-left hidden md:block">
-                <p className="text-sm font-medium text-zinc-950 leading-tight">Admin</p>
-                <p className="text-xs  text-zinc-500">{currentUser?.email || 'Administrator'}</p>
+                <p className="text-sm font-medium text-zinc-950 dark:text-zinc-100 leading-tight">
+                  Admin
+                </p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {currentUser?.email || 'Administrator'}
+                </p>
               </div>
-              <ChevronDown className="h-5 w-5 text-black hidden md:block ml-auto" />
+              <ChevronDown className="h-5 w-5 text-black dark:text-white hidden md:block ml-auto" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48" sideOffset={8} collisionPadding={16}>
