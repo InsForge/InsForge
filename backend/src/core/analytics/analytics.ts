@@ -17,6 +17,10 @@ export class AnalyticsManager {
   private cwClient: CloudWatchLogsClient | null = null;
   private cwLogGroup: string | null = null;
   private cwRegion: string | null = null;
+  private provider: 'logflare' | 'cloudwatch' = 'logflare';
+  private cwClient: CloudWatchLogsClient | null = null;
+  private cwLogGroup: string | null = null;
+  private cwRegion: string | null = null;
 
   // Source name mapping for user-friendly display
   private sourceNameMap: Record<string, string> = {
@@ -134,6 +138,35 @@ export class AnalyticsManager {
     }
 
     // Logflare/Postgres path
+    if (this.provider === 'cloudwatch') {
+      // Derive sources by inspecting stream suffixes
+      const logGroup = this.cwLogGroup!;
+      const client = this.cwClient!;
+
+      // Default suffix mapping
+      const suffixMapping: Record<string, string> = {
+        'insforge.logs': process.env.CW_SUFFIX_INFORGE || 'insforge-vector',
+        'postgREST.logs': process.env.CW_SUFFIX_POSTGREST || 'postgrest-vector',
+        'postgres.logs': process.env.CW_SUFFIX_POSTGRES || 'postgres-vector',
+        // 'function.logs': process.env.CW_SUFFIX_FUNCTION || 'function-vector', // optional
+      };
+
+      const cmd = new DescribeLogStreamsCommand({ logGroupName: logGroup });
+      const result = await client.send(cmd);
+      const streams = result.logStreams || [];
+
+      const available: LogSource[] = [];
+      let idCounter = 1;
+      for (const [displayName, suffix] of Object.entries(suffixMapping)) {
+        const have = streams.some((s) => (s.logStreamName || '').endsWith(`-${suffix}`) || (s.logStreamName || '').includes(suffix));
+        if (have) {
+          available.push({ id: idCounter++, name: displayName, token: suffix });
+        }
+      }
+      return available;
+    }
+
+    // Logflare/Postgres path
     const client = await this.pool.connect();
     try {
       const result = await client.query(`
@@ -181,6 +214,63 @@ export class AnalyticsManager {
     total: number;
     tableName: string;
   }> {
+    if (this.provider === 'cloudwatch') {
+      const client = this.cwClient!;
+      const logGroup = this.cwLogGroup!;
+
+      // Map source to stream suffix
+      const suffixMapping: Record<string, string> = {
+        'insforge.logs': process.env.CW_SUFFIX_INFORGE || 'insforge-vector',
+        'postgREST.logs': process.env.CW_SUFFIX_POSTGREST || 'postgrest-vector',
+        'postgres.logs': process.env.CW_SUFFIX_POSTGRES || 'postgres-vector',
+        'function.logs': process.env.CW_SUFFIX_FUNCTION || 'function-vector',
+      };
+      const suffix = suffixMapping[sourceName] || suffixMapping[this.getDisplayName(sourceName)] || '';
+
+      // Collect all streams matching suffix
+      const dls = await client.send(new DescribeLogStreamsCommand({ logGroupName: logGroup }));
+      const streams = (dls.logStreams || [])
+        .map((s) => s.logStreamName || '')
+        .filter((name) => (suffix ? name.endsWith(`-${suffix}`) || name.includes(suffix) : true));
+
+      const startMs = startTime ? Date.parse(startTime) : undefined;
+      const endMs = (beforeTimestamp ? Date.parse(beforeTimestamp) : undefined) || (endTime ? Date.parse(endTime) : undefined);
+
+      const fle = await client.send(
+        new FilterLogEventsCommand({
+          logGroupName: logGroup,
+          logStreamNames: streams.length > 0 ? streams.slice(0, 100) : undefined,
+          startTime: startMs,
+          endTime: endMs,
+          limit,
+        })
+      );
+
+      const events = fle.events || [];
+      const logs: AnalyticsLogRecord[] = events.map((e) => {
+        const message = e.message || '';
+        let parsed: Record<string, unknown> = {};
+        try {
+          parsed = JSON.parse(message);
+        } catch {
+          parsed = { message };
+        }
+        return {
+          id: e.eventId || `${e.logStreamName || ''}-${e.timestamp || ''}`,
+          timestamp: new Date((e.timestamp || Date.now())).toISOString(),
+          event_message: typeof parsed === 'object' && parsed && (parsed as any).msg ? (parsed as any).msg : (typeof message === 'string' ? message.slice(0, 500) : String(message)),
+          body: parsed as Record<string, any>,
+        };
+      });
+
+      return {
+        logs,
+        total: logs.length,
+        tableName: `cloudwatch:${logGroup}`,
+      };
+    }
+
+    // Logflare/Postgres path
     if (this.provider === 'cloudwatch') {
       const client = this.cwClient!;
       const logGroup = this.cwLogGroup!;
@@ -334,6 +424,36 @@ export class AnalyticsManager {
     }
 
     // Logflare/Postgres path
+    if (this.provider === 'cloudwatch') {
+      const client = this.cwClient!;
+      const logGroup = this.cwLogGroup!;
+      const sources = await this.getLogSources();
+      const stats: LogSourceStats[] = [];
+
+      for (const src of sources) {
+        // Use DescribeLogStreams to get last ingestion time as proxy for last activity
+        const dls = await client.send(new DescribeLogStreamsCommand({ logGroupName: logGroup }));
+        const suffix = src.token;
+        const last = (dls.logStreams || [])
+          .filter((s) => (s.logStreamName || '').includes(suffix))
+          .reduce<number | null>((acc, s) => {
+            const t = s.lastIngestionTime ?? s.creationTime ?? null;
+            if (t == null) return acc;
+            if (acc == null) return t;
+            return Math.max(acc, t);
+          }, null);
+
+        stats.push({
+          source: src.name,
+          count: 0, // Optional: can be computed via Logs Insights if needed
+          lastActivity: last ? new Date(last).toISOString() : '',
+        });
+      }
+
+      return stats;
+    }
+
+    // Logflare/Postgres path
     const client = await this.pool.connect();
     try {
       const sources = await this.getLogSources();
@@ -448,6 +568,75 @@ export class AnalyticsManager {
     }
 
     // Logflare/Postgres path
+    if (this.provider === 'cloudwatch') {
+      const client = this.cwClient!;
+      const logGroup = this.cwLogGroup!;
+
+      // Choose time range (default last 7 days)
+      const end = Date.now();
+      const start = end - 7 * 24 * 60 * 60 * 1000;
+
+      // Build query string
+      const escaped = query.replace(/"/g, '\\"');
+      let insights = `fields @timestamp, @message, @logStream | filter @message like /${escaped}/`;
+      if (sourceName) {
+        const suffix = sourceName === 'insforge.logs'
+          ? (process.env.CW_SUFFIX_INFORGE || 'insforge-vector')
+          : sourceName === 'postgREST.logs'
+          ? (process.env.CW_SUFFIX_POSTGREST || 'postgrest-vector')
+          : sourceName === 'postgres.logs'
+          ? (process.env.CW_SUFFIX_POSTGRES || 'postgres-vector')
+          : (process.env.CW_SUFFIX_FUNCTION || 'function-vector');
+        insights += ` | filter @logStream like /${suffix}/`;
+      }
+      insights += ` | sort @timestamp desc | limit ${limit}`;
+
+      const startQuery = await client.send(new StartQueryCommand({
+        logGroupName: logGroup,
+        startTime: Math.floor(start / 1000),
+        endTime: Math.floor(end / 1000),
+        queryString: insights,
+        limit,
+      }));
+      const qid = startQuery.queryId!;
+
+      // Poll results briefly (simple loop, small wait)
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      let results;
+      for (let i = 0; i < 20; i++) {
+        const r = await client.send(new GetQueryResultsCommand({ queryId: qid }));
+        if (r.status === 'Complete' || r.status === 'Failed' || r.status === 'Cancelled') {
+          results = r.results || [];
+          break;
+        }
+        await sleep(300);
+      }
+      const rows = results || [];
+      const toObj = (row: any[]) => Object.fromEntries(row.map((c: any) => [c.field, c.value]));
+      const mapped: (AnalyticsLogRecord & { source: string })[] = rows.map((r: any) => {
+        const o = toObj(r);
+        const msg = o['@message'] || '';
+        let parsed: Record<string, unknown> = {};
+        try { parsed = JSON.parse(msg); } catch { parsed = { message: msg }; }
+        const logStream: string = o['@logStream'] || '';
+        const source: string = logStream.includes('postgrest')
+          ? 'postgREST.logs'
+          : logStream.includes('postgres')
+          ? 'postgres.logs'
+          : 'insforge.logs';
+        return {
+          id: `${o['@logStream']}-${o['@timestamp']}`,
+          timestamp: new Date(Number(o['@timestamp'] || Date.now())).toISOString(),
+          event_message: typeof parsed === 'object' && (parsed as any).msg ? (parsed as any).msg : (typeof msg === 'string' ? msg.slice(0, 500) : String(msg)),
+          body: parsed as Record<string, any>,
+          source,
+        };
+      });
+
+      return { logs: mapped, total: mapped.length };
+    }
+
+    // Logflare/Postgres path
     const client = await this.pool.connect();
     try {
       let sources: LogSource[];
@@ -480,6 +669,7 @@ export class AnalyticsManager {
             [source.name, `%${query}%`, limit, offset]
           );
           results.push(...(searchResult.rows as (AnalyticsLogRecord & { source: string })[]));
+          results.push(...(searchResult.rows as (AnalyticsLogRecord & { source: string })[]));
           const countResult = await client.query(
             `SELECT COUNT(*) as count
             FROM _analytics.${tableName}
@@ -496,12 +686,16 @@ export class AnalyticsManager {
       }
       results.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       return { logs: results.slice(0, limit), total: totalCount };
+      return { logs: results.slice(0, limit), total: totalCount };
     } finally {
       client.release();
     }
   }
 
   async close(): Promise<void> {
+    if (this.provider === 'logflare' && this.pool) {
+      await this.pool.end();
+    }
     if (this.provider === 'logflare' && this.pool) {
       await this.pool.end();
     }
