@@ -8,6 +8,7 @@ import {
   StartQueryCommand,
   GetQueryResultsCommand,
 } from '@aws-sdk/client-cloudwatch-logs';
+import { isCloudEnvironment } from '@/utils/environment.js';
 
 export class AnalyticsManager {
   private static instance: AnalyticsManager;
@@ -53,9 +54,13 @@ export class AnalyticsManager {
   }
 
   async initialize(): Promise<void> {
-    // Decide provider based on environment
-    const provider = (process.env.ANALYTICS_PROVIDER || 'logflare').toLowerCase();
-    if (provider === 'cloudwatch') {
+    // Decide provider based on environment and explicit override
+    const explicitProvider = (process.env.ANALYTICS_PROVIDER || '').toLowerCase();
+    const shouldUseCloudwatch =
+      explicitProvider === 'cloudwatch' ||
+      (!explicitProvider && isCloudEnvironment() && !!process.env.CLOUDWATCH_LOG_GROUP);
+
+    if (shouldUseCloudwatch) {
       this.provider = 'cloudwatch';
       this.cwRegion = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1';
       this.cwLogGroup = process.env.CLOUDWATCH_LOG_GROUP || null;
@@ -72,7 +77,7 @@ export class AnalyticsManager {
       return;
     }
 
-    // Default to Logflare/Postgres
+    // Default to Logflare/Postgres (explicit logflare or local dev)
     this.provider = 'logflare';
     // PostgreSQL connection configuration for _insforge database
     this.pool = new Pool({
