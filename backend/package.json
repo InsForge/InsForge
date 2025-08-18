@@ -23,6 +23,7 @@
     "jwt"
   ],
   "dependencies": {
+    "@aws-sdk/client-cloudwatch-logs": "^3.713.0",
     "@aws-sdk/client-s3": "^3.713.0",
     "@insforge/insforge-mcp": "^1.0.8",
     "@insforge/shared-schemas": "1.0.0",
