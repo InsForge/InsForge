@@ -14,6 +14,33 @@ import {
 import logger from '@/utils/logger.js';
 import { convertSqlTypeToColumnType } from '@/utils/helpers';
 
+// Runtime type guard for OAuth metadata read from the database
+function isOAuthMetadataSchema(value: unknown): value is OAuthMetadataSchema {
+  if (value === null || value === undefined || typeof value !== 'object') {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  const google = record['google'];
+  const github = record['github'];
+  if (google === null || google === undefined || typeof google !== 'object') {
+    return false;
+  }
+  if (github === null || github === undefined || typeof github !== 'object') {
+    return false;
+  }
+
+  const g = google as { enabled?: unknown; useSharedKeys?: unknown };
+  const gh = github as { enabled?: unknown; useSharedKeys?: unknown };
+
+  const isBoolOrUndefined = (v: unknown) => typeof v === 'boolean' || v === undefined;
+  return (
+    isBoolOrUndefined(g.enabled) &&
+    isBoolOrUndefined(g.useSharedKeys) &&
+    isBoolOrUndefined(gh.enabled) &&
+    isBoolOrUndefined(gh.useSharedKeys)
+  );
+}
+
 export class MetadataService {
   private static instance: MetadataService;
   private db: ReturnType<DatabaseManager['getDb']>;
@@ -247,7 +274,7 @@ export class MetadataService {
   }
 
   async updateAuthMetadata(config?: OAuthConfigSchema): Promise<void> {
-    const currentAuth = (await this.getMetadata('auth')) || {
+    const defaultAuth: OAuthMetadataSchema = {
       google: {
         enabled: false,
         useSharedKeys: false,
@@ -257,6 +284,9 @@ export class MetadataService {
         useSharedKeys: false,
       },
     };
+
+    const rawAuth = await this.getMetadata('auth');
+    const currentAuth: OAuthMetadataSchema = isOAuthMetadataSchema(rawAuth) ? rawAuth : defaultAuth;
 
     const authMetadata: OAuthMetadataSchema = {
       google: {
