@@ -5,10 +5,10 @@ info:
   description: Authentication endpoints with separated auth and profile tables
 
 paths:
-  /api/auth/register:
+  /api/auth/users:
     post:
       summary: Register new user
-      description: Creates a new user with separate auth and profile records
+      description: Creates a new user account
       requestBody:
         required: true
         content:
@@ -25,14 +25,11 @@ paths:
                   example: user@example.com
                 password:
                   type: string
-                  minLength: 6
+                  minLength: 8
                   example: securepassword123
                 name:
                   type: string
                   example: John Doe
-                id:
-                  type: string
-                  description: Optional custom user ID
       responses:
         '201':
           description: User created successfully
@@ -41,43 +38,131 @@ paths:
               schema:
                 type: object
                 properties:
-                  success:
-                    type: boolean
-                    example: true
-                  data:
+                  user:
                     type: object
                     properties:
-                      user:
-                        type: object
-                        properties:
-                          id:
-                            type: string
-                            description: Auth record ID
-                          email:
-                            type: string
-                          name:
-                            type: string
-                            description: From profile record
-                          avatarUrl:
-                            type: string
-                            nullable: true
-                          bio:
-                            type: string
-                            nullable: true
-                      token:
+                      id:
                         type: string
-                        description: JWT authentication token
-                  meta:
-                    type: object
-                    properties:
-                      timestamp:
+                        format: uuid
+                      email:
+                        type: string
+                      name:
+                        type: string
+                      emailVerified:
+                        type: boolean
+                      createdAt:
                         type: string
                         format: date-time
+                      updatedAt:
+                        type: string
+                        format: date-time
+                  accessToken:
+                    type: string
+                    description: JWT authentication token
+        '400':
+          description: Invalid request
+        '409':
+          description: User already exists
 
-  /api/auth/login:
+    get:
+      summary: List all users (admin only)
+      description: Returns paginated list of users
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [user, admin]
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        email:
+                          type: string
+                        name:
+                          type: string
+                        role:
+                          type: string
+                        created_at:
+                          type: string
+                          format: date-time
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  totalPages:
+                    type: integer
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+
+    delete:
+      summary: Delete users (admin only)
+      description: Delete multiple users by their IDs
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userIds:
+                  type: array
+                  items:
+                    type: string
+              required:
+                - userIds
+      responses:
+        '200':
+          description: Users deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  deletedCount:
+                    type: integer
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+
+  /api/auth/sessions:
     post:
       summary: User login
-      description: Authenticates user and returns profile data with token
+      description: Authenticates user and returns access token
       requestBody:
         required: true
         content:
@@ -101,30 +186,58 @@ paths:
               schema:
                 type: object
                 properties:
-                  success:
-                    type: boolean
-                  data:
+                  user:
                     type: object
                     properties:
-                      user:
-                        type: object
-                        properties:
-                          id:
-                            type: string
-                          email:
-                            type: string
-                          name:
-                            type: string
-                          avatarUrl:
-                            type: string
-                            nullable: true
-                          bio:
-                            type: string
-                            nullable: true
-                      token:
+                      id:
                         type: string
+                        format: uuid
+                      email:
+                        type: string
+                      name:
+                        type: string
+                      emailVerified:
+                        type: boolean
+                      createdAt:
+                        type: string
+                        format: date-time
+                      updatedAt:
+                        type: string
+                        format: date-time
+                  accessToken:
+                    type: string
+        '401':
+          description: Invalid credentials
 
-  /api/auth/admin/login:
+  /api/auth/sessions/current:
+    get:
+      summary: Get current user
+      description: Returns the currently authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      email:
+                        type: string
+                      name:
+                        type: string
+                      role:
+                        type: string
+        '401':
+          description: Unauthorized
+
+  /api/auth/admin/sessions:
     post:
       summary: Admin login
       description: Authenticates admin user for dashboard access
@@ -151,167 +264,166 @@ paths:
               schema:
                 type: object
                 properties:
-                  success:
-                    type: boolean
-                  data:
+                  accessToken:
+                    type: string
+                  user:
                     type: object
                     properties:
-                      user:
-                        type: object
-                        properties:
-                          id:
-                            type: string
-                          email:
-                            type: string
-                          name:
-                            type: string
-                          role:
-                            type: string
-                            enum: [admin]
-                      token:
+                      id:
                         type: string
+                      email:
+                        type: string
+                      name:
+                        type: string
+                      role:
+                        type: string
+                        enum: [admin]
+        '401':
+          description: Invalid credentials
+        '403':
+          description: User is not an admin
 
-  /api/auth/me:
-    get:
-      summary: Get current user
-      security:
-        - bearerAuth: []
+  /api/auth/admin/sessions/exchange:
+    post:
+      summary: Exchange cloud provider authorization code for admin session
+      description: Verifies an authorization code/JWT from from Insforge Cloud platform and issues an internal admin session token with project_admin role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+              properties:
+                code:
+                  type: string
+                  description: Authorization code or JWT from the Insforge
+                  example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
       responses:
         '200':
-          description: Current user info
+          description: Cloud authorization verified, admin session created
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  success:
-                    type: boolean
-                  data:
+                  accessToken:
+                    type: string
+                    description: Internal JWT for admin authentication
+                  user:
                     type: object
                     properties:
-                      user:
-                        type: object
+                      id:
+                        type: string
+                        format: uuid
+                      email:
+                        type: string
+                      name:
+                        type: string
+                        example: Administrator
+                      emailVerified:
+                        type: boolean
+                      createdAt:
+                        type: string
+                        format: date-time
+                      updatedAt:
+                        type: string
+                        format: date-time
+        '400':
+          description: Invalid authorization code or JWT verification failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
-  /api/auth/v1/google-auth:
+  /api/auth/oauth/google:
     get:
-      summary: Get Google OAuth authorization URL
+      summary: Initiate Google OAuth flow
       parameters:
-        - name: redirectUrl
+        - name: redirect_uri
           in: query
-          required: false
           schema:
             type: string
             format: uri
-          description: Client redirect URL after OAuth completion
+          description: URL to redirect after authentication
       responses:
-        '200':
-          description: Google OAuth authorization URL
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  data:
-                    type: object
-                    properties:
-                      authUrl:
-                        type: string
+        '302':
+          description: Redirect to Google OAuth
+        '500':
+          description: OAuth not configured
 
-  /api/auth/v1/github-auth:
+  /api/auth/oauth/github:
     get:
-      summary: Get GitHub OAuth authorization URL
+      summary: Initiate GitHub OAuth flow
       parameters:
-        - name: redirectUrl
+        - name: redirect_uri
           in: query
-          required: false
           schema:
             type: string
             format: uri
-          description: Client redirect URL after OAuth completion
+          description: URL to redirect after authentication
       responses:
-        '200':
-          description: Github OAuth authorization URL
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  data:
-                    type: object
-                    properties:
-                      authUrl:
-                        type: string
+        '302':
+          description: Redirect to GitHub OAuth
+        '500':
+          description: OAuth not configured
 
-  /api/auth/v1/callback:
+  /api/auth/oauth/shared/callback:
     get:
-      summary: Unified OAuth callback for Google/GitHub
-      description: Handles OAuth callbacks from both Google and GitHub providers
+      summary: Shared OAuth callback handler
+      description: Handles OAuth callbacks from all providers
       parameters:
         - name: code
           in: query
-          required: false
           schema:
             type: string
           description: Authorization code from OAuth provider
         - name: state
           in: query
-          required: false
           schema:
             type: string
-          description: Base64 encoded state containing client redirect URL and provider info
+          description: JWT encoded state with provider and redirect URL
         - name: token
           in: query
-          required: false
           schema:
             type: string
-          description: Direct Google ID token (alternative to code)
+          description: Direct ID token (for Google)
       responses:
         '302':
-          description: Redirect to the final URL with token and user info
+          description: Redirect with access token and user info in query params
           headers:
             Location:
-              type: string
-              format: uri
-
-  /api/auth/users:
-    get:
-      summary: List all users
-      description: Returns list of users with basic profile info
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: List of users
-          content:
-            application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  data:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id:
-                          type: string
-                        email:
-                          type: string
-                        name:
-                          type: string
-                        status:
-                          type: string
-                        createdAt:
-                          type: string
-                          format: date-time
-                        updatedAt:
-                          type: string
-                          format: date-time
+                type: string
+                format: uri
+
+  /api/auth/oauth/{provider}/callback:
+    get:
+      summary: Provider-specific OAuth callback
+      description: Alternative callback endpoint for specific providers
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [google, github]
+        - name: code
+          in: query
+          schema:
+            type: string
+        - name: state
+          in: query
+          schema:
+            type: string
+        - name: token
+          in: query
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect with access token
 
 components:
   securitySchemes:

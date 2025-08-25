@@ -149,7 +149,7 @@
                 showStatus('Getting Google authorization link...', 'info');
                 redirect_url = 'http://localhost/'; // window.location.href
                 // Get authorization URL
-                const response = await fetch(`${API_BASE}/auth/oauth/google?redirectUrl=${encodeURIComponent(redirect_url)}`);
+                const response = await fetch(`${API_BASE}/auth/oauth/google?redirect_uri=${encodeURIComponent(redirect_url)}`);
                 const data = await response.json();
                 
                 if (data.authUrl) {
@@ -177,7 +177,7 @@
                 
                 showStatus('Getting GitHub authorization link...', 'info');
                 redirect_url = 'http://localhost/';
-                const response = await fetch(`${API_BASE}/auth/oauth/github?redirectUrl=${encodeURIComponent(redirect_url)}`);
+                const response = await fetch(`${API_BASE}/auth/oauth/github?redirect_uri=${encodeURIComponent(redirect_url)}`);
                 const data = await response.json();
                 console.log('GitHub OAuth response:', data);
 

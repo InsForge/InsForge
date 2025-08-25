@@ -4,53 +4,7 @@ info:
   version: 1.0.0
 
 paths:
-  /api/tables/field-types:
-    get:
-      summary: Get Available Field Types
-      security:
-        - bearerAuth: []
-        - apiKey: []
-      responses:
-        '200':
-          description: List of available field types with SQL type mappings
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties:
-                  type: object
-                  properties:
-                    sqlType:
-                      type: string
-                    defaultValue:
-                      type: string
-              example:
-                string:
-                  sqlType: TEXT
-                  defaultValue: "''"
-                integer:
-                  sqlType: INTEGER
-                  defaultValue: "0"
-                uuid:
-                  sqlType: TEXT
-                  defaultValue: gen_random_uuid()
-                boolean:
-                  sqlType: BOOLEAN
-                  defaultValue: "false"
-                datetime:
-                  sqlType: TIMESTAMPTZ
-                  defaultValue: "CURRENT_TIMESTAMP"
-                json:
-                  sqlType: JSONB
-                  defaultValue: "'{}'"
-                float:
-                  sqlType: REAL
-                  defaultValue: "0.0"
-                file:
-                  sqlType: TEXT
-                  defaultValue: "null"
-
-  /api/tables:
+  /api/database/tables:
     get:
       summary: List Tables
       security:
@@ -157,7 +111,7 @@ paths:
                 statusCode: 422
                 nextActions: "Use one of the valid field types"
 
-  /api/tables/{tableName}/schema:
+  /api/database/tables/{tableName}:
     get:
       summary: Get Table Schema
       security:
@@ -431,7 +385,7 @@ paths:
                 statusCode: 404
                 nextActions: "Check table name and try again"
 
-  /api/tables/{tableName}:
+  /api/database/tables/{tableName}:
     delete:
       summary: Delete Table
       security:

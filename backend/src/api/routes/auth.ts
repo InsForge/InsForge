@@ -347,11 +347,11 @@ router.delete('/users', verifyAdmin, async (req: Request, res: Response, next: N
 // OAuth endpoints following naming convention: /oauth/:provider and /oauth/:provider/callback
 router.get('/oauth/google', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { redirectUrl } = req.query;
+    const { redirect_uri } = req.query;
 
     const jwtPayload = {
       provider: 'google',
-      redirectUrl: redirectUrl ? (redirectUrl as string) : undefined,
+      redirectUrl: redirect_uri ? (redirect_uri as string) : undefined,
       createdAt: Date.now(),
     };
     const state = jwt.sign(jwtPayload, process.env.JWT_SECRET || 'default_secret', {
@@ -375,10 +375,10 @@ router.get('/oauth/google', async (req: Request, res: Response, next: NextFuncti
 
 router.get('/oauth/github', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { redirectUrl } = req.query;
+    const { redirect_uri } = req.query;
     const jwtPayload = {
       provider: 'github',
-      redirectUrl: redirectUrl ? (redirectUrl as string) : undefined,
+      redirectUrl: redirect_uri ? (redirect_uri as string) : undefined,
       createdAt: Date.now(),
     };
     const state = jwt.sign(jwtPayload, process.env.JWT_SECRET || 'default_secret', {
