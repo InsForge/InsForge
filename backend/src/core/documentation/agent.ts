@@ -34,18 +34,26 @@ export class AgentAPIDocService {
   }
 
   /**
-   * Convert table schema to simplified record schema
+   * Convert table schema to simplified record schema with foreign key descriptions
    */
   private tableToRecordSchema(
     table: TableSchema
-  ): Record<string, { type: string; required: boolean }> {
-    const schema: Record<string, { type: string; required: boolean }> = {};
+  ): Record<string, { type: string; required: boolean; description?: string }> {
+    const schema: Record<string, { type: string; required: boolean; description?: string }> = {};
 
     for (const column of table.columns) {
-      schema[column.columnName] = {
+      const field: { type: string; required: boolean; description?: string } = {
         type: this.mapColumnType(column.type),
         required: !column.isNullable,
       };
+
+      // Add foreign key relationship description
+      if (column.foreignKey) {
+        const fk = column.foreignKey;
+        field.description = `Foreign key reference to ${fk.referenceTable}.${fk.referenceColumn}`;
+      }
+
+      schema[column.columnName] = field;
     }
 
     return schema;
@@ -67,8 +75,11 @@ export class AgentAPIDocService {
         return true;
       });
 
-      // Generate table schemas
-      const tableSchemas: Record<string, Record<string, { type: string; required: boolean }>> = {};
+      // Generate table schemas with descriptions
+      const tableSchemas: Record<
+        string,
+        Record<string, { type: string; required: boolean; description?: string }>
+      > = {};
       const tableList: string[] = [];
 
       for (const table of tables) {
@@ -238,7 +249,8 @@ export class AgentAPIDocService {
         },
 
         // Universal patterns for all tables
-        '<critical-database>': 'Re-read the tableApi section before implementing database operations',
+        '<critical-database>':
+          'Re-read the tableApi section before implementing database operations',
         tableApi: {
           list: {
             method: 'GET',
@@ -315,16 +327,18 @@ export class AgentAPIDocService {
           },
 
           create: {
-            '<critical-create>': 'Re-read this create operation documentation before every POST request',
+            '<critical-create>':
+              'Re-read this create operation documentation before every POST request',
             method: 'POST',
             path: '/api/database/records/{tableName}',
             request: {
               params: {
                 tableName: 'string - name of the table',
               },
-              body: '[{tableName}RecordSchema] - MUST be array even for single record (exclude: id, created_at, updated_at)',
+              body: '[Omit<{tableName}RecordSchema, "id" | "created_at" | "updated_at">] - MUST be array even for single record (exclude the system fields)',
               headers: {
-                'Prefer': 'return=representation (REQUIRED to get created record back, otherwise returns empty array)',
+                Prefer:
+                  'return=representation (REQUIRED to get created record back, otherwise returns empty array)',
               },
             },
             response: {
@@ -356,9 +370,9 @@ export class AgentAPIDocService {
               queryParams: {
                 'id=eq.{value}': 'string - primary key value (using PostgREST eq operator)',
               },
-              body: 'Partial<{tableName}RecordSchema> (all fields optional, exclude: id, created_at, updated_at)',
+              body: 'Partial<{tableName}RecordSchema> (all fields optional, exclude the system fields)',
               headers: {
-                'Prefer': 'return=representation (optional - to return updated record)',
+                Prefer: 'return=representation (optional - to return updated record)',
               },
             },
             response: {
@@ -390,7 +404,7 @@ export class AgentAPIDocService {
                 'id=eq.{value}': 'string - primary key value (using PostgREST eq operator)',
               },
               headers: {
-                'Prefer': 'return=representation (optional - to return deleted record)',
+                Prefer: 'return=representation (optional - to return deleted record)',
               },
             },
             response: {
@@ -406,37 +420,6 @@ export class AgentAPIDocService {
             example: {
               request: 'DELETE /api/database/records/products?id=eq.123',
               response: 'Status: 204',
-            },
-          },
-
-          bulkCreate: {
-            method: 'POST',
-            path: '/api/database/records/{tableName}',
-            request: {
-              params: {
-                tableName: 'string - name of the table',
-              },
-              body: 'Array<{tableName}RecordSchema> (exclude system fields)',
-              headers: {
-                'Prefer': 'return=representation (REQUIRED to get created records back, otherwise returns empty array)',
-              },
-            },
-            response: {
-              success: {
-                status: 201,
-                body: 'Array<{tableName}RecordSchema> with Prefer header | [] empty array without',
-              },
-              error: {
-                status: '400 | 401 | 500',
-                body: '{error: string, message: string, statusCode: number}',
-              },
-            },
-            example: {
-              request: 'POST /api/database/records/products',
-              headers: 'Prefer: return=representation',
-              body: '[{name: "Product 1", price: 19.99}, {name: "Product 2", price: 29.99}]',
-              response:
-                '[{id: "123", name: "Product 1", price: 19.99, ...}, {id: "124", name: "Product 2", price: 29.99, ...}]',
             },
           },
 
@@ -621,6 +604,7 @@ export class AgentAPIDocService {
           availableTableNames: tableList,
           schemas: tableSchemas,
           systemFields: {
+            '<critical-info>': 'All system fields are auto-managed by InsForge. NEVER change them.',
             id: { type: 'uuid', autoGenerated: true, primary: true },
             created_at: { type: 'datetime', autoGenerated: true },
             updated_at: { type: 'datetime', autoGenerated: true, autoUpdated: true },
@@ -636,8 +620,8 @@ export class AgentAPIDocService {
               size: { type: 'number (bytes)', required: true },
               mimeType: { type: 'string', required: false },
               uploadedAt: { type: 'datetime string', required: true },
-              url: { 
-                type: 'string', 
+              url: {
+                type: 'string',
                 required: true,
                 description: 'Relative path: /api/storage/buckets/{bucket}/objects/{key}',
               },
@@ -686,7 +670,8 @@ export class AgentAPIDocService {
             listProducts: 'GET /api/database/records/products?limit=10&category=eq.electronics',
             createProduct:
               'POST /api/database/records/products with Prefer: return=representation header and body [{name: "New Product", price: 29.99}]',
-            updateProduct: 'PATCH /api/database/records/products?id=eq.123 with Prefer: return=representation header and body {price: 39.99}',
+            updateProduct:
+              'PATCH /api/database/records/products?id=eq.123 with Prefer: return=representation header and body {price: 39.99}',
             deleteProduct: 'DELETE /api/database/records/products?id=eq.123',
             // Storage examples
             uploadFile: 'PUT /api/storage/buckets/uploads/objects/avatar.jpg with FormData file',
