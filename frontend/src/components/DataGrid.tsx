@@ -9,13 +9,13 @@ import ReactDataGrid, {
 import { Button } from '@/components/radix/Button';
 import { Badge } from '@/components/radix/Badge';
 import { Copy, Check, ArrowDownWideNarrow, ArrowUpNarrowWide } from 'lucide-react';
-import { cn } from '@/lib/utils/utils';
+import { cn, formatValueForDisplay } from '@/lib/utils/utils';
 import { PaginationControls } from './PaginationControls';
 import { Checkbox } from './Checkbox';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { TypeBadge } from './TypeBadge';
-
-// Types
+import { ColumnType } from '@insforge/shared-schemas';
+import type { DatabaseRecord } from '@/lib/types/datagridTypes';
 export interface DataGridColumn {
   key: string;
   name: string;
@@ -35,7 +35,7 @@ export interface DataGridColumn {
 }
 
 export interface DataGridProps {
-  data: any[];
+  data: DatabaseRecord[];
   columns: DataGridColumn[];
   loading?: boolean;
   isSorting?: boolean;
@@ -44,7 +44,7 @@ export interface DataGridProps {
   onSelectedRowsChange?: (selectedRows: Set<string>) => void;
   sortColumns?: SortColumn[];
   onSortColumnsChange?: (sortColumns: SortColumn[]) => void;
-  onCellEdit?: (rowId: string, columnKey: string, newValue: any) => Promise<void>;
+  onCellEdit?: (rowId: string, columnKey: string, newValue: string) => Promise<void>;
   onCellClick?: (args: any, event: any) => void;
   searchQuery?: string;
   currentPage?: number;
@@ -71,7 +71,7 @@ export interface DataGridProps {
 export const DefaultCellRenderers = {
   text: ({ row, column }: any) => {
     const value = row[column.key];
-    const displayValue = value === null || value === undefined ? 'null' : String(value);
+    const displayValue = formatValueForDisplay(value, ColumnType.STRING);
     return (
       <div className="w-full h-full flex items-center">
         <span className="truncate dark:text-zinc-300" title={displayValue}>
@@ -83,13 +83,14 @@ export const DefaultCellRenderers = {
 
   boolean: ({ row, column }: any) => {
     const value = row[column.key];
+    const displayValue = formatValueForDisplay(value, ColumnType.BOOLEAN);
     return (
       <div className="w-full h-full flex items-center justify-start">
         <Badge
           variant={value ? 'default' : 'secondary'}
           className="border border-transparent dark:bg-neutral-800 dark:text-zinc-300 dark:border-neutral-700"
         >
-          {value === null ? 'null' : value ? 'true' : 'false'}
+          {displayValue}
         </Badge>
       </div>
     );
@@ -97,44 +98,24 @@ export const DefaultCellRenderers = {
 
   date: ({ row, column }: any) => {
     const value = row[column.key];
-    if (!value) {
-      return <span className="text-black dark:text-zinc-300">null</span>;
-    }
+    const displayValue = formatValueForDisplay(value, ColumnType.DATETIME);
+    const isError = displayValue === 'Invalid date';
 
-    try {
-      const date = new Date(value);
-      return (
-        <div className="w-full h-full flex items-center">
-          <span className="truncate" title={date.toLocaleString()}>
-            {date.toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </span>
-        </div>
-      );
-    } catch {
-      return <span className="text-red-500">Invalid date</span>;
-    }
+    return (
+      <div className="w-full h-full flex items-center">
+        <span
+          className={cn('truncate', isError ? 'text-red-500' : 'text-black dark:text-zinc-300')}
+          title={displayValue}
+        >
+          {displayValue}
+        </span>
+      </div>
+    );
   },
 
   json: ({ row, column }: any) => {
     const value = row[column.key];
-    let displayText = 'null';
-
-    try {
-      const parsed = typeof value === 'string' ? JSON.parse(value) : value;
-      if (parsed && typeof parsed === 'object') {
-        displayText = JSON.stringify(parsed);
-      } else {
-        displayText = String(parsed);
-      }
-    } catch {
-      displayText = 'Invalid JSON';
-    }
+    const displayText = formatValueForDisplay(value, ColumnType.JSON);
 
     return (
       <div className="w-full h-full flex items-center">
@@ -156,7 +137,7 @@ export const DefaultCellRenderers = {
 
   email: ({ row, column }: any) => {
     const value = row[column.key];
-    const displayValue = value === null || value === undefined ? 'null' : String(value);
+    const displayValue = formatValueForDisplay(value, ColumnType.STRING);
     return (
       <span
         className="text-sm text-gray-800 font-medium truncate dark:text-zinc-300"

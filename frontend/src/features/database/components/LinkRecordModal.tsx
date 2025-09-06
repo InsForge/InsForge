@@ -34,14 +34,7 @@ export function LinkRecordModal({
   const [selectedRecord, setSelectedRecord] = useState<DatabaseRecord | null>(null);
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-
-  // Fetch table schema
-  const { data: schema } = useQuery({
-    queryKey: ['table-schema', referenceTable],
-    queryFn: () => databaseService.getTableSchema(referenceTable),
-    enabled: open,
-  });
-
+  
   // Fetch records from the reference table
   const { data: recordsData, isLoading } = useQuery({
     queryKey: [
@@ -93,10 +86,13 @@ export function LinkRecordModal({
 
   // Handle cell click to select record - only for reference column
   const handleCellClick = useCallback(
-    (args: any) => {
+    (args: any, event: any) => {
       // Only allow selection when clicking on the reference column
       if (args.column.key !== referenceColumn) {
-        return; // Ignore clicks on other columns
+        // Prevent the default selection behavior for non-reference columns
+        event?.preventDefault();
+        event?.stopPropagation();
+        return;
       }
 
       const record = records.find((r: DatabaseRecord) => r.id === args.row.id);
@@ -109,7 +105,7 @@ export function LinkRecordModal({
 
   // Convert schema to columns for the DataGrid with visual distinction
   const columns = useMemo(() => {
-    const cols = convertSchemaToColumns(schema);
+    const cols = convertSchemaToColumns(recordsData?.schema);
     // Add visual indication for the reference column (clickable column)
     return cols.map((col) => {
       const baseCol = {
@@ -169,7 +165,7 @@ export function LinkRecordModal({
         return {
           ...baseCol,
           renderCell: (props: any) => {
-            const displayValue = renderCellValue(props.row[col.key], col.type);
+            const displayValue = renderCellValue(props.row[col.key], col.type as ColumnType);
             return (
               <div className="w-full h-full flex items-center cursor-pointer">
                 <span className="truncate font-medium" title={displayValue}>
@@ -194,7 +190,7 @@ export function LinkRecordModal({
         ...baseCol,
         cellClass: 'link-modal-disabled-cell',
         renderCell: (props: any) => {
-          const displayValue = renderCellValue(props.row[col.key], col.type);
+          const displayValue = renderCellValue(props.row[col.key], col.type as ColumnType);
           return (
             <div className="w-full h-full flex items-center cursor-not-allowed relative">
               <div className="absolute inset-0 pointer-events-none opacity-0 hover:opacity-10 bg-gray-200 dark:bg-gray-600 transition-opacity z-5" />
@@ -215,7 +211,7 @@ export function LinkRecordModal({
         ),
       };
     });
-  }, [schema, referenceColumn]);
+  }, [recordsData?.schema, referenceColumn]);
 
   const handleConfirmSelection = () => {
     if (selectedRecord) {
@@ -263,14 +259,15 @@ export function LinkRecordModal({
             loading={isLoading && !records.length}
             selectedRows={selectedRows}
             onSelectedRowsChange={(newSelectedRows) => {
-              // Handle selection changes from cell clicks
+              // Only allow selection changes if they come from valid interactions
+              // This helps prevent programmatic selection of disabled rows
               const selectedId = Array.from(newSelectedRows)[0];
-              if (selectedId) {
+              if (selectedId && selectedRecord?.id !== selectedId) {
                 const record = records.find((r: DatabaseRecord) => r.id === selectedId);
                 if (record) {
                   setSelectedRecord(record);
                 }
-              } else {
+              } else if (!selectedId) {
                 setSelectedRecord(null);
               }
             }}

@@ -6,20 +6,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/radix/Select';
-
-interface BooleanCellEditorProps {
-  value: boolean | null;
-  nullable: boolean;
-  onValueChange: (newValue: string) => void;
-  onCancel: () => void;
-}
+import { CellEditorProps } from '../types/databaseTypes';
 
 export function BooleanCellEditor({
   value,
   nullable,
   onValueChange,
   onCancel,
-}: BooleanCellEditorProps) {
+}: CellEditorProps<boolean | null>) {
   const [open, setOpen] = useState(true);
 
   // Convert boolean to string for Select component

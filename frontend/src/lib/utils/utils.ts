@@ -11,23 +11,39 @@ import {
   jsonSchema,
   stringSchema,
 } from './validation-schemas';
+import {
+  DatabaseValue,
+  UserInputValue,
+  DisplayValue,
+  ValueConversionResult,
+  ValueFormatOptions,
+} from '../types/datagridTypes';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// Re-export types from datagridTypes for backward compatibility
+export type {
+  DatabaseValue,
+  UserInputValue,
+  DisplayValue,
+  ValueConversionResult,
+  ValueFormatOptions,
+  DatabaseRecord,
+  CellRendererProps,
+} from '../types/datagridTypes';
+
+// Keep ConvertedValue for the existing convertValueForColumn function
 export type ConvertedValue = string | number | boolean | null | JSON;
 
-export type ValueConversionResult =
-  | { success: true; value: ConvertedValue }
-  | { success: false; error: string };
-
 /**
- * Convert and validate a string value based on the specified ColumnType
+ * Convert and validate a user input value based on the specified ColumnType
+ * This function converts string inputs from forms/editors to proper database values
  */
 export function convertValueForColumn(
   type: ColumnType,
-  value: string | null | undefined
+  value: UserInputValue
 ): ValueConversionResult {
   try {
     let convertedValue;
@@ -84,4 +100,138 @@ export function convertValueForColumn(
  */
 export function isEmptyValue(value: unknown): boolean {
   return value === null || value === undefined || value === '';
+}
+
+/**
+ * Centralized value formatter that handles all data types consistently
+ * Converts database values to formatted display strings for UI components
+ */
+export function formatValueForDisplay(
+  value: DatabaseValue,
+  type?: ColumnType,
+  options: ValueFormatOptions = {}
+): DisplayValue {
+  const {
+    locale = 'en-US',
+    dateOptions = {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    },
+    showNullAsString = true,
+    maxLength,
+  } = options;
+
+  // Handle null/undefined values
+  if (value === null || value === undefined) {
+    return showNullAsString ? 'null' : '';
+  }
+
+  // Handle different column types
+  switch (type) {
+    case ColumnType.BOOLEAN:
+      return value === null ? 'null' : value ? 'true' : 'false';
+
+    case ColumnType.DATETIME:
+      if (!value) return showNullAsString ? 'null' : '';
+      try {
+        let date: Date;
+
+        if (value instanceof Date) {
+          date = value;
+        } else if (typeof value === 'string' || typeof value === 'number') {
+          date = new Date(value);
+        } else {
+          return 'Invalid date';
+        }
+
+        if (isNaN(date.getTime())) {
+          return 'Invalid date';
+        }
+        const formatted = date.toLocaleDateString(locale, dateOptions);
+        return maxLength ? truncateString(formatted, maxLength) : formatted;
+      } catch {
+        return 'Invalid date';
+      }
+
+    case ColumnType.JSON:
+      if (value === null || value === undefined) {
+        return showNullAsString ? 'null' : '';
+      }
+
+      try {
+        let parsed: unknown;
+
+        if (typeof value === 'string') {
+          parsed = JSON.parse(value);
+        } else if (typeof value === 'object') {
+          parsed = value;
+        } else {
+          parsed = value;
+        }
+
+        if (parsed && typeof parsed === 'object') {
+          const jsonString = JSON.stringify(parsed);
+          return maxLength ? truncateString(jsonString, maxLength) : jsonString;
+        } else {
+          const stringValue = String(parsed);
+          return maxLength ? truncateString(stringValue, maxLength) : stringValue;
+        }
+      } catch {
+        return 'Invalid JSON';
+      }
+
+    case ColumnType.INTEGER:
+    case ColumnType.FLOAT:
+      if (typeof value === 'number') {
+        return value.toString();
+      }
+      // Try to parse as number
+      const numValue = Number(value);
+      return isNaN(numValue) ? String(value) : numValue.toString();
+
+    case ColumnType.UUID:
+    case ColumnType.STRING:
+    default:
+      // Handle objects that aren't explicitly JSON type (fallback for legacy data)
+      if (value && typeof value === 'object' && !(value instanceof Date)) {
+        try {
+          const jsonString = JSON.stringify(value);
+          return maxLength ? truncateString(jsonString, maxLength) : jsonString;
+        } catch {
+          return '[Invalid Object]';
+        }
+      }
+
+      // Convert to string and optionally truncate
+      const stringValue = String(value);
+      return maxLength ? truncateString(stringValue, maxLength) : stringValue;
+  }
+}
+
+/**
+ * Helper function to truncate strings with ellipsis
+ */
+function truncateString(str: string, maxLength: number): string {
+  if (str.length <= maxLength) return str;
+  return str.substring(0, maxLength - 3) + '...';
+}
+
+/**
+ * Get appropriate error message for invalid values
+ */
+export function getValueErrorMessage(type?: ColumnType): string {
+  switch (type) {
+    case ColumnType.DATETIME:
+      return 'Invalid date';
+    case ColumnType.JSON:
+      return 'Invalid JSON';
+    case ColumnType.INTEGER:
+    case ColumnType.FLOAT:
+      return 'Invalid number';
+    default:
+      return 'Invalid value';
+  }
 }

@@ -13,6 +13,7 @@ import {
 import { databaseService } from '@/features/database/services/database.service';
 import { DataGrid } from '@/components/DataGrid';
 import { convertSchemaToColumns } from '@/features/database/components/DatabaseDataGrid';
+import { formatValueForDisplay } from '@/lib/utils/utils';
 
 interface ForeignKeyCellProps {
   value: string;
@@ -28,21 +29,7 @@ export function ForeignKeyCell({ value, foreignKey, onJumpToTable }: ForeignKeyC
 
   // Helper function to safely render any value type (including JSON objects)
   const renderValue = (val: any): string => {
-    if (val === null || val === undefined) {
-      return 'null';
-    }
-
-    // If it's an object (likely JSON), stringify it
-    if (typeof val === 'object') {
-      try {
-        return JSON.stringify(val);
-      } catch {
-        return '[Invalid Object]';
-      }
-    }
-
-    // For all other types, convert to string
-    return String(val);
+    return formatValueForDisplay(val);
   };
 
   // Fetch the referenced record when popover opens

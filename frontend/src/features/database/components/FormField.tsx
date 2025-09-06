@@ -9,7 +9,7 @@ import { DateCellEditor } from './DateCellEditor';
 import { JsonCellEditor } from './JsonCellEditor';
 import { LinkRecordModal } from './LinkRecordModal';
 import { ColumnSchema, ColumnType } from '@insforge/shared-schemas';
-import { convertValueForColumn, cn } from '@/lib/utils/utils';
+import { convertValueForColumn, cn, formatValueForDisplay } from '@/lib/utils/utils';
 import { TypeBadge } from '@/components/TypeBadge';
 
 // Type for database records
@@ -74,12 +74,17 @@ function FormBooleanEditor({ value, nullable, onChange, hasForeignKey }: FormBoo
 
 interface FormDateEditorProps {
   value: string | null;
-  type?: 'date' | 'datetime';
+  type?: ColumnType.DATETIME;
   onChange: (value: string | null) => void;
   field: ColumnSchema;
 }
 
-function FormDateEditor({ value, type = 'datetime', onChange, field }: FormDateEditorProps) {
+function FormDateEditor({
+  value,
+  type = ColumnType.DATETIME,
+  onChange,
+  field,
+}: FormDateEditorProps) {
   const [showEditor, setShowEditor] = useState(false);
 
   const handleValueChange = (newValue: string | null) => {
@@ -112,11 +117,7 @@ function FormDateEditor({ value, type = 'datetime', onChange, field }: FormDateE
       return getPlaceholderText(field);
     }
 
-    const d = new Date(value);
-    if (type === 'datetime') {
-      return d.toLocaleString();
-    }
-    return d.toLocaleDateString();
+    return formatValueForDisplay(value, type);
   };
 
   return (
@@ -138,7 +139,7 @@ function FormDateEditor({ value, type = 'datetime', onChange, field }: FormDateE
 
 interface FormNumberEditorProps {
   value: number | null;
-  type: 'integer' | 'float';
+  type: ColumnType.INTEGER | ColumnType.FLOAT;
   onChange: (value: number | null) => void;
   tableName: string;
   field: ColumnSchema;
@@ -148,8 +149,8 @@ function FormNumberEditor({ value, type, onChange, tableName, field }: FormNumbe
   return (
     <Input
       id={`${tableName}-${field.columnName}`}
-      type={type === 'integer' ? 'number' : 'text'}
-      step={type === 'integer' ? '1' : undefined}
+      type={type === ColumnType.INTEGER ? 'number' : 'text'}
+      step={type === ColumnType.INTEGER ? '1' : undefined}
       value={value ?? ''}
       onChange={(e) => {
         const inputValue = e.target.value;
@@ -157,7 +158,7 @@ function FormNumberEditor({ value, type, onChange, tableName, field }: FormNumbe
           // Handle empty value - let form validation handle required fields
           onChange(null);
         } else {
-          const numValue = type === 'integer' ? parseInt(inputValue, 10) : parseFloat(inputValue);
+          const numValue = type === ColumnType.INTEGER ? parseInt(inputValue, 10) : parseFloat(inputValue);
           onChange(isNaN(numValue) ? null : numValue);
         }
       }}
@@ -415,7 +416,7 @@ export function FormField({ field, form, tableName }: FormFieldProps) {
                   render={({ field: formField }) => (
                     <FormNumberEditor
                       value={formField.value}
-                      type={field.type === ColumnType.INTEGER ? 'integer' : 'float'}
+                      type={field.type === ColumnType.INTEGER ? ColumnType.INTEGER : ColumnType.FLOAT}
                       onChange={formField.onChange}
                       tableName={tableName}
                       field={field}
@@ -441,7 +442,7 @@ export function FormField({ field, form, tableName }: FormFieldProps) {
                   render={({ field: formField }) => (
                     <FormDateEditor
                       value={formField.value}
-                      type="datetime"
+                      type={ColumnType.DATETIME}
                       onChange={formField.onChange}
                       field={field}
                     />
