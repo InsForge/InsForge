@@ -16,6 +16,8 @@ Before ANY database operation, call `get-backend-metadata` to get the current da
 - Authentication (register, login, logout)
 - Database CRUD operations (select, insert, update, delete)
 - User profile management
+- AI operations (chat completions, image generation)
+- Storage operations (upload, download, list files)
 - Application logic
 
 ### Use MCP Tools for:
@@ -138,6 +140,58 @@ const url = client.storage
   .getPublicUrl('file.jpg');
 ```
 
+## AI Operations
+
+### Chat Completions
+
+```javascript
+// Non-streaming chat completion
+const { data, error } = await client.ai.chat.completions.create({
+  model: 'anthropic/claude-3.5-haiku',
+  messages: [
+    { role: 'system', content: 'You are a helpful assistant' },
+    { role: 'user', content: 'What is the capital of France?' }
+  ],
+  temperature: 0.7,
+  maxTokens: 500
+});
+// Returns: { success: true, content: '...', metadata: { model, usage } }
+
+// Streaming chat completion
+const stream = await client.ai.chat.completions.create({
+  model: 'anthropic/claude-3.5-haiku',
+  messages: [
+    { role: 'user', content: 'Tell me a story' }
+  ],
+  stream: true
+});
+
+// Process stream events
+for await (const event of stream) {
+  if (event.chunk) {
+    process.stdout.write(event.chunk); // Partial response
+  }
+  if (event.done) {
+    console.log('\nStream complete');
+  }
+}
+```
+
+### Image Generation
+
+```javascript
+// Generate images
+const { data, error } = await client.ai.images.generate({
+  model: 'google/gemini-2.5-flash-image-preview',
+  prompt: 'A serene landscape with mountains at sunset',
+  size: '1024x1024',
+  numImages: 1,
+  quality: 'hd'
+});
+// Returns: { images: [{ url, ... }] }
+console.log(data.images[0].url); // Image URL
+```
+
 ## Complete Example
 
 ```javascript
@@ -195,5 +249,5 @@ console.log(otherUser.nickname); // Direct access to properties
 - Use `.single()` to get object instead of array from queries
 
 ### When to Use What
-- **SDK**: Authentication, database CRUD, profile management
+- **SDK**: Authentication, database CRUD, profile management, AI operations, storage
 - **MCP Tools**: Table creation/modification, schema management
