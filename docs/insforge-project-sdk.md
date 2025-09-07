@@ -172,7 +172,7 @@ const { data, error } = await insforge.ai.chat.completions.create({
   temperature: 0.7,
   maxTokens: 500
 });
-// Returns: { response, usage, model }
+// Returns: { success: true, content: '...', metadata: { model, usage } }
 
 // Streaming chat completion
 const stream = await insforge.ai.chat.completions.create({

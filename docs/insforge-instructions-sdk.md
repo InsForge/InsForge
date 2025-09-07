@@ -155,7 +155,7 @@ const { data, error } = await client.ai.chat.completions.create({
   temperature: 0.7,
   maxTokens: 500
 });
-// Returns: { response, usage, model }
+// Returns: { success: true, content: '...', metadata: { model, usage } }
 
 // Streaming chat completion
 const stream = await client.ai.chat.completions.create({
