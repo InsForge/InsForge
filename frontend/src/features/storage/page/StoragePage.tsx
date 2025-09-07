@@ -338,7 +338,7 @@ export default function StoragePage() {
       const fileItems: File[] = Array.from(event.dataTransfer.items)
         .filter((item) => item.webkitGetAsEntry()?.isFile)
         .map((item) => item.getAsFile())
-        .filter((item) => item !== null);
+        .filter((item): item is File => item !== null);
 
       void handleFileUpload(fileItems);
     },

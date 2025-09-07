@@ -1,10 +1,7 @@
 import { useMemo } from 'react';
-import {
-  DataGrid,
-  DefaultCellRenderers,
-  type DataGridColumn,
-  type DataGridProps,
-} from '@/components/DataGrid';
+import { DataGrid, DefaultCellRenderers, type DataGridProps } from '@/components/DataGrid';
+import type { DataGridColumn, DataGridRow } from '@/lib/types/datagridTypes';
+import type { RenderCellProps } from 'react-data-grid';
 import { Badge } from '@/components/radix/Badge';
 import { cn } from '@/lib/utils/utils';
 
@@ -23,12 +20,6 @@ const ProviderIcon = ({ provider }: { provider: string }) => {
           label: 'GitHub',
           color:
             'bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-zinc-300 dark:border-gray-500',
-        };
-      case 'discord':
-        return {
-          label: 'Discord',
-          color:
-            'bg-blue-100 text-blue-700 dark:bg-neutral-800 dark:text-blue-300 dark:border-blue-500',
         };
       case 'email':
         return {
@@ -58,16 +49,16 @@ const ProviderIcon = ({ provider }: { provider: string }) => {
 };
 
 // Custom cell renderers for users
-const NameCellRenderer = ({ row, column }: any) => (
+const NameCellRenderer = ({ row, column }: RenderCellProps<DataGridRow>) => (
   <span
     className="text-sm text-gray-800 dark:text-zinc-300 truncate"
-    title={row[column.key] || 'null'}
+    title={String(row[column.key] || 'null')}
   >
-    {row[column.key] || 'null'}
+    {String(row[column.key] || 'null')}
   </span>
 );
 
-const IdentitiesCellRenderer = ({ row, column }: any) => {
+const IdentitiesCellRenderer = ({ row, column }: RenderCellProps<DataGridRow>) => {
   const identities = row[column.key];
 
   if (!identities || !Array.isArray(identities) || identities.length === 0) {
@@ -97,12 +88,12 @@ const IdentitiesCellRenderer = ({ row, column }: any) => {
   );
 };
 
-const ProviderTypeCellRenderer = ({ row, column }: any) => (
+const ProviderTypeCellRenderer = ({ row, column }: RenderCellProps<DataGridRow>) => (
   <span
     className="text-sm text-black dark:text-zinc-300 truncate"
-    title={row[column.key] || 'null'}
+    title={String(row[column.key] || 'null')}
   >
-    {row[column.key] || 'null'}
+    {String(row[column.key] || 'null')}
   </span>
 );
 
@@ -169,10 +160,13 @@ export function createUsersColumns(): DataGridColumn[] {
 }
 
 // Users-specific DataGrid props
-export type UsersDataGridProps = Omit<DataGridProps, 'columns'>;
+export type UsersDataGridProps = Omit<DataGridProps, 'columns'> & {
+  searchQuery?: string;
+};
 
 // Specialized DataGrid for users
 export function UsersDataGrid({
+  searchQuery,
   emptyStateTitle = 'No users available',
   emptyStateDescription,
   emptyStateActionText,
@@ -181,7 +175,7 @@ export function UsersDataGrid({
 }: UsersDataGridProps) {
   const columns = useMemo(() => createUsersColumns(), []);
 
-  const defaultEmptyDescription = props.searchQuery
+  const defaultEmptyDescription = searchQuery
     ? 'No users match your search criteria'
     : 'No users have been created yet';
 

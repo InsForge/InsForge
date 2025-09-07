@@ -1,10 +1,13 @@
 import '@/rdg.css';
 import React, { useMemo, useState, useCallback } from 'react';
 import ReactDataGrid, {
-  Column,
-  SortColumn,
+  type Column,
+  type SortColumn,
   SelectColumn,
   SELECT_COLUMN_KEY,
+  type RenderCellProps,
+  type CellClickArgs,
+  type CellMouseEvent,
 } from 'react-data-grid';
 import { Button } from '@/components/radix/Button';
 import { Badge } from '@/components/radix/Badge';
@@ -15,27 +18,10 @@ import { Checkbox } from './Checkbox';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { TypeBadge } from './TypeBadge';
 import { ColumnType } from '@insforge/shared-schemas';
-import type { DatabaseRecord } from '@/lib/types/datagridTypes';
-export interface DataGridColumn {
-  key: string;
-  name: string;
-  type?: string;
-  width?: number | string;
-  minWidth?: number;
-  maxWidth?: number;
-  resizable?: boolean;
-  sortable?: boolean;
-  sortDescendingFirst?: boolean;
-  editable?: boolean;
-  isPrimaryKey?: boolean;
-  isNullable?: boolean;
-  renderCell?: (props: any) => React.ReactNode;
-  renderEditCell?: (props: any) => React.ReactNode;
-  renderHeaderCell?: (props: any) => React.ReactNode;
-}
+import type { DataGridColumn, DataGridRow } from '@/lib/types/datagridTypes';
 
 export interface DataGridProps {
-  data: DatabaseRecord[];
+  data: DataGridRow[];
   columns: DataGridColumn[];
   loading?: boolean;
   isSorting?: boolean;
@@ -44,126 +30,25 @@ export interface DataGridProps {
   onSelectedRowsChange?: (selectedRows: Set<string>) => void;
   sortColumns?: SortColumn[];
   onSortColumnsChange?: (sortColumns: SortColumn[]) => void;
-  onCellEdit?: (rowId: string, columnKey: string, newValue: string) => Promise<void>;
-  onCellClick?: (args: any, event: any) => void;
-  searchQuery?: string;
+  onCellClick?: (args: CellClickArgs<DataGridRow>, event: CellMouseEvent) => void;
   currentPage?: number;
   totalPages?: number;
   pageSize?: number;
   totalRecords?: number;
   onPageChange?: (page: number) => void;
-  onDeleteRecord?: (id: string) => void;
-  onNewRecord?: () => void;
   emptyStateTitle?: string;
   emptyStateDescription?: string;
   emptyStateActionText?: string;
   onEmptyStateAction?: () => void;
-  emptyStateIcon?: React.ReactNode;
-  emptyStateAction?: React.ReactNode;
-  rowKeyGetter?: (row: any) => string;
+  rowKeyGetter?: (row: DataGridRow) => string;
   className?: string;
   showSelection?: boolean;
   showPagination?: boolean;
   showTypeBadge?: boolean;
 }
 
-// Default cell renderers
-export const DefaultCellRenderers = {
-  text: ({ row, column }: any) => {
-    const value = row[column.key];
-    const displayValue = formatValueForDisplay(value, ColumnType.STRING);
-    return (
-      <div className="w-full h-full flex items-center">
-        <span className="truncate dark:text-zinc-300" title={displayValue}>
-          {displayValue}
-        </span>
-      </div>
-    );
-  },
-
-  boolean: ({ row, column }: any) => {
-    const value = row[column.key];
-    const displayValue = formatValueForDisplay(value, ColumnType.BOOLEAN);
-    return (
-      <div className="w-full h-full flex items-center justify-start">
-        <Badge
-          variant={value ? 'default' : 'secondary'}
-          className="border border-transparent dark:bg-neutral-800 dark:text-zinc-300 dark:border-neutral-700"
-        >
-          {displayValue}
-        </Badge>
-      </div>
-    );
-  },
-
-  date: ({ row, column }: any) => {
-    const value = row[column.key];
-    const displayValue = formatValueForDisplay(value, ColumnType.DATETIME);
-    const isError = displayValue === 'Invalid date';
-
-    return (
-      <div className="w-full h-full flex items-center">
-        <span
-          className={cn('truncate', isError ? 'text-red-500' : 'text-black dark:text-zinc-300')}
-          title={displayValue}
-        >
-          {displayValue}
-        </span>
-      </div>
-    );
-  },
-
-  json: ({ row, column }: any) => {
-    const value = row[column.key];
-    const displayText = formatValueForDisplay(value, ColumnType.JSON);
-
-    return (
-      <div className="w-full h-full flex items-center">
-        <span
-          className="truncate text-sm text-black dark:text-zinc-300 max-w-full overflow-hidden whitespace-nowrap"
-          title={displayText}
-        >
-          {displayText}
-        </span>
-      </div>
-    );
-  },
-
-  id: ({ row, column }: any) => {
-    const value = row[column.key];
-
-    return <IdCell value={value} />;
-  },
-
-  email: ({ row, column }: any) => {
-    const value = row[column.key];
-    const displayValue = formatValueForDisplay(value, ColumnType.STRING);
-    return (
-      <span
-        className="text-sm text-gray-800 font-medium truncate dark:text-zinc-300"
-        title={displayValue}
-      >
-        {displayValue}
-      </span>
-    );
-  },
-
-  badge: ({ row, column, options }: any) => {
-    const value = row[column.key];
-    const variant = options?.getVariant ? options.getVariant(value) : 'secondary';
-    const label = options?.getLabel ? options.getLabel(value) : String(value || '');
-
-    return (
-      <div className="w-full h-full flex items-center">
-        <Badge variant={variant} className="text-xs dark:bg-neutral-800 dark:text-zinc-300">
-          {label}
-        </Badge>
-      </div>
-    );
-  },
-};
 // Separate IdCell component to use hooks properly
-function IdCell({ value }: { value: any }) {
+function IdCell({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async (e: React.MouseEvent) => {
@@ -202,6 +87,92 @@ function IdCell({ value }: { value: any }) {
   );
 }
 
+// Default cell renderers
+export const DefaultCellRenderers = {
+  text: ({ row, column }: RenderCellProps<DataGridRow>) => {
+    const value = row[column.key];
+    const displayValue = formatValueForDisplay(value, ColumnType.STRING);
+    return (
+      <div className="w-full h-full flex items-center">
+        <span className="truncate dark:text-zinc-300" title={displayValue}>
+          {displayValue}
+        </span>
+      </div>
+    );
+  },
+
+  boolean: ({ row, column }: RenderCellProps<DataGridRow>) => {
+    const value = row[column.key];
+    const displayValue = formatValueForDisplay(value, ColumnType.BOOLEAN);
+    return (
+      <div className="w-full h-full flex items-center justify-start">
+        <Badge
+          variant={value ? 'default' : 'secondary'}
+          className="px-1.5 py-0.5 border border-transparent dark:bg-neutral-800 dark:text-zinc-300 dark:border-neutral-700"
+        >
+          {displayValue}
+        </Badge>
+      </div>
+    );
+  },
+
+  date: ({ row, column }: RenderCellProps<DataGridRow>) => {
+    const value = row[column.key];
+    const displayValue = formatValueForDisplay(value, ColumnType.DATETIME);
+    const isError = displayValue === 'Invalid date';
+
+    return (
+      <div className="w-full h-full flex items-center">
+        <span
+          className={cn('truncate', isError ? 'text-red-500' : 'text-black dark:text-zinc-300')}
+          title={displayValue}
+        >
+          {displayValue}
+        </span>
+      </div>
+    );
+  },
+
+  json: ({ row, column }: RenderCellProps<DataGridRow>) => {
+    const value = row[column.key];
+    const displayText = formatValueForDisplay(value, ColumnType.JSON);
+    const isError = displayText === 'Invalid JSON';
+
+    return (
+      <div className="w-full h-full flex items-center">
+        <span
+          className={cn(
+            'truncate text-sm text-black dark:text-zinc-300 max-w-full overflow-hidden whitespace-nowrap',
+            isError ? 'text-red-500' : ''
+          )}
+          title={displayText}
+        >
+          {displayText}
+        </span>
+      </div>
+    );
+  },
+
+  id: ({ row, column }: RenderCellProps<DataGridRow>) => {
+    const value = row[column.key];
+
+    return <IdCell value={String(value)} />;
+  },
+
+  email: ({ row, column }: RenderCellProps<DataGridRow>) => {
+    const value = row[column.key];
+    const displayValue = formatValueForDisplay(value, ColumnType.STRING);
+    return (
+      <span
+        className="text-sm text-gray-800 font-medium truncate dark:text-zinc-300"
+        title={displayValue}
+      >
+        {displayValue}
+      </span>
+    );
+  },
+};
+
 // Default header renderer
 export function SortableHeaderRenderer({
   column,
@@ -210,7 +181,7 @@ export function SortableHeaderRenderer({
   showTypeBadge,
   mutedHeader,
 }: {
-  column: any;
+  column: DataGridColumn;
   sortDirection?: 'ASC' | 'DESC';
   columnType?: string;
   showTypeBadge?: boolean;
@@ -234,7 +205,7 @@ export function SortableHeaderRenderer({
       <div className="flex flex-row gap-1 items-center">
         <span
           className={`truncate text-sm font-medium ${mutedHeader ? 'text-zinc-500 dark:text-neutral-400' : 'text-zinc-950 dark:text-zinc-300'} max-w-[120px]`}
-          title={column.name}
+          title={typeof column.name === 'string' ? column.name : ''}
         >
           {column.name}
         </span>
@@ -283,22 +254,16 @@ export function DataGrid({
   onSelectedRowsChange,
   sortColumns,
   onSortColumnsChange,
-  // onCellEdit,
   onCellClick,
-  searchQuery: _searchQuery,
   currentPage,
   totalPages,
   pageSize,
   totalRecords,
   onPageChange,
-  onDeleteRecord: _onDeleteRecord,
-  onNewRecord: _onNewRecord,
   emptyStateTitle = 'No data available',
-  emptyStateDescription: _emptyStateDescription,
+  emptyStateDescription,
   emptyStateActionText,
   onEmptyStateAction,
-  emptyStateIcon: _emptyStateIcon,
-  emptyStateAction: _emptyStateAction,
   rowKeyGetter,
   className,
   showSelection = false,
@@ -308,7 +273,7 @@ export function DataGrid({
   const { resolvedTheme } = useTheme();
   // Convert columns to react-data-grid format
   const gridColumns = useMemo(() => {
-    const cols: Column<any>[] = [];
+    const cols: Column<DataGridRow>[] = [];
 
     // Add selection column if enabled and not hidden
     if (showSelection && selectedRows !== undefined && onSelectedRowsChange) {
@@ -367,7 +332,7 @@ export function DataGrid({
       const currentSort = sortColumns?.find((sort) => sort.columnKey === col.key);
       const sortDirection = currentSort?.direction;
 
-      const gridColumn: Column<any> = {
+      const gridColumn: Column<DataGridRow> = {
         ...col,
         key: col.key,
         name: col.name,
@@ -382,9 +347,9 @@ export function DataGrid({
         renderEditCell: col.renderEditCell,
         renderHeaderCell:
           col.renderHeaderCell ||
-          (({ column }: { column: any }) => (
+          (() => (
             <SortableHeaderRenderer
-              column={column}
+              column={col}
               sortDirection={sortDirection}
               columnType={col.type}
               showTypeBadge={showTypeBadge}
@@ -408,7 +373,7 @@ export function DataGrid({
 
   // Default row key getter
   const defaultRowKeyGetter = useCallback(
-    (row: any) => row.id || row.key || Math.random().toString(),
+    (row: DataGridRow) => row.id || Math.random().toString(),
     []
   );
   const keyGetter = rowKeyGetter || defaultRowKeyGetter;
@@ -447,15 +412,24 @@ export function DataGrid({
           renderers={{
             noRowsFallback: (
               <div className="absolute inset-x-0 top-0 mt-13 py-8 flex items-center justify-center bg-white dark:bg-neutral-800">
-                <div className="flex flex-row gap-2.5 items-center">
-                  <div className="text-sm text-zinc-500 dark:text-zinc-400">{emptyStateTitle}</div>
-                  {emptyStateActionText && onEmptyStateAction && (
-                    <button
-                      onClick={onEmptyStateAction}
-                      className="inline-flex items-center text-sm font-medium text-chart-blue-dark focus:outline-none focus:ring-0 dark:text-zinc-400"
-                    >
-                      {emptyStateActionText}
-                    </button>
+                <div className="flex flex-col gap-1 items-center">
+                  <div className="flex flex-row gap-2.5 items-center">
+                    <div className="text-sm text-zinc-500 dark:text-zinc-400">
+                      {emptyStateTitle}
+                    </div>
+                    {emptyStateActionText && onEmptyStateAction && (
+                      <button
+                        onClick={onEmptyStateAction}
+                        className="inline-flex items-center text-sm font-medium text-chart-blue-dark focus:outline-none focus:ring-0 dark:text-zinc-400"
+                      >
+                        {emptyStateActionText}
+                      </button>
+                    )}
+                  </div>
+                  {emptyStateDescription && (
+                    <div className="text-sm text-zinc-500 dark:text-zinc-400">
+                      {emptyStateDescription}
+                    </div>
                   )}
                 </div>
               </div>

@@ -6,14 +6,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/radix/Select';
-import { CellEditorProps } from '../types/databaseTypes';
+import { CellEditorProps } from '../../types/databaseTypes';
+import { ColumnType } from '@insforge/shared-schemas';
 
 export function BooleanCellEditor({
   value,
   nullable,
   onValueChange,
   onCancel,
-}: CellEditorProps<boolean | null>) {
+}: CellEditorProps<ColumnType.BOOLEAN | null>) {
   const [open, setOpen] = useState(true);
 
   // Convert boolean to string for Select component

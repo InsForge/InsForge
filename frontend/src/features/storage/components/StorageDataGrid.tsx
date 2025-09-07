@@ -1,25 +1,27 @@
 import { useMemo } from 'react';
-import { DataGrid, type DataGridColumn, type DataGridProps } from '@/components/DataGrid';
+import { DataGrid, type DataGridProps } from '@/components/DataGrid';
+import type { DataGridColumn, DataGridRow } from '@/lib/types/datagridTypes';
+import type { RenderCellProps } from 'react-data-grid';
 import { Button } from '@/components/radix/Button';
 import { Download, Eye, Trash2, Image, FileText, Music, Video, Archive, File } from 'lucide-react';
 import { formatDistance } from 'date-fns';
 import { StorageFileSchema } from '@insforge/shared-schemas';
 
 // Custom cell renderers for storage files
-const FileNameRenderer = ({ row, column }: any) => {
-  const fileName = row[column.key].split('/').pop() || row[column.key];
+const FileNameRenderer = ({ row, column }: RenderCellProps<DataGridRow>) => {
+  const fileName = String(row[column.key]).split('/').pop() || String(row[column.key]);
   return (
     <span
       className="text-sm font-medium text-zinc-900 dark:text-zinc-300 truncate"
-      title={row[column.key]}
+      title={String(row[column.key])}
     >
       {fileName}
     </span>
   );
 };
 
-const FileSizeRenderer = ({ row, column }: any) => {
-  const bytes = row[column.key];
+const FileSizeRenderer = ({ row, column }: RenderCellProps<DataGridRow>) => {
+  const bytes = Number(row[column.key]);
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) {
@@ -37,8 +39,8 @@ const FileSizeRenderer = ({ row, column }: any) => {
   return <span className="text-sm text-zinc-600 dark:text-zinc-300">{formatFileSize(bytes)}</span>;
 };
 
-const MimeTypeRenderer = ({ row, column }: any) => {
-  const mimeType = row[column.key] || 'Unknown';
+const MimeTypeRenderer = ({ row, column }: RenderCellProps<DataGridRow>) => {
+  const mimeType = String(row[column.key] || 'Unknown');
   const category = mimeType.split('/')[0];
 
   // Get appropriate icon based on MIME type category
@@ -74,13 +76,16 @@ const MimeTypeRenderer = ({ row, column }: any) => {
   );
 };
 
-const UploadedAtRenderer = ({ row, column }: any) => {
+const UploadedAtRenderer = ({ row, column }: RenderCellProps<DataGridRow>) => {
   const value = row[column.key];
   if (!value) {
     return <span className="text-sm text-zinc-500 dark:text-zinc-300">Unknown</span>;
   }
 
-  const timestamp = value.includes('Z') || value.includes('+') ? value : value + 'Z';
+  const timestamp =
+    String(value).includes('Z') || String(value).includes('+')
+      ? String(value)
+      : String(value) + 'Z';
 
   try {
     return (
@@ -143,8 +148,8 @@ export function createStorageColumns(
       maxWidth: 120,
       resizable: false,
       sortable: false,
-      renderCell: ({ row }: any) => {
-        const isFileDownloading = isDownloading?.(row.key) || false;
+      renderCell: ({ row }: RenderCellProps<DataGridRow>) => {
+        const isFileDownloading = isDownloading?.(String(row.key)) || false;
 
         return (
           <div className="flex justify-center">
@@ -155,7 +160,7 @@ export function createStorageColumns(
                 className="h-8 w-8"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onPreview(row);
+                  onPreview(row as unknown as StorageFileSchema);
                 }}
                 title="Preview file"
               >
@@ -169,7 +174,7 @@ export function createStorageColumns(
                 className="h-8 w-8"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onDownload(row);
+                  onDownload(row as unknown as StorageFileSchema);
                 }}
                 disabled={isFileDownloading}
                 title="Download file"
@@ -184,7 +189,7 @@ export function createStorageColumns(
                 className="h-8 w-8 hover:bg-red-50"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onDelete(row);
+                  onDelete(row as unknown as StorageFileSchema);
                 }}
                 title="Delete file"
               >
@@ -202,6 +207,7 @@ export function createStorageColumns(
 
 // Storage-specific DataGrid props
 export interface StorageDataGridProps extends Omit<DataGridProps, 'columns'> {
+  searchQuery?: string;
   onPreview?: (file: StorageFileSchema) => void;
   onDownload?: (file: StorageFileSchema) => void;
   onDelete?: (file: StorageFileSchema) => void;
@@ -210,6 +216,7 @@ export interface StorageDataGridProps extends Omit<DataGridProps, 'columns'> {
 
 // Specialized DataGrid for storage files
 export function StorageDataGrid({
+  searchQuery,
   onPreview,
   onDownload,
   onDelete,
@@ -223,7 +230,7 @@ export function StorageDataGrid({
     [onPreview, onDownload, onDelete, isDownloading]
   );
 
-  const defaultEmptyDescription = props.searchQuery
+  const defaultEmptyDescription = searchQuery
     ? 'No files match your search criteria'
     : 'Upload files to this bucket to see them here';
 
@@ -231,7 +238,7 @@ export function StorageDataGrid({
   const dataWithIds = useMemo(() => {
     return props.data.map((file) => ({
       ...file,
-      id: file.key, // Use key as id for selection
+      id: String(file.key), // Use key as id for selection
     }));
   }, [props.data]);
 
@@ -244,7 +251,7 @@ export function StorageDataGrid({
       emptyStateDescription={emptyStateDescription || defaultEmptyDescription}
       showSelection={true}
       showPagination={true}
-      rowKeyGetter={(row) => row.key}
+      rowKeyGetter={(row) => String(row.key)}
     />
   );
 }

@@ -14,9 +14,10 @@ import { databaseService } from '@/features/database/services/database.service';
 import { DataGrid } from '@/components/DataGrid';
 import { convertSchemaToColumns } from '@/features/database/components/DatabaseDataGrid';
 import { formatValueForDisplay } from '@/lib/utils/utils';
+import type { DatabaseValue } from '@/lib/types/datagridTypes';
 
 interface ForeignKeyCellProps {
-  value: string;
+  value: DatabaseValue;
   foreignKey: {
     table: string;
     column: string;
@@ -27,8 +28,8 @@ interface ForeignKeyCellProps {
 export function ForeignKeyCell({ value, foreignKey, onJumpToTable }: ForeignKeyCellProps) {
   const [open, setOpen] = useState(false);
 
-  // Helper function to safely render any value type (including JSON objects)
-  const renderValue = (val: any): string => {
+  // Helper function to safely render database value type (including JSON objects)
+  const renderValue = (val: DatabaseValue): string => {
     return formatValueForDisplay(val);
   };
 

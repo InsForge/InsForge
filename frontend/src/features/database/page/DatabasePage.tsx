@@ -32,10 +32,13 @@ import {
   SocketMessage,
   useSocket,
 } from '@/lib/contexts/SocketContext';
+import { LinkModalProvider, useLinkModal } from '@/features/database/hooks/useLinkModal';
+import { LinkRecordModal } from '@/features/database/components/LinkRecordModal';
+import { UserInputValue } from '@/lib/types/datagridTypes';
 
 const PAGE_SIZE = 50;
 
-export default function DatabasePage() {
+function DatabasePageContent() {
   // Load selected table from localStorage on mount
   const [selectedTable, setSelectedTable] = useState<string | null>(() => {
     return localStorage.getItem('selectedTable');
@@ -57,6 +60,7 @@ export default function DatabasePage() {
   const queryClient = useQueryClient();
 
   const { socket, isConnected } = useSocket();
+  const { modalState, closeModal } = useLinkModal();
 
   // Persist selected table to localStorage when it changes
   useEffect(() => {
@@ -331,7 +335,7 @@ export default function DatabasePage() {
   };
 
   // Handle record update
-  const handleRecordUpdate = async (rowId: string, columnKey: string, newValue: string) => {
+  const handleRecordUpdate = async (rowId: string, columnKey: string, newValue: UserInputValue) => {
     if (!selectedTable) {
       return;
     }
@@ -356,37 +360,6 @@ export default function DatabasePage() {
     } catch (error) {
       showToast('Failed to update record', 'error');
       throw error;
-    }
-  };
-
-  // Handle record delete
-  const handleRecordDelete = async (id: string) => {
-    if (!selectedTable) {
-      return;
-    }
-    const shouldDelete = await confirm({
-      title: 'Delete Record',
-      description: 'Are you sure you want to delete this record? This action cannot be undone.',
-      confirmText: 'Delete',
-      destructive: true,
-    });
-
-    if (shouldDelete) {
-      try {
-        await databaseService.deleteRecord(selectedTable, id);
-        await Promise.all([
-          refetchTableData(),
-          refetchMetadata(), // Also refresh metadata to update sidebar record counts
-        ]);
-        setSelectedRows((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(id);
-          return newSet;
-        });
-        showToast('Record deleted successfully', 'success');
-      } catch {
-        showToast('Failed to delete record', 'error');
-      }
     }
   };
 
@@ -622,8 +595,6 @@ export default function DatabasePage() {
                   pageSize={PAGE_SIZE}
                   totalRecords={tableData?.totalRecords || 0}
                   onPageChange={setCurrentPage}
-                  onDeleteRecord={(id) => void handleRecordDelete(id)}
-                  onNewRecord={() => setShowRecordForm(true)}
                 />
               )}
             </div>
@@ -648,8 +619,34 @@ export default function DatabasePage() {
         />
       )}
 
+      {/* Link Record Modal */}
+      {modalState.isOpen &&
+        modalState.referenceTable &&
+        modalState.referenceColumn &&
+        modalState.onSelectRecord && (
+          <LinkRecordModal
+            open={modalState.isOpen}
+            onOpenChange={closeModal}
+            referenceTable={modalState.referenceTable}
+            referenceColumn={modalState.referenceColumn}
+            currentValue={modalState.currentValue}
+            onSelectRecord={(record) => {
+              modalState.onSelectRecord?.(record);
+              closeModal();
+            }}
+          />
+        )}
+
       {/* Confirm Dialog */}
       <ConfirmDialog {...confirmDialogProps} />
     </div>
+  );
+}
+
+export default function DatabasePage() {
+  return (
+    <LinkModalProvider>
+      <DatabasePageContent />
+    </LinkModalProvider>
   );
 }

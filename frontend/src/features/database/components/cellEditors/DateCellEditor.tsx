@@ -1,16 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { Button } from '@/components/radix/Button';
-import { cn } from '@/lib/utils/utils';
+import { cn, formatValueForDisplay } from '@/lib/utils/utils';
 import { format } from 'date-fns';
+import { ColumnType } from '@insforge/shared-schemas';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/radix/Popover';
+import { CellEditorProps } from '../../types/databaseTypes';
 
-interface DateCellEditorProps {
-  value: string | null;
+interface DateCellEditorProps extends CellEditorProps<string | null> {
   type?: 'date' | 'datetime';
-  nullable: boolean;
-  onValueChange: (newValue: string | null) => void;
-  onCancel: () => void;
 }
 
 type PickerMode = 'day' | 'month' | 'year';
@@ -215,7 +213,7 @@ export function DateCellEditor({
 
   const handleClear = () => {
     if (nullable) {
-      onValueChange(null);
+      onValueChange('null');
       setOpen(false);
     }
   };
@@ -225,11 +223,9 @@ export function DateCellEditor({
       return 'Select date...';
     }
 
-    const d = new Date(value);
-    if (type === 'datetime') {
-      return format(d, 'MMM dd, yyyy HH:mm');
-    }
-    return format(d, 'MMM dd, yyyy');
+    // Use centralized formatting with appropriate format based on type
+    const dateFormat = type === 'datetime' ? 'MMM dd, yyyy h:mm a' : 'MMM dd, yyyy';
+    return formatValueForDisplay(value, ColumnType.DATETIME, { dateFormat });
   };
 
   const renderDayPicker = () => {

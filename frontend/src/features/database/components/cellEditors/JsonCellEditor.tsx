@@ -3,45 +3,23 @@ import { FileJson, AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/radix/Button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/radix/Popover';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { cn } from '@/lib/utils/utils';
+import { CellEditorProps } from '../../types/databaseTypes';
+import { formatValueForDisplay, cn } from '@/lib/utils/utils';
+import { ColumnType } from '@insforge/shared-schemas';
 
-interface JsonCellEditorProps {
-  value: string | null;
-  nullable: boolean;
-  onValueChange: (newValue: string) => void;
-  onCancel: () => void;
-}
-
-export function JsonCellEditor({ value, nullable, onValueChange, onCancel }: JsonCellEditorProps) {
+export function JsonCellEditor({
+  value,
+  nullable,
+  onValueChange,
+  onCancel,
+}: CellEditorProps<string | null>) {
   const [open, setOpen] = useState(true);
   const [showNullConfirm, setShowNullConfirm] = useState(false);
   const [jsonText, setJsonText] = useState(() => {
-    // Ensure value is always converted to string
     if (!value || value === 'null') {
       return '';
     }
-
-    // If value is already a string, try to parse and format it
-    if (typeof value === 'string') {
-      try {
-        const parsed = JSON.parse(value);
-        return JSON.stringify(parsed, null, 2);
-      } catch {
-        return value;
-      }
-    }
-
-    // If value is an object/array, stringify it
-    if (typeof value === 'object') {
-      try {
-        return JSON.stringify(value, null, 2);
-      } catch {
-        return JSON.stringify(value);
-      }
-    }
-
-    // For any other type, convert to string
-    return String(value || '');
+    return formatValueForDisplay(value, ColumnType.JSON);
   });
   const [isValid, setIsValid] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +69,7 @@ export function JsonCellEditor({ value, nullable, onValueChange, onCancel }: Jso
       setIsValid(true);
       setError(null);
     } catch (e) {
+      console.error(e);
       // Already showing error from validation
     }
   };
@@ -108,6 +87,7 @@ export function JsonCellEditor({ value, nullable, onValueChange, onCancel }: Jso
       setIsValid(true);
       setError(null);
     } catch (e) {
+      console.error(e);
       // Already showing error from validation
     }
   };
@@ -174,24 +154,7 @@ export function JsonCellEditor({ value, nullable, onValueChange, onCancel }: Jso
       return 'Empty JSON';
     }
 
-    try {
-      const parsed = typeof value === 'string' ? JSON.parse(value) : value;
-
-      if (typeof parsed !== 'object' || parsed === null) {
-        return 'Invalid JSON';
-      }
-
-      const keys = Object.keys(parsed);
-      if (keys.length === 0) {
-        return '{}';
-      }
-      if (keys.length === 1) {
-        return `{ ${keys[0]}: ... }`;
-      }
-      return `{ ${keys.length} properties }`;
-    } catch {
-      return 'Invalid JSON';
-    }
+    return formatValueForDisplay(value, ColumnType.JSON);
   };
 
   return (

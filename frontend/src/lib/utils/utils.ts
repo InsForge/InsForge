@@ -1,6 +1,7 @@
 import { ColumnType } from '@insforge/shared-schemas';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { format, isValid } from 'date-fns';
 import { z } from 'zod';
 import {
   uuidSchema,
@@ -22,17 +23,6 @@ import {
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
-
-// Re-export types from datagridTypes for backward compatibility
-export type {
-  DatabaseValue,
-  UserInputValue,
-  DisplayValue,
-  ValueConversionResult,
-  ValueFormatOptions,
-  DatabaseRecord,
-  CellRendererProps,
-} from '../types/datagridTypes';
 
 // Keep ConvertedValue for the existing convertValueForColumn function
 export type ConvertedValue = string | number | boolean | null | JSON;
@@ -111,18 +101,7 @@ export function formatValueForDisplay(
   type?: ColumnType,
   options: ValueFormatOptions = {}
 ): DisplayValue {
-  const {
-    locale = 'en-US',
-    dateOptions = {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    },
-    showNullAsString = true,
-    maxLength,
-  } = options;
+  const { dateFormat = 'MMM dd, yyyy h:mm a', showNullAsString = true, maxLength } = options;
 
   // Handle null/undefined values
   if (value === null || value === undefined) {
@@ -135,7 +114,9 @@ export function formatValueForDisplay(
       return value === null ? 'null' : value ? 'true' : 'false';
 
     case ColumnType.DATETIME:
-      if (!value) return showNullAsString ? 'null' : '';
+      if (!value) {
+        return showNullAsString ? 'null' : '';
+      }
       try {
         let date: Date;
 
@@ -147,10 +128,12 @@ export function formatValueForDisplay(
           return 'Invalid date';
         }
 
-        if (isNaN(date.getTime())) {
+        if (!isValid(date)) {
           return 'Invalid date';
         }
-        const formatted = date.toLocaleDateString(locale, dateOptions);
+
+        // Use date-fns format for consistent, readable formatting
+        const formatted = format(date, dateFormat);
         return maxLength ? truncateString(formatted, maxLength) : formatted;
       } catch {
         return 'Invalid date';
@@ -184,17 +167,18 @@ export function formatValueForDisplay(
       }
 
     case ColumnType.INTEGER:
-    case ColumnType.FLOAT:
+    case ColumnType.FLOAT: {
       if (typeof value === 'number') {
         return value.toString();
       }
       // Try to parse as number
       const numValue = Number(value);
       return isNaN(numValue) ? String(value) : numValue.toString();
+    }
 
     case ColumnType.UUID:
     case ColumnType.STRING:
-    default:
+    default: {
       // Handle objects that aren't explicitly JSON type (fallback for legacy data)
       if (value && typeof value === 'object' && !(value instanceof Date)) {
         try {
@@ -208,6 +192,7 @@ export function formatValueForDisplay(
       // Convert to string and optionally truncate
       const stringValue = String(value);
       return maxLength ? truncateString(stringValue, maxLength) : stringValue;
+    }
   }
 }
 
@@ -215,23 +200,8 @@ export function formatValueForDisplay(
  * Helper function to truncate strings with ellipsis
  */
 function truncateString(str: string, maxLength: number): string {
-  if (str.length <= maxLength) return str;
-  return str.substring(0, maxLength - 3) + '...';
-}
-
-/**
- * Get appropriate error message for invalid values
- */
-export function getValueErrorMessage(type?: ColumnType): string {
-  switch (type) {
-    case ColumnType.DATETIME:
-      return 'Invalid date';
-    case ColumnType.JSON:
-      return 'Invalid JSON';
-    case ColumnType.INTEGER:
-    case ColumnType.FLOAT:
-      return 'Invalid number';
-    default:
-      return 'Invalid value';
+  if (str.length <= maxLength) {
+    return str;
   }
+  return str.substring(0, maxLength - 3) + '...';
 }

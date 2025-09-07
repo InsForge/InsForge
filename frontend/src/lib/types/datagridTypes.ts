@@ -1,4 +1,10 @@
 import { ColumnType } from '@insforge/shared-schemas';
+import type {
+  Column,
+  RenderCellProps,
+  RenderEditCellProps,
+  RenderHeaderCellProps,
+} from 'react-data-grid';
 
 /**
  * Raw database values - these are the actual data types stored in the database
@@ -31,14 +37,31 @@ export interface DatabaseRecord {
 }
 
 /**
- * Cell renderer props for DataGrid components
+ * DataGrid row data - extends DatabaseRecord with required id
  */
-export interface CellRendererProps {
-  row: DatabaseRecord;
-  column: {
-    key: string;
-    name: string;
-  };
+export interface DataGridRow extends DatabaseRecord {
+  id: string;
+}
+
+/**
+ * DataGrid column definition - extends react-data-grid's Column
+ */
+export interface DataGridColumn extends Column<DataGridRow> {
+  type?: ColumnType;
+  isPrimaryKey?: boolean;
+  isNullable?: boolean;
+  // Override render functions to use our custom prop types
+  renderCell?: (props: RenderCellProps<DataGridRow>) => React.ReactNode;
+  renderEditCell?: (props: RenderEditCellProps<DataGridRow>) => React.ReactNode;
+  renderHeaderCell?: (props: RenderHeaderCellProps<DataGridRow>) => React.ReactNode;
+}
+
+/**
+ * Custom cell renderer props for components that need additional options
+ */
+export interface CustomCellRendererProps {
+  row: DataGridRow;
+  column: DataGridColumn;
   options?: {
     getVariant?: (value: DatabaseValue) => 'default' | 'destructive' | 'outline' | 'secondary';
     getLabel?: (value: DatabaseValue) => string;
@@ -72,8 +95,10 @@ export type ValueConversionResult =
 export interface ValueFormatOptions {
   /** Locale for date formatting (default: 'en-US') */
   locale?: string;
-  /** Date format options */
+  /** Date format options (legacy - use dateFormat instead) */
   dateOptions?: Intl.DateTimeFormatOptions;
+  /** date-fns format string (default: 'MMM dd, yyyy h:mm a') */
+  dateFormat?: string;
   /** Show null as 'null' string or empty string */
   showNullAsString?: boolean;
   /** Truncate long strings/JSON to this length */

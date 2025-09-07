@@ -3,17 +3,24 @@ import { Control, Controller, UseFormReturn } from 'react-hook-form';
 import { Input } from '@/components/radix/Input';
 import { Label } from '@/components/radix/Label';
 import { Button } from '@/components/radix/Button';
-import { Calendar, Link2, X } from 'lucide-react';
-import { BooleanCellEditor } from './BooleanCellEditor';
-import { DateCellEditor } from './DateCellEditor';
-import { JsonCellEditor } from './JsonCellEditor';
-import { LinkRecordModal } from './LinkRecordModal';
+import { Calendar } from 'lucide-react';
+import { BooleanCellEditor, DateCellEditor, JsonCellEditor } from './cellEditors';
 import { ColumnSchema, ColumnType } from '@insforge/shared-schemas';
 import { convertValueForColumn, cn, formatValueForDisplay } from '@/lib/utils/utils';
 import { TypeBadge } from '@/components/TypeBadge';
+import { ForeignKeyField } from './ForeignKeyField';
+import type { UserInputValue } from '@/lib/types/datagridTypes';
 
-// Type for database records
-type DatabaseRecord = Record<string, any>;
+// Common styles for form inputs
+const FORM_INPUT_CLASSES =
+  'dark:text-white dark:placeholder:text-neutral-400 dark:bg-neutral-900 dark:border-neutral-700';
+
+// Common interface for all form editors
+interface BaseFormEditorProps {
+  nullable: boolean;
+  onChange: (value: UserInputValue) => void;
+  hasForeignKey?: boolean;
+}
 
 // Helper function to get appropriate placeholder text
 function getPlaceholderText(field: ColumnSchema): string {
@@ -26,11 +33,8 @@ function getPlaceholderText(field: ColumnSchema): string {
 }
 
 // Form adapters for edit cell components
-interface FormBooleanEditorProps {
-  value: boolean | null;
-  nullable: boolean;
-  onChange: (value: boolean | null) => void;
-  hasForeignKey?: boolean;
+interface FormBooleanEditorProps extends BaseFormEditorProps {
+  value: ColumnType.BOOLEAN | null;
 }
 
 function FormBooleanEditor({ value, nullable, onChange, hasForeignKey }: FormBooleanEditorProps) {
@@ -65,17 +69,16 @@ function FormBooleanEditor({ value, nullable, onChange, hasForeignKey }: FormBoo
       type="button"
       variant="outline"
       onClick={() => setShowEditor(true)}
-      className={`w-full justify-start h-9 dark:text-white dark:bg-neutral-900 dark:placeholder:text-neutral-400 dark:border-neutral-700 ${hasForeignKey ? 'pr-20' : ''}`}
+      className={cn('w-full justify-start h-9', FORM_INPUT_CLASSES, hasForeignKey && 'pr-16')}
     >
       {value === null ? 'null' : value ? 'true' : 'false'}
     </Button>
   );
 }
 
-interface FormDateEditorProps {
+interface FormDateEditorProps extends BaseFormEditorProps {
   value: string | null;
   type?: ColumnType.DATETIME;
-  onChange: (value: string | null) => void;
   field: ColumnSchema;
 }
 
@@ -117,7 +120,9 @@ function FormDateEditor({
       return getPlaceholderText(field);
     }
 
-    return formatValueForDisplay(value, type);
+    // Use appropriate format based on type
+    const dateFormat = type === ColumnType.DATETIME ? 'MMM dd, yyyy h:mm a' : 'MMM dd, yyyy';
+    return formatValueForDisplay(value, ColumnType.DATETIME, { dateFormat });
   };
 
   return (
@@ -126,9 +131,10 @@ function FormDateEditor({
       variant="outline"
       onClick={() => setShowEditor(true)}
       className={cn(
-        'w-full justify-start h-9 text-black dark:text-white dark:bg-neutral-900 dark:border-neutral-700',
+        'w-full justify-start h-9 text-black',
+        FORM_INPUT_CLASSES,
         (!value || value === 'null') && 'text-muted-foreground dark:text-neutral-400',
-        !!field.foreignKey && 'pr-20'
+        !!field.foreignKey && 'pr-16'
       )}
     >
       <Calendar className="mr-2 h-4 w-4" />
@@ -137,10 +143,9 @@ function FormDateEditor({
   );
 }
 
-interface FormNumberEditorProps {
+interface FormNumberEditorProps extends BaseFormEditorProps {
   value: number | null;
   type: ColumnType.INTEGER | ColumnType.FLOAT;
-  onChange: (value: number | null) => void;
   tableName: string;
   field: ColumnSchema;
 }
@@ -163,16 +168,13 @@ function FormNumberEditor({ value, type, onChange, tableName, field }: FormNumbe
         }
       }}
       placeholder={getPlaceholderText(field)}
-      className={`dark:text-white dark:placeholder:text-neutral-400 dark:bg-neutral-900 dark:border-neutral-700 ${field.foreignKey ? 'pr-16' : ''}`}
+      className={cn(FORM_INPUT_CLASSES, !!field.foreignKey && 'pr-16')}
     />
   );
 }
 
-interface FormJsonEditorProps {
+interface FormJsonEditorProps extends BaseFormEditorProps {
   value: string | null;
-  onChange: (value: string | null) => void;
-  nullable: boolean;
-  hasForeignKey: boolean;
 }
 
 function FormJsonEditor({ value, nullable, onChange, hasForeignKey }: FormJsonEditorProps) {
@@ -202,27 +204,7 @@ function FormJsonEditor({ value, nullable, onChange, hasForeignKey }: FormJsonEd
     if (!value || value === 'null') {
       return 'Empty JSON';
     }
-
-    try {
-      // Ensure we're working with an object, not a string
-      const parsed = typeof value === 'string' ? JSON.parse(value) : value;
-
-      if (!parsed || typeof parsed !== 'object') {
-        return String(parsed);
-      }
-
-      const keys = Object.keys(parsed);
-      if (keys.length === 0) {
-        return '{}';
-      }
-      if (keys.length === 1) {
-        return `{ ${keys[0]}: ... }`;
-      }
-
-      return `{ ${keys.length} properties }`;
-    } catch {
-      return 'Invalid JSON';
-    }
+    return formatValueForDisplay(value, ColumnType.JSON);
   };
 
   return (
@@ -231,9 +213,10 @@ function FormJsonEditor({ value, nullable, onChange, hasForeignKey }: FormJsonEd
       variant="outline"
       onClick={() => setShowEditor(true)}
       className={cn(
-        'w-full justify-start h-9 text-black dark:text-white dark:bg-neutral-900 dark:border-neutral-700',
+        'w-full justify-start h-9 text-black',
+        FORM_INPUT_CLASSES,
         (!value || value === 'null') && 'text-muted-foreground dark:text-neutral-400',
-        hasForeignKey && 'pr-20'
+        hasForeignKey && 'pr-16'
       )}
     >
       {formatDisplayValue()}
@@ -269,100 +252,197 @@ function FieldLabel({
   );
 }
 
-// Generic component for any field type with foreign key linking
-interface FieldWithLinkProps {
+// Generic field layout component to eliminate repetitive grid layout
+interface FieldLayoutProps {
   field: ColumnSchema;
-  control: Control<any, any, any>;
+  tableName: string;
   children: React.ReactNode;
 }
 
-function FieldWithLink({ field, control, children }: FieldWithLinkProps) {
-  const [showLinkModal, setShowLinkModal] = useState(false);
-
-  if (!field.foreignKey) {
-    // Regular field without foreign key
-    return <>{children}</>;
-  }
-
-  // Field with foreign key linking capability - integrated design
+function FieldLayout({ field, tableName, children }: FieldLayoutProps) {
   return (
-    <>
-      <Controller
-        control={control}
-        name={field.columnName}
-        render={({ field: formField }) => {
-          const hasLinkedValue = formField.value && formField.value !== '';
-          const childElement = children as React.ReactElement<any>;
-          const existingClassName = childElement.props.className || '';
-          const paddingClass = hasLinkedValue ? 'pr-16' : 'pr-11';
-          const modifiedChildren = React.cloneElement(childElement, {
-            value: formField.value,
-            className: `${existingClassName} ${paddingClass}`.trim(),
-          });
-
-          return (
-            <>
-              <div className="space-y-1">
-                <div className="relative">
-                  {modifiedChildren}
-                  <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center">
-                    {hasLinkedValue && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => formField.onChange('')}
-                        className="h-7 w-7 p-1 flex-shrink-0 text-zinc-500 hover:text-red-600 hover:bg-red-50 dark:text-neutral-400 dark:hover:text-red-400 dark:hover:bg-red-950/20"
-                        title="Clear linked record"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setShowLinkModal(true)}
-                      className="rounded-l-none h-9 w-9 p-2 flex-shrink-0 text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 dark:text-neutral-400 dark:hover:text-neutral-200 dark:hover:bg-neutral-700 border-l border-zinc-200 dark:border-neutral-700"
-                      title={
-                        hasLinkedValue
-                          ? `Change linked ${field.foreignKey?.referenceTable} record`
-                          : `Link to ${field.foreignKey?.referenceTable} record`
-                      }
-                    >
-                      <Link2 className="h-5 w-5" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Foreign Key Relationship Info */}
-                <div className="text-xs text-medium text-black dark:text-neutral-400 flex items-center gap-1.5">
-                  <span>Has a Foreign Key relation to</span>
-                  <TypeBadge
-                    type={`${field.foreignKey?.referenceTable}.${field.foreignKey?.referenceColumn}`}
-                    className="dark:bg-neutral-700"
-                  />
-                </div>
-              </div>
-
-              <LinkRecordModal
-                open={showLinkModal}
-                onOpenChange={setShowLinkModal}
-                referenceTable={field.foreignKey!.referenceTable}
-                referenceColumn={field.foreignKey!.referenceColumn}
-                currentValue={formField.value}
-                onSelectRecord={(record: DatabaseRecord) => {
-                  const referenceValue = record[field.foreignKey!.referenceColumn];
-                  formField.onChange(referenceValue);
-                }}
-              />
-            </>
-          );
-        }}
-      />
-    </>
+    <div className="grid grid-cols-8 gap-x-10">
+      <div className="col-span-3">
+        <FieldLabel field={field} tableName={tableName} />
+      </div>
+      <div className="col-span-5">{children}</div>
+    </div>
   );
 }
+
+// ForeignKeyField is now imported from its own file
+
+// Field renderer mapping for cleaner code organization
+const fieldRenderers = {
+  [ColumnType.BOOLEAN]: (
+    field: ColumnSchema,
+    control: Control<any>,
+    _tableName: string,
+    _register: any,
+    hasForeignKey: boolean
+  ) => (
+    <Controller
+      control={control}
+      name={field.columnName}
+      render={({ field: formField }) => (
+        <FormBooleanEditor
+          value={formField.value}
+          nullable={field.isNullable}
+          onChange={formField.onChange}
+          hasForeignKey={hasForeignKey}
+        />
+      )}
+    />
+  ),
+
+  [ColumnType.INTEGER]: (
+    field: ColumnSchema,
+    control: Control<any>,
+    tableName: string,
+    _register: any,
+    hasForeignKey: boolean
+  ) => (
+    <Controller
+      control={control}
+      name={field.columnName}
+      render={({ field: formField }) => (
+        <FormNumberEditor
+          value={formField.value}
+          type={ColumnType.INTEGER}
+          nullable={field.isNullable}
+          onChange={formField.onChange}
+          tableName={tableName}
+          hasForeignKey={hasForeignKey}
+          field={field}
+        />
+      )}
+    />
+  ),
+
+  [ColumnType.FLOAT]: (
+    field: ColumnSchema,
+    control: Control<any>,
+    tableName: string,
+    _register: any,
+    hasForeignKey: boolean
+  ) => (
+    <Controller
+      control={control}
+      name={field.columnName}
+      render={({ field: formField }) => (
+        <FormNumberEditor
+          value={formField.value}
+          type={ColumnType.FLOAT}
+          nullable={field.isNullable}
+          onChange={formField.onChange}
+          tableName={tableName}
+          hasForeignKey={hasForeignKey}
+          field={field}
+        />
+      )}
+    />
+  ),
+
+  [ColumnType.DATETIME]: (
+    field: ColumnSchema,
+    control: Control<any>,
+    _tableName: string,
+    _register: any,
+    hasForeignKey: boolean
+  ) => (
+    <Controller
+      control={control}
+      name={field.columnName}
+      render={({ field: formField }) => (
+        <FormDateEditor
+          value={formField.value}
+          type={ColumnType.DATETIME}
+          nullable={field.isNullable}
+          onChange={formField.onChange}
+          hasForeignKey={hasForeignKey}
+          field={field}
+        />
+      )}
+    />
+  ),
+
+  [ColumnType.JSON]: (
+    field: ColumnSchema,
+    control: Control<any>,
+    _tableName: string,
+    _register: any,
+    hasForeignKey: boolean
+  ) => (
+    <Controller
+      control={control}
+      name={field.columnName}
+      render={({ field: formField }) => (
+        <FormJsonEditor
+          value={
+            typeof formField.value === 'object' ? JSON.stringify(formField.value) : formField.value
+          }
+          nullable={field.isNullable}
+          onChange={(newValue) => {
+            const result = convertValueForColumn(ColumnType.JSON, newValue);
+            if (result.success) {
+              formField.onChange(result.value as JSON);
+            } else {
+              // If parsing fails, keep the string value
+              formField.onChange(newValue);
+            }
+          }}
+          hasForeignKey={hasForeignKey}
+        />
+      )}
+    />
+  ),
+
+  [ColumnType.UUID]: (
+    field: ColumnSchema,
+    control: Control<any>,
+    tableName: string,
+    _register: any,
+    hasForeignKey: boolean
+  ) => (
+    <Controller
+      control={control}
+      name={field.columnName}
+      render={({ field: formField }) => (
+        <Input
+          id={`${tableName}-${field.columnName}`}
+          type="text"
+          value={formField.value || ''}
+          onChange={(e) => formField.onChange(e.target.value)}
+          placeholder={getPlaceholderText(field)}
+          className={cn(FORM_INPUT_CLASSES, hasForeignKey && 'pr-16')}
+        />
+      )}
+    />
+  ),
+
+  [ColumnType.STRING]: (
+    field: ColumnSchema,
+    control: Control<any>,
+    tableName: string,
+    _register: any,
+    hasForeignKey: boolean
+  ) => (
+    <Controller
+      control={control}
+      name={field.columnName}
+      render={({ field: formField }) => (
+        <Input
+          id={`${tableName}-${field.columnName}`}
+          type={field.columnName === 'password' ? 'password' : 'text'}
+          value={formField.value || ''}
+          onChange={(e) => formField.onChange(e.target.value)}
+          placeholder={field.isNullable ? 'Optional' : 'Required'}
+          className={cn(FORM_INPUT_CLASSES, hasForeignKey && 'pr-16')}
+        />
+      )}
+    />
+  ),
+};
 
 export function FormField({ field, form, tableName }: FormFieldProps) {
   const {
@@ -371,168 +451,32 @@ export function FormField({ field, form, tableName }: FormFieldProps) {
     formState: { errors },
   } = form;
 
-  // TODO: This is a mess, we need to clean it up. To fix in future.
+  const renderFieldEditor = () => {
+    const renderer = fieldRenderers[field.type] || fieldRenderers[ColumnType.STRING];
+    const hasForeignKey = !!field.foreignKey;
+    return renderer(field, control, tableName, register, hasForeignKey);
+  };
+
   const renderField = () => {
-    // Infer frontend type from field name and SQLite type
+    const fieldEditor = renderFieldEditor();
 
-    switch (field.type) {
-      case ColumnType.BOOLEAN:
-        return (
-          <div className="grid grid-cols-6 gap-x-10">
-            <div className="col-span-2">
-              <FieldLabel field={field} tableName={tableName} />
-            </div>
-            <div className="col-span-4">
-              <FieldWithLink field={field} control={control}>
-                <Controller
-                  control={control}
-                  name={field.columnName}
-                  render={({ field: formField }) => (
-                    <FormBooleanEditor
-                      value={formField.value}
-                      nullable={field.isNullable}
-                      onChange={formField.onChange}
-                      hasForeignKey={!!field.foreignKey}
-                    />
-                  )}
-                />
-              </FieldWithLink>
-            </div>
-          </div>
-        );
-
-      case ColumnType.INTEGER:
-      case ColumnType.FLOAT:
-        return (
-          <div className="grid grid-cols-6 gap-x-10">
-            <div className="col-span-2">
-              <FieldLabel field={field} tableName={tableName} />
-            </div>
-            <div className="col-span-4">
-              <FieldWithLink field={field} control={control}>
-                <Controller
-                  control={control}
-                  name={field.columnName}
-                  render={({ field: formField }) => (
-                    <FormNumberEditor
-                      value={formField.value}
-                      type={field.type === ColumnType.INTEGER ? ColumnType.INTEGER : ColumnType.FLOAT}
-                      onChange={formField.onChange}
-                      tableName={tableName}
-                      field={field}
-                    />
-                  )}
-                />
-              </FieldWithLink>
-            </div>
-          </div>
-        );
-
-      case ColumnType.DATETIME:
-        return (
-          <div className="grid grid-cols-6 gap-x-10">
-            <div className="col-span-2">
-              <FieldLabel field={field} tableName={tableName} />
-            </div>
-            <div className="col-span-4">
-              <FieldWithLink field={field} control={control}>
-                <Controller
-                  control={control}
-                  name={field.columnName}
-                  render={({ field: formField }) => (
-                    <FormDateEditor
-                      value={formField.value}
-                      type={ColumnType.DATETIME}
-                      onChange={formField.onChange}
-                      field={field}
-                    />
-                  )}
-                />
-              </FieldWithLink>
-            </div>
-          </div>
-        );
-
-      case ColumnType.JSON:
-        return (
-          <div className="grid grid-cols-6 gap-x-10">
-            <div className="col-span-2">
-              <FieldLabel field={field} tableName={tableName} />
-            </div>
-            <div className="col-span-4">
-              <FieldWithLink field={field} control={control}>
-                <Controller
-                  control={control}
-                  name={field.columnName}
-                  render={({ field: formField }) => {
-                    return (
-                      <FormJsonEditor
-                        value={
-                          typeof formField.value === 'object'
-                            ? JSON.stringify(formField.value)
-                            : formField.value
-                        }
-                        nullable={field.isNullable}
-                        hasForeignKey={!!field.foreignKey}
-                        onChange={(newValue) => {
-                          const result = convertValueForColumn(ColumnType.JSON, newValue);
-                          if (result.success) {
-                            formField.onChange(result.value as JSON);
-                          } else {
-                            // If parsing fails, keep the string value
-                            formField.onChange(newValue);
-                          }
-                        }}
-                      />
-                    );
-                  }}
-                />
-              </FieldWithLink>
-            </div>
-          </div>
-        );
-
-      case ColumnType.UUID:
-        return (
-          <div className="grid grid-cols-6 gap-x-10">
-            <div className="col-span-2">
-              <FieldLabel field={field} tableName={tableName} />
-            </div>
-            <div className="col-span-4">
-              <FieldWithLink field={field} control={control}>
-                <Input
-                  id={`${tableName}-${field.columnName}`}
-                  type="text"
-                  {...register(field.columnName)}
-                  placeholder={getPlaceholderText(field)}
-                  className="dark:text-white dark:placeholder:text-neutral-400 dark:bg-neutral-900 dark:border-neutral-700"
-                />
-              </FieldWithLink>
-            </div>
-          </div>
-        );
-
-      case ColumnType.STRING:
-      default:
-        return (
-          <div className="grid grid-cols-6 gap-x-10">
-            <div className="col-span-2">
-              <FieldLabel field={field} tableName={tableName} />
-            </div>
-            <div className="col-span-4">
-              <FieldWithLink field={field} control={control}>
-                <Input
-                  id={`${tableName}-${field.columnName}`}
-                  type={field.columnName === 'password' ? 'password' : 'text'}
-                  {...register(field.columnName)}
-                  placeholder={getPlaceholderText(field)}
-                  className="dark:text-white dark:placeholder:text-neutral-400 dark:bg-neutral-900 dark:border-neutral-700"
-                />
-              </FieldWithLink>
-            </div>
-          </div>
-        );
+    // Check if field has foreign key and wrap accordingly
+    if (field.foreignKey) {
+      return (
+        <FieldLayout field={field} tableName={tableName}>
+          <ForeignKeyField field={field} control={control}>
+            {fieldEditor}
+          </ForeignKeyField>
+        </FieldLayout>
+      );
     }
+
+    // Regular field without foreign key
+    return (
+      <FieldLayout field={field} tableName={tableName}>
+        {fieldEditor}
+      </FieldLayout>
+    );
   };
 
   return (
