@@ -158,6 +158,60 @@ const { data } = await insforge.database
 // data is typed as Post[]
 ```
 
+## AI Operations
+
+### Chat Completions
+```javascript
+// Non-streaming chat completion
+const { data, error } = await insforge.ai.chat.completions.create({
+  model: 'anthropic/claude-3.5-haiku',
+  messages: [
+    { role: 'system', content: 'You are a helpful assistant' },
+    { role: 'user', content: 'What is the capital of France?' }
+  ],
+  temperature: 0.7,
+  maxTokens: 500
+});
+// Returns: { response, usage, model }
+
+// Streaming chat completion
+const stream = await insforge.ai.chat.completions.create({
+  model: 'anthropic/claude-3.5-haiku',
+  messages: [
+    { role: 'user', content: 'Tell me a story' }
+  ],
+  stream: true
+});
+
+// Process stream events
+for await (const event of stream) {
+  if (event.chunk) {
+    process.stdout.write(event.chunk); // Partial response
+  }
+  if (event.done) {
+    console.log('\nStream complete');
+  }
+}
+```
+
+### Image Generation
+```javascript
+// Generate images
+const { data, error } = await insforge.ai.images.generate({
+  model: 'google/gemini-2.5-flash-image-preview',
+  prompt: 'A serene landscape with mountains at sunset',
+  size: '1024x1024',
+  numImages: 1,
+  quality: 'hd'
+});
+// Returns: { images: [{ url, ... }] }
+console.log(data.images[0].url); // Image URL
+```
+
+### Available Models
+- **Chat**: `anthropic/claude-3.5-haiku`, `openai/gpt-4o-mini`, `google/gemini-2.5-flash`
+- **Image**: `google/gemini-2.5-flash-image-preview`
+
 ## Testing
 
 ### Unit Tests
