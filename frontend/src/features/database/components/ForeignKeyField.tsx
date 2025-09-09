@@ -5,7 +5,7 @@ import { Link2, X } from 'lucide-react';
 import { TypeBadge } from '@/components/TypeBadge';
 import { useLinkModal } from '@/features/database/hooks/useLinkModal';
 import { type ColumnSchema, ColumnType } from '@insforge/shared-schemas';
-import type { DataGridRow, DatabaseValue } from '@/lib/types/datagridTypes';
+import type { DataGridRow, DatabaseValue } from '@/components/datagrid';
 
 interface ForeignKeyFieldProps {
   field: ColumnSchema;

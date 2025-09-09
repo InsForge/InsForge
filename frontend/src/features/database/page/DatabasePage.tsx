@@ -34,7 +34,7 @@ import {
 } from '@/lib/contexts/SocketContext';
 import { LinkModalProvider, useLinkModal } from '@/features/database/hooks/useLinkModal';
 import { LinkRecordModal } from '@/features/database/components/LinkRecordModal';
-import { UserInputValue } from '@/lib/types/datagridTypes';
+import type { UserInputValue } from '@/components/datagrid';
 
 const PAGE_SIZE = 50;
 

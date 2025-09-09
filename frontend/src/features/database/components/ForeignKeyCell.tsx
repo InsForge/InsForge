@@ -11,10 +11,9 @@ import {
   TooltipTrigger,
 } from '@/components/radix/Tooltip';
 import { databaseService } from '@/features/database/services/database.service';
-import { DataGrid } from '@/components/DataGrid';
+import { DataGrid, type DatabaseValue } from '@/components/datagrid';
 import { convertSchemaToColumns } from '@/features/database/components/DatabaseDataGrid';
 import { formatValueForDisplay } from '@/lib/utils/utils';
-import type { DatabaseValue } from '@/lib/types/datagridTypes';
 
 interface ForeignKeyCellProps {
   value: DatabaseValue;

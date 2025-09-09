@@ -4,7 +4,23 @@ import type {
   RenderCellProps,
   RenderEditCellProps,
   RenderHeaderCellProps,
-} from 'react-data-grid';
+} from '@/components/datagrid';
+
+export type ColumnValueType<T extends ColumnType> = T extends ColumnType.STRING
+  ? string
+  : T extends ColumnType.INTEGER
+    ? number
+    : T extends ColumnType.FLOAT
+      ? number
+      : T extends ColumnType.BOOLEAN
+        ? boolean
+        : T extends ColumnType.DATETIME
+          ? string
+          : T extends ColumnType.UUID
+            ? string
+            : T extends ColumnType.JSON
+              ? string
+              : null;
 
 /**
  * Raw database values - these are the actual data types stored in the database
@@ -57,32 +73,6 @@ export interface DataGridColumn extends Column<DataGridRow> {
 }
 
 /**
- * Custom cell renderer props for components that need additional options
- */
-export interface CustomCellRendererProps {
-  row: DataGridRow;
-  column: DataGridColumn;
-  options?: {
-    getVariant?: (value: DatabaseValue) => 'default' | 'destructive' | 'outline' | 'secondary';
-    getLabel?: (value: DatabaseValue) => string;
-  };
-}
-
-/**
- * Form field value change handler
- */
-export type FormFieldChangeHandler = (value: DatabaseValue) => void;
-
-/**
- * Cell edit handler for DataGrid
- */
-export type CellEditHandler = (
-  rowId: string,
-  columnKey: string,
-  newValue: DatabaseValue
-) => Promise<void>;
-
-/**
  * Value conversion result for user input validation
  */
 export type ValueConversionResult =
@@ -99,42 +89,6 @@ export interface ValueFormatOptions {
   dateOptions?: Intl.DateTimeFormatOptions;
   /** date-fns format string (default: 'MMM dd, yyyy h:mm a') */
   dateFormat?: string;
-  /** Show null as 'null' string or empty string */
-  showNullAsString?: boolean;
   /** Truncate long strings/JSON to this length */
   maxLength?: number;
-}
-
-/**
- * Type guard to check if a value is a valid DatabaseValue
- */
-export function isDatabaseValue(value: unknown): value is DatabaseValue {
-  return (
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    typeof value === 'boolean' ||
-    value === null ||
-    (typeof value === 'object' && value !== null)
-  );
-}
-
-/**
- * Type guard to check if a column type is datetime-related
- */
-export function isDateTimeColumn(type: ColumnType): boolean {
-  return type === ColumnType.DATETIME;
-}
-
-/**
- * Type guard to check if a column type is numeric
- */
-export function isNumericColumn(type: ColumnType): boolean {
-  return type === ColumnType.INTEGER || type === ColumnType.FLOAT;
-}
-
-/**
- * Type guard to check if a column type is JSON
- */
-export function isJsonColumn(type: ColumnType): boolean {
-  return type === ColumnType.JSON;
 }

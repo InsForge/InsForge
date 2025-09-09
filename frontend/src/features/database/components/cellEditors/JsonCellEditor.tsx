@@ -3,16 +3,18 @@ import { FileJson, AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/radix/Button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/radix/Popover';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { CellEditorProps } from '../../types/databaseTypes';
+import { CellEditorProps } from '.';
 import { formatValueForDisplay, cn } from '@/lib/utils/utils';
 import { ColumnType } from '@insforge/shared-schemas';
+import { ColumnValueType } from '@/components/datagrid/datagridTypes';
 
 export function JsonCellEditor({
   value,
   nullable,
   onValueChange,
   onCancel,
-}: CellEditorProps<string | null>) {
+  className,
+}: CellEditorProps<ColumnValueType<ColumnType.JSON> | null>) {
   const [open, setOpen] = useState(true);
   const [showNullConfirm, setShowNullConfirm] = useState(false);
   const [jsonText, setJsonText] = useState(() => {
@@ -165,11 +167,12 @@ export function JsonCellEditor({
             variant="ghost"
             className={cn(
               'w-full justify-start text-sm text-left font-normal h-full border-0 p-0 hover:bg-transparent dark:text-white',
-              (!value || value === 'null') && 'text-muted-foreground'
+              (!value || value === 'null') && 'text-muted-foreground',
+              className
             )}
           >
             <FileJson className="mr-2 h-4 w-4" />
-            {formatDisplayValue()}
+            <span className="truncate">{formatDisplayValue()}</span>
           </Button>
         </PopoverTrigger>
         <PopoverContent

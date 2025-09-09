@@ -4,10 +4,11 @@ import { Button } from '@/components/radix/Button';
 import { cn, formatValueForDisplay } from '@/lib/utils/utils';
 import { format } from 'date-fns';
 import { ColumnType } from '@insforge/shared-schemas';
+import { ColumnValueType } from '@/components/datagrid/datagridTypes';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/radix/Popover';
-import { CellEditorProps } from '../../types/databaseTypes';
+import { CellEditorProps } from '.';
 
-interface DateCellEditorProps extends CellEditorProps<string | null> {
+interface DateCellEditorProps extends CellEditorProps<ColumnValueType<ColumnType.DATETIME> | null> {
   type?: 'date' | 'datetime';
 }
 

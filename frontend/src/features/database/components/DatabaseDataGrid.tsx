@@ -1,14 +1,21 @@
 import React, { useMemo } from 'react';
-import { DataGrid, DefaultCellRenderers, type DataGridProps } from '@/components/DataGrid';
+import {
+  DataGrid,
+  DefaultCellRenderers,
+  type DataGridProps,
+  type RenderCellProps,
+  type RenderEditCellProps,
+  type DataGridColumn,
+  type DataGridRow,
+  type UserInputValue,
+} from '@/components/datagrid';
 import {
   BooleanCellEditor,
   DateCellEditor,
   JsonCellEditor,
 } from '@/features/database/components/cellEditors';
-import type { DataGridColumn, DataGridRow, UserInputValue } from '@/lib/types/datagridTypes';
 import { ColumnSchema, ColumnType, TableSchema } from '@insforge/shared-schemas';
 import { ForeignKeyCell } from './ForeignKeyCell';
-import { RenderCellProps, RenderEditCellProps } from 'react-data-grid';
 
 // Extended props for database cell editors
 interface DatabaseCellEditorProps extends RenderEditCellProps<DataGridRow> {
@@ -80,20 +87,7 @@ function CustomBooleanCellEditor({
 }: DatabaseCellEditorProps) {
   const handleValueChange = React.useCallback(
     async (newValue: string) => {
-      let value: boolean | null;
-      switch (newValue) {
-        case 'true':
-          value = true;
-          break;
-        case 'false':
-          value = false;
-          break;
-        case 'null':
-          value = null;
-          break;
-        default:
-          value = null;
-      }
+      const value: boolean | null = newValue === 'null' ? null : newValue === 'true';
 
       if (onCellEdit && row[column.key] !== value) {
         try {
@@ -114,7 +108,7 @@ function CustomBooleanCellEditor({
   return (
     <div className="w-full h-full">
       <BooleanCellEditor
-        value={row[column.key] as ColumnType.BOOLEAN | null}
+        value={row[column.key] as boolean | null}
         nullable={columnSchema?.isNullable ?? false}
         onValueChange={(value) => void handleValueChange(value)}
         onCancel={onClose}

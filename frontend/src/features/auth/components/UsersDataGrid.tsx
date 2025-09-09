@@ -1,7 +1,12 @@
 import { useMemo } from 'react';
-import { DataGrid, DefaultCellRenderers, type DataGridProps } from '@/components/DataGrid';
-import type { DataGridColumn, DataGridRow } from '@/lib/types/datagridTypes';
-import type { RenderCellProps } from 'react-data-grid';
+import {
+  DataGrid,
+  DefaultCellRenderers,
+  type DataGridProps,
+  type DataGridColumn,
+  type DataGridRow,
+  type RenderCellProps,
+} from '@/components/datagrid';
 import { Badge } from '@/components/radix/Badge';
 import { cn } from '@/lib/utils/utils';
 

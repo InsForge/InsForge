@@ -76,7 +76,7 @@ export const storageService = {
       {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${apiClient.getToken()}`,
+          Authorization: `Bearer ${apiClient.getToken()}`,
         },
         body: formData,
       }
@@ -102,7 +102,7 @@ export const storageService = {
   async downloadObject(bucketName: string, objectKey: string): Promise<Blob> {
     const response = await fetch(this.getDownloadUrl(bucketName, objectKey), {
       headers: {
-        'Authorization': `Bearer ${apiClient.getToken()}`,
+        Authorization: `Bearer ${apiClient.getToken()}`,
       },
     });
     if (!response.ok) {

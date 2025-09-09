@@ -1,25 +1,22 @@
 import '@/rdg.css';
-import React, { useMemo, useState, useCallback } from 'react';
+import { useMemo, useCallback } from 'react';
 import ReactDataGrid, {
   type Column,
   type SortColumn,
   SelectColumn,
   SELECT_COLUMN_KEY,
-  type RenderCellProps,
   type CellClickArgs,
   type CellMouseEvent,
 } from 'react-data-grid';
-import { Button } from '@/components/radix/Button';
-import { Badge } from '@/components/radix/Badge';
-import { Copy, Check, ArrowDownWideNarrow, ArrowUpNarrowWide } from 'lucide-react';
-import { cn, formatValueForDisplay } from '@/lib/utils/utils';
-import { PaginationControls } from './PaginationControls';
-import { Checkbox } from './Checkbox';
+import { cn } from '@/lib/utils/utils';
+import { PaginationControls } from '../PaginationControls';
+import { Checkbox } from '../Checkbox';
 import { useTheme } from '@/lib/contexts/ThemeContext';
-import { TypeBadge } from './TypeBadge';
-import { ColumnType } from '@insforge/shared-schemas';
-import type { DataGridColumn, DataGridRow } from '@/lib/types/datagridTypes';
+import type { DataGridColumn, DataGridRow } from './datagridTypes';
+import SortableHeaderRenderer from './SortableHeader';
+import { DefaultCellRenderers } from './DefaultCells';
 
+// Default cell renderers
 export interface DataGridProps {
   data: DataGridRow[];
   columns: DataGridColumn[];
@@ -47,204 +44,8 @@ export interface DataGridProps {
   showTypeBadge?: boolean;
 }
 
-// Separate IdCell component to use hooks properly
-function IdCell({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await navigator.clipboard.writeText(String(value));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Copy failed silently
-    }
-  };
-
-  return (
-    <div className="w-full h-full flex items-center justify-between group">
-      <span className="text-sm truncate" title={String(value)}>
-        {value}
-      </span>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-7 w-7 p-1 bg-white dark:bg-neutral-700 opacity-0 group-hover:opacity-100 transition-opacity"
-        onClick={(e) => {
-          handleCopy(e).catch(() => {
-            // Handle copy error silently
-          });
-        }}
-      >
-        {copied ? (
-          <Check className="h-5 w-5 text-green-600 dark:text-green-400" />
-        ) : (
-          <Copy className="h-5 w-5 text-black dark:text-white" />
-        )}
-      </Button>
-    </div>
-  );
-}
-
-// Default cell renderers
-export const DefaultCellRenderers = {
-  text: ({ row, column }: RenderCellProps<DataGridRow>) => {
-    const value = row[column.key];
-    const displayValue = formatValueForDisplay(value, ColumnType.STRING);
-    return (
-      <div className="w-full h-full flex items-center">
-        <span className="truncate dark:text-zinc-300" title={displayValue}>
-          {displayValue}
-        </span>
-      </div>
-    );
-  },
-
-  boolean: ({ row, column }: RenderCellProps<DataGridRow>) => {
-    const value = row[column.key];
-    const displayValue = formatValueForDisplay(value, ColumnType.BOOLEAN);
-    return (
-      <div className="w-full h-full flex items-center justify-start">
-        <Badge
-          variant={value ? 'default' : 'secondary'}
-          className="px-1.5 py-0.5 border border-transparent dark:bg-neutral-800 dark:text-zinc-300 dark:border-neutral-700"
-        >
-          {displayValue}
-        </Badge>
-      </div>
-    );
-  },
-
-  date: ({ row, column }: RenderCellProps<DataGridRow>) => {
-    const value = row[column.key];
-    const displayValue = formatValueForDisplay(value, ColumnType.DATETIME);
-    const isError = displayValue === 'Invalid date';
-
-    return (
-      <div className="w-full h-full flex items-center">
-        <span
-          className={cn('truncate', isError ? 'text-red-500' : 'text-black dark:text-zinc-300')}
-          title={displayValue}
-        >
-          {displayValue}
-        </span>
-      </div>
-    );
-  },
-
-  json: ({ row, column }: RenderCellProps<DataGridRow>) => {
-    const value = row[column.key];
-    const displayText = formatValueForDisplay(value, ColumnType.JSON);
-    const isError = displayText === 'Invalid JSON';
-
-    return (
-      <div className="w-full h-full flex items-center">
-        <span
-          className={cn(
-            'truncate text-sm text-black dark:text-zinc-300 max-w-full overflow-hidden whitespace-nowrap',
-            isError ? 'text-red-500' : ''
-          )}
-          title={displayText}
-        >
-          {displayText}
-        </span>
-      </div>
-    );
-  },
-
-  id: ({ row, column }: RenderCellProps<DataGridRow>) => {
-    const value = row[column.key];
-
-    return <IdCell value={String(value)} />;
-  },
-
-  email: ({ row, column }: RenderCellProps<DataGridRow>) => {
-    const value = row[column.key];
-    const displayValue = formatValueForDisplay(value, ColumnType.STRING);
-    return (
-      <span
-        className="text-sm text-gray-800 font-medium truncate dark:text-zinc-300"
-        title={displayValue}
-      >
-        {displayValue}
-      </span>
-    );
-  },
-};
-
-// Default header renderer
-export function SortableHeaderRenderer({
-  column,
-  sortDirection,
-  columnType,
-  showTypeBadge,
-  mutedHeader,
-}: {
-  column: DataGridColumn;
-  sortDirection?: 'ASC' | 'DESC';
-  columnType?: string;
-  showTypeBadge?: boolean;
-  mutedHeader?: boolean;
-}) {
-  // Determine which arrow to show on hover based on current sort state
-  const getNextSortDirection = () => {
-    if (!sortDirection) {
-      return 'DESC'; // Default to DESC for first sort
-    } else if (sortDirection === 'ASC') {
-      return null;
-    } else {
-      return 'ASC';
-    }
-  };
-
-  const nextDirection = getNextSortDirection();
-
-  return (
-    <div className="group w-full h-full flex items-center cursor-pointer">
-      <div className="flex flex-row gap-1 items-center">
-        <span
-          className={`truncate text-sm font-medium ${mutedHeader ? 'text-zinc-500 dark:text-neutral-400' : 'text-zinc-950 dark:text-zinc-300'} max-w-[120px]`}
-          title={typeof column.name === 'string' ? column.name : ''}
-        >
-          {column.name}
-        </span>
-
-        {columnType && showTypeBadge && (
-          <TypeBadge type={columnType} className="dark:bg-neutral-800" />
-        )}
-
-        {/* Show sort arrow with hover effect */}
-        {column.sortable && (
-          <div className="relative ml-0.5 w-5 h-5">
-            {sortDirection && (
-              <div className="bg-transparent p-0.5 rounded">
-                {sortDirection === 'DESC' ? (
-                  <ArrowDownWideNarrow className="h-4 w-4 text-zinc-500 dark:text-neutral-400 transition-opacity group-hover:opacity-0" />
-                ) : (
-                  <ArrowUpNarrowWide className="h-4 w-4 text-zinc-500 dark:text-neutral-400 transition-opacity group-hover:opacity-0" />
-                )}
-              </div>
-            )}
-
-            {nextDirection && (
-              <div className="absolute inset-0 invisible group-hover:visible transition-opacity bg-slate-200 border border-slate-200 dark:bg-neutral-800 dark:border-neutral-800 p-0.5 rounded w-5 h-5">
-                {nextDirection === 'DESC' ? (
-                  <ArrowDownWideNarrow className="h-4 w-4 text-zinc-500 dark:text-neutral-400" />
-                ) : (
-                  <ArrowUpNarrowWide className="h-4 w-4 text-zinc-500 dark:text-neutral-400" />
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // Main DataGrid component
-export function DataGrid({
+export default function DataGrid({
   data,
   columns,
   loading = false,

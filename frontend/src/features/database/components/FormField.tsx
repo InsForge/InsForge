@@ -6,10 +6,14 @@ import { Button } from '@/components/radix/Button';
 import { Calendar } from 'lucide-react';
 import { BooleanCellEditor, DateCellEditor, JsonCellEditor } from './cellEditors';
 import { ColumnSchema, ColumnType } from '@insforge/shared-schemas';
+import { ColumnValueType } from '@/components/datagrid/datagridTypes';
 import { convertValueForColumn, cn, formatValueForDisplay } from '@/lib/utils/utils';
 import { TypeBadge } from '@/components/TypeBadge';
 import { ForeignKeyField } from './ForeignKeyField';
-import type { UserInputValue } from '@/lib/types/datagridTypes';
+import type { UserInputValue } from '@/components/datagrid';
+
+// Type for dynamic record form data - using any for flexibility since schema is dynamic
+type RecordFormData = Record<string, UserInputValue>;
 
 // Common styles for form inputs
 const FORM_INPUT_CLASSES =
@@ -34,18 +38,14 @@ function getPlaceholderText(field: ColumnSchema): string {
 
 // Form adapters for edit cell components
 interface FormBooleanEditorProps extends BaseFormEditorProps {
-  value: ColumnType.BOOLEAN | null;
+  value: ColumnValueType<ColumnType.BOOLEAN> | null;
 }
 
 function FormBooleanEditor({ value, nullable, onChange, hasForeignKey }: FormBooleanEditorProps) {
   const [showEditor, setShowEditor] = useState(false);
 
   const handleValueChange = (newValue: string) => {
-    if (newValue === 'null') {
-      onChange(null);
-    } else {
-      onChange(newValue === 'true');
-    }
+    onChange(newValue === 'null' ? null : newValue === 'true');
     setShowEditor(false);
   };
 
@@ -77,7 +77,7 @@ function FormBooleanEditor({ value, nullable, onChange, hasForeignKey }: FormBoo
 }
 
 interface FormDateEditorProps extends BaseFormEditorProps {
-  value: string | null;
+  value: ColumnValueType<ColumnType.DATETIME> | null;
   type?: ColumnType.DATETIME;
   field: ColumnSchema;
 }
@@ -144,7 +144,7 @@ function FormDateEditor({
 }
 
 interface FormNumberEditorProps extends BaseFormEditorProps {
-  value: number | null;
+  value: ColumnValueType<ColumnType.INTEGER | ColumnType.FLOAT> | null;
   type: ColumnType.INTEGER | ColumnType.FLOAT;
   tableName: string;
   field: ColumnSchema;
@@ -154,7 +154,7 @@ function FormNumberEditor({ value, type, onChange, tableName, field }: FormNumbe
   return (
     <Input
       id={`${tableName}-${field.columnName}`}
-      type={type === ColumnType.INTEGER ? 'number' : 'text'}
+      type="number"
       step={type === ColumnType.INTEGER ? '1' : undefined}
       value={value ?? ''}
       onChange={(e) => {
@@ -163,7 +163,8 @@ function FormNumberEditor({ value, type, onChange, tableName, field }: FormNumbe
           // Handle empty value - let form validation handle required fields
           onChange(null);
         } else {
-          const numValue = type === ColumnType.INTEGER ? parseInt(inputValue, 10) : parseFloat(inputValue);
+          const numValue =
+            type === ColumnType.INTEGER ? parseInt(inputValue, 10) : parseFloat(inputValue);
           onChange(isNaN(numValue) ? null : numValue);
         }
       }}
@@ -174,10 +175,11 @@ function FormNumberEditor({ value, type, onChange, tableName, field }: FormNumbe
 }
 
 interface FormJsonEditorProps extends BaseFormEditorProps {
-  value: string | null;
+  value: ColumnValueType<ColumnType.JSON> | null;
+  field: ColumnSchema;
 }
 
-function FormJsonEditor({ value, nullable, onChange, hasForeignKey }: FormJsonEditorProps) {
+function FormJsonEditor({ value, nullable, onChange, hasForeignKey, field }: FormJsonEditorProps) {
   const [showEditor, setShowEditor] = useState(false);
 
   const handleValueChange = (newValue: string) => {
@@ -196,13 +198,14 @@ function FormJsonEditor({ value, nullable, onChange, hasForeignKey }: FormJsonEd
         nullable={nullable}
         onValueChange={handleValueChange}
         onCancel={handleCancel}
+        className={hasForeignKey ? 'pr-16' : undefined}
       />
     );
   }
 
   const formatDisplayValue = () => {
     if (!value || value === 'null') {
-      return 'Empty JSON';
+      return getPlaceholderText(field);
     }
     return formatValueForDisplay(value, ColumnType.JSON);
   };
@@ -216,17 +219,17 @@ function FormJsonEditor({ value, nullable, onChange, hasForeignKey }: FormJsonEd
         'w-full justify-start h-9 text-black',
         FORM_INPUT_CLASSES,
         (!value || value === 'null') && 'text-muted-foreground dark:text-neutral-400',
-        hasForeignKey && 'pr-16'
+        hasForeignKey ? 'pr-16' : undefined
       )}
     >
-      {formatDisplayValue()}
+      <span className="truncate block">{formatDisplayValue()}</span>
     </Button>
   );
 }
 
 interface FormFieldProps {
   field: ColumnSchema;
-  form: UseFormReturn<any>;
+  form: UseFormReturn<RecordFormData>;
   tableName: string;
 }
 
@@ -270,15 +273,13 @@ function FieldLayout({ field, tableName, children }: FieldLayoutProps) {
   );
 }
 
-// ForeignKeyField is now imported from its own file
-
 // Field renderer mapping for cleaner code organization
 const fieldRenderers = {
   [ColumnType.BOOLEAN]: (
     field: ColumnSchema,
-    control: Control<any>,
+    control: Control<RecordFormData>,
     _tableName: string,
-    _register: any,
+    _register: UseFormReturn<RecordFormData>['register'],
     hasForeignKey: boolean
   ) => (
     <Controller
@@ -286,7 +287,7 @@ const fieldRenderers = {
       name={field.columnName}
       render={({ field: formField }) => (
         <FormBooleanEditor
-          value={formField.value}
+          value={formField.value as boolean | null}
           nullable={field.isNullable}
           onChange={formField.onChange}
           hasForeignKey={hasForeignKey}
@@ -297,9 +298,9 @@ const fieldRenderers = {
 
   [ColumnType.INTEGER]: (
     field: ColumnSchema,
-    control: Control<any>,
+    control: Control<RecordFormData>,
     tableName: string,
-    _register: any,
+    _register: UseFormReturn<RecordFormData>['register'],
     hasForeignKey: boolean
   ) => (
     <Controller
@@ -307,7 +308,7 @@ const fieldRenderers = {
       name={field.columnName}
       render={({ field: formField }) => (
         <FormNumberEditor
-          value={formField.value}
+          value={formField.value as number | null}
           type={ColumnType.INTEGER}
           nullable={field.isNullable}
           onChange={formField.onChange}
@@ -321,9 +322,9 @@ const fieldRenderers = {
 
   [ColumnType.FLOAT]: (
     field: ColumnSchema,
-    control: Control<any>,
+    control: Control<RecordFormData>,
     tableName: string,
-    _register: any,
+    _register: UseFormReturn<RecordFormData>['register'],
     hasForeignKey: boolean
   ) => (
     <Controller
@@ -331,7 +332,7 @@ const fieldRenderers = {
       name={field.columnName}
       render={({ field: formField }) => (
         <FormNumberEditor
-          value={formField.value}
+          value={formField.value as number | null}
           type={ColumnType.FLOAT}
           nullable={field.isNullable}
           onChange={formField.onChange}
@@ -345,9 +346,9 @@ const fieldRenderers = {
 
   [ColumnType.DATETIME]: (
     field: ColumnSchema,
-    control: Control<any>,
+    control: Control<RecordFormData>,
     _tableName: string,
-    _register: any,
+    _register: UseFormReturn<RecordFormData>['register'],
     hasForeignKey: boolean
   ) => (
     <Controller
@@ -355,7 +356,7 @@ const fieldRenderers = {
       name={field.columnName}
       render={({ field: formField }) => (
         <FormDateEditor
-          value={formField.value}
+          value={formField.value as string | null}
           type={ColumnType.DATETIME}
           nullable={field.isNullable}
           onChange={formField.onChange}
@@ -368,9 +369,9 @@ const fieldRenderers = {
 
   [ColumnType.JSON]: (
     field: ColumnSchema,
-    control: Control<any>,
+    control: Control<RecordFormData>,
     _tableName: string,
-    _register: any,
+    _register: UseFormReturn<RecordFormData>['register'],
     hasForeignKey: boolean
   ) => (
     <Controller
@@ -378,9 +379,7 @@ const fieldRenderers = {
       name={field.columnName}
       render={({ field: formField }) => (
         <FormJsonEditor
-          value={
-            typeof formField.value === 'object' ? JSON.stringify(formField.value) : formField.value
-          }
+          value={formField.value as string | null}
           nullable={field.isNullable}
           onChange={(newValue) => {
             const result = convertValueForColumn(ColumnType.JSON, newValue);
@@ -392,6 +391,7 @@ const fieldRenderers = {
             }
           }}
           hasForeignKey={hasForeignKey}
+          field={field}
         />
       )}
     />
@@ -399,9 +399,9 @@ const fieldRenderers = {
 
   [ColumnType.UUID]: (
     field: ColumnSchema,
-    control: Control<any>,
+    control: Control<RecordFormData>,
     tableName: string,
-    _register: any,
+    _register: UseFormReturn<RecordFormData>['register'],
     hasForeignKey: boolean
   ) => (
     <Controller
@@ -411,7 +411,7 @@ const fieldRenderers = {
         <Input
           id={`${tableName}-${field.columnName}`}
           type="text"
-          value={formField.value || ''}
+          value={typeof formField.value === 'string' ? formField.value : ''}
           onChange={(e) => formField.onChange(e.target.value)}
           placeholder={getPlaceholderText(field)}
           className={cn(FORM_INPUT_CLASSES, hasForeignKey && 'pr-16')}
@@ -422,9 +422,9 @@ const fieldRenderers = {
 
   [ColumnType.STRING]: (
     field: ColumnSchema,
-    control: Control<any>,
+    control: Control<RecordFormData>,
     tableName: string,
-    _register: any,
+    _register: UseFormReturn<RecordFormData>['register'],
     hasForeignKey: boolean
   ) => (
     <Controller
@@ -434,7 +434,7 @@ const fieldRenderers = {
         <Input
           id={`${tableName}-${field.columnName}`}
           type={field.columnName === 'password' ? 'password' : 'text'}
-          value={formField.value || ''}
+          value={typeof formField.value === 'string' ? formField.value : ''}
           onChange={(e) => formField.onChange(e.target.value)}
           placeholder={field.isNullable ? 'Optional' : 'Required'}
           className={cn(FORM_INPUT_CLASSES, hasForeignKey && 'pr-16')}

@@ -1,7 +1,11 @@
 import { useMemo } from 'react';
-import { DataGrid, type DataGridProps } from '@/components/DataGrid';
-import type { DataGridColumn, DataGridRow } from '@/lib/types/datagridTypes';
-import type { RenderCellProps } from 'react-data-grid';
+import {
+  DataGrid,
+  type DataGridProps,
+  type RenderCellProps,
+  type DataGridColumn,
+  type DataGridRow,
+} from '@/components/datagrid';
 import { Button } from '@/components/radix/Button';
 import { Download, Eye, Trash2, Image, FileText, Music, Video, Archive, File } from 'lucide-react';
 import { formatDistance } from 'date-fns';

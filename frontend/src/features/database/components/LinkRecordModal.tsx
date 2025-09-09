@@ -4,7 +4,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/r
 import { Button } from '@/components/radix/Button';
 import { databaseService } from '@/features/database/services/database.service';
 import { convertSchemaToColumns } from '@/features/database/components/DatabaseDataGrid';
-import { SortableHeaderRenderer } from '@/components/DataGrid';
 import { SearchInput, DataGrid, TypeBadge } from '@/components';
 import {
   type CellMouseEvent,
@@ -12,10 +11,13 @@ import {
   type RenderCellProps,
   type RenderHeaderCellProps,
   type SortColumn,
-} from 'react-data-grid';
+  SortableHeaderRenderer,
+  type DataGridColumn,
+  type DataGridRow,
+  type DatabaseValue,
+} from '@/components/datagrid';
 import { formatValueForDisplay } from '@/lib/utils/utils';
 import { ColumnType } from '@insforge/shared-schemas';
-import type { DataGridColumn, DataGridRow, DatabaseValue } from '@/lib/types/datagridTypes';
 
 const PAGE_SIZE = 50;
 
@@ -39,7 +41,7 @@ export function LinkRecordModal({
   const [selectedRecord, setSelectedRecord] = useState<DataGridRow | null>(null);
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  
+
   // Fetch records from the reference table
   const { data: recordsData, isLoading } = useQuery({
     queryKey: [

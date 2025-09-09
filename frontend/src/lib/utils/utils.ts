@@ -1,7 +1,7 @@
 import { ColumnType } from '@insforge/shared-schemas';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { format, isValid } from 'date-fns';
+import { format } from 'date-fns';
 import { z } from 'zod';
 import {
   uuidSchema,
@@ -12,13 +12,13 @@ import {
   jsonSchema,
   stringSchema,
 } from './validation-schemas';
-import {
+import type {
   DatabaseValue,
   UserInputValue,
   DisplayValue,
   ValueConversionResult,
   ValueFormatOptions,
-} from '../types/datagridTypes';
+} from '@/components/datagrid';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -101,89 +101,68 @@ export function formatValueForDisplay(
   type?: ColumnType,
   options: ValueFormatOptions = {}
 ): DisplayValue {
-  const { dateFormat = 'MMM dd, yyyy h:mm a', showNullAsString = true, maxLength } = options;
+  const { dateFormat = 'MMM dd, yyyy h:mm a', maxLength } = options;
 
   // Handle null/undefined values
-  if (value === null || value === undefined) {
-    return showNullAsString ? 'null' : '';
+  if (isEmptyValue(value)) {
+    return 'null';
   }
 
   // Handle different column types
   switch (type) {
     case ColumnType.BOOLEAN:
-      return value === null ? 'null' : value ? 'true' : 'false';
+      return value ? 'true' : 'false';
 
-    case ColumnType.DATETIME:
-      if (!value) {
-        return showNullAsString ? 'null' : '';
-      }
-      try {
-        let date: Date;
+    case ColumnType.DATETIME: {
+      const date =
+        value instanceof Date
+          ? value
+          : typeof value === 'string' || typeof value === 'number'
+            ? new Date(value)
+            : null;
 
-        if (value instanceof Date) {
-          date = value;
-        } else if (typeof value === 'string' || typeof value === 'number') {
-          date = new Date(value);
-        } else {
-          return 'Invalid date';
-        }
-
-        if (!isValid(date)) {
-          return 'Invalid date';
-        }
-
-        // Use date-fns format for consistent, readable formatting
-        const formatted = format(date, dateFormat);
-        return maxLength ? truncateString(formatted, maxLength) : formatted;
-      } catch {
+      if (!date || Number.isNaN(date.getTime())) {
         return 'Invalid date';
       }
 
-    case ColumnType.JSON:
-      if (value === null || value === undefined) {
-        return showNullAsString ? 'null' : '';
-      }
+      // Use date-fns format for consistent, readable formatting
+      const formatted = format(date, dateFormat);
+      return maxLength ? truncateString(formatted, maxLength) : formatted;
+    }
 
+    case ColumnType.JSON: {
       try {
         let parsed: unknown;
 
         if (typeof value === 'string') {
           parsed = JSON.parse(value);
-        } else if (typeof value === 'object') {
-          parsed = value;
         } else {
           parsed = value;
         }
 
-        if (parsed && typeof parsed === 'object') {
-          const jsonString = JSON.stringify(parsed);
-          return maxLength ? truncateString(jsonString, maxLength) : jsonString;
-        } else {
-          const stringValue = String(parsed);
-          return maxLength ? truncateString(stringValue, maxLength) : stringValue;
-        }
+        const formatted =
+          parsed && typeof parsed === 'object' ? JSON.stringify(parsed) : String(parsed);
+
+        return maxLength ? truncateString(formatted, maxLength) : formatted;
       } catch {
         return 'Invalid JSON';
       }
+    }
 
     case ColumnType.INTEGER:
     case ColumnType.FLOAT: {
-      if (typeof value === 'number') {
-        return value.toString();
-      }
-      // Try to parse as number
-      const numValue = Number(value);
-      return isNaN(numValue) ? String(value) : numValue.toString();
+      const num = Number(value);
+      return Number.isNaN(num) ? String(value) : String(num);
     }
 
     case ColumnType.UUID:
     case ColumnType.STRING:
     default: {
       // Handle objects that aren't explicitly JSON type (fallback for legacy data)
-      if (value && typeof value === 'object' && !(value instanceof Date)) {
+      if (typeof value === 'object' && !(value instanceof Date)) {
         try {
-          const jsonString = JSON.stringify(value);
-          return maxLength ? truncateString(jsonString, maxLength) : jsonString;
+          const formatted = JSON.stringify(value);
+          return maxLength ? truncateString(formatted, maxLength) : formatted;
         } catch {
           return '[Invalid Object]';
         }
