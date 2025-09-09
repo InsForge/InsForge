@@ -1,4 +1,4 @@
-import type { DataGridColumn } from '@/lib/types/datagridTypes';
+import type { DataGridColumn } from './datagridTypes';
 import { TypeBadge } from '@/components/TypeBadge';
 import { ArrowDownWideNarrow, ArrowUpNarrowWide } from 'lucide-react';
 

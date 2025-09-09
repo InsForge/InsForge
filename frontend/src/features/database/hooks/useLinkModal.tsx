@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
-import type { DataGridRow } from '@/lib/types/datagridTypes';
+import type { DataGridRow } from '@/components/datagrid';
 
 interface LinkModalState {
   isOpen: boolean;

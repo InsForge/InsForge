@@ -70,8 +70,7 @@ export function JsonCellEditor({
       setJsonText(JSON.stringify(parsed, null, 2));
       setIsValid(true);
       setError(null);
-    } catch (e) {
-      console.error(e);
+    } catch {
       // Already showing error from validation
     }
   };
@@ -88,8 +87,7 @@ export function JsonCellEditor({
       setJsonText(JSON.stringify(parsed));
       setIsValid(true);
       setError(null);
-    } catch (e) {
-      console.error(e);
+    } catch {
       // Already showing error from validation
     }
   };

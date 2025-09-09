@@ -40,15 +40,14 @@ function TextCellEditor({
     if (onCellEdit && String(oldValue) !== String(newValue)) {
       try {
         await onCellEdit(row.id, column.key, newValue);
-      } catch (error) {
-        console.error(error);
+      } catch {
+        // Edit failed silently
       }
     }
 
     const updatedRow = { ...row, [column.key]: newValue };
     onRowChange(updatedRow);
     onClose();
-    return;
   }, [row, column.key, value, onCellEdit, onRowChange, onClose]);
 
   const handleKeyDown = React.useCallback(
@@ -60,7 +59,6 @@ function TextCellEditor({
         e.preventDefault();
         onClose();
       }
-      return;
     },
     [handleSave, onClose]
   );
@@ -92,15 +90,14 @@ function CustomBooleanCellEditor({
       if (onCellEdit && row[column.key] !== value) {
         try {
           await onCellEdit(row.id, column.key, value);
-        } catch (error) {
-          console.error(error);
+        } catch {
+          // Edit failed silently
         }
       }
 
       const updatedRow = { ...row, [column.key]: value };
       onRowChange(updatedRow);
       onClose();
-      return;
     },
     [row, column.key, onRowChange, onClose, onCellEdit]
   );
@@ -134,15 +131,14 @@ function CustomDateCellEditor({
       ) {
         try {
           await onCellEdit(row.id, column.key, newValue);
-        } catch (error) {
-          console.error(error);
+        } catch {
+          // Edit failed silently
         }
       }
 
       const updatedRow = { ...row, [column.key]: newValue };
       onRowChange(updatedRow);
       onClose();
-      return;
     },
     [row, column.key, onRowChange, onClose, onCellEdit]
   );
@@ -172,15 +168,14 @@ function CustomJsonCellEditor({
       if (onCellEdit && row[column.key] !== newValue) {
         try {
           await onCellEdit(row.id, column.key, newValue);
-        } catch (error) {
-          console.error(error);
+        } catch {
+          // Edit failed silently
         }
       }
 
       const updatedRow = { ...row, [column.key]: newValue };
       onRowChange(updatedRow);
       onClose();
-      return;
     },
     [column.key, onCellEdit, row, onRowChange, onClose]
   );
