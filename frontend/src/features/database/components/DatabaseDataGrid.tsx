@@ -230,17 +230,15 @@ export function convertSchemaToColumns(
 
     // Set custom renderers - check for foreign key first (highest priority)
     if (col.foreignKey) {
+      const fk = col.foreignKey;
       // Foreign key column - show reference popover, disable editing
       column.renderCell = (props: RenderCellProps<DataGridRow>) => {
-        if (!col.foreignKey) {
-          return <span>Error: Missing foreign key</span>;
-        }
         return (
           <ForeignKeyCell
             value={props.row[col.columnName]}
             foreignKey={{
-              table: col.foreignKey.referenceTable,
-              column: col.foreignKey.referenceColumn,
+              table: fk.referenceTable,
+              column: fk.referenceColumn,
             }}
             onJumpToTable={onJumpToTable}
           />

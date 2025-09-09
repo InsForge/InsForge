@@ -4,11 +4,14 @@ import { Button } from '@/components/radix/Button';
 import { Link2, X } from 'lucide-react';
 import { TypeBadge } from '@/components/TypeBadge';
 import { useLinkModal } from '@/features/database/hooks/useLinkModal';
-import { type ColumnSchema, ColumnType } from '@insforge/shared-schemas';
+import { ColumnType, ForeignKeySchema } from '@insforge/shared-schemas';
 import type { DataGridRow, DatabaseValue } from '@/components/datagrid';
 
 interface ForeignKeyFieldProps {
-  field: ColumnSchema;
+  foreignKey: ForeignKeySchema;
+  type: ColumnType;
+  columnName: string;
+  isNullable: boolean;
   control: Control<any, any, any>;
   children: React.ReactElement<{ className?: string }>;
 }
@@ -21,7 +24,14 @@ interface ForeignKeyFieldProps {
  * - Foreign key relationship info display
  * - Automatic padding adjustment for buttons
  */
-export function ForeignKeyField({ field, control, children }: ForeignKeyFieldProps) {
+export function ForeignKeyField({
+  foreignKey,
+  type,
+  columnName,
+  isNullable,
+  control,
+  children,
+}: ForeignKeyFieldProps) {
   const { openModal } = useLinkModal();
 
   const handleOpenLinkModal = (
@@ -41,18 +51,13 @@ export function ForeignKeyField({ field, control, children }: ForeignKeyFieldPro
     });
   };
 
-  if (!field.foreignKey) {
-    console.warn('ForeignKeyField used on field without foreign key:', field.columnName);
-    return <>{children}</>;
-  }
-
   return (
     <Controller
       control={control}
-      name={field.columnName}
+      name={columnName}
       render={({ field: formField }) => {
         const hasLinkedValue =
-          field.type === ColumnType.BOOLEAN
+          type === ColumnType.BOOLEAN
             ? formField.value !== null && formField.value !== undefined
             : formField.value && formField.value !== '';
 
@@ -68,16 +73,16 @@ export function ForeignKeyField({ field, control, children }: ForeignKeyFieldPro
                     size="icon"
                     onClick={() => {
                       // Clear logic based on field type and nullability
-                      if (field.type === ColumnType.BOOLEAN) {
+                      if (type === ColumnType.BOOLEAN) {
                         // For boolean: null if nullable, false if not nullable
-                        formField.onChange(field.isNullable ? null : false);
+                        formField.onChange(isNullable ? null : false);
                       } else {
                         // For other types: null if nullable, appropriate default if not nullable
-                        if (field.isNullable) {
+                        if (isNullable) {
                           formField.onChange(null);
                         } else {
                           // Set appropriate default value based on type
-                          switch (field.type) {
+                          switch (type) {
                             case ColumnType.INTEGER:
                             case ColumnType.FLOAT:
                               formField.onChange(0);
@@ -102,10 +107,10 @@ export function ForeignKeyField({ field, control, children }: ForeignKeyFieldPro
                   variant="ghost"
                   size="icon"
                   onClick={() => {
-                    if (field.foreignKey?.referenceTable && field.foreignKey?.referenceColumn) {
+                    if (foreignKey.referenceTable && foreignKey.referenceColumn) {
                       handleOpenLinkModal(
-                        field.foreignKey.referenceTable,
-                        field.foreignKey.referenceColumn,
+                        foreignKey.referenceTable,
+                        foreignKey.referenceColumn,
                         formField.value,
                         formField.onChange
                       );
@@ -114,8 +119,8 @@ export function ForeignKeyField({ field, control, children }: ForeignKeyFieldPro
                   className="rounded-l-none h-9 w-9 p-2 flex-shrink-0 text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 dark:text-neutral-400 dark:hover:text-neutral-200 dark:hover:bg-neutral-700 border-l border-zinc-200 dark:border-neutral-700"
                   title={
                     hasLinkedValue
-                      ? `Change linked ${field.foreignKey?.referenceTable} record`
-                      : `Link to ${field.foreignKey?.referenceTable} record`
+                      ? `Change linked ${foreignKey.referenceTable} record`
+                      : `Link to ${foreignKey.referenceTable} record`
                   }
                 >
                   <Link2 className="h-5 w-5" />
@@ -127,7 +132,7 @@ export function ForeignKeyField({ field, control, children }: ForeignKeyFieldPro
             <div className="text-xs text-medium text-black dark:text-neutral-400 flex items-center gap-1.5">
               <span className="whitespace-nowrap">Has a Foreign Key relation to</span>
               <TypeBadge
-                type={`${field.foreignKey?.referenceTable}.${field.foreignKey?.referenceColumn}`}
+                type={`${foreignKey.referenceTable}.${foreignKey.referenceColumn}`}
                 className="dark:bg-neutral-700 truncate"
               />
             </div>

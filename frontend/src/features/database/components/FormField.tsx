@@ -219,7 +219,7 @@ function FormJsonEditor({ value, nullable, onChange, hasForeignKey, field }: For
         'w-full justify-start h-9 text-black',
         FORM_INPUT_CLASSES,
         (!value || value === 'null') && 'text-muted-foreground dark:text-neutral-400',
-        hasForeignKey ? 'pr-16' : undefined
+        hasForeignKey && 'pr-16'
       )}
     >
       <span className="truncate block">{formatDisplayValue()}</span>
@@ -464,7 +464,13 @@ export function FormField({ field, form, tableName }: FormFieldProps) {
     if (field.foreignKey) {
       return (
         <FieldLayout field={field} tableName={tableName}>
-          <ForeignKeyField field={field} control={control}>
+          <ForeignKeyField
+            foreignKey={field.foreignKey}
+            type={field.type}
+            columnName={field.columnName}
+            isNullable={field.isNullable}
+            control={control}
+          >
             {fieldEditor}
           </ForeignKeyField>
         </FieldLayout>
