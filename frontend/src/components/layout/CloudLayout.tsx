@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ThemeProvider } from '@/lib/contexts/ThemeContext';
 import { cn } from '@/lib/utils/utils';
+import { ServerEvents, useSocket } from '@/lib/contexts/SocketContext';
 
 interface CloudLayoutProps {
   children: React.ReactNode;
@@ -15,6 +16,7 @@ interface RouterMessage {
 export default function CloudLayout({ children }: CloudLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { socket } = useSocket();
 
   useEffect(() => {
     const handleCloudMessage = (event: MessageEvent) => {
@@ -57,6 +59,31 @@ export default function CloudLayout({ children }: CloudLayoutProps) {
       );
     }
   }, [location.pathname]);
+
+  // Listen for MCP connection events and forward to parent
+  useEffect(() => {
+    if (!socket || window.parent === window) return;
+
+    const handleMcpConnected = () => {
+      const targetOrigin = window.location.origin.includes('localhost')
+        ? '*'
+        : 'https://insforge.dev';
+
+      window.parent.postMessage(
+        {
+          type: 'MCP_CONNECTION_STATUS',
+          connected: true,
+        },
+        targetOrigin
+      );
+    };
+
+    socket.on(ServerEvents.MCP_CONNECTED, handleMcpConnected);
+
+    return () => {
+      socket.off(ServerEvents.MCP_CONNECTED, handleMcpConnected);
+    };
+  }, [socket]);
 
   return (
     <ThemeProvider forcedTheme="dark">

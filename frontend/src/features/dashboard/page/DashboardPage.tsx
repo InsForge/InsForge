@@ -5,7 +5,16 @@ import { metadataService } from '@/features/metadata/services/metadata.service';
 import { authService } from '@/features/auth/services/auth.service';
 import { Skeleton } from '@/components/radix/Skeleton';
 import { Card, CardContent } from '@/components/radix/Card';
-import { Users, Database, HardDrive, Lock, Box, ChevronRight } from 'lucide-react';
+import {
+  Users,
+  Database,
+  HardDrive,
+  Lock,
+  Box,
+  ChevronRight,
+  ArrowLeftRight,
+  Link2,
+} from 'lucide-react';
 import GithubLight from '@/assets/icons/github.svg';
 import Google from '@/assets/icons/google.svg';
 import GithubDark from '@/assets/icons/github_dark.svg';
@@ -45,6 +54,23 @@ export default function DashboardPage() {
     void navigate(`${basePath}/${to}`, { state });
   };
 
+  const handleConnectInsForge = () => {
+    if (window.parent !== window) {
+      // Send message to parent window to open onboarding overlay
+      const targetOrigin = window.location.origin.includes('localhost')
+        ? '*'
+        : 'https://insforge.dev';
+      window.parent.postMessage(
+        {
+          type: 'OPEN_CONNECT_OVERLAY',
+        },
+        targetOrigin
+      );
+    } else {
+      void handleNavigateTo('onboard');
+    }
+  };
+
   return (
     <main className="h-full bg-white dark:bg-neutral-800">
       <div className="flex justify-center py-6 px-0">
@@ -55,6 +81,32 @@ export default function DashboardPage() {
               Dashboard
             </h1>
           </div>
+
+          {/* Connect InsForge Card */}
+          <Card className="w-full bg-white dark:bg-[#333333] rounded-lg border border-gray-200 dark:border-neutral-700 shadow-[0px_1px_3px_0px_rgba(0,0,0,0.1)]">
+            <CardContent className="px-8 py-6">
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <Link2 className="w-5 h-5 text-black dark:text-white" />
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Connect InsForge
+                    </h3>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-neutral-400">
+                    With InsForge connected, your agent takes care of the backend for you
+                  </p>
+                </div>
+                <div
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-300 hover:bg-emerald-400 text-black rounded font-medium text-sm transition-colors cursor-pointer"
+                  onClick={handleConnectInsForge}
+                >
+                  <ArrowLeftRight className="w-5 h-5" />
+                  Connect
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Stats Cards */}
           <div className="flex gap-6 w-full">
@@ -76,10 +128,10 @@ export default function DashboardPage() {
                     ) : (
                       <>
                         <span className="text-2xl font-normal text-gray-900 dark:text-white tracking-[-0.144px]">
-                          {(usersData?.records?.length || 0).toLocaleString()}
+                          {(usersData?.users.length || 0).toLocaleString()}
                         </span>
                         <span className="text-sm font-normal text-gray-500 dark:text-neutral-400">
-                          {usersData?.records?.length === 1 ? 'user' : 'users'}
+                          {usersData?.users.length === 1 ? 'user' : 'users'}
                         </span>
                       </>
                     )}
