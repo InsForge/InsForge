@@ -488,7 +488,7 @@ export function DataGrid({
                   {emptyStateActionText && onEmptyStateAction && (
                     <button
                       onClick={onEmptyStateAction}
-                      className="inline-flex items-center text-sm font-medium text-chart-blue-dark focus:outline-none focus:ring-0 dark:text-zinc-400"
+                      className="inline-flex items-center text-sm font-medium text-chart-blue-dark focus:outline-none focus:ring-0 dark:text-emerald-300"
                     >
                       {emptyStateActionText}
                     </button>
