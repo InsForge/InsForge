@@ -4,8 +4,6 @@ import { z } from 'zod';
 import fetch from 'node-fetch';
 import { program } from 'commander';
 import { handleApiResponse, formatSuccessMessage } from './response-handler.js';
-import { promises as fs } from 'fs';
-import path from 'path';
 import { UsageTracker } from './usage-tracker.js';
 import {
   ColumnType,
@@ -15,6 +13,8 @@ import {
   updateTableSchemaRequestSchema,
   CreateBucketRequest,
   createBucketRequestSchema,
+  rawSQLRequestSchema,
+  RawSQLRequest,
 } from '@insforge/shared-schemas';
 
 // Parse command line arguments
@@ -655,6 +655,60 @@ server.tool(
           {
             type: 'text',
             text: `Error retrieving backend metadata: ${errMsg}`,
+          },
+        ],
+        isError: true,
+      });
+    }
+  })
+);
+
+// Execute raw SQL query
+server.tool(
+  'run-raw-sql',
+  'Execute raw SQL query with optional parameters. Admin access required. Use with caution as it can modify data directly.',
+  {
+    apiKey: z
+      .string()
+      .optional()
+      .describe('API key for authentication (optional if provided via --api_key)'),
+    ...rawSQLRequestSchema.shape,
+  },
+  withUsageTracking('run-raw-sql', async ({ apiKey, query, params }) => {
+    try {
+      const actualApiKey = getApiKey(apiKey);
+
+      const requestBody: RawSQLRequest = {
+        query,
+        params: params || [],
+      };
+
+      const response = await fetch(`${API_BASE_URL}/api/database/advance/rawsql`, {
+        method: 'POST',
+        headers: {
+          'x-api-key': actualApiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const result = await handleApiResponse(response);
+
+      return await addBackgroundContext({
+        content: [
+          {
+            type: 'text',
+            text: formatSuccessMessage('SQL query executed', result),
+          },
+        ],
+      });
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+      return await addBackgroundContext({
+        content: [
+          {
+            type: 'text',
+            text: `Error executing SQL query: ${errMsg}`,
           },
         ],
         isError: true,
