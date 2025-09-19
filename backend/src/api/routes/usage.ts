@@ -50,21 +50,18 @@ usageRouter.get('/stats', verifyCloudBackend, async (req, res, next) => {
     const dbManager = DatabaseManager.getInstance();
     const db = dbManager.getDb();
 
-    // Get MCP tool usage count within date range
-    const endDatePlusOne = new Date(end_date as string);
-    endDatePlusOne.setDate(endDatePlusOne.getDate() + 1);
-
+    // Date parameters are ignored for MCP because:
+    // 1. MCP usage should accumulate continuously
+    // 2. Cloud backend calculates deltas between snapshots
     const mcpResult = await db
       .prepare(
         `
       SELECT COUNT(*) as count 
       FROM _mcp_usage 
-      WHERE success = true 
-        AND created_at >= $1 
-        AND created_at < $2
+      WHERE success = true
     `
       )
-      .get(new Date(start_date as string), endDatePlusOne);
+      .get();
     const mcpUsageCount = parseInt(mcpResult?.count || '0');
 
     // Get database size (in bytes)
