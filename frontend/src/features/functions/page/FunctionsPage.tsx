@@ -98,7 +98,7 @@ export default function FunctionsPage() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex flex-col gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Edge Functions</h1>
+          <h1 className="text-3xl font-bold text-zinc-950 dark:text-white">Edge Functions</h1>
           <p className="text-muted-foreground mt-1">
             View and manage serverless functions
           </p>

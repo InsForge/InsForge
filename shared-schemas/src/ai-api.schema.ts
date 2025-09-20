@@ -84,8 +84,8 @@ export const openRouterModelSchema = z.object({
   description: z.string().optional(),
   architecture: z
     .object({
-      inputModalities: z.array(z.string()),
-      outputModalities: z.array(z.string()),
+      input_modalities: z.array(z.string()),
+      output_modalities: z.array(z.string()),
       tokenizer: z.string(),
       instructType: z.string(),
     })
