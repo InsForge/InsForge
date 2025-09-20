@@ -1,11 +1,15 @@
 import { AIConfigurationSchema } from '@insforge/shared-schemas';
 import { authService } from '@/features/auth/services/auth.service';
-import { FileText, Image, Mic, Video } from 'lucide-react';
+import { Type, Image, Mic, Video } from 'lucide-react';
+import GrokIcon from '@/assets/icons/grok.svg?react';
+import GeminiIcon from '@/assets/icons/gemini.svg?react';
+import ClaudeIcon from '@/assets/icons/claude_code_logo.svg?react';
+import OpenAIIcon from '@/assets/icons/openai.svg?react';
 
 export const getModalityIcon = (modality: string) => {
   switch (modality) {
     case 'text':
-      return FileText;
+      return Type;
     case 'image':
       return Image;
     case 'audio':
@@ -13,7 +17,7 @@ export const getModalityIcon = (modality: string) => {
     case 'video':
       return Video;
     default:
-      return FileText; // Default fallback icon
+      return Type; // Default fallback icon
   }
 };
 
@@ -42,6 +46,41 @@ export const getProviderDisplayName = (providerId: string): string => {
     providerMap[providerId.toLowerCase()] ||
     providerId.charAt(0).toUpperCase() + providerId.slice(1)
   );
+};
+
+export const getProviderLogo = (providerId: string) => {
+  const logoMap: Record<string, React.FunctionComponent<React.SVGProps<SVGSVGElement>>> = {
+    anthropic: ClaudeIcon,
+    openai: OpenAIIcon,
+    google: GeminiIcon,
+    xai: GrokIcon,
+  };
+  return logoMap[providerId] || providerId.charAt(0).toUpperCase();
+};
+
+// Calculate price level based on pricing data
+export const calculatePriceLevel = (
+  pricing: any
+): { level: 'FREE' | '$' | '$$' | '$$$'; color: string } => {
+  if (!pricing) return { level: 'FREE', color: 'text-green-400' };
+
+  // Check if it's free
+  if (pricing.prompt === '0' && pricing.completion === '0') {
+    return { level: 'FREE', color: 'text-green-400' };
+  }
+
+  // Calculate average cost per 1M tokens (prompt + completion)
+  // Convert from per-token to per-1M-tokens
+  const promptCostPerToken = parseFloat(pricing.prompt) || 0;
+  const completionCostPerToken = parseFloat(pricing.completion) || 0;
+  const promptCostPer1M = promptCostPerToken * 1000000;
+  const completionCostPer1M = completionCostPerToken * 1000000;
+  const avgCostPer1M = (promptCostPer1M + completionCostPer1M) / 2;
+
+  // Adjusted thresholds based on actual pricing data and user feedback
+  if (avgCostPer1M <= 3) return { level: '$', color: 'text-green-400' }; // ≤$3/1M tokens (Haiku, Gemini Flash, etc.)
+  if (avgCostPer1M <= 15) return { level: '$$', color: 'text-amber-400' }; // ≤$15/1M tokens (GPT-4o, Claude Sonnet, etc.)
+  return { level: '$$$', color: 'text-red-400' }; // >$15/1M tokens (Claude Opus, etc.)
 };
 
 export const generateAIIntegrationPrompt = async (
