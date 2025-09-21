@@ -16,6 +16,7 @@ import {
   getProviderDisplayName,
   filterModelsByModalities,
 } from '../helpers';
+import { useToast } from '@/lib/hooks/useToast';
 import { ModalityField } from './fields/ModalityField';
 import { ModelSelectionField } from './fields/ModelSelectionField';
 import { SystemPromptField } from './fields/SystemPromptField';
@@ -28,6 +29,7 @@ interface AIConfigFormProps {
 
 export function AIConfigForm({ mode, editingConfig, onSubmit }: AIConfigFormProps) {
   const { configuredTextProviders, configuredImageProviders, configurations } = useAIConfigs();
+  const { showToast } = useToast();
   const [selectedInputModality, setSelectedInputModality] = useState<ModalitySchema[]>(['text']);
   const [selectedOutputModality, setSelectedOutputModality] = useState<ModalitySchema[]>(['text']);
 
@@ -134,6 +136,17 @@ export function AIConfigForm({ mode, editingConfig, onSubmit }: AIConfigFormProp
   const handleFormSubmit = useCallback(
     (data: CreateAIConfigurationRequest | UpdateAIConfigurationRequest) => {
       if (isCreateMode) {
+        // Validate that input and output modalities are selected
+        if (selectedInputModality.length === 0) {
+          showToast('Please select at least one input modality');
+          return;
+        }
+        
+        if (selectedOutputModality.length === 0) {
+          showToast('Please select at least one output modality');
+          return;
+        }
+
         // For create mode, we need to get the actual model's architecture capabilities
         const selectedModelId = (data as CreateAIConfigurationRequest).modelId;
 
@@ -144,7 +157,7 @@ export function AIConfigForm({ mode, editingConfig, onSubmit }: AIConfigFormProp
           .find((model) => model.id === selectedModelId);
 
         if (!selectedModel) {
-          console.error('Selected model not found');
+          showToast('Selected model not found');
           return;
         }
 
@@ -165,7 +178,7 @@ export function AIConfigForm({ mode, editingConfig, onSubmit }: AIConfigFormProp
         onSubmit(data as UpdateAIConfigurationRequest);
       }
     },
-    [onSubmit, isCreateMode, configuredTextProviders, configuredImageProviders]
+    [onSubmit, isCreateMode, selectedInputModality, selectedOutputModality, configuredTextProviders, configuredImageProviders]
   );
 
   const isModelConfigured = useCallback(
@@ -180,6 +193,11 @@ export function AIConfigForm({ mode, editingConfig, onSubmit }: AIConfigFormProp
     },
     [configurations, editingConfig]
   );
+
+  // Check if model selection should be disabled
+  const isModelSelectionDisabled = useMemo(() => {
+    return selectedInputModality.length === 0 || selectedOutputModality.length === 0;
+  }, [selectedInputModality.length, selectedOutputModality.length]);
 
   return (
     <form
@@ -214,17 +232,18 @@ export function AIConfigForm({ mode, editingConfig, onSubmit }: AIConfigFormProp
                 createForm.setValue('provider', 'openrouter');
               }}
               isModelConfigured={isModelConfigured}
+              disabled={isModelSelectionDisabled}
             />
 
             {/* System prompt field */}
-            <SystemPromptField
+            <SystemPromptField<CreateAIConfigurationRequest>
               register={createForm.register}
               error={form.formState.errors.systemPrompt}
             />
           </div>
         ) : (
           <div className="flex flex-col gap-6 w-full items-stretch">
-            <SystemPromptField
+            <SystemPromptField<UpdateAIConfigurationRequest>
               register={editForm.register}
               error={form.formState.errors.systemPrompt}
             />

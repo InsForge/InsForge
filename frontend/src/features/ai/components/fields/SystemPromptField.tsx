@@ -1,13 +1,13 @@
-import { UseFormRegister, FieldError } from 'react-hook-form';
+import { UseFormRegister, FieldError, FieldValues, Path } from 'react-hook-form';
 import { Label } from '@/components/radix/Label';
 import { Textarea } from '@/components/radix/Textarea';
 
-interface SystemPromptFieldProps {
-  register: UseFormRegister<any>;
+interface SystemPromptFieldProps<T extends FieldValues> {
+  register: UseFormRegister<T>;
   error?: FieldError;
 }
 
-export function SystemPromptField({ register, error }: SystemPromptFieldProps) {
+export function SystemPromptField<T extends FieldValues>({ register, error }: SystemPromptFieldProps<T>) {
   return (
     <div className="flex flex-row gap-10 items-start">
       <Label
@@ -19,7 +19,7 @@ export function SystemPromptField({ register, error }: SystemPromptFieldProps) {
       <div className="flex flex-col gap-1 w-full">
         <Textarea
           id="systemPrompt"
-          {...register('systemPrompt')}
+          {...register('systemPrompt' as Path<T>)}
           placeholder="Enter system prompt..."
           className="w-full min-h-[160px] resize-none bg-transparent dark:bg-neutral-900 dark:text-white dark:placeholder:text-neutral-400 dark:border-neutral-700"
         />
