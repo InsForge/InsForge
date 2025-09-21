@@ -8,11 +8,13 @@ import {
   updateAIConfigurationRequestSchema,
   CreateAIConfigurationRequest,
   UpdateAIConfigurationRequest,
+  ModalitySchema,
 } from '@insforge/shared-schemas';
 import {
   getProviderLogo,
   calculatePriceLevel,
   getProviderDisplayName,
+  filterModelsByModalities,
 } from '../helpers';
 import { ModalityField } from './fields/ModalityField';
 import { ModelSelectionField } from './fields/ModelSelectionField';
@@ -24,57 +26,38 @@ interface AIConfigFormProps {
   onSubmit: (data: CreateAIConfigurationRequest | UpdateAIConfigurationRequest) => void;
 }
 
-interface ModelOption {
-  value: string;
-  label: string;
-  company: string;
-  priceLevel: 'FREE' | '$' | '$$' | '$$$';
-  priceColor: string;
-  logo: React.FunctionComponent<React.SVGProps<SVGSVGElement>>;
-}
-
 export function AIConfigForm({ mode, editingConfig, onSubmit }: AIConfigFormProps) {
   const { configuredTextProviders, configuredImageProviders, configurations } = useAIConfigs();
-  const [selectedInputModality, setSelectedInputModality] = useState<string>('text');
-  const [selectedOutputModality, setSelectedOutputModality] = useState<string>('text');
+  const [selectedInputModality, setSelectedInputModality] = useState<ModalitySchema[]>(['text']);
+  const [selectedOutputModality, setSelectedOutputModality] = useState<ModalitySchema[]>(['text']);
 
-
-  // Filter models based on input and output modalities
   const filteredModels = useMemo(() => {
-    const allModels: ModelOption[] = [];
+    // Only calculate filtered models in create mode
+    if (mode === 'edit') {
+      return [];
+    }
 
-    // Collect all models from configured providers
-    [...configuredTextProviders, ...configuredImageProviders].forEach((provider) => {
-      provider.models.forEach((model) => {
-        // Check if model supports the selected input and output modalities
-        const supportsInput =
-          model.architecture?.input_modalities?.includes(selectedInputModality) ?? false;
-        const supportsOutput =
-          model.architecture?.output_modalities?.includes(selectedOutputModality) ?? false;
+    const filteredRawModels = filterModelsByModalities(
+      [...configuredTextProviders, ...configuredImageProviders],
+      selectedInputModality,
+      selectedOutputModality
+    );
 
-        if (supportsInput && supportsOutput) {
-          const companyId = model.id.split('/')[0];
-          const company = getProviderDisplayName(companyId);
-          const priceInfo = calculatePriceLevel(model.pricing);
-          const logoComponent = getProviderLogo(companyId);
+    return filteredRawModels.map((model) => {
+      const companyId = model.id.split('/')[0];
+      const priceInfo = calculatePriceLevel(model.pricing);
 
-          allModels.push({
-            value: model.id,
-            label: model.name,
-            company,
-            priceLevel: priceInfo.level,
-            priceColor: priceInfo.color,
-            logo: logoComponent,
-          });
-        }
-      });
+      return {
+        value: model.id,
+        label: model.name,
+        company: getProviderDisplayName(companyId),
+        priceLevel: priceInfo.level,
+        priceColor: priceInfo.color,
+        logo: getProviderLogo(companyId),
+      };
     });
-
-    // Sort models by name
-    allModels.sort((a, b) => a.label.localeCompare(b.label));
-
-    return allModels;
   }, [
+    mode,
     configuredTextProviders,
     configuredImageProviders,
     selectedInputModality,
@@ -84,7 +67,8 @@ export function AIConfigForm({ mode, editingConfig, onSubmit }: AIConfigFormProp
   const getInitialCreateValues = useCallback((): CreateAIConfigurationRequest => {
     if (editingConfig && mode === 'create') {
       return {
-        modality: editingConfig.modality,
+        inputModality: editingConfig.inputModality,
+        outputModality: editingConfig.outputModality,
         provider: 'openrouter', // Always OpenRouter now
         modelId: editingConfig.modelId,
         systemPrompt: editingConfig.systemPrompt,
@@ -92,7 +76,8 @@ export function AIConfigForm({ mode, editingConfig, onSubmit }: AIConfigFormProp
     }
 
     return {
-      modality: 'text', // Default to text modality
+      inputModality: ['text'], // Default to text modality
+      outputModality: ['text'], // Default to text modality
       provider: 'openrouter', // Always OpenRouter now
       modelId: '',
       systemPrompt: undefined,
@@ -121,13 +106,13 @@ export function AIConfigForm({ mode, editingConfig, onSubmit }: AIConfigFormProp
   useEffect(() => {
     if (isCreateMode) {
       const initialValues = getInitialCreateValues();
-      setSelectedInputModality('text');
-      setSelectedOutputModality('text');
+      setSelectedInputModality(initialValues.inputModality);
+      setSelectedOutputModality(initialValues.outputModality);
       createForm.reset(initialValues);
     } else {
       const initialValues = getInitialEditValues();
-      setSelectedInputModality('text');
-      setSelectedOutputModality('text');
+      setSelectedInputModality(['text']);
+      setSelectedOutputModality(['text']);
       editForm.reset(initialValues);
     }
   }, [
@@ -148,26 +133,53 @@ export function AIConfigForm({ mode, editingConfig, onSubmit }: AIConfigFormProp
 
   const handleFormSubmit = useCallback(
     (data: CreateAIConfigurationRequest | UpdateAIConfigurationRequest) => {
-      onSubmit(data);
+      if (isCreateMode) {
+        // For create mode, we need to get the actual model's architecture capabilities
+        const selectedModelId = (data as CreateAIConfigurationRequest).modelId;
+
+        // Find the selected model to get its actual architecture
+        const allModels = [...configuredTextProviders, ...configuredImageProviders];
+        const selectedModel = allModels
+          .flatMap((provider) => provider.models)
+          .find((model) => model.id === selectedModelId);
+
+        if (!selectedModel) {
+          console.error('Selected model not found');
+          return;
+        }
+
+        const actualInputModality = (selectedModel.architecture?.input_modalities || [
+          'text',
+        ]) as ModalitySchema[];
+        const actualOutputModality = (selectedModel.architecture?.output_modalities || [
+          'text',
+        ]) as ModalitySchema[];
+
+        const createData: CreateAIConfigurationRequest = {
+          ...(data as CreateAIConfigurationRequest),
+          inputModality: actualInputModality,
+          outputModality: actualOutputModality,
+        };
+        onSubmit(createData);
+      } else {
+        onSubmit(data as UpdateAIConfigurationRequest);
+      }
     },
-    [onSubmit]
+    [onSubmit, isCreateMode, configuredTextProviders, configuredImageProviders]
   );
 
-  // Check if a model is already configured
   const isModelConfigured = useCallback(
     (modelId: string) => {
       if (!configurations) {
         return false;
       }
 
-      // When editing, exclude the current config from the check
       return configurations.some(
         (config) => config.modelId === modelId && (!editingConfig || config.id !== editingConfig.id)
       );
     },
     [configurations, editingConfig]
   );
-
 
   return (
     <form
@@ -179,50 +191,41 @@ export function AIConfigForm({ mode, editingConfig, onSubmit }: AIConfigFormProp
       className="flex flex-col"
     >
       <div className="flex flex-col gap-6 p-6">
-        {filteredModels.length === 0 ? (
-          <div className="text-sm text-zinc-500 dark:text-zinc-400 text-center py-8">
-            No AI models available. Please configure your OpenRouter API key to access AI models.
-          </div>
-        ) : (
+        {isCreateMode ? (
           <div className="flex flex-col gap-6 w-full items-stretch">
-            {/* Input/Output fields - only show in create mode */}
-            {isCreateMode && (
-              <>
-                <ModalityField
-                  fieldType="input"
-                  value={selectedInputModality}
-                  onChange={setSelectedInputModality}
-                />
-                <ModalityField
-                  fieldType="output"
-                  value={selectedOutputModality}
-                  onChange={setSelectedOutputModality}
-                />
-              </>
-            )}
+            {/* Input/Output fields */}
+            <ModalityField
+              fieldType="input"
+              value={selectedInputModality}
+              onChange={setSelectedInputModality}
+            />
+            <ModalityField
+              fieldType="output"
+              value={selectedOutputModality}
+              onChange={setSelectedOutputModality}
+            />
 
             {/* Model selection field */}
-            {isCreateMode ? (
-              <ModelSelectionField
-                models={filteredModels}
-                selectedModelId={createForm.watch('modelId')}
-                onModelChange={(modelId) => {
-                  createForm.setValue('modelId', modelId);
-                  createForm.setValue('provider', 'openrouter');
-                }}
-                isModelConfigured={isModelConfigured}
-              />
-            ) : (
-              <ModelSelectionField
-                models={[]}
-                isReadOnly={true}
-                readOnlyModelId={editingConfig?.modelId}
-              />
-            )}
+            <ModelSelectionField
+              models={filteredModels}
+              selectedModelId={createForm.watch('modelId')}
+              onModelChange={(modelId) => {
+                createForm.setValue('modelId', modelId);
+                createForm.setValue('provider', 'openrouter');
+              }}
+              isModelConfigured={isModelConfigured}
+            />
 
             {/* System prompt field */}
             <SystemPromptField
-              register={isCreateMode ? createForm.register : editForm.register}
+              register={createForm.register}
+              error={form.formState.errors.systemPrompt}
+            />
+          </div>
+        ) : (
+          <div className="flex flex-col gap-6 w-full items-stretch">
+            <SystemPromptField
+              register={editForm.register}
               error={form.formState.errors.systemPrompt}
             />
           </div>

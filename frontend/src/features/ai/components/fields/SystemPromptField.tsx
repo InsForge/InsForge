@@ -21,11 +21,9 @@ export function SystemPromptField({ register, error }: SystemPromptFieldProps) {
           id="systemPrompt"
           {...register('systemPrompt')}
           placeholder="Enter system prompt..."
-          className="w-full min-h-[100px] resize-none bg-transparent dark:bg-neutral-900 dark:text-white dark:placeholder:text-neutral-400 dark:border-neutral-700"
+          className="w-full min-h-[160px] resize-none bg-transparent dark:bg-neutral-900 dark:text-white dark:placeholder:text-neutral-400 dark:border-neutral-700"
         />
-        {error && (
-          <p className="text-sm text-red-600 dark:text-red-500">{error.message}</p>
-        )}
+        {error && <p className="text-sm text-red-600 dark:text-red-500">{error.message}</p>}
       </div>
     </div>
   );

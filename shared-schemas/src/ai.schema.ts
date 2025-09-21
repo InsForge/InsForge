@@ -1,11 +1,12 @@
 import { z } from 'zod';
 
 // Core schemas
-export const modalitySchema = z.enum(['text', 'image', 'audio', 'video', 'multi']);
+export const modalitySchema = z.enum(['text', 'image', 'audio', 'video']);
 
 export const aiConfigurationSchema = z.object({
   id: z.string().uuid(),
-  modality: modalitySchema,
+  inputModality: z.array(modalitySchema).min(1),
+  outputModality: z.array(modalitySchema).min(1),
   provider: z.string(),
   modelId: z.string(),
   systemPrompt: z.string().optional(),

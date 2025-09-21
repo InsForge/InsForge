@@ -43,15 +43,11 @@ export function AIConfigDialog({
         <div className="flex flex-col">
           <DialogHeader className="px-6 py-3 flex flex-col gap-1 justify-start border-b border-zinc-200 dark:border-neutral-700">
             <DialogTitle className="text-lg font-semibold text-zinc-950 dark:text-white">
-              {mode === 'create' ? 'New AI Integration' : 'Edit AI Configuration'}
+              {mode === 'create' ? 'New AI Integration' : 'Edit System Prompt'}
             </DialogTitle>
           </DialogHeader>
 
-          <AIConfigForm
-            mode={mode}
-            editingConfig={editingConfig}
-            onSubmit={handleFormSubmit}
-          />
+          <AIConfigForm mode={mode} editingConfig={editingConfig} onSubmit={handleFormSubmit} />
 
           <DialogFooter className="p-6 gap-3 border-t border-zinc-200 dark:border-neutral-700">
             <Button
