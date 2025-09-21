@@ -12,6 +12,7 @@ import { useConfirm } from '@/lib/hooks/useConfirm';
 import { AIConfigDialog } from '@/features/ai/components/AIConfigDialog';
 import { AIModelCard } from '@/features/ai/components/AIModelCard';
 import AIEmptyState from '@/features/ai/components/AIEmptyState';
+import { getProviderLogo } from '../helpers';
 
 export default function AIPage() {
   const {
@@ -21,6 +22,8 @@ export default function AIPage() {
     updateConfiguration,
     deleteConfiguration,
   } = useAIConfigs();
+
+  console.log(configurations);
 
   const { confirm, confirmDialogProps } = useConfirm();
 
@@ -38,10 +41,10 @@ export default function AIPage() {
   };
 
   const handleDelete = async (id: string) => {
-    const config = configurations.find((c) => c.id === id);
     const shouldDelete = await confirm({
       title: 'Delete AI Configuration',
-      description: `Are you sure you want to delete the configuration "${config?.provider} - ${config?.modelId}"? This action cannot be undone.`,
+      description:
+        'Are you certain you wish to remove this AI Integration? This action is irreversible.',
       confirmText: 'Delete',
       destructive: true,
     });
@@ -63,7 +66,8 @@ export default function AIPage() {
     if (dialogMode === 'create') {
       const createData = configData as CreateAIConfigurationRequest;
       createConfiguration({
-        modality: createData.modality,
+        inputModality: createData.inputModality,
+        outputModality: createData.outputModality,
         provider: createData.provider,
         modelId: createData.modelId,
         systemPrompt: createData.systemPrompt,
@@ -108,14 +112,22 @@ export default function AIPage() {
             </div>
           ) : configurations.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {configurations.map((config) => (
-                <AIModelCard
-                  key={config.id}
-                  config={config}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                />
-              ))}
+              {configurations.map((config) => {
+                const providerLogo = getProviderLogo(config.modelId.split('/')[0]);
+                const extendedConfig = {
+                  ...config,
+                  logo: providerLogo,
+                };
+
+                return (
+                  <AIModelCard
+                    key={config.id}
+                    config={extendedConfig}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                  />
+                );
+              })}
             </div>
           ) : (
             <AIEmptyState />

@@ -167,9 +167,16 @@ router.post(
           ERROR_CODES.INVALID_INPUT
         );
       }
-      const { modality, provider, modelId, systemPrompt } = validationResult.data;
+      const { inputModality, outputModality, provider, modelId, systemPrompt } =
+        validationResult.data;
 
-      const result = await aiConfigService.create(modality, provider, modelId, systemPrompt);
+      const result = await aiConfigService.create(
+        inputModality,
+        outputModality,
+        provider,
+        modelId,
+        systemPrompt
+      );
 
       successResponse(
         res,

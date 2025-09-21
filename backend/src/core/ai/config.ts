@@ -14,7 +14,8 @@ export class AIConfigService {
   }
 
   async create(
-    modality: string,
+    inputModality: string[],
+    outputModality: string[],
     provider: string,
     modelId: string,
     systemPrompt?: string
@@ -22,10 +23,16 @@ export class AIConfigService {
     const client = await this.getPool().connect();
     try {
       const result = await client.query(
-        `INSERT INTO _ai_configs (modality, provider, model_id, system_prompt)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO _ai_configs (input_modality, output_modality, provider, model_id, system_prompt)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
-        [modality, provider, modelId, systemPrompt || null]
+        [
+          JSON.stringify(inputModality),
+          JSON.stringify(outputModality),
+          provider,
+          modelId,
+          systemPrompt || null,
+        ]
       );
 
       logger.info('AI configuration created', { id: result.rows[0].id });
@@ -45,7 +52,8 @@ export class AIConfigService {
       const result = await client.query(
         `SELECT 
           c.id,
-          c.modality,
+          c.input_modality as "inputModality",
+          c.output_modality as "outputModality",
           c.provider,
           c.model_id as "modelId",
           c.system_prompt as "systemPrompt",
@@ -56,13 +64,14 @@ export class AIConfigService {
           COALESCE(COUNT(u.id), 0)::INTEGER as "totalRequests"
          FROM _ai_configs c
          LEFT JOIN _ai_usage u ON c.id = u.config_id
-         GROUP BY c.id, c.modality, c.provider, c.model_id, c.system_prompt, c.created_at
+         GROUP BY c.id, c.input_modality, c.output_modality, c.provider, c.model_id, c.system_prompt, c.created_at
          ORDER BY c.created_at DESC`
       );
 
       return result.rows.map((row) => ({
         id: row.id,
-        modality: row.modality,
+        inputModality: row.inputModality,
+        outputModality: row.outputModality,
         provider: row.provider,
         modelId: row.modelId,
         systemPrompt: row.systemPrompt,
@@ -127,7 +136,7 @@ export class AIConfigService {
     const client = await this.getPool().connect();
     try {
       const result = await client.query(
-        `SELECT id, modality, provider, model_id as "modelId", system_prompt as "systemPrompt", created_at, updated_at
+        `SELECT id, input_modality as "inputModality", output_modality as "outputModality", provider, model_id as "modelId", system_prompt as "systemPrompt", created_at, updated_at
          FROM _ai_configs
          WHERE model_id = $1`,
         [modelId]
@@ -140,7 +149,8 @@ export class AIConfigService {
       const row = result.rows[0];
       return {
         id: row.id,
-        modality: row.modality,
+        inputModality: row.inputModality,
+        outputModality: row.outputModality,
         provider: row.provider,
         modelId: row.modelId,
         systemPrompt: row.systemPrompt,
@@ -159,13 +169,16 @@ export class AIConfigService {
   /**
    * Get AI metadata
    */
-  async getMetadata(): Promise<{ models: Array<{ modality: string; modelId: string }> }> {
+  async getMetadata(): Promise<{
+    models: Array<{ inputModality: string[]; outputModality: string[]; modelId: string }>;
+  }> {
     try {
       const configs = await this.findAll();
 
       // Map configs to simplified model metadata
       const models = configs.map((config) => ({
-        modality: config.modality,
+        inputModality: config.inputModality,
+        outputModality: config.outputModality,
         modelId: config.modelId,
       }));
 
