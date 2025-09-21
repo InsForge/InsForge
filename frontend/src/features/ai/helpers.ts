@@ -1,4 +1,17 @@
-import { AIConfigurationSchema } from '@insforge/shared-schemas';
+import { AIConfigurationSchema, OpenRouterModel } from '@insforge/shared-schemas';
+
+// Type for pricing information from OpenRouter model
+type ModelPricing = {
+  prompt: string;
+  completion: string;
+  image?: string;
+  request?: string;
+  webSearch?: string;
+  internalReasoning?: string;
+  inputCacheRead?: string;
+  inputCacheWrite?: string;
+};
+
 import { authService } from '@/features/auth/services/auth.service';
 import { Type, Image, Mic, Video } from 'lucide-react';
 import GrokIcon from '@/assets/icons/grok.svg?react';
@@ -66,7 +79,7 @@ export const getProviderLogo = (
 
 // Calculate price level based on pricing data
 export const calculatePriceLevel = (
-  pricing: any
+  pricing: ModelPricing | undefined | null
 ): { level: 'FREE' | '$' | '$$' | '$$$'; color: string } => {
   if (!pricing) return { level: 'FREE', color: 'text-green-400' };
 
@@ -200,11 +213,11 @@ const completion = await client.ai.chat.completions.create({
 
 // Helper function to filter AI models based on selected modalities
 export const filterModelsByModalities = (
-  providers: Array<{ models: any[] }>,
+  providers: Array<{ models: OpenRouterModel[] }>,
   selectedInputModalities: string[],
   selectedOutputModalities: string[]
-) => {
-  const allModels: any[] = [];
+): OpenRouterModel[] => {
+  const allModels: OpenRouterModel[] = [];
   const processedModelIds = new Set<string>();
 
   providers.forEach((provider) => {

@@ -23,6 +23,7 @@ interface ModelSelectionFieldProps {
   isReadOnly?: boolean;
   readOnlyModelId?: string;
   isModelConfigured?: (modelId: string) => boolean;
+  disabled?: boolean;
 }
 
 export function ModelSelectionField({
@@ -32,6 +33,7 @@ export function ModelSelectionField({
   isReadOnly = false,
   readOnlyModelId,
   isModelConfigured,
+  disabled = false,
 }: ModelSelectionFieldProps) {
   const hasModels = models.length > 0;
 
@@ -56,7 +58,7 @@ export function ModelSelectionField({
       <Select
         value={selectedModelId || ''}
         onValueChange={onModelChange || (() => {})}
-        disabled={!hasModels}
+        disabled={!hasModels || disabled}
       >
         <SelectTrigger
           id="model"
