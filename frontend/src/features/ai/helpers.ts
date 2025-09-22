@@ -1,4 +1,4 @@
-import { AIConfigurationSchema, OpenRouterModel } from '@insforge/shared-schemas';
+import { AIConfigurationSchema, OpenRouterModel, ModalitySchema } from '@insforge/shared-schemas';
 
 // Type for pricing information from OpenRouter model
 type ModelPricing = {
@@ -12,8 +12,19 @@ type ModelPricing = {
   inputCacheWrite?: string;
 };
 
+export type ModelPriceLevel = 'FREE' | '$' | '$$' | '$$$';
+
+export interface ModelOption {
+  value: string;
+  label: string;
+  company: string;
+  priceLevel: ModelPriceLevel;
+  priceColor: string;
+  logo: React.ComponentType<React.SVGProps<SVGSVGElement>> | undefined;
+}
+
 import { authService } from '@/features/auth/services/auth.service';
-import { Type, Image, Mic, Video } from 'lucide-react';
+import { Type, Image, Mic, Video, File } from 'lucide-react';
 import GrokIcon from '@/assets/icons/grok.svg?react';
 import GeminiIcon from '@/assets/icons/gemini.svg?react';
 import ClaudeIcon from '@/assets/icons/claude_code_logo.svg?react';
@@ -21,7 +32,7 @@ import OpenAIIcon from '@/assets/icons/openai.svg?react';
 import AmazonIcon from '@/assets/icons/amazon.svg?react';
 
 export const getModalityIcon = (
-  modality: string
+  modality: ModalitySchema
 ): React.FunctionComponent<React.SVGProps<SVGSVGElement>> => {
   switch (modality) {
     case 'text':
@@ -32,6 +43,8 @@ export const getModalityIcon = (
       return Mic;
     case 'video':
       return Video;
+    case 'file':
+      return File;
     default:
       return Type;
   }
@@ -80,8 +93,10 @@ export const getProviderLogo = (
 // Calculate price level based on pricing data
 export const calculatePriceLevel = (
   pricing: ModelPricing | undefined | null
-): { level: 'FREE' | '$' | '$$' | '$$$'; color: string } => {
-  if (!pricing) return { level: 'FREE', color: 'text-green-400' };
+): { level: ModelPriceLevel; color: string } => {
+  if (!pricing) {
+    return { level: 'FREE', color: 'text-green-400' };
+  }
 
   // Check if it's free
   if (pricing.prompt === '0' && pricing.completion === '0') {
@@ -97,8 +112,12 @@ export const calculatePriceLevel = (
   const avgCostPer1M = (promptCostPer1M + completionCostPer1M) / 2;
 
   // Adjusted thresholds based on actual pricing data and user feedback
-  if (avgCostPer1M <= 3) return { level: '$', color: 'text-green-400' }; // ≤$3/1M tokens (Haiku, Gemini Flash, etc.)
-  if (avgCostPer1M <= 15) return { level: '$$', color: 'text-amber-400' }; // ≤$15/1M tokens (GPT-4o, Claude Sonnet, etc.)
+  if (avgCostPer1M <= 3) {
+    return { level: '$', color: 'text-green-400' };
+  } // ≤$3/1M tokens (Haiku, Gemini Flash, etc.)
+  if (avgCostPer1M <= 15) {
+    return { level: '$$', color: 'text-amber-400' };
+  } // ≤$15/1M tokens (GPT-4o, Claude Sonnet, etc.)
   return { level: '$$$', color: 'text-red-400' }; // >$15/1M tokens (Claude Opus, etc.)
 };
 
@@ -117,7 +136,7 @@ export const generateAIIntegrationPrompt = async (
     ? 'Image + Text Generation'
     : 'Chat Completion (OpenAI-Compatible)';
 
-  let setupSection = `# InsForge AI SDK - ${endpointTitle}
+  const setupSection = `# InsForge AI SDK - ${endpointTitle}
 
 ## Setup
 
@@ -214,15 +233,17 @@ const completion = await client.ai.chat.completions.create({
 // Helper function to filter AI models based on selected modalities
 export const filterModelsByModalities = (
   providers: Array<{ models: OpenRouterModel[] }>,
-  selectedInputModalities: string[],
-  selectedOutputModalities: string[]
+  selectedInputModalities: ModalitySchema[],
+  selectedOutputModalities: ModalitySchema[]
 ): OpenRouterModel[] => {
   const allModels: OpenRouterModel[] = [];
   const processedModelIds = new Set<string>();
 
   providers.forEach((provider) => {
     provider.models.forEach((model) => {
-      if (processedModelIds.has(model.id)) return;
+      if (processedModelIds.has(model.id)) {
+        return;
+      }
       processedModelIds.add(model.id);
 
       const inputModalities = model.architecture?.input_modalities || [];

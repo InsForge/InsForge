@@ -6,15 +6,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/radix/Select';
-
-interface ModelOption {
-  value: string;
-  label: string;
-  company: string;
-  priceLevel: 'FREE' | '$' | '$$' | '$$$';
-  priceColor: string;
-  logo: undefined | React.FunctionComponent<React.SVGProps<SVGSVGElement>>;
-}
+import { ModelOption } from '../../helpers';
 
 interface ModelSelectionFieldProps {
   models: ModelOption[];

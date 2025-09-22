@@ -11,7 +11,8 @@ import {
   CreateAIConfigurationRequest,
   UpdateAIConfigurationRequest,
 } from '@insforge/shared-schemas';
-import { AIConfigForm } from './AIConfigForm';
+import { AIConfigCreateForm } from './AIConfigCreateForm';
+import { AIConfigEditForm } from './AIConfigEditForm';
 
 interface AIConfigDialogProps {
   open: boolean;
@@ -47,7 +48,16 @@ export function AIConfigDialog({
             </DialogTitle>
           </DialogHeader>
 
-          <AIConfigForm mode={mode} editingConfig={editingConfig} onSubmit={handleFormSubmit} />
+          {mode === 'create' ? (
+            <AIConfigCreateForm onSubmit={(data) => handleFormSubmit(data)} />
+          ) : (
+            editingConfig && (
+              <AIConfigEditForm
+                editingConfig={editingConfig}
+                onSubmit={(data) => handleFormSubmit(data)}
+              />
+            )
+          )}
 
           <DialogFooter className="p-6 gap-3 border-t border-zinc-200 dark:border-neutral-700">
             <Button

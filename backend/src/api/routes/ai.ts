@@ -187,7 +187,8 @@ router.post(
         module: 'AI',
         details: {
           configId: result.id,
-          modality,
+          inputModality,
+          outputModality,
           provider,
           modelId,
         },

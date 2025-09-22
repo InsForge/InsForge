@@ -7,7 +7,10 @@ interface SystemPromptFieldProps<T extends FieldValues> {
   error?: FieldError;
 }
 
-export function SystemPromptField<T extends FieldValues>({ register, error }: SystemPromptFieldProps<T>) {
+export function SystemPromptField<T extends FieldValues>({
+  register,
+  error,
+}: SystemPromptFieldProps<T>) {
   return (
     <div className="flex flex-row gap-10 items-start">
       <Label

@@ -23,8 +23,6 @@ export default function AIPage() {
     deleteConfiguration,
   } = useAIConfigs();
 
-  console.log(configurations);
-
   const { confirm, confirmDialogProps } = useConfirm();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -124,7 +122,7 @@ export default function AIPage() {
                     key={config.id}
                     config={extendedConfig}
                     onEdit={handleEdit}
-                    onDelete={handleDelete}
+                    onDelete={() => void handleDelete(config.id)}
                   />
                 );
               })}

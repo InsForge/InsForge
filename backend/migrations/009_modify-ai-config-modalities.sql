@@ -20,15 +20,16 @@ BEGIN
     UPDATE _ai_configs 
     SET 
         input_modality = CASE 
-            WHEN modality = 'multi' THEN '["text", "image", "audio", "video"]'::jsonb
+            WHEN modality = 'multi' THEN '["text", "image", "audio", "video", "file"]'::jsonb
             ELSE jsonb_build_array(modality)
         END,
         output_modality = CASE 
-            WHEN modality = 'multi' THEN '["text", "image", "audio", "video"]'::jsonb
+            WHEN modality = 'multi' THEN '["text", "image", "audio", "video", "file"]'::jsonb
             WHEN modality = 'text' THEN '["text"]'::jsonb
             WHEN modality = 'image' THEN '["text", "image"]'::jsonb
             WHEN modality = 'audio' THEN '["text", "audio"]'::jsonb
             WHEN modality = 'video' THEN '["text", "video"]'::jsonb
+            WHEN modality = 'file' THEN '["text", "file"]'::jsonb
             ELSE jsonb_build_array(modality)
         END
     WHERE input_modality = '[]'::jsonb OR input_modality IS NULL;
@@ -61,13 +62,13 @@ BEGIN
     ALTER TABLE _ai_configs 
     ADD CONSTRAINT check_input_modality_valid 
     CHECK (
-        input_modality <@ '["text", "image", "audio", "video"]'::jsonb
+        input_modality <@ '["text", "image", "audio", "video", "file"]'::jsonb
     );
     
     ALTER TABLE _ai_configs 
     ADD CONSTRAINT check_output_modality_valid 
     CHECK (
-        output_modality <@ '["text", "image", "audio", "video"]'::jsonb
+        output_modality <@ '["text", "image", "audio", "video", "file"]'::jsonb
     );
 
 END $$;

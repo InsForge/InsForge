@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { MoreHorizontal, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/radix/Button';
 import {
   Tooltip,
@@ -13,14 +12,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/radix/DropdownMenu';
-import { Pencil, Trash2, Type, Image } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import {
   generateAIIntegrationPrompt,
   //   formatTokenCount,
   getProviderDisplayName,
   getFriendlyModelName,
+  getModalityIcon,
 } from '../helpers';
 import { AIConfigurationWithUsageSchema } from '@insforge/shared-schemas';
+import { CopyButton } from '@/components/CopyButton';
 
 interface AIConfigExtended extends AIConfigurationWithUsageSchema {
   logo?: React.FunctionComponent<React.SVGProps<SVGSVGElement>>;
@@ -33,8 +34,7 @@ interface AIModelCardProps {
 }
 
 export function AIModelCard({ config, onEdit, onDelete }: AIModelCardProps) {
-  const [isCopied, setIsCopied] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [promptText, setPromptText] = useState<string>('');
 
   // Extract provider info
   const companyId = config.modelId.split('/')[0];
@@ -43,26 +43,19 @@ export function AIModelCard({ config, onEdit, onDelete }: AIModelCardProps) {
   // Get friendly model name from modelId
   const modelName = getFriendlyModelName(config.modelId);
 
-  // Get modality icons
-  const getModalityIcon = (modality: string) => {
-    return modality === 'text' ? Type : Image;
-  };
-
   const inputModality = config.inputModality;
   const outputModality = config.outputModality;
 
-  // Handle copy prompt
-  const handleCopyPrompt = async () => {
-    setIsLoading(true);
+  // Generate prompt text for copy button
+  const handleCopy = async () => {
+    if (promptText) {
+      return;
+    }
     try {
       const prompt = await generateAIIntegrationPrompt(config);
-      await navigator.clipboard.writeText(prompt);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2000);
+      setPromptText(prompt);
     } catch (error) {
-      console.error('Failed to copy prompt:', error);
-    } finally {
-      setIsLoading(false);
+      console.error('Failed to generate prompt:', error);
     }
   };
 
@@ -102,7 +95,7 @@ export function AIModelCard({ config, onEdit, onDelete }: AIModelCardProps) {
             {/* Provider Logo */}
             <div className="w-10 h-10">
               {config.logo ? (
-                <config.logo className="w-10 h-10" />
+                <config.logo className="w-10 h-10 dark:text-white" />
               ) : (
                 <div className="w-10 h-10 bg-gray-500 rounded flex items-center justify-center text-white text-sm font-bold">
                   {companyId.charAt(0).toUpperCase()}
@@ -173,29 +166,15 @@ export function AIModelCard({ config, onEdit, onDelete }: AIModelCardProps) {
           </div>
         </div>
 
-        {/* Copy Prompt Button */}
-        <Button
-          onClick={handleCopyPrompt}
-          disabled={isLoading}
-          className="w-full h-9 bg-emerald-300 hover:bg-emerald-400 text-black font-medium rounded transition-colors duration-200"
-        >
-          {isLoading ? (
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              <span>Copying...</span>
-            </div>
-          ) : isCopied ? (
-            <div className="flex items-center gap-2">
-              <Check className="w-4 h-4" />
-              <span>Copied!</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Copy className="w-4 h-4" />
-              <span>Copy Prompt</span>
-            </div>
-          )}
-        </Button>
+        <CopyButton
+          text={promptText}
+          variant="default"
+          size="sm"
+          className="w-full h-9 dark:bg-emerald-300 dark:hover:bg-emerald-400 dark:text-black data-[copied=true]:dark:bg-neutral-700 data-[copied=true]:dark:hover:bg-neutral-700 data-[copied=true]:dark:text-white font-medium rounded transition-colors duration-200"
+          copyText="Copy Prompt"
+          copiedText="Copied - Paste to agent"
+          onCopy={() => void handleCopy()}
+        />
       </div>
     </TooltipProvider>
   );

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { aiService } from '@/features/ai/services/ai.service';
 import {
@@ -6,8 +6,16 @@ import {
   AIConfigurationWithUsageSchema,
   CreateAIConfigurationRequest,
   UpdateAIConfigurationRequest,
+  ModalitySchema,
 } from '@insforge/shared-schemas';
 import { useToast } from '@/lib/hooks/useToast';
+import {
+  getProviderLogo,
+  calculatePriceLevel,
+  getProviderDisplayName,
+  filterModelsByModalities,
+  type ModelOption,
+} from '../helpers';
 
 interface UseAIConfigsOptions {
   enabled?: boolean;
@@ -99,6 +107,38 @@ export function useAIConfigs(options: UseAIConfigsOptions = {}) {
   const allTextModels = modelsData?.text?.flatMap((p) => p.models) || [];
   const allImageModels = modelsData?.image?.flatMap((p) => p.models) || [];
 
+  // Combined configured providers for easier consumption
+  const allConfiguredProviders = useMemo(
+    () => [...configuredTextProviders, ...configuredImageProviders],
+    [configuredTextProviders, configuredImageProviders]
+  );
+
+  // Helper function to get filtered and processed models
+  const getFilteredModels = useCallback(
+    (inputModality: ModalitySchema[], outputModality: ModalitySchema[]): ModelOption[] => {
+      const filteredRawModels = filterModelsByModalities(
+        allConfiguredProviders,
+        inputModality,
+        outputModality
+      );
+
+      return filteredRawModels.map((model) => {
+        const companyId = model.id.split('/')[0];
+        const priceInfo = calculatePriceLevel(model.pricing);
+
+        return {
+          value: model.id,
+          label: model.name,
+          company: getProviderDisplayName(companyId),
+          priceLevel: priceInfo.level,
+          priceColor: priceInfo.color,
+          logo: getProviderLogo(companyId),
+        };
+      });
+    },
+    [allConfiguredProviders]
+  );
+
   // Check if any providers are configured
   const hasConfiguredTextProviders = configuredTextProviders.length > 0;
   const hasConfiguredImageProviders = configuredImageProviders.length > 0;
@@ -117,6 +157,7 @@ export function useAIConfigs(options: UseAIConfigsOptions = {}) {
     // Configured providers
     configuredTextProviders,
     configuredImageProviders,
+    allConfiguredProviders,
 
     // Unconfigured providers
     unconfiguredTextProviders,
@@ -149,5 +190,8 @@ export function useAIConfigs(options: UseAIConfigsOptions = {}) {
     // Operations
     refetch,
     refetchConfigurations,
+
+    // Helper functions
+    getFilteredModels,
   };
 }
