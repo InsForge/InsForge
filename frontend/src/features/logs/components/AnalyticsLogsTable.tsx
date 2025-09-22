@@ -141,7 +141,9 @@ export function AnalyticsLogsTable({
             </span>
           )}
         </div>
-        {isLoadingMore && <span className="text-gray-500 dark:text-zinc-400">Loading older logs...</span>}
+        {isLoadingMore && (
+          <span className="text-gray-500 dark:text-zinc-400">Loading older logs...</span>
+        )}
       </div>
 
       {/* Logs List - Scrollable with infinite scroll */}
@@ -163,7 +165,10 @@ export function AnalyticsLogsTable({
             const hasDetails = log.body && Object.keys(log.body).length > 0;
 
             return (
-              <div key={uniqueKey} className="border-b border-gray-100 dark:border-neutral-700 hover:bg-gray-50 dark:hover:bg-neutral-700 dark:hover:text-white">
+              <div
+                key={uniqueKey}
+                className="border-b border-gray-100 dark:border-neutral-700 hover:bg-gray-50 dark:hover:bg-neutral-700 dark:hover:text-white"
+              >
                 <div
                   className={cn(
                     'flex items-start px-4 py-2',
@@ -191,7 +196,9 @@ export function AnalyticsLogsTable({
                       )}
 
                       {/* Log message */}
-                      <span className="text-gray-900 dark:text-white break-all">{log.event_message}</span>
+                      <span className="text-gray-900 dark:text-white break-all">
+                        {log.event_message}
+                      </span>
 
                       {/* Status code badge */}
                       {log.body?.status_code && (
@@ -222,7 +229,9 @@ export function AnalyticsLogsTable({
 
                       {/* Size */}
                       {log.body?.size && (
-                        <span className="text-gray-500 dark:text-zinc-400 text-xs">{log.body.size}b</span>
+                        <span className="text-gray-500 dark:text-zinc-400 text-xs">
+                          {log.body.size}b
+                        </span>
                       )}
                     </div>
                   </div>
@@ -237,18 +246,23 @@ export function AnalyticsLogsTable({
                         <div className="space-y-1 text-xs text-gray-600 dark:text-zinc-400 mb-3">
                           {log.body.ip && (
                             <div>
-                              <span className="font-medium text-gray-700 dark:text-white">IP:</span> {log.body.ip}
+                              <span className="font-medium text-gray-700 dark:text-white">IP:</span>{' '}
+                              {log.body.ip}
                             </div>
                           )}
                           {log.body.user_agent && (
                             <div>
-                              <span className="font-medium text-gray-700 dark:text-white">User Agent:</span>{' '}
+                              <span className="font-medium text-gray-700 dark:text-white">
+                                User Agent:
+                              </span>{' '}
                               {log.body.user_agent}
                             </div>
                           )}
                           {log.body.path && (
                             <div>
-                              <span className="font-medium text-gray-700 dark:text-white">Path:</span>{' '}
+                              <span className="font-medium text-gray-700 dark:text-white">
+                                Path:
+                              </span>{' '}
                               {log.body.path}
                             </div>
                           )}
@@ -258,7 +272,9 @@ export function AnalyticsLogsTable({
                       {/* Error details */}
                       {log.body?.error && (
                         <div className="mb-3 p-2 bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-800 rounded text-xs">
-                          <div className="text-red-800 dark:text-red-200 font-medium mb-1">Error:</div>
+                          <div className="text-red-800 dark:text-red-200 font-medium mb-1">
+                            Error:
+                          </div>
                           <div className="text-red-700 dark:text-red-300">{log.body.error}</div>
                           {log.body.stack && (
                             <pre className="mt-2 text-red-600 dark:text-red-400 text-xs whitespace-pre-wrap overflow-x-auto">

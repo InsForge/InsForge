@@ -1,20 +1,7 @@
 import { useState, useEffect } from 'react';
-import { 
-  Code2, 
-  Search, 
-  ChevronRight, 
-  Activity,
-  AlertCircle,
-  Clock
-} from 'lucide-react';
+import { Code2, Search, ChevronRight, Activity, AlertCircle, Clock } from 'lucide-react';
 import { Input } from '@/components/radix/Input';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/radix/Card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/radix/Card';
 import { Badge } from '@/components/radix/Badge';
 import { Skeleton } from '@/components/radix/Skeleton';
 import { useToast } from '@/lib/hooks/useToast';
@@ -27,7 +14,7 @@ export default function FunctionsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFunction, setSelectedFunction] = useState<EdgeFunction | null>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
-  const { showError } = useToast();
+  const { showToast } = useToast();
 
   const fetchFunctions = async () => {
     try {
@@ -35,7 +22,7 @@ export default function FunctionsPage() {
       setFunctions(data);
     } catch (error) {
       console.error('Failed to fetch functions:', error);
-      showError('Failed to load functions');
+      showToast('Failed to load functions', 'error');
     } finally {
       setLoading(false);
     }
@@ -52,25 +39,29 @@ export default function FunctionsPage() {
       setShowDetailDialog(true);
     } catch (error) {
       console.error('Failed to fetch function details:', error);
-      showError('Failed to load function details');
+      showToast('Failed to load function details', 'error');
     }
   };
 
-  const filteredFunctions = functions.filter(func =>
-    func.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    func.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (func.description && func.description.toLowerCase().includes(searchTerm.toLowerCase()))
+  const filteredFunctions = functions.filter(
+    (func) =>
+      func.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      func.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (func.description && func.description.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline', icon: React.ReactNode }> = {
+    const variants: Record<
+      string,
+      { variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: React.ReactNode }
+    > = {
       active: { variant: 'default', icon: <Activity className="w-3 h-3 mr-1" /> },
       draft: { variant: 'secondary', icon: <Clock className="w-3 h-3 mr-1" /> },
-      error: { variant: 'destructive', icon: <AlertCircle className="w-3 h-3 mr-1" /> }
+      error: { variant: 'destructive', icon: <AlertCircle className="w-3 h-3 mr-1" /> },
     };
-    
+
     const config = variants[status] || variants.draft;
-    
+
     return (
       <Badge variant={config.variant} className="flex items-center">
         {config.icon}
@@ -99,9 +90,7 @@ export default function FunctionsPage() {
       <div className="flex flex-col gap-4">
         <div>
           <h1 className="text-3xl font-bold text-zinc-950 dark:text-white">Edge Functions</h1>
-          <p className="text-muted-foreground mt-1">
-            View and manage serverless functions
-          </p>
+          <p className="text-muted-foreground mt-1">View and manage serverless functions</p>
         </div>
 
         <div className="relative">
@@ -124,8 +113,8 @@ export default function FunctionsPage() {
               {searchTerm ? 'No functions found' : 'No functions available'}
             </h3>
             <p className="text-muted-foreground text-center">
-              {searchTerm 
-                ? 'Try adjusting your search terms' 
+              {searchTerm
+                ? 'Try adjusting your search terms'
                 : 'No edge functions have been created yet'}
             </p>
           </CardContent>
@@ -133,8 +122,8 @@ export default function FunctionsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredFunctions.map((func) => (
-            <Card 
-              key={func.id} 
+            <Card
+              key={func.id}
               className="cursor-pointer hover:shadow-lg transition-shadow group"
               onClick={() => handleFunctionClick(func)}
             >
@@ -154,9 +143,7 @@ export default function FunctionsPage() {
               </CardHeader>
               <CardContent>
                 {func.description && (
-                  <CardDescription className="mb-3">
-                    {func.description}
-                  </CardDescription>
+                  <CardDescription className="mb-3">{func.description}</CardDescription>
                 )}
                 <div className="flex flex-col gap-1 text-xs text-muted-foreground">
                   <div>Created: {new Date(func.created_at).toLocaleDateString()}</div>

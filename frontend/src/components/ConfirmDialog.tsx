@@ -10,7 +10,7 @@ import {
   AlertDialogTitle,
 } from '@/components';
 
-interface confirmDialogProps {
+interface ConfirmDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
@@ -32,7 +32,7 @@ export function ConfirmDialog({
   onConfirm,
   destructive = false,
   isLoading = false,
-}: confirmDialogProps) {
+}: ConfirmDialogProps) {
   const handleConfirm = async () => {
     await onConfirm();
     onOpenChange(false);

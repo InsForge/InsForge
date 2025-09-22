@@ -45,13 +45,13 @@ self.onmessage = async (e) => {
     // Serialize and send response
     // Properly handle responses with no body
     let body = null;
-    
+
     // Only read body if response has content
     // Status codes 204, 205, and 304 should not have a body
     if (![204, 205, 304].includes(response.status)) {
       body = await response.text();
     }
-    
+
     const responseData = {
       status: response.status,
       statusText: response.statusText,
@@ -65,11 +65,11 @@ self.onmessage = async (e) => {
     if (error instanceof Response) {
       // Handle error responses the same way
       let body = null;
-      
+
       if (![204, 205, 304].includes(error.status)) {
         body = await error.text();
       }
-      
+
       const responseData = {
         status: error.status,
         statusText: error.statusText,

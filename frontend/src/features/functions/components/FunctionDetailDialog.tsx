@@ -8,14 +8,7 @@ import {
 import { Button } from '@/components/radix/Button';
 import { Badge } from '@/components/radix/Badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/radix/Tabs';
-import {
-  Copy,
-  Code2,
-  Info,
-  Clock,
-  Activity,
-  AlertCircle
-} from 'lucide-react';
+import { Copy, Code2, Info, Clock, Activity, AlertCircle } from 'lucide-react';
 import { useToast } from '@/lib/hooks/useToast';
 import { type EdgeFunction } from '../services/functions.service';
 
@@ -30,30 +23,33 @@ export default function FunctionDetailDialog({
   onClose,
   function: func,
 }: FunctionDetailDialogProps) {
-  const { showInfo } = useToast();
+  const { showToast } = useToast();
 
   const handleCopyCode = () => {
     if (func.code) {
       navigator.clipboard.writeText(func.code);
-      showInfo('Code copied to clipboard');
+      showToast('Code copied to clipboard', 'success');
     }
   };
 
   const handleCopyEndpoint = () => {
     const endpoint = `${window.location.origin}/api/functions/run/${func.slug}`;
     navigator.clipboard.writeText(endpoint);
-    showInfo('Endpoint URL copied to clipboard');
+    showToast('Endpoint URL copied to clipboard', 'success');
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive', icon: React.ReactNode }> = {
+    const variants: Record<
+      string,
+      { variant: 'default' | 'secondary' | 'destructive'; icon: React.ReactNode }
+    > = {
       active: { variant: 'default', icon: <Activity className="w-3 h-3 mr-1" /> },
       draft: { variant: 'secondary', icon: <Clock className="w-3 h-3 mr-1" /> },
-      error: { variant: 'destructive', icon: <AlertCircle className="w-3 h-3 mr-1" /> }
+      error: { variant: 'destructive', icon: <AlertCircle className="w-3 h-3 mr-1" /> },
     };
-    
+
     const config = variants[status] || variants.draft;
-    
+
     return (
       <Badge variant={config.variant} className="flex items-center">
         {config.icon}
@@ -74,15 +70,8 @@ export default function FunctionDetailDialog({
               </DialogTitle>
               <DialogDescription className="mt-2 flex flex-col gap-1">
                 <div className="flex items-center gap-2">
-                  <code className="text-sm bg-muted px-2 py-0.5 rounded">
-                    /{func.slug}
-                  </code>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleCopyEndpoint}
-                    className="h-6"
-                  >
+                  <code className="text-sm bg-muted px-2 py-0.5 rounded">/{func.slug}</code>
+                  <Button variant="ghost" size="sm" onClick={handleCopyEndpoint} className="h-6">
                     <Copy className="w-3 h-3 mr-1" />
                     Copy Endpoint
                   </Button>
@@ -125,9 +114,7 @@ export default function FunctionDetailDialog({
                   Copy
                 </Button>
                 <pre className="bg-muted p-4 rounded-lg overflow-auto">
-                  <code className="text-sm font-mono">
-                    {func.code || '// No code available'}
-                  </code>
+                  <code className="text-sm font-mono">{func.code || '// No code available'}</code>
                 </pre>
               </div>
             </TabsContent>

@@ -16,7 +16,6 @@ export class OpenAPIService {
 
   private constructor() {}
 
-
   static getInstance(): OpenAPIService {
     if (!OpenAPIService.instance) {
       OpenAPIService.instance = new OpenAPIService();
