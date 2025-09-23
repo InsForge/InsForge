@@ -38,7 +38,7 @@ export const ColumnTypeSelect = memo(function TableFormSelect({
       control={control}
       name={name}
       render={({ field }) => {
-        const Icon = columnTypeIcons[field.value];
+        const Icon = columnTypeIcons[field.value as keyof typeof columnTypeIcons];
         return (
           <Select disabled={disabled} value={field.value} onValueChange={field.onChange}>
             <SelectTrigger className={className}>

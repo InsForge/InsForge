@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useUsers } from '@/features/auth/hooks/useUsers';
-import { authService } from '@/features/auth/services/auth.service';
 import { UsersDataGrid } from './UsersDataGrid';
 import { SortColumn } from 'react-data-grid';
 import { UserSchema } from '@insforge/shared-schemas';
@@ -49,23 +48,6 @@ export function UsersTab({
   useEffect(() => {
     setSelectedRows(new Set());
   }, [currentPage, externalSearchQuery, setSelectedRows]);
-
-  // Handle single user deletion
-  const handleDeleteSingleUser = async (userId: string) => {
-    try {
-      await authService.deleteUsers([userId]);
-      // Remove from selected rows if it was selected
-      if (selectedRows.has(userId)) {
-        const updated = new Set(selectedRows);
-        updated.delete(userId);
-        setSelectedRows(updated);
-      }
-      void refetch();
-    } catch (error) {
-      console.error('Failed to delete user:', error);
-      throw error;
-    }
-  };
 
   // Apply sorting to users data
   const sortedUsers = useMemo(() => {
@@ -125,9 +107,6 @@ export function UsersTab({
           pageSize={pageSize}
           totalRecords={totalUsers}
           onPageChange={setCurrentPage}
-          onDeleteRecord={(userId) => {
-            void handleDeleteSingleUser(userId);
-          }}
           emptyStateTitle="No users found"
           emptyStateDescription={
             externalSearchQuery

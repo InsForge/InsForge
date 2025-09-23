@@ -4,14 +4,8 @@ import { Button } from '@/components/radix/Button';
 import { cn } from '@/lib/utils/utils';
 import { format, parse } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/radix/Popover';
-
-interface DateCellEditorProps {
-  value: string | null;
-  type?: 'date' | 'datetime';
-  nullable: boolean;
-  onValueChange: (newValue: string | null) => void;
-  onCancel: () => void;
-}
+import type { DateCellEditorProps } from './types';
+import { ColumnType } from '@insforge/shared-schemas';
 
 type PickerMode = 'day' | 'month' | 'year';
 
@@ -24,7 +18,6 @@ interface TimeColumnProps {
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
 const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
 // Reusable time column component
@@ -55,16 +48,17 @@ function TimeColumn({ label, value, range, onChange, scrollRef }: TimeColumnProp
 
 export function DateCellEditor({
   value,
-  type = 'datetime',
+  type = ColumnType.DATETIME,
   nullable,
   onValueChange,
   onCancel,
+  className,
 }: DateCellEditorProps) {
   const [open, setOpen] = useState(true);
   const [pickerMode, setPickerMode] = useState<PickerMode>('day');
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
     if (value && value !== 'null') {
-      if (type === 'date') {
+      if (type === ColumnType.DATE) {
         return parse(value, 'yyyy-MM-dd', new Date());
       } else {
         return new Date(value);
@@ -74,14 +68,14 @@ export function DateCellEditor({
   });
 
   const [selectedHour, setSelectedHour] = useState(() => {
-    if (value && value !== 'null' && type === 'datetime') {
+    if (value && value !== 'null' && type === ColumnType.DATETIME) {
       return new Date(value).getHours();
     }
     return new Date().getHours();
   });
 
   const [selectedMinute, setSelectedMinute] = useState(() => {
-    if (value && value !== 'null' && type === 'datetime') {
+    if (value && value !== 'null' && type === ColumnType.DATETIME) {
       return new Date(value).getMinutes();
     }
     return new Date().getMinutes();
@@ -99,7 +93,7 @@ export function DateCellEditor({
 
   useEffect(() => {
     // Auto-scroll to selected time values when popover opens
-    if (open && type === 'datetime') {
+    if (open && type === ColumnType.DATETIME) {
       setTimeout(() => {
         if (hourScrollRef.current) {
           const hourButton = hourScrollRef.current.querySelector(
@@ -140,7 +134,7 @@ export function DateCellEditor({
     const newDate = new Date(displayYear, displayMonth, day);
     setSelectedDate(newDate);
 
-    if (type === 'date') {
+    if (type === ColumnType.DATE) {
       const dateString = format(newDate, 'yyyy-MM-dd');
       onValueChange(dateString);
       setOpen(false);
@@ -192,7 +186,7 @@ export function DateCellEditor({
   };
 
   const handleSave = () => {
-    if (type === 'datetime') {
+    if (type === ColumnType.DATETIME) {
       const dateTime = new Date(selectedDate);
       dateTime.setHours(selectedHour, selectedMinute, 0, 0);
       // Format as local ISO string with timezone offset
@@ -231,7 +225,7 @@ export function DateCellEditor({
       return 'Select date...';
     }
 
-    if (type === 'datetime') {
+    if (type === ColumnType.DATETIME) {
       const d = new Date(value);
       return format(d, 'MMM dd, yyyy hh:mm a');
     } else {
@@ -328,10 +322,11 @@ export function DateCellEditor({
           variant="ghost"
           className={cn(
             'w-full justify-start text-left text-sm font-normal h-full border-0 p-0 hover:bg-transparent dark:text-white',
-            (!value || value === 'null') && 'text-muted-foreground'
+            (!value || value === 'null') && 'text-muted-foreground',
+            className
           )}
         >
-          {type === 'datetime' ? (
+          {type === ColumnType.DATETIME ? (
             <Clock className="mr-2 h-4 w-4" />
           ) : (
             <Calendar className="mr-2 h-4 w-4" />
@@ -344,7 +339,7 @@ export function DateCellEditor({
         align="start"
         side="bottom"
       >
-        <div className={cn('flex', type === 'datetime' && '')}>
+        <div className={cn('flex', type === ColumnType.DATETIME && '')}>
           <div className="p-3">
             {/* Header */}
             <div className="flex items-center justify-between mb-3">
@@ -426,7 +421,7 @@ export function DateCellEditor({
             </div>
           </div>
 
-          {type === 'datetime' && (
+          {type === ColumnType.DATETIME && (
             <div className="border-l border-border-gray dark:border-neutral-600 bg-muted/30 dark:bg-neutral-800 w-35">
               <div className="p-3">
                 <div className="flex items-center justify-center gap-2 mb-3">

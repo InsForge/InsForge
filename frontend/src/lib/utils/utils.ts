@@ -2,6 +2,7 @@ import { ColumnType } from '@insforge/shared-schemas';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { z } from 'zod';
+import { format, parse, isValid, parseISO } from 'date-fns';
 import {
   uuidSchema,
   integerSchema,
@@ -12,16 +13,11 @@ import {
   jsonSchema,
   stringSchema,
 } from './validation-schemas';
+import type { ConvertedValue, DisplayValue, ValueConversionResult } from '@/components/datagrid';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
-
-export type ConvertedValue = string | number | boolean | null | JSON;
-
-export type ValueConversionResult =
-  | { success: true; value: ConvertedValue }
-  | { success: false; error: string };
 
 /**
  * Convert and validate a string value based on the specified ColumnType
@@ -80,6 +76,61 @@ export function convertValueForColumn(
       success: false,
       error: error instanceof Error ? error.message : 'Unknown conversion error',
     };
+  }
+}
+
+/**
+ * Centralized value formatter that handles all data types consistently
+ * Converts database values to formatted display strings for UI components
+ */
+export function formatValueForDisplay(value: ConvertedValue, type?: ColumnType): DisplayValue {
+  // Handle null/undefined values
+  if (isEmptyValue(value)) {
+    return 'null';
+  }
+
+  // Handle different column types
+  switch (type) {
+    case ColumnType.BOOLEAN:
+      return value ? 'True' : 'False';
+
+    case ColumnType.DATE: {
+      const date = parse(String(value), 'yyyy-MM-dd', new Date());
+      if (!isValid(date)) return 'Invalid date';
+      const displayValue = format(date, 'MMM dd, yyyy');
+      return displayValue;
+    }
+
+    case ColumnType.DATETIME: {
+      const date = parseISO(String(value));
+      if (!isValid(date)) return 'Invalid date time';
+      const displayValue = format(date, 'MMM dd, yyyy, hh:mm a');
+      return displayValue;
+    }
+
+    case ColumnType.JSON: {
+      try {
+        const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+        const formatted =
+          parsed && typeof parsed === 'object' ? JSON.stringify(parsed) : String(parsed);
+
+        return formatted;
+      } catch {
+        return 'Invalid JSON';
+      }
+    }
+
+    case ColumnType.INTEGER:
+    case ColumnType.FLOAT: {
+      return String(value);
+    }
+
+    case ColumnType.UUID:
+    case ColumnType.STRING:
+    default: {
+      // Convert to string and optionally truncate
+      return String(value);
+    }
   }
 }
 

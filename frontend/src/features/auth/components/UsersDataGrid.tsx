@@ -1,12 +1,21 @@
 import { useMemo } from 'react';
 import {
   DataGrid,
-  DefaultCellRenderers,
-  type DataGridColumn,
+  createDefaultCellRenderers,
   type DataGridProps,
-} from '@/components/DataGrid';
+  type DataGridColumn,
+  type RenderCellProps,
+  ConvertedValue,
+} from '@/components/datagrid';
 import { Badge } from '@/components/radix/Badge';
 import { cn } from '@/lib/utils/utils';
+import type { UserSchema } from '@insforge/shared-schemas';
+
+// Create a type that makes UserSchema compatible with DataGrid requirements
+// We bypass the strict DatabaseRecord constraint since UserSchema has its own structure
+type UserDataGridRow = UserSchema & {
+  [key: string]: ConvertedValue | { [key: string]: string }[];
+};
 
 // Provider icon component
 const ProviderIcon = ({ provider }: { provider: string }) => {
@@ -23,12 +32,6 @@ const ProviderIcon = ({ provider }: { provider: string }) => {
           label: 'GitHub',
           color:
             'bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-zinc-300 dark:border-gray-500',
-        };
-      case 'discord':
-        return {
-          label: 'Discord',
-          color:
-            'bg-blue-100 text-blue-700 dark:bg-neutral-800 dark:text-blue-300 dark:border-blue-500',
         };
       case 'email':
         return {
@@ -57,30 +60,22 @@ const ProviderIcon = ({ provider }: { provider: string }) => {
   );
 };
 
-// Custom cell renderers for users
-const NameCellRenderer = ({ row, column }: any) => (
-  <span
-    className="text-sm text-gray-800 dark:text-zinc-300 truncate"
-    title={row[column.key] || 'null'}
-  >
-    {row[column.key] || 'null'}
-  </span>
-);
-
-const IdentitiesCellRenderer = ({ row, column }: any) => {
-  const identities = row[column.key];
+const IdentitiesCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
+  const identities = row.identities;
 
   if (!identities || !Array.isArray(identities) || identities.length === 0) {
     return <span className="text-sm text-black dark:text-zinc-300">null</span>;
   }
 
   // Get unique providers to avoid duplicates
-  const uniqueProviders = [...new Set(identities.map((identity: any) => identity.provider))];
+  const uniqueProviders = [
+    ...new Set(identities.map((identity: { provider: string }) => identity.provider)),
+  ];
 
   return (
     <div
       className="flex flex-wrap gap-1"
-      title={identities.map((identity: any) => identity.provider).join(', ')}
+      title={identities.map((identity: { provider: string }) => identity.provider).join(', ')}
     >
       {uniqueProviders.slice(0, 2).map((provider: string, index: number) => (
         <ProviderIcon key={index} provider={provider} />
@@ -97,17 +92,10 @@ const IdentitiesCellRenderer = ({ row, column }: any) => {
   );
 };
 
-const ProviderTypeCellRenderer = ({ row, column }: any) => (
-  <span
-    className="text-sm text-black dark:text-zinc-300 truncate"
-    title={row[column.key] || 'null'}
-  >
-    {row[column.key] || 'null'}
-  </span>
-);
-
 // Convert users data to DataGrid columns
-export function createUsersColumns(): DataGridColumn[] {
+export function createUsersColumns(): DataGridColumn<UserDataGridRow>[] {
+  const cellRenderers = createDefaultCellRenderers<UserDataGridRow>();
+
   return [
     {
       key: 'id',
@@ -115,7 +103,7 @@ export function createUsersColumns(): DataGridColumn[] {
       width: '1fr',
       resizable: true,
       sortable: true,
-      renderCell: DefaultCellRenderers.id,
+      renderCell: cellRenderers.id,
     },
     {
       key: 'email',
@@ -123,7 +111,7 @@ export function createUsersColumns(): DataGridColumn[] {
       width: '1fr',
       resizable: true,
       sortable: true,
-      renderCell: DefaultCellRenderers.email,
+      renderCell: cellRenderers.email,
     },
     {
       key: 'name',
@@ -131,7 +119,7 @@ export function createUsersColumns(): DataGridColumn[] {
       width: '1fr',
       resizable: true,
       sortable: true,
-      renderCell: NameCellRenderer,
+      renderCell: cellRenderers.text,
     },
     {
       key: 'identities',
@@ -147,7 +135,7 @@ export function createUsersColumns(): DataGridColumn[] {
       width: '1fr',
       resizable: true,
       sortable: true,
-      renderCell: ProviderTypeCellRenderer,
+      renderCell: cellRenderers.text,
     },
     {
       key: 'createdAt',
@@ -155,7 +143,7 @@ export function createUsersColumns(): DataGridColumn[] {
       width: '1fr',
       resizable: true,
       sortable: true,
-      renderCell: DefaultCellRenderers.datetime,
+      renderCell: cellRenderers.datetime,
     },
     {
       key: 'updatedAt',
@@ -163,13 +151,15 @@ export function createUsersColumns(): DataGridColumn[] {
       width: '1fr',
       resizable: true,
       sortable: true,
-      renderCell: DefaultCellRenderers.datetime,
+      renderCell: cellRenderers.datetime,
     },
   ];
 }
 
 // Users-specific DataGrid props
-export type UsersDataGridProps = Omit<DataGridProps, 'columns'>;
+export type UsersDataGridProps = Omit<DataGridProps<UserDataGridRow>, 'columns'> & {
+  searchQuery?: string;
+};
 
 // Specialized DataGrid for users
 export function UsersDataGrid({
@@ -177,16 +167,17 @@ export function UsersDataGrid({
   emptyStateDescription,
   emptyStateActionText,
   onEmptyStateAction,
+  searchQuery,
   ...props
 }: UsersDataGridProps) {
   const columns = useMemo(() => createUsersColumns(), []);
 
-  const defaultEmptyDescription = props.searchQuery
+  const defaultEmptyDescription = searchQuery
     ? 'No users match your search criteria'
     : 'No users have been created yet';
 
   return (
-    <DataGrid
+    <DataGrid<UserDataGridRow>
       {...props}
       columns={columns}
       emptyStateTitle={emptyStateTitle}

@@ -20,13 +20,13 @@ import { cn } from '@/lib/utils/utils';
 import { useToast } from '@/lib/hooks/useToast';
 import { ColumnSchema } from '@insforge/shared-schemas';
 import { SYSTEM_FIELDS } from '../helpers';
+import { ConvertedValue } from '@/components/datagrid/datagridTypes';
 
 interface RecordFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tableName: string;
   schema: ColumnSchema[];
-  editingRecord?: any;
   onSuccess?: () => void;
 }
 
@@ -35,7 +35,6 @@ export function RecordFormDialog({
   onOpenChange,
   tableName,
   schema,
-  editingRecord,
   onSuccess,
 }: RecordFormDialogProps) {
   const [error, setError] = useState<string | null>(null);
@@ -53,9 +52,9 @@ export function RecordFormDialog({
   }, [displayFields]);
 
   const initialValues = useMemo(() => {
-    const values = editingRecord || getInitialValues(displayFields);
+    const values = getInitialValues(displayFields);
     return values;
-  }, [editingRecord, displayFields]);
+  }, [displayFields]);
 
   const form = useForm({
     resolver: zodResolver(dynamicSchema),
@@ -63,12 +62,8 @@ export function RecordFormDialog({
   });
 
   useEffect(() => {
-    if (editingRecord) {
-      form.reset(editingRecord);
-    } else {
-      form.reset(initialValues);
-    }
-  }, [editingRecord, displayFields, schema, form, initialValues]);
+    form.reset(initialValues);
+  }, [displayFields, schema, form, initialValues]);
 
   // Clear error state when dialog opens/closes
   useEffect(() => {
@@ -78,7 +73,7 @@ export function RecordFormDialog({
   }, [open]);
 
   const createRecordMutation = useMutation({
-    mutationFn: (data: any) => {
+    mutationFn: (data: { [key: string]: ConvertedValue }) => {
       return databaseService.createRecord(tableName, data);
     },
     onSuccess: () => {
@@ -92,38 +87,15 @@ export function RecordFormDialog({
       }
       showToast('Record created successfully', 'success');
     },
-    onError: (err: any) => {
+    onError: (err: Error) => {
       setError(err.message || 'Failed to create record');
-    },
-  });
-
-  const updateRecordMutation = useMutation({
-    mutationFn: (data: any) => {
-      return databaseService.updateRecord(tableName, editingRecord.id, data);
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['records', tableName] });
-      void queryClient.invalidateQueries({ queryKey: ['table', tableName] });
-      onOpenChange(false);
-      form.reset();
-      setError(null);
-      if (onSuccess) {
-        onSuccess();
-      }
-    },
-    onError: (err: any) => {
-      setError(err.message || 'Failed to update record');
     },
   });
 
   const handleSubmit = form.handleSubmit(
     async (data) => {
       try {
-        if (editingRecord) {
-          await updateRecordMutation.mutateAsync(data);
-        } else {
-          await createRecordMutation.mutateAsync(data);
-        }
+        await createRecordMutation.mutateAsync(data);
       } catch (err) {
         console.error('Form submission error:', err);
       }
@@ -139,7 +111,7 @@ export function RecordFormDialog({
         <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col">
           <DialogHeader className="px-6 py-3 border-b border-zinc-200 dark:border-neutral-700">
             <DialogTitle className="text-lg font-semibold text-zinc-950 dark:text-white">
-              {editingRecord ? `Edit ${tableName} Record` : `Add Record`}
+              Add Record
             </DialogTitle>
           </DialogHeader>
 
@@ -176,17 +148,13 @@ export function RecordFormDialog({
             </Button>
             <Button
               type="submit"
-              disabled={createRecordMutation.isPending || updateRecordMutation.isPending}
+              disabled={createRecordMutation.isPending}
               className={cn(
                 'h-10 px-4 bg-zinc-950 text-white hover:bg-zinc-800 dark:bg-emerald-300 dark:text-zinc-950 dark:hover:bg-emerald-400',
-                (createRecordMutation.isPending || updateRecordMutation.isPending) && 'opacity-40'
+                createRecordMutation.isPending && 'opacity-40'
               )}
             >
-              {createRecordMutation.isPending || updateRecordMutation.isPending
-                ? 'Saving...'
-                : editingRecord
-                  ? 'Update'
-                  : 'Add Record'}
+              {createRecordMutation.isPending ? 'Saving...' : 'Add Record'}
             </Button>
           </DialogFooter>
         </form>

@@ -11,8 +11,9 @@ import {
   TooltipTrigger,
 } from '@/components/radix/Tooltip';
 import { databaseService } from '@/features/database/services/database.service';
-import { DataGrid } from '@/components/DataGrid';
+import { ConvertedValue, DataGrid } from '@/components/datagrid';
 import { convertSchemaToColumns } from '@/features/database/components/DatabaseDataGrid';
+import { formatValueForDisplay } from '@/lib/utils/utils';
 
 interface ForeignKeyCellProps {
   value: string;
@@ -27,22 +28,8 @@ export function ForeignKeyCell({ value, foreignKey, onJumpToTable }: ForeignKeyC
   const [open, setOpen] = useState(false);
 
   // Helper function to safely render any value type (including JSON objects)
-  const renderValue = (val: any): string => {
-    if (val === null || val === undefined) {
-      return 'null';
-    }
-
-    // If it's an object (likely JSON), stringify it
-    if (typeof val === 'object') {
-      try {
-        return JSON.stringify(val);
-      } catch {
-        return '[Invalid Object]';
-      }
-    }
-
-    // For all other types, convert to string
-    return String(val);
+  const renderValue = (val: ConvertedValue): string => {
+    return formatValueForDisplay(val);
   };
 
   // Fetch the referenced record when popover opens

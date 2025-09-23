@@ -6,19 +6,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/radix/Select';
-
-interface BooleanCellEditorProps {
-  value: boolean | null;
-  nullable: boolean;
-  onValueChange: (newValue: string) => void;
-  onCancel: () => void;
-}
+import type { BooleanCellEditorProps } from './types';
 
 export function BooleanCellEditor({
   value,
   nullable,
   onValueChange,
   onCancel,
+  className,
 }: BooleanCellEditorProps) {
   const [open, setOpen] = useState(true);
 
@@ -44,7 +39,9 @@ export function BooleanCellEditor({
       open={open}
       onOpenChange={handleOpenChange}
     >
-      <SelectTrigger className="w-full h-full border-0 focus:ring-0 focus:ring-offset-0 p-0 text-black dark:text-white dark:placeholder:text-neutral-400 dark:border-neutral-700">
+      <SelectTrigger
+        className={`w-full h-full border-0 focus:ring-0 focus:ring-offset-0 p-0 text-black dark:text-white dark:placeholder:text-neutral-400 dark:border-neutral-700 ${className || ''}`}
+      >
         <SelectValue />
       </SelectTrigger>
       <SelectContent align="start" className="min-w-25">

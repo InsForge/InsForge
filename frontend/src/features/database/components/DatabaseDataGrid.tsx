@@ -1,86 +1,76 @@
 import React, { useMemo } from 'react';
 import {
   DataGrid,
-  DefaultCellRenderers,
+  createDefaultCellRenderers,
   type DataGridColumn,
   type DataGridProps,
-} from '@/components/DataGrid';
-import { BooleanCellEditor } from '@/features/database/components/BooleanCellEditor';
-import { DateCellEditor } from '@/features/database/components/DateCellEditor';
-import { JsonCellEditor } from '@/features/database/components/JsonCellEditor';
+  type DataGridRowType,
+  type RenderCellProps,
+  type RenderEditCellProps,
+  BooleanCellEditor,
+  DateCellEditor,
+  JsonCellEditor,
+  TextCellEditor,
+} from '@/components/datagrid';
 import { ColumnSchema, ColumnType, TableSchema } from '@insforge/shared-schemas';
 import { ForeignKeyCell } from './ForeignKeyCell';
 
-// Custom cell editors for database fields
-function TextCellEditor({ row, column, onRowChange, onClose, onCellEdit }: any) {
-  const [value, setValue] = React.useState(String(row[column.key] || ''));
+// Create a type adapter for database records
+// Database records are dynamic and must have string id for DataGrid compatibility
+type DatabaseDataGridRow = DataGridRowType;
 
-  const handleSave = React.useCallback(async () => {
-    const oldValue = row[column.key];
-    const newValue = value;
+// Custom cell editor wrapper components that handle database-specific logic
+function DatabaseTextCellEditor({
+  row,
+  column,
+  onRowChange,
+  onClose,
+  onCellEdit,
+}: RenderEditCellProps<DatabaseDataGridRow> & {
+  onCellEdit?: (rowId: string, columnKey: string, newValue: string) => Promise<void>;
+}) {
+  const handleValueChange = React.useCallback(
+    (newValue: string) => {
+      const oldValue = row[column.key];
 
-    if (onCellEdit && String(oldValue) !== String(newValue)) {
-      try {
-        await onCellEdit(row.id, column.key, newValue);
-      } catch {
-        // Edit failed silently
+      if (onCellEdit && String(oldValue) !== String(newValue)) {
+        void onCellEdit(String(row.id || ''), column.key, newValue);
       }
-    }
 
-    const updatedRow = { ...row, [column.key]: newValue };
-    onRowChange(updatedRow);
-    onClose();
-  }, [row, column.key, value, onCellEdit, onRowChange, onClose]);
-
-  const handleKeyDown = React.useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        void handleSave();
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-      }
+      const updatedRow = { ...row, [column.key]: newValue };
+      onRowChange(updatedRow);
+      onClose();
     },
-    [handleSave, onClose]
+    [row, column.key, onCellEdit, onRowChange, onClose]
   );
 
   return (
-    <input
-      value={value}
-      onChange={(e) => setValue(e.target.value)}
-      onKeyDown={handleKeyDown}
-      onBlur={handleSave}
-      className="w-full border-none outline-none bg-white dark:bg-neutral-800 focus:border-0! focus:ring-0! focus:ring-offset-0! focus:outline-none!"
-      autoFocus
+    <TextCellEditor
+      value={String(row[column.key] || '')}
+      nullable={false}
+      onValueChange={handleValueChange}
+      onCancel={onClose}
     />
   );
 }
 
-function CustomBooleanCellEditor({ row, column, onRowChange, onClose, onCellEdit }: any) {
+function DatabaseBooleanCellEditor({
+  row,
+  column,
+  onRowChange,
+  onClose,
+  onCellEdit,
+  columnSchema,
+}: RenderEditCellProps<DatabaseDataGridRow> & {
+  onCellEdit?: (rowId: string, columnKey: string, newValue: string) => Promise<void>;
+  columnSchema: ColumnSchema;
+}) {
   const handleValueChange = React.useCallback(
-    async (newValue: string) => {
-      let value: boolean | null;
-      switch (newValue) {
-        case 'true':
-          value = true;
-          break;
-        case 'false':
-          value = false;
-          break;
-        case 'null':
-          value = null;
-          break;
-        default:
-          value = null;
-      }
+    (newValue: string) => {
+      const value: boolean | null = newValue === 'null' ? null : newValue === 'true';
 
       if (onCellEdit && row[column.key] !== value) {
-        try {
-          await onCellEdit(row.id, column.key, value);
-        } catch {
-          // Edit failed silently
-        }
+        void onCellEdit(String(row.id || ''), column.key, newValue);
       }
 
       const updatedRow = { ...row, [column.key]: value };
@@ -91,90 +81,99 @@ function CustomBooleanCellEditor({ row, column, onRowChange, onClose, onCellEdit
   );
 
   return (
-    <div className="w-full h-full">
-      <BooleanCellEditor
-        value={row[column.key]}
-        nullable={column.isNullable}
-        onValueChange={handleValueChange}
-        onCancel={onClose}
-      />
-    </div>
+    <BooleanCellEditor
+      value={row[column.key] as boolean | null}
+      nullable={columnSchema.isNullable || false}
+      onValueChange={handleValueChange}
+      onCancel={onClose}
+    />
   );
 }
 
-function CustomDateCellEditor({ row, column, onRowChange, onClose, onCellEdit }: any) {
+function DatabaseDateCellEditor({
+  row,
+  column,
+  onRowChange,
+  onClose,
+  onCellEdit,
+  columnSchema,
+}: RenderEditCellProps<DatabaseDataGridRow> & {
+  onCellEdit?: (rowId: string, columnKey: string, newValue: string) => Promise<void>;
+  columnSchema: ColumnSchema;
+}) {
   const handleValueChange = React.useCallback(
-    async (newValue: string | null) => {
+    (newValue: string | null) => {
       if (
         onCellEdit &&
-        new Date(row[column.key]).getTime() !== new Date(newValue ?? '').getTime()
+        new Date(row[column.key] as string).getTime() !== new Date(newValue ?? '').getTime()
       ) {
-        try {
-          await onCellEdit(row.id, column.columnName, newValue);
-        } catch {
-          // Edit failed silently
-        }
+        void onCellEdit(String(row.id || ''), column.key, newValue ?? '');
       }
 
-      const updatedRow = { ...row, [column.columnName]: newValue };
+      const updatedRow = { ...row, [column.key]: newValue };
       onRowChange(updatedRow);
       onClose();
     },
-    [onCellEdit, row, column.key, column.columnName, onRowChange, onClose]
+    [onCellEdit, row, column.key, onRowChange, onClose]
   );
 
   return (
-    <div className="w-full h-full">
-      <DateCellEditor
-        value={row[column.columnName]}
-        nullable={column.isNullable}
-        type={column.type}
-        onValueChange={handleValueChange}
-        onCancel={onClose}
-      />
-    </div>
+    <DateCellEditor
+      value={row[column.key] as string | null}
+      nullable={columnSchema.isNullable || false}
+      type={columnSchema.type as ColumnType.DATE | ColumnType.DATETIME}
+      onValueChange={handleValueChange}
+      onCancel={onClose}
+    />
   );
 }
 
-function CustomJsonCellEditor({ row, column, onRowChange, onClose, onCellEdit }: any) {
+function DatabaseJsonCellEditor({
+  row,
+  column,
+  onRowChange,
+  onClose,
+  onCellEdit,
+  columnSchema,
+}: RenderEditCellProps<DatabaseDataGridRow> & {
+  onCellEdit?: (rowId: string, columnKey: string, newValue: string) => Promise<void>;
+  columnSchema: ColumnSchema;
+}) {
   const handleValueChange = React.useCallback(
-    async (newValue: string) => {
-      if (onCellEdit && row[column.columnName] !== newValue) {
-        try {
-          await onCellEdit(row.id, column.columnName, newValue);
-        } catch {
-          // Edit failed silently
-        }
+    (newValue: string) => {
+      if (onCellEdit && row[column.key] !== newValue) {
+        void onCellEdit(String(row.id || ''), column.key, newValue);
       }
 
-      const updatedRow = { ...row, [column.columnName]: newValue };
+      const updatedRow = { ...row, [column.key]: newValue };
       onRowChange(updatedRow);
       onClose();
     },
-    [column.columnName, onCellEdit, row, onRowChange, onClose]
+    [column.key, onCellEdit, row, onRowChange, onClose]
   );
 
   return (
-    <div className="w-full h-full">
-      <JsonCellEditor
-        value={row[column.columnName]}
-        nullable={column.isNullable}
-        onValueChange={handleValueChange}
-        onCancel={onClose}
-      />
-    </div>
+    <JsonCellEditor
+      value={row[column.key] as string | null}
+      nullable={columnSchema.isNullable || false}
+      onValueChange={handleValueChange}
+      onCancel={onClose}
+    />
   );
 }
 
 // Convert database schema to DataGrid columns
 export function convertSchemaToColumns(
   schema?: TableSchema,
-  onCellEdit?: (rowId: string, columnKey: string, newValue: any) => Promise<void>,
+  onCellEdit?: (rowId: string, columnKey: string, newValue: string) => Promise<void>,
   onJumpToTable?: (tableName: string) => void
-): DataGridColumn[] {
+): DataGridColumn<DatabaseDataGridRow>[] {
   if (!schema?.columns) {
     return [];
   }
+
+  // Create typed cell renderers
+  const cellRenderers = createDefaultCellRenderers<DatabaseDataGridRow>();
 
   return schema.columns.map((col: ColumnSchema) => {
     const isEditable =
@@ -191,10 +190,10 @@ export function convertSchemaToColumns(
       ].includes(col.type as ColumnType);
     const isSortable = col.type?.toLowerCase() !== ColumnType.JSON;
 
-    const column: DataGridColumn = {
+    const column: DataGridColumn<DatabaseDataGridRow> = {
       key: col.columnName,
       name: col.columnName,
-      type: col.type,
+      type: col.type as ColumnType,
       width: 'minmax(200px, 1fr)',
       resizable: true,
       sortable: isSortable,
@@ -206,43 +205,45 @@ export function convertSchemaToColumns(
     // Set custom renderers - check for foreign key first (highest priority)
     if (col.foreignKey) {
       // Foreign key column - show reference popover, disable editing
-      column.renderCell = (props: any) => (
+      column.renderCell = (props: RenderCellProps<DatabaseDataGridRow>) => (
         <ForeignKeyCell
-          value={props.row[col.columnName]}
+          value={String(props.row[col.columnName] || '')}
           foreignKey={{
-            table: col.foreignKey!.referenceTable,
-            column: col.foreignKey!.referenceColumn,
+            table: col.foreignKey?.referenceTable || '',
+            column: col.foreignKey?.referenceColumn || '',
           }}
           onJumpToTable={onJumpToTable}
         />
       );
-      column.editable = false; // Disable editing for foreign key columns
+      // Note: editable is set in the column definition above
     } else if (col.columnName === 'id') {
-      column.renderCell = DefaultCellRenderers.id;
-      column.editable = false;
+      column.renderCell = cellRenderers.id;
+      // Note: editable is set in the column definition above
     } else if (col.type === ColumnType.BOOLEAN) {
-      column.renderCell = DefaultCellRenderers.boolean;
-      column.renderEditCell = (props: any) => (
-        <CustomBooleanCellEditor {...props} onCellEdit={onCellEdit} />
+      column.renderCell = cellRenderers.boolean;
+      column.renderEditCell = (props: RenderEditCellProps<DatabaseDataGridRow>) => (
+        <DatabaseBooleanCellEditor {...props} columnSchema={col} onCellEdit={onCellEdit} />
       );
     } else if (col.type === ColumnType.DATE) {
-      column.renderCell = DefaultCellRenderers.date;
-      column.renderEditCell = (props: any) => (
-        <CustomDateCellEditor {...props} column={col} onCellEdit={onCellEdit} />
+      column.renderCell = cellRenderers.date;
+      column.renderEditCell = (props: RenderEditCellProps<DatabaseDataGridRow>) => (
+        <DatabaseDateCellEditor {...props} columnSchema={col} onCellEdit={onCellEdit} />
       );
     } else if (col.type === ColumnType.DATETIME) {
-      column.renderCell = DefaultCellRenderers.datetime;
-      column.renderEditCell = (props: any) => (
-        <CustomDateCellEditor {...props} column={col} onCellEdit={onCellEdit} />
+      column.renderCell = cellRenderers.datetime;
+      column.renderEditCell = (props: RenderEditCellProps<DatabaseDataGridRow>) => (
+        <DatabaseDateCellEditor {...props} columnSchema={col} onCellEdit={onCellEdit} />
       );
     } else if (col.type === ColumnType.JSON) {
-      column.renderCell = DefaultCellRenderers.json;
-      column.renderEditCell = (props: any) => (
-        <CustomJsonCellEditor {...props} column={col} onCellEdit={onCellEdit} />
+      column.renderCell = cellRenderers.json;
+      column.renderEditCell = (props: RenderEditCellProps<DatabaseDataGridRow>) => (
+        <DatabaseJsonCellEditor {...props} columnSchema={col} onCellEdit={onCellEdit} />
       );
     } else {
-      column.renderCell = DefaultCellRenderers.text;
-      column.renderEditCell = (props: any) => <TextCellEditor {...props} onCellEdit={onCellEdit} />;
+      column.renderCell = cellRenderers.text;
+      column.renderEditCell = (props: RenderEditCellProps<DatabaseDataGridRow>) => (
+        <DatabaseTextCellEditor {...props} onCellEdit={onCellEdit} />
+      );
     }
 
     return column;
@@ -250,9 +251,11 @@ export function convertSchemaToColumns(
 }
 
 // Database-specific DataGrid props
-export interface DatabaseDataGridProps extends Omit<DataGridProps, 'columns'> {
+export interface DatabaseDataGridProps extends Omit<DataGridProps<DatabaseDataGridRow>, 'columns'> {
   schema?: TableSchema;
+  onCellEdit?: (rowId: string, columnKey: string, newValue: string) => Promise<void>;
   onJumpToTable?: (tableName: string) => void;
+  searchQuery?: string;
 }
 
 // Specialized DataGrid for database tables
@@ -262,18 +265,19 @@ export function DatabaseDataGrid({
   onJumpToTable,
   emptyStateTitle = 'No data available',
   emptyStateDescription,
+  searchQuery,
   ...props
 }: DatabaseDataGridProps) {
   const columns = useMemo(() => {
     return convertSchemaToColumns(schema, onCellEdit, onJumpToTable);
   }, [schema, onCellEdit, onJumpToTable]);
 
-  const defaultEmptyDescription = props.searchQuery
+  const defaultEmptyDescription = searchQuery
     ? 'No records match your search criteria'
     : 'This table contains no records';
 
   return (
-    <DataGrid
+    <DataGrid<DatabaseDataGridRow>
       {...props}
       columns={columns}
       emptyStateTitle={emptyStateTitle}

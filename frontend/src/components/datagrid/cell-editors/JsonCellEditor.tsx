@@ -1,16 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FileJson, AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/radix/Button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/radix/Popover';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { cn } from '@/lib/utils/utils';
-
-interface JsonCellEditorProps {
-  value: string | null;
-  nullable: boolean;
-  onValueChange: (newValue: string) => void;
-  onCancel: () => void;
-}
+import type { JsonCellEditorProps } from './types';
 
 export function JsonCellEditor({ value, nullable, onValueChange, onCancel }: JsonCellEditorProps) {
   const [open, setOpen] = useState(true);

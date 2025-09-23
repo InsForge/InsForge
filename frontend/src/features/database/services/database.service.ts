@@ -1,3 +1,4 @@
+import { ConvertedValue } from '@/components/datagrid/datagridTypes';
 import { apiClient } from '@/lib/api/client';
 import {
   ColumnSchema,
@@ -70,7 +71,7 @@ export class DatabaseService {
     limit = 10,
     offset = 0,
     searchQuery?: string,
-    sortColumns?: any[]
+    sortColumns?: { columnKey: string; direction: string }[]
   ) {
     const params = new URLSearchParams();
     params.set('limit', limit.toString());
@@ -107,13 +108,15 @@ export class DatabaseService {
     }
 
     const response: {
-      data: { [key: string]: string | boolean | number | JSON | null }[];
+      data: { [key: string]: ConvertedValue }[];
       pagination: { offset: number; limit: number; total: number };
     } = await apiClient.request(`/database/records/${tableName}?${params.toString()}`, {
       headers: {
         Prefer: 'count=exact',
       },
     });
+
+    console.log(response);
 
     return {
       records: response.data,
@@ -169,7 +172,7 @@ export class DatabaseService {
     };
   }
 
-  createRecords(table: string, records: any[]) {
+  createRecords(table: string, records: { [key: string]: ConvertedValue }[]) {
     // if data is json and data[id] == "" then remove id from data, because can't assign '' to uuid
     records = records.map((record) => {
       if (typeof record === 'object' && record.id === '') {
@@ -186,7 +189,7 @@ export class DatabaseService {
     });
   }
 
-  createRecord(table: string, data: any) {
+  createRecord(table: string, data: { [key: string]: ConvertedValue }) {
     if (typeof data === 'object' && data.id === '') {
       // can't assign '' to uuid, so we need to remove it
       delete data.id;
@@ -194,7 +197,7 @@ export class DatabaseService {
     return this.createRecords(table, [data]);
   }
 
-  updateRecord(table: string, id: string, data: any) {
+  updateRecord(table: string, id: string, data: { [key: string]: ConvertedValue }) {
     return apiClient.request(`/database/records/${table}?id=eq.${id}`, {
       method: 'PATCH',
       headers: apiClient.withAccessToken({

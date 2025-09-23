@@ -4,16 +4,22 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/r
 import { Button } from '@/components/radix/Button';
 import { databaseService } from '@/features/database/services/database.service';
 import { convertSchemaToColumns } from '@/features/database/components/DatabaseDataGrid';
-import { SortableHeaderRenderer } from '@/components/DataGrid';
 import { SearchInput, DataGrid, TypeBadge } from '@/components';
-import { SortColumn } from 'react-data-grid';
+import {
+  type CellMouseEvent,
+  type CellClickArgs,
+  type RenderCellProps,
+  type RenderHeaderCellProps,
+  type SortColumn,
+  SortableHeaderRenderer,
+  type DataGridColumn,
+  type DatabaseRecord,
+  type ConvertedValue,
+} from '@/components/datagrid';
+import { formatValueForDisplay } from '@/lib/utils/utils';
 import { ColumnType } from '@insforge/shared-schemas';
-import { format, parse } from 'date-fns';
 
 const PAGE_SIZE = 50;
-
-// Type for database records
-type DatabaseRecord = Record<string, any>;
 
 interface LinkRecordModalProps {
   open: boolean;
@@ -89,18 +95,21 @@ export function LinkRecordModal({
     if (!selectedRecord) {
       return new Set<string>();
     }
-    return new Set([selectedRecord.id]);
+    return new Set([String(selectedRecord.id || '')]);
   }, [selectedRecord]);
 
   // Handle cell click to select record - only for reference column
   const handleCellClick = useCallback(
-    (args: any) => {
+    (args: CellClickArgs<DatabaseRecord>, event: CellMouseEvent) => {
       // Only allow selection when clicking on the reference column
       if (args.column.key !== referenceColumn) {
-        return; // Ignore clicks on other columns
+        // Prevent the default selection behavior for non-reference columns
+        event?.preventDefault();
+        event?.stopPropagation();
+        return;
       }
 
-      const record = records.find((r: DatabaseRecord) => r.id === args.row.id);
+      const record = records.find((r: DatabaseRecord) => String(r.id) === String(args.row.id));
       if (record) {
         setSelectedRecord(record);
       }
@@ -110,7 +119,7 @@ export function LinkRecordModal({
 
   // Convert schema to columns for the DataGrid with visual distinction
   const columns = useMemo(() => {
-    const cols = convertSchemaToColumns(schema);
+    const cols: DataGridColumn<DatabaseRecord>[] = convertSchemaToColumns(schema);
     // Add visual indication for the reference column (clickable column)
     return cols.map((col) => {
       const baseCol = {
@@ -122,61 +131,15 @@ export function LinkRecordModal({
       };
 
       // Helper function to render cell value properly based on type
-      const renderCellValue = (value: any, type: string | undefined) => {
-        if (value === null || value === undefined) {
-          return 'null';
-        }
-
-        if (type === ColumnType.JSON) {
-          // Use the same JSON rendering logic as DefaultCellRenderers.json
-          try {
-            const parsed = typeof value === 'string' ? JSON.parse(value) : value;
-            if (parsed && typeof parsed === 'object') {
-              return JSON.stringify(parsed);
-            } else {
-              return String(parsed);
-            }
-          } catch {
-            return 'Invalid JSON';
-          }
-        }
-
-        if (type === ColumnType.BOOLEAN) {
-          return value === null ? 'null' : value ? 'true' : 'false';
-        }
-
-        if (type === ColumnType.DATE) {
-          if (!value) {
-            return 'null';
-          }
-          try {
-            const date = parse(value, 'yyyy-MM-dd', new Date());
-            return format(date, 'MMM dd, yyyy');
-          } catch {
-            return 'Invalid date';
-          }
-        }
-
-        if (type === ColumnType.DATETIME) {
-          if (!value) {
-            return 'null';
-          }
-          try {
-            const date = new Date(value);
-            return format(date, 'MMM dd, yyyy, hh:mm a');
-          } catch {
-            return 'Invalid date';
-          }
-        }
-
-        return String(value);
+      const renderCellValue = (value: ConvertedValue, type: ColumnType | undefined) => {
+        return formatValueForDisplay(value, type);
       };
 
       if (col.key === referenceColumn) {
         return {
           ...baseCol,
-          renderCell: (props: any) => {
-            const displayValue = renderCellValue(props.row[col.key], col.type);
+          renderCell: (props: RenderCellProps<DatabaseRecord>) => {
+            const displayValue = renderCellValue(String(props.row[col.key]), col.type);
             return (
               <div className="w-full h-full flex items-center cursor-pointer">
                 <span className="truncate font-medium" title={displayValue}>
@@ -185,7 +148,7 @@ export function LinkRecordModal({
               </div>
             );
           },
-          renderHeaderCell: (props: any) => (
+          renderHeaderCell: (props: RenderHeaderCellProps<DatabaseRecord>) => (
             <SortableHeaderRenderer
               column={col}
               sortDirection={props.sortDirection}
@@ -200,8 +163,8 @@ export function LinkRecordModal({
       return {
         ...baseCol,
         cellClass: 'link-modal-disabled-cell',
-        renderCell: (props: any) => {
-          const displayValue = renderCellValue(props.row[col.key], col.type);
+        renderCell: (props: RenderCellProps<DatabaseRecord>) => {
+          const displayValue = renderCellValue(String(props.row[col.key]), col.type);
           return (
             <div className="w-full h-full flex items-center cursor-not-allowed relative">
               <div className="absolute inset-0 pointer-events-none opacity-0 hover:opacity-10 bg-gray-200 dark:bg-gray-600 transition-opacity z-5" />
@@ -211,7 +174,7 @@ export function LinkRecordModal({
             </div>
           );
         },
-        renderHeaderCell: (props: any) => (
+        renderHeaderCell: (props: RenderHeaderCellProps<DatabaseRecord>) => (
           <SortableHeaderRenderer
             column={col}
             sortDirection={props.sortDirection}
@@ -275,7 +238,7 @@ export function LinkRecordModal({
               // Handle selection changes from cell clicks
               const selectedId = Array.from(newSelectedRows)[0];
               if (selectedId) {
-                const record = records.find((r: DatabaseRecord) => r.id === selectedId);
+                const record = records.find((r: DatabaseRecord) => String(r.id) === selectedId);
                 if (record) {
                   setSelectedRecord(record);
                 }
@@ -286,7 +249,6 @@ export function LinkRecordModal({
             sortColumns={sortColumns}
             onSortColumnsChange={setSortColumns}
             onCellClick={handleCellClick}
-            searchQuery={searchQuery}
             currentPage={currentPage}
             totalPages={totalPages}
             pageSize={PAGE_SIZE}

@@ -1,20 +1,21 @@
 import React, { useState } from 'react';
-import { Control, Controller, UseFormReturn } from 'react-hook-form';
+import { Control, Controller, FieldError, UseFormReturn } from 'react-hook-form';
 import { Input } from '@/components/radix/Input';
 import { Label } from '@/components/radix/Label';
 import { Button } from '@/components/radix/Button';
 import { Calendar, Clock, Link2, X } from 'lucide-react';
-import { BooleanCellEditor } from './BooleanCellEditor';
-import { DateCellEditor } from './DateCellEditor';
-import { JsonCellEditor } from './JsonCellEditor';
-import { LinkRecordModal } from './LinkRecordModal';
+import {
+  BooleanCellEditor,
+  DateCellEditor,
+  JsonCellEditor,
+  type DatabaseRecord,
+  type ConvertedValue,
+  type UserInputValue,
+} from '@/components/datagrid';
 import { ColumnSchema, ColumnType } from '@insforge/shared-schemas';
-import { convertValueForColumn, cn } from '@/lib/utils/utils';
+import { useLinkModal } from '@/features/database/hooks/UseLinkModal';
+import { convertValueForColumn, cn, formatValueForDisplay } from '@/lib/utils/utils';
 import { TypeBadge } from '@/components/TypeBadge';
-import { format, parse } from 'date-fns';
-
-// Type for database records
-type DatabaseRecord = Record<string, any>;
 
 // Helper function to get appropriate placeholder text
 function getPlaceholderText(field: ColumnSchema): string {
@@ -26,12 +27,16 @@ function getPlaceholderText(field: ColumnSchema): string {
   return field.isNullable ? 'Optional' : 'Required';
 }
 
-// Form adapters for edit cell components
-interface FormBooleanEditorProps {
-  value: boolean | null;
+// Common interface for all form editors
+interface BaseFormEditorProps {
   nullable: boolean;
-  onChange: (value: boolean | null) => void;
+  onChange: (value: ConvertedValue) => void;
   hasForeignKey?: boolean;
+}
+
+// Form adapters for edit cell components
+interface FormBooleanEditorProps extends BaseFormEditorProps {
+  value: boolean | null;
 }
 
 function FormBooleanEditor({ value, nullable, onChange, hasForeignKey }: FormBooleanEditorProps) {
@@ -68,19 +73,23 @@ function FormBooleanEditor({ value, nullable, onChange, hasForeignKey }: FormBoo
       onClick={() => setShowEditor(true)}
       className={`w-full justify-start h-9 dark:text-white dark:bg-neutral-900 dark:placeholder:text-neutral-400 dark:border-neutral-700 ${hasForeignKey ? 'pr-20' : ''}`}
     >
-      {value === null ? 'null' : value ? 'true' : 'false'}
+      {formatValueForDisplay(value, ColumnType.BOOLEAN)}
     </Button>
   );
 }
 
-interface FormDateEditorProps {
+interface FormDateEditorProps extends BaseFormEditorProps {
   value: string | null;
-  type: 'date' | 'datetime';
-  onChange: (value: string | null) => void;
+  type?: ColumnType.DATETIME | ColumnType.DATE;
   field: ColumnSchema;
 }
 
-function FormDateEditor({ value, type = 'datetime', onChange, field }: FormDateEditorProps) {
+function FormDateEditor({
+  value,
+  type = ColumnType.DATETIME,
+  onChange,
+  field,
+}: FormDateEditorProps) {
   const [showEditor, setShowEditor] = useState(false);
 
   const handleValueChange = (newValue: string | null) => {
@@ -113,14 +122,7 @@ function FormDateEditor({ value, type = 'datetime', onChange, field }: FormDateE
       return getPlaceholderText(field);
     }
 
-    if (type === 'datetime') {
-      // For datetime, parse ISO string and format consistently
-      const d = new Date(value);
-      return format(d, 'MMM dd, yyyy, hh:mm a');
-    } else {
-      const date = parse(value, 'yyyy-MM-dd', new Date());
-      return format(date, 'MMM dd, yyyy');
-    }
+    return formatValueForDisplay(value, type);
   };
 
   return (
@@ -134,7 +136,7 @@ function FormDateEditor({ value, type = 'datetime', onChange, field }: FormDateE
         !!field.foreignKey && 'pr-20'
       )}
     >
-      {type === 'datetime' ? (
+      {type === ColumnType.DATETIME ? (
         <Clock className="mr-2 h-4 w-4" />
       ) : (
         <Calendar className="mr-2 h-4 w-4" />
@@ -144,10 +146,9 @@ function FormDateEditor({ value, type = 'datetime', onChange, field }: FormDateE
   );
 }
 
-interface FormNumberEditorProps {
+interface FormNumberEditorProps extends BaseFormEditorProps {
   value: number | null;
-  type: 'integer' | 'float';
-  onChange: (value: number | null) => void;
+  type: ColumnType.INTEGER | ColumnType.FLOAT;
   tableName: string;
   field: ColumnSchema;
 }
@@ -156,8 +157,8 @@ function FormNumberEditor({ value, type, onChange, tableName, field }: FormNumbe
   return (
     <Input
       id={`${tableName}-${field.columnName}`}
-      type={type === 'integer' ? 'number' : 'text'}
-      step={type === 'integer' ? '1' : undefined}
+      type="number"
+      step={type === ColumnType.INTEGER ? '1' : undefined}
       value={value ?? ''}
       onChange={(e) => {
         const inputValue = e.target.value;
@@ -165,7 +166,8 @@ function FormNumberEditor({ value, type, onChange, tableName, field }: FormNumbe
           // Handle empty value - let form validation handle required fields
           onChange(null);
         } else {
-          const numValue = type === 'integer' ? parseInt(inputValue, 10) : parseFloat(inputValue);
+          const numValue =
+            type === ColumnType.INTEGER ? parseInt(inputValue, 10) : parseFloat(inputValue);
           onChange(isNaN(numValue) ? null : numValue);
         }
       }}
@@ -175,10 +177,8 @@ function FormNumberEditor({ value, type, onChange, tableName, field }: FormNumbe
   );
 }
 
-interface FormJsonEditorProps {
+interface FormJsonEditorProps extends BaseFormEditorProps {
   value: string | null;
-  onChange: (value: string | null) => void;
-  nullable: boolean;
   hasForeignKey: boolean;
 }
 
@@ -210,26 +210,7 @@ function FormJsonEditor({ value, nullable, onChange, hasForeignKey }: FormJsonEd
       return 'Empty JSON';
     }
 
-    try {
-      // Ensure we're working with an object, not a string
-      const parsed = typeof value === 'string' ? JSON.parse(value) : value;
-
-      if (!parsed || typeof parsed !== 'object') {
-        return String(parsed);
-      }
-
-      const keys = Object.keys(parsed);
-      if (keys.length === 0) {
-        return '{}';
-      }
-      if (keys.length === 1) {
-        return `{ ${keys[0]}: ... }`;
-      }
-
-      return `{ ${keys.length} properties }`;
-    } catch {
-      return 'Invalid JSON';
-    }
+    return formatValueForDisplay(value, ColumnType.JSON);
   };
 
   return (
@@ -250,7 +231,7 @@ function FormJsonEditor({ value, nullable, onChange, hasForeignKey }: FormJsonEd
 
 interface RecordFormFieldProps {
   field: ColumnSchema;
-  form: UseFormReturn<any>;
+  form: UseFormReturn<DatabaseRecord>;
   tableName: string;
 }
 
@@ -284,7 +265,7 @@ interface FieldWithLinkProps {
 }
 
 function FieldWithLink({ field, control, children }: FieldWithLinkProps) {
-  const [showLinkModal, setShowLinkModal] = useState(false);
+  const { openModal } = useLinkModal();
 
   if (!field.foreignKey) {
     // Regular field without foreign key
@@ -299,7 +280,10 @@ function FieldWithLink({ field, control, children }: FieldWithLinkProps) {
         name={field.columnName}
         render={({ field: formField }) => {
           const hasLinkedValue = formField.value && formField.value !== '';
-          const childElement = children as React.ReactElement<any>;
+          const childElement = children as React.ReactElement<{
+            className?: string;
+            value?: UserInputValue;
+          }>;
           const existingClassName = childElement.props.className || '';
           const paddingClass = hasLinkedValue ? 'pr-16' : 'pr-11';
           const modifiedChildren = React.cloneElement(childElement, {
@@ -329,7 +313,27 @@ function FieldWithLink({ field, control, children }: FieldWithLinkProps) {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      onClick={() => setShowLinkModal(true)}
+                      onClick={() => {
+                        if (field.foreignKey) {
+                          openModal({
+                            referenceTable: field.foreignKey.referenceTable,
+                            referenceColumn: field.foreignKey.referenceColumn,
+                            currentValue: formField.value,
+                            onSelectRecord: (record: DatabaseRecord) => {
+                              if (field.foreignKey) {
+                                const referenceValue = record[field.foreignKey.referenceColumn];
+                                const result = convertValueForColumn(field.type, String(referenceValue || ''));
+                                if (result.success) {
+                                  formField.onChange(result.value);
+                                } else {
+                                  // Fallback to string if conversion fails
+                                  formField.onChange(String(referenceValue || ''));
+                                }
+                              }
+                            },
+                          });
+                        }
+                      }}
                       className="rounded-l-none h-9 w-9 p-2 flex-shrink-0 text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 dark:text-neutral-400 dark:hover:text-neutral-200 dark:hover:bg-neutral-700 border-l border-zinc-200 dark:border-neutral-700"
                       title={
                         hasLinkedValue
@@ -351,18 +355,6 @@ function FieldWithLink({ field, control, children }: FieldWithLinkProps) {
                   />
                 </div>
               </div>
-
-              <LinkRecordModal
-                open={showLinkModal}
-                onOpenChange={setShowLinkModal}
-                referenceTable={field.foreignKey!.referenceTable}
-                referenceColumn={field.foreignKey!.referenceColumn}
-                currentValue={formField.value}
-                onSelectRecord={(record: DatabaseRecord) => {
-                  const referenceValue = record[field.foreignKey!.referenceColumn];
-                  formField.onChange(referenceValue);
-                }}
-              />
             </>
           );
         }}
@@ -396,7 +388,7 @@ export function RecordFormField({ field, form, tableName }: RecordFormFieldProps
                   name={field.columnName}
                   render={({ field: formField }) => (
                     <FormBooleanEditor
-                      value={formField.value}
+                      value={formField.value as boolean | null}
                       nullable={field.isNullable}
                       onChange={formField.onChange}
                       hasForeignKey={!!field.foreignKey}
@@ -422,9 +414,12 @@ export function RecordFormField({ field, form, tableName }: RecordFormFieldProps
                   name={field.columnName}
                   render={({ field: formField }) => (
                     <FormNumberEditor
-                      value={formField.value}
-                      type={field.type === ColumnType.INTEGER ? 'integer' : 'float'}
+                      value={formField.value as number | null}
+                      type={
+                        field.type === ColumnType.INTEGER ? ColumnType.INTEGER : ColumnType.FLOAT
+                      }
                       onChange={formField.onChange}
+                      nullable={field.isNullable}
                       tableName={tableName}
                       field={field}
                     />
@@ -449,9 +444,10 @@ export function RecordFormField({ field, form, tableName }: RecordFormFieldProps
                   name={field.columnName}
                   render={({ field: formField }) => (
                     <FormDateEditor
-                      value={formField.value}
+                      value={formField.value as string | null}
                       type={field.type as ColumnType.DATE | ColumnType.DATETIME}
                       onChange={formField.onChange}
+                      nullable={field.isNullable}
                       field={field}
                     />
                   )}
@@ -478,12 +474,12 @@ export function RecordFormField({ field, form, tableName }: RecordFormFieldProps
                         value={
                           typeof formField.value === 'object'
                             ? JSON.stringify(formField.value)
-                            : formField.value
+                            : String(formField.value || '')
                         }
                         nullable={field.isNullable}
                         hasForeignKey={!!field.foreignKey}
                         onChange={(newValue) => {
-                          const result = convertValueForColumn(ColumnType.JSON, newValue);
+                          const result = convertValueForColumn(ColumnType.JSON, newValue as string);
                           if (result.success) {
                             formField.onChange(result.value as JSON);
                           } else {
@@ -548,7 +544,7 @@ export function RecordFormField({ field, form, tableName }: RecordFormFieldProps
       {renderField()}
       {errors[field.columnName] && (
         <p className="text-sm text-red-500 dark:text-red-400">
-          {(errors[field.columnName] as any)?.message || `${field.columnName} is required`}
+          {(errors[field.columnName] as FieldError)?.message || `${field.columnName} is required`}
         </p>
       )}
     </div>
