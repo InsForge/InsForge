@@ -40,7 +40,7 @@ export default function FunctionDetailDialog({
   };
 
   const handleCopyEndpoint = () => {
-    const endpoint = `${window.location.origin}/api/functions/run/${func.slug}`;
+    const endpoint = `${window.location.origin}/functions/${func.slug}`;
     navigator.clipboard.writeText(endpoint);
     showInfo('Endpoint URL copied to clipboard');
   };
@@ -165,7 +165,7 @@ export default function FunctionDetailDialog({
                   <h3 className="font-semibold">Endpoint URL</h3>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 text-xs bg-muted px-3 py-2 rounded">
-                      {window.location.origin}/api/functions/run/{func.slug}
+                      {window.location.origin}/functions/{func.slug}
                     </code>
                     <Button variant="outline" size="sm" onClick={handleCopyEndpoint}>
                       <Copy className="w-3 h-3" />
