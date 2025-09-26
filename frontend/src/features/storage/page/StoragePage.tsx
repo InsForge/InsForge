@@ -339,8 +339,13 @@ export default function StoragePage() {
       // Ref: https://developer.mozilla.org/en-US/docs/Web/API/DataTransferItem/webkitGetAsEntry
       const fileItems: File[] = Array.from(event.dataTransfer.items)
         .filter((item) => item.webkitGetAsEntry()?.isFile)
-        .map((item) => item.getAsFile())
-        .filter((item) => item !== null);
+        .flatMap((item) => {
+          const f = item.getAsFile();
+          return f ? [f] : [];
+        });
+        // Alternative Solution: 
+        // .map((item) => item.getAsFile())
+        // .filter((item): item is File => item !== null);
 
       void handleFileUpload(fileItems);
     },
