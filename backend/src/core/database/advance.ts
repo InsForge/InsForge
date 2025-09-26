@@ -18,6 +18,7 @@ import { parseSQLStatements } from '@/utils/sql-parser.js';
 import { convertSqlTypeToColumnType } from '@/utils/helpers.js';
 import { validateTableName } from '@/utils/validations.js';
 import format from 'pg-format';
+import { parse } from 'csv-parse/sync';
 
 export class DatabaseAdvanceService {
   private dbManager = DatabaseManager.getInstance();
@@ -845,18 +846,14 @@ export class DatabaseAdvanceService {
     validateTableName(table);
 
     const fileExtension = filename.toLowerCase().substring(filename.lastIndexOf('.'));
-    let records: Record<string, any>[] = [];
-    
+    let records: Record<string, unknown>[] = [];
+
     // Parse file based on type
     try {
       if (fileExtension === '.csv') {
-        const { parse } = await import('csv-parse/sync');
         records = parse(fileBuffer, {
           columns: true,
           skip_empty_lines: true,
-          trim: true,
-          cast: true,
-          cast_date: false,
         });
       } else if (fileExtension === '.json') {
         const jsonContent = fileBuffer.toString('utf-8');
@@ -883,10 +880,10 @@ export class DatabaseAdvanceService {
     if (!records || records.length === 0) {
       throw new AppError('No records found in file', 400, ERROR_CODES.INVALID_INPUT);
     }
-    
+
     // Perform the bulk insert
     const result = await this.bulkInsert(table, records, upsertKey);
-    
+
     return {
       success: true,
       message: `Successfully inserted ${result.rowCount} rows into ${table}`,
@@ -899,9 +896,9 @@ export class DatabaseAdvanceService {
 
   private async bulkInsert(
     table: string,
-    records: Record<string, any>[],
+    records: Record<string, unknown>[],
     upsertKey?: string
-  ): Promise<{ rowCount: number; rows?: any[] }> {
+  ): Promise<{ rowCount: number; rows?: unknown[] }> {
     if (!records || records.length === 0) {
       throw new AppError('No records to insert', 400, ERROR_CODES.INVALID_INPUT);
     }
@@ -912,10 +909,10 @@ export class DatabaseAdvanceService {
     try {
       // Get column names from first record
       const columns = Object.keys(records[0]);
-      
+
       // Convert records to array format for pg-format
-      const values = records.map(record => 
-        columns.map(col => {
+      const values = records.map((record) =>
+        columns.map((col) => {
           const value = record[col];
           // pg-format handles NULL, dates, JSON automatically
           // Convert empty strings to NULL for consistency
@@ -924,7 +921,7 @@ export class DatabaseAdvanceService {
       );
 
       let query: string;
-      
+
       if (upsertKey) {
         // Validate upsert key exists in columns
         if (!columns.includes(upsertKey)) {
@@ -936,14 +933,14 @@ export class DatabaseAdvanceService {
         }
 
         // Build upsert query with pg-format
-        const updateColumns = columns.filter(c => c !== upsertKey);
-        
+        const updateColumns = columns.filter((c) => c !== upsertKey);
+
         if (updateColumns.length > 0) {
           // Build UPDATE SET clause
           const updateClause = updateColumns
-            .map(col => format('%I = EXCLUDED.%I', col, col))
+            .map((col) => format('%I = EXCLUDED.%I', col, col))
             .join(', ');
-          
+
           query = format(
             'INSERT INTO %I (%I) VALUES %L ON CONFLICT (%I) DO UPDATE SET %s',
             table,
@@ -969,23 +966,23 @@ export class DatabaseAdvanceService {
 
       // Execute query
       const result = await client.query(query);
-      
+
       // Refresh schema cache if needed
       await client.query(`NOTIFY pgrst, 'reload schema';`);
-      
+
       return {
         rowCount: result.rowCount || 0,
-        rows: result.rows
+        rows: result.rows,
       };
     } catch (error) {
       // Log the error for debugging
       logger.error('Bulk insert error:', error);
-      
+
       // Re-throw with better error message
       if (error instanceof AppError) {
         throw error;
       }
-      
+
       const message = error instanceof Error ? error.message : 'Bulk insert failed';
       throw new AppError(message, 400, ERROR_CODES.INVALID_INPUT);
     } finally {
