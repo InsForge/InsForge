@@ -343,9 +343,9 @@ export default function StoragePage() {
           const f = item.getAsFile();
           return f ? [f] : [];
         });
-        // Alternative Solution: 
-        // .map((item) => item.getAsFile())
-        // .filter((item): item is File => item !== null);
+      // Alternative Solution:
+      // .map((item) => item.getAsFile())
+      // .filter((item): item is File => item !== null);
 
       void handleFileUpload(fileItems);
     },
