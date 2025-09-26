@@ -1,11 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/radix/Select';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/radix/Select';
 import type { BooleanCellEditorProps } from './types';
 
 export function BooleanCellEditor({
@@ -42,7 +36,7 @@ export function BooleanCellEditor({
       <SelectTrigger
         className={`w-full h-full border-0 focus:ring-0 focus:ring-offset-0 p-0 text-black dark:text-white dark:placeholder:text-neutral-400 dark:border-neutral-700 ${className || ''}`}
       >
-        <SelectValue />
+        <span className="text-black dark:text-white capitalize">{stringValue}</span>
       </SelectTrigger>
       <SelectContent align="start" className="min-w-25">
         <SelectItem value="true">true</SelectItem>
