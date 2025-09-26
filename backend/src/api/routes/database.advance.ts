@@ -9,6 +9,7 @@ import {
   rawSQLRequestSchema,
   exportRequestSchema,
   importRequestSchema,
+  bulkInsertRequestSchema,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger';
 
@@ -124,6 +125,81 @@ router.post('/export', verifyAdmin, async (req: AuthRequest, res: Response) => {
     });
   }
 });
+
+/**
+ * Bulk insert data from file upload (CSV/JSON)
+ * POST /api/database/advance/bulk-insert
+ * Expects multipart/form-data with:
+ * - file: CSV or JSON file
+ * - table: Target table name
+ * - upsertKey: Optional column for upsert operations
+ */
+router.post(
+  '/bulk-insert',
+  verifyAdmin,
+  upload.single('file'),
+  handleUploadError,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.file) {
+        throw new AppError('File is required', 400, ERROR_CODES.INVALID_INPUT);
+      }
+
+      // Validate request body
+      const validation = bulkInsertRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const { table, upsertKey } = validation.data;
+
+      const response = await dbAdvanceService.bulkInsertFromFile(
+        table,
+        req.file.buffer,
+        req.file.originalname,
+        upsertKey
+      );
+
+      // Log audit
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'BULK_INSERT',
+        module: 'DATABASE',
+        details: {
+          table,
+          filename: req.file.originalname,
+          fileSize: req.file.size,
+          upsertKey: upsertKey || null,
+          rowsAffected: response.rowsAffected,
+          totalRecords: response.totalRecords,
+        },
+        ip_address: req.ip,
+      });
+
+      res.json(response);
+    } catch (error: unknown) {
+      logger.warn('Bulk insert error:', error);
+
+      if (error instanceof AppError) {
+        res.status(error.statusCode).json({
+          error: 'BULK_INSERT_ERROR',
+          message: error.message,
+          statusCode: error.statusCode,
+        });
+      } else {
+        res.status(400).json({
+          error: 'BULK_INSERT_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to perform bulk insert',
+          statusCode: 400,
+        });
+      }
+    }
+  }
+);
 
 /**
  * Import database data from SQL file

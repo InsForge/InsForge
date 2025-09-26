@@ -5,6 +5,7 @@ import {
   type ExportDatabaseResponse,
   type ExportDatabaseJsonData,
   type ImportDatabaseResponse,
+  type BulkInsertResponse,
   type DatabaseMetadataSchema,
   type TableSchema,
   type ColumnSchema,
@@ -15,6 +16,8 @@ import logger from '@/utils/logger.js';
 import { ERROR_CODES } from '@/types/error-constants';
 import { parseSQLStatements } from '@/utils/sql-parser.js';
 import { convertSqlTypeToColumnType } from '@/utils/helpers.js';
+import { validateTableName } from '@/utils/validations.js';
+import format from 'pg-format';
 
 export class DatabaseAdvanceService {
   private dbManager = DatabaseManager.getInstance();
@@ -828,6 +831,163 @@ export class DatabaseAdvanceService {
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async bulkInsertFromFile(
+    table: string,
+    fileBuffer: Buffer,
+    filename: string,
+    upsertKey?: string
+  ): Promise<BulkInsertResponse> {
+    validateTableName(table);
+
+    const fileExtension = filename.toLowerCase().substring(filename.lastIndexOf('.'));
+    let records: Record<string, any>[] = [];
+    
+    // Parse file based on type
+    try {
+      if (fileExtension === '.csv') {
+        const { parse } = await import('csv-parse/sync');
+        records = parse(fileBuffer, {
+          columns: true,
+          skip_empty_lines: true,
+          trim: true,
+          cast: true,
+          cast_date: false,
+        });
+      } else if (fileExtension === '.json') {
+        const jsonContent = fileBuffer.toString('utf-8');
+        const parsed = JSON.parse(jsonContent);
+        records = Array.isArray(parsed) ? parsed : [parsed];
+      } else {
+        throw new AppError(
+          'Unsupported file type. Use .csv or .json',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+    } catch (parseError) {
+      if (parseError instanceof AppError) {
+        throw parseError;
+      }
+      throw new AppError(
+        `Failed to parse ${fileExtension} file: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`,
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    if (!records || records.length === 0) {
+      throw new AppError('No records found in file', 400, ERROR_CODES.INVALID_INPUT);
+    }
+    
+    // Perform the bulk insert
+    const result = await this.bulkInsert(table, records, upsertKey);
+    
+    return {
+      success: true,
+      message: `Successfully inserted ${result.rowCount} rows into ${table}`,
+      table,
+      rowsAffected: result.rowCount,
+      totalRecords: records.length,
+      filename,
+    };
+  }
+
+  private async bulkInsert(
+    table: string,
+    records: Record<string, any>[],
+    upsertKey?: string
+  ): Promise<{ rowCount: number; rows?: any[] }> {
+    if (!records || records.length === 0) {
+      throw new AppError('No records to insert', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
+    const pool = this.dbManager.getPool();
+    const client = await pool.connect();
+
+    try {
+      // Get column names from first record
+      const columns = Object.keys(records[0]);
+      
+      // Convert records to array format for pg-format
+      const values = records.map(record => 
+        columns.map(col => {
+          const value = record[col];
+          // pg-format handles NULL, dates, JSON automatically
+          // Convert empty strings to NULL for consistency
+          return value === '' ? null : value;
+        })
+      );
+
+      let query: string;
+      
+      if (upsertKey) {
+        // Validate upsert key exists in columns
+        if (!columns.includes(upsertKey)) {
+          throw new AppError(
+            `Upsert key '${upsertKey}' not found in record columns`,
+            400,
+            ERROR_CODES.INVALID_INPUT
+          );
+        }
+
+        // Build upsert query with pg-format
+        const updateColumns = columns.filter(c => c !== upsertKey);
+        
+        if (updateColumns.length > 0) {
+          // Build UPDATE SET clause
+          const updateClause = updateColumns
+            .map(col => format('%I = EXCLUDED.%I', col, col))
+            .join(', ');
+          
+          query = format(
+            'INSERT INTO %I (%I) VALUES %L ON CONFLICT (%I) DO UPDATE SET %s',
+            table,
+            columns,
+            values,
+            upsertKey,
+            updateClause
+          );
+        } else {
+          // No columns to update, just do nothing on conflict
+          query = format(
+            'INSERT INTO %I (%I) VALUES %L ON CONFLICT (%I) DO NOTHING',
+            table,
+            columns,
+            values,
+            upsertKey
+          );
+        }
+      } else {
+        // Simple insert
+        query = format('INSERT INTO %I (%I) VALUES %L', table, columns, values);
+      }
+
+      // Execute query
+      const result = await client.query(query);
+      
+      // Refresh schema cache if needed
+      await client.query(`NOTIFY pgrst, 'reload schema';`);
+      
+      return {
+        rowCount: result.rowCount || 0,
+        rows: result.rows
+      };
+    } catch (error) {
+      // Log the error for debugging
+      logger.error('Bulk insert error:', error);
+      
+      // Re-throw with better error message
+      if (error instanceof AppError) {
+        throw error;
+      }
+      
+      const message = error instanceof Error ? error.message : 'Bulk insert failed';
+      throw new AppError(message, 400, ERROR_CODES.INVALID_INPUT);
     } finally {
       client.release();
     }
