@@ -1,12 +1,7 @@
 import { useEffect, useState } from 'react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/radix/Select';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/radix/Select';
 import type { BooleanCellEditorProps } from './types';
+import { cn } from '@/lib/utils/utils';
 
 export function BooleanCellEditor({
   value,
@@ -40,13 +35,18 @@ export function BooleanCellEditor({
       onOpenChange={handleOpenChange}
     >
       <SelectTrigger
-        className={`w-full h-full border-0 focus:ring-0 focus:ring-offset-0 p-0 text-black dark:text-white dark:placeholder:text-neutral-400 dark:border-neutral-700 ${className || ''}`}
+        className={cn(
+          'w-full h-full border-0 focus:ring-0 focus:ring-offset-0 p-0 text-black dark:text-white dark:placeholder:text-neutral-400 dark:border-neutral-700',
+          className
+        )}
       >
-        <SelectValue />
+        <span>
+          {stringValue === 'true' ? 'True' : stringValue === 'false' ? 'False' : stringValue}
+        </span>
       </SelectTrigger>
       <SelectContent align="start" className="min-w-25">
-        <SelectItem value="true">true</SelectItem>
-        <SelectItem value="false">false</SelectItem>
+        <SelectItem value="true">True</SelectItem>
+        <SelectItem value="false">False</SelectItem>
         {nullable && <SelectItem value="null">null</SelectItem>}
       </SelectContent>
     </Select>

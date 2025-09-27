@@ -62,6 +62,7 @@ function FormBooleanEditor({ value, nullable, onChange, hasForeignKey }: FormBoo
         nullable={nullable}
         onValueChange={handleValueChange}
         onCancel={handleCancel}
+        className="h-9 px-4 py-2 dark:bg-neutral-900 border"
       />
     );
   }
@@ -113,6 +114,7 @@ function FormDateEditor({
         nullable={field.isNullable}
         onValueChange={handleValueChange}
         onCancel={handleCancel}
+        className="h-9 px-4 py-2 dark:bg-neutral-900 border dark:border-neutral-700"
       />
     );
   }
@@ -201,6 +203,7 @@ function FormJsonEditor({ value, nullable, onChange, hasForeignKey }: FormJsonEd
         nullable={nullable}
         onValueChange={handleValueChange}
         onCancel={handleCancel}
+        className="h-9 px-4 py-2 dark:bg-neutral-900 border dark:border-neutral-700"
       />
     );
   }

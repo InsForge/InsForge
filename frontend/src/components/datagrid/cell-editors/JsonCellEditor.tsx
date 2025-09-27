@@ -6,7 +6,13 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { cn } from '@/lib/utils/utils';
 import type { JsonCellEditorProps } from './types';
 
-export function JsonCellEditor({ value, nullable, onValueChange, onCancel }: JsonCellEditorProps) {
+export function JsonCellEditor({
+  value,
+  nullable,
+  onValueChange,
+  onCancel,
+  className,
+}: JsonCellEditorProps) {
   const [open, setOpen] = useState(true);
   const [showNullConfirm, setShowNullConfirm] = useState(false);
   const [jsonText, setJsonText] = useState(() => {
@@ -196,7 +202,8 @@ export function JsonCellEditor({ value, nullable, onValueChange, onCancel }: Jso
             variant="ghost"
             className={cn(
               'w-full justify-start text-sm text-left font-normal h-full border-0 p-0 hover:bg-transparent dark:text-white',
-              (!value || value === 'null') && 'text-muted-foreground'
+              (!value || value === 'null') && 'text-muted-foreground',
+              className
             )}
           >
             <FileJson className="mr-2 h-4 w-4" />
