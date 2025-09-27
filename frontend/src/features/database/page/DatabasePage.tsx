@@ -3,7 +3,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import PencilIcon from '@/assets/icons/pencil.svg?react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
-import EmptyDatabase from '@/assets/icons/empty_table.svg';
 import { databaseService } from '@/features/database/services/database.service';
 import { metadataService } from '@/features/metadata/services/metadata.service';
 import { Button } from '@/components/radix/Button';
@@ -568,7 +567,6 @@ function DatabasePageContent() {
               {!selectedTable ? (
                 <div className="flex-1 flex items-center justify-center">
                   <EmptyState
-                    image={EmptyDatabase}
                     title="No Table Selected"
                     description="Select a table from the sidebar to view its data"
                   />

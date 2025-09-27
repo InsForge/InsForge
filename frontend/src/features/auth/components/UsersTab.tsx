@@ -8,14 +8,12 @@ interface UsersTabProps {
   searchQuery?: string;
   selectedRows?: Set<string>;
   onSelectedRowsChange?: (selectedRows: Set<string>) => void;
-  onAddUser?: () => void;
 }
 
 export function UsersTab({
   searchQuery: externalSearchQuery = '',
   selectedRows: externalSelectedRows,
   onSelectedRowsChange: externalOnSelectedRowsChange,
-  onAddUser,
 }: UsersTabProps) {
   // Default page size of 20 records per page
   const pageSize = 20;
@@ -109,8 +107,6 @@ export function UsersTab({
           emptyStateTitle={
             externalSearchQuery ? 'No users match your search criteria' : 'No users found'
           }
-          emptyStateActionText={!externalSearchQuery && onAddUser ? 'Add User' : undefined}
-          onEmptyStateAction={!externalSearchQuery && onAddUser ? onAddUser : undefined}
         />
       </div>
     </div>

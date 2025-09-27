@@ -202,7 +202,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
         className
       )}
     >
-      <div className="flex-1 overflow-hidden relative mx-3 rounded-lg border border-border-gray dark:border-0">
+      <div className="flex-1 overflow-hidden relative mx-3 border border-border-gray dark:border-0">
         <ReactDataGrid
           columns={gridColumns}
           rows={isRefreshing ? [] : data}

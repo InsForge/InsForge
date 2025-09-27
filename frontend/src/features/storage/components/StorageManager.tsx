@@ -18,7 +18,6 @@ interface StorageManagerProps {
   selectedFiles: Set<string>;
   onSelectedFilesChange: (selectedFiles: Set<string>) => void;
   isRefreshing?: boolean;
-  onAddRecord?: () => void;
 }
 
 export function StorageManager({
@@ -28,7 +27,6 @@ export function StorageManager({
   selectedFiles,
   onSelectedFilesChange,
   isRefreshing = false,
-  onAddRecord,
 }: StorageManagerProps) {
   const queryClient = useQueryClient();
   const [downloadingFiles, setDownloadingFiles] = useState<Set<string>>(new Set());
@@ -220,8 +218,6 @@ export function StorageManager({
           onDelete={(file) => void handleDelete(file)}
           isDownloading={isDownloading}
           emptyStateTitle={searchQuery ? 'No files match your search criteria' : 'No files found'}
-          emptyStateActionText={!searchQuery && onAddRecord ? 'Add Record' : undefined}
-          onEmptyStateAction={!searchQuery && onAddRecord ? onAddRecord : undefined}
         />
       </div>
 

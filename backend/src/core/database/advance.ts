@@ -96,6 +96,13 @@ export class DatabaseAdvanceService {
       );
     }
 
+    // Check for DROP or RENAME operations on 'users' table
+    const usersTablePattern =
+      /(?:^|\n|;)\s*(?:DROP\s+(?:TABLE\s+)?(?:IF\s+EXISTS\s+)?(?:\w+\.)?["']?users["']?|ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:\w+\.)?["']?users["']?\s+RENAME\s+TO)/im;
+    if (usersTablePattern.test(query)) {
+      throw new AppError('Cannot drop or rename the users table', 403, ERROR_CODES.FORBIDDEN);
+    }
+
     return query;
   }
 

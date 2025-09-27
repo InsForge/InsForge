@@ -21,7 +21,6 @@ import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
 import { useUploadToast } from '@/features/storage/components/UploadToast';
 import { SearchInput, SelectionClearButton, DeleteActionButton } from '@/components';
-import EmptyBucket from '@/assets/icons/empty_bucket.svg';
 import {
   DataUpdatePayload,
   DataUpdateResourceType,
@@ -274,10 +273,6 @@ export default function StoragePage() {
     await handleFileUpload(event.target.files);
   };
 
-  const handleAddRecord = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
-
   const handleDeleteBucket = async (bucketName: string) => {
     const confirmOptions = {
       title: 'Delete Bucket',
@@ -506,7 +501,6 @@ export default function StoragePage() {
                 selectedFiles={selectedFiles}
                 onSelectedFilesChange={setSelectedFiles}
                 isRefreshing={isRefreshing}
-                onAddRecord={handleAddRecord}
               />
             </div>
           </>
@@ -514,7 +508,6 @@ export default function StoragePage() {
         {!selectedBucket && (
           <div className="flex-1 flex items-center justify-center">
             <EmptyState
-              image={EmptyBucket}
               title="No Bucket Selected"
               description="Select a bucket from the sidebar to view its files"
             />

@@ -141,7 +141,6 @@ export default function AuthenticationPage() {
             searchQuery={searchQuery}
             selectedRows={selectedRows}
             onSelectedRowsChange={setSelectedRows}
-            onAddUser={() => setAddDialogOpen(true)}
           />
         )}
 
