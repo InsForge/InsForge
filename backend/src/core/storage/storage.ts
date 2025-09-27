@@ -21,6 +21,9 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import logger from '@/utils/logger.js';
+import { ADMIN_ID } from '@/utils/constants';
+import { AppError } from '@/api/middleware/error';
+import { ERROR_CODES } from '@/types/error-constants';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -424,7 +427,8 @@ export class StorageService {
   async putObject(
     bucket: string,
     key: string,
-    file: Express.Multer.File
+    file: Express.Multer.File,
+    userId?: string
   ): Promise<StorageFileSchema> {
     this.validateBucketName(bucket);
     this.validateKey(key);
@@ -447,11 +451,17 @@ export class StorageService {
     await db
       .prepare(
         `
-      INSERT INTO _storage (bucket, key, size, mime_type)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO _storage (bucket, key, size, mime_type, uploaded_by)
+      VALUES (?, ?, ?, ?, ?)
     `
       )
-      .run(bucket, key, file.size, file.mimetype || null);
+      .run(
+        bucket,
+        key,
+        file.size,
+        file.mimetype || null,
+        userId && userId !== ADMIN_ID ? userId : null
+      );
 
     // Get the actual uploaded_at timestamp from database (with alias for camelCase)
     const result = (await db
@@ -507,11 +517,31 @@ export class StorageService {
     };
   }
 
-  async deleteObject(bucket: string, key: string): Promise<boolean> {
+  async deleteObject(bucket: string, key: string, userId?: string): Promise<boolean> {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
     const db = DatabaseManager.getInstance().getDb();
+
+    // Check permissions if userId is provided
+    if (userId && userId !== ADMIN_ID) {
+      const file = (await db
+        .prepare('SELECT uploaded_by FROM _storage WHERE bucket = ? AND key = ?')
+        .get(bucket, key)) as { uploaded_by: string | null } | undefined;
+
+      if (!file) {
+        return false; // File doesn't exist
+      }
+
+      // Check if user owns the file
+      if (file.uploaded_by !== userId) {
+        throw new AppError(
+          'Permission denied: You can only delete files you uploaded',
+          403,
+          ERROR_CODES.FORBIDDEN
+        );
+      }
+    }
 
     // Delete file using backend
     await this.backend.deleteObject(bucket, key);
@@ -719,7 +749,8 @@ export class StorageService {
       size: number;
       contentType?: string;
       etag?: string;
-    }
+    },
+    userId?: string
   ): Promise<StorageFileSchema> {
     this.validateBucketName(bucket);
     this.validateKey(key);
@@ -745,11 +776,17 @@ export class StorageService {
     await db
       .prepare(
         `
-        INSERT INTO _storage (bucket, key, size, mime_type)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO _storage (bucket, key, size, mime_type, uploaded_by)
+        VALUES (?, ?, ?, ?, ?)
       `
       )
-      .run(bucket, key, metadata.size, metadata.contentType || null);
+      .run(
+        bucket,
+        key,
+        metadata.size,
+        metadata.contentType || null,
+        userId && userId !== ADMIN_ID ? userId : null
+      );
 
     // Get the actual uploaded_at timestamp from database
     const result = (await db

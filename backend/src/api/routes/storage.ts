@@ -253,7 +253,12 @@ router.put(
       }
 
       const storageService = StorageService.getInstance();
-      const storedFile = await storageService.putObject(bucketName, objectKey, req.file);
+      const storedFile = await storageService.putObject(
+        bucketName,
+        objectKey,
+        req.file,
+        req.user?.id
+      );
 
       successResponse(res, storedFile, 201);
     } catch (error) {
@@ -293,7 +298,12 @@ router.post(
       const objectKey = `${sanitizedBaseName}-${timestamp}-${randomStr}${fileExt}`;
 
       const storageService = StorageService.getInstance();
-      const storedFile = await storageService.putObject(bucketName, objectKey, req.file);
+      const storedFile = await storageService.putObject(
+        bucketName,
+        objectKey,
+        req.file,
+        req.user?.id
+      );
 
       successResponse(res, storedFile, 201);
     } catch (error) {
@@ -420,12 +430,9 @@ router.delete(
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
-      // TODO: we need add more policies to check if user has permission to delete this object
-      // For now, we assume user has permission if they can access the bucket
-
       // Delete specific object
       const storageService = StorageService.getInstance();
-      const deleted = await storageService.deleteObject(bucketName, objectKey);
+      const deleted = await storageService.deleteObject(bucketName, objectKey, req.user?.id);
 
       if (!deleted) {
         throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
@@ -487,11 +494,16 @@ router.post(
       }
 
       const storageService = StorageService.getInstance();
-      const fileInfo = await storageService.confirmUpload(bucketName, objectKey, {
-        size,
-        contentType,
-        etag,
-      });
+      const fileInfo = await storageService.confirmUpload(
+        bucketName,
+        objectKey,
+        {
+          size,
+          contentType,
+          etag,
+        },
+        req.user?.id
+      );
 
       successResponse(res, fileInfo, 201);
     } catch (error) {

@@ -20,6 +20,7 @@ import type {
 } from '@insforge/shared-schemas';
 import { OAuthConfigService } from './oauth';
 import { GitHubEmailInfo, GitHubUserInfo, GoogleUserInfo, UserRecord } from '@/types/auth';
+import { ADMIN_ID } from '@/utils/constants';
 
 const JWT_SECRET = () => process.env.JWT_SECRET ?? '';
 const JWT_EXPIRES_IN = '7d';
@@ -212,14 +213,13 @@ export class AuthService {
     }
 
     // Use a fixed admin ID for the system administrator
-    const adminId = '00000000-0000-0000-0000-000000000001';
 
     // Return admin user with JWT token - no database interaction
-    const accessToken = this.generateToken({ sub: adminId, email, role: 'project_admin' });
+    const accessToken = this.generateToken({ sub: ADMIN_ID, email, role: 'project_admin' });
 
     return {
       user: {
-        id: adminId,
+        id: ADMIN_ID,
         email: email,
         name: 'Administrator',
         emailVerified: true,
@@ -239,7 +239,7 @@ export class AuthService {
       const { payload } = await verifyCloudToken(code);
 
       // If verification succeeds, extract user info and generate internal token
-      const adminId = payload['userId'] || '00000000-0000-0000-0000-000000000001';
+      const adminId = payload['userId'] || ADMIN_ID;
       const email = payload['email'] || payload['sub'] || 'admin@insforge.local';
 
       // Generate internal access token

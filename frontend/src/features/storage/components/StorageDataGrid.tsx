@@ -122,7 +122,7 @@ export function createStorageColumns(
     },
     {
       key: 'uploadedAt',
-      name: 'Uploaded',
+      name: 'Uploaded At',
       width: '1fr',
       resizable: true,
       sortable: true,
