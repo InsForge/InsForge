@@ -5,7 +5,7 @@ import {
   type ExportDatabaseResponse,
   type ExportDatabaseJsonData,
   type ImportDatabaseResponse,
-  type BulkInsertResponse,
+  type BulkUpsertResponse,
   type DatabaseMetadataSchema,
   type TableSchema,
   type ColumnSchema,
@@ -837,12 +837,12 @@ export class DatabaseAdvanceService {
     }
   }
 
-  async bulkInsertFromFile(
+  async bulkUpsertFromFile(
     table: string,
     fileBuffer: Buffer,
     filename: string,
     upsertKey?: string
-  ): Promise<BulkInsertResponse> {
+  ): Promise<BulkUpsertResponse> {
     validateTableName(table);
 
     const fileExtension = filename.toLowerCase().substring(filename.lastIndexOf('.'));

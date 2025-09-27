@@ -217,14 +217,14 @@ export const importResponseSchema = z.object({
   fileSize: z.number(),
 });
 
-// Bulk Insert Schemas
-export const bulkInsertRequestSchema = z.object({
+// Bulk Upsert Schemas
+export const bulkUpsertRequestSchema = z.object({
   table: z.string().min(1, 'Table name is required'),
   upsertKey: z.string().optional(),
   // Note: File handling is done at the API layer via multipart/form-data
 });
 
-export const bulkInsertResponseSchema = z.object({
+export const bulkUpsertResponseSchema = z.object({
   success: z.boolean(),
   message: z.string(),
   table: z.string(),
@@ -253,6 +253,6 @@ export type ExportDatabaseResponse = z.infer<typeof exportResponseSchema>;
 export type ImportDatabaseRequest = z.infer<typeof importRequestSchema>;
 export type ImportDatabaseResponse = z.infer<typeof importResponseSchema>;
 
-// Bulk Insert Types
-export type BulkInsertRequest = z.infer<typeof bulkInsertRequestSchema>;
-export type BulkInsertResponse = z.infer<typeof bulkInsertResponseSchema>;
+// Bulk Upsert Types
+export type BulkUpsertRequest = z.infer<typeof bulkUpsertRequestSchema>;
+export type BulkUpsertResponse = z.infer<typeof bulkUpsertResponseSchema>;

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Bulk Insert Feature Test Script
+# Bulk Upsert Feature Test Script
 # Tests CSV/JSON bulk imports with various edge cases and upsert scenarios
 
 # Get the directory where this script is located
@@ -9,7 +9,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # Source the test configuration
 source "$SCRIPT_DIR/../test-config.sh"
 
-echo "🧪 Testing bulk insert feature..."
+echo "🧪 Testing bulk upsert feature..."
 echo "================================"
 
 # Configuration
@@ -24,8 +24,8 @@ ADMIN_PASSWORD="$TEST_ADMIN_PASSWORD"
 AUTH_TOKEN=""
 
 # Dynamic table name to avoid conflicts
-TEST_TABLE="test_bulk_insert_$(date +%s)"
-DATA_DIR="$SCRIPT_DIR/test-data/bulk-insert"
+TEST_TABLE="test_bulk_upsert_$(date +%s)"
+DATA_DIR="$SCRIPT_DIR/test-data/bulk-upsert"
 
 # Create test data directory
 mkdir -p "$DATA_DIR"
@@ -181,7 +181,7 @@ login_admin() {
         echo "   Password: $ADMIN_PASSWORD"
         echo ""
         echo "   You can set these with environment variables:"
-        echo "   TEST_ADMIN_EMAIL=your@email.com TEST_ADMIN_PASSWORD=yourpassword ./test-bulk-insert.sh"
+        echo "   TEST_ADMIN_EMAIL=your@email.com TEST_ADMIN_PASSWORD=yourpassword ./test-bulk-upsert.sh"
         exit 1
     fi
     
@@ -208,8 +208,8 @@ create_test_table() {
     register_test_table "$TEST_TABLE"
 }
 
-# Function to test bulk insert
-test_bulk_insert() {
+# Function to test bulk upsert
+test_bulk_upsert() {
     local file_name=$1
     local table=$2
     local upsert_key=$3
@@ -223,7 +223,7 @@ test_bulk_insert() {
     fi
     
     # Build form data
-    local curl_cmd="curl -s -X POST \"$API_BASE/database/advance/bulk-insert\" \
+    local curl_cmd="curl -s -X POST \"$API_BASE/database/advance/bulk-upsert\" \
         -H \"Authorization: Bearer $AUTH_TOKEN\" \
         -F \"file=@$DATA_DIR/$file_name\" \
         -F \"table=$table\""
@@ -320,36 +320,36 @@ main() {
     
     echo ""
     echo "="
-    echo "🚀 RUNNING BULK INSERT TESTS"
+    echo "🚀 RUNNING BULK UPSERT TESTS"
     echo "="
     
     # Test 1: Basic CSV import
-    test_bulk_insert "products.csv" "$TEST_TABLE" "" "Basic CSV Import"
+    test_bulk_upsert "products.csv" "$TEST_TABLE" "" "Basic CSV Import"
     verify_data 5 "5 products imported"
     
     # Test 2: JSON array import
-    test_bulk_insert "products.json" "$TEST_TABLE" "sku" "JSON Array Import (with upsert)"
+    test_bulk_upsert "products.json" "$TEST_TABLE" "sku" "JSON Array Import (with upsert)"
     verify_data 8 "3 new products added"
     
     # Test 3: Single JSON object
-    test_bulk_insert "single-product.json" "$TEST_TABLE" "sku" "Single JSON Object"
+    test_bulk_upsert "single-product.json" "$TEST_TABLE" "sku" "Single JSON Object"
     verify_data 9 "1 product added"
     
     # Test 4: CSV with special characters
-    test_bulk_insert "special-chars.csv" "$TEST_TABLE" "sku" "Special Characters in CSV"
+    test_bulk_upsert "special-chars.csv" "$TEST_TABLE" "sku" "Special Characters in CSV"
     verify_data 13 "4 products with special chars"
     
     # Test 5: Upsert test (update existing)
-    test_bulk_insert "upsert-test.csv" "$TEST_TABLE" "sku" "Upsert - Update Existing"
+    test_bulk_upsert "upsert-test.csv" "$TEST_TABLE" "sku" "Upsert - Update Existing"
     verify_data 14 "1 new product, 2 updated"
     check_data "SELECT name, price FROM $TEST_TABLE WHERE sku='PROD-001'" "Updated Laptop" "PROD-001 was updated"
     
     # Test 6: NULL values handling
-    test_bulk_insert "null-values.csv" "$TEST_TABLE" "sku" "NULL Values in CSV"
+    test_bulk_upsert "null-values.csv" "$TEST_TABLE" "sku" "NULL Values in CSV"
     verify_data 18 "4 products with nulls"
     
     # Test 7: Unicode/Emoji support
-    test_bulk_insert "unicode.csv" "$TEST_TABLE" "sku" "Unicode and Emoji Support"
+    test_bulk_upsert "unicode.csv" "$TEST_TABLE" "sku" "Unicode and Emoji Support"
     verify_data 22 "4 unicode products"
     check_data "SELECT name FROM $TEST_TABLE WHERE sku='UNI-004'" "🚀 Rocket Toy" "Emoji preserved"
     
@@ -357,7 +357,7 @@ main() {
     echo ""
     echo "🧪 Test: Error Handling - Empty CSV"
     echo "   File: empty.csv"
-    if test_bulk_insert "empty.csv" "$TEST_TABLE" "" "Empty CSV (should fail)" true; then
+    if test_bulk_upsert "empty.csv" "$TEST_TABLE" "" "Empty CSV (should fail)" true; then
         echo "   ❌ ERROR: Empty file was accepted (should have been rejected)"
     else
         echo "   ✅ Correctly rejected empty file (expected behavior)"
@@ -367,7 +367,7 @@ main() {
     echo ""
     echo "🧪 Test: Error Handling - Invalid CSV"
     echo "   File: invalid.csv"
-    if test_bulk_insert "invalid.csv" "$TEST_TABLE" "" "Invalid CSV (should fail)" true; then
+    if test_bulk_upsert "invalid.csv" "$TEST_TABLE" "" "Invalid CSV (should fail)" true; then
         echo "   ❌ ERROR: Invalid CSV was accepted (should have been rejected)"
     else
         echo "   ✅ Correctly rejected invalid CSV (expected behavior)"
@@ -377,7 +377,7 @@ main() {
     echo ""
     echo "🧪 Test: Large Dataset Performance"
     START_TIME=$(date +%s%N)
-    test_bulk_insert "large-dataset.csv" "$TEST_TABLE" "sku" "1000 rows bulk insert"
+    test_bulk_upsert "large-dataset.csv" "$TEST_TABLE" "sku" "1000 rows bulk insert"
     END_TIME=$(date +%s%N)
     ELAPSED=$((($END_TIME - $START_TIME) / 1000000))
     echo "   ⏱️  Time: ${ELAPSED}ms ($(echo "scale=1; 1000000/$ELAPSED" | bc) rows/sec)"
@@ -400,7 +400,7 @@ main() {
     cleanup
     
     echo ""
-    echo "✅ All bulk insert tests completed!"
+    echo "✅ All bulk upsert tests completed!"
 }
 
 # Trap to ensure cleanup on exit

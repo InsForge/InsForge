@@ -9,7 +9,7 @@ import {
   rawSQLRequestSchema,
   exportRequestSchema,
   importRequestSchema,
-  bulkInsertRequestSchema,
+  bulkUpsertRequestSchema,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger';
 
@@ -127,15 +127,15 @@ router.post('/export', verifyAdmin, async (req: AuthRequest, res: Response) => {
 });
 
 /**
- * Bulk insert data from file upload (CSV/JSON)
- * POST /api/database/advance/bulk-insert
+ * Bulk upsert data from file upload (CSV/JSON)
+ * POST /api/database/advance/bulk-upsert
  * Expects multipart/form-data with:
  * - file: CSV or JSON file
  * - table: Target table name
  * - upsertKey: Optional column for upsert operations
  */
 router.post(
-  '/bulk-insert',
+  '/bulk-upsert',
   verifyAdmin,
   upload.single('file'),
   handleUploadError,
@@ -146,7 +146,7 @@ router.post(
       }
 
       // Validate request body
-      const validation = bulkInsertRequestSchema.safeParse(req.body);
+      const validation = bulkUpsertRequestSchema.safeParse(req.body);
       if (!validation.success) {
         throw new AppError(
           validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
@@ -157,7 +157,7 @@ router.post(
 
       const { table, upsertKey } = validation.data;
 
-      const response = await dbAdvanceService.bulkInsertFromFile(
+      const response = await dbAdvanceService.bulkUpsertFromFile(
         table,
         req.file.buffer,
         req.file.originalname,
@@ -167,7 +167,7 @@ router.post(
       // Log audit
       await auditService.log({
         actor: req.user?.email || 'api-key',
-        action: 'BULK_INSERT',
+        action: 'BULK_UPSERT',
         module: 'DATABASE',
         details: {
           table,
@@ -182,18 +182,18 @@ router.post(
 
       res.json(response);
     } catch (error: unknown) {
-      logger.warn('Bulk insert error:', error);
+      logger.warn('Bulk upsert error:', error);
 
       if (error instanceof AppError) {
         res.status(error.statusCode).json({
-          error: 'BULK_INSERT_ERROR',
+          error: 'BULK_UPSERT_ERROR',
           message: error.message,
           statusCode: error.statusCode,
         });
       } else {
         res.status(400).json({
-          error: 'BULK_INSERT_ERROR',
-          message: error instanceof Error ? error.message : 'Failed to perform bulk insert',
+          error: 'BULK_UPSERT_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to perform bulk upsert',
           statusCode: 400,
         });
       }
