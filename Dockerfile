@@ -2,16 +2,14 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy root package files for workspaces
-COPY package*.json ./
+# Copy only package.json files (not lock files) to avoid platform issues
+COPY package.json ./
+COPY backend/package.json ./backend/
+COPY frontend/package.json ./frontend/
+COPY shared-schemas/package.json ./shared-schemas/
 
-# Copy backend, frontend, and shared-schemas package files
-COPY backend/package*.json ./backend/
-COPY frontend/package*.json ./frontend/
-COPY shared-schemas/package*.json ./shared-schemas/
-
-# Install all dependencies (workspaces will handle both backend and frontend)
-RUN npm ci --production=false && npm cache clean --force && rm -rf /tmp/*
+# Install all dependencies - will generate Linux-compatible lock file
+RUN npm install && npm cache clean --force && rm -rf /tmp/*
 
 # Copy source code
 COPY . .
