@@ -74,8 +74,8 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
       - POSTGREST_BASE_URL=http://postgrest:3000
-      # Deno Runtime URL (disabled)
-      # - DENO_RUNTIME_URL=http://deno:7133
+      # Deno Runtime URL for serverless functions
+      - DENO_RUNTIME_URL=http://deno:7133
       # Storage Configuration
       - AWS_S3_BUCKET=${AWS_S3_BUCKET:-}
       - AWS_REGION=${AWS_REGION:-}
@@ -90,46 +90,51 @@ services:
     networks:
       - insforge-network
 
-  # Deno service disabled for now
-  # deno:
-  #   image: denoland/deno:alpine-2.0.6
-  #   container_name: insforge-deno
-  #   working_dir: /app
-  #   depends_on:
-  #     - postgres
-  #     - postgrest
-  #   ports:
-  #     - "7133:7133"
-  #   environment:
-  #     - DENO_ENV=${DENO_ENV:-development}
-  #     - DENO_DIR=/deno-dir
-  #     # PostgreSQL connection
-  #     - POSTGRES_HOST=postgres
-  #     - POSTGRES_PORT=5432
-  #     - POSTGRES_DB=${POSTGRES_DB:-insforge}
-  #     - POSTGRES_USER=${POSTGRES_USER:-postgres}
-  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-  #     - POSTGREST_BASE_URL=http://postgrest:3000
-  #   volumes:
-  #     - ./functions:/app/functions
-  #     - deno_cache:/deno-dir
-  #   command: >
-  #     sh -c "
-  #       echo 'Downloading Deno dependencies...' &&
-  #       deno cache functions/server.ts &&
-  #       echo 'Starting Deno server...' &&
-  #       # Minimal permissions: net (server), env (config), read (worker template only)
-  #       deno run --allow-net --allow-env --allow-read=./functions/worker-template.js --watch functions/server.ts
-  #     "
-  #   restart: unless-stopped
-  #   networks:
-  #     - insforge-network
+  # Deno serverless runtime for edge functions
+  deno:
+    image: denoland/deno:alpine-2.0.6
+    container_name: insforge-deno
+    working_dir: /app
+    depends_on:
+      - postgres
+      - postgrest
+    ports:
+      - "7133:7133"
+    environment:
+      - PORT=7133
+      - DENO_ENV=${DENO_ENV:-production}
+      - DENO_DIR=/deno-dir
+      # PostgreSQL connection
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-insforge}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGREST_BASE_URL=http://postgrest:3000
+      # Worker timeout (30 seconds default)
+      - WORKER_TIMEOUT_MS=${WORKER_TIMEOUT_MS:-30000}
+      # Encryption keys for decrypting function secrets
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+    volumes:
+      - ./functions:/app/functions
+      - deno_cache:/deno-dir
+    command: >
+      sh -c "
+        echo 'Downloading Deno dependencies...' &&
+        deno cache functions/server.ts &&
+        echo 'Starting Deno server on port 7133...' &&
+        deno run --allow-net --allow-env --allow-read=./functions/worker-template.js functions/server.ts
+      "
+    restart: unless-stopped
+    networks:
+      - insforge-network
 
 volumes:
   postgres-data:
     driver: local
-  # deno_cache:
-  #   driver: local
+  deno_cache:
+    driver: local
 
 networks:
   insforge-network:
