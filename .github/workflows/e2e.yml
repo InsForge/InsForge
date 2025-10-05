@@ -1,0 +1,63 @@
+name: E2E Tests
+
+on:
+  pull_request:
+    branches: [main, master, develop]
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create .env file
+        run: |
+          cat > .env << EOF
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=postgres
+          POSTGRES_DB=insforge
+          JWT_SECRET=test-secret-key-for-ci-cd-pipeline
+          ADMIN_EMAIL=admin@example.com
+          ADMIN_PASSWORD=test-admin-password-for-ci
+          TEST_API_BASE=http://localhost:7130/api
+          EOF
+
+      - name: Start Docker Compose services
+        run: docker compose up -d
+
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          echo "Waiting for PostgreSQL..."
+          timeout 60 bash -c 'until docker compose exec -T postgres pg_isready -U postgres; do sleep 2; done'
+
+      - name: Wait for InsForge backend to be ready
+        run: |
+          echo "Waiting for InsForge backend..."
+          timeout 120 bash -c 'until curl -f http://localhost:7130/api/health 2>/dev/null; do echo "Waiting..."; sleep 5; done'
+          echo "Backend is ready!"
+
+      - name: Install test dependencies in container
+        run: docker compose exec -T insforge apk add --no-cache bash curl jq
+
+      - name: Run E2E tests
+        run: docker compose exec -T insforge npm run test:e2e
+
+      - name: Show container logs on failure
+        if: failure()
+        run: |
+          echo "=== PostgreSQL logs ==="
+          docker compose logs postgres
+          echo ""
+          echo "=== InsForge backend logs ==="
+          docker compose logs insforge
+          echo ""
+          echo "=== PostgREST logs ==="
+          docker compose logs postgrest
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v
