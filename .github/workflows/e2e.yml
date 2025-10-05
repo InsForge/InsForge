@@ -40,8 +40,8 @@ jobs:
           timeout 120 bash -c 'until curl -f http://localhost:7130/api/health 2>/dev/null; do echo "Waiting..."; sleep 5; done'
           echo "Backend is ready!"
 
-      - name: Install bash in container
-        run: docker compose exec -T insforge apk add --no-cache bash
+      - name: Install test dependencies in container
+        run: docker compose exec -T insforge apk add --no-cache bash curl jq
 
       - name: Run E2E tests
         run: docker compose exec -T insforge npm run test:e2e
