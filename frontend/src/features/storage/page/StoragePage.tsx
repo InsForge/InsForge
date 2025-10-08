@@ -232,12 +232,10 @@ export default function StoragePage() {
       try {
         await deleteBucket(bucketName);
 
-        // If the deleted bucket was selected, select the first available bucket
-        if (selectedBucket === bucketName) {
-          const updatedBuckets =
-            queryClient.getQueryData<typeof buckets>(['storage', 'buckets']) || [];
-          setSelectedBucket(updatedBuckets[0]?.name || null);
-        }
+        // Refresh bucket list then select the next available bucket
+        await Promise.all([refetchBuckets()]);
+        const nextBucket = buckets.find((b) => b.name !== bucketName)?.name || null;
+        setSelectedBucket(nextBucket);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to delete bucket';
         showToast(errorMessage, 'error');
