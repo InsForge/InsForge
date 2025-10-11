@@ -110,7 +110,7 @@ Start building your project in a new directory! Build your next todo app, Instag
 
 **Contributing**: If you're interested in contributing, you can check our guide here [CONTRIBUTING.md](CONTRIBUTING.md). We truly appreciate pull requests, all types of help are appreciated!
 
-**Support**: If you need any type of help support, we're responsive on our [Discord channel](https://discord.gg/MPxwj5xVvW), and also feel free to email us [info@insforge.dev](mailto:info@insforge.dev) too!
+**Support**: If you need any help or support, we're responsive on our [Discord channel](https://discord.gg/MPxwj5xVvW), and also feel free to email us [info@insforge.dev](mailto:info@insforge.dev) too!
 
 
 ## Documentation & Support
