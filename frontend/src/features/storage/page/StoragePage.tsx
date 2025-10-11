@@ -106,6 +106,11 @@ export default function StoragePage() {
     }
   }, [buckets, selectedBucket]);
 
+  // Clear selected files when switching buckets
+  useEffect(() => {
+    setSelectedFiles(new Set());
+  }, [selectedBucket]);
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
