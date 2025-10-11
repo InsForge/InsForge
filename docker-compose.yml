@@ -63,6 +63,9 @@ services:
       - PROJECT_ROOT=/app
       - API_BASE_URL=${API_BASE_URL:-}
       - VITE_API_BASE_URL=${VITE_API_BASE_URL:-}
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+      - VITE_USE_POLLING=true
       - JWT_SECRET=${JWT_SECRET:-dev-secret-please-change-in-production}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
@@ -98,11 +101,11 @@ services:
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
     volumes:
-      - ./package.json:/app/package.json
-      - ./backend:/app/backend
-      - ./frontend:/app/frontend
-      - ./shared-schemas:/app/shared-schemas
-      - ./docs:/app/docs
+      - ./package.json:/app/package.json:delegated
+      - ./backend:/app/backend:delegated
+      - ./frontend:/app/frontend:delegated
+      - ./shared-schemas:/app/shared-schemas:delegated
+      - ./docs:/app/docs:delegated
       - node_modules:/app/node_modules
       - backend_node_modules:/app/backend/node_modules
       - frontend_node_modules:/app/frontend/node_modules
