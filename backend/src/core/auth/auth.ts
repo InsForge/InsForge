@@ -629,7 +629,7 @@ export class AuthService {
     const clientSecret = await oauthConfigService.getClientSecretByProvider('google');
 
     if (!clientSecret) {
-      throw new Error('Google Client Secret not conifgured.');
+      throw new Error('Google Client Secret not configured.');
     }
 
     // Create OAuth2Client with fresh config
