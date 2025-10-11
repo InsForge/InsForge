@@ -100,7 +100,7 @@ Start building your project in a new directory! Build your next todo app, Instag
 
 
 <div align="center">
-  <img src="assets/archDiagram.png" alt="Carch">
+  <img src="assets/archDiagram.png" alt="Architecture Diagram">
   <br>
 </div>
 
