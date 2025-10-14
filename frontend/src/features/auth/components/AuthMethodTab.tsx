@@ -3,6 +3,7 @@ import { Button } from '@/components/radix/Button';
 import { MoreHorizontal, Plus, Trash2, Pencil } from 'lucide-react';
 import Github from '@/assets/logos/github.svg?react';
 import Google from '@/assets/logos/google.svg?react';
+import Discord from '@/assets/logos/discord.svg?react';
 import { OAuthEmptyState } from './OAuthEmptyState';
 import { OAuthConfigDialog } from './OAuthConfigDialog';
 import { AddOAuthDialog } from './AddOAuthDialog';
@@ -31,10 +32,17 @@ const providers: OAuthProviderInfo[] = [
     description: 'Configure GitHub authentication for your users',
     setupUrl: 'https://github.com/settings/developers',
   },
+  {
+    id: 'discord',
+    name: 'Discord OAuth',
+    icon: <Discord className="w-6 h-6" />,
+    description: 'Configure Discord authentication for your users',
+    setupUrl: 'https://discord.com/developers/applications',
+  },
 ];
 
 export interface OAuthProviderInfo {
-  id: 'google' | 'github';
+  id: 'google' | 'github' | 'discord';
   name: string;
   icon: ReactElement;
   description: string;
@@ -60,7 +68,10 @@ export function AuthMethodTab() {
     setIsDialogOpen(true);
   };
 
-  const deleteOAuthConfig = async (providerId: 'google' | 'github', providerName: string) => {
+  const deleteOAuthConfig = async (
+    providerId: 'google' | 'github' | 'discord',
+    providerName: string
+  ) => {
     const shouldDelete = await confirm({
       title: `Delete ${providerName} OAuth`,
       description: `Are you sure you want to delete the ${providerName} configuration? This action cannot be undone.`,
@@ -95,6 +106,7 @@ export function AuthMethodTab() {
     return {
       google: isProviderConfigured('google'),
       github: isProviderConfigured('github'),
+      discord: isProviderConfigured('discord'),
     };
   }, [isProviderConfigured]);
 
@@ -103,7 +115,7 @@ export function AuthMethodTab() {
     return providers.every((provider) => enabledProviders[provider.id]);
   }, [enabledProviders]);
 
-  const handleConfirmSelected = (selectedId: 'google' | 'github') => {
+  const handleConfirmSelected = (selectedId: 'google' | 'github' | 'discord') => {
     // Find the selected provider
     const selectedProvider = providers.find((p) => p.id === selectedId);
     if (!selectedProvider) {

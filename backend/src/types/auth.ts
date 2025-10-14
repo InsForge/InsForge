@@ -88,3 +88,10 @@ export interface GitHubEmailInfo {
   verified: boolean;
   visibility?: string;
 }
+
+export interface DiscordUserInfo {
+  id: string;
+  username: string;
+  email?: string;
+  avatar?: string;
+}

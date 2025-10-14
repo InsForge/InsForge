@@ -33,6 +33,12 @@ const ProviderIcon = ({ provider }: { provider: string }) => {
           color:
             'bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-zinc-300 dark:border-gray-500',
         };
+      case 'discord':
+        return {
+          label: 'Discord',
+          color:
+            'bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-zinc-300 dark:border-gray-500',
+        };
       case 'email':
         return {
           label: 'Email',

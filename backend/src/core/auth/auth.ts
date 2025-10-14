@@ -19,7 +19,13 @@ import type {
   AuthMetadataSchema,
 } from '@insforge/shared-schemas';
 import { OAuthConfigService } from './oauth';
-import { GitHubEmailInfo, GitHubUserInfo, GoogleUserInfo, UserRecord } from '@/types/auth';
+import {
+  GitHubEmailInfo,
+  GitHubUserInfo,
+  GoogleUserInfo,
+  DiscordUserInfo,
+  UserRecord,
+} from '@/types/auth';
 import { ADMIN_ID } from '@/utils/constants';
 import { getApiBaseUrl } from '@/utils/environment';
 
@@ -276,7 +282,7 @@ export class AuthService {
     email: string,
     userName: string,
     avatarUrl: string,
-    identityData: GoogleUserInfo | GitHubUserInfo | Record<string, unknown>
+    identityData: GoogleUserInfo | GitHubUserInfo | DiscordUserInfo | Record<string, unknown>
   ): Promise<CreateSessionResponse> {
     // First, try to find existing user by provider ID in _account_providers table
     const account = await this.db
@@ -355,7 +361,7 @@ export class AuthService {
     userName: string,
     email: string,
     providerId: string,
-    identityData: GoogleUserInfo | GitHubUserInfo | Record<string, unknown>,
+    identityData: GoogleUserInfo | GitHubUserInfo | DiscordUserInfo | Record<string, unknown>,
     avatarUrl: string
   ): Promise<CreateSessionResponse> {
     const userId = crypto.randomUUID();
@@ -534,6 +540,63 @@ export class AuthService {
     authUrl.searchParams.set('client_id', config.clientId ?? '');
     authUrl.searchParams.set('redirect_uri', `${selfBaseUrl}/api/auth/oauth/github/callback`);
     authUrl.searchParams.set('scope', config.scopes ? config.scopes.join(' ') : 'user:email');
+    if (state) {
+      authUrl.searchParams.set('state', state);
+    }
+
+    return authUrl.toString();
+  }
+
+  /**
+   * Generate Discord OAuth authorization URL
+   */
+  async generateDiscordAuthUrl(state?: string): Promise<string> {
+    const oauthConfigService = OAuthConfigService.getInstance();
+    const config = await oauthConfigService.getConfigByProvider('discord');
+
+    if (!config) {
+      throw new Error('Discord OAuth not configured');
+    }
+
+    const selfBaseUrl = getApiBaseUrl();
+
+    if (config?.useSharedKey) {
+      if (!state) {
+        logger.warn('Shared Discord OAuth called without state parameter');
+        throw new Error('State parameter is required for shared Discord OAuth');
+      }
+      // Use shared keys if configured
+      const cloudBaseUrl = process.env.CLOUD_API_HOST || 'https://api.insforge.dev';
+      const redirectUri = `${selfBaseUrl}/api/auth/oauth/shared/callback/${state}`;
+      const authUrl = await fetch(
+        `${cloudBaseUrl}/auth/v1/shared/discord?redirect_uri=${encodeURIComponent(redirectUri)}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      if (!authUrl.ok) {
+        logger.error('Failed to fetch Discord auth URL:', {
+          status: authUrl.status,
+          statusText: authUrl.statusText,
+        });
+        throw new Error(`Failed to fetch Discord auth URL: ${authUrl.statusText}`);
+      }
+      const responseData = (await authUrl.json()) as { auth_url?: string; url?: string };
+      return responseData.auth_url || responseData.url || '';
+    }
+
+    logger.debug('Discord OAuth Config (fresh from DB):', {
+      clientId: config.clientId ? 'SET' : 'NOT SET',
+    });
+
+    const authUrl = new URL('https://discord.com/api/oauth2/authorize');
+    authUrl.searchParams.set('client_id', config.clientId ?? '');
+    authUrl.searchParams.set('redirect_uri', `${selfBaseUrl}/api/auth/oauth/discord/callback`);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('scope', config.scopes ? config.scopes.join(' ') : 'identify email');
     if (state) {
       authUrl.searchParams.set('state', state);
     }
@@ -761,6 +824,79 @@ export class AuthService {
       userName,
       githubUserInfo.avatar_url || '',
       githubUserInfo
+    );
+  }
+
+  /**
+   * Exchange Discord code for access token
+   */
+  async exchangeDiscordCodeForToken(code: string): Promise<string> {
+    const oauthConfigService = OAuthConfigService.getInstance();
+    const config = await oauthConfigService.getConfigByProvider('discord');
+
+    if (!config) {
+      throw new Error('Discord OAuth not configured');
+    }
+
+    const clientSecret = await oauthConfigService.getClientSecretByProvider('discord');
+    const selfBaseUrl = getApiBaseUrl();
+    const response = await axios.post(
+      'https://discord.com/api/oauth2/token',
+      new URLSearchParams({
+        client_id: config.clientId ?? '',
+        client_secret: clientSecret ?? '',
+        code,
+        redirect_uri: `${selfBaseUrl}/api/auth/oauth/discord/callback`,
+        grant_type: 'authorization_code',
+      }).toString(),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      }
+    );
+
+    if (!response.data.access_token) {
+      throw new Error('Failed to get access token from Discord');
+    }
+
+    return response.data.access_token;
+  }
+
+  /**
+   * Get Discord user info
+   */
+  async getDiscordUserInfo(accessToken: string) {
+    const response = await axios.get('https://discord.com/api/users/@me', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    return {
+      id: response.data.id,
+      username: response.data.username,
+      email: response.data.email,
+      avatar: response.data.avatar
+        ? `https://cdn.discordapp.com/avatars/${response.data.id}/${response.data.avatar}.png`
+        : '',
+    };
+  }
+
+  /**
+   * Find or create Discord user
+   */
+  async findOrCreateDiscordUser(discordUserInfo: DiscordUserInfo): Promise<CreateSessionResponse> {
+    const userName = discordUserInfo.username;
+    const email = discordUserInfo.email || `${discordUserInfo.id}@users.noreply.discord.local`;
+
+    return this.findOrCreateThirdPartyUser(
+      'discord',
+      discordUserInfo.id,
+      email,
+      userName,
+      discordUserInfo.avatar || '',
+      discordUserInfo
     );
   }
 
