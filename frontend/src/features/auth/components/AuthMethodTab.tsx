@@ -68,7 +68,10 @@ export function AuthMethodTab() {
     setIsDialogOpen(true);
   };
 
-  const deleteOAuthConfig = async (providerId: 'google' | 'github' | 'linkedin', providerName: string) => {
+  const deleteOAuthConfig = async (
+    providerId: 'google' | 'github' | 'linkedin',
+    providerName: string
+  ) => {
     const shouldDelete = await confirm({
       title: `Delete ${providerName} OAuth`,
       description: `Are you sure you want to delete the ${providerName} configuration? This action cannot be undone.`,
