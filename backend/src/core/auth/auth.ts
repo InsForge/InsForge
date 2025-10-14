@@ -19,7 +19,7 @@ import type {
   AuthMetadataSchema,
 } from '@insforge/shared-schemas';
 import { OAuthConfigService } from './oauth';
-import { GitHubEmailInfo, GitHubUserInfo, GoogleUserInfo, UserRecord } from '@/types/auth';
+import { GitHubEmailInfo, GitHubUserInfo, GoogleUserInfo, LinkedInUserInfo, UserRecord } from '@/types/auth';
 import { ADMIN_ID } from '@/utils/constants';
 
 const JWT_SECRET = () => process.env.JWT_SECRET ?? '';
@@ -275,7 +275,7 @@ export class AuthService {
     email: string,
     userName: string,
     avatarUrl: string,
-    identityData: GoogleUserInfo | GitHubUserInfo | Record<string, unknown>
+    identityData: GoogleUserInfo | GitHubUserInfo | LinkedInUserInfo | Record<string, unknown>
   ): Promise<CreateSessionResponse> {
     // First, try to find existing user by provider ID in _account_providers table
     const account = await this.db
@@ -354,7 +354,7 @@ export class AuthService {
     userName: string,
     email: string,
     providerId: string,
-    identityData: GoogleUserInfo | GitHubUserInfo | Record<string, unknown>,
+    identityData: GoogleUserInfo | GitHubUserInfo | LinkedInUserInfo | Record<string, unknown>,
     avatarUrl: string
   ): Promise<CreateSessionResponse> {
     const userId = crypto.randomUUID();
@@ -444,24 +444,15 @@ export class AuthService {
       // Use shared keys if configured
       const cloudBaseUrl = process.env.CLOUD_API_HOST || 'https://api.insforge.dev';
       const redirectUri = `${selfBaseUrl}/api/auth/oauth/shared/callback/${state}`;
-      const authUrl = await fetch(
+      const response = await axios.get(
         `${cloudBaseUrl}/auth/v1/shared/google?redirect_uri=${encodeURIComponent(redirectUri)}`,
         {
-          method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           },
         }
       );
-      if (!authUrl.ok) {
-        logger.error('Failed to fetch Google auth URL:', {
-          status: authUrl.status,
-          statusText: authUrl.statusText,
-        });
-        throw new Error(`Failed to fetch Google auth URL: ${authUrl.statusText}`);
-      }
-      const responseData = (await authUrl.json()) as { auth_url?: string; url?: string };
-      return responseData.auth_url || responseData.url || '';
+      return response.data.auth_url || response.data.url || '';
     }
 
     logger.debug('Google OAuth Config (fresh from DB):', {
@@ -505,24 +496,15 @@ export class AuthService {
       // Use shared keys if configured
       const cloudBaseUrl = process.env.CLOUD_API_HOST || 'https://api.insforge.dev';
       const redirectUri = `${selfBaseUrl}/api/auth/oauth/shared/callback/${state}`;
-      const authUrl = await fetch(
+      const response = await axios.get(
         `${cloudBaseUrl}/auth/v1/shared/github?redirect_uri=${encodeURIComponent(redirectUri)}`,
         {
-          method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           },
         }
       );
-      if (!authUrl.ok) {
-        logger.error('Failed to fetch GitHub auth URL:', {
-          status: authUrl.status,
-          statusText: authUrl.statusText,
-        });
-        throw new Error(`Failed to fetch GitHub auth URL: ${authUrl.statusText}`);
-      }
-      const responseData = (await authUrl.json()) as { auth_url?: string; url?: string };
-      return responseData.auth_url || responseData.url || '';
+      return response.data.auth_url || response.data.url || '';
     }
 
     logger.debug('GitHub OAuth Config (fresh from DB):', {
@@ -760,6 +742,183 @@ export class AuthService {
       userName,
       githubUserInfo.avatar_url || '',
       githubUserInfo
+    );
+  }
+
+  /**
+   * Generate LinkedIn OAuth authorization URL
+   */
+  async generateLinkedInAuthUrl(state?: string): Promise<string | undefined> {
+    const oauthConfigService = OAuthConfigService.getInstance();
+    const config = await oauthConfigService.getConfigByProvider('linkedin');
+
+    if (!config) {
+      throw new Error('LinkedIn OAuth not configured');
+    }
+
+    const selfBaseUrl = process.env.API_BASE_URL || 'http://localhost:7130';
+
+    if (config?.useSharedKey) {
+      if (!state) {
+        logger.warn('Shared LinkedIn OAuth called without state parameter');
+        throw new Error('State parameter is required for shared LinkedIn OAuth');
+      }
+      const cloudBaseUrl = process.env.CLOUD_API_HOST || 'https://api.insforge.dev';
+      const redirectUri = `${selfBaseUrl}/api/auth/oauth/shared/callback/${state}`;
+      const response = await axios.get(
+        `${cloudBaseUrl}/auth/v1/shared/linkedin?redirect_uri=${encodeURIComponent(redirectUri)}`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      return response.data.auth_url || response.data.url || '';
+    }
+
+    logger.debug('LinkedIn OAuth Config (fresh from DB):', {
+      clientId: config.clientId ? 'SET' : 'NOT SET',
+    });
+
+    const authUrl = new URL('https://www.linkedin.com/oauth/v2/authorization');
+    authUrl.searchParams.set('client_id', config.clientId ?? '');
+    authUrl.searchParams.set('redirect_uri', `${selfBaseUrl}/api/auth/oauth/linkedin/callback`);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set(
+      'scope',
+      config.scopes ? config.scopes.join(' ') : 'openid profile email'
+    );
+    if (state) {
+      authUrl.searchParams.set('state', state);
+    }
+
+    return authUrl.toString();
+  }
+
+  /**
+   * Exchange LinkedIn code for tokens
+   */
+  async exchangeCodeToTokenByLinkedIn(
+    code: string
+  ): Promise<{ access_token: string; id_token: string }> {
+    if (this.processedCodes.has(code)) {
+      const cachedTokens = this.tokenCache.get(code);
+      if (cachedTokens) {
+        logger.debug('Returning cached tokens for already processed code.');
+        return cachedTokens;
+      }
+      throw new Error('Authorization code is currently being processed.');
+    }
+
+    const oauthConfigService = OAuthConfigService.getInstance();
+    const config = await oauthConfigService.getConfigByProvider('linkedin');
+
+    if (!config) {
+      throw new Error('LinkedIn OAuth not configured');
+    }
+
+    try {
+      this.processedCodes.add(code);
+
+      logger.info('Exchanging LinkedIn code for tokens', {
+        hasCode: !!code,
+        clientId: config.clientId?.substring(0, 10) + '...',
+      });
+
+      const clientSecret = await oauthConfigService.getClientSecretByProvider('linkedin');
+      const selfBaseUrl = process.env.API_BASE_URL || 'http://localhost:7130';
+      const response = await axios.post(
+        'https://www.linkedin.com/oauth/v2/accessToken',
+        new URLSearchParams({
+          code,
+          client_id: config.clientId ?? '',
+          client_secret: clientSecret ?? '',
+          redirect_uri: `${selfBaseUrl}/api/auth/oauth/linkedin/callback`,
+          grant_type: 'authorization_code',
+        }),
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+        }
+      );
+
+      if (!response.data.access_token || !response.data.id_token) {
+        throw new Error('Failed to get tokens from LinkedIn');
+      }
+
+      const result = {
+        access_token: response.data.access_token,
+        id_token: response.data.id_token,
+      };
+
+      this.tokenCache.set(code, result);
+
+      setTimeout(() => {
+        this.processedCodes.delete(code);
+        this.tokenCache.delete(code);
+      }, 60000);
+
+      return result;
+    } catch (error) {
+      this.processedCodes.delete(code);
+
+      if (axios.isAxiosError(error) && error.response) {
+        logger.error('LinkedIn token exchange failed', {
+          status: error.response.status,
+          error: error.response.data,
+        });
+        throw new Error(`LinkedIn OAuth error: ${JSON.stringify(error.response.data)}`);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Verify LinkedIn ID token and get user info
+   */
+  async verifyLinkedInToken(idToken: string) {
+    const oauthConfigService = OAuthConfigService.getInstance();
+    const config = await oauthConfigService.getConfigByProvider('linkedin');
+
+    if (!config) {
+      throw new Error('LinkedIn OAuth not configured');
+    }
+
+    try {
+      const decoded = jwt.decode(idToken) as LinkedInUserInfo;
+      if (!decoded) {
+        throw new Error('Invalid LinkedIn token payload');
+      }
+
+      return {
+        sub: decoded.sub,
+        email: decoded.email || '',
+        email_verified: decoded.email_verified || false,
+        name: decoded.name || '',
+        picture: decoded.picture || '',
+        given_name: decoded.given_name || '',
+        family_name: decoded.family_name || '',
+        locale: decoded.locale || '',
+      };
+    } catch (error) {
+      logger.error('LinkedIn token verification failed:', error);
+      throw new Error(`LinkedIn token verification failed: ${error}`);
+    }
+  }
+
+  /**
+   * Find or create LinkedIn user
+   */
+  async findOrCreateLinkedInUser(linkedinUserInfo: LinkedInUserInfo): Promise<CreateSessionResponse> {
+    const userName = linkedinUserInfo.name || linkedinUserInfo.email.split('@')[0];
+    return this.findOrCreateThirdPartyUser(
+      'linkedin',
+      linkedinUserInfo.sub,
+      linkedinUserInfo.email,
+      userName,
+      linkedinUserInfo.picture || '',
+      linkedinUserInfo
     );
   }
 

@@ -87,6 +87,39 @@ router.get('/github', async (req: Request, res: Response, next: NextFunction) =>
   }
 });
 
+// GET /api/auth/oauth/linkedin - Initialize LinkedIn OAuth flow
+router.get('/linkedin', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { redirect_uri } = req.query;
+    if (!redirect_uri) {
+      throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
+    const jwtPayload = {
+      provider: 'linkedin',
+      redirectUri: redirect_uri ? (redirect_uri as string) : undefined,
+      createdAt: Date.now(),
+    };
+    const state = jwt.sign(jwtPayload, process.env.JWT_SECRET || 'default_secret', {
+      algorithm: 'HS256',
+      expiresIn: '1h',
+    });
+
+    const authUrl = await authService.generateLinkedInAuthUrl(state);
+
+    res.json({ authUrl });
+  } catch (error) {
+    logger.error('LinkedIn OAuth error', { error });
+    next(
+      new AppError(
+        'LinkedIn OAuth is not properly configured. Please check your oauth configurations.',
+        500,
+        ERROR_CODES.AUTH_OAUTH_CONFIG_ERROR
+      )
+    );
+  }
+});
+
 // GET /api/auth/oauth/shared/callback/:state - Shared callback for OAuth providers
 router.get('/shared/callback/:state', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -112,7 +145,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       throw new AppError('Invalid state parameter', 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    if (!['google', 'github'].includes(provider)) {
+    if (!['google', 'github', 'linkedin'].includes(provider)) {
       logger.warn('Invalid provider in state', { provider });
       throw new AppError('Invalid provider in state', 400, ERROR_CODES.INVALID_INPUT);
     }
@@ -151,6 +184,15 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
         avatar_url: payloadData.avatar || '',
       };
       result = await authService.findOrCreateGitHubUser(githubUserInfo);
+    } else if (provider === 'linkedin') {
+      // Handle LinkedIn OAuth payload
+      const linkedinUserInfo = {
+        sub: payloadData.providerId,
+        email: payloadData.email,
+        name: payloadData.name || '',
+        picture: payloadData.avatar || '',
+      };
+      result = await authService.findOrCreateLinkedInUser(linkedinUserInfo);
     }
 
     const finalredirectUri = new URL(redirectUri);
@@ -188,7 +230,7 @@ router.get('/:provider/callback', async (req: Request, res: Response, _: NextFun
       }
     }
 
-    if (!['google', 'github'].includes(provider)) {
+    if (!['google', 'github', 'linkedin'].includes(provider)) {
       throw new AppError('Invalid provider', 400, ERROR_CODES.INVALID_INPUT);
     }
 
@@ -220,6 +262,24 @@ router.get('/:provider/callback', async (req: Request, res: Response, _: NextFun
       const accessToken = await authService.exchangeGitHubCodeForToken(code as string);
       const githubUserInfo = await authService.getGitHubUserInfo(accessToken);
       result = await authService.findOrCreateGitHubUser(githubUserInfo);
+    } else if (provider === 'linkedin') {
+      let id_token: string;
+
+      if (token) {
+        id_token = token as string;
+      } else if (code) {
+        const tokens = await authService.exchangeCodeToTokenByLinkedIn(code as string);
+        id_token = tokens.id_token;
+      } else {
+        throw new AppError(
+          'No authorization code or token provided',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const linkedinUserInfo = await authService.verifyLinkedInToken(id_token);
+      result = await authService.findOrCreateLinkedInUser(linkedinUserInfo);
     }
 
     // Create URL with JWT token and user info (like the working example)
