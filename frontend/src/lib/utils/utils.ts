@@ -155,11 +155,5 @@ export function isEmptyValue(value: unknown): boolean {
   return value === null || value === undefined || value === '';
 }
 
-export const isInsForgeCloudProject = () => {
-  return window.location.hostname.endsWith('.insforge.app');
-};
-
-export const getBackendUrl = () => {
-  const isHttp = window.location.protocol === 'http:';
-  return isHttp ? 'http://localhost:7130' : window.location.origin;
-};
+// Re-export config utilities for backward compatibility
+export { getApiBaseUrl, getApiBaseUrl as getBackendUrl, isInsForgeCloudProject } from './config';
