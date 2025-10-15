@@ -24,6 +24,7 @@ router.get('/', async (_req: Request, res: Response, next) => {
       new AppError('Failed to generate agent API documentation', 500, ERROR_CODES.INTERNAL_ERROR)
     );
   }
+  // this is just a test
 });
 
 export { router as agentDocsRouter };
