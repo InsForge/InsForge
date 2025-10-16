@@ -282,11 +282,7 @@ export class AuthService {
     email: string,
     userName: string,
     avatarUrl: string,
-    identityData:
-      | GoogleUserInfo
-      | GitHubUserInfo
-      | FacebookUserInfo
-      | Record<string, unknown>
+    identityData: GoogleUserInfo | GitHubUserInfo | FacebookUserInfo | Record<string, unknown>
   ): Promise<CreateSessionResponse> {
     // First, try to find existing user by provider ID in _account_providers table
     const account = await this.db
@@ -365,11 +361,7 @@ export class AuthService {
     userName: string,
     email: string,
     providerId: string,
-    identityData:
-      | GoogleUserInfo
-      | GitHubUserInfo
-      | FacebookUserInfo
-      | Record<string, unknown>,
+    identityData: GoogleUserInfo | GitHubUserInfo | FacebookUserInfo | Record<string, unknown>,
     avatarUrl: string
   ): Promise<CreateSessionResponse> {
     const userId = crypto.randomUUID();
