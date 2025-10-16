@@ -182,6 +182,8 @@ export class OAuthConfigService {
           scopes = ['openid', 'email', 'profile'];
         } else if (provider === 'github') {
           scopes = ['user:email'];
+        } else if (provider === 'microsoft') {
+          scopes = ['openid', 'email', 'profile'];
         }
       }
 

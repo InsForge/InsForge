@@ -19,7 +19,13 @@ import type {
   AuthMetadataSchema,
 } from '@insforge/shared-schemas';
 import { OAuthConfigService } from './oauth';
-import { GitHubEmailInfo, GitHubUserInfo, GoogleUserInfo, UserRecord } from '@/types/auth';
+import {
+  GitHubEmailInfo,
+  GitHubUserInfo,
+  GoogleUserInfo,
+  MicrosoftUserInfo,
+  UserRecord,
+} from '@/types/auth';
 import { ADMIN_ID } from '@/utils/constants';
 import { getApiBaseUrl } from '@/utils/environment';
 
@@ -276,7 +282,7 @@ export class AuthService {
     email: string,
     userName: string,
     avatarUrl: string,
-    identityData: GoogleUserInfo | GitHubUserInfo | Record<string, unknown>
+    identityData: GoogleUserInfo | GitHubUserInfo | MicrosoftUserInfo | Record<string, unknown>
   ): Promise<CreateSessionResponse> {
     // First, try to find existing user by provider ID in _account_providers table
     const account = await this.db
@@ -355,7 +361,7 @@ export class AuthService {
     userName: string,
     email: string,
     providerId: string,
-    identityData: GoogleUserInfo | GitHubUserInfo | Record<string, unknown>,
+    identityData: GoogleUserInfo | GitHubUserInfo | MicrosoftUserInfo | Record<string, unknown>,
     avatarUrl: string
   ): Promise<CreateSessionResponse> {
     const userId = crypto.randomUUID();
@@ -763,6 +769,108 @@ export class AuthService {
       githubUserInfo
     );
   }
+  
+  // NEW: Generate Microsoft OAuth authorization URL
+async generateMicrosoftAuthUrl(state?: string): Promise<string> {
+  const oauthConfigService = OAuthConfigService.getInstance();
+  const config = await oauthConfigService.getConfigByProvider('microsoft');
+  if (!config) {
+    throw new Error('Microsoft OAuth not configured');
+  }
+
+  const selfBaseUrl = process.env.API_BASE_URL || 'http://localhost:7130';
+
+  // Note: shared-keys path not implemented for Microsoft; configure local keys
+  const authUrl = new URL('https://login.microsoftonline.com/common/oauth2/v2.0/authorize');
+  authUrl.searchParams.set('client_id', config.clientId ?? '');
+  authUrl.searchParams.set('response_type', 'code');
+  authUrl.searchParams.set('redirect_uri', `${selfBaseUrl}/api/auth/oauth/microsoft/callback`);
+  authUrl.searchParams.set('scope', (config.scopes && config.scopes.length > 0)
+    ? config.scopes.join(' ')
+    : 'openid email profile offline_access User.Read');
+  if (state) {
+    authUrl.searchParams.set('state', state);
+  }
+  return authUrl.toString();
+}
+
+// NEW: Exchange Microsoft code for tokens
+async exchangeCodeToTokenByMicrosoft(
+  code: string
+): Promise<{ access_token: string; id_token?: string }> {
+  const oauthConfigService = OAuthConfigService.getInstance();
+  const config = await oauthConfigService.getConfigByProvider('microsoft');
+  if (!config) {
+    throw new Error('Microsoft OAuth not configured');
+  }
+  const clientSecret = await oauthConfigService.getClientSecretByProvider('microsoft');
+  const selfBaseUrl = process.env.API_BASE_URL || 'http://localhost:7130';
+
+  const body = new URLSearchParams({
+    client_id: config.clientId ?? '',
+    client_secret: clientSecret ?? '',
+    code,
+    redirect_uri: `${selfBaseUrl}/api/auth/oauth/microsoft/callback`,
+    grant_type: 'authorization_code',
+    scope: (config.scopes && config.scopes.length > 0)
+      ? config.scopes.join(' ')
+      : 'openid email profile offline_access User.Read',
+  });
+
+  const response = await axios.post(
+    'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+    body.toString(),
+    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+  );
+
+  if (!response.data.access_token) {
+    throw new Error('Failed to get access token from Microsoft');
+  }
+  return {
+    access_token: response.data.access_token,
+    id_token: response.data.id_token, // optional
+  };
+}
+
+// NEW: Get Microsoft user info via Graph API
+async getMicrosoftUserInfo(accessToken: string) {
+  const userResp = await axios.get('https://graph.microsoft.com/v1.0/me', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  const data = userResp.data as {
+    id: string;
+    displayName?: string;
+    userPrincipalName?: string;
+    mail?: string | null;
+  };
+
+  const email = data.mail || data.userPrincipalName || `${data.id}@users.noreply.microsoft.com`;
+  return {
+    id: data.id,
+    displayName: data.displayName || '',
+    userPrincipalName: data.userPrincipalName || '',
+    email,
+  };
+}
+
+// NEW: Find or create Microsoft user
+async findOrCreateMicrosoftUser(msUserInfo: {
+  id: string;
+  displayName?: string;
+  userPrincipalName?: string;
+  email: string;
+}): Promise<CreateSessionResponse> {
+  const userName = msUserInfo.displayName || (msUserInfo.email.split('@')[0] || 'user');
+  return this.findOrCreateThirdPartyUser(
+    'microsoft',
+    msUserInfo.id,
+    msUserInfo.email,
+    userName,
+    '',
+    msUserInfo
+  );
+}
 
   async getMetadata(): Promise<AuthMetadataSchema> {
     const oAuthConfigService = OAuthConfigService.getInstance();

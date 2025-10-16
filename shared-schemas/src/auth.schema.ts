@@ -54,7 +54,7 @@ export const userSchema = z.object({
  * OAuth state for redirect handling
  */
 
-export const oAuthProvidersSchema = z.enum(['google', 'github']);
+export const oAuthProvidersSchema = z.enum(['google', 'github', 'microsoft']);
 
 export const oAuthStateSchema = z.object({
   provider: oAuthProvidersSchema,

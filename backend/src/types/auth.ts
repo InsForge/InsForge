@@ -88,3 +88,10 @@ export interface GitHubEmailInfo {
   verified: boolean;
   visibility?: string;
 }
+
+export interface MicrosoftUserInfo {
+  sub: string;
+  email: string;
+  name: string;
+  avatar_url?: string;
+}
