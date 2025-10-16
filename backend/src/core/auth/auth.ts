@@ -19,7 +19,13 @@ import type {
   AuthMetadataSchema,
 } from '@insforge/shared-schemas';
 import { OAuthConfigService } from './oauth';
-import { GitHubEmailInfo, GitHubUserInfo, GoogleUserInfo, UserRecord } from '@/types/auth';
+import {
+  FacebookUserInfo,
+  GitHubEmailInfo,
+  GitHubUserInfo,
+  GoogleUserInfo,
+  UserRecord,
+} from '@/types/auth';
 import { ADMIN_ID } from '@/utils/constants';
 import { getApiBaseUrl } from '@/utils/environment';
 
@@ -276,7 +282,11 @@ export class AuthService {
     email: string,
     userName: string,
     avatarUrl: string,
-    identityData: GoogleUserInfo | GitHubUserInfo | Record<string, unknown>
+    identityData:
+      | GoogleUserInfo
+      | GitHubUserInfo
+      | FacebookUserInfo
+      | Record<string, unknown>
   ): Promise<CreateSessionResponse> {
     // First, try to find existing user by provider ID in _account_providers table
     const account = await this.db
@@ -355,7 +365,11 @@ export class AuthService {
     userName: string,
     email: string,
     providerId: string,
-    identityData: GoogleUserInfo | GitHubUserInfo | Record<string, unknown>,
+    identityData:
+      | GoogleUserInfo
+      | GitHubUserInfo
+      | FacebookUserInfo
+      | Record<string, unknown>,
     avatarUrl: string
   ): Promise<CreateSessionResponse> {
     const userId = crypto.randomUUID();
@@ -761,6 +775,118 @@ export class AuthService {
       userName,
       githubUserInfo.avatar_url || '',
       githubUserInfo
+    );
+  }
+
+  /**
+   * Generate Facebook OAuth authorization URL
+   */
+  async generateFacebookAuthUrl(state?: string): Promise<string | undefined> {
+    const oauthConfigService = OAuthConfigService.getInstance();
+    const config = await oauthConfigService.getConfigByProvider('facebook');
+
+    if (!config) {
+      throw new Error('Facebook OAuth not configured');
+    }
+
+    const selfBaseUrl = getApiBaseUrl();
+
+    if (config?.useSharedKey) {
+      if (!state) {
+        logger.warn('Shared Facebook OAuth called without state parameter');
+        throw new Error('State parameter is required for shared Facebook OAuth');
+      }
+      const cloudBaseUrl = process.env.CLOUD_API_HOST || 'https://api.insforge.dev';
+      const redirectUri = `${selfBaseUrl}/api/auth/oauth/shared/callback/${state}`;
+      const response = await axios.get(
+        `${cloudBaseUrl}/auth/v1/shared/facebook?redirect_uri=${encodeURIComponent(redirectUri)}`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      return response.data.auth_url || response.data.url || '';
+    }
+
+    logger.debug('Facebook OAuth Config (fresh from DB):', {
+      clientId: config.clientId ? 'SET' : 'NOT SET',
+    });
+
+    const authUrl = new URL('https://www.facebook.com/v18.0/dialog/oauth');
+    authUrl.searchParams.set('client_id', config.clientId ?? '');
+    authUrl.searchParams.set('redirect_uri', `${selfBaseUrl}/api/auth/oauth/facebook/callback`);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set(
+      'scope',
+      config.scopes ? config.scopes.join(',') : 'email,public_profile'
+    );
+    if (state) {
+      authUrl.searchParams.set('state', state);
+    }
+
+    return authUrl.toString();
+  }
+
+  /**
+   * Exchange Facebook code for access token
+   */
+  async exchangeFacebookCodeForToken(code: string): Promise<string> {
+    const oauthConfigService = OAuthConfigService.getInstance();
+    const config = await oauthConfigService.getConfigByProvider('facebook');
+
+    if (!config) {
+      throw new Error('Facebook OAuth not configured');
+    }
+
+    const clientSecret = await oauthConfigService.getClientSecretByProvider('facebook');
+    const selfBaseUrl = getApiBaseUrl();
+    const response = await axios.get('https://graph.facebook.com/v18.0/oauth/access_token', {
+      params: {
+        client_id: config.clientId,
+        client_secret: clientSecret,
+        code,
+        redirect_uri: `${selfBaseUrl}/api/auth/oauth/facebook/callback`,
+      },
+    });
+
+    if (!response.data.access_token) {
+      throw new Error('Failed to get access token from Facebook');
+    }
+
+    return response.data.access_token;
+  }
+
+  /**
+   * Get Facebook user info
+   */
+  async getFacebookUserInfo(accessToken: string): Promise<FacebookUserInfo> {
+    const response = await axios.get('https://graph.facebook.com/v18.0/me', {
+      params: {
+        fields: 'id,email,name,first_name,last_name,picture',
+        access_token: accessToken,
+      },
+    });
+
+    return response.data;
+  }
+
+  /**
+   * Find or create Facebook user
+   */
+  async findOrCreateFacebookUser(
+    facebookUserInfo: FacebookUserInfo
+  ): Promise<CreateSessionResponse> {
+    const userName = facebookUserInfo.name || facebookUserInfo.email.split('@')[0];
+    const avatarUrl = facebookUserInfo.picture?.data?.url || '';
+
+    return this.findOrCreateThirdPartyUser(
+      'facebook',
+      facebookUserInfo.id,
+      facebookUserInfo.email,
+      userName,
+      avatarUrl,
+      facebookUserInfo
     );
   }
 

@@ -88,3 +88,16 @@ export interface GitHubEmailInfo {
   verified: boolean;
   visibility?: string;
 }
+
+export interface FacebookUserInfo {
+  id: string;
+  email: string;
+  name?: string;
+  picture?: {
+    data?: {
+      url?: string;
+    };
+  };
+  first_name?: string;
+  last_name?: string;
+}
