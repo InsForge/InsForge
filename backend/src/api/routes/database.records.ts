@@ -460,7 +460,7 @@ router.post(
   }
 );
 
-router.get('/sample/:tableName', async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/_meta/sample/:tableName', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { tableName } = req.params;
 

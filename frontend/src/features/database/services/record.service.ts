@@ -221,7 +221,7 @@ export class RecordService {
   async downloadSampleCSV(tableName: string): Promise<void> {
     try {
       const token = apiClient.getToken();
-      const endpoint = `/api/database/records/sample/${tableName}`;
+      const endpoint = `/api/database/records/_meta/sample/${tableName}`;
 
       const response = await fetch(endpoint, {
         method: 'GET',
