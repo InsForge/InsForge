@@ -1,0 +1,240 @@
+{"id":"1760674279024-0.10622118588427076","timestamp":"2025-10-17T04:11:19.019Z","message":"AuthService initialized","level":"info","metadata":{}}
+{"id":"1760674279024-0.08822426508691472","timestamp":"2025-10-17T04:11:19.020Z","message":"AuthService initialized","level":"info","metadata":{}}
+{"id":"1760674279029-0.7008882611795733","timestamp":"2025-10-17T04:11:19.025Z","message":"AuthService initialized","level":"info","metadata":{}}
+{"id":"1760674279140-0.4439449959944348","timestamp":"2025-10-17T04:11:19.140Z","message":"OAuthService initialized","level":"info","metadata":{}}
+{"id":"1760674279142-0.30421347132419485","timestamp":"2025-10-17T04:11:19.140Z","message":"AuditService initialized","level":"info","metadata":{}}
+{"id":"1760674279147-0.46378483437351936","timestamp":"2025-10-17T04:11:19.146Z","message":"OAuthService initialized","level":"info","metadata":{}}
+{"id":"1760674279150-0.19746736559738642","timestamp":"2025-10-17T04:11:19.147Z","message":"AuditService initialized","level":"info","metadata":{}}
+{"id":"1760674279052-0.43733646262946535","timestamp":"2025-10-17T04:11:19.045Z","message":"AuthService initialized","level":"info","metadata":{}}
+{"id":"1760674279142-0.28401510342770053","timestamp":"2025-10-17T04:11:19.142Z","message":"OAuthService initialized","level":"info","metadata":{}}
+{"id":"1760674279145-0.26969866561300293","timestamp":"2025-10-17T04:11:19.142Z","message":"AuditService initialized","level":"info","metadata":{}}
+{"id":"1760674279145-0.10939159697249634","timestamp":"2025-10-17T04:11:19.144Z","message":"OAuthService initialized","level":"info","metadata":{}}
+{"id":"1760674279146-0.9315239085263156","timestamp":"2025-10-17T04:11:19.145Z","message":"AuditService initialized","level":"info","metadata":{}}
+{"id":"1760674279024-0.4795169412057676","timestamp":"2025-10-17T04:11:19.021Z","message":"AuthService initialized","level":"info","metadata":{}}
+{"id":"1760674279151-0.7492571809301563","timestamp":"2025-10-17T04:11:19.150Z","message":"OAuthService initialized","level":"info","metadata":{}}
+{"id":"1760674279156-0.035127497250314166","timestamp":"2025-10-17T04:11:19.151Z","message":"AuditService initialized","level":"info","metadata":{}}
+{"id":"1760674279541-0.649197140841338","timestamp":"2025-10-17T04:11:19.541Z","message":"Using log provider: File-based (no AWS credentials required)","level":"info","metadata":{}}
+{"id":"1760674279542-0.3805894166317103","timestamp":"2025-10-17T04:11:19.542Z","message":"Using log provider: File-based (no AWS credentials required)","level":"info","metadata":{}}
+{"id":"1760674279542-0.2098731331311543","timestamp":"2025-10-17T04:11:19.542Z","message":"Using log provider: File-based (no AWS credentials required)","level":"info","metadata":{}}
+{"id":"1760674279543-0.7546455735952688","timestamp":"2025-10-17T04:11:19.543Z","message":"File-based analytics initialized at: /Users/gary/projects/insforge-repo/InsForge/backend/insforge-logs","level":"info","metadata":{}}
+{"id":"1760674279543-0.6825069978654206","timestamp":"2025-10-17T04:11:19.543Z","message":"File-based analytics initialized at: /Users/gary/projects/insforge-repo/InsForge/backend/insforge-logs","level":"info","metadata":{}}
+{"id":"1760674279543-0.4065005929912302","timestamp":"2025-10-17T04:11:19.543Z","message":"File-based analytics initialized at: /Users/gary/projects/insforge-repo/InsForge/backend/insforge-logs","level":"info","metadata":{}}
+{"id":"1760674279548-0.9255014437571389","timestamp":"2025-10-17T04:11:19.547Z","message":"Using log provider: File-based (no AWS credentials required)","level":"info","metadata":{}}
+{"id":"1760674279549-0.7804353715756263","timestamp":"2025-10-17T04:11:19.548Z","message":"File-based analytics initialized at: /Users/gary/projects/insforge-repo/InsForge/backend/insforge-logs","level":"info","metadata":{}}
+{"id":"1760674279568-0.9691480859630903","timestamp":"2025-10-17T04:11:19.565Z","message":"\n🚀 Insforge Backend Starting...","level":"info","metadata":{}}
+{"id":"1760674279572-0.13663714581409225","timestamp":"2025-10-17T04:11:19.569Z","message":"✅ Admin configured: admin@example.com","level":"info","metadata":{}}
+{"id":"1760674279566-0.9856445600527435","timestamp":"2025-10-17T04:11:19.564Z","message":"\n🚀 Insforge Backend Starting...","level":"info","metadata":{}}
+{"id":"1760674279567-0.545935236084659","timestamp":"2025-10-17T04:11:19.566Z","message":"✅ Admin configured: admin@example.com","level":"info","metadata":{}}
+{"id":"1760674279564-0.3659354438779938","timestamp":"2025-10-17T04:11:19.563Z","message":"\n🚀 Insforge Backend Starting...","level":"info","metadata":{}}
+{"id":"1760674279566-0.1649343625848516","timestamp":"2025-10-17T04:11:19.564Z","message":"✅ Admin configured: admin@example.com","level":"info","metadata":{}}
+{"id":"1760674279713-0.5862683212121298","timestamp":"2025-10-17T04:11:19.712Z","message":"Using log provider: File-based (no AWS credentials required)","level":"info","metadata":{}}
+{"id":"1760674279717-0.10255259492828017","timestamp":"2025-10-17T04:11:19.717Z","message":"File-based analytics initialized at: /Users/gary/projects/insforge-repo/InsForge/backend/insforge-logs","level":"info","metadata":{}}
+{"id":"1760674279565-0.24791824134867113","timestamp":"2025-10-17T04:11:19.564Z","message":"\n🚀 Insforge Backend Starting...","level":"info","metadata":{}}
+{"id":"1760674279566-0.0962167157676852","timestamp":"2025-10-17T04:11:19.565Z","message":"✅ Admin configured: admin@example.com","level":"info","metadata":{}}
+{"id":"1760674279835-0.7807755822830411","timestamp":"2025-10-17T04:11:19.830Z","message":"\n🚀 Insforge Backend Starting...","level":"info","metadata":{}}
+{"id":"1760674279842-0.17847990247672807","timestamp":"2025-10-17T04:11:19.838Z","message":"✅ Admin configured: admin@example.com","level":"info","metadata":{}}
+{"id":"1760674279953-0.8511416532283109","timestamp":"2025-10-17T04:11:19.952Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"API_KEY"}}
+{"id":"1760674279954-0.10959886751443682","timestamp":"2025-10-17T04:11:19.954Z","message":"✅ API key exists in database","level":"info","metadata":{}}
+{"id":"1760674279954-0.7197521700596548","timestamp":"2025-10-17T04:11:19.953Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"API_KEY"}}
+{"id":"1760674279958-0.6461195362466978","timestamp":"2025-10-17T04:11:19.958Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"API_KEY"}}
+{"id":"1760674279958-0.85457967653638","timestamp":"2025-10-17T04:11:19.957Z","message":"✅ API key exists in database","level":"info","metadata":{}}
+{"id":"1760674279963-0.027652112239281657","timestamp":"2025-10-17T04:11:19.959Z","message":"✅ API key exists in database","level":"info","metadata":{}}
+{"id":"1760674279983-0.6970044861341158","timestamp":"2025-10-17T04:11:19.980Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"API_KEY"}}
+{"id":"1760674279984-0.2861302660013725","timestamp":"2025-10-17T04:11:19.983Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"API_KEY"}}
+{"id":"1760674279984-0.745657227219283","timestamp":"2025-10-17T04:11:19.983Z","message":"✅ API key exists in database","level":"info","metadata":{}}
+{"id":"1760674279984-0.9142088361671477","timestamp":"2025-10-17T04:11:19.984Z","message":"✅ API key exists in database","level":"info","metadata":{}}
+{"id":"1760674280000-0.40649049194009135","timestamp":"2025-10-17T04:11:19.999Z","message":"✅ Database connected to PostgreSQL","level":"info","metadata":{"host":"localhost","port":"5432","database":"insforge"}}
+{"id":"1760674280001-0.126840706253319","timestamp":"2025-10-17T04:11:20.001Z","message":"✅ Found 2 user tables","level":"info","metadata":{}}
+{"id":"1760674280002-0.48491593906113195","timestamp":"2025-10-17T04:11:20.001Z","message":"✅ Database connected to PostgreSQL","level":"info","metadata":{"host":"localhost","port":"5432","database":"insforge"}}
+{"id":"1760674280004-0.4300088642221227","timestamp":"2025-10-17T04:11:20.001Z","message":"✅ Database connected to PostgreSQL","level":"info","metadata":{"host":"localhost","port":"5432","database":"insforge"}}
+{"id":"1760674280002-0.15147999251084454","timestamp":"2025-10-17T04:11:20.002Z","message":"✅ Found 2 user tables","level":"info","metadata":{}}
+{"id":"1760674280004-0.1107270071981119","timestamp":"2025-10-17T04:11:20.004Z","message":"✅ Found 2 user tables","level":"info","metadata":{}}
+{"id":"1760674280008-0.30644156642452014","timestamp":"2025-10-17T04:11:20.008Z","message":"✅ Database connected to PostgreSQL","level":"info","metadata":{"host":"localhost","port":"5432","database":"insforge"}}
+{"id":"1760674280011-0.5564516907408854","timestamp":"2025-10-17T04:11:20.011Z","message":"✅ Found 2 user tables","level":"info","metadata":{}}
+{"id":"1760674280015-0.20224720039050137","timestamp":"2025-10-17T04:11:20.015Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"INSFORGE_INTERNAL_URL"}}
+{"id":"1760674280016-0.10368582314768937","timestamp":"2025-10-17T04:11:20.015Z","message":"✅ Database connected to PostgreSQL","level":"info","metadata":{"host":"localhost","port":"5432","database":"insforge"}}
+{"id":"1760674280016-0.08913384672577163","timestamp":"2025-10-17T04:11:20.016Z","message":"✅ Found 2 user tables","level":"info","metadata":{}}
+{"id":"1760674280018-0.64290259352299","timestamp":"2025-10-17T04:11:20.018Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"INSFORGE_INTERNAL_URL"}}
+{"id":"1760674280021-0.4717623154307429","timestamp":"2025-10-17T04:11:20.021Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"INSFORGE_INTERNAL_URL"}}
+{"id":"1760674280024-0.6251088827960454","timestamp":"2025-10-17T04:11:20.023Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"INSFORGE_INTERNAL_URL"}}
+{"id":"1760674280027-0.5216650412504542","timestamp":"2025-10-17T04:11:20.026Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"INSFORGE_INTERNAL_URL"}}
+{"id":"1760674304347-0.8161873918626883","timestamp":"2025-10-17T04:11:44.343Z","message":"AuthService initialized","level":"info","metadata":{}}
+{"id":"1760674304346-0.25508208767309637","timestamp":"2025-10-17T04:11:44.343Z","message":"AuthService initialized","level":"info","metadata":{}}
+{"id":"1760674304353-0.18370818355198737","timestamp":"2025-10-17T04:11:44.344Z","message":"AuthService initialized","level":"info","metadata":{}}
+{"id":"1760674304353-0.9011230488142301","timestamp":"2025-10-17T04:11:44.344Z","message":"AuthService initialized","level":"info","metadata":{}}
+{"id":"1760674304427-0.26557981462610925","timestamp":"2025-10-17T04:11:44.427Z","message":"OAuthService initialized","level":"info","metadata":{}}
+{"id":"1760674304428-0.7488425658159668","timestamp":"2025-10-17T04:11:44.427Z","message":"AuditService initialized","level":"info","metadata":{}}
+{"id":"1760674304425-0.9255987005635591","timestamp":"2025-10-17T04:11:44.425Z","message":"OAuthService initialized","level":"info","metadata":{}}
+{"id":"1760674304426-0.8652349568541702","timestamp":"2025-10-17T04:11:44.425Z","message":"AuditService initialized","level":"info","metadata":{}}
+{"id":"1760674304346-0.9664715325366513","timestamp":"2025-10-17T04:11:44.343Z","message":"AuthService initialized","level":"info","metadata":{}}
+{"id":"1760674304431-0.7680521702127667","timestamp":"2025-10-17T04:11:44.430Z","message":"OAuthService initialized","level":"info","metadata":{}}
+{"id":"1760674304432-0.15680632169175146","timestamp":"2025-10-17T04:11:44.431Z","message":"AuditService initialized","level":"info","metadata":{}}
+{"id":"1760674304428-0.835773161122765","timestamp":"2025-10-17T04:11:44.427Z","message":"OAuthService initialized","level":"info","metadata":{}}
+{"id":"1760674304428-0.6843074096466812","timestamp":"2025-10-17T04:11:44.428Z","message":"AuditService initialized","level":"info","metadata":{}}
+{"id":"1760674304433-0.6151839689288778","timestamp":"2025-10-17T04:11:44.432Z","message":"OAuthService initialized","level":"info","metadata":{}}
+{"id":"1760674304434-0.5567639938640176","timestamp":"2025-10-17T04:11:44.433Z","message":"AuditService initialized","level":"info","metadata":{}}
+{"id":"1760674304706-0.30080504795954055","timestamp":"2025-10-17T04:11:44.706Z","message":"Using log provider: File-based (no AWS credentials required)","level":"info","metadata":{}}
+{"id":"1760674304706-0.8034076352921444","timestamp":"2025-10-17T04:11:44.706Z","message":"Using log provider: File-based (no AWS credentials required)","level":"info","metadata":{}}
+{"id":"1760674304707-0.8186046098585447","timestamp":"2025-10-17T04:11:44.706Z","message":"Using log provider: File-based (no AWS credentials required)","level":"info","metadata":{}}
+{"id":"1760674304707-0.9826063862857348","timestamp":"2025-10-17T04:11:44.706Z","message":"Using log provider: File-based (no AWS credentials required)","level":"info","metadata":{}}
+{"id":"1760674304707-0.5085999849658516","timestamp":"2025-10-17T04:11:44.707Z","message":"File-based analytics initialized at: /Users/gary/projects/insforge-repo/InsForge/backend/insforge-logs","level":"info","metadata":{}}
+{"id":"1760674304707-0.3481117764589592","timestamp":"2025-10-17T04:11:44.707Z","message":"File-based analytics initialized at: /Users/gary/projects/insforge-repo/InsForge/backend/insforge-logs","level":"info","metadata":{}}
+{"id":"1760674304707-0.607450599618246","timestamp":"2025-10-17T04:11:44.707Z","message":"File-based analytics initialized at: /Users/gary/projects/insforge-repo/InsForge/backend/insforge-logs","level":"info","metadata":{}}
+{"id":"1760674304708-0.6816661993755166","timestamp":"2025-10-17T04:11:44.707Z","message":"File-based analytics initialized at: /Users/gary/projects/insforge-repo/InsForge/backend/insforge-logs","level":"info","metadata":{}}
+{"id":"1760674304710-0.7437226388432598","timestamp":"2025-10-17T04:11:44.710Z","message":"Using log provider: File-based (no AWS credentials required)","level":"info","metadata":{}}
+{"id":"1760674304711-0.60299285254072","timestamp":"2025-10-17T04:11:44.711Z","message":"File-based analytics initialized at: /Users/gary/projects/insforge-repo/InsForge/backend/insforge-logs","level":"info","metadata":{}}
+{"id":"1760674304714-0.34718323402296525","timestamp":"2025-10-17T04:11:44.714Z","message":"\n🚀 Insforge Backend Starting...","level":"info","metadata":{}}
+{"id":"1760674304715-0.33247073156982343","timestamp":"2025-10-17T04:11:44.715Z","message":"✅ Admin configured: admin@example.com","level":"info","metadata":{}}
+{"id":"1760674304716-0.4234811828267797","timestamp":"2025-10-17T04:11:44.715Z","message":"\n🚀 Insforge Backend Starting...","level":"info","metadata":{}}
+{"id":"1760674304716-0.13813087950646352","timestamp":"2025-10-17T04:11:44.716Z","message":"✅ Admin configured: admin@example.com","level":"info","metadata":{}}
+{"id":"1760674304716-0.3261897682986803","timestamp":"2025-10-17T04:11:44.715Z","message":"\n🚀 Insforge Backend Starting...","level":"info","metadata":{}}
+{"id":"1760674304716-0.8366377494190682","timestamp":"2025-10-17T04:11:44.716Z","message":"✅ Admin configured: admin@example.com","level":"info","metadata":{}}
+{"id":"1760674304718-0.2470329606658339","timestamp":"2025-10-17T04:11:44.717Z","message":"\n🚀 Insforge Backend Starting...","level":"info","metadata":{}}
+{"id":"1760674304718-0.9940171951157952","timestamp":"2025-10-17T04:11:44.718Z","message":"✅ Admin configured: admin@example.com","level":"info","metadata":{}}
+{"id":"1760674304725-0.13199329653324","timestamp":"2025-10-17T04:11:44.723Z","message":"\n🚀 Insforge Backend Starting...","level":"info","metadata":{}}
+{"id":"1760674304725-0.5037318744637311","timestamp":"2025-10-17T04:11:44.725Z","message":"✅ Admin configured: admin@example.com","level":"info","metadata":{}}
+{"id":"1760674304743-0.49496393803610284","timestamp":"2025-10-17T04:11:44.743Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"API_KEY"}}
+{"id":"1760674304743-0.15315127960230113","timestamp":"2025-10-17T04:11:44.743Z","message":"✅ API key exists in database","level":"info","metadata":{}}
+{"id":"1760674304744-0.5320507351297077","timestamp":"2025-10-17T04:11:44.744Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"API_KEY"}}
+{"id":"1760674304745-0.05604992018798338","timestamp":"2025-10-17T04:11:44.745Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"API_KEY"}}
+{"id":"1760674304745-0.8092270573546341","timestamp":"2025-10-17T04:11:44.744Z","message":"✅ API key exists in database","level":"info","metadata":{}}
+{"id":"1760674304746-0.29970738132993624","timestamp":"2025-10-17T04:11:44.745Z","message":"✅ API key exists in database","level":"info","metadata":{}}
+{"id":"1760674304747-0.7802957776000599","timestamp":"2025-10-17T04:11:44.747Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"API_KEY"}}
+{"id":"1760674304748-0.8304087611039406","timestamp":"2025-10-17T04:11:44.748Z","message":"✅ API key exists in database","level":"info","metadata":{}}
+{"id":"1760674304749-0.9681592810749313","timestamp":"2025-10-17T04:11:44.749Z","message":"✅ Database connected to PostgreSQL","level":"info","metadata":{"host":"localhost","port":"5432","database":"insforge"}}
+{"id":"1760674304749-0.6748571312702463","timestamp":"2025-10-17T04:11:44.749Z","message":"✅ Database connected to PostgreSQL","level":"info","metadata":{"host":"localhost","port":"5432","database":"insforge"}}
+{"id":"1760674304750-0.5170992298813635","timestamp":"2025-10-17T04:11:44.750Z","message":"✅ Found 2 user tables","level":"info","metadata":{}}
+{"id":"1760674304750-0.9168413927775321","timestamp":"2025-10-17T04:11:44.750Z","message":"✅ Found 2 user tables","level":"info","metadata":{}}
+{"id":"1760674304751-0.6632877471726495","timestamp":"2025-10-17T04:11:44.751Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"API_KEY"}}
+{"id":"1760674304752-0.22534491629062448","timestamp":"2025-10-17T04:11:44.751Z","message":"✅ Database connected to PostgreSQL","level":"info","metadata":{"host":"localhost","port":"5432","database":"insforge"}}
+{"id":"1760674304752-0.8038727735614593","timestamp":"2025-10-17T04:11:44.752Z","message":"✅ Database connected to PostgreSQL","level":"info","metadata":{"host":"localhost","port":"5432","database":"insforge"}}
+{"id":"1760674304752-0.4435186363327315","timestamp":"2025-10-17T04:11:44.751Z","message":"✅ API key exists in database","level":"info","metadata":{}}
+{"id":"1760674304753-0.5894218067436519","timestamp":"2025-10-17T04:11:44.752Z","message":"✅ Found 2 user tables","level":"info","metadata":{}}
+{"id":"1760674304753-0.4197025902388096","timestamp":"2025-10-17T04:11:44.753Z","message":"✅ Found 2 user tables","level":"info","metadata":{}}
+{"id":"1760674304753-0.6999721231562885","timestamp":"2025-10-17T04:11:44.753Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"INSFORGE_INTERNAL_URL"}}
+{"id":"1760674304753-0.5305350728530647","timestamp":"2025-10-17T04:11:44.753Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"INSFORGE_INTERNAL_URL"}}
+{"id":"1760674304757-0.6746794032162844","timestamp":"2025-10-17T04:11:44.757Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"INSFORGE_INTERNAL_URL"}}
+{"id":"1760674304757-0.5929399992434223","timestamp":"2025-10-17T04:11:44.757Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"INSFORGE_INTERNAL_URL"}}
+{"id":"1760674304759-0.5080104294679777","timestamp":"2025-10-17T04:11:44.758Z","message":"✅ Database connected to PostgreSQL","level":"info","metadata":{"host":"localhost","port":"5432","database":"insforge"}}
+{"id":"1760674304760-0.23060247700446146","timestamp":"2025-10-17T04:11:44.759Z","message":"✅ Found 2 user tables","level":"info","metadata":{}}
+{"id":"1760674304765-0.732864023463873","timestamp":"2025-10-17T04:11:44.765Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"INSFORGE_INTERNAL_URL"}}
+{"id":"1760674367355-0.26075119485386744","timestamp":"2025-10-17T04:12:47.350Z","message":"AuthService initialized","level":"info","metadata":{}}
+{"id":"1760674367355-0.7680839273497073","timestamp":"2025-10-17T04:12:47.350Z","message":"AuthService initialized","level":"info","metadata":{}}
+{"id":"1760674367362-0.6063584102512278","timestamp":"2025-10-17T04:12:47.359Z","message":"AuthService initialized","level":"info","metadata":{}}
+{"id":"1760674367356-0.5155384720360823","timestamp":"2025-10-17T04:12:47.353Z","message":"AuthService initialized","level":"info","metadata":{}}
+{"id":"1760674367507-0.09142817117344615","timestamp":"2025-10-17T04:12:47.507Z","message":"OAuthService initialized","level":"info","metadata":{}}
+{"id":"1760674367510-0.6287650406305036","timestamp":"2025-10-17T04:12:47.507Z","message":"AuditService initialized","level":"info","metadata":{}}
+{"id":"1760674367356-0.3256061685597058","timestamp":"2025-10-17T04:12:47.354Z","message":"AuthService initialized","level":"info","metadata":{}}
+{"id":"1760674367478-0.015124972530160319","timestamp":"2025-10-17T04:12:47.477Z","message":"OAuthService initialized","level":"info","metadata":{}}
+{"id":"1760674367509-0.9606035263553014","timestamp":"2025-10-17T04:12:47.479Z","message":"AuditService initialized","level":"info","metadata":{}}
+{"id":"1760674367510-0.6031876006619732","timestamp":"2025-10-17T04:12:47.510Z","message":"OAuthService initialized","level":"info","metadata":{}}
+{"id":"1760674367513-0.5867329009895126","timestamp":"2025-10-17T04:12:47.510Z","message":"AuditService initialized","level":"info","metadata":{}}
+{"id":"1760674367521-0.2177051951141804","timestamp":"2025-10-17T04:12:47.518Z","message":"OAuthService initialized","level":"info","metadata":{}}
+{"id":"1760674367535-0.2042849660166186","timestamp":"2025-10-17T04:12:47.521Z","message":"AuditService initialized","level":"info","metadata":{}}
+{"id":"1760674367493-0.7514569543460334","timestamp":"2025-10-17T04:12:47.478Z","message":"OAuthService initialized","level":"info","metadata":{}}
+{"id":"1760674367508-0.8955311133838249","timestamp":"2025-10-17T04:12:47.494Z","message":"AuditService initialized","level":"info","metadata":{}}
+{"id":"1760674367913-0.3281844073740283","timestamp":"2025-10-17T04:12:47.913Z","message":"Using log provider: File-based (no AWS credentials required)","level":"info","metadata":{}}
+{"id":"1760674367913-0.20163661430574198","timestamp":"2025-10-17T04:12:47.913Z","message":"Using log provider: File-based (no AWS credentials required)","level":"info","metadata":{}}
+{"id":"1760674367913-0.8976510468975964","timestamp":"2025-10-17T04:12:47.913Z","message":"Using log provider: File-based (no AWS credentials required)","level":"info","metadata":{}}
+{"id":"1760674367914-0.6009755562666723","timestamp":"2025-10-17T04:12:47.913Z","message":"File-based analytics initialized at: /Users/gary/projects/insforge-repo/InsForge/backend/insforge-logs","level":"info","metadata":{}}
+{"id":"1760674367914-0.3080212910189879","timestamp":"2025-10-17T04:12:47.914Z","message":"File-based analytics initialized at: /Users/gary/projects/insforge-repo/InsForge/backend/insforge-logs","level":"info","metadata":{}}
+{"id":"1760674367914-0.2702709761170581","timestamp":"2025-10-17T04:12:47.914Z","message":"File-based analytics initialized at: /Users/gary/projects/insforge-repo/InsForge/backend/insforge-logs","level":"info","metadata":{}}
+{"id":"1760674367916-0.9349386810453746","timestamp":"2025-10-17T04:12:47.915Z","message":"Using log provider: File-based (no AWS credentials required)","level":"info","metadata":{}}
+{"id":"1760674367917-0.4255456283039747","timestamp":"2025-10-17T04:12:47.917Z","message":"File-based analytics initialized at: /Users/gary/projects/insforge-repo/InsForge/backend/insforge-logs","level":"info","metadata":{}}
+{"id":"1760674367918-0.8350269599828855","timestamp":"2025-10-17T04:12:47.918Z","message":"Using log provider: File-based (no AWS credentials required)","level":"info","metadata":{}}
+{"id":"1760674367919-0.2939781745844885","timestamp":"2025-10-17T04:12:47.918Z","message":"File-based analytics initialized at: /Users/gary/projects/insforge-repo/InsForge/backend/insforge-logs","level":"info","metadata":{}}
+{"id":"1760674367921-0.9918991760664955","timestamp":"2025-10-17T04:12:47.920Z","message":"\n🚀 Insforge Backend Starting...","level":"info","metadata":{}}
+{"id":"1760674367921-0.09224005753679321","timestamp":"2025-10-17T04:12:47.921Z","message":"✅ Admin configured: admin@example.com","level":"info","metadata":{}}
+{"id":"1760674367921-0.47693634376025806","timestamp":"2025-10-17T04:12:47.920Z","message":"\n🚀 Insforge Backend Starting...","level":"info","metadata":{}}
+{"id":"1760674367922-0.3930365221402454","timestamp":"2025-10-17T04:12:47.921Z","message":"✅ Admin configured: admin@example.com","level":"info","metadata":{}}
+{"id":"1760674367922-0.18321846576404988","timestamp":"2025-10-17T04:12:47.921Z","message":"\n🚀 Insforge Backend Starting...","level":"info","metadata":{}}
+{"id":"1760674367923-0.36787997608886647","timestamp":"2025-10-17T04:12:47.922Z","message":"✅ Admin configured: admin@example.com","level":"info","metadata":{}}
+{"id":"1760674367926-0.6078188443138943","timestamp":"2025-10-17T04:12:47.925Z","message":"\n🚀 Insforge Backend Starting...","level":"info","metadata":{}}
+{"id":"1760674367926-0.8843488929505514","timestamp":"2025-10-17T04:12:47.926Z","message":"✅ Admin configured: admin@example.com","level":"info","metadata":{}}
+{"id":"1760674367932-0.8937986378570588","timestamp":"2025-10-17T04:12:47.931Z","message":"\n🚀 Insforge Backend Starting...","level":"info","metadata":{}}
+{"id":"1760674367933-0.5253317422522208","timestamp":"2025-10-17T04:12:47.932Z","message":"✅ Admin configured: admin@example.com","level":"info","metadata":{}}
+{"id":"1760674367951-0.4432622715815395","timestamp":"2025-10-17T04:12:47.950Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"API_KEY"}}
+{"id":"1760674367951-0.2888068389304135","timestamp":"2025-10-17T04:12:47.951Z","message":"✅ API key exists in database","level":"info","metadata":{}}
+{"id":"1760674367954-0.4259491597684204","timestamp":"2025-10-17T04:12:47.953Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"API_KEY"}}
+{"id":"1760674367954-0.6066402056511802","timestamp":"2025-10-17T04:12:47.954Z","message":"✅ API key exists in database","level":"info","metadata":{}}
+{"id":"1760674367955-0.590943537591694","timestamp":"2025-10-17T04:12:47.955Z","message":"✅ Database connected to PostgreSQL","level":"info","metadata":{"host":"localhost","port":"5432","database":"insforge"}}
+{"id":"1760674367956-0.5982887641936094","timestamp":"2025-10-17T04:12:47.955Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"API_KEY"}}
+{"id":"1760674367956-0.23634980719027476","timestamp":"2025-10-17T04:12:47.956Z","message":"✅ Found 2 user tables","level":"info","metadata":{}}
+{"id":"1760674367957-0.31813718777261335","timestamp":"2025-10-17T04:12:47.956Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"API_KEY"}}
+{"id":"1760674367957-0.8581646814507138","timestamp":"2025-10-17T04:12:47.956Z","message":"✅ API key exists in database","level":"info","metadata":{}}
+{"id":"1760674367957-0.9741839517110351","timestamp":"2025-10-17T04:12:47.957Z","message":"✅ API key exists in database","level":"info","metadata":{}}
+{"id":"1760674367959-0.7387946950776392","timestamp":"2025-10-17T04:12:47.959Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"INSFORGE_INTERNAL_URL"}}
+{"id":"1760674367960-0.8033715765604776","timestamp":"2025-10-17T04:12:47.959Z","message":"✅ Database connected to PostgreSQL","level":"info","metadata":{"host":"localhost","port":"5432","database":"insforge"}}
+{"id":"1760674367961-0.9887119927607297","timestamp":"2025-10-17T04:12:47.960Z","message":"✅ Database connected to PostgreSQL","level":"info","metadata":{"host":"localhost","port":"5432","database":"insforge"}}
+{"id":"1760674367961-0.031073011955032204","timestamp":"2025-10-17T04:12:47.960Z","message":"✅ Found 2 user tables","level":"info","metadata":{}}
+{"id":"1760674367961-0.711790644708908","timestamp":"2025-10-17T04:12:47.961Z","message":"✅ Found 2 user tables","level":"info","metadata":{}}
+{"id":"1760674367964-0.9586947258517675","timestamp":"2025-10-17T04:12:47.964Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"INSFORGE_INTERNAL_URL"}}
+{"id":"1760674367964-0.7206474483676826","timestamp":"2025-10-17T04:12:47.964Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"INSFORGE_INTERNAL_URL"}}
+{"id":"1760674367966-0.9141215871098023","timestamp":"2025-10-17T04:12:47.965Z","message":"✅ Database connected to PostgreSQL","level":"info","metadata":{"host":"localhost","port":"5432","database":"insforge"}}
+{"id":"1760674367966-0.26007156965969647","timestamp":"2025-10-17T04:12:47.966Z","message":"✅ Found 2 user tables","level":"info","metadata":{}}
+{"id":"1760674367970-0.2701032076492722","timestamp":"2025-10-17T04:12:47.970Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"INSFORGE_INTERNAL_URL"}}
+{"id":"1760674367971-0.3195535184307501","timestamp":"2025-10-17T04:12:47.970Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"API_KEY"}}
+{"id":"1760674367971-0.1289073185509746","timestamp":"2025-10-17T04:12:47.971Z","message":"✅ API key exists in database","level":"info","metadata":{}}
+{"id":"1760674367982-0.7905907308055231","timestamp":"2025-10-17T04:12:47.981Z","message":"✅ Database connected to PostgreSQL","level":"info","metadata":{"host":"localhost","port":"5432","database":"insforge"}}
+{"id":"1760674367982-0.3929529860557892","timestamp":"2025-10-17T04:12:47.982Z","message":"✅ Found 2 user tables","level":"info","metadata":{}}
+{"id":"1760674367986-0.804362223989868","timestamp":"2025-10-17T04:12:47.986Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"INSFORGE_INTERNAL_URL"}}
+{"id":"1760674375986-0.8005550442805935","timestamp":"2025-10-17T04:12:55.982Z","message":"AuthService initialized","level":"info","metadata":{}}
+{"id":"1760674376066-0.35261554378176063","timestamp":"2025-10-17T04:12:56.065Z","message":"OAuthService initialized","level":"info","metadata":{}}
+{"id":"1760674376069-0.3370660250030897","timestamp":"2025-10-17T04:12:56.066Z","message":"AuditService initialized","level":"info","metadata":{}}
+{"id":"1760674376016-0.9896295370341766","timestamp":"2025-10-17T04:12:56.014Z","message":"AuthService initialized","level":"info","metadata":{}}
+{"id":"1760674376072-0.9113167338558685","timestamp":"2025-10-17T04:12:56.070Z","message":"OAuthService initialized","level":"info","metadata":{}}
+{"id":"1760674376073-0.7037754805041505","timestamp":"2025-10-17T04:12:56.073Z","message":"AuditService initialized","level":"info","metadata":{}}
+{"id":"1760674376015-0.5196760461163317","timestamp":"2025-10-17T04:12:56.013Z","message":"AuthService initialized","level":"info","metadata":{}}
+{"id":"1760674376089-0.6936818573818038","timestamp":"2025-10-17T04:12:56.088Z","message":"OAuthService initialized","level":"info","metadata":{}}
+{"id":"1760674376093-0.7290908760514183","timestamp":"2025-10-17T04:12:56.089Z","message":"AuditService initialized","level":"info","metadata":{}}
+{"id":"1760674376291-0.7530441045738538","timestamp":"2025-10-17T04:12:56.290Z","message":"Using log provider: File-based (no AWS credentials required)","level":"info","metadata":{}}
+{"id":"1760674376292-0.18222304813555534","timestamp":"2025-10-17T04:12:56.291Z","message":"File-based analytics initialized at: /Users/gary/projects/insforge-repo/InsForge/backend/insforge-logs","level":"info","metadata":{}}
+{"id":"1760674376076-0.9253189311153229","timestamp":"2025-10-17T04:12:56.074Z","message":"AuthService initialized","level":"info","metadata":{}}
+{"id":"1760674376300-0.44012596355351397","timestamp":"2025-10-17T04:12:56.299Z","message":"Using log provider: File-based (no AWS credentials required)","level":"info","metadata":{}}
+{"id":"1760674376123-0.20728469206022293","timestamp":"2025-10-17T04:12:56.123Z","message":"OAuthService initialized","level":"info","metadata":{}}
+{"id":"1760674376125-0.822660093851663","timestamp":"2025-10-17T04:12:56.124Z","message":"AuditService initialized","level":"info","metadata":{}}
+{"id":"1760674376301-0.29760605500122717","timestamp":"2025-10-17T04:12:56.300Z","message":"File-based analytics initialized at: /Users/gary/projects/insforge-repo/InsForge/backend/insforge-logs","level":"info","metadata":{}}
+{"id":"1760674376306-0.4686045169789059","timestamp":"2025-10-17T04:12:56.304Z","message":"\n🚀 Insforge Backend Starting...","level":"info","metadata":{}}
+{"id":"1760674376307-0.9734342845086821","timestamp":"2025-10-17T04:12:56.306Z","message":"✅ Admin configured: admin@example.com","level":"info","metadata":{}}
+{"id":"1760674376310-0.08927514140909865","timestamp":"2025-10-17T04:12:56.310Z","message":"\n🚀 Insforge Backend Starting...","level":"info","metadata":{}}
+{"id":"1760674376311-0.32518768766561945","timestamp":"2025-10-17T04:12:56.311Z","message":"✅ Admin configured: admin@example.com","level":"info","metadata":{}}
+{"id":"1760674376328-0.7430790313719171","timestamp":"2025-10-17T04:12:56.328Z","message":"Using log provider: File-based (no AWS credentials required)","level":"info","metadata":{}}
+{"id":"1760674376329-0.8984124517911014","timestamp":"2025-10-17T04:12:56.329Z","message":"File-based analytics initialized at: /Users/gary/projects/insforge-repo/InsForge/backend/insforge-logs","level":"info","metadata":{}}
+{"id":"1760674376332-0.5406559480133184","timestamp":"2025-10-17T04:12:56.332Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"API_KEY"}}
+{"id":"1760674376333-0.620311744525772","timestamp":"2025-10-17T04:12:56.333Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"API_KEY"}}
+{"id":"1760674376333-0.701115061608617","timestamp":"2025-10-17T04:12:56.333Z","message":"✅ API key exists in database","level":"info","metadata":{}}
+{"id":"1760674376334-0.4109683105693209","timestamp":"2025-10-17T04:12:56.333Z","message":"✅ API key exists in database","level":"info","metadata":{}}
+{"id":"1760674376338-0.3920278983710497","timestamp":"2025-10-17T04:12:56.338Z","message":"✅ Database connected to PostgreSQL","level":"info","metadata":{"host":"localhost","port":"5432","database":"insforge"}}
+{"id":"1760674376339-0.18720112372450903","timestamp":"2025-10-17T04:12:56.338Z","message":"✅ Database connected to PostgreSQL","level":"info","metadata":{"host":"localhost","port":"5432","database":"insforge"}}
+{"id":"1760674376339-0.9213539645898521","timestamp":"2025-10-17T04:12:56.339Z","message":"✅ Found 2 user tables","level":"info","metadata":{}}
+{"id":"1760674376340-0.5008517237995651","timestamp":"2025-10-17T04:12:56.340Z","message":"✅ Found 2 user tables","level":"info","metadata":{}}
+{"id":"1760674376341-0.7896954033645875","timestamp":"2025-10-17T04:12:56.341Z","message":"Using log provider: File-based (no AWS credentials required)","level":"info","metadata":{}}
+{"id":"1760674376342-0.13116243162119412","timestamp":"2025-10-17T04:12:56.342Z","message":"File-based analytics initialized at: /Users/gary/projects/insforge-repo/InsForge/backend/insforge-logs","level":"info","metadata":{}}
+{"id":"1760674376342-0.05133358709311042","timestamp":"2025-10-17T04:12:56.340Z","message":"\n🚀 Insforge Backend Starting...","level":"info","metadata":{}}
+{"id":"1760674376343-0.43528682352354076","timestamp":"2025-10-17T04:12:56.342Z","message":"✅ Admin configured: admin@example.com","level":"info","metadata":{}}
+{"id":"1760674376345-0.5211234143611503","timestamp":"2025-10-17T04:12:56.345Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"INSFORGE_INTERNAL_URL"}}
+{"id":"1760674376345-0.8459835607965196","timestamp":"2025-10-17T04:12:56.345Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"INSFORGE_INTERNAL_URL"}}
+{"id":"1760674376353-0.6290421833732254","timestamp":"2025-10-17T04:12:56.351Z","message":"\n🚀 Insforge Backend Starting...","level":"info","metadata":{}}
+{"id":"1760674376353-0.5539513888447132","timestamp":"2025-10-17T04:12:56.353Z","message":"✅ Admin configured: admin@example.com","level":"info","metadata":{}}
+{"id":"1760674376363-0.08474820478471967","timestamp":"2025-10-17T04:12:56.362Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"API_KEY"}}
+{"id":"1760674376364-0.6171601894947347","timestamp":"2025-10-17T04:12:56.363Z","message":"✅ API key exists in database","level":"info","metadata":{}}
+{"id":"1760674376369-0.754977856315731","timestamp":"2025-10-17T04:12:56.368Z","message":"✅ Database connected to PostgreSQL","level":"info","metadata":{"host":"localhost","port":"5432","database":"insforge"}}
+{"id":"1760674376369-0.07823732902668912","timestamp":"2025-10-17T04:12:56.369Z","message":"✅ Found 2 user tables","level":"info","metadata":{}}
+{"id":"1760674376370-0.46243636060721705","timestamp":"2025-10-17T04:12:56.370Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"API_KEY"}}
+{"id":"1760674376371-0.01761889419718865","timestamp":"2025-10-17T04:12:56.370Z","message":"✅ API key exists in database","level":"info","metadata":{}}
+{"id":"1760674376373-0.6068376666384709","timestamp":"2025-10-17T04:12:56.373Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"INSFORGE_INTERNAL_URL"}}
+{"id":"1760674376375-0.9235703491425724","timestamp":"2025-10-17T04:12:56.375Z","message":"✅ Database connected to PostgreSQL","level":"info","metadata":{"host":"localhost","port":"5432","database":"insforge"}}
+{"id":"1760674376376-0.022389999282703688","timestamp":"2025-10-17T04:12:56.376Z","message":"✅ Found 2 user tables","level":"info","metadata":{}}
+{"id":"1760674376381-0.7630872924592491","timestamp":"2025-10-17T04:12:56.381Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"INSFORGE_INTERNAL_URL"}}
+{"id":"1760674376209-0.4987702602861339","timestamp":"2025-10-17T04:12:56.205Z","message":"AuthService initialized","level":"info","metadata":{}}
+{"id":"1760674376270-0.09914193524272719","timestamp":"2025-10-17T04:12:56.269Z","message":"OAuthService initialized","level":"info","metadata":{}}
+{"id":"1760674376271-0.6846915229870605","timestamp":"2025-10-17T04:12:56.270Z","message":"AuditService initialized","level":"info","metadata":{}}
+{"id":"1760674376432-0.9574309900577127","timestamp":"2025-10-17T04:12:56.432Z","message":"Using log provider: File-based (no AWS credentials required)","level":"info","metadata":{}}
+{"id":"1760674376433-0.9686905954185174","timestamp":"2025-10-17T04:12:56.433Z","message":"File-based analytics initialized at: /Users/gary/projects/insforge-repo/InsForge/backend/insforge-logs","level":"info","metadata":{}}
+{"id":"1760674376440-0.9079704184961717","timestamp":"2025-10-17T04:12:56.439Z","message":"\n🚀 Insforge Backend Starting...","level":"info","metadata":{}}
+{"id":"1760674376440-0.07259381427349898","timestamp":"2025-10-17T04:12:56.440Z","message":"✅ Admin configured: admin@example.com","level":"info","metadata":{}}
+{"id":"1760674376452-0.703001056366021","timestamp":"2025-10-17T04:12:56.451Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"API_KEY"}}
+{"id":"1760674376452-0.739509714859538","timestamp":"2025-10-17T04:12:56.452Z","message":"✅ API key exists in database","level":"info","metadata":{}}
+{"id":"1760674376456-0.07024861842494023","timestamp":"2025-10-17T04:12:56.455Z","message":"✅ Database connected to PostgreSQL","level":"info","metadata":{"host":"localhost","port":"5432","database":"insforge"}}
+{"id":"1760674376456-0.5080403306745469","timestamp":"2025-10-17T04:12:56.456Z","message":"✅ Found 2 user tables","level":"info","metadata":{}}
+{"id":"1760674376459-0.3853433063789875","timestamp":"2025-10-17T04:12:56.459Z","message":"Secret retrieved by key","level":"info","metadata":{"key":"INSFORGE_INTERNAL_URL"}}
