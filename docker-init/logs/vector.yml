@@ -198,6 +198,8 @@ sinks:
     stream_name: ${HOSTNAME_OVERRIDE:-local}-insforge-vector
     encoding:
       codec: json
+    healthcheck:
+      enabled: false
   cw_rest:
     type: aws_cloudwatch_logs
     inputs:
@@ -207,6 +209,8 @@ sinks:
     stream_name: ${HOSTNAME_OVERRIDE:-local}-postgrest-vector
     encoding:
       codec: json
+    healthcheck:
+      enabled: false
   cw_deno:
     type: aws_cloudwatch_logs
     inputs:
@@ -216,6 +220,8 @@ sinks:
     stream_name: ${HOSTNAME_OVERRIDE:-local}-function-vector
     encoding:
       codec: json
+    healthcheck:
+      enabled: false
   cw_db:
     type: aws_cloudwatch_logs
     inputs:
@@ -225,3 +231,5 @@ sinks:
     stream_name: ${HOSTNAME_OVERRIDE:-local}-postgres-vector
     encoding:
       codec: json
+    healthcheck:
+      enabled: false

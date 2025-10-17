@@ -94,6 +94,13 @@ services:
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+      # Logs directory
+      - LOGS_DIR=/insforge-logs
+      # Storage directory (for local file storage when S3 is not configured)
+      - STORAGE_DIR=/insforge-storage
+    volumes:
+      - storage-data:/insforge-storage
+      - shared-logs:/insforge-logs
     restart: unless-stopped
     networks:
       - insforge-network
@@ -138,10 +145,47 @@ services:
     networks:
       - insforge-network
 
+  # Vector.dev for log collection and shipping
+  vector:
+    container_name: insforge-vector
+    image: timberio/vector:0.28.1-alpine
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgrest:
+        condition: service_started
+      insforge:
+        condition: service_started
+      deno:
+        condition: service_started
+    volumes:
+      - ./docker-init/logs/vector.yml:/etc/vector/vector.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - shared-logs:/insforge-logs
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:7135/health"]
+      timeout: 5s
+      interval: 5s
+      retries: 3
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_REGION=${AWS_REGION:-skip}
+      - PROJECT_ID=${PROJECT_ID:-}
+      - HOSTNAME_OVERRIDE=${HOSTNAME_OVERRIDE:-}
+    command: ["--config", "/etc/vector/vector.yml"]
+    networks:
+      - insforge-network
+
 volumes:
   postgres-data:
     driver: local
   deno_cache:
+    driver: local
+  storage-data:
+    driver: local
+  shared-logs:
     driver: local
 
 networks:

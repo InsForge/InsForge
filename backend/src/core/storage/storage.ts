@@ -1,6 +1,5 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { DatabaseManager } from '@/core/database/manager.js';
 import { StorageRecord, BucketRecord } from '@/types/storage.js';
 import {
@@ -27,9 +26,6 @@ import { AppError } from '@/api/middleware/error';
 import { ERROR_CODES } from '@/types/error-constants';
 import { escapeSqlLikePattern, escapeRegexPattern } from '@/utils/validations.js';
 import { getApiBaseUrl } from '@/utils/environment';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // Storage backend interface
 interface StorageBackend {
@@ -451,7 +447,7 @@ export class StorageService {
       this.backend = new S3StorageBackend(s3Bucket, appKey, process.env.AWS_REGION || 'us-east-2');
     } else {
       // Use local filesystem backend
-      const baseDir = process.env.STORAGE_DIR || path.join(__dirname, '../../data/storage');
+      const baseDir = process.env.STORAGE_DIR || path.resolve(process.cwd(), 'insforge-storage');
       this.backend = new LocalStorageBackend(baseDir);
     }
   }
