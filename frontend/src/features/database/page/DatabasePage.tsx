@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Plus, FileUp } from 'lucide-react';
 import PencilIcon from '@/assets/icons/pencil.svg?react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import { useTables } from '@/features/database/hooks/useTables';
@@ -32,6 +32,7 @@ import {
   SocketMessage,
   useSocket,
 } from '@/lib/contexts/SocketContext';
+import { CSVImportDialog } from '../components/CSVImportDialog';
 
 const PAGE_SIZE = 50;
 
@@ -51,6 +52,7 @@ function DatabasePageContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isSorting, setIsSorting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showCSVImport, setShowCSVImport] = useState(false);
 
   const { confirm, confirmDialogProps } = useConfirm();
   const { showToast } = useToast();
@@ -449,9 +451,18 @@ function DatabasePageContent() {
                           debounceTime={300}
                         />
                       )}
+
                       <div className="flex items-center gap-2 ml-4">
                         {selectedRows.size === 0 && selectedTable !== 'users' && (
                           <>
+                            {/* CSV Import Button with Text */}
+                            <Button
+                              className="h-10 px-4 font-medium gap-1.5 dark:bg-emerald-300 dark:hover:bg-emerald-400"
+                              onClick={() => setShowCSVImport(true)}
+                            >
+                              <FileUp className="w-4 h-4" />
+                              <span className="text-sm font-medium">Import CSV</span>
+                            </Button>
                             {/* Add Record Button */}
                             <Button
                               className="h-10 px-4 font-medium gap-1.5 dark:bg-emerald-300 dark:hover:bg-emerald-400"
@@ -514,6 +525,22 @@ function DatabasePageContent() {
           </>
         )}
       </div>
+
+      {/* CSV Import Dialog */}
+      {selectedTable && (
+        <CSVImportDialog
+          open={showCSVImport}
+          onOpenChange={setShowCSVImport}
+          tableName={selectedTable}
+          onSuccess={() => {
+            void refetchTableData();
+            void refetchTables();
+            if (selectedTable) {
+              void queryClient.invalidateQueries({ queryKey: ['table-schema', selectedTable] });
+            }
+          }}
+        />
+      )}
 
       {/* Add Record Form */}
       {selectedTable && schemaData && (

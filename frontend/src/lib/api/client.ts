@@ -83,6 +83,12 @@ export class ApiClient {
           }
         }
 
+        // For CSV validation errors (400 with rowErrors), throw the entire error object
+        // This allows the component to detect and display validation errors properly
+        if (response.status === 400 && errorData.rowErrors) {
+          throw errorData;
+        }
+
         // Handle traditional REST error format
         if (errorData.error && errorData.message) {
           const error: ApiError = new Error(errorData.message);

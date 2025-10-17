@@ -3,6 +3,37 @@ import { apiClient } from '@/lib/api/client';
 import { ColumnSchema } from '@insforge/shared-schemas';
 import { tableService } from './table.service';
 
+export interface CSVImportMetadata {
+  successCount: number;
+  failedCount: number;
+  failedRows: Array<{
+    rowNumber: number;
+    errors: string[];
+  }>;
+  totalFailedRows: number;
+  message: string;
+}
+export interface CSVImportResponse {
+  success: boolean;
+  message?: string;
+  data?: unknown;
+  csvImport?: {
+    successCount: number;
+    failedCount: number;
+    failedRows: Array<{
+      rowNumber: number;
+      errors: string[];
+    }>;
+    totalFailedRows: number;
+  };
+  rowErrors?: Array<{
+    rowNumber: number;
+    errors: string[];
+  }>;
+  totalRowErrors?: number;
+  validRowCount?: number;
+  errors?: string[];
+}
 export class RecordService {
   /**
    * Data fetching method with built-in search, sorting, and pagination for UI components.
@@ -158,6 +189,64 @@ export class RecordService {
       method: 'DELETE',
       headers: apiClient.withAccessToken(),
     });
+  }
+
+  validateCSVFile(file: File): { valid: boolean; error?: string } {
+    if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
+      return { valid: false, error: 'Invalid file type. Please upload a CSV file.' };
+    }
+    const maxSizeInBytes = 50 * 1024 * 1024;
+    if (file.size > maxSizeInBytes) {
+      return { valid: false, error: `File size exceeds the limit of ${maxSizeInBytes} bytes.` };
+    }
+    return { valid: true };
+  }
+
+  async importCSV(tableName: string, file: File): Promise<CSVImportResponse> {
+    const validation = this.validateCSVFile(file);
+    if (!validation.valid) {
+      throw new Error(validation.error || 'Invalid CSV file.');
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    return apiClient.request(`/database/records/import/${tableName}`, {
+      method: 'POST',
+      headers: apiClient.withAccessToken(),
+      body: formData,
+    });
+  }
+
+  async downloadSampleCSV(tableName: string): Promise<void> {
+    try {
+      const token = apiClient.getToken();
+      const endpoint = `/api/database/records/sample/${tableName}`;
+
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: {
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to download sample CSV: ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${tableName}_sample.csv`;
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to download sample CSV');
+    }
   }
 }
 

@@ -2,11 +2,19 @@ import { Router, Response, NextFunction } from 'express';
 import axios from 'axios';
 import http from 'http';
 import https from 'https';
+import { upload } from '@/api/middleware/upload.js';
 import { AuthRequest, extractApiKey } from '@/api/middleware/auth.js';
 import { DatabaseManager } from '@/core/database/manager.js';
+import { DatabaseTableService } from '@/core/database/table';
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { validateTableName } from '@/utils/validations.js';
+import { parseAndValidateCSV, CSVValidationError } from '@/utils/import-csv';
+import { preScanCSVForCandidates, logPreScanResults } from '@/utils/pre-scan-candidate';
+import {
+  fetchConstraintValuesFromDB,
+  buildConstraintCheckers,
+} from '@/utils/table-constraint-checker';
 import { DatabaseRecord } from '@/types/database.js';
 import { successResponse } from '@/utils/response.js';
 import logger from '@/utils/logger.js';
@@ -56,6 +64,13 @@ const adminToken = authService.generateToken({
   email: 'project-admin@email.com',
   role: 'project_admin',
 });
+interface CSVImportMetadata {
+  isCSVImport: boolean;
+  successCount: number;
+  failedCount: number;
+  failedRows: CSVValidationError[];
+  totalFailedRows: number;
+}
 
 // anonymous users can access the database, postgREST does not require authentication, however we seed to unwrap session token for better auth, thus
 // we need to verify user token below.
@@ -64,7 +79,12 @@ const adminToken = authService.generateToken({
 /**
  * Forward database requests to PostgREST
  */
-const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFunction) => {
+const forwardToPostgrest = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+  csvImportMetadata?: CSVImportMetadata
+) => {
   const { tableName } = req.params;
   const wildcardPath = req.params[0] || '';
 
@@ -203,7 +223,26 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
       responseData = [];
     }
 
-    successResponse(res, responseData, response.status);
+    const csvMetadata = csvImportMetadata;
+    if (csvMetadata?.isCSVImport) {
+      logger.info('CSV import completed successfully', {
+        table: req.params.tableName,
+        recordsImported: csvMetadata.successCount,
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: `Successfully imported ${csvMetadata.successCount} record${csvMetadata.successCount !== 1 ? 's' : ''}`,
+        csvImport: {
+          successCount: csvMetadata.successCount,
+          failedCount: 0,
+          failedRows: [],
+          totalFailedRows: 0,
+        },
+      });
+    } else {
+      successResponse(res, responseData, response.status);
+    }
   } catch (error) {
     if (axios.isAxiosError(error)) {
       // Log more detailed error information
@@ -238,6 +277,275 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
     }
   }
 };
+
+router.post(
+  '/import/:tableName',
+  upload.single('file'),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { tableName } = req.params;
+
+      if (!req.file) {
+        throw new AppError(
+          'No file provided',
+          400,
+          ERROR_CODES.INVALID_INPUT,
+          'Please upload a CSV file'
+        );
+      }
+
+      if (!req.file.mimetype.includes('text/csv') && !req.file.originalname.endsWith('.csv')) {
+        throw new AppError(
+          'Invalid file type',
+          400,
+          ERROR_CODES.INVALID_INPUT,
+          'Please upload a valid CSV file'
+        );
+      }
+
+      try {
+        validateTableName(tableName);
+      } catch (error) {
+        if (error instanceof AppError) {
+          throw error;
+        }
+        throw new AppError('Invalid table name', 400, ERROR_CODES.INVALID_INPUT);
+      }
+
+      const tableService = new DatabaseTableService();
+      const tableSchema = await tableService.getTableSchema(tableName);
+      if (!tableSchema || tableSchema.columns.length === 0) {
+        throw new AppError(
+          'Table not found',
+          404,
+          ERROR_CODES.DATABASE_NOT_FOUND,
+          `Table ${tableName} does not exist or has no columns`
+        );
+      }
+
+      logger.info('Starting CSV import', {
+        tableName,
+        fileName: req.file.originalname,
+        fileSize: req.file.size,
+      });
+
+      // Pre-scan CSV to collect candidate values
+      let preScanResult;
+      try {
+        logger.info('Pre-scanning CSV for candidate values');
+        preScanResult = await preScanCSVForCandidates(req.file.buffer, tableSchema.columns);
+        logPreScanResults(tableName, preScanResult);
+      } catch (prescanError) {
+        logger.error('CSV pre-scan failed', { error: prescanError });
+        throw new AppError(
+          'Failed to pre-scan CSV file',
+          400,
+          ERROR_CODES.INVALID_INPUT,
+          prescanError instanceof Error ? prescanError.message : 'Unknown error'
+        );
+      }
+
+      // Batch query database for existing constraint values
+      let existingDbValues: Record<string, Set<string>> = {};
+      try {
+        logger.info('Starting batch database queries for constraint validation');
+        existingDbValues = await fetchConstraintValuesFromDB(
+          postgrestAxios,
+          postgrestUrl,
+          adminToken,
+          tableName,
+          tableSchema.columns,
+          preScanResult.candidateValues
+        );
+      } catch (dbQueryError) {
+        logger.error('Database batch query failed', { error: dbQueryError });
+        throw new AppError(
+          'Failed to validate constraints',
+          500,
+          ERROR_CODES.INTERNAL_ERROR,
+          dbQueryError instanceof Error ? dbQueryError.message : 'Unknown error'
+        );
+      }
+
+      // Build constraint checkers using pre-fetched values
+      const constraintCheckers = buildConstraintCheckers(existingDbValues);
+
+      logger.info('Parsing and validating CSV with constraint checks');
+
+      // Parse and validate CSV with constraint information
+      const parseResult = await parseAndValidateCSV(req.file.buffer, tableSchema.columns, {
+        tableName,
+        checkUnique: constraintCheckers.checkUnique,
+        checkForeignKey: constraintCheckers.checkForeignKey,
+      });
+
+      // Check for header validation errors
+      if (parseResult.validationErrors.length > 0) {
+        logger.warn('CSV header validation failed', {
+          tableName,
+          errors: parseResult.validationErrors,
+        });
+
+        return res.status(400).json({
+          success: false,
+          message: 'CSV header validation failed. Please check the column names in your file.',
+          errors: parseResult.validationErrors,
+          rowErrors: [],
+          totalRowErrors: 0,
+        });
+      }
+
+      // Check if there are ANY row errors - reject import if any exist
+      if (parseResult.rowErrors.length > 0) {
+        logger.warn('CSV validation failed with row errors', {
+          tableName,
+          failedRowCount: parseResult.rowErrors.length,
+          validRowCount: parseResult.rows.length,
+        });
+
+        return res.status(400).json({
+          success: false,
+          message: `Import failed: ${parseResult.rowErrors.length} row${parseResult.rowErrors.length !== 1 ? 's have' : ' has'} validation errors. Please fix all errors and try again.`,
+          rowErrors: parseResult.rowErrors.slice(0, 20),
+          totalRowErrors: parseResult.rowErrors.length,
+          validRowCount: parseResult.rows.length,
+        });
+      }
+
+      // All rows are valid - proceed with import
+      if (parseResult.rows.length === 0) {
+        logger.warn('No valid rows in CSV after validation', { tableName });
+
+        return res.status(400).json({
+          success: false,
+          message: 'No valid rows found in CSV file',
+          rowErrors: [],
+          totalRowErrors: 0,
+        });
+      }
+
+      logger.info('CSV validation passed, proceeding with import', {
+        tableName,
+        validRowCount: parseResult.rows.length,
+      });
+
+      // Inject parsed rows into request body
+      req.body = parseResult.rows;
+      req.method = 'POST';
+      req.params[0] = '';
+
+      delete req.file;
+      delete (req.headers as Record<string, unknown>)['content-type'];
+      delete (req.headers as Record<string, unknown>)['content-length'];
+      delete (req.headers as Record<string, unknown>)['transfer-encoding'];
+
+      // Attach CSV metadata for response handling
+      const csvMetadata: CSVImportMetadata = {
+        isCSVImport: true,
+        successCount: parseResult.rows.length,
+        failedCount: 0,
+        failedRows: [],
+        totalFailedRows: 0,
+      };
+
+      // Forward to PostgREST for actual insertion
+      return forwardToPostgrest(req, res, next, csvMetadata);
+    } catch (error) {
+      logger.error('CSV import preprocessing failed', {
+        tableName: req.params.tableName,
+        error,
+      });
+      next(error);
+    }
+  }
+);
+
+router.get('/sample/:tableName', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { tableName } = req.params;
+
+    // Validate table name
+    try {
+      validateTableName(tableName);
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new AppError('Invalid table name', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
+    // Retrieve table schema
+    let tableSchema;
+    const tableService = new DatabaseTableService();
+    try {
+      tableSchema = await tableService.getTableSchema(tableName);
+    } catch (error) {
+      logger.error('Failed to retrieve table schema for sample CSV', {
+        tableName,
+        error,
+      });
+      throw new AppError(
+        'Table not found',
+        404,
+        ERROR_CODES.DATABASE_NOT_FOUND,
+        `Table "${tableName}" does not exist`
+      );
+    }
+
+    if (!tableSchema || tableSchema.columns.length === 0) {
+      throw new AppError(
+        'Table has no columns',
+        400,
+        ERROR_CODES.INVALID_INPUT,
+        `Table "${tableName}" exists but has no columns defined`
+      );
+    }
+    const systemColumns = new Set(['id', 'created_at', 'updated_at']);
+    const userColumns = tableSchema.columns.filter((col) => !systemColumns.has(col.columnName));
+
+    if (userColumns.length === 0) {
+      throw new AppError(
+        'No user-defined columns',
+        400,
+        ERROR_CODES.INVALID_INPUT,
+        `Table "${tableName}" has no user-defined columns (only system columns)`
+      );
+    }
+
+    // Build CSV header from filtered columns
+    const headers = userColumns
+      .map((col) => {
+        // Escape column names with special characters
+        if (col.columnName.includes(',') || col.columnName.includes('"')) {
+          return `"${col.columnName.replace(/"/g, '""')}"`;
+        }
+        return col.columnName;
+      })
+      .join(',');
+
+    const csvContent = `${headers}\n`;
+
+    // Set headers for file download
+    const fileName = `${tableName}_sample.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+
+    logger.info('Sample CSV generated', {
+      tableName,
+      columnCount: tableSchema.columns.length,
+      fileName,
+    });
+
+    res.send(csvContent);
+  } catch (error) {
+    logger.error('Failed to generate sample CSV', {
+      tableName: req.params.tableName,
+      error,
+    });
+    next(error);
+  }
+});
 
 // Forward all database operations to PostgREST
 router.all('/:tableName', forwardToPostgrest);
