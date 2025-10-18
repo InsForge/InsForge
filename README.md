@@ -143,3 +143,4 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 - [Korean | 한국어](/i18n/README.ko.md)
 - [Portuguese (Brazilian) / Português Brasileiro](/i18n/README.pt-BR.md)
 - [Russian | Русский](/i18n/README.ru.md)
+- [Chinese (Simplified) | 简体中文](/i18n/README.zh-CN.md)
