@@ -134,9 +134,11 @@ router.get('/admin-password', (_req: Request, res: Response, next: NextFunction)
     }
     const adminPassword = process.env.ADMIN_PASSWORD;
 
-    res.json({
-      password: adminPassword,
-    });
+    if (!adminPassword) {
+      throw new AppError('Admin password not configured', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+
+    successResponse(res, { password: adminPassword });
   } catch (error) {
     next(error);
   }

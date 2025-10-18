@@ -48,7 +48,9 @@ export default function LoginPage() {
         const response = await fetch('/api/auth/admin-password');
         if (response.ok) {
           const credentials = await response.json();
-          form.setValue('password', credentials.password);
+          if (credentials.password && typeof credentials.password === 'string') {
+            form.setValue('password', credentials.password);
+          }
         }
       } catch (error) {
         // Fallback to defaults if fetch fails
@@ -57,7 +59,7 @@ export default function LoginPage() {
     };
 
     void fetchAdminCredentials();
-  }, [form]);
+  }, []);
 
   const onSubmit = async (data: LoginFormData) => {
     setIsSubmitting(true);
