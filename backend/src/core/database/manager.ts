@@ -172,51 +172,57 @@ export class DatabaseManager {
   async getMetadata(): Promise<DatabaseMetadataSchema> {
     const client = await this.pool.connect();
     try {
-      // Fetch all tables, database size, and record counts in parallel
-      const [allTables, databaseSize, countResults] = await Promise.all([
-        this.getUserTables(),
+      // Fetch database size and record counts in parallel
+      const [databaseSize, countResults] = await Promise.all([
         this.getDatabaseSizeInGB(),
         // Get all counts in a single query using UNION ALL
         (async () => {
           try {
             const tablesResult = await client.query(
               `
-              SELECT table_name as name
+              SELECT table_schema as schema, table_name as name
               FROM information_schema.tables
-              WHERE table_schema = 'public'
-              AND table_type = 'BASE TABLE'
+              WHERE table_type = 'BASE TABLE'
               AND (table_name NOT LIKE '\\_%')
-              ORDER BY table_name
+              AND table_schema NOT IN ('information_schema', 'pg_catalog')
+              AND table_schema NOT LIKE 'pg_%'
+              ORDER BY table_schema, table_name
             `
             );
-            const tableNames = tablesResult.rows.map((row: { name: string }) => row.name);
+            const tables = tablesResult.rows.map((row: { schema: string; name: string }) => ({
+              schema: row.schema,
+              name: row.name,
+            }));
 
-            if (tableNames.length === 0) {
+            if (tables.length === 0) {
               return [];
             }
 
             // Build a UNION ALL query to get all counts in one query
-            const unionQuery = tableNames
+            const unionQuery = tables
               .map(
-                (tableName) =>
-                  `SELECT '${tableName.replace(/'/g, "''")}' as table_name, COUNT(*) as count FROM "${tableName}"`
+                (table) =>
+                  `SELECT '${table.schema.replace(/'/g, "''")}' as schema, '${table.name.replace(/'/g, "''")}' as table_name, COUNT(*) as count FROM "${table.schema}"."${table.name}"`
               )
               .join(' UNION ALL ');
 
             const result = await client.query(unionQuery);
-            return result.rows as { table_name: string; count: number }[];
+            return result.rows as { schema: string; table_name: string; count: number }[];
           } catch {
             return [];
           }
         })(),
       ]);
 
-      // Map the count results to a lookup object
-      const countMap = new Map(countResults.map((r) => [r.table_name, Number(r.count)]));
+      // Map the count results to a lookup object (use schema.table as key)
+      const countMap = new Map(
+        countResults.map((r) => [`${r.schema}.${r.table_name}`, Number(r.count)])
+      );
 
-      const tableMetadatas = allTables.map((tableName) => ({
-        tableName,
-        recordCount: countMap.get(tableName) || 0,
+      const tableMetadatas = countResults.map((r) => ({
+        schema: r.schema,
+        tableName: r.table_name,
+        recordCount: Number(r.count),
       }));
 
       return {

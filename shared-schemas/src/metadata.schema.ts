@@ -9,6 +9,7 @@ export const authMetadataSchema = z.object({
 export const databaseMetadataSchema = z.object({
   tables: z.array(
     z.object({
+      schema: z.string(),
       tableName: z.string(),
       recordCount: z.number(),
     })
