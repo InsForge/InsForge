@@ -8,7 +8,19 @@ export TEST_API_BASE="${TEST_API_BASE:-http://localhost:7130/api}"
 
 # Admin credentials - can be overridden by environment variables
 export TEST_ADMIN_EMAIL="${TEST_ADMIN_EMAIL:-${ADMIN_EMAIL:-admin@example.com}}"
-export TEST_ADMIN_PASSWORD="${TEST_ADMIN_PASSWORD:-${ADMIN_PASSWORD:-change-this-password}}"
+
+# Fetch admin password from backend if not set
+if [ -z "$TEST_ADMIN_PASSWORD" ]; then
+    # Try to fetch from backend's /admin-password endpoint
+    fetched_pwd=$(curl -s "$TEST_API_BASE/auth/admin-password" 2>/dev/null | grep -o '"password":"[^"]*"' | cut -d'"' -f4)
+    if [ -n "$fetched_pwd" ]; then
+        TEST_ADMIN_PASSWORD="$fetched_pwd"
+    else
+        # Fall back to environment variable or hardcoded default
+        TEST_ADMIN_PASSWORD="${ADMIN_PASSWORD:-change-this-password}"
+    fi
+fi
+export TEST_ADMIN_PASSWORD
 
 # User test credentials
 export TEST_USER_EMAIL_PREFIX="${TEST_USER_EMAIL_PREFIX:-testuser_}"

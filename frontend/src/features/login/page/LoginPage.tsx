@@ -41,6 +41,24 @@ export default function LoginPage() {
     },
   });
 
+  // Add this useEffect to fetch admin password
+  useEffect(() => {
+    const fetchAdminCredentials = async () => {
+      try {
+        const response = await fetch('/api/auth/admin-password');
+        if (response.ok) {
+          const credentials = await response.json();
+          form.setValue('password', credentials.password);
+        }
+      } catch (error) {
+        // Fallback to defaults if fetch fails
+        console.warn('Could not fetch admin credentials, using defaults', error);
+      }
+    };
+
+    void fetchAdminCredentials();
+  }, [form]);
+
   const onSubmit = async (data: LoginFormData) => {
     setIsSubmitting(true);
     setSubmitError(null);
