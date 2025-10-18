@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { LockIcon } from 'lucide-react';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
+import { postMessageToParent } from '@/lib/utils/cloud-messaging';
 
 export default function CloudLoginPage() {
   const navigate = useNavigate();
@@ -33,7 +34,7 @@ export default function CloudLoginPage() {
             if (success) {
               // Notify parent of success
               if (window.parent !== window) {
-                window.parent.postMessage(
+                postMessageToParent(
                   {
                     type: 'AUTH_SUCCESS',
                   },
@@ -43,7 +44,7 @@ export default function CloudLoginPage() {
             } else {
               setAuthError('The authorization code may have expired or already been used.');
               if (window.parent !== window) {
-                window.parent.postMessage(
+                postMessageToParent(
                   {
                     type: 'AUTH_ERROR',
                     message: 'Authorization code validation failed',
@@ -57,7 +58,7 @@ export default function CloudLoginPage() {
             console.error('Authorization code exchange failed:', error);
             setAuthError('The authorization code may have expired or already been used.');
             if (window.parent !== window) {
-              window.parent.postMessage(
+              postMessageToParent(
                 {
                   type: 'AUTH_ERROR',
                   message: 'Authorization code validation failed',

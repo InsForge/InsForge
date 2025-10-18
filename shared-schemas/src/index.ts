@@ -11,3 +11,4 @@ export * from './logs.schema';
 export * from './logs-api.schema';
 export * from './functions.schema';
 export * from './functions-api.schema';
+export * from './cloud-events.schema';
