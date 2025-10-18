@@ -141,4 +141,49 @@ else
     track_test_failure
 fi
 
+echo ""
+
+# 6. get admin password (development mode only)
+echo "🔑 Getting admin password from backend..."
+admin_pwd_response=$(curl -s -w "\n%{http_code}" -X GET "$API_BASE/auth/admin-password" \
+    -H "Content-Type: application/json")
+
+admin_pwd_body=$(echo "$admin_pwd_response" | sed '$d')
+admin_pwd_status=$(echo "$admin_pwd_response" | tail -n 1)
+
+if [ "$admin_pwd_status" -eq 200 ]; then
+    if echo "$admin_pwd_body" | grep -q '"password"'; then
+        fetched_password=$(echo "$admin_pwd_body" | grep -o '"password":"[^"]*"' | cut -d'"' -f4)
+        print_success "Admin password fetched successfully"
+        echo "Password: $fetched_password"
+
+        # 7. Test admin login with fetched password
+        echo ""
+        echo "🔐 Testing admin login with fetched password..."
+        admin_login_response=$(curl -s -X POST "$API_BASE/auth/admin/sessions" \
+            -H "Content-Type: application/json" \
+            -d '{"email":"'"$TEST_ADMIN_EMAIL"'","password":"'"$fetched_password"'"}')
+
+        if echo "$admin_login_response" | grep -q '"accessToken"'; then
+            print_success "Admin login successful with fetched password"
+        else
+            print_fail "Admin login failed with fetched password"
+            echo "Response: $admin_login_response"
+            track_test_failure
+        fi
+    else
+        print_fail "Admin password response missing 'password' field"
+        echo "Response: $admin_pwd_body"
+        track_test_failure
+    fi
+elif [ "$admin_pwd_status" -eq 404 ]; then
+    print_info "Admin password endpoint returned 404 (expected in production mode)"
+else
+    print_fail "Admin password endpoint failed (Status: $admin_pwd_status)"
+    echo "Response: $admin_pwd_body"
+    track_test_failure
+fi
+
+echo ""
+
 print_success "🎉 Auth router test completed!" 

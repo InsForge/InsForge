@@ -126,6 +126,24 @@ router.post('/admin/sessions', (req: Request, res: Response, next: NextFunction)
   }
 });
 
+router.get('/admin-password', (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Only expose in development mode for security
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    const adminPassword = process.env.ADMIN_PASSWORD;
+
+    if (!adminPassword) {
+      throw new AppError('Admin password not configured', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+
+    successResponse(res, { password: adminPassword });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/auth/sessions/current - Get current session user
 router.get('/sessions/current', (req: Request, res: Response, next: NextFunction) => {
   try {
