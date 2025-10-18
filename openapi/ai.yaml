@@ -583,13 +583,22 @@ components:
     CreateAIConfigurationRequest:
       type: object
       required:
-        - modality
+        - inputModality
+        - outputModality
         - provider
         - modelId
+        
       properties:
-        modality:
-          type: string
-          enum: [text, image]
+        inputModality:
+          type: array
+          items:
+            type: string
+            enum: [text, image]
+        outputModality:
+          type: array
+          items:
+            type: string
+            enum: [text, image]
         provider:
           type: string
           example: openrouter
@@ -672,6 +681,24 @@ components:
         createdAt:
           type: string
           format: date-time
+        provider:
+          type: string
+          nullable: true
+        model:
+          type: string
+          nullable: true
+        inputModality:
+          type: array
+          nullable: true
+          items:
+            type: string
+            enum: [text, image]
+        outputModality:
+          type: array
+          nullable: true
+          items:
+            type: string
+            enum: [text, image]
 
     ErrorResponse:
       type: object

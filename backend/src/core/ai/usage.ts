@@ -241,7 +241,8 @@ export class AIUsageService {
           u.model_id as "modelId",
           COALESCE(u.model_id, c.model_id) as "model",
           c.provider,
-          c.modality
+          c.input_modality as "inputModality",
+          c.output_modality as "outputModality"
         FROM _ai_usage u
         LEFT JOIN _ai_configs c ON u.config_id = c.id
         WHERE 1=1
