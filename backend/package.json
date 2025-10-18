@@ -48,6 +48,7 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-rate-limit": "^7.1.5",
+    "fast-csv": "^5.0.5",
     "google-auth-library": "^10.1.0",
     "jose": "^6.1.0",
     "jsonwebtoken": "^9.0.2",
