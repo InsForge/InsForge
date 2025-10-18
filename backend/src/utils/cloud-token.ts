@@ -1,6 +1,6 @@
 import { createRemoteJWKSet, JWTPayload, jwtVerify } from 'jose';
-import { AppError } from '@/api/middleware/error.js';
-import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
+import { AppError } from '@/api/middleware/error';
+import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants';
 
 /**
  * Helper function to verify cloud backend JWT token

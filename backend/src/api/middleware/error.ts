@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { DatabaseError } from 'pg';
 import { errorResponse } from '@/utils/response.js';
-import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
-import logger from '@/utils/logger.js';
+import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants';
+import logger from '@/utils/logger';
 
 export class AppError extends Error {
   constructor(
