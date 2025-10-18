@@ -5,6 +5,7 @@ import Github from '@/assets/logos/github.svg?react';
 import Google from '@/assets/logos/google.svg?react';
 import Discord from '@/assets/logos/discord.svg?react';
 import LinkedIn from '@/assets/logos/linkedin.svg?react';
+import Facebook from '@/assets/logos/facebook.svg?react';
 import { OAuthEmptyState } from './OAuthEmptyState';
 import { OAuthConfigDialog } from './OAuthConfigDialog';
 import { AddOAuthDialog } from './AddOAuthDialog';
@@ -47,10 +48,17 @@ const providers: OAuthProviderInfo[] = [
     description: 'Configure LinkedIn authentication for your users',
     setupUrl: 'https://www.linkedin.com/developers/apps',
   },
+  {
+    id: 'facebook',
+    name: 'Facebook OAuth',
+    icon: <Facebook className="w-6 h-6" />,
+    description: 'Configure Facebook authentication for your users',
+    setupUrl: 'https://developers.facebook.com/apps',
+  },
 ];
 
 export interface OAuthProviderInfo {
-  id: 'google' | 'github' | 'discord' | 'linkedin';
+  id: 'google' | 'github' | 'discord' | 'linkedin' | 'facebook';
   name: string;
   icon: ReactElement;
   description: string;
@@ -77,7 +85,7 @@ export function AuthMethodTab() {
   };
 
   const deleteOAuthConfig = async (
-    providerId: 'google' | 'github' | 'linkedin' | 'discord',
+    providerId: 'google' | 'github' | 'linkedin' | 'discord' | 'facebook',
     providerName: string
   ) => {
     const shouldDelete = await confirm({
@@ -116,6 +124,7 @@ export function AuthMethodTab() {
       github: isProviderConfigured('github'),
       discord: isProviderConfigured('discord'),
       linkedin: isProviderConfigured('linkedin'),
+      facebook: isProviderConfigured('facebook'),
     };
   }, [isProviderConfigured]);
 
@@ -124,7 +133,9 @@ export function AuthMethodTab() {
     return providers.every((provider) => enabledProviders[provider.id]);
   }, [enabledProviders]);
 
-  const handleConfirmSelected = (selectedId: 'google' | 'github' | 'discord' | 'linkedin') => {
+  const handleConfirmSelected = (
+    selectedId: 'google' | 'github' | 'discord' | 'linkedin' | 'facebook'
+  ) => {
     // Find the selected provider
     const selectedProvider = providers.find((p) => p.id === selectedId);
     if (!selectedProvider) {

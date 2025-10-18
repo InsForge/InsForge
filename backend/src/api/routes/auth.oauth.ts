@@ -22,6 +22,38 @@ const authService = AuthService.getInstance();
 const oauthConfigService = OAuthConfigService.getInstance();
 const auditService = AuditService.getInstance();
 
+// GET /api/auth/oauth/facebook - Initialize Facebook OAuth flow
+router.get('/facebook', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { redirect_uri } = req.query;
+    if (!redirect_uri) {
+      throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
+    const jwtPayload = {
+      provider: 'facebook',
+      redirectUri: redirect_uri ? (redirect_uri as string) : undefined,
+      createdAt: Date.now(),
+    };
+    const state = jwt.sign(jwtPayload, process.env.JWT_SECRET || 'default_secret', {
+      algorithm: 'HS256',
+      expiresIn: '1h',
+    });
+    const authUrl = await authService.generateFacebookAuthUrl(state);
+
+    res.json({ authUrl });
+  } catch (error) {
+    logger.error('Facebook OAuth error', { error });
+    next(
+      new AppError(
+        'Facebook OAuth is not properly configured. Please check your oauth configurations.',
+        500,
+        ERROR_CODES.AUTH_OAUTH_CONFIG_ERROR
+      )
+    );
+  }
+});
+
 // GET /api/auth/oauth/google - Initialize Google OAuth flow
 router.get('/google', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -178,7 +210,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       throw new AppError('Invalid state parameter', 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    if (!['google', 'github', 'discord', 'linkedin'].includes(provider)) {
+    if (!['google', 'github', 'facebook', 'discord', 'linkedin'].includes(provider)) {
       logger.warn('Invalid provider in state', { provider });
       throw new AppError('Invalid provider in state', 400, ERROR_CODES.INVALID_INPUT);
     }
@@ -272,13 +304,21 @@ router.get('/:provider/callback', async (req: Request, res: Response, _: NextFun
       }
     }
 
-    if (!['google', 'github', 'discord', 'linkedin'].includes(provider)) {
+    if (!['google', 'github', 'facebook', 'discord', 'linkedin'].includes(provider)) {
       throw new AppError('Invalid provider', 400, ERROR_CODES.INVALID_INPUT);
     }
 
     let result;
 
-    if (provider === 'google') {
+    if (provider === 'facebook') {
+      if (!code) {
+        throw new AppError('No authorization code provided', 400, ERROR_CODES.INVALID_INPUT);
+      }
+
+      const accessToken = await authService.exchangeFacebookCodeForToken(code as string);
+      const facebookUserInfo = await authService.getFacebookUserInfo(accessToken);
+      result = await authService.findOrCreateFacebookUser(facebookUserInfo);
+    } else if (provider === 'google') {
       let id_token: string;
 
       if (token) {

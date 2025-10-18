@@ -45,6 +45,12 @@ const ProviderIcon = ({ provider }: { provider: string }) => {
           color:
             'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-500',
         };
+      case 'facebook':
+        return {
+          label: 'Facebook',
+          color:
+            'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-600',
+        };
       case 'email':
         return {
           label: 'Email',
