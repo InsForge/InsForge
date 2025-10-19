@@ -28,7 +28,7 @@ import {
   SocketMessage,
   useSocket,
 } from '@/lib/contexts/SocketContext';
-import { isInsForgeCloudProject } from '@/lib/utils/utils';
+import { isIframe } from '@/lib/utils/utils';
 
 interface BucketFormState {
   mode: 'create' | 'edit';
@@ -349,7 +349,7 @@ export default function StoragePage() {
                             </TooltipContent>
                           </Tooltip>
                         )}
-                        {!isInsForgeCloudProject() && (
+                        {!isIframe() && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button

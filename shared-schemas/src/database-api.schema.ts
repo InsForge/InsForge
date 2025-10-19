@@ -79,11 +79,11 @@ export const deleteTableResponse = z.object({
 // Raw SQL Schemas
 export const rawSQLRequestSchema = z.object({
   query: z.string().min(1, 'Query is required'),
-  params: z.array(z.any()).optional(),
+  params: z.array(z.unknown()).optional(),
 });
 
 export const rawSQLResponseSchema = z.object({
-  rows: z.array(z.any()),
+  rows: z.array(z.record(z.string(), z.unknown())),
   rowCount: z.number().nullable(),
   fields: z
     .array(
@@ -160,7 +160,7 @@ export const exportJsonDataSchema = z.object({
           oldTable: z.string().nullable(),
         })
       ),
-      rows: z.array(z.any()).optional(),
+      rows: z.array(z.record(z.string(), z.unknown())).optional(),
       recordCount: z.number().optional(),
     })
   ),

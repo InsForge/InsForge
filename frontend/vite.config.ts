@@ -4,6 +4,8 @@ import svgr from 'vite-plugin-svgr';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 
+const BACKEND_URL = process.env.VITE_API_BASE_URL || 'http://localhost:7130';
+
 export default defineConfig({
   plugins: [react(), tailwindcss(), svgr()],
   resolve: {
@@ -17,15 +19,15 @@ export default defineConfig({
     port: 7131,
     proxy: {
       '/api': {
-        target: 'http://localhost:7130',
+        target: BACKEND_URL,
         changeOrigin: true,
       },
       '/functions': {
-        target: 'http://localhost:7130',
+        target: BACKEND_URL,
         changeOrigin: true,
       },
       '/socket.io': {
-        target: 'http://localhost:7130',
+        target: BACKEND_URL,
         ws: true,
         changeOrigin: true,
       },

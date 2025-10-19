@@ -163,3 +163,7 @@ export const getBackendUrl = () => {
   const isHttp = window.location.protocol === 'http:';
   return isHttp ? 'http://localhost:7130' : window.location.origin;
 };
+
+export const isIframe = () => {
+  return window.self !== window.top;
+};

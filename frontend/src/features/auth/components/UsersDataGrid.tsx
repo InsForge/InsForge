@@ -33,6 +33,18 @@ const ProviderIcon = ({ provider }: { provider: string }) => {
           color:
             'bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-zinc-300 dark:border-gray-500',
         };
+      case 'discord':
+        return {
+          label: 'Discord',
+          color:
+            'bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-zinc-300 dark:border-gray-500',
+        };
+      case 'linkedin':
+        return {
+          label: 'LinkedIn',
+          color:
+            'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-500',
+        };
       case 'email':
         return {
           label: 'Email',
@@ -83,7 +95,7 @@ const IdentitiesCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
       {uniqueProviders.length > 2 && (
         <Badge
           variant="secondary"
-          className="text-xs bg-gray-100 text-gray-600 dark:bg-neutral-800 dark:text-zinc-300 dark:border-neutral-700"
+          className="text-xs px-2 py-1 bg-gray-100 text-gray-600 dark:bg-neutral-800 dark:text-zinc-300 dark:border-neutral-700 border border-transparent"
         >
           +{uniqueProviders.length - 2}
         </Badge>
@@ -124,7 +136,7 @@ export function createUsersColumns(): DataGridColumn<UserDataGridRow>[] {
     {
       key: 'identities',
       name: 'Identities',
-      width: '1fr',
+      width: '1.5fr',
       resizable: true,
       sortable: true,
       renderCell: IdentitiesCellRenderer,

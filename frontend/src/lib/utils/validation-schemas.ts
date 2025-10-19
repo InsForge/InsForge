@@ -106,7 +106,7 @@ export const jsonSchema = z
       }
     }),
     z.object({}).passthrough(),
-    z.array(z.any()),
+    z.array(z.unknown()),
     z.null(),
   ])
   .catch(() => {

@@ -182,6 +182,10 @@ export class OAuthConfigService {
           scopes = ['openid', 'email', 'profile'];
         } else if (provider === 'github') {
           scopes = ['user:email'];
+        } else if (provider === 'discord') {
+          scopes = ['identify', 'email'];
+        } else if (provider === 'linkedin') {
+          scopes = ['openid', 'profile', 'email'];
         }
       }
 

@@ -184,7 +184,7 @@ function FormNumberEditor({ value, type, onChange, tableName, field }: FormNumbe
         }
       }}
       placeholder={getPlaceholderText(field)}
-      className={`dark:text-white dark:placeholder:text-neutral-400 dark:bg-neutral-900 dark:border-neutral-700 ${field.foreignKey ? 'pr-16' : ''}`}
+      className={`dark:text-white dark:placeholder:text-neutral-400 dark:bg-neutral-900 dark:border-neutral-700 ${field.foreignKey ? 'pr-18' : ''}`}
     />
   );
 }
@@ -310,14 +310,14 @@ function FieldWithLink({ field, control, children }: FieldWithLinkProps) {
               <div className="space-y-1">
                 <div className="relative">
                   {modifiedChildren}
-                  <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center">
-                    {hasLinkedValue && (
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    {(hasLinkedValue || hasLinkedValue === 0) && (
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
                         onClick={() => formField.onChange('')}
-                        className="h-7 w-7 p-1 flex-shrink-0 text-zinc-500 hover:text-red-600 hover:bg-red-50 dark:text-neutral-400 dark:hover:text-red-400 dark:hover:bg-red-950/20"
+                        className="h-7 w-7 p-1 flex-shrink-0 text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 dark:text-neutral-400 dark:hover:text-neutral-200 dark:hover:bg-neutral-700"
                         title="Clear linked record"
                       >
                         <X className="h-4 w-4" />

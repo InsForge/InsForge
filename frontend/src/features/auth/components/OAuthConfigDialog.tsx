@@ -63,6 +63,11 @@ export function OAuthConfigDialog({
   const clientId = form.watch('clientId');
   const clientSecret = form.watch('clientSecret');
 
+  // Our Cloud only support shared keys of these OAuth Providers for now
+  const isSharedKeysAvailable =
+    isInsForgeCloudProject() &&
+    ['google', 'github', 'discord', 'linkedin', 'facebook'].includes(provider?.id ?? '');
+
   // Use useFormState hook for better reactivity
   const { isDirty } = useFormState({
     control: form.control,
@@ -90,11 +95,11 @@ export function OAuthConfigDialog({
           provider: provider.id,
           clientId: '',
           clientSecret: '',
-          useSharedKey: isInsForgeCloudProject(),
+          useSharedKey: isSharedKeysAvailable,
         });
       }
     }
-  }, [isOpen, provider, providerConfig, form, isLoadingProvider]);
+  }, [form, isLoadingProvider, isOpen, isSharedKeysAvailable, provider, providerConfig]);
 
   const handleSubmitData = (data: OAuthConfigSchema & { clientSecret?: string }) => {
     if (!provider) {
@@ -160,8 +165,6 @@ export function OAuthConfigDialog({
     // If NOT using shared keys, require both clientId and clientSecret
     return !clientId || !clientSecret;
   };
-
-  const isSharedKeysAvailable = isInsForgeCloudProject();
 
   return (
     <Dialog open={isOpen && !!provider} onOpenChange={(open) => !open && onClose()}>

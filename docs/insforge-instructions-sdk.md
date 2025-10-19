@@ -74,7 +74,7 @@ module.exports = async function(request) {
 ## Setup
 
 ```bash
-npm install @insforge/sdk
+npm install @insforge/sdk@latest
 ```
 
 ```javascript

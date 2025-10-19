@@ -94,7 +94,7 @@ export const storageService = {
 
   // Download an object (returns blob)
   async downloadObject(bucketName: string, objectKey: string): Promise<Blob> {
-    const response = await fetch(this.getDownloadUrl(bucketName, objectKey), {
+    const response = await fetch(storageService.getDownloadUrl(bucketName, objectKey), {
       headers: {
         Authorization: `Bearer ${apiClient.getToken()}`,
       },

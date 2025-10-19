@@ -124,6 +124,15 @@ export class DatabaseTableService {
     // Filter out reserved fields with matching types, throw error for mismatched types
     const validatedColumns = this.validateReservedFields(columns);
 
+    // Ensure at least one user-defined column exists
+    if (validatedColumns.length === 0) {
+      throw new AppError(
+        'Table must have at least one user-defined column',
+        400,
+        ERROR_CODES.DATABASE_VALIDATION_ERROR,
+        'Please add at least one custom column (not id, created_at, or updated_at) to the table.'
+      );
+    }
     // Validate remaining columns - only need to validate column names since Zod handles type validation
     validatedColumns.forEach((col: ColumnSchema, index: number) => {
       // Validate column name
@@ -420,6 +429,29 @@ export class DatabaseTableService {
         404,
         ERROR_CODES.DATABASE_NOT_FOUND,
         'Please check the table name, it must be a valid table name, or you can create a new table with the POST /api/database/tables endpoint'
+      );
+    }
+    const currentSchema = await this.getTableSchema(tableName);
+    const currentUserColumns = currentSchema.columns.filter(
+      (col) => !Object.keys(reservedColumns).includes(col.columnName)
+    );
+
+    // Filter dropped and added user columns
+    const droppedUserColumns = dropColumns
+      ? dropColumns.filter((col) => !Object.keys(reservedColumns).includes(col))
+      : [];
+    const addedUserColumns = addColumns ? this.validateReservedFields(addColumns) : [];
+
+    // Calculate final user column count
+    const finalUserColumnsCount =
+      currentUserColumns.length - droppedUserColumns.length + addedUserColumns.length;
+
+    if (finalUserColumnsCount <= 0) {
+      throw new AppError(
+        'Table must have at least one user-defined column after update',
+        400,
+        ERROR_CODES.DATABASE_VALIDATION_ERROR,
+        'The update would leave the table with no custom columns. Please add columns or avoid dropping all user-defined columns.'
       );
     }
 

@@ -419,6 +419,24 @@ paths:
         '500':
           description: OAuth not configured
 
+  /api/auth/oauth/discord:
+    get:
+      summary: Initiate Discord OAuth flow
+      tags:
+        - Client
+      parameters:
+        - name: redirect_uri
+          in: query
+          schema:
+            type: string
+            format: uri
+          description: URL to redirect after authentication
+      responses:
+        '302':
+          description: Redirect to Discord OAuth
+        '500':
+          description: OAuth not configured
+
   /api/auth/oauth/shared/callback:
     get:
       summary: Shared OAuth callback handler
@@ -462,7 +480,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [google, github]
+            enum: [google, github, discord]
         - name: code
           in: query
           schema:

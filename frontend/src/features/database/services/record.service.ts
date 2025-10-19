@@ -184,8 +184,13 @@ export class RecordService {
     });
   }
 
-  deleteRecord(table: string, id: string) {
-    return apiClient.request(`/database/records/${table}?id=eq.${id}`, {
+  // PostgREST supports bulk deletes via in.() filter
+  deleteRecords(table: string, ids: string[]) {
+    if (ids.length === 0) {
+      return Promise.resolve();
+    }
+    const idFilter = `in.(${ids.join(',')})`;
+    return apiClient.request(`/database/records/${table}?id=${idFilter}`, {
       method: 'DELETE',
       headers: apiClient.withAccessToken(),
     });

@@ -91,14 +91,22 @@ export function useRecords(tableName: string) {
 
   // Mutation to delete a record
   const deleteRecordMutation = useMutation({
-    mutationFn: (id: string) => recordService.deleteRecord(tableName, id),
-    onSuccess: () => {
+    mutationFn: (ids: string[]) => recordService.deleteRecords(tableName, ids),
+    onSuccess: (_data, ids) => {
       void queryClient.invalidateQueries({ queryKey: ['records', tableName] });
       void queryClient.invalidateQueries({ queryKey: ['table', tableName] });
-      showToast('Record deleted successfully', 'success');
+      const count = ids.length;
+      if (count === 1) {
+        showToast('Record deleted successfully', 'success');
+      } else {
+        showToast(`${count} records deleted successfully`, 'success');
+      }
     },
-    onError: (error: Error) => {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete record';
+    onError: (error: Error, variables) => {
+      const count = variables.length;
+      const recordText = count === 1 ? 'record' : 'records';
+      const errorMessage =
+        error instanceof Error ? error.message : `Failed to delete ${recordText}`;
       showToast(errorMessage, 'error');
     },
   });
@@ -118,6 +126,6 @@ export function useRecords(tableName: string) {
     // Actions - all using mutateAsync for consistency
     createRecord: createRecordMutation.mutateAsync,
     updateRecord: updateRecordMutation.mutateAsync,
-    deleteRecord: deleteRecordMutation.mutateAsync,
+    deleteRecords: deleteRecordMutation.mutateAsync,
   };
 }

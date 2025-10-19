@@ -60,7 +60,7 @@ export function buildDynamicSchema(columns: ColumnSchema[]) {
         }
         break;
       default:
-        fieldSchema = z.any();
+        fieldSchema = z.unknown();
         if (column.isNullable) {
           fieldSchema = fieldSchema.nullable().optional();
         }

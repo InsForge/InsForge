@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { LoadingState } from '@/components/LoadingState';
+import { isInsForgeCloudProject } from '@/lib/utils/utils';
 
 interface RequireAuthProps {
   children: ReactNode;
@@ -19,7 +20,7 @@ export const RequireAuth = ({ children }: RequireAuthProps) => {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/dashboard/login" replace />;
+    return <Navigate to={isInsForgeCloudProject() ? '/cloud/login' : '/dashboard/login'} replace />;
   }
 
   return <>{children}</>;
