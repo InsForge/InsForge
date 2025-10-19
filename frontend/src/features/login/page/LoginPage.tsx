@@ -36,8 +36,8 @@ export default function LoginPage() {
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
-      email: 'admin@example.com',
-      password: 'change-this-password',
+      email: '',
+      password: '',
     },
   });
 
@@ -148,8 +148,18 @@ export default function LoginPage() {
                 >
                   Sign in
                 </ButtonWithLoading>
+
+                <Alert className="text-xs">
+                  <AlertDescription>
+                    <strong>First time?</strong> Check your backend logs for admin credentials:
+                    <code className="block mt-1 text-xs bg-muted p-2 rounded">
+                      docker-compose logs insforge | grep &quot;Admin&quot;
+                    </code>
+                  </AlertDescription>
+                </Alert>
+
                 <p className="text-xs text-center text-muted-foreground">
-                  Use the credentials configured in your .env file
+                  Configured via ADMIN_EMAIL and ADMIN_PASSWORD in .env
                 </p>
               </CardFooter>
             </form>
