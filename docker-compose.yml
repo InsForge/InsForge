@@ -49,6 +49,14 @@ services:
       - insforge-network
 
   insforge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Pass VITE variables for build time (frontend compilation)
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:7130}
+        VITE_ADMIN_EMAIL: ${VITE_ADMIN_EMAIL:-admin@example.com}
+        VITE_ADMIN_PASSWORD: ${VITE_ADMIN_PASSWORD:-change-this-password}
     image: node:20-alpine
     container_name: insforge
     working_dir: /app
