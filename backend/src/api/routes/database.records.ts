@@ -9,12 +9,12 @@ import { DatabaseTableService } from '@/core/database/table';
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { validateTableName } from '@/utils/validations.js';
-import { parseAndValidateCSV, CSVValidationError } from '@/utils/import-csv';
-import { preScanCSVForCandidates, logPreScanResults } from '@/utils/pre-scan-candidate';
+import { parseAndValidateCSV, CSVValidationError } from '@/utils/import-csv.js';
+import { preScanCSVForCandidates, logPreScanResults } from '@/utils/pre-scan-candidate.js';
 import {
   fetchConstraintValuesFromDB,
   buildConstraintCheckers,
-} from '@/utils/table-constraint-checker';
+} from '@/utils/table-constraint-checker.js';
 import { DatabaseRecord } from '@/types/database.js';
 import { successResponse } from '@/utils/response.js';
 import logger from '@/utils/logger.js';
@@ -294,7 +294,7 @@ router.post(
         );
       }
 
-      if (!req.file.mimetype.includes('text/csv') && !req.file.originalname.endsWith('.csv')) {
+      if (req.file.mimetype !== 'text/csv' && !req.file.originalname.endsWith('.csv')) {
         throw new AppError(
           'Invalid file type',
           400,
@@ -460,92 +460,95 @@ router.post(
   }
 );
 
-router.get('/_meta/sample/:tableName', async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { tableName } = req.params;
-
-    // Validate table name
+router.get(
+  '/_meta/sample/:tableName',
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      validateTableName(tableName);
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
+      const { tableName } = req.params;
+
+      // Validate table name
+      try {
+        validateTableName(tableName);
+      } catch (error) {
+        if (error instanceof AppError) {
+          throw error;
+        }
+        throw new AppError('Invalid table name', 400, ERROR_CODES.INVALID_INPUT);
       }
-      throw new AppError('Invalid table name', 400, ERROR_CODES.INVALID_INPUT);
-    }
 
-    // Retrieve table schema
-    let tableSchema;
-    const tableService = new DatabaseTableService();
-    try {
-      tableSchema = await tableService.getTableSchema(tableName);
-    } catch (error) {
-      logger.error('Failed to retrieve table schema for sample CSV', {
+      // Retrieve table schema
+      let tableSchema;
+      const tableService = new DatabaseTableService();
+      try {
+        tableSchema = await tableService.getTableSchema(tableName);
+      } catch (error) {
+        logger.error('Failed to retrieve table schema for sample CSV', {
+          tableName,
+          error,
+        });
+        throw new AppError(
+          'Table not found',
+          404,
+          ERROR_CODES.DATABASE_NOT_FOUND,
+          `Table "${tableName}" does not exist`
+        );
+      }
+
+      if (!tableSchema || tableSchema.columns.length === 0) {
+        throw new AppError(
+          'Table has no columns',
+          400,
+          ERROR_CODES.INVALID_INPUT,
+          `Table "${tableName}" exists but has no columns defined`
+        );
+      }
+      const systemColumns = new Set(['id', 'created_at', 'updated_at']);
+      const userColumns = tableSchema.columns.filter((col) => !systemColumns.has(col.columnName));
+
+      if (userColumns.length === 0) {
+        throw new AppError(
+          'No user-defined columns',
+          400,
+          ERROR_CODES.INVALID_INPUT,
+          `Table "${tableName}" has no user-defined columns (only system columns)`
+        );
+      }
+
+      // Build CSV header from filtered columns
+      const headers = userColumns
+        .map((col) => {
+          // Escape column names with special characters
+          if (col.columnName.includes(',') || col.columnName.includes('"')) {
+            return `"${col.columnName.replace(/"/g, '""')}"`;
+          }
+          return col.columnName;
+        })
+        .join(',');
+
+      const csvContent = `${headers}\n`;
+
+      // Set headers for file download
+      const fileName = `${tableName}_sample.csv`;
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+
+      logger.info('Sample CSV generated', {
         tableName,
+        columnCount: tableSchema.columns.length,
+        fileName,
+      });
+
+      res.send(csvContent);
+    } catch (error) {
+      logger.error('Failed to generate sample CSV', {
+        tableName: req.params.tableName,
         error,
       });
-      throw new AppError(
-        'Table not found',
-        404,
-        ERROR_CODES.DATABASE_NOT_FOUND,
-        `Table "${tableName}" does not exist`
-      );
+      next(error);
     }
-
-    if (!tableSchema || tableSchema.columns.length === 0) {
-      throw new AppError(
-        'Table has no columns',
-        400,
-        ERROR_CODES.INVALID_INPUT,
-        `Table "${tableName}" exists but has no columns defined`
-      );
-    }
-    const systemColumns = new Set(['id', 'created_at', 'updated_at']);
-    const userColumns = tableSchema.columns.filter((col) => !systemColumns.has(col.columnName));
-
-    if (userColumns.length === 0) {
-      throw new AppError(
-        'No user-defined columns',
-        400,
-        ERROR_CODES.INVALID_INPUT,
-        `Table "${tableName}" has no user-defined columns (only system columns)`
-      );
-    }
-
-    // Build CSV header from filtered columns
-    const headers = userColumns
-      .map((col) => {
-        // Escape column names with special characters
-        if (col.columnName.includes(',') || col.columnName.includes('"')) {
-          return `"${col.columnName.replace(/"/g, '""')}"`;
-        }
-        return col.columnName;
-      })
-      .join(',');
-
-    const csvContent = `${headers}\n`;
-
-    // Set headers for file download
-    const fileName = `${tableName}_sample.csv`;
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-
-    logger.info('Sample CSV generated', {
-      tableName,
-      columnCount: tableSchema.columns.length,
-      fileName,
-    });
-
-    res.send(csvContent);
-  } catch (error) {
-    logger.error('Failed to generate sample CSV', {
-      tableName: req.params.tableName,
-      error,
-    });
-    next(error);
   }
-});
+);
 
 // Forward all database operations to PostgREST
 router.all('/:tableName', (req: AuthRequest, res: Response, next: NextFunction) =>
