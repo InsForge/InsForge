@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:17
+    image: pgvector/pgvector:pg17
     container_name: insforge-postgres
     command: postgres -c config_file=/etc/postgresql/postgresql.conf
     environment:
@@ -13,6 +13,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./docker-init/db/db-init.sql:/docker-entrypoint-initdb.d/01-init.sql
       - ./docker-init/db/jwt.sql:/docker-entrypoint-initdb.d/02-jwt.sql
+      - ./docker-init/db/03-pgvector.sql:/docker-entrypoint-initdb.d/03-pgvector.sql
       - ./docker-init/db/postgresql.conf:/etc/postgresql/postgresql.conf
     ports:
       - "5432:5432"
