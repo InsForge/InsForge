@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { LockIcon } from 'lucide-react';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
+import { postMessageToParent } from '@/lib/utils/cloud-messaging';
 
 export default function CloudLoginPage() {
   const navigate = useNavigate();
@@ -32,32 +33,15 @@ export default function CloudLoginPage() {
           .then((success) => {
             if (success) {
               // Notify parent of success
-              if (window.parent !== window) {
-                window.parent.postMessage(
-                  {
-                    type: 'AUTH_SUCCESS',
-                  },
-                  event.origin
-                );
-              }
+              postMessageToParent(
+                {
+                  type: 'AUTH_SUCCESS',
+                },
+                event.origin
+              );
             } else {
               setAuthError('The authorization code may have expired or already been used.');
-              if (window.parent !== window) {
-                window.parent.postMessage(
-                  {
-                    type: 'AUTH_ERROR',
-                    message: 'Authorization code validation failed',
-                  },
-                  event.origin
-                );
-              }
-            }
-          })
-          .catch((error) => {
-            console.error('Authorization code exchange failed:', error);
-            setAuthError('The authorization code may have expired or already been used.');
-            if (window.parent !== window) {
-              window.parent.postMessage(
+              postMessageToParent(
                 {
                   type: 'AUTH_ERROR',
                   message: 'Authorization code validation failed',
@@ -65,6 +49,17 @@ export default function CloudLoginPage() {
                 event.origin
               );
             }
+          })
+          .catch((error) => {
+            console.error('Authorization code exchange failed:', error);
+            setAuthError('The authorization code may have expired or already been used.');
+            postMessageToParent(
+              {
+                type: 'AUTH_ERROR',
+                message: 'Authorization code validation failed',
+              },
+              event.origin
+            );
           });
       }
     };

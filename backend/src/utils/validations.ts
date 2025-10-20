@@ -1,5 +1,5 @@
-import { AppError } from '@/api/middleware/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/api/middleware/error';
+import { ERROR_CODES } from '@/types/error-constants';
 
 export function validateEmail(email: string) {
   return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
@@ -25,7 +25,7 @@ const IDENTIFIER_REGEX = /^[^"\x00-\x1F\x7F]+$/;
  * @throws AppError if invalid
  */
 export function validateIdentifier(identifier: string, type: string = 'identifier'): boolean {
-  if (!identifier || identifier.trim().length === 0) {
+  if (!identifier || !identifier.trim()) {
     throw new AppError(
       `Invalid ${type} name: cannot be empty`,
       400,
@@ -52,7 +52,7 @@ export function validateIdentifier(identifier: string, type: string = 'identifie
  * @returns true if valid, false if invalid
  */
 export function isValidIdentifier(identifier: string): boolean {
-  return Boolean(identifier && identifier.trim().length > 0 && IDENTIFIER_REGEX.test(identifier));
+  return Boolean(identifier && identifier.trim() && IDENTIFIER_REGEX.test(identifier));
 }
 
 /**
@@ -85,7 +85,7 @@ export function validateTableName(tableName: string): boolean {
  * @returns Safe error message
  */
 export function getIdentifierErrorMessage(identifier: string, type: string = 'identifier'): string {
-  if (!identifier || identifier.trim().length === 0) {
+  if (!identifier || !identifier.trim()) {
     return `Invalid ${type} name: cannot be empty`;
   }
   if (!IDENTIFIER_REGEX.test(identifier)) {

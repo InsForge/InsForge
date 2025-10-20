@@ -177,7 +177,7 @@ function DatabasePageContent() {
         return;
       }
 
-      if (!selectedTable && tables.length > 0 && !showTableForm && !pendingTableSelection) {
+      if (!selectedTable && tables.length && !showTableForm && !pendingTableSelection) {
         setSelectedTable(tables[0]);
       }
     }
@@ -298,7 +298,7 @@ function DatabasePageContent() {
 
   // Handle bulk delete
   const handleBulkDelete = async (ids: string[]) => {
-    if (!selectedTable || ids.length === 0) {
+    if (!selectedTable || !ids.length) {
       return;
     }
 

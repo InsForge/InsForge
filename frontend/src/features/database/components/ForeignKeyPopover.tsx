@@ -228,7 +228,7 @@ export function ForeignKeyPopover({
                   <SelectContent className="max-w-[360px]">
                     {(() => {
                       const allColumns = referenceTableSchema?.columns || [];
-                      if (allColumns.length > 0) {
+                      if (allColumns.length) {
                         const sourceType = getSourceFieldType;
 
                         return allColumns.map((col: ColumnSchema) => {

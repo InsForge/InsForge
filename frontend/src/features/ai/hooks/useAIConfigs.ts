@@ -105,7 +105,7 @@ export function useAIConfigs(options: UseAIConfigsOptions = {}) {
   const getFilteredModels = useCallback(
     (inputModality: ModalitySchema[], outputModality: ModalitySchema[]): ModelOption[] => {
       // If both modality arrays are empty, return all models
-      const shouldFilter = inputModality.length > 0 || outputModality.length > 0;
+      const shouldFilter = inputModality.length || outputModality.length;
 
       const filteredRawModels = shouldFilter
         ? filterModelsByModalities(allAvailableModels, inputModality, outputModality)

@@ -80,7 +80,7 @@ async function getFunctionCode(slug: string): Promise<string | null> {
       WHERE slug = ${slug} AND status = 'active'
     `;
 
-    if (result.rows.length === 0) {
+    if (!result.rows.length) {
       return null;
     }
 

@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://insforge.dev">
-    <img src="assets/banner.png" alt="Insforge Logo">
+    <img src="../assets/banner.png" alt="Insforge Logo">
   </a>
  
 </div>
@@ -42,7 +42,7 @@
 
 
 <td align="center">
-  <img src="assets/userflow.png" alt="userFlow">
+  <img src="../assets/userflow.png" alt="userFlow">
   <br>
 </td>
 
@@ -76,12 +76,12 @@ InsForgeダッシュボード（デフォルト: [http://localhost:7131）にア
   <table>
     <tr>
       <td align="center">
-        <img src="assets/signin.png" alt="Sign In">
+        <img src="../assets/signin.png" alt="Sign In">
         <br>
         <em>InsForgeにサインイン</em>
       </td>
       <td align="center">
-        <img src="assets/mcpInstallv2.png" alt="MCP Configuration">
+        <img src="../assets/mcpInstallv2.png" alt="MCP Configuration">
         <br>
         <em>MCP接続の設定</em>
       </td>
@@ -102,7 +102,7 @@ InsForge is my backend platform, what is my current backend structure?
 
 
 <div align="center">
-  <img src="assets/sampleResponse.png" alt="Successful Connection Response" width="600">
+  <img src="../assets/sampleResponse.png" alt="Successful Connection Response" width="600">
   <br>
   <em>insforge MCPツールを呼び出した成功例のレスポンス</em>
 </div>
@@ -125,7 +125,7 @@ InsForge is my backend platform, what is my current backend structure?
 
 
 <div align="center">
-  <img src="assets/archDiagram.png" alt="Architecture Diagram">
+  <img src="../assets/archDiagram.png" alt="Architecture Diagram">
   <br>
 </div>
 

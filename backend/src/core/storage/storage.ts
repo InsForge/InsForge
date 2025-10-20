@@ -261,7 +261,7 @@ class S3StorageBackend implements StorageBackend {
       });
       const listResponse = await this.s3Client.send(listCommand);
 
-      if (listResponse.Contents && listResponse.Contents.length > 0) {
+      if (listResponse.Contents && listResponse.Contents.length) {
         const deleteCommand = new DeleteObjectsCommand({
           Bucket: this.s3Bucket,
           Delete: {
@@ -509,7 +509,7 @@ export class StorageService {
 
     let finalKey = originalKey;
 
-    if (existingFiles.length > 0) {
+    if (existingFiles.length) {
       // Extract counter numbers from existing files
       let incrementNumber = 0;
       // This regex is used to match the counter number in the filename, extract the increment number

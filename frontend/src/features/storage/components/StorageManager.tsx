@@ -72,7 +72,7 @@ export function StorageManager({
     let files = objectsData?.objects || [];
 
     // Apply sorting
-    if (sortColumns.length > 0) {
+    if (sortColumns.length) {
       const sortColumn = sortColumns[0];
       files = [...files].sort((a, b) => {
         const aValue = a[sortColumn.columnKey as keyof StorageFileSchema];

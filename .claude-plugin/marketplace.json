@@ -1,0 +1,20 @@
+{
+  "name": "insforge-official-marketplace",
+  "owner": {
+    "name": "InsForge Team",
+    "email": "tony.chang@insforge.dev"
+  },
+  "plugins": [
+    {
+      "name": "insforge",
+      "source": "./claude-plugin",
+      "description": "Official InsForge plugin with schema patterns, best practices for database design, RLS policies, and SDK usage examples. Includes patterns for social graphs, multi-tenancy, and complex relationships.",
+      "version": "1.0.0",
+      "author": {
+        "name": "InsForge Team"
+      },
+      "category": "database",
+      "tags": ["insforge", "postgresql", "postgrest", "database", "baas", "backend", "rls", "schema"]
+    }
+  ]
+}

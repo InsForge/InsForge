@@ -103,7 +103,7 @@ export function AuthMethodTab() {
   };
 
   const hasAuthMethods = useMemo(() => {
-    return configs.length > 0;
+    return !!configs.length;
   }, [configs]);
 
   const openSelectDialog = () => {

@@ -214,7 +214,7 @@ export default function AuditsPage() {
                           size="icon"
                           className="h-9 w-9 hover:bg-gray-100 dark:hover:bg-neutral-700"
                           onClick={handleClearLogs}
-                          disabled={clearMutation.isPending || logsData.length === 0}
+                          disabled={clearMutation.isPending || !logsData.length}
                         >
                           <Trash2 className="h-4 w-4 text-gray-600 dark:text-neutral-400" />
                         </Button>
@@ -250,7 +250,7 @@ export default function AuditsPage() {
           )}
 
           <div className="flex-1 flex flex-col overflow-hidden px-8">
-            {logsData.length === 0 && !isLoading ? (
+            {!logsData.length && !isLoading ? (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
                   <FileText className="mx-auto h-12 w-12 text-gray-400 dark:text-neutral-600 mb-4" />
@@ -278,7 +278,7 @@ export default function AuditsPage() {
                     }
                   />
                 </div>
-                {!isLoading && logsData.length > 0 && (
+                {!isLoading && logsData.length && (
                   <PaginationControls
                     currentPage={currentPage}
                     totalPages={Math.ceil(totalRecords / pageSize)}

@@ -16,7 +16,7 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
-    "types": ["node"]
+    "types": ["node","vitest" ]
   },
   "include": ["src/**/*", "../shared-schemas/src/**/*"],
   "exclude": ["node_modules", "dist"]

@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://insforge.dev">
-    <img src="assets/banner.png" alt="Insforge Logo">
+    <img src="../assets/banner.png" alt="Insforge Logo">
   </a>
 </div>
 
@@ -40,7 +40,7 @@ Criação de aplicações full-stack usando linguagem natural
 ## Exemplos de Prompt:
 
 <td align="center">
-  <img src="assets/userflow.png" alt="userFlow">
+  <img src="../assets/userflow.png" alt="userFlow">
   <br>
 </td>
 
@@ -67,12 +67,12 @@ Visite o painel do InsForge (padrão: http://localhost:7131), faça login e siga
   <table>
     <tr>
       <td align="center">
-        <img src="assets/signin.png" alt="Sign In">
+        <img src="../assets/signin.png" alt="Sign In">
         <br>
         <em>Entrar no InsForge</em>
       </td>
       <td align="center">
-        <img src="assets/mcpInstallv2.png" alt="MCP Configuration">
+        <img src="../assets/mcpInstallv2.png" alt="MCP Configuration">
         <br>
         <em>Configurar conexão MCP</em>
       </td>
@@ -86,7 +86,7 @@ No seu agente, envie:
 > InsForge é minha plataforma de backend, qual é a estrutura atual do meu backend?
 
 <div align="center">
-  <img src="assets/sampleResponse.png" alt="Successful Connection Response" width="600">
+  <img src="../assets/sampleResponse.png" alt="Successful Connection Response" width="600">
   <br>
   <em>Exemplo de resposta bem-sucedida chamando ferramentas MCP do InsForge</em>
 </div>
@@ -103,7 +103,7 @@ Crie seu próximo aplicativo de tarefas, clone do Instagram ou plataforma online
 ## Arquitetura
 
 <div align="center">
-  <img src="assets/archDiagram.png" alt="Architecture Diagram">
+  <img src="../assets/archDiagram.png" alt="Architecture Diagram">
   <br>
 </div>
 

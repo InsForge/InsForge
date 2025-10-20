@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://insforge.dev">
-    <img src="assets/banner.png" alt="Insforge Logo">
+    <img src="../assets/banner.png" alt="Insforge Logo">
   </a>
   
 </div>
@@ -37,7 +37,7 @@
 ## 프롬프트 예시:
 
 <td align="center">
-  <img src="assets/userflow.png" alt="userFlow">
+  <img src="../assets/userflow.png" alt="userFlow">
   <br>
 </td>
 
@@ -64,12 +64,12 @@ InsForge Dashboard (기본 주소: http://localhost:7131) 에 접속 후 로그�
   <table>
     <tr>
       <td align="center">
-        <img src="assets/signin.png" alt="Sign In">
+        <img src="../assets/signin.png" alt="Sign In">
         <br>
         <em>Sign in to InsForge</em>
       </td>
       <td align="center">
-        <img src="assets/mcpInstallv2.png" alt="MCP Configuration">
+        <img src="../assets/mcpInstallv2.png" alt="MCP Configuration">
         <br>
         <em>Configure MCP connection</em>
       </td>
@@ -86,7 +86,7 @@ InsForge is my backend platform, what is my current backend structure?
 ```
 
 <div align="center">
-  <img src="assets/sampleResponse.png" alt="Successful Connection Response" width="600">
+  <img src="../assets/sampleResponse.png" alt="Successful Connection Response" width="600">
   <br>
   <em>Sample successful response calling insforge MCP tools</em>
 </div>
@@ -103,7 +103,7 @@ InsForge is my backend platform, what is my current backend structure?
 ## 아키텍처
 
 <div align="center">
-  <img src="assets/archDiagram.png" alt="Architecture Diagram">
+  <img src="../assets/archDiagram.png" alt="Architecture Diagram">
   <br>
 </div>
 

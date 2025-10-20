@@ -57,7 +57,7 @@ export function useMcpUsage() {
     if (
       hasNotifiedInitialStatus.current ||
       isLoading ||
-      records.length === 0 ||
+      !records.length ||
       !isInsForgeCloudProject()
     ) {
       return;
@@ -113,7 +113,7 @@ export function useMcpUsage() {
   }, [socket, isConnected, handleMcpConnected]);
 
   // Computed values
-  const hasCompletedOnboarding = useMemo(() => records.length > 0, [records]);
+  const hasCompletedOnboarding = useMemo(() => !!records.length, [records]);
   const recordsCount = useMemo(() => records.length, [records]);
   const latestRecord = useMemo(() => records[0] || null, [records]);
 

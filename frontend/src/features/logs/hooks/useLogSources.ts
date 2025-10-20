@@ -46,7 +46,7 @@ export function useLogSources() {
 
   // Auto-select first source or validate current selection
   useEffect(() => {
-    if (!isLoading && sources && sources.length > 0) {
+    if (!isLoading && sources && sources.length) {
       // If no source selected or selected source doesn't exist (except 'MCP logs'), select first one
       if (
         !selectedSource ||

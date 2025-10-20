@@ -101,7 +101,7 @@ export function FeatureSidebar({
       <ScrollArea className="flex-1 px-3 pb-3 dark:bg-neutral-800">
         {loading ? (
           renderSkeleton()
-        ) : filteredItems.length === 0 ? (
+        ) : !filteredItems.length ? (
           renderEmptyState(searchTerm)
         ) : (
           <div className="space-y-1 dark:text-zinc-300">

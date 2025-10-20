@@ -75,7 +75,7 @@ const ProviderIcon = ({ provider }: { provider: string }) => {
 const IdentitiesCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
   const identities = row.identities;
 
-  if (!identities || !Array.isArray(identities) || identities.length === 0) {
+  if (!identities || !Array.isArray(identities) || !identities.length) {
     return <span className="text-sm text-black dark:text-zinc-300">null</span>;
   }
 

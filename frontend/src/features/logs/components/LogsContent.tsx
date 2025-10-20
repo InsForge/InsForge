@@ -269,7 +269,7 @@ export function LogsContent({ source }: LogsContentProps) {
       </div>
 
       {/* Footer with Pagination - only for regular logs */}
-      {!isMcpLogs && !logsLoading && filteredLogs.length > 0 && (
+      {!isMcpLogs && !logsLoading && filteredLogs.length && (
         <PaginationControls
           currentPage={currentPage}
           totalPages={totalPages}

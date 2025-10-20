@@ -1,6 +1,6 @@
 import splitSqlQuery from '@databases/split-sql-query';
 import sql from '@databases/sql';
-import logger from './logger.js';
+import logger from './logger';
 
 /**
  * Parse a SQL string into individual statements, properly handling:
@@ -49,7 +49,7 @@ export function parseSQLStatements(sqlText: string): string[] {
           .replace(/--.*$/gm, '') // Remove line comments
           .replace(/\/\*[\s\S]*?\*\//g, '') // Remove block comments
           .trim();
-        return withoutComments.length > 0;
+        return withoutComments.length;
       });
 
     logger.debug(`Parsed ${statements.length} SQL statements from input`);

@@ -14,7 +14,7 @@ export function ModelSelectionGrid({
   onSelectModel,
   configuredModelIds,
 }: ModelSelectionGridProps) {
-  if (models.length === 0) {
+  if (!models.length) {
     return (
       <div className="flex-1 flex items-center justify-center min-h-[300px] mr-6">
         <div className="text-center">

@@ -61,11 +61,12 @@ export function useLogs(source: string) {
     setIsLoadingMore(true);
     try {
       // Get the oldest log's timestamp (last in the array since we reverse)
-      const oldestTimestamp =
-        loadedLogs.length > 0 ? loadedLogs[loadedLogs.length - 1]?.timestamp : undefined;
+      const oldestTimestamp = loadedLogs.length
+        ? loadedLogs[loadedLogs.length - 1]?.timestamp
+        : undefined;
       const data = await logService.getLogsBySource(source, FETCH_SIZE, oldestTimestamp);
 
-      if (data.logs && data.logs.length > 0) {
+      if (data.logs && data.logs.length) {
         // Reverse and append to the end (older logs)
         setLoadedLogs((prev) => [...prev, ...[...data.logs].reverse()]);
         setHasMore(data.logs.length === FETCH_SIZE);
@@ -99,8 +100,7 @@ export function useLogs(source: string) {
         log.eventMessage.toLowerCase().includes(searchQuery.toLowerCase()) ||
         JSON.stringify(log.body).toLowerCase().includes(searchQuery.toLowerCase());
 
-      const matchesSeverity =
-        severityFilter.length === 0 || severityFilter.includes(getSeverity(log));
+      const matchesSeverity = !severityFilter.length || severityFilter.includes(getSeverity(log));
 
       return matchesSearch && matchesSeverity;
     });

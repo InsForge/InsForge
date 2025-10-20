@@ -121,7 +121,7 @@ const getLayoutedElements = (nodes: Node<CustomNodeData>[], edges: BuiltInEdge[]
 
   // Position table nodes in a grid in the middle
   let positionedTableNodes: Node<CustomNodeData>[] = [];
-  if (tableNodes.length > 0) {
+  if (tableNodes.length) {
     const cols = Math.ceil(Math.sqrt(tableNodes.length));
 
     // Group tables by column for better height calculation

@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://insforge.dev">
-    <img src="assets/banner.png" alt="Logo de InsForge">
+    <img src="../assets/banner.png" alt="Logo de InsForge">
   </a>
 </div>
 
@@ -41,7 +41,7 @@ Estamos construyendo las funcionalidades de Supabase de una manera nativa para I
 ## Ejemplos de Prompts:
 
 <td align="center">
-  <img src="assets/userflow.png" alt="Flujo de usuario">
+  <img src="../assets/userflow.png" alt="Flujo de usuario">
   <br>
 </td>
 
@@ -72,12 +72,12 @@ Visita el **Panel de Control de InsForge** (por defecto: http://localhost:7131),
   <table>
     <tr>
       <td align="center">
-        <img src="assets/signin.png" alt="Iniciar Sesión">
+        <img src="../assets/signin.png" alt="Iniciar Sesión">
         <br>
         <em>Inicia sesión en InsForge</em>
       </td>
       <td align="center">
-        <img src="assets/mcpInstallv2.png" alt="Configuración MCP">
+        <img src="../assets/mcpInstallv2.png" alt="Configuración MCP">
         <br>
         <em>Configura la conexión MCP</em>
       </td>
@@ -95,7 +95,7 @@ InsForge es mi plataforma Backend, ¿cuál es mi estructura actual de Backend?
 ```
 
 <div align="center">
-  <img src="assets/sampleResponse.png" alt="Respuesta de Conexión Exitosa" width="600">
+  <img src="../assets/sampleResponse.png" alt="Respuesta de Conexión Exitosa" width="600">
   <br>
   <em>Ejemplo de respuesta exitosa usando las herramientas MCP de InsForge</em>
 </div>
@@ -116,7 +116,7 @@ Empieza a construir tu proyecto en un nuevo directorio.
 ## Arquitectura
 
 <div align="center">
-  <img src="assets/archDiagram.png" alt="Diagrama de Arquitectura">
+  <img src="../assets/archDiagram.png" alt="Diagrama de Arquitectura">
   <br>
 </div>
 

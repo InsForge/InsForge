@@ -60,7 +60,7 @@ export function AddOAuthDialog({
           </DialogTitle>
         </DialogHeader>
         <div className="p-6">
-          {availableProviders.length > 0 ? (
+          {availableProviders.length ? (
             <div className="grid grid-cols-2 gap-3">
               {availableProviders.map((p) => (
                 <button

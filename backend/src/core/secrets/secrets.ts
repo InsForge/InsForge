@@ -83,7 +83,7 @@ export class SecretService {
         [id]
       );
 
-      if (result.rows.length === 0) {
+      if (!result.rows.length) {
         return null;
       }
 
@@ -113,7 +113,7 @@ export class SecretService {
         [key]
       );
 
-      if (result.rows.length === 0) {
+      if (!result.rows.length) {
         return null;
       }
 
@@ -225,7 +225,7 @@ export class SecretService {
         [key]
       );
 
-      if (result.rows.length === 0) {
+      if (!result.rows.length) {
         logger.warn('Secret not found for verification', { key });
         return false;
       }
@@ -267,7 +267,7 @@ export class SecretService {
         id,
       ]);
 
-      if (checkResult.rows.length > 0 && checkResult.rows[0].is_reserved) {
+      if (checkResult.rows.length && checkResult.rows[0].is_reserved) {
         throw new Error('Cannot delete reserved secret');
       }
 
@@ -296,7 +296,7 @@ export class SecretService {
 
       const oldSecretResult = await client.query(`SELECT key FROM _secrets WHERE id = $1`, [id]);
 
-      if (oldSecretResult.rows.length === 0) {
+      if (!oldSecretResult.rows.length) {
         throw new Error('Secret not found');
       }
 

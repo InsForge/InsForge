@@ -129,7 +129,7 @@ export default function AIPage() {
             <div className="flex-1 flex items-center justify-center h-full">
               <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
             </div>
-          ) : configurationOptions.length > 0 ? (
+          ) : configurationOptions.length ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {configurationOptions.map((modelOption) => (
                 <AIModelCard

@@ -122,7 +122,7 @@ export function TableNode({ data }: TableNodeProps) {
         ))}
 
         {/* Empty state */}
-        {table.columns.length === 0 && (
+        {!table.columns.length && (
           <div className="flex items-center justify-center p-6">
             <div className="text-center">
               <Database className="w-6 h-6 text-neutral-600 mx-auto mb-2" />

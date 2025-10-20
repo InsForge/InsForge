@@ -3,7 +3,7 @@ import path from 'path';
 
 const logsDir = process.env.LOGS_DIR || path.join(process.cwd(), 'logs');
 
-const logger = winston.createLogger({
+export const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
   format: winston.format.combine(
     winston.format.timestamp(),

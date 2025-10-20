@@ -124,7 +124,7 @@ export function ForeignKeyCell({ value, foreignKey, onJumpToTable }: ForeignKeyC
                 </div>
               )}
 
-              {record && schema && columns.length > 0 && (
+              {record && schema && columns.length && (
                 <div className="h-full flex flex-col">
                   {/* Mini DataGrid */}
                   <div className="flex-1">

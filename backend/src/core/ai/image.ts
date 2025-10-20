@@ -97,7 +97,7 @@ export class ImageService {
       };
 
       // Process the OpenAI-compatible response
-      if (response.choices && response.choices.length > 0) {
+      if (response.choices && response.choices.length) {
         for (const choice of response.choices) {
           const message = choice.message;
 

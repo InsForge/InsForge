@@ -383,7 +383,7 @@ export function TableForm({
 
   const handleSubmit = form.handleSubmit((data) => {
     const userColumns = data.columns.filter((col) => !col.isSystemColumn);
-    if (userColumns.length === 0) {
+    if (!userColumns.length) {
       const msg =
         mode === 'create'
           ? 'Please add at least one user-defined column to create a table.'
@@ -530,7 +530,7 @@ export function TableForm({
               </div>
 
               {/* Existing foreign keys */}
-              {foreignKeys.length > 0 && (
+              {foreignKeys.length && (
                 <div className="px-6 pb-6 space-y-3">
                   {foreignKeys.map((fk) => (
                     <div

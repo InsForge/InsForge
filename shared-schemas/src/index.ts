@@ -13,3 +13,5 @@ export * from './functions.schema';
 export * from './functions-api.schema';
 export * from './schedules.schema';
 export * from './schedules-api.schema';
+export * from './cloud-events.schema';
+

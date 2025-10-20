@@ -145,7 +145,7 @@ export class CloudWatchProvider extends BaseLogProvider {
         const fle = await client.send(
           new FilterLogEventsCommand({
             logGroupName: logGroup,
-            logStreamNames: streams.length > 0 ? streams.slice(0, 100) : undefined,
+            logStreamNames: streams.length ? streams.slice(0, 100) : undefined,
             startTime: startMs,
             endTime: endMs,
             nextToken,
@@ -203,7 +203,7 @@ export class CloudWatchProvider extends BaseLogProvider {
           await sleep(300);
         }
 
-        if (results && results.length > 0) {
+        if (results && results.length) {
           // Convert Insights results to our format
           events = results.map((row) => {
             const obj = Object.fromEntries(row.map((c) => [c.field || '', c.value || '']));
@@ -243,7 +243,7 @@ export class CloudWatchProvider extends BaseLogProvider {
         const fle = await client.send(
           new FilterLogEventsCommand({
             logGroupName: logGroup,
-            logStreamNames: streams.length > 0 ? streams.slice(0, 100) : undefined,
+            logStreamNames: streams.length ? streams.slice(0, 100) : undefined,
             startTime: fallbackStartMs,
             endTime: beforeMs,
             limit: limit * 2, // Get a bit more to ensure we have enough
@@ -311,7 +311,7 @@ export class CloudWatchProvider extends BaseLogProvider {
 
       let lastActivity = '';
 
-      if (sourceStreams.length > 0) {
+      if (sourceStreams.length) {
         try {
           // Use EXACTLY the same approach as getLogsBySource to get consistent results
           const endMs = Date.now();
@@ -345,7 +345,7 @@ export class CloudWatchProvider extends BaseLogProvider {
               await sleep(200);
             }
 
-            if (results && results.length > 0) {
+            if (results && results.length) {
               const row = results[0];
               const timestampField = row.find((field) => field.field === '@timestamp');
               if (timestampField && timestampField.value) {
@@ -376,7 +376,7 @@ export class CloudWatchProvider extends BaseLogProvider {
             const fle = await client.send(
               new FilterLogEventsCommand({
                 logGroupName: logGroup,
-                logStreamNames: sourceStreams.length > 0 ? sourceStreams.slice(0, 100) : undefined,
+                logStreamNames: sourceStreams.length ? sourceStreams.slice(0, 100) : undefined,
                 startTime: startMs,
                 endTime: endMs,
                 limit: 1000, // Reasonable limit for fallback
@@ -384,7 +384,7 @@ export class CloudWatchProvider extends BaseLogProvider {
             );
 
             const events = fle.events || [];
-            if (events.length > 0) {
+            if (events.length) {
               const latestEvent = events[events.length - 1];
               if (latestEvent.timestamp) {
                 lastActivity = new Date(latestEvent.timestamp).toISOString();

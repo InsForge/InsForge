@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://insforge.dev">
-    <img src="assets/banner.png" alt="Insforge Logo">
+    <img src="../assets/banner.png" alt="Insforge Logo">
   </a>
 </div>
 <p align="center">
@@ -34,7 +34,7 @@
 ## Примеры промптов:
 
 <td align="center">
-  <img src="assets/userflow.png" alt="userFlow">
+  <img src="../assets/userflow.png" alt="userFlow">
   <br>
 </td>
 
@@ -61,12 +61,12 @@ docker compose up
   <table>
     <tr>
       <td align="center">
-        <img src="assets/signin.png" alt="Sign In">
+        <img src="../assets/signin.png" alt="Sign In">
         <br>
         <em>Войдите в InsForge</em>
       </td>
       <td align="center">
-        <img src="assets/mcpInstallv2.png" alt="MCP Configuration">
+        <img src="../assets/mcpInstallv2.png" alt="MCP Configuration">
         <br>
         <em>Настройте подключение MCP</em>
       </td>
@@ -82,7 +82,7 @@ InsForge — моя бэкенд-платформа, какова моя тек�
 ```
 
 <div align="center">
-  <img src="assets/sampleResponse.png" alt="Successful Connection Response" width="600">
+  <img src="../assets/sampleResponse.png" alt="Successful Connection Response" width="600">
   <br>
   <em>Пример успешного ответа при вызове инструментов InsForge MCP</em>
 </div>
@@ -98,7 +98,7 @@ InsForge — моя бэкенд-платформа, какова моя тек�
 ## Архитектура
 
 <div align="center">
-  <img src="assets/archDiagram.png" alt="Architecture Diagram">
+  <img src="../assets/archDiagram.png" alt="Architecture Diagram">
   <br>
 </div>
 

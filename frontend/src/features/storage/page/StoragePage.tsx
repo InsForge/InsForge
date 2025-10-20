@@ -101,7 +101,7 @@ export default function StoragePage() {
 
   // Auto-select first bucket
   useEffect(() => {
-    if (buckets.length > 0 && !selectedBucket) {
+    if (buckets.length && !selectedBucket) {
       setSelectedBucket(buckets[0].name);
     }
   }, [buckets, selectedBucket]);
@@ -125,7 +125,7 @@ export default function StoragePage() {
 
   // Handle bulk delete files
   const handleBulkDeleteFiles = async (fileKeys: string[]) => {
-    if (!selectedBucket || fileKeys.length === 0) {
+    if (!selectedBucket || !fileKeys.length) {
       return;
     }
 
@@ -147,7 +147,7 @@ export default function StoragePage() {
   };
 
   const uploadFiles = async (files: FileList | File[] | null) => {
-    if (!files || files.length === 0 || !selectedBucket) {
+    if (!files || !files.length || !selectedBucket) {
       return;
     }
 

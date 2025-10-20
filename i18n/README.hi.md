@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://insforge.dev">
-    <img src="assets/banner.png" alt="Insforge Logo">
+    <img src="../assets/banner.png" alt="Insforge Logo">
   </a>
 </div>
 <p align="center">
@@ -34,7 +34,7 @@
 ## प्रॉम्प्ट उदाहरण:
 
 <td align="center">
-  <img src="assets/userflow.png" alt="userFlow">
+  <img src="../assets/userflow.png" alt="userFlow">
   <br>
 </td>
 
@@ -61,12 +61,12 @@ InsForge डैशबोर्ड (डिफ़ॉल्ट: http://localhost:71
   <table>
     <tr>
       <td align="center">
-        <img src="assets/signin.png" alt="Sign In">
+        <img src="../assets/signin.png" alt="Sign In">
         <br>
         <em>InsForge में साइन इन करें</em>
       </td>
       <td align="center">
-        <img src="assets/mcpInstallv2.png" alt="MCP Configuration">
+        <img src="../assets/mcpInstallv2.png" alt="MCP Configuration">
         <br>
         <em>MCP कनेक्शन कॉन्फ़िगर करें</em>
       </td>
@@ -82,7 +82,7 @@ InsForge मेरा बैकएंड प्लेटफ़ॉर्म ह�
 ```
 
 <div align="center">
-  <img src="assets/sampleResponse.png" alt="Successful Connection Response" width="600">
+  <img src="../assets/sampleResponse.png" alt="Successful Connection Response" width="600">
   <br>
   <em>insforge MCP टूल को कॉल करने पर सफल प्रतिक्रिया का नमूना</em>
 </div>
@@ -98,7 +98,7 @@ InsForge मेरा बैकएंड प्लेटफ़ॉर्म ह�
 ## आर्किटेक्चर
 
 <div align="center">
-  <img src="assets/archDiagram.png" alt="Architecture Diagram">
+  <img src="../assets/archDiagram.png" alt="Architecture Diagram">
   <br>
 </div>
 

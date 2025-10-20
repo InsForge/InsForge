@@ -182,7 +182,7 @@ export function JsonCellEditor({
       }
 
       const keys = Object.keys(parsed);
-      if (keys.length === 0) {
+      if (!keys.length) {
         return '{}';
       }
       if (keys.length === 1) {

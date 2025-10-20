@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://insforge.dev">
-    <img src="assets/banner.png" alt="Insforge Logo">
+    <img src="../assets/banner.png" alt="Insforge Logo">
   </a>
   
 </div>
@@ -35,7 +35,7 @@
 ## Exemples de prompt:
 
 <td align="center">
-  <img src="assets/userflow.png" alt="userFlow">
+  <img src="../assets/userflow.png" alt="userFlow">
   <br>
 </td>
 
@@ -62,12 +62,12 @@ Visitez le tableau de bord InsForge (par défaut : http://localhost:7131), conne
   <table>
     <tr>
       <td align="center">
-        <img src="assets/signin.png" alt="Sign In">
+        <img src="../assets/signin.png" alt="Sign In">
         <br>
         <em>Se connecter à InsForge</em>
       </td>
       <td align="center">
-        <img src="assets/mcpInstallv2.png" alt="MCP Configuration">
+        <img src="../assets/mcpInstallv2.png" alt="MCP Configuration">
         <br>
         <em>Configurez la connexion MCP</em>
       </td>
@@ -83,7 +83,7 @@ InsForge is my backend platform, what is my current backend structure?
 ```
 
 <div align="center">
-  <img src="assets/sampleResponse.png" alt="Successful Connection Response" width="600">
+  <img src="../assets/sampleResponse.png" alt="Successful Connection Response" width="600">
   <br>
   <em>Exemple de réponse réussie lors de l’appel des outils MCP d’InsForge</em>
 </div>
@@ -100,7 +100,7 @@ Commencez à créer votre projet dans un nouveau répertoire ! Créez votre proc
 
 
 <div align="center">
-  <img src="assets/archDiagram.png" alt="Architecture Diagram">
+  <img src="../assets/archDiagram.png" alt="Architecture Diagram">
   <br>
 </div>
 

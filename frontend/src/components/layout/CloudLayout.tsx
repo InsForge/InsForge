@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { ThemeProvider } from '@/lib/contexts/ThemeContext';
 import { cn } from '@/lib/utils/utils';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
+import { postMessageToParent } from '@/lib/utils/cloud-messaging';
 
 interface CloudLayoutProps {
   children: React.ReactNode;
@@ -50,17 +51,14 @@ export default function CloudLayout({ children }: CloudLayoutProps) {
   }, [navigate, hasCompletedOnboarding]);
 
   useEffect(() => {
-    // Only send messages if we're in an iframe (not the main window)
-    if (window.parent !== window) {
-      // Send the current route to the parent cloud application
-      window.parent.postMessage(
-        {
-          type: 'APP_ROUTE_CHANGE',
-          path: location.pathname,
-        },
-        '*'
-      );
-    }
+    // Send the current route to the parent cloud application
+    postMessageToParent(
+      {
+        type: 'APP_ROUTE_CHANGE',
+        path: location.pathname,
+      },
+      '*'
+    );
   }, [location.pathname]);
 
   return (

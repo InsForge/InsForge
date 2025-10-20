@@ -31,7 +31,7 @@ async function seedDefaultAIConfigs(): Promise<void> {
   // Check if AI configs already exist
   const existingConfigs = await aiConfigService.findAll();
 
-  if (existingConfigs.length > 0) {
+  if (existingConfigs.length) {
     return;
   }
 
@@ -163,7 +163,7 @@ export async function seedBackend(): Promise<void> {
     });
     // Database connection info is already logged above
 
-    if (tables.length > 0) {
+    if (tables.length) {
       logger.info(`✅ Found ${tables.length} user tables`);
     }
 

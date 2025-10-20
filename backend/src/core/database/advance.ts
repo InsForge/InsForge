@@ -195,7 +195,7 @@ export class DatabaseAdvanceService {
       [table]
     );
 
-    if (schemaResult.rows.length > 0) {
+    if (schemaResult.rows.length) {
       sqlExport += `-- Table: ${table}\n`;
       sqlExport += schemaResult.rows[0].create_statement + '\n\n';
     }
@@ -215,7 +215,7 @@ export class DatabaseAdvanceService {
       [table]
     );
 
-    if (indexesResult.rows.length > 0) {
+    if (indexesResult.rows.length) {
       sqlExport += `-- Indexes for table: ${table}\n`;
       for (const indexRow of indexesResult.rows) {
         sqlExport += indexRow.indexdef + ';\n';
@@ -260,7 +260,7 @@ export class DatabaseAdvanceService {
       [table]
     );
 
-    if (foreignKeysResult.rows.length > 0) {
+    if (foreignKeysResult.rows.length) {
       sqlExport += `-- Foreign key constraints for table: ${table}\n`;
       for (const fkRow of foreignKeysResult.rows) {
         sqlExport += fkRow.fk_statement + '\n';
@@ -279,7 +279,7 @@ export class DatabaseAdvanceService {
       [table]
     );
     const rlsEnabled =
-      rlsResult.rows.length > 0 &&
+      !!rlsResult.rows.length &&
       (rlsResult.rows[0].relrowsecurity === true || rlsResult.rows[0].relrowsecurity === 1);
     if (rlsEnabled) {
       sqlExport += `-- RLS enabled for table: ${table}\n`;
@@ -311,7 +311,7 @@ export class DatabaseAdvanceService {
       [table]
     );
 
-    if (policiesResult.rows.length > 0) {
+    if (policiesResult.rows.length) {
       sqlExport += `-- RLS policies for table: ${table}\n`;
       for (const policyRow of policiesResult.rows) {
         sqlExport += policyRow.policy_statement + '\n';
@@ -354,7 +354,7 @@ export class DatabaseAdvanceService {
       [table]
     );
 
-    if (triggersResult.rows.length > 0) {
+    if (triggersResult.rows.length) {
       sqlExport += `-- Triggers for table: ${table}\n`;
       for (const triggerRow of triggersResult.rows) {
         sqlExport += triggerRow.trigger_statement + '\n';
@@ -379,7 +379,7 @@ export class DatabaseAdvanceService {
     try {
       // Get tables to export
       let tablesToExport: string[];
-      if (tables && tables.length > 0) {
+      if (tables && tables.length) {
         tablesToExport = tables;
       } else {
         const tablesResult = await client.query(`
@@ -413,7 +413,7 @@ export class DatabaseAdvanceService {
 
             const { rows, wasTruncated } = await this.getTableData(client, table, rowLimit);
 
-            if (rows.length > 0) {
+            if (rows.length) {
               tableDataSql += `-- Data for table: ${table}\n`;
 
               for (const row of rows) {
@@ -471,7 +471,7 @@ export class DatabaseAdvanceService {
             ORDER BY p.proname
           `);
 
-          if (functionsResult.rows.length > 0) {
+          if (functionsResult.rows.length) {
             sqlExport += `-- Functions and Procedures\n`;
             for (const funcRow of functionsResult.rows) {
               sqlExport += `-- Function: ${funcRow.function_name}\n`;
@@ -497,7 +497,7 @@ export class DatabaseAdvanceService {
             ORDER BY sequence_name
           `);
 
-          if (sequencesResult.rows.length > 0) {
+          if (sequencesResult.rows.length) {
             sqlExport += `-- Sequences\n`;
             for (const seqRow of sequencesResult.rows) {
               sqlExport += seqRow.sequence_statement + '\n';
@@ -518,7 +518,7 @@ export class DatabaseAdvanceService {
             ORDER BY table_name
           `);
 
-          if (viewsResult.rows.length > 0) {
+          if (viewsResult.rows.length) {
             sqlExport += `-- Views\n`;
             for (const viewRow of viewsResult.rows) {
               sqlExport += `-- View: ${viewRow.view_name}\n`;
@@ -531,7 +531,7 @@ export class DatabaseAdvanceService {
           format: 'sql',
           data: sqlExport,
           timestamp,
-          ...(truncatedTables.length > 0 && {
+          ...(truncatedTables.length && {
             truncatedTables,
             rowLimit,
           }),
@@ -623,7 +623,7 @@ export class DatabaseAdvanceService {
           );
 
           const rlsEnabled =
-            rlsResult.rows.length > 0 &&
+            !!rlsResult.rows.length &&
             (rlsResult.rows[0].relrowsecurity === true || rlsResult.rows[0].relrowsecurity === 1);
 
           // Get policies
@@ -749,7 +749,7 @@ export class DatabaseAdvanceService {
           format: 'json',
           data: jsonData,
           timestamp,
-          ...(truncatedTables.length > 0 && {
+          ...(truncatedTables.length && {
             truncatedTables,
             rowLimit,
           }),
@@ -917,7 +917,7 @@ export class DatabaseAdvanceService {
       );
     }
 
-    if (!records || records.length === 0) {
+    if (!records || !records.length) {
       throw new AppError('No records found in file', 400, ERROR_CODES.INVALID_INPUT);
     }
 
@@ -939,7 +939,7 @@ export class DatabaseAdvanceService {
     records: Record<string, unknown>[],
     upsertKey?: string
   ): Promise<{ rowCount: number; rows?: unknown[] }> {
-    if (!records || records.length === 0) {
+    if (!records || !records.length) {
       throw new AppError('No records to insert', 400, ERROR_CODES.INVALID_INPUT);
     }
 
@@ -975,7 +975,7 @@ export class DatabaseAdvanceService {
         // Build upsert query with pg-format
         const updateColumns = columns.filter((c) => c !== upsertKey);
 
-        if (updateColumns.length > 0) {
+        if (updateColumns.length) {
           // Build UPDATE SET clause
           const updateClause = updateColumns
             .map((col) => format('%I = EXCLUDED.%I', col, col))
