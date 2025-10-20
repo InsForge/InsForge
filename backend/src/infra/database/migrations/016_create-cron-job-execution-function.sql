@@ -37,7 +37,7 @@ DECLARE
   v_key TEXT;
   v_decrypted TEXT;
 BEGIN
-  IF p_encrypted_headers IS NULL THEN
+  IF p_encrypted_headers IS NULL OR p_encrypted_headers = '' THEN
     RETURN '{}'::JSONB;
   END IF;
 
@@ -46,12 +46,14 @@ BEGIN
     RAISE EXCEPTION 'Encryption key app.encryption_key is not set';
   END IF;
 
-  -- Decode base64 to bytea, then decrypt
-  v_decrypted := pgp_sym_decrypt(decode(p_encrypted_headers, 'base64'), v_key);
-
-  RETURN v_decrypted::JSONB;
-EXCEPTION WHEN OTHERS THEN
-  RETURN '{}'::JSONB;
+  -- Try to decode and decrypt
+  BEGIN
+    v_decrypted := pgp_sym_decrypt(decode(p_encrypted_headers, 'base64'), v_key);
+    RETURN v_decrypted::JSONB;
+  EXCEPTION WHEN others THEN
+    RAISE NOTICE 'Decryption failed for value: %, error: %', left(p_encrypted_headers, 50), SQLERRM;
+    RETURN '{}'::JSONB;
+  END;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

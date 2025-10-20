@@ -46,33 +46,34 @@ export class ScheduleService {
     headers: Record<string, string>
   ): Promise<Record<string, string>> {
     const resolvedHeaders: Record<string, string> = {};
-    const secretPrefix = 'secret:';
+    // This regex finds all occurrences of `secret:KEY` where KEY is a sequence of non-space characters.
+    const secretRegex = /secret:(\S+)/g;
 
     for (const key in headers) {
-      const value = headers[key];
-      if (typeof value === 'string' && value.startsWith(secretPrefix)) {
-        const secretKey = value.substring(secretPrefix.length);
-        if (!secretKey) {
-          throw new AppError(
-            `Invalid secret reference for header "${key}": key is missing.`,
-            400,
-            ERROR_CODES.INVALID_INPUT
-          );
-        }
-        const secretValue = await this.secretService.getSecretByKey(secretKey);
+      let value = headers[key];
+      if (typeof value === 'string') {
+        const matches = [...value.matchAll(secretRegex)];
 
-        if (secretValue) {
-          resolvedHeaders[key] = secretValue;
-        } else {
-          throw new AppError(
-            `Secret with key "${secretKey}" not found for schedule header "${key}".`,
-            404,
-            ERROR_CODES.NOT_FOUND
-          );
+        // Asynchronously resolve all secrets found in this single header value
+        for (const match of matches) {
+          const placeholder = match[0]; // The full match, e.g., "secret:MY_API_KEY"
+          const secretKey = match[1]; // The captured group, e.g., "MY_API_KEY"
+
+          const secretValue = await this.secretService.getSecretByKey(secretKey);
+
+          if (secretValue) {
+            // Replace the placeholder (e.g., "secret:MY_API_KEY") with the actual secret.
+            value = value.replace(placeholder, secretValue);
+          } else {
+            throw new AppError(
+              `Secret with key "${secretKey}" not found for schedule header "${key}".`,
+              404,
+              ERROR_CODES.NOT_FOUND
+            );
+          }
         }
-      } else {
-        resolvedHeaders[key] = value;
       }
+      resolvedHeaders[key] = value;
     }
     return resolvedHeaders;
   }
