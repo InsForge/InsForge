@@ -140,7 +140,7 @@ export class ScheduleService {
 
       const sql = `
         SELECT * FROM upsert_cron_schedule(
-          $1::UUID, $2::TEXT, $3::TEXT, $4::TEXT, $5::JSONB, $6::JSONB
+          $1::UUID, $2::TEXT, $3::TEXT, $4::TEXT, $5::TEXT, $6::JSONB, $7::JSONB
         )
       `;
       const values = [
