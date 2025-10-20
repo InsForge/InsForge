@@ -1,5 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
-import { AuthRequest } from '@/api/middleware/auth.js';
+import { AuthRequest, verifyUser } from '@/api/middleware/auth.js';
 import { ScheduleService } from '@/core/schedule/schedule.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/api/middleware/error.js';
@@ -12,7 +12,6 @@ import {
   deleteScheduleResponseSchema,
 } from '@insforge/shared-schemas';
 import { randomUUID } from 'crypto';
-import { verifyUser } from '@/api/middleware/auth.js';
 
 const router = Router();
 const scheduleService = ScheduleService.getInstance();
