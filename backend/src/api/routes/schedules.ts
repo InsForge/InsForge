@@ -27,7 +27,12 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const schedules = await scheduleService.listSchedules();
     // Validate the response against the shared schema
-    const validatedResponse = listSchedulesResponseSchema.parse(schedules);
+    const schedulesWithStringDates = schedules.map((schedule) => ({
+      ...schedule,
+      createdAt: schedule.createdAt.toISOString(),
+      updatedAt: schedule.updatedAt.toISOString(),
+    }));
+    const validatedResponse = listSchedulesResponseSchema.parse(schedulesWithStringDates);
     successResponse(res, validatedResponse);
   } catch (error) {
     next(error);
@@ -45,8 +50,14 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
     if (!schedule) {
       throw new AppError('Schedule not found.', 404, ERROR_CODES.NOT_FOUND);
     }
+
+    const scheduleWithStringDates = {
+      ...schedule,
+      createdAt: schedule.createdAt.toISOString(),
+      updatedAt: schedule.updatedAt.toISOString(),
+    };
     // Validate the response against the shared schema
-    const validatedResponse = getScheduleResponseSchema.parse(schedule);
+    const validatedResponse = getScheduleResponseSchema.parse(scheduleWithStringDates);
     successResponse(res, validatedResponse);
   } catch (error) {
     next(error);

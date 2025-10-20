@@ -29,7 +29,7 @@ import { seedBackend } from '@/utils/seed.js';
 import logger from '@/utils/logger.js';
 import { isProduction } from './utils/environment';
 import packageJson from '../../package.json';
-
+import { schedulesRouter } from '@/api/routes/schedules';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -180,6 +180,7 @@ export async function createApp() {
   apiRouter.use('/openapi', openAPIRouter);
   apiRouter.use('/agent-docs', agentDocsRouter);
   apiRouter.use('/ai', aiRouter);
+  apiRouter.use('/schedules', schedulesRouter);
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);

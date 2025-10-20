@@ -7,7 +7,7 @@ services:
       context: ./docker-init/db
       dockerfile: Dockerfile.postgres
     container_name: insforge-postgres
-    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf -c app.encryption_key='${DB_ENCRYPTION_KEY:-your-strong-secret-key}'
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
