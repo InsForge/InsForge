@@ -186,6 +186,7 @@ $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION upsert_cron_schedule(
   p_schedule_id UUID,
+  p_name TEXT,
   p_cron_expression TEXT,
   p_http_method TEXT,
   p_function_url TEXT,
@@ -197,42 +198,12 @@ DECLARE
   v_existing_cron_id BIGINT;
   v_new_cron_id BIGINT;
   v_function_call TEXT;
-  v_schedule_exists BOOLEAN;
   v_encrypted_headers TEXT;
 BEGIN
   -- Encrypt headers before storing
   v_encrypted_headers := encrypt_headers(p_headers);
 
-  -- Check existence
-  SELECT EXISTS(
-    SELECT 1 FROM _schedules AS s WHERE s.id = p_schedule_id
-  ) INTO v_schedule_exists;
-
-  IF NOT v_schedule_exists THEN
-    INSERT INTO _schedules (
-      id,
-      name,
-      cron_schedule,
-      function_url,
-      http_method,
-      encrypted_headers,
-      body,
-      created_at,
-      updated_at
-    ) VALUES (
-      p_schedule_id,
-      'Schedule ' || p_schedule_id::TEXT,
-      p_cron_expression,
-      p_function_url,
-      p_http_method,
-      v_encrypted_headers,
-      p_body,
-      NOW(),
-      NOW()
-    );
-  END IF;
-
-  -- Unschedule existing cron job if present
+  -- Unschedule any existing job for this schedule to prevent duplicates
   SELECT s.cron_job_id INTO v_existing_cron_id
   FROM _schedules AS s
   WHERE s.id = p_schedule_id;
@@ -241,26 +212,33 @@ BEGIN
     PERFORM cron.unschedule(v_existing_cron_id);
   END IF;
 
-  -- Create cron job
-  v_function_call := format(
-    'SELECT execute_scheduled_request(%L::UUID)',
-    p_schedule_id::TEXT
-  );
+  -- Schedule the new cron job
+  v_function_call := format('SELECT execute_scheduled_request(%L::UUID)', p_schedule_id);
+  SELECT cron.schedule(p_cron_expression, v_function_call) INTO v_new_cron_id;
 
-  SELECT cron.schedule(p_cron_expression, v_function_call)
-  INTO v_new_cron_id;
-
-  -- Update record
-  UPDATE _schedules AS s
-  SET
-    cron_schedule = p_cron_expression,
-    http_method = p_http_method,
-    function_url = p_function_url,
-    encrypted_headers = v_encrypted_headers,
-    body = p_body,
-    cron_job_id = v_new_cron_id,
-    updated_at = NOW()
-  WHERE s.id = p_schedule_id;
+  -- Insert or update the schedule record in the `_schedules` table
+  INSERT INTO _schedules (
+    id, name, cron_schedule, function_url, http_method, encrypted_headers, body, cron_job_id, created_at, updated_at
+  ) VALUES (
+    p_schedule_id,
+    p_name,
+    p_cron_expression,
+    p_function_url,
+    p_http_method,
+    v_encrypted_headers,
+    p_body,
+    v_new_cron_id,
+    NOW(),
+    NOW()
+  ) ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    cron_schedule = EXCLUDED.cron_schedule,
+    function_url = EXCLUDED.function_url,
+    http_method = EXCLUDED.http_method,
+    encrypted_headers = EXCLUDED.encrypted_headers,
+    body = EXCLUDED.body,
+    cron_job_id = EXCLUDED.cron_job_id,
+    updated_at = NOW();
 
   RETURN QUERY SELECT v_new_cron_id, TRUE, 'Cron job scheduled successfully';
 EXCEPTION WHEN OTHERS THEN
