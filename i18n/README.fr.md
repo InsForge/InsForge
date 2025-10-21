@@ -30,7 +30,6 @@
 
 ### Cas d’usage : Création d’applications full-stack à l’aide du langage naturel
 - **Connecter des agents IA à InsForge** - Permettre à Claude, GPT ou à d’autres agents IA de gérer votre backend
-- **Ajouter un backend à des projets de type Lovable ou Bolt-style vibe coding** - Backend instantané pour des frontends générés par l’IA
 
 ## Exemples de prompt:
 
