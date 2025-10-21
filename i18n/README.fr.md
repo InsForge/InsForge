@@ -112,7 +112,7 @@ Commencez à créer votre projet dans un nouveau répertoire ! Créez votre proc
 **Assistance**: Si vous avez besoin d’aide ou de support, nous sommes réactifs sur notre [Discord channel](https://discord.gg/MPxwj5xVvW), et n’hésitez pas non plus à nous envoyer un e-mail à [info@insforge.dev](mailto:info@insforge.dev) !
 
 
-## Documentation & Assitance
+## Documentation & Assistance
 
 ### Documentation
 - **[Official Docs](https://docs.insforge.dev/introduction)** - Guides complets et références API
