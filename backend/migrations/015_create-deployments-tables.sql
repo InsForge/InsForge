@@ -1,11 +1,14 @@
 -- Migration: Create deployments tables
 -- Description: Add tables for frontend website deployments
 
+-- Ensure pgcrypto extension exists for gen_random_uuid()
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- Main deployments table
 CREATE TABLE IF NOT EXISTS _deployments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_name VARCHAR(255) NOT NULL,
-  subdomain VARCHAR(255) UNIQUE,
+  subdomain VARCHAR(255) NOT NULL UNIQUE,
   status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'deploying', 'active', 'failed')),
   deployment_url TEXT,
   storage_path TEXT,

@@ -485,7 +485,7 @@ export class AgentAPIDocService {
               body: {
                 projectName: 'string - name of the project',
                 files:
-                  'Array<{path: string, content: string}> - array of files with path and base64 content',
+                  'Array<{path: string, content: string (base64-encoded)}> - array of files with path and base64-encoded content',
               },
             },
             response: {
@@ -494,9 +494,9 @@ export class AgentAPIDocService {
                 body: {
                   id: 'string - deployment UUID',
                   projectName: 'string',
-                  subdomain: 'string - unique subdomain',
-                  status: 'string - "active" | "failed"',
-                  deploymentUrl: 'string - full URL to deployed site',
+                  status: 'string - "pending" | "deploying" | "active" | "failed"',
+                  deploymentUrl:
+                    'string - full URL to deployed site (path-based: {base}/deployments/{id}/)',
                   createdAt: 'datetime string',
                 },
               },
@@ -509,7 +509,7 @@ export class AgentAPIDocService {
               request: 'POST /api/deployments',
               body: '{projectName: "my-site", files: [{path: "index.html", content: "PGh0bWw+..."}, {path: "style.css", content: "Ym9keXs..."}]}',
               response:
-                '{id: "uuid", projectName: "my-site", subdomain: "my-site-abc123", status: "active", deploymentUrl: "http://localhost:8080/my-site-abc123"}',
+                '{id: "uuid", projectName: "my-site", status: "active", deploymentUrl: "http://localhost:8080/deployments/uuid/"}',
             },
           },
 
@@ -532,7 +532,7 @@ export class AgentAPIDocService {
             example: {
               request: 'GET /api/deployments',
               response:
-                '[{id: "uuid", projectName: "my-site", subdomain: "my-site-abc123", status: "active", deploymentUrl: "..."}]',
+                '[{id: "uuid", projectName: "my-site", status: "active", deploymentUrl: "http://localhost:8080/deployments/uuid/"}]',
             },
           },
 
@@ -558,7 +558,7 @@ export class AgentAPIDocService {
             example: {
               request: 'GET /api/deployments/uuid-123',
               response:
-                '{id: "uuid-123", projectName: "my-site", subdomain: "my-site-abc123", status: "active", deploymentUrl: "..."}',
+                '{id: "uuid-123", projectName: "my-site", status: "active", deploymentUrl: "http://localhost:8080/deployments/uuid-123/"}',
             },
           },
 

@@ -5,7 +5,7 @@ import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
 import { createDeploymentRequestSchema } from '@insforge/shared-schemas';
-import logger from '@/utils/logger.js';
+import { logger } from '@/utils/logger.js';
 
 const router = Router();
 const deploymentService = DeploymentService.getInstance();
@@ -31,7 +31,7 @@ router.post('/', verifyUser, async (req: AuthRequest, res: Response, next: NextF
     logger.info('Creating deployment', {
       projectName,
       fileCount: files.length,
-      user: req.user?.email,
+      userId: req.user?.id,
     });
 
     const deployment = await deploymentService.createDeployment({
