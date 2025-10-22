@@ -383,7 +383,7 @@ paths:
         '403':
           description: Forbidden - admin access required
 
-  /api/auth/auth/request-email-verification:
+  /api/auth/request-email-verification:
     post:
       summary: Request email verification
       description: Send email verification code to user's email address
@@ -416,7 +416,7 @@ paths:
         '400':
           description: Invalid request
 
-  /api/auth/auth/verify-email:
+  /api/auth/verify-email:
     post:
       summary: Verify email with code
       description: Verify email address using the code sent via email and create session
@@ -475,7 +475,7 @@ paths:
         '401':
           description: Verification code expired or invalid
 
-  /api/auth/auth/request-one-time-password:
+  /api/auth/request-one-time-password:
     post:
       summary: Request one-time password (OTP)
       description: Send OTP code to user's email for passwordless login
@@ -508,7 +508,7 @@ paths:
         '400':
           description: Invalid request
 
-  /api/auth/auth/verify-one-time-password:
+  /api/auth/verify-one-time-password:
     post:
       summary: Verify one-time password
       description: Verify OTP code and create session for passwordless login

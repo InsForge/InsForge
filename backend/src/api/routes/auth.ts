@@ -387,7 +387,8 @@ router.post('/tokens/anon', verifyAdmin, (_req: Request, res: Response, next: Ne
   }
 });
 
-router.post('/auth/request-email-verification', async (req: Request, res: Response, next: NextFunction) => {
+// POST /api/auth/request-email-verification - Request email verification
+router.post('/request-email-verification', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validationResult = requestEmailVerificationSchema.safeParse(req.body);
     if (!validationResult.success) {
@@ -406,7 +407,8 @@ router.post('/auth/request-email-verification', async (req: Request, res: Respon
   }
 });
 
-router.post('/auth/request-one-time-password', async (req: Request, res: Response, next: NextFunction) => {
+// POST /api/auth/request-one-time-password - Request one-time password (OTP)
+router.post('/request-one-time-password', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validationResult = requestOneTimePasswordSchema.safeParse(req.body);
     if (!validationResult.success) {
@@ -424,7 +426,8 @@ router.post('/auth/request-one-time-password', async (req: Request, res: Respons
   }
 });
 
-router.post('/auth/verify-email', async (req: Request, res: Response, next: NextFunction) => {
+// POST /api/auth/verify-email - Verify email with code
+router.post('/verify-email', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validationResult = verifyEmailRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
@@ -442,7 +445,8 @@ router.post('/auth/verify-email', async (req: Request, res: Response, next: Next
   }
 });
 
-router.post('/auth/verify-one-time-password', async (req: Request, res: Response, next: NextFunction) => {
+// POST /api/auth/verify-one-time-password - Verify one-time password (OTP)
+router.post('/verify-one-time-password', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validationResult = verifyOneTimePasswordRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
