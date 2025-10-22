@@ -122,6 +122,11 @@ async function seedLocalOAuthConfigs(): Promise<void> {
         clientIdEnv: 'LINKEDIN_CLIENT_ID',
         clientSecretEnv: 'LINKEDIN_CLIENT_SECRET',
       },
+      {
+        provider: 'microsoft',
+        clientIdEnv: 'MICROSOFT_CLIENT_ID',
+        clientSecretEnv: 'MICROSOFT_CLIENT_SECRET',
+      },
     ];
 
     for (const { provider, clientIdEnv, clientSecretEnv } of envMappings) {

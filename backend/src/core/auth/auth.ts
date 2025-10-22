@@ -32,6 +32,8 @@ import {
 } from '@/types/auth';
 import { ADMIN_ID } from '@/utils/constants';
 import { getApiBaseUrl } from '@/utils/environment';
+import { AppError } from '@/api/middleware/error';
+import { ERROR_CODES } from '@/types/error-constants';
 
 const JWT_SECRET = () => process.env.JWT_SECRET ?? '';
 const JWT_EXPIRES_IN = '7d';
@@ -451,7 +453,7 @@ export class AuthService {
   /**
    * Generate Google OAuth authorization URL
    */
-  async generateGoogleAuthUrl(state?: string): Promise<string> {
+  async generateGoogleOAuthUrl(state?: string): Promise<string> {
     const oauthConfigService = OAuthConfigService.getInstance();
     const config = await oauthConfigService.getConfigByProvider('google');
 
@@ -503,7 +505,7 @@ export class AuthService {
   /**
    * Generate GitHub OAuth authorization URL - ALWAYS reads fresh from DB
    */
-  async generateGitHubAuthUrl(state?: string): Promise<string> {
+  async generateGitHubOAuthUrl(state?: string): Promise<string> {
     const oauthConfigService = OAuthConfigService.getInstance();
     const config = await oauthConfigService.getConfigByProvider('github');
 
@@ -550,7 +552,7 @@ export class AuthService {
   /**
    * Generate Discord OAuth authorization URL
    */
-  async generateDiscordAuthUrl(state?: string): Promise<string> {
+  async generateDiscordOAuthUrl(state?: string): Promise<string> {
     const oauthConfigService = OAuthConfigService.getInstance();
     const config = await oauthConfigService.getConfigByProvider('discord');
 
@@ -827,7 +829,7 @@ export class AuthService {
     );
   }
   // NEW: Generate Microsoft OAuth authorization URL
-  async generateMicrosoftAuthUrl(state?: string): Promise<string> {
+  async generateMicrosoftOAuthUrl(state?: string): Promise<string> {
     const oauthConfigService = OAuthConfigService.getInstance();
     const config = await oauthConfigService.getConfigByProvider('microsoft');
     if (!config) {
@@ -1020,7 +1022,7 @@ export class AuthService {
   /**
    * Generate LinkedIn OAuth authorization URL
    */
-  async generateLinkedInAuthUrl(state?: string): Promise<string> {
+  async generateLinkedInOAuthUrl(state?: string): Promise<string> {
     const oauthConfigService = OAuthConfigService.getInstance();
     const config = await oauthConfigService.getConfigByProvider('linkedin');
 
@@ -1202,7 +1204,7 @@ export class AuthService {
   /**
    * Generate Facebook OAuth authorization URL
    */
-  async generateFacebookAuthUrl(state?: string): Promise<string | undefined> {
+  async generateFacebookOAuthUrl(state?: string): Promise<string | undefined> {
     const oauthConfigService = OAuthConfigService.getInstance();
     const config = await oauthConfigService.getConfigByProvider('facebook');
 
@@ -1326,16 +1328,18 @@ export class AuthService {
   /**
    * Generate OAuth authorization URL for any supported provider
    */
-  async generateAuthUrl(provider: OAuthProvidersSchema, state?: string): Promise<string> {
+  async generateOAuthUrl(provider: OAuthProvidersSchema, state?: string): Promise<string> {
     switch (provider) {
       case 'google':
-        return this.generateGoogleAuthUrl(state);
+        return this.generateGoogleOAuthUrl(state);
       case 'github':
-        return this.generateGitHubAuthUrl(state);
+        return this.generateGitHubOAuthUrl(state);
       case 'discord':
-        return this.generateDiscordAuthUrl(state);
+        return this.generateDiscordOAuthUrl(state);
       case 'linkedin':
-        return this.generateLinkedInAuthUrl(state);
+        return this.generateLinkedInOAuthUrl(state);
+      case 'microsoft':
+        return this.generateMicrosoftOAuthUrl(state);
       default:
         throw new Error(`OAuth provider ${provider} is not yet implemented`);
     }
@@ -1357,6 +1361,8 @@ export class AuthService {
         return this.handleDiscordCallback(payload);
       case 'linkedin':
         return this.handleLinkedInCallback(payload);
+      case 'microsoft':
+        return this.handleMicrosoftCallback(payload);
       default:
         throw new Error(`OAuth provider ${provider} is not yet implemented`);
     }
@@ -1434,6 +1440,22 @@ export class AuthService {
     }
 
     throw new Error('No authorization code or token provided');
+  }
+
+  /**
+   * Handle Microsoft OAuth callback
+   */
+  private async handleMicrosoftCallback(payload: {
+    code?: string;
+    token?: string;
+  }): Promise<CreateSessionResponse> {
+    if (!payload.code) {
+      throw new AppError('No authorization code provided', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
+    const accessToken = await this.exchangeCodeToTokenByMicrosoft(payload.code as string);
+    const microsoftUserInfo = await this.getMicrosoftUserInfo(accessToken.access_token);
+    return this.findOrCreateMicrosoftUser(microsoftUserInfo);
   }
 
   /**

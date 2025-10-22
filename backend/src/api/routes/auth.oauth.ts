@@ -28,81 +28,12 @@ const validateJwtSecret = (): string => {
   const jwtSecret = process.env.JWT_SECRET;
   if (!jwtSecret || jwtSecret.trim() === '') {
     throw new AppError(
-      'JWT_SECRET environment variable is not configured. This is required for OAuth state protection.',
+      'JWT_SECRET environment variable is not configured.',
       500,
-      ERROR_CODES.AUTH_OAUTH_CONFIG_ERROR
+      ERROR_CODES.INTERNAL_ERROR
     );
   }
   return jwtSecret;
-};
-
-// Helper function to validate and normalize redirect origins
-const validateRedirectOrigin = (redirectUri: string): string => {
-  let parsedUrl: URL;
-  try {
-    parsedUrl = new URL(redirectUri);
-  } catch {
-    throw new AppError('Invalid redirect URI format', 400, ERROR_CODES.INVALID_INPUT);
-  }
-
-  // Get allowed origins from environment
-  const allowedOrigins =
-    process.env.OAUTH_ALLOWED_ORIGINS?.split(',').map((origin) => origin.trim()) || [];
-
-  if (allowedOrigins.length === 0) {
-    throw new AppError(
-      'OAuth redirect validation is not configured. OAUTH_ALLOWED_ORIGINS must be set.',
-      500,
-      ERROR_CODES.AUTH_OAUTH_CONFIG_ERROR
-    );
-  }
-
-  const origin = `${parsedUrl.protocol}//${parsedUrl.host}`;
-
-  if (!allowedOrigins.includes(origin)) {
-    logger.warn('OAuth redirect to disallowed origin blocked', {
-      origin,
-      allowedOrigins,
-      redirectUri,
-    });
-    throw new AppError(
-      `Redirect origin not allowed. Allowed origins: ${allowedOrigins.join(', ')}`,
-      400,
-      ERROR_CODES.INVALID_INPUT
-    );
-  }
-
-  return origin;
-};
-
-// Helper function to set secure authentication cookies
-type AuthResult = { accessToken?: string; user?: { id?: string; email?: string; name?: string } };
-
-const setAuthCookies = (res: Response, result: AuthResult) => {
-  const cookieOptions = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'none' as const, // 'none' required for cross-origin OAuth flows with CORS credentials
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    path: '/',
-  };
-
-  if (result?.accessToken) {
-    res.cookie('access_token', result.accessToken, cookieOptions);
-  }
-};
-
-// Helper function to clear authentication cookies
-const clearAuthCookies = (res: Response) => {
-  const cookieOptions = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'none' as const, // 'none' required for cross-origin OAuth flows with CORS credentials
-    maxAge: 0,
-    path: '/',
-  };
-
-  res.cookie('access_token', '', cookieOptions);
 };
 
 // OAuth Configuration Management Routes (must come before wildcard routes)
@@ -116,7 +47,7 @@ router.get('/configs', verifyAdmin, async (req: AuthRequest, res: Response, next
     };
     res.json(response);
   } catch (error) {
-    logger.error('Failed to get OAuth configs', { error });
+    logger.error('Failed to list OAuth configurations', { error });
     next(error);
   }
 });
@@ -338,12 +269,9 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
       throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    // Validate and normalize the redirect origin
-    const validatedOrigin = validateRedirectOrigin(redirect_uri as string);
-
     const jwtPayload = {
       provider: validatedProvider,
-      origin: validatedOrigin, // Store only the validated origin, not full URL
+      redirectUri: redirect_uri ? (redirect_uri as string) : undefined,
       createdAt: Date.now(),
     };
     const jwtSecret = validateJwtSecret();
@@ -352,7 +280,7 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
       expiresIn: '1h', // Set expiration time for the state token
     });
 
-    const authUrl = await authService.generateAuthUrl(validatedProvider, state);
+    const authUrl = await authService.generateOAuthUrl(validatedProvider, state);
 
     res.json({ authUrl });
   } catch (error) {
@@ -386,15 +314,15 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       throw new AppError('State parameter is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    let origin: string;
+    let redirectUri: string;
     let provider: string;
     try {
       const jwtSecret = validateJwtSecret();
       const decodedState = jwt.verify(state, jwtSecret) as {
         provider: string;
-        origin: string;
+        redirectUri: string;
       };
-      origin = decodedState.origin || '';
+      redirectUri = decodedState.redirectUri || '';
       provider = decodedState.provider || '';
     } catch {
       logger.warn('Invalid state parameter', { state });
@@ -412,16 +340,16 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       );
     }
     const validatedProvider = providerValidation.data;
-    if (!origin) {
+    if (!redirectUri) {
       throw new AppError('Origin is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
     if (success !== 'true') {
       const errorMessage = error || 'OAuth authentication failed';
       logger.warn('Shared OAuth callback failed', { error: errorMessage, provider });
-      clearAuthCookies(res);
-      return res.redirect(`${origin}/?error=${encodeURIComponent(String(errorMessage))}`);
+      return res.redirect(`${redirectUri}/?error=${encodeURIComponent(String(errorMessage))}`);
     }
+
     if (!payload) {
       throw new AppError('No payload provided in callback', 400, ERROR_CODES.INVALID_INPUT);
     }
@@ -430,15 +358,15 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       const payloadData = JSON.parse(Buffer.from(payload as string, 'base64').toString('utf8'));
       const result = await authService.handleOAuthCallback(validatedProvider, payloadData);
 
-      // Set secure cookies instead of URL parameters
-      setAuthCookies(res, result);
-
-      // Redirect to the validated origin without sensitive data in URL
-      res.redirect(`${origin}/?success=true`);
+      const finalredirectUri = new URL(redirectUri);
+      finalredirectUri.searchParams.set('access_token', result?.accessToken ?? '');
+      finalredirectUri.searchParams.set('user_id', result?.user.id ?? '');
+      finalredirectUri.searchParams.set('email', result?.user.email ?? '');
+      finalredirectUri.searchParams.set('name', result?.user.name ?? '');
+      res.redirect(finalredirectUri.toString());
     } catch (error) {
       logger.error('OAuth callback processing failed', { error, provider });
-      clearAuthCookies(res);
-      res.redirect(`${origin}/?error=${encodeURIComponent('Authentication failed')}`);
+      res.redirect(`${redirectUri}/?error=${encodeURIComponent('Authentication failed')}`);
     }
   } catch (error) {
     logger.error('Shared OAuth callback error', { error });
@@ -452,18 +380,18 @@ router.get('/:provider/callback', async (req: Request, res: Response, _: NextFun
     const { provider } = req.params;
     const { code, state, token } = req.query;
 
-    let origin = process.env.DEFAULT_FRONTEND_ORIGIN || 'http://localhost:3000';
+    let redirectUri = '/';
 
     if (state) {
       try {
         const jwtSecret = validateJwtSecret();
         const stateData = jwt.verify(state as string, jwtSecret) as {
           provider: string;
-          origin: string;
+          redirectUri: string;
         };
-        origin = stateData.origin || origin;
+        redirectUri = stateData.redirectUri || '/';
       } catch {
-        // Invalid state, use default origin
+        // Invalid state, use default redirectUri
         logger.warn('Invalid state in provider callback, using default origin', { state });
       }
     }
@@ -480,65 +408,56 @@ router.get('/:provider/callback', async (req: Request, res: Response, _: NextFun
 
     const validatedProvider = providerValidation.data;
 
-    try {
-      const result = await authService.handleOAuthCallback(validatedProvider, {
-        code: code as string | undefined,
-        token: token as string | undefined,
-      });
+    const result = await authService.handleOAuthCallback(validatedProvider, {
+      code: code as string | undefined,
+      token: token as string | undefined,
+    });
 
-      // Set secure cookies instead of URL parameters
-      setAuthCookies(res, result);
+    const finalredirectUri = new URL(redirectUri);
+    finalredirectUri.searchParams.set('access_token', result?.accessToken ?? '');
+    finalredirectUri.searchParams.set('user_id', result?.user.id ?? '');
+    finalredirectUri.searchParams.set('email', result?.user.email ?? '');
+    finalredirectUri.searchParams.set('name', result?.user.name ?? '');
 
-      logger.info('OAuth callback successful, redirecting with secure cookies', {
-        origin,
-        hasAccessToken: !!result?.accessToken,
-        hasUserId: !!result?.user?.id,
-        provider: validatedProvider,
-      });
+    logger.info('OAuth callback successful, redirecting with token', {
+      redirectUri: finalredirectUri.toString(),
+      hasAccessToken: !!result?.accessToken,
+      hasUserId: !!result?.user?.id,
+      provider: validatedProvider,
+    });
 
-      // Redirect to the validated origin without sensitive data in URL
-      return res.redirect(`${origin}/?success=true`);
-    } catch (error) {
-      logger.error('OAuth callback processing failed', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        provider: validatedProvider,
-        origin,
-      });
-      clearAuthCookies(res);
-      return res.redirect(`${origin}/?error=${encodeURIComponent('Authentication failed')}`);
-    }
+    // Redirect to the validated origin without sensitive data in URL
+    return res.redirect(finalredirectUri.toString());
   } catch (error) {
     logger.error('OAuth callback error', {
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : error,
+      stack: error instanceof Error ? error.stack : undefined,
       provider: req.params.provider,
       hasCode: !!req.query.code,
       hasState: !!req.query.state,
       hasToken: !!req.query.token,
     });
 
-    // Clear any authentication cookies on error
-    clearAuthCookies(res);
-
-    // Get origin from state or use default
-    let origin = process.env.DEFAULT_FRONTEND_ORIGIN || 'http://localhost:3000';
+    // Redirect to app with error message
     const { state } = req.query;
-
-    if (state) {
-      try {
-        const jwtSecret = validateJwtSecret();
-        const stateData = jwt.verify(state as string, jwtSecret) as {
-          origin: string;
-        };
-        origin = stateData.origin || origin;
-      } catch {
-        // Invalid state, use default origin
-      }
-    }
+    const redirectUri = state
+      ? (() => {
+          try {
+            const stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
+            return stateData.redirectUri || '/';
+          } catch {
+            return '/';
+          }
+        })()
+      : '/';
 
     const errorMessage = error instanceof Error ? error.message : 'OAuth authentication failed';
 
-    // Redirect to validated origin with error message
-    return res.redirect(`${origin}/?error=${encodeURIComponent(errorMessage)}`);
+    // Redirect with error in URL parameters
+    const errorredirectUri = new URL(redirectUri);
+    errorredirectUri.searchParams.set('error', errorMessage);
+
+    return res.redirect(errorredirectUri.toString());
   }
 });
 

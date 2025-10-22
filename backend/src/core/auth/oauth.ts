@@ -215,7 +215,7 @@ export class OAuthConfigService {
             scopes = ['user-read-email', 'user-read-private'];
             break;
           case 'microsoft':
-            scopes = ['openid', 'email', 'profile'];
+            scopes = ['User.Read'];
             break;
           default:
             scopes = ['email', 'profile'];
