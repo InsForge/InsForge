@@ -3,9 +3,10 @@
  * Handles deployment lifecycle
  */
 
+import { randomUUID } from 'crypto';
 import { DatabaseManager } from '@/core/database/manager.js';
 import { getStorageAdapter, DeploymentFile } from './storage-adapter.js';
-import logger from '@/utils/logger.js';
+import { logger } from '@/utils/logger.js';
 
 export interface CreateDeploymentRequest {
   projectName: string;
@@ -51,15 +52,32 @@ export class DeploymentService {
       throw new Error('No files provided for deployment');
     }
 
+    // Sanitize and validate file paths
+    for (const file of files) {
+      // Disallow absolute paths
+      if (file.path.startsWith('/')) {
+        throw new Error(`Invalid file path: ${file.path} (absolute paths not allowed)`);
+      }
+      // Disallow path traversal
+      if (file.path.includes('..')) {
+        throw new Error(`Invalid file path: ${file.path} (path traversal not allowed)`);
+      }
+      // Disallow empty paths
+      if (!file.path.trim()) {
+        throw new Error('File path cannot be empty');
+      }
+    }
+
     // Ensure index.html exists
     const hasIndexHtml = files.some((f) => f.path === 'index.html');
     if (!hasIndexHtml) {
       throw new Error('Deployment must include an index.html file');
     }
 
+    let deploymentId: string | undefined;
     try {
       // Generate deployment ID
-      const deploymentId = crypto.randomUUID();
+      deploymentId = randomUUID();
 
       // Generate subdomain (simple slug from project name)
       const subdomain = this.generateSubdomain(projectName, deploymentId);
@@ -104,6 +122,16 @@ export class DeploymentService {
         projectName,
         error: error instanceof Error ? error.message : String(error),
       });
+      // Set status to 'failed' if deployment was created
+      if (deploymentId) {
+        try {
+          await this.db
+            .prepare(`UPDATE _deployments SET status = ?, deployed_at = NULL WHERE id = ?`)
+            .run('failed', deploymentId);
+        } catch {
+          // best-effort; swallow to not mask original error
+        }
+      }
       throw error;
     }
   }

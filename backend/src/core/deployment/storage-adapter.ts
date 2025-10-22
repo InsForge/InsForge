@@ -5,8 +5,15 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import logger from '@/utils/logger.js';
+import {
+  S3Client,
+  PutObjectCommand,
+  ListObjectsV2Command,
+  DeleteObjectsCommand,
+} from '@aws-sdk/client-s3';
+import { logger } from '@/utils/logger.js';
+
+const DEFAULT_AWS_REGION = 'us-east-1';
 
 export interface DeploymentFile {
   path: string;
@@ -37,9 +44,19 @@ export class LocalStorageAdapter implements StorageAdapter {
 
       // Write all files
       for (const file of files) {
-        const filePath = path.join(deployPath, file.path);
-        await fs.mkdir(path.dirname(filePath), { recursive: true });
-        await fs.writeFile(filePath, file.content);
+        // Normalize and validate file path to prevent traversal
+        const normalizedPath = file.path.replace(/^\/+/, ''); // Remove leading slashes
+        const resolvedPath = path.resolve(deployPath, normalizedPath);
+        const resolvedDeployPath = path.resolve(deployPath);
+
+        // Ensure resolved path is within deployment directory
+        if (!resolvedPath.startsWith(resolvedDeployPath + path.sep)) {
+          logger.warn('Skipping file with invalid path', { file: file.path, deploymentId });
+          continue;
+        }
+
+        await fs.mkdir(path.dirname(resolvedPath), { recursive: true });
+        await fs.writeFile(resolvedPath, file.content);
       }
 
       logger.info('Local deployment successful', { deploymentId, fileCount: files.length });
@@ -98,7 +115,7 @@ export class S3StorageAdapter implements StorageAdapter {
       region: string;
       credentials?: { accessKeyId: string; secretAccessKey: string };
     } = {
-      region: process.env.AWS_REGION || 'us-east-2',
+      region: process.env.AWS_REGION || DEFAULT_AWS_REGION,
     };
 
     // Use explicit credentials if provided, otherwise use IAM role
@@ -135,16 +152,21 @@ export class S3StorageAdapter implements StorageAdapter {
   }
 
   async deploy(deploymentId: string, files: DeploymentFile[]): Promise<string> {
+    const region = process.env.AWS_REGION || DEFAULT_AWS_REGION;
+
     try {
       // Upload all files to S3
       const uploadPromises = files.map(async (file) => {
         const s3Key = this.getS3Key(deploymentId, file.path);
+        // Set no-cache for index.html, long cache for other assets
+        const cacheControl = file.path === 'index.html' ? 'no-cache' : 'public, max-age=31536000';
+
         const command = new PutObjectCommand({
           Bucket: this.bucket,
           Key: s3Key,
           Body: file.content,
           ContentType: this.getContentType(file.path),
-          CacheControl: 'public, max-age=31536000',
+          CacheControl: cacheControl,
         });
 
         await this.s3Client.send(command);
@@ -157,11 +179,11 @@ export class S3StorageAdapter implements StorageAdapter {
       // Return CloudFront URL if available
       const cloudFrontUrl = process.env.AWS_CLOUDFRONT_URL;
       if (cloudFrontUrl) {
-        return `${cloudFrontUrl}/${this.appKey}/deployments/${deploymentId}/index.html`;
+        const url = cloudFrontUrl.startsWith('http') ? cloudFrontUrl : `https://${cloudFrontUrl}`;
+        return `${url}/${this.appKey}/deployments/${deploymentId}/index.html`;
       }
 
       // Fallback to S3 URL (must include index.html since S3 doesn't support directory indexes)
-      const region = process.env.AWS_REGION || 'us-east-1';
       return `https://${this.bucket}.s3.${region}.amazonaws.com/${this.appKey}/deployments/${deploymentId}/index.html`;
     } catch (error) {
       logger.error('S3 deployment failed', {
@@ -176,14 +198,50 @@ export class S3StorageAdapter implements StorageAdapter {
 
   async delete(deploymentId: string): Promise<void> {
     try {
-      const s3Key = this.getS3Key(deploymentId, 'index.html');
-      const command = new DeleteObjectCommand({
-        Bucket: this.bucket,
-        Key: s3Key,
-      });
+      // Get deployment prefix
+      const prefix = `${this.appKey}/deployments/${deploymentId}/`;
 
-      await this.s3Client.send(command);
-      logger.info('S3 deployment deleted', { deploymentId });
+      // List all objects under the deployment prefix
+      const objectsToDelete: { Key: string }[] = [];
+      let continuationToken: string | undefined;
+
+      do {
+        const listCommand = new ListObjectsV2Command({
+          Bucket: this.bucket,
+          Prefix: prefix,
+          ContinuationToken: continuationToken,
+        });
+
+        const listResponse = await this.s3Client.send(listCommand);
+
+        if (listResponse.Contents) {
+          objectsToDelete.push(
+            ...listResponse.Contents.filter((obj) => obj.Key).map((obj) => ({
+              Key: obj.Key as string,
+            }))
+          );
+        }
+
+        continuationToken = listResponse.NextContinuationToken;
+      } while (continuationToken);
+
+      // Delete all objects in batches of 1000
+      if (objectsToDelete.length > 0) {
+        for (let i = 0; i < objectsToDelete.length; i += 1000) {
+          const batch = objectsToDelete.slice(i, i + 1000);
+          const deleteCommand = new DeleteObjectsCommand({
+            Bucket: this.bucket,
+            Delete: {
+              Objects: batch,
+              Quiet: true,
+            },
+          });
+
+          await this.s3Client.send(deleteCommand);
+        }
+      }
+
+      logger.info('S3 deployment deleted', { deploymentId, filesDeleted: objectsToDelete.length });
     } catch (error) {
       logger.error('Failed to delete S3 deployment', {
         deploymentId,
@@ -200,7 +258,8 @@ export class S3StorageAdapter implements StorageAdapter {
  * Factory function to get appropriate storage adapter
  */
 export function getStorageAdapter(): StorageAdapter {
-  const backend = process.env.AWS_S3_BUCKET ? 's3' : 'local';
+  const bucket = process.env.AWS_S3_BUCKET;
+  const backend = bucket && bucket.trim() ? 's3' : 'local';
 
   if (backend === 's3') {
     return new S3StorageAdapter();
