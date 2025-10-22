@@ -474,6 +474,116 @@ export class AgentAPIDocService {
           },
         },
 
+        // Deployment API for deploying static websites
+        '<critical-deployment>': 'Re-read deploymentApi section before deploying websites',
+        deploymentApi: {
+          createDeployment: {
+            method: 'POST',
+            path: '/api/deployments',
+            request: {
+              requiresAuth: true,
+              body: {
+                projectName: 'string - name of the project',
+                files: 'Array<{path: string, content: string}> - array of files with path and base64 content',
+              },
+            },
+            response: {
+              success: {
+                status: 201,
+                body: {
+                  id: 'string - deployment UUID',
+                  projectName: 'string',
+                  subdomain: 'string - unique subdomain',
+                  status: 'string - "active" | "failed"',
+                  deploymentUrl: 'string - full URL to deployed site',
+                  createdAt: 'datetime string',
+                },
+              },
+              error: {
+                status: '400 | 401 | 500',
+                body: '{error: string, message: string, statusCode: number}',
+              },
+            },
+            example: {
+              request: 'POST /api/deployments',
+              body: '{projectName: "my-site", files: [{path: "index.html", content: "PGh0bWw+..."}, {path: "style.css", content: "Ym9keXs..."}]}',
+              response: '{id: "uuid", projectName: "my-site", subdomain: "my-site-abc123", status: "active", deploymentUrl: "http://localhost:8080/my-site-abc123"}',
+            },
+          },
+
+          listDeployments: {
+            method: 'GET',
+            path: '/api/deployments',
+            request: {
+              requiresAuth: true,
+            },
+            response: {
+              success: {
+                status: 200,
+                body: 'Array<DeploymentSchema>',
+              },
+              error: {
+                status: '401 | 500',
+                body: '{error: string, message: string, statusCode: number}',
+              },
+            },
+            example: {
+              request: 'GET /api/deployments',
+              response: '[{id: "uuid", projectName: "my-site", subdomain: "my-site-abc123", status: "active", deploymentUrl: "..."}]',
+            },
+          },
+
+          getDeployment: {
+            method: 'GET',
+            path: '/api/deployments/{id}',
+            request: {
+              requiresAuth: true,
+              params: {
+                id: 'string - deployment UUID',
+              },
+            },
+            response: {
+              success: {
+                status: 200,
+                body: 'DeploymentSchema',
+              },
+              error: {
+                status: '404 | 401 | 500',
+                body: '{error: string, message: string, statusCode: number}',
+              },
+            },
+            example: {
+              request: 'GET /api/deployments/uuid-123',
+              response: '{id: "uuid-123", projectName: "my-site", subdomain: "my-site-abc123", status: "active", deploymentUrl: "..."}',
+            },
+          },
+
+          deleteDeployment: {
+            method: 'DELETE',
+            path: '/api/deployments/{id}',
+            request: {
+              requiresAuth: true,
+              params: {
+                id: 'string - deployment UUID',
+              },
+            },
+            response: {
+              success: {
+                status: 200,
+                body: '{message: string}',
+              },
+              error: {
+                status: '404 | 401 | 500',
+                body: '{error: string, message: string, statusCode: number}',
+              },
+            },
+            example: {
+              request: 'DELETE /api/deployments/uuid-123',
+              response: '{message: "Deployment deleted successfully"}',
+            },
+          },
+        },
+
         // Storage API for file upload and management
         '<critical-storage>': 'Re-read storageApi section before implementing file operations',
         storageApi: {
@@ -655,6 +765,14 @@ export class AgentAPIDocService {
             '6. Private buckets require authentication for all operations',
             '7. Organize files using key prefixes like "images/", "documents/"',
           ],
+          deploymentSteps: [
+            '1. Create deployment with POST /api/deployments',
+            '2. Provide projectName and files array with path and base64 content',
+            '3. Files must include index.html at root level',
+            '4. Response includes deploymentUrl to access the deployed site',
+            '5. List all deployments with GET /api/deployments',
+            '6. Delete deployment with DELETE /api/deployments/{id}',
+          ],
           examples: {
             // Authentication examples
             register:
@@ -675,6 +793,10 @@ export class AgentAPIDocService {
             uploadFile: 'PUT /api/storage/buckets/uploads/objects/avatar.jpg with FormData file',
             downloadFile: 'GET /api/storage/buckets/uploads/objects/avatar.jpg',
             deleteFile: 'DELETE /api/storage/buckets/uploads/objects/temp/old-file.tmp',
+            // Deployment examples
+            deployWebsite: 'POST /api/deployments with body {projectName: "my-site", files: [{path: "index.html", content: "base64..."}]}',
+            listDeployments: 'GET /api/deployments',
+            deleteDeployment: 'DELETE /api/deployments/uuid-123',
           },
         },
       };
