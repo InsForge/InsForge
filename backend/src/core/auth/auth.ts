@@ -31,6 +31,9 @@ import {
 } from '@/types/auth';
 import { ADMIN_ID } from '@/utils/constants';
 import { getApiBaseUrl } from '@/utils/environment';
+import { generateNumericCode } from '@/utils/uuid';
+import { config } from '@/app.config';
+import { EmailService } from '../email';
 
 const JWT_SECRET = () => process.env.JWT_SECRET ?? '';
 const JWT_EXPIRES_IN = '7d';
@@ -107,6 +110,18 @@ export class AuthService {
    * Generate JWT token for users and admins
    */
   generateToken(payload: TokenPayloadSchema): string {
+    return jwt.sign(payload, JWT_SECRET(), {
+      algorithm: 'HS256',
+      expiresIn: JWT_EXPIRES_IN,
+    });
+  }
+
+  generateProjectToken(projectId: string): string {
+    const payload = {
+      sub: projectId,
+      email: 'project@insforge.com',
+      role: 'project',
+    };
     return jwt.sign(payload, JWT_SECRET(), {
       algorithm: 'HS256',
       expiresIn: JWT_EXPIRES_IN,
@@ -202,6 +217,152 @@ export class AuthService {
     if (!validPassword) {
       throw new Error('Invalid credentials');
     }
+
+    const user = this.dbUserToApiUser(dbUser);
+    const accessToken = this.generateToken({
+      sub: dbUser.id,
+      email: dbUser.email,
+      role: 'authenticated',
+    });
+
+    return { user, accessToken };
+  }
+
+  /**
+   * Request email verification
+   */
+  async requestEmailVerification(email: string): Promise<void> {
+    // Implementation for sending email verification
+    const dbUser = await this.db.prepare('SELECT * FROM _accounts WHERE email = ?').get(email);
+    if (!dbUser) {
+      throw new Error('User not found');
+    }
+
+    // Generate verification code and handle conflicts
+    let verificationCode = generateNumericCode(6);
+    let codeLength = 6;
+    const maxRetries = 1; // Allow up to 1 retry (6, 7 digit codes)
+    let retries = 0;
+
+    while (retries <= maxRetries) {
+      try {
+        await this.db
+          .prepare('UPDATE _accounts SET verify_email_code = ?, verify_email_code_expires_at = ? WHERE email = ?')
+          .run(verificationCode, Date.now() + 3600000, email);
+        break; // Success, exit loop
+      } catch (error) {
+        // Check if error is due to unique constraint violation
+        const isUniqueConstraintError =
+          error instanceof Error &&
+          (error.message.includes('UNIQUE constraint failed') ||
+           error.message.includes('verify_email_code'));
+
+        if (isUniqueConstraintError && retries < maxRetries) {
+          // Retry with longer code
+          retries++;
+          codeLength++;
+          verificationCode = generateNumericCode(codeLength);
+          logger.warn(`Verification code conflict, retrying with ${codeLength} digits`, { email, attempt: retries + 1 });
+        } else {
+          // Either not a conflict error, or max retries reached
+          logger.error('Failed to update email verification code:', error);
+          throw new Error('Failed to initiate email verification');
+        }
+      }
+    }
+
+    // Send email with verification code
+    const emailService = EmailService.getInstance();
+    await emailService.sendVerificationEmail(email, dbUser.name || 'User', verificationCode);
+  }
+
+  /**
+   * Verify email
+   */
+  async verifyEmail(email: string, verificationCode: string): Promise<CreateSessionResponse> {
+    // Implementation for verifying email
+    const dbUser = await this.db.prepare('SELECT * FROM _accounts WHERE email = ?').get(email);
+    if (!dbUser) {
+      throw new Error('User not found');
+    }
+    // ignore expiration for now
+    if (dbUser.verify_email_code !== verificationCode) {
+      throw new Error('Invalid verification code');
+    }
+
+    await this.db
+      .prepare('UPDATE _accounts SET email_verified = true, verify_email_code = NULL, verify_email_code_expires_at = NULL WHERE email = ?')
+      .run(email);
+
+    const user = this.dbUserToApiUser(dbUser);
+    const accessToken = this.generateToken({
+      sub: dbUser.id,
+      email: dbUser.email,
+      role: 'authenticated',
+    });
+
+    return { user, accessToken };
+  }
+
+  async requestOneTimePassword(email: string): Promise<void> {
+    // Implementation for sending one-time password
+    const dbUser = await this.db.prepare('SELECT * FROM _accounts WHERE email = ?').get(email);
+    if (!dbUser) {
+      throw new Error('User not found');
+    }
+
+    // Generate verification code and handle conflicts
+    let verificationCode = generateNumericCode(6);
+    let codeLength = 6;
+    const maxRetries = 1; // Allow up to 1 retry (6, 7 digit codes)
+    let retries = 0;
+
+    while (retries <= maxRetries) {
+      try {
+        await this.db
+          .prepare('UPDATE _accounts SET otp_code = ?, otp_code_expires_at = ? WHERE email = ?')
+          .run(verificationCode, Date.now() + 3600000, email);
+        break; // Success, exit loop
+      } catch (error) {
+        // Check if error is due to unique constraint violation
+        const isUniqueConstraintError =
+          error instanceof Error &&
+          (error.message.includes('UNIQUE constraint failed') ||
+           error.message.includes('otp_code'));
+
+        if (isUniqueConstraintError && retries < maxRetries) {
+          // Retry with longer code
+          retries++;
+          codeLength++;
+          verificationCode = generateNumericCode(codeLength);
+          logger.warn(`Verification code conflict, retrying with ${codeLength} digits`, { email, attempt: retries + 1 });
+        } else {
+          // Either not a conflict error, or max retries reached
+          logger.error('Failed to update OTP code:', error);
+          throw new Error('Failed to initiate OTP request');
+        }
+      }
+    }
+
+    // Send email with verification code
+    const emailService = EmailService.getInstance();
+    await emailService.sendOTPRequestEmail(email, dbUser.name || 'User', verificationCode);
+  }
+
+  async verifyOneTimePassword(email: string, otp: string): Promise<CreateSessionResponse> {
+    // Implementation for verifying one-time password
+    const dbUser = await this.db.prepare('SELECT * FROM _accounts WHERE email = ?').get(email);
+    if (!dbUser) {
+      throw new Error('User not found');
+    }
+    // ignore expiration for now
+    if (dbUser.otp !== otp) {
+      throw new Error('Invalid one-time password');
+    }
+
+    await this.db
+      .prepare('UPDATE _accounts SET otp_code = NULL, otp_code_expires_at = NULL WHERE email = ?')
+      .run(email);
 
     const user = this.dbUserToApiUser(dbUser);
     const accessToken = this.generateToken({

@@ -63,6 +63,34 @@ export const deleteUsersRequestSchema = z.object({
   userIds: z.array(userIdSchema).min(1, 'At least one user ID is required'),
 });
 
+/**
+ * POST /api/auth/request-email-verification - Request email verification
+ */
+export const requestEmailVerificationSchema = z.object({
+  email: emailSchema,
+});
+
+/**
+ * POST /api/auth/request-one-time-password - Request one-time password
+ */
+export const requestOneTimePasswordSchema = z.object({
+  email: emailSchema,
+});
+
+/**
+ * POST /api/auth/verify-one-time-password - Verify one-time password
+ */
+export const verifyOneTimePasswordRequestSchema = z.object({
+  email: emailSchema,
+  otp: z.string().min(4).max(6),
+});
+
+// /api/auth/verify-email - Verify email verification
+export const verifyEmailRequestSchema = z.object({
+  email: emailSchema,
+  verificationCode: z.string().min(4).max(6),
+});
+
 // ============================================================================
 // Response schemas
 // ============================================================================

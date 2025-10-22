@@ -13,6 +13,10 @@ import {
   createAdminSessionRequestSchema,
   deleteUsersRequestSchema,
   listUsersRequestSchema,
+  requestEmailVerificationSchema,
+  requestOneTimePasswordSchema,
+  verifyEmailRequestSchema,
+  verifyOneTimePasswordRequestSchema,
   type CreateUserResponse,
   type CreateSessionResponse,
   type CreateAdminSessionResponse,
@@ -382,5 +386,98 @@ router.post('/tokens/anon', verifyAdmin, (_req: Request, res: Response, next: Ne
     next(error);
   }
 });
+
+router.post('/auth/request-email-verification', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const validationResult = requestEmailVerificationSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      throw new AppError(
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const { email } = validationResult.data;
+    await authService.requestEmailVerification(email);
+    successResponse(res, { message: 'Email verification sent if the email is registered' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/auth/request-one-time-password', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const validationResult = requestOneTimePasswordSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      throw new AppError(
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+    const { email } = validationResult.data;
+    await authService.requestOneTimePassword(email);
+    successResponse(res, { message: 'One-time password sent if the email is registered' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/auth/verify-email', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const validationResult = verifyEmailRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      throw new AppError(
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+    const { email, verificationCode } = validationResult.data;
+    const result: CreateSessionResponse = await authService.verifyEmail(email, verificationCode);
+    successResponse(res, result); // Return session info upon successful verification
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/auth/verify-one-time-password', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const validationResult = verifyOneTimePasswordRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      throw new AppError(
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+    const { email, otp } = validationResult.data;
+    const result: CreateSessionResponse = await authService.verifyOneTimePassword(email, otp);
+    successResponse(res, result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// router.post('/auth/request-password-reset', async (req: Request, res: Response, next: NextFunction) => {
+//   try {
+//     const { email } = req.body;
+//     await authService.requestPasswordReset(email);
+//     successResponse(res, { message: 'Password reset email sent if the email is registered' });
+//   } catch (error) {
+//     next(error);
+//   }
+// });
+
+// router.post('/auth/reset-password', async (req: Request, res: Response, next: NextFunction) => {
+//   try {
+//     const { token, newPassword } = req.body;
+//     await authService.resetPassword(token, newPassword);
+//     successResponse(res, { message: 'Password has been reset successfully' });
+//   } catch (error) {
+//     next(error);
+//   }
+// });
 
 export default router;
