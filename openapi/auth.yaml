@@ -383,6 +383,190 @@ paths:
         '403':
           description: Forbidden - admin access required
 
+  /api/auth/auth/request-email-verification:
+    post:
+      summary: Request email verification
+      description: Send email verification code to user's email address
+      tags:
+        - Client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+      responses:
+        '200':
+          description: Verification email sent (if email exists)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Email verification sent if the email is registered"
+        '400':
+          description: Invalid request
+
+  /api/auth/auth/verify-email:
+    post:
+      summary: Verify email with code
+      description: Verify email address using the code sent via email and create session
+      tags:
+        - Client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - verificationCode
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                verificationCode:
+                  type: string
+                  minLength: 4
+                  maxLength: 8
+                  example: "123456"
+      responses:
+        '200':
+          description: Email verified successfully, session created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      email:
+                        type: string
+                      name:
+                        type: string
+                      emailVerified:
+                        type: boolean
+                      createdAt:
+                        type: string
+                        format: date-time
+                      updatedAt:
+                        type: string
+                        format: date-time
+                  accessToken:
+                    type: string
+                    description: JWT authentication token
+        '400':
+          description: Invalid verification code
+        '401':
+          description: Verification code expired or invalid
+
+  /api/auth/auth/request-one-time-password:
+    post:
+      summary: Request one-time password (OTP)
+      description: Send OTP code to user's email for passwordless login
+      tags:
+        - Client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+      responses:
+        '200':
+          description: OTP sent (if email exists)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "One-time password sent if the email is registered"
+        '400':
+          description: Invalid request
+
+  /api/auth/auth/verify-one-time-password:
+    post:
+      summary: Verify one-time password
+      description: Verify OTP code and create session for passwordless login
+      tags:
+        - Client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - otp
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                otp:
+                  type: string
+                  minLength: 4
+                  maxLength: 8
+                  example: "789012"
+      responses:
+        '200':
+          description: OTP verified successfully, session created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      email:
+                        type: string
+                      name:
+                        type: string
+                      emailVerified:
+                        type: boolean
+                      createdAt:
+                        type: string
+                        format: date-time
+                      updatedAt:
+                        type: string
+                        format: date-time
+                  accessToken:
+                    type: string
+                    description: JWT authentication token
+        '400':
+          description: Invalid OTP
+        '401':
+          description: OTP expired or invalid
+
   /api/auth/oauth/google:
     get:
       summary: Initiate Google OAuth flow

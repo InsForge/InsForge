@@ -116,18 +116,6 @@ export class AuthService {
     });
   }
 
-  generateProjectToken(projectId: string): string {
-    const payload = {
-      sub: projectId,
-      email: 'project@insforge.com',
-      role: 'project',
-    };
-    return jwt.sign(payload, JWT_SECRET(), {
-      algorithm: 'HS256',
-      expiresIn: JWT_EXPIRES_IN,
-    });
-  }
-
   /**
    * Generate anonymous JWT token (never expires)
    */
@@ -294,6 +282,7 @@ export class AuthService {
       .prepare('UPDATE _accounts SET email_verified = true, verify_email_code = NULL, verify_email_code_expires_at = NULL WHERE email = ?')
       .run(email);
 
+    dbUser.email_verified = true;
     const user = this.dbUserToApiUser(dbUser);
     const accessToken = this.generateToken({
       sub: dbUser.id,
@@ -361,9 +350,10 @@ export class AuthService {
     }
 
     await this.db
-      .prepare('UPDATE _accounts SET otp_code = NULL, otp_code_expires_at = NULL WHERE email = ?')
+      .prepare('UPDATE _accounts SET email_verified = true, otp_code = NULL, otp_code_expires_at = NULL WHERE email = ?')
       .run(email);
 
+    dbUser.email_verified = true;
     const user = this.dbUserToApiUser(dbUser);
     const accessToken = this.generateToken({
       sub: dbUser.id,
