@@ -484,7 +484,8 @@ export class AgentAPIDocService {
               requiresAuth: true,
               body: {
                 projectName: 'string - name of the project',
-                files: 'Array<{path: string, content: string}> - array of files with path and base64 content',
+                files:
+                  'Array<{path: string, content: string}> - array of files with path and base64 content',
               },
             },
             response: {
@@ -507,7 +508,8 @@ export class AgentAPIDocService {
             example: {
               request: 'POST /api/deployments',
               body: '{projectName: "my-site", files: [{path: "index.html", content: "PGh0bWw+..."}, {path: "style.css", content: "Ym9keXs..."}]}',
-              response: '{id: "uuid", projectName: "my-site", subdomain: "my-site-abc123", status: "active", deploymentUrl: "http://localhost:8080/my-site-abc123"}',
+              response:
+                '{id: "uuid", projectName: "my-site", subdomain: "my-site-abc123", status: "active", deploymentUrl: "http://localhost:8080/my-site-abc123"}',
             },
           },
 
@@ -529,7 +531,8 @@ export class AgentAPIDocService {
             },
             example: {
               request: 'GET /api/deployments',
-              response: '[{id: "uuid", projectName: "my-site", subdomain: "my-site-abc123", status: "active", deploymentUrl: "..."}]',
+              response:
+                '[{id: "uuid", projectName: "my-site", subdomain: "my-site-abc123", status: "active", deploymentUrl: "..."}]',
             },
           },
 
@@ -554,7 +557,8 @@ export class AgentAPIDocService {
             },
             example: {
               request: 'GET /api/deployments/uuid-123',
-              response: '{id: "uuid-123", projectName: "my-site", subdomain: "my-site-abc123", status: "active", deploymentUrl: "..."}',
+              response:
+                '{id: "uuid-123", projectName: "my-site", subdomain: "my-site-abc123", status: "active", deploymentUrl: "..."}',
             },
           },
 
@@ -794,7 +798,8 @@ export class AgentAPIDocService {
             downloadFile: 'GET /api/storage/buckets/uploads/objects/avatar.jpg',
             deleteFile: 'DELETE /api/storage/buckets/uploads/objects/temp/old-file.tmp',
             // Deployment examples
-            deployWebsite: 'POST /api/deployments with body {projectName: "my-site", files: [{path: "index.html", content: "base64..."}]}',
+            deployWebsite:
+              'POST /api/deployments with body {projectName: "my-site", files: [{path: "index.html", content: "base64..."}]}',
             listDeployments: 'GET /api/deployments',
             deleteDeployment: 'DELETE /api/deployments/uuid-123',
           },

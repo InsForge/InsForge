@@ -1,5 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
-import { AuthRequest, verifyAdmin, verifyUser } from '@/api/middleware/auth.js';
+import { AuthRequest, verifyUser } from '@/api/middleware/auth.js';
 import { DeploymentService } from '@/core/deployment/deployment.js';
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -10,7 +10,7 @@ import logger from '@/utils/logger.js';
 const router = Router();
 const deploymentService = DeploymentService.getInstance();
 
-/** 
+/**
  * POST /api/deployments
  * Create a new deployment
  */
