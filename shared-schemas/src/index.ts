@@ -12,3 +12,4 @@ export * from './logs-api.schema';
 export * from './functions.schema';
 export * from './functions-api.schema';
 export * from './cloud-events.schema';
+export * from './deployment-api.schema';
