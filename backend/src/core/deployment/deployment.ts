@@ -5,7 +5,6 @@
 
 import { DatabaseManager } from '@/core/database/manager.js';
 import { getStorageAdapter, DeploymentFile } from './storage-adapter.js';
-import { getDeploymentBaseUrl } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
 
 export interface CreateDeploymentRequest {
@@ -78,9 +77,10 @@ export class DeploymentService {
       // Decode base64 content if needed
       const decodedFiles = files.map((file) => ({
         path: file.path,
-        content: typeof file.content === 'string' && this.isBase64(file.content)
-          ? Buffer.from(file.content, 'base64')
-          : file.content,
+        content:
+          typeof file.content === 'string' && this.isBase64(file.content)
+            ? Buffer.from(file.content, 'base64')
+            : file.content,
       }));
 
       // Deploy files to storage

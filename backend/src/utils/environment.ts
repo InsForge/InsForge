@@ -59,11 +59,11 @@ export function getDeploymentBackend(): 's3' | 'local' {
  */
 export function getDeploymentBaseUrl(): string {
   const backend = getDeploymentBackend();
-  
+
   if (backend === 's3' && process.env.AWS_CLOUDFRONT_URL) {
     return `${process.env.AWS_CLOUDFRONT_URL}/deployments`;
   }
-  
+
   // Local deployment URL
   return process.env.DEPLOYMENT_BASE_URL || 'http://localhost:8080/deployments';
 }
