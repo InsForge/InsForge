@@ -7,6 +7,11 @@ import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin } from '@/api/middleware/auth.js';
 import oauthRouter from './auth.oauth.js';
 import {
+  emailVerificationLimiter,
+  otpRequestLimiter,
+  verificationAttemptLimiter,
+} from '@/api/middleware/rate-limit.js';
+import {
   userIdSchema,
   createUserRequestSchema,
   createSessionRequestSchema,
@@ -390,6 +395,7 @@ router.post('/tokens/anon', verifyAdmin, (_req: Request, res: Response, next: Ne
 // POST /api/auth/request-email-verification - Request email verification
 router.post(
   '/request-email-verification',
+  emailVerificationLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const validationResult = requestEmailVerificationSchema.safeParse(req.body);
@@ -413,6 +419,7 @@ router.post(
 // POST /api/auth/request-one-time-password - Request one-time password (OTP)
 router.post(
   '/request-one-time-password',
+  otpRequestLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const validationResult = requestOneTimePasswordSchema.safeParse(req.body);
@@ -433,7 +440,10 @@ router.post(
 );
 
 // POST /api/auth/verify-email - Verify email with code
-router.post('/verify-email', async (req: Request, res: Response, next: NextFunction) => {
+router.post(
+  '/verify-email',
+  verificationAttemptLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validationResult = verifyEmailRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
@@ -454,6 +464,7 @@ router.post('/verify-email', async (req: Request, res: Response, next: NextFunct
 // POST /api/auth/verify-one-time-password - Verify one-time password (OTP)
 router.post(
   '/verify-one-time-password',
+  verificationAttemptLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const validationResult = verifyOneTimePasswordRequestSchema.safeParse(req.body);
