@@ -72,11 +72,9 @@ describe('EmailService', () => {
         'email-verification'
       );
 
-      expect(jwt.sign).toHaveBeenCalledWith(
-        { sub: 'test-project-123' },
-        'test-jwt-secret',
-        { expiresIn: '10m' }
-      );
+      expect(jwt.sign).toHaveBeenCalledWith({ sub: 'test-project-123' }, 'test-jwt-secret', {
+        expiresIn: '10m',
+      });
 
       expect(axios.post).toHaveBeenCalledWith(
         'https://api.test.com/email/v1/test-project-123/send-with-template',
@@ -391,11 +389,9 @@ describe('EmailService', () => {
         'email-verification'
       );
 
-      expect(jwt.sign).toHaveBeenCalledWith(
-        { sub: 'test-project-123' },
-        'test-jwt-secret',
-        { expiresIn: '10m' }
-      );
+      expect(jwt.sign).toHaveBeenCalledWith({ sub: 'test-project-123' }, 'test-jwt-secret', {
+        expiresIn: '10m',
+      });
     });
   });
 });
