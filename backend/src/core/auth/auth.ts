@@ -354,7 +354,7 @@ export class AuthService {
       throw new Error('User not found');
     }
     // ignore expiration for now
-    if (dbUser.otp !== otp) {
+    if (dbUser.otp_code !== otp) {
       throw new Error('Invalid one-time password');
     }
 

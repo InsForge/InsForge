@@ -98,13 +98,6 @@ export class EmailService {
       }
 
       const url = `${apiHost}/email/v1/${projectId}/send-with-template`;
-
-      logger.info('Sending email via cloud backend', {
-        email,
-        template,
-        url,
-      });
-
       const response = await axios.post(
         url,
         {
@@ -124,7 +117,7 @@ export class EmailService {
 
       if (response.data?.success) {
         logger.info('Email sent successfully', {
-          email,
+          projectId,
           template,
         });
       } else {
@@ -141,7 +134,7 @@ export class EmailService {
         const message = error.response?.data?.message || error.message;
 
         logger.error('Failed to send email via cloud backend', {
-          email,
+          projectId: config.cloud.projectId,
           template,
           status,
           message,
@@ -183,7 +176,7 @@ export class EmailService {
 
       // Handle other errors
       logger.error('Unexpected error sending email', {
-        email,
+        projectId: config.cloud.projectId,
         template,
         error: error instanceof Error ? error.message : 'Unknown error',
       });

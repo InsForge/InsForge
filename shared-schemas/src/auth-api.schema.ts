@@ -82,13 +82,13 @@ export const requestOneTimePasswordSchema = z.object({
  */
 export const verifyOneTimePasswordRequestSchema = z.object({
   email: emailSchema,
-  otp: z.string().min(4).max(6),
+  otp: z.string().min(4).max(8),
 });
 
 // /api/auth/verify-email - Verify email verification
 export const verifyEmailRequestSchema = z.object({
   email: emailSchema,
-  verificationCode: z.string().min(4).max(6),
+  verificationCode: z.string().min(4).max(8),
 });
 
 // ============================================================================
