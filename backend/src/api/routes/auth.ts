@@ -444,22 +444,23 @@ router.post(
   '/verify-email',
   verificationAttemptLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const validationResult = verifyEmailRequestSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      throw new AppError(
-        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
+    try {
+      const validationResult = verifyEmailRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+      const { email, verificationCode } = validationResult.data;
+      const result: CreateSessionResponse = await authService.verifyEmail(email, verificationCode);
+      successResponse(res, result); // Return session info upon successful verification
+    } catch (error) {
+      next(error);
     }
-    const { email, verificationCode } = validationResult.data;
-    const result: CreateSessionResponse = await authService.verifyEmail(email, verificationCode);
-    successResponse(res, result); // Return session info upon successful verification
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 // POST /api/auth/verify-one-time-password - Verify one-time password (OTP)
 router.post(

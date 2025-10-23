@@ -1,5 +1,5 @@
 import rateLimit from 'express-rate-limit';
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { AppError } from './error';
 import { ERROR_CODES } from '@/types/error-constants';
 
@@ -12,16 +12,19 @@ const emailCooldowns = new Map<string, number>();
 /**
  * Cleanup old cooldown entries every 5 minutes
  */
-setInterval(() => {
-  const now = Date.now();
-  const fiveMinutes = 5 * 60 * 1000;
+setInterval(
+  () => {
+    const now = Date.now();
+    const fiveMinutes = 5 * 60 * 1000;
 
-  for (const [email, timestamp] of emailCooldowns.entries()) {
-    if (now - timestamp > fiveMinutes) {
-      emailCooldowns.delete(email);
+    for (const [email, timestamp] of emailCooldowns.entries()) {
+      if (now - timestamp > fiveMinutes) {
+        emailCooldowns.delete(email);
+      }
     }
-  }
-}, 5 * 60 * 1000);
+  },
+  5 * 60 * 1000
+);
 
 /**
  * Per-IP rate limiter for email verification requests
@@ -35,7 +38,7 @@ export const emailVerificationRateLimiter = rateLimit({
   message: 'Too many email verification requests from this IP, please try again later',
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  handler: (req: Request, res: Response) => {
+  handler: (_req: Request, _res: Response) => {
     throw new AppError(
       'Too many email verification requests from this IP. Please try again in 15 minutes.',
       429,
@@ -60,7 +63,7 @@ export const otpRequestRateLimiter = rateLimit({
   message: 'Too many OTP requests from this IP, please try again later',
   standardHeaders: true,
   legacyHeaders: false,
-  handler: (req: Request, res: Response) => {
+  handler: (_req: Request, _res: Response) => {
     throw new AppError(
       'Too many OTP requests from this IP. Please try again in 15 minutes.',
       429,
@@ -83,7 +86,7 @@ export const verificationAttemptRateLimiter = rateLimit({
   message: 'Too many verification attempts from this IP, please try again later',
   standardHeaders: true,
   legacyHeaders: false,
-  handler: (req: Request, res: Response) => {
+  handler: (_req: Request, _res: Response) => {
     throw new AppError(
       'Too many verification attempts from this IP. Please try again in 15 minutes.',
       429,
@@ -101,7 +104,7 @@ export const verificationAttemptRateLimiter = rateLimit({
  * Cooldown: 60 seconds between requests for same email
  */
 export const perEmailCooldown = (cooldownMs: number = 60000) => {
-  return (req: Request, res: Response, next: Function) => {
+  return (req: Request, _res: Response, next: NextFunction) => {
     const email = req.body?.email?.toLowerCase();
 
     if (!email) {
