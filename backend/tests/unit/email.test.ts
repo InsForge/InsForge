@@ -1,6 +1,5 @@
 import { EmailService } from '../../src/core/email/email';
 import { AppError } from '../../src/api/middleware/error';
-import { ERROR_CODES } from '../../src/types/error-constants';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
@@ -45,7 +44,7 @@ describe('EmailService', () => {
     emailService = EmailService.getInstance();
 
     // Default mock for jwt.sign
-    vi.mocked(jwt.sign).mockReturnValue('mocked-jwt-token' as any);
+    vi.mocked(jwt.sign).mockReturnValue('mocked-jwt-token' as unknown as string);
   });
 
   afterEach(() => {
@@ -193,6 +192,7 @@ describe('EmailService', () => {
           'user@example.com',
           'John',
           '123456',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           'invalid-template' as any
         )
       ).rejects.toThrow('Invalid template type');
@@ -209,6 +209,7 @@ describe('EmailService', () => {
     });
 
     it('handles 401 authentication error', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const error = new Error('Request failed') as any;
       error.isAxiosError = true;
       error.response = {
@@ -225,6 +226,7 @@ describe('EmailService', () => {
     });
 
     it('handles 403 forbidden error', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const error = new Error('Request failed') as any;
       error.isAxiosError = true;
       error.response = {
@@ -241,6 +243,7 @@ describe('EmailService', () => {
     });
 
     it('handles 429 rate limit error', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const error = new Error('Request failed') as any;
       error.isAxiosError = true;
       error.response = {
@@ -257,6 +260,7 @@ describe('EmailService', () => {
     });
 
     it('handles 400 bad request error', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const error = new Error('Request failed') as any;
       error.isAxiosError = true;
       error.response = {
@@ -273,6 +277,7 @@ describe('EmailService', () => {
     });
 
     it('handles generic axios error', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const error = new Error('Request failed') as any;
       error.isAxiosError = true;
       error.response = {
@@ -289,6 +294,7 @@ describe('EmailService', () => {
     });
 
     it('handles network error without response', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const error = new Error('Network error') as any;
       error.isAxiosError = true;
 

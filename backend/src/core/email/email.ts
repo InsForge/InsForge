@@ -230,11 +230,7 @@ export class EmailService {
    * @param name - Recipient name
    * @param otp - One-time password to send
    */
-  public async sendOTPRequestEmail(
-    email: string,
-    name: string,
-    otp: string
-  ): Promise<void> {
+  public async sendOTPRequestEmail(email: string, name: string, otp: string): Promise<void> {
     return this.sendWithTemplate(email, name, otp, 'request-otp');
   }
 }

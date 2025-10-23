@@ -32,7 +32,6 @@ import {
 import { ADMIN_ID } from '@/utils/constants';
 import { getApiBaseUrl } from '@/utils/environment';
 import { generateNumericCode } from '@/utils/uuid';
-import { config } from '@/app.config';
 import { EmailService } from '../email';
 
 const JWT_SECRET = () => process.env.JWT_SECRET ?? '';
@@ -235,7 +234,9 @@ export class AuthService {
     while (retries <= maxRetries) {
       try {
         await this.db
-          .prepare('UPDATE _accounts SET verify_email_code = ?, verify_email_code_expires_at = ? WHERE email = ?')
+          .prepare(
+            'UPDATE _accounts SET verify_email_code = ?, verify_email_code_expires_at = ? WHERE email = ?'
+          )
           .run(verificationCode, Date.now() + 3600000, email);
         break; // Success, exit loop
       } catch (error) {
@@ -243,14 +244,17 @@ export class AuthService {
         const isUniqueConstraintError =
           error instanceof Error &&
           (error.message.includes('UNIQUE constraint failed') ||
-           error.message.includes('verify_email_code'));
+            error.message.includes('verify_email_code'));
 
         if (isUniqueConstraintError && retries < maxRetries) {
           // Retry with longer code
           retries++;
           codeLength++;
           verificationCode = generateNumericCode(codeLength);
-          logger.warn(`Verification code conflict, retrying with ${codeLength} digits`, { email, attempt: retries + 1 });
+          logger.warn(`Verification code conflict, retrying with ${codeLength} digits`, {
+            email,
+            attempt: retries + 1,
+          });
         } else {
           // Either not a conflict error, or max retries reached
           logger.error('Failed to update email verification code:', error);
@@ -279,7 +283,9 @@ export class AuthService {
     }
 
     await this.db
-      .prepare('UPDATE _accounts SET email_verified = true, verify_email_code = NULL, verify_email_code_expires_at = NULL WHERE email = ?')
+      .prepare(
+        'UPDATE _accounts SET email_verified = true, verify_email_code = NULL, verify_email_code_expires_at = NULL WHERE email = ?'
+      )
       .run(email);
 
     dbUser.email_verified = true;
@@ -317,14 +323,17 @@ export class AuthService {
         const isUniqueConstraintError =
           error instanceof Error &&
           (error.message.includes('UNIQUE constraint failed') ||
-           error.message.includes('otp_code'));
+            error.message.includes('otp_code'));
 
         if (isUniqueConstraintError && retries < maxRetries) {
           // Retry with longer code
           retries++;
           codeLength++;
           verificationCode = generateNumericCode(codeLength);
-          logger.warn(`Verification code conflict, retrying with ${codeLength} digits`, { email, attempt: retries + 1 });
+          logger.warn(`Verification code conflict, retrying with ${codeLength} digits`, {
+            email,
+            attempt: retries + 1,
+          });
         } else {
           // Either not a conflict error, or max retries reached
           logger.error('Failed to update OTP code:', error);
@@ -350,7 +359,9 @@ export class AuthService {
     }
 
     await this.db
-      .prepare('UPDATE _accounts SET email_verified = true, otp_code = NULL, otp_code_expires_at = NULL WHERE email = ?')
+      .prepare(
+        'UPDATE _accounts SET email_verified = true, otp_code = NULL, otp_code_expires_at = NULL WHERE email = ?'
+      )
       .run(email);
 
     dbUser.email_verified = true;
