@@ -11,7 +11,6 @@ import { logger } from '@/utils/logger.js';
 export interface CreateDeploymentRequest {
   projectName: string;
   files: DeploymentFile[];
-  userId?: string;
 }
 
 export interface Deployment {
@@ -22,6 +21,7 @@ export interface Deployment {
   deploymentUrl: string | null;
   createdAt: string;
   deployedAt: string | null;
+  updatedAt: string;
 }
 
 export class DeploymentService {
@@ -45,7 +45,15 @@ export class DeploymentService {
    * Create and deploy a new deployment
    */
   async createDeployment(request: CreateDeploymentRequest): Promise<Deployment> {
-    const { projectName, files, userId } = request;
+    const { projectName, files } = request;
+
+    // Check if deployment already exists
+    const existing = await this.db.prepare('SELECT id FROM _deployments LIMIT 1').get();
+    if (existing) {
+      throw new Error(
+        'Deployment already exists. Delete existing deployment before creating a new one.'
+      );
+    }
 
     // Validate files
     if (!files || files.length === 0) {
@@ -85,10 +93,10 @@ export class DeploymentService {
       // Create database record
       await this.db
         .prepare(
-          `INSERT INTO _deployments (id, project_name, subdomain, status, created_by)
-           VALUES (?, ?, ?, ?, ?)`
+          `INSERT INTO _deployments (id, project_name, subdomain, status)
+           VALUES (?, ?, ?, ?)`
         )
-        .run(deploymentId, projectName, subdomain, 'deploying', userId || null);
+        .run(deploymentId, projectName, subdomain, 'deploying');
 
       logger.info('Deployment record created', { deploymentId, projectName });
 
@@ -111,12 +119,12 @@ export class DeploymentService {
            SET status = ?, deployment_url = ?, deployed_at = CURRENT_TIMESTAMP, storage_path = ?
            WHERE id = ?`
         )
-        .run('active', deploymentUrl, deploymentId, deploymentId);
+        .run('active', deploymentUrl, `deployments/${deploymentId}`, deploymentId);
 
       logger.info('Deployment successful', { deploymentId, url: deploymentUrl });
 
       // Return deployment info
-      return this.getDeployment(deploymentId);
+      return this.getDeployment();
     } catch (error) {
       logger.error('Deployment failed', {
         projectName,
@@ -137,70 +145,44 @@ export class DeploymentService {
   }
 
   /**
-   * Get deployment by ID
+   * Get the single deployment
    */
-  async getDeployment(id: string): Promise<Deployment> {
+  async getDeployment(): Promise<Deployment> {
     const result = await this.db
       .prepare(
         `SELECT id, project_name as projectName, subdomain, status, deployment_url as deploymentUrl,
-                created_at as createdAt, deployed_at as deployedAt
+                created_at as createdAt, deployed_at as deployedAt, updated_at as updatedAt
          FROM _deployments
-         WHERE id = ?`
+         LIMIT 1`
       )
-      .get(id);
+      .get();
 
     if (!result) {
-      throw new Error('Deployment not found');
+      throw new Error('No deployment found');
     }
 
     return result as Deployment;
   }
 
   /**
-   * List all deployments
+   * Delete the deployment
    */
-  async listDeployments(userId?: string): Promise<Deployment[]> {
-    let query = `SELECT id, project_name as projectName, subdomain, status, deployment_url as deploymentUrl,
-                        created_at as createdAt, deployed_at as deployedAt
-                 FROM _deployments`;
-
-    const params: string[] = [];
-
-    if (userId) {
-      query += ' WHERE created_by = ?';
-      params.push(userId);
-    }
-
-    query += ' ORDER BY created_at DESC';
-
-    const results = await this.db.prepare(query).all(...params);
-    return results as Deployment[];
-  }
-
-  /**
-   * Delete deployment
-   */
-  async deleteDeployment(id: string, userId?: string, isAdmin: boolean = false): Promise<void> {
+  async deleteDeployment(): Promise<void> {
     // Get deployment
-    const deployment = await this.db
-      .prepare('SELECT id, created_by FROM _deployments WHERE id = ?')
-      .get(id);
+    const deployment = await this.db.prepare('SELECT id FROM _deployments LIMIT 1').get();
 
     if (!deployment) {
-      throw new Error('Deployment not found');
+      throw new Error('No deployment found');
     }
 
-    // Check permissions
-    if (!isAdmin && userId && deployment.created_by !== userId) {
-      throw new Error('Permission denied: You can only delete your own deployments');
-    }
+    const id = deployment.id;
 
     try {
       // Delete from storage
       await this.storageAdapter.delete(id);
 
       // Delete from database
-      await this.db.prepare('DELETE FROM _deployments WHERE id = ?').run(id);
+      await this.db.prepare('DELETE FROM _deployments').run();
 
       logger.info('Deployment deleted', { deploymentId: id });
     } catch (error) {
