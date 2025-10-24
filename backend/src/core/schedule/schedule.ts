@@ -90,7 +90,8 @@ export class ScheduleService {
         http_method AS "httpMethod",
         cron_job_id AS "cronJobId",
         created_at AS "createdAt",
-        updated_at AS "updatedAt"
+        updated_at AS "updatedAt",
+        last_executed_at AS "lastExecutedAt"
       FROM _schedules
       ORDER BY created_at DESC
     `;
@@ -118,7 +119,8 @@ export class ScheduleService {
         http_method AS "httpMethod",
         cron_job_id AS "cronJobId",
         created_at AS "createdAt",
-        updated_at AS "updatedAt"
+        updated_at AS "updatedAt",
+        last_executed_at AS "lastExecutedAt"
       FROM _schedules
       WHERE id = ?
     `;
@@ -138,7 +140,8 @@ export class ScheduleService {
   async upsertSchedule(data: UpsertScheduleData) {
     try {
       const resolvedHeaders = data.headers ? await this._resolveHeaderSecrets(data.headers) : {};
-
+      const existingSchedule = await this.getScheduleById(data.scheduleId);
+      const isCreating = !existingSchedule;
       const sql = `
         SELECT * FROM upsert_cron_schedule(
           $1::UUID, $2::TEXT, $3::TEXT, $4::TEXT, $5::TEXT, $6::JSONB, $7::JSONB
@@ -171,8 +174,9 @@ export class ScheduleService {
       logger.info('Successfully upserted schedule', {
         scheduleId: data.scheduleId,
         cronJobId: jobResult.cron_job_id,
+        operation: isCreating ? 'create' : 'update',
       });
-      return jobResult;
+      return { ...jobResult, isCreating };
     } catch (error) {
       logger.error('Error in upsertSchedule service', { scheduleId: data.scheduleId, error });
       throw error;
@@ -204,6 +208,59 @@ export class ScheduleService {
       return deleteResult;
     } catch (error) {
       logger.error('Error in deleteSchedule service', { scheduleId: id, error });
+      throw error;
+    }
+  }
+
+  async getExecutionLogs(scheduleId: string, limit: number = 50, offset: number = 0) {
+    if (!scheduleId) {
+      throw new AppError('Invalid schedule ID provided.', 400, ERROR_CODES.INVALID_INPUT);
+    }
+    try {
+      const sql = `
+        SELECT
+          id,
+          schedule_id AS "scheduleId",
+          executed_at AS "executedAt",
+          status_code AS "statusCode",
+          success,
+          duration_ms AS "durationMs",
+          message
+        FROM _schedule_execution_logs
+        WHERE schedule_id = $1::UUID
+        ORDER BY executed_at DESC
+        LIMIT $2 OFFSET $3
+      `;
+      const logs = await this.queryWithEncryption(sql, [scheduleId, limit, offset]);
+
+      // Get total count
+      const countSql = `
+        SELECT COUNT(*) as total FROM _schedule_execution_logs
+        WHERE schedule_id = $1::UUID
+      `;
+      const countResult = await this.queryWithEncryption(countSql, [scheduleId]);
+      const total = parseInt(countResult.rows[0]?.total || '0', 10);
+
+      // Convert string values to proper types
+      const formattedLogs = logs.rows.map((log) => ({
+        id: log.id,
+        scheduleId: log.scheduleId,
+        executedAt: log.executedAt,
+        statusCode: log.statusCode,
+        success: log.success,
+        durationMs: parseInt(log.durationMs, 10),
+        message: log.message,
+      }));
+
+      logger.info(`Retrieved ${formattedLogs.length} execution logs for schedule`, { scheduleId });
+      return {
+        logs: formattedLogs,
+        total,
+        limit,
+        offset,
+      };
+    } catch (error) {
+      logger.error('Error retrieving execution logs:', { scheduleId, error });
       throw error;
     }
   }
