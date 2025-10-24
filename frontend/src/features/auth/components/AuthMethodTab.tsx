@@ -45,7 +45,7 @@ const providers: OAuthProviderInfo[] = [
   {
     id: 'discord',
     name: 'Discord OAuth',
-    icon: <Discord className="w-6 h-6" />,
+    icon: <Discord className="w-6 h-6 text-black dark:text-white" />,
     description: 'Configure Discord authentication for your users',
     setupUrl: 'https://discord.com/developers/applications',
   },

@@ -479,8 +479,8 @@ router.get('/:provider/callback', async (req: Request, res: Response, _: NextFun
 
 // ============= OAuth Configuration Management Endpoints =============
 
-// GET /api/auth/oauth/configs - List all OAuth configurations (admin only)
-router.get('/configs', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+// GET /api/auth/oauth/configs - List all OAuth configurations (public)
+router.get('/configs', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const configs = await oauthConfigService.getAllConfigs();
 
