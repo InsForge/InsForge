@@ -259,6 +259,9 @@ export async function createApp() {
     app.get('/dashboard*', (_req: Request, res: Response) => {
       res.sendFile(path.join(frontendPath, 'index.html'));
     });
+    app.get('/auth*', (_req: Request, res: Response) => {
+      res.sendFile(path.join(frontendPath, 'index.html'));
+    });
     app.use(express.static(frontendPath));
   } else {
     // Catch-all for 404 errors - Traditional REST format
