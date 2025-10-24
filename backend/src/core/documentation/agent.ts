@@ -474,96 +474,6 @@ export class AgentAPIDocService {
           },
         },
 
-        // Deployment API for deploying static websites (single deployment per backend)
-        '<critical-deployment>':
-          'Re-read deploymentApi section before deploying websites. Note: Only one deployment allowed per backend.',
-        deploymentApi: {
-          createDeployment: {
-            method: 'POST',
-            path: '/api/deployments',
-            description:
-              'Create a new deployment. Only one deployment is allowed per backend. Delete existing deployment first if updating.',
-            request: {
-              requiresAuth: true,
-              body: {
-                projectName: 'string - name of the project',
-                files:
-                  'Array<{path: string, content: string (base64-encoded)}> - array of files with path and base64-encoded content',
-              },
-            },
-            response: {
-              success: {
-                status: 201,
-                body: {
-                  id: 'string - deployment UUID',
-                  projectName: 'string',
-                  status: 'string - "pending" | "deploying" | "active" | "failed"',
-                  deploymentUrl:
-                    'string - full URL to deployed site (path-based: {base}/deployments/{id}/)',
-                  createdAt: 'datetime string',
-                },
-              },
-              error: {
-                status: '400 | 401 | 500',
-                body: '{error: string, message: string, statusCode: number}',
-              },
-            },
-            example: {
-              request: 'POST /api/deployments',
-              body: '{projectName: "my-site", files: [{path: "index.html", content: "PGh0bWw+..."}, {path: "style.css", content: "Ym9keXs..."}]}',
-              response:
-                '{id: "uuid", projectName: "my-site", status: "active", deploymentUrl: "http://localhost:8080/deployments/uuid/"}',
-            },
-          },
-
-          getDeployment: {
-            method: 'GET',
-            path: '/api/deployments',
-            description: 'Get the current deployment (only one deployment exists per backend)',
-            request: {
-              requiresAuth: true,
-            },
-            response: {
-              success: {
-                status: 200,
-                body: 'DeploymentSchema',
-              },
-              error: {
-                status: '404 | 401 | 500',
-                body: '{error: string, message: string, statusCode: number}',
-              },
-            },
-            example: {
-              request: 'GET /api/deployments',
-              response:
-                '{id: "uuid-123", projectName: "my-site", status: "active", deploymentUrl: "http://localhost:8080/deployments/uuid-123/"}',
-            },
-          },
-
-          deleteDeployment: {
-            method: 'DELETE',
-            path: '/api/deployments',
-            description: 'Delete the current deployment',
-            request: {
-              requiresAuth: true,
-            },
-            response: {
-              success: {
-                status: 200,
-                body: '{message: string}',
-              },
-              error: {
-                status: '404 | 401 | 500',
-                body: '{error: string, message: string, statusCode: number}',
-              },
-            },
-            example: {
-              request: 'DELETE /api/deployments',
-              response: '{message: "Deployment deleted successfully"}',
-            },
-          },
-        },
-
         // Storage API for file upload and management
         '<critical-storage>': 'Re-read storageApi section before implementing file operations',
         storageApi: {
@@ -745,15 +655,6 @@ export class AgentAPIDocService {
             '6. Private buckets require authentication for all operations',
             '7. Organize files using key prefixes like "images/", "documents/"',
           ],
-          deploymentSteps: [
-            '1. Only one deployment allowed per backend',
-            '2. Create deployment with POST /api/deployments',
-            '3. Provide projectName and files array with path and base64 content',
-            '4. Files must include index.html at root level',
-            '5. Response includes deploymentUrl to access the deployed site',
-            '6. Get current deployment with GET /api/deployments',
-            '7. Delete deployment with DELETE /api/deployments (required before creating new one)',
-          ],
           examples: {
             // Authentication examples
             register:
@@ -774,11 +675,6 @@ export class AgentAPIDocService {
             uploadFile: 'PUT /api/storage/buckets/uploads/objects/avatar.jpg with FormData file',
             downloadFile: 'GET /api/storage/buckets/uploads/objects/avatar.jpg',
             deleteFile: 'DELETE /api/storage/buckets/uploads/objects/temp/old-file.tmp',
-            // Deployment examples
-            deployWebsite:
-              'POST /api/deployments with body {projectName: "my-site", files: [{path: "index.html", content: "base64..."}]}',
-            getDeployment: 'GET /api/deployments',
-            deleteDeployment: 'DELETE /api/deployments',
           },
         },
       };

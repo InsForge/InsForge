@@ -39,16 +39,3 @@ export function isProduction(): boolean {
 export function getApiBaseUrl(): string {
   return process.env.API_BASE_URL || 'http://localhost:7130';
 }
-
-/**
- * Get deployment backend type based on environment
- * @returns 's3' for cloud with S3, 'local' for self-hosted
- */
-export function getDeploymentBackend(): 's3' | 'local' {
-  // If AWS S3 bucket is configured, use S3 backend
-  if (process.env.AWS_S3_BUCKET && process.env.AWS_S3_BUCKET.trim()) {
-    return 's3';
-  }
-  // Default to local filesystem
-  return 'local';
-}
