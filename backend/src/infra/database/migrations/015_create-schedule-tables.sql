@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS _schedules (
    encrypted_headers TEXT DEFAULT NULL,
     body JSONB DEFAULT NULL,
     cron_job_id BIGINT,
+    last_executed_at TIMESTAMPTZ DEFAULT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 
@@ -36,3 +37,19 @@ CREATE TRIGGER update__schedules_updated_at
 BEFORE UPDATE ON _schedules
 FOR EACH ROW
 EXECUTE PROCEDURE update_updated_at_column();
+
+
+-- ===============================================
+-- SCHEDULE EXECUTION LOGGING TABLE 
+-- ===============================================
+CREATE TABLE _schedule_execution_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    schedule_id UUID REFERENCES _schedules(id) ON DELETE CASCADE,
+    executed_at TIMESTAMPTZ DEFAULT NOW(),
+    status_code INT,
+    success BOOLEAN,
+    duration_ms BIGINT,
+    message TEXT
+);
+
+CREATE INDEX idx_schedule_execution_logs_schedule_id ON _schedule_execution_logs(schedule_id);

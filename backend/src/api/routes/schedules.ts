@@ -10,6 +10,7 @@ import {
   getScheduleResponseSchema,
   upsertScheduleResponseSchema,
   deleteScheduleResponseSchema,
+  listExecutionLogsResponseSchema,
 } from '@insforge/shared-schemas';
 import { randomUUID } from 'crypto';
 
@@ -29,6 +30,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
     // Validate the response against the shared schema
     const schedulesWithStringDates = schedules.map((schedule) => ({
       ...schedule,
+      lastExecutedAt: schedule.lastExecutedAt ? schedule.lastExecutedAt.toISOString() : null,
       createdAt: schedule.createdAt.toISOString(),
       updatedAt: schedule.updatedAt.toISOString(),
     }));
@@ -53,12 +55,44 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
 
     const scheduleWithStringDates = {
       ...schedule,
+      lastExecutedAt: schedule.lastExecutedAt ? schedule.lastExecutedAt.toISOString() : null,
       createdAt: schedule.createdAt.toISOString(),
       updatedAt: schedule.updatedAt.toISOString(),
     };
     // Validate the response against the shared schema
     const validatedResponse = getScheduleResponseSchema.parse(scheduleWithStringDates);
     successResponse(res, validatedResponse);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/:id/logs', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const logs = await scheduleService.getExecutionLogs(id, limit, offset);
+
+    const logsWithStringDates = {
+      logs: logs.logs.map((log) => ({
+        ...log,
+        executedAt: log.executedAt.toISOString(),
+      })),
+      totalCount: logs.total,
+      limit: logs.limit,
+      offset: logs.offset,
+    };
+    const validatedResponse = listExecutionLogsResponseSchema.safeParse(logsWithStringDates);
+    if (!validatedResponse.success) {
+      throw new AppError(
+        validatedResponse.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+    successResponse(res, validatedResponse.data);
   } catch (error) {
     next(error);
   }
@@ -98,11 +132,11 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
       cronJobId: result.cron_job_id,
       message: 'Schedule processed successfully',
     };
-
+    const statusCode = result.isCreating ? 201 : 200;
     // Validate the response against the shared schema
     const validatedResponse = upsertScheduleResponseSchema.parse(responsePayload);
 
-    successResponse(res, validatedResponse, 201);
+    successResponse(res, validatedResponse, statusCode);
   } catch (error) {
     next(error);
   }
