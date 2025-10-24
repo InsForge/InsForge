@@ -84,7 +84,7 @@ END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 -- ===============================================
--- AUDIT LOGGING
+-- LOG SCHEDULE EXECUTION FUNCTION
 -- ===============================================
 
 CREATE OR REPLACE FUNCTION log_schedule_execution(
@@ -92,31 +92,35 @@ CREATE OR REPLACE FUNCTION log_schedule_execution(
   p_schedule_name TEXT,
   p_success BOOLEAN,
   p_response_status INT,
-  p_response_body TEXT
+  p_duration_ms BIGINT,
+  p_message TEXT DEFAULT NULL
 )
 RETURNS void AS $$
 BEGIN
-  INSERT INTO _audit_logs (
-    actor,
-    action,
-    module,
-    details,
-    created_at
+  INSERT INTO _schedule_execution_logs (
+    schedule_id,
+    executed_at,
+    status_code,
+    success,
+    duration_ms,
+    message
   ) VALUES (
-    'system',
-    'execution',
-    'schedule',
-    jsonb_build_object(
-      'schedule_id', p_schedule_id,
-      'schedule_name', p_schedule_name,
-      'success', p_success,
-      'response_status', p_response_status,
-      'response_body', p_response_body
-    ),
-    NOW()
+    p_schedule_id,
+    NOW(),
+    p_response_status,
+    p_success,
+    p_duration_ms,
+    p_message
   );
+
+  -- Update last_executed_at in _schedules table
+  UPDATE _schedules
+  SET last_executed_at = NOW(),
+      updated_at = NOW()
+  WHERE id = p_schedule_id;
 END;
 $$ LANGUAGE plpgsql;
+
 
 -- ===============================================
 -- EXECUTE SCHEDULED REQUEST
@@ -133,6 +137,10 @@ DECLARE
   v_body TEXT;
   v_decrypted_headers JSONB;
   v_final_body JSONB;
+  v_start_time TIMESTAMP := clock_timestamp();
+  v_end_time TIMESTAMP;
+  v_duration_ms BIGINT;
+  v_error_message TEXT;
 BEGIN
   -- Fetch the schedule
   SELECT
@@ -147,7 +155,7 @@ BEGIN
   WHERE s.id = p_schedule_id;
 
   IF NOT FOUND THEN
-    PERFORM log_schedule_execution(p_schedule_id, 'unknown', FALSE, 404, 'Schedule not found');
+    PERFORM log_schedule_execution(p_schedule_id, 'unknown', FALSE, 404, 0, 'Schedule not found');
     RETURN;
   END IF;
 
@@ -166,18 +174,23 @@ BEGIN
       'application/json',
       v_final_body::TEXT
     );
-
+    v_start_time := clock_timestamp();
     -- Execute HTTP call
     v_http_response := http(v_http_request);
+    v_end_time := clock_timestamp();
+    v_duration_ms := EXTRACT(EPOCH FROM (v_end_time - v_start_time)) * 1000;
     v_status := v_http_response.status;
     v_body := v_http_response.content;
     v_success := v_status BETWEEN 200 AND 299;
 
     -- Log execution
-    PERFORM log_schedule_execution(v_schedule.id, v_schedule.name, v_success, v_status, v_body);
+   v_error_message := CASE WHEN v_success THEN 'Success' ELSE 'HTTP ' || v_status END;
+    PERFORM log_schedule_execution(v_schedule.id, v_schedule.name, v_success, v_status, v_duration_ms, v_error_message);
 
   EXCEPTION WHEN OTHERS THEN
-    PERFORM log_schedule_execution(v_schedule.id, v_schedule.name, FALSE, 500, SQLERRM);
+   v_end_time := clock_timestamp();
+    v_duration_ms := EXTRACT(EPOCH FROM (v_end_time - v_start_time)) * 1000;
+    PERFORM log_schedule_execution(v_schedule.id, v_schedule.name, FALSE, 500, v_duration_ms, SQLERRM);
   END;
 END;
 $$ LANGUAGE plpgsql;

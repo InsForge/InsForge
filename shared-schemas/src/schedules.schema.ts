@@ -13,8 +13,20 @@ export const scheduleSchema = z.object({
   httpMethod: z.string(),
   // cron_job_id is a BIGINT in postgres, which node-pg returns as a string.
   cronJobId: z.string().nullable(),
+  lastExecutedAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
 
+export const executionLogSchema = z.object({
+  id: z.string().uuid(),
+  scheduleId: z.string().uuid(),
+  executedAt: z.string().datetime(),
+  statusCode: z.number().int(),
+  success: z.boolean(),
+  durationMs: z.number().int(),
+  message: z.string().nullable(),
+});
+
 export type Schedule = z.infer<typeof scheduleSchema>;
+export type ExecutionLog = z.infer<typeof executionLogSchema>;

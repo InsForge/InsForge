@@ -1,6 +1,5 @@
 import { z } from 'zod';
-// The import remains the same, but it now brings in the camelCased schema
-import { scheduleSchema } from './schedules.schema';
+import { scheduleSchema, executionLogSchema } from './schedules.schema';
 
 /**
  * Schema for the input of the upsert (create/update) schedule endpoint.
@@ -40,6 +39,21 @@ export const listSchedulesResponseSchema = z.array(scheduleSchema);
 export const getScheduleResponseSchema = scheduleSchema;
 
 /**
+ * Schema for a single execution log in the response.
+ */
+export const executionLogResponseSchema = executionLogSchema;
+
+/**
+ * Schema for the response when listing execution logs with pagination.
+ */
+export const listExecutionLogsResponseSchema = z.object({
+  logs: z.array(executionLogResponseSchema),
+  totalCount: z.number().int().nonnegative(),
+  limit: z.number().int().positive(),
+  offset: z.number().int().nonnegative(),
+});
+
+/**
  * Schema for the response of a successful upsert operation.
  */
 export const upsertScheduleResponseSchema = z.object({
@@ -58,5 +72,7 @@ export const deleteScheduleResponseSchema = z.object({
 export type UpsertScheduleRequest = z.infer<typeof upsertScheduleRequestSchema>;
 export type ListSchedulesResponse = z.infer<typeof listSchedulesResponseSchema>;
 export type GetScheduleResponse = z.infer<typeof getScheduleResponseSchema>;
+export type ExecutionLogResponse = z.infer<typeof executionLogResponseSchema>;
+export type ListExecutionLogsResponse = z.infer<typeof listExecutionLogsResponseSchema>;
 export type UpsertScheduleResponse = z.infer<typeof upsertScheduleResponseSchema>;
 export type DeleteScheduleResponse = z.infer<typeof deleteScheduleResponseSchema>;
