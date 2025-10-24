@@ -233,11 +233,12 @@ export class AuthService {
 
     while (retries <= maxRetries) {
       try {
+        const expiresAt = new Date(Date.now() + 3600000).toISOString();
         await this.db
           .prepare(
             'UPDATE _accounts SET verify_email_code = ?, verify_email_code_expires_at = ? WHERE email = ?'
           )
-          .run(verificationCode, Date.now() + 3600000, email);
+          .run(verificationCode, expiresAt, email);
         break; // Success, exit loop
       } catch (error) {
         // Check if error is due to unique constraint violation
@@ -314,9 +315,10 @@ export class AuthService {
 
     while (retries <= maxRetries) {
       try {
+        const expiresAt = new Date(Date.now() + 3600000).toISOString();
         await this.db
           .prepare('UPDATE _accounts SET otp_code = ?, otp_code_expires_at = ? WHERE email = ?')
-          .run(verificationCode, Date.now() + 3600000, email);
+          .run(verificationCode, expiresAt, email);
         break; // Success, exit loop
       } catch (error) {
         // Check if error is due to unique constraint violation

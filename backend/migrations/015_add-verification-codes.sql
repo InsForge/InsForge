@@ -35,21 +35,21 @@ CREATE INDEX IF NOT EXISTS idx_accounts_reset_password_code ON _accounts(reset_p
 CREATE INDEX IF NOT EXISTS idx_accounts_otp_code ON _accounts(otp_code) WHERE otp_code IS NOT NULL;
 
 -- Rollback: Remove verification and reset code columns from _accounts table
-ALTER TABLE _accounts
-DROP COLUMN IF EXISTS verify_email_code,
-DROP COLUMN IF EXISTS reset_password_code,
-DROP COLUMN IF EXISTS otp_code,
-DROP COLUMN IF EXISTS verify_email_code_expires_at,
-DROP COLUMN IF EXISTS reset_password_code_expires_at,
-DROP COLUMN IF EXISTS otp_code_expires_at;
+-- ALTER TABLE _accounts
+-- DROP COLUMN IF EXISTS verify_email_code,
+-- DROP COLUMN IF EXISTS reset_password_code,
+-- DROP COLUMN IF EXISTS otp_code,
+-- DROP COLUMN IF EXISTS verify_email_code_expires_at,
+-- DROP COLUMN IF EXISTS reset_password_code_expires_at,
+-- DROP COLUMN IF EXISTS otp_code_expires_at;
 
--- Rollback: Remove check constraints from _accounts table
-ALTER TABLE _accounts
-DROP CONSTRAINT IF EXISTS verify_email_code_length,
-DROP CONSTRAINT IF EXISTS reset_password_code_length,
-DROP CONSTRAINT IF EXISTS otp_code_length;
+-- -- Rollback: Remove check constraints from _accounts table
+-- ALTER TABLE _accounts
+-- DROP CONSTRAINT IF EXISTS verify_email_code_length,
+-- DROP CONSTRAINT IF EXISTS reset_password_code_length,
+-- DROP CONSTRAINT IF EXISTS otp_code_length;
 
--- Rollback: Drop indexes for verification codes
-DROP INDEX IF EXISTS idx_accounts_verify_email_code;
-DROP INDEX IF EXISTS idx_accounts_reset_password_code;
-DROP INDEX IF EXISTS idx_accounts_otp_code;
+-- -- Rollback: Drop indexes for verification codes
+-- DROP INDEX IF EXISTS idx_accounts_verify_email_code;
+-- DROP INDEX IF EXISTS idx_accounts_reset_password_code;
+-- DROP INDEX IF EXISTS idx_accounts_otp_code;
