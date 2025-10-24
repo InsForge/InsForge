@@ -24,6 +24,17 @@ export function AppRoutes() {
       <Route path="/dashboard/login" element={<LoginPage />} />
       <Route path="/cloud/login" element={<CloudLoginPage />} />
       <Route
+        path="/auth/*"
+        element={
+          <Routes>
+            <Route path="/" element={<Navigate to="/auth/signin" replace />} />
+            <Route path="/signin" element={<SignInPage />} />
+            <Route path="/signup" element={<SignUpPage />} />
+            <Route path="*" element={<Navigate to="/auth/signin" replace />} />
+          </Routes>
+        }
+      />
+      <Route
         path="/cloud/*"
         element={
           <RequireAuth>
@@ -66,17 +77,6 @@ export function AppRoutes() {
               </Routes>
             </Layout>
           </RequireAuth>
-        }
-      />
-      <Route
-        path="/auth/*"
-        element={
-          <Routes>
-            <Route path="/" element={<Navigate to="/auth/signin" replace />} />
-            <Route path="/signin" element={<SignInPage />} />
-            <Route path="/signup" element={<SignUpPage />} />
-            <Route path="*" element={<Navigate to="/auth/signin" replace />} />
-          </Routes>
         }
       />
     </Routes>
