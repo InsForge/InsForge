@@ -159,7 +159,10 @@ export default function SignInPage() {
 
           <p className="text-center text-sm text-gray-600 dark:text-gray-400">
             Don&apos;t have an account?{' '}
-            <Link to="/auth/signup" className="text-black dark:text-white font-medium">
+            <Link 
+              to={`/auth/signup${redirectUrl ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`} 
+              className="text-black dark:text-white font-medium"
+            >
               Sign Up Now
             </Link>
           </p>
