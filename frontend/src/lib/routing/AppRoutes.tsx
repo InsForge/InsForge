@@ -15,6 +15,8 @@ import OnBoardPage from '@/features/onboard/page/OnBoardPage';
 import VisualizerPage from '@/features/visualizer/page/VisualizerPage';
 import FunctionsPage from '@/features/functions/page/FunctionsPage';
 import AIPage from '@/features/ai/page/AIPage';
+import SignInPage from '@/features/auth/page/SignInPage';
+import SignUpPage from '@/features/auth/page/SignUpPage';
 
 export function AppRoutes() {
   return (
@@ -64,6 +66,17 @@ export function AppRoutes() {
               </Routes>
             </Layout>
           </RequireAuth>
+        }
+      />
+      <Route
+        path="/auth/*"
+        element={
+          <Routes>
+            <Route path="/" element={<Navigate to="/auth/signin" replace />} />
+            <Route path="/signin" element={<SignInPage />} />
+            <Route path="/signup" element={<SignUpPage />} />
+            <Route path="*" element={<Navigate to="/auth/signin" replace />} />
+          </Routes>
         }
       />
     </Routes>
