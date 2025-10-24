@@ -23,20 +23,8 @@ CREATE INDEX idx_deployments_created_by ON _deployments(created_by);
 CREATE INDEX idx_deployments_status ON _deployments(status);
 CREATE INDEX idx_deployments_created_at ON _deployments(created_at DESC);
 
--- Updated_at trigger
-CREATE OR REPLACE FUNCTION update_deployments_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = CURRENT_TIMESTAMP;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
+-- Updated_at trigger (using existing function from 000_create-base-tables.sql)
 CREATE TRIGGER trigger_deployments_updated_at
   BEFORE UPDATE ON _deployments
   FOR EACH ROW
-  EXECUTE FUNCTION update_deployments_updated_at();
-
--- Grant permissions
-GRANT SELECT, INSERT, UPDATE, DELETE ON _deployments TO project_admin;
-GRANT SELECT ON _deployments TO authenticated;
+  EXECUTE FUNCTION update_updated_at_column();
