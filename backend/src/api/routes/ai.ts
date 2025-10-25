@@ -19,6 +19,7 @@ import {
   imageGenerationRequestSchema,
 } from '@insforge/shared-schemas';
 
+
 const router = Router();
 const chatService = new ChatService();
 const aiConfigService = new AIConfigService();
@@ -29,6 +30,8 @@ const auditService = AuditService.getInstance();
  * GET /api/ai/models
  * Get all available AI models in ListModelsResponse format
  */
+
+
 router.get('/models', verifyAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const models = await AIModelService.getModels();
@@ -173,6 +176,7 @@ router.post(
       const { inputModality, outputModality, provider, modelId, systemPrompt } =
         validationResult.data;
 
+        
       const result = await aiConfigService.create(
         inputModality,
         outputModality,
@@ -205,7 +209,7 @@ router.post(
         201
       );
     } catch (error) {
-      if (error instanceof AppError) {
+      if (error instanceof AppError ) {
         next(error);
       } else {
         next(
