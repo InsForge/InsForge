@@ -34,8 +34,6 @@ Estamos construindo os recursos do Supabase de forma nativa para IA, permitindo 
 Criação de aplicações full-stack usando linguagem natural  
 - **Conecte agentes de IA ao InsForge**  
 - Permita que Claude, GPT ou outros agentes de IA gerenciem seu backend  
-- **Adicione backend a projetos no estilo Lovable ou Bolt**  
-- Backend instantâneo para frontends gerados por IA  
 
 ## Exemplos de Prompt:
 

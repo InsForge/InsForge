@@ -30,7 +30,6 @@
 
 ### Use Cases: Building full-stack applications using natural language
 - **Connect AI agents to InsForge** - Enable Claude, GPT, or other AI agents to manage your backend
-- **Add backend to Lovable or Bolt-style vibe coding project projects** - Instant backend for AI-generated frontends
 
 ## Prompt Examples:
 

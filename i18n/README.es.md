@@ -34,7 +34,6 @@ Estamos construyendo las funcionalidades de Supabase de una manera nativa para I
 
 ### Casos de Uso: Crear aplicaciones full-stack usando lenguaje natural  
 - **Conecta agentes de IA a InsForge** - Permite que Claude, GPT u otros agentes de IA administren tu Backend  
-- **Agrega un Backend a proyectos tipo Lovable o Bolt** - Backend instantáneo para Frontends generados por IA  
 
 ---
 

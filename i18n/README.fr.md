@@ -30,7 +30,6 @@
 
 ### Cas d’usage : Création d’applications full-stack à l’aide du langage naturel
 - **Connecter des agents IA à InsForge** - Permettre à Claude, GPT ou à d’autres agents IA de gérer votre backend
-- **Ajouter un backend à des projets de type Lovable ou Bolt-style vibe coding** - Backend instantané pour des frontends générés par l’IA
 
 ## Exemples de prompt:
 
@@ -113,7 +112,7 @@ Commencez à créer votre projet dans un nouveau répertoire ! Créez votre proc
 **Assistance**: Si vous avez besoin d’aide ou de support, nous sommes réactifs sur notre [Discord channel](https://discord.gg/MPxwj5xVvW), et n’hésitez pas non plus à nous envoyer un e-mail à [info@insforge.dev](mailto:info@insforge.dev) !
 
 
-## Documentation & Assitance
+## Documentation & Assistance
 
 ### Documentation
 - **[Official Docs](https://docs.insforge.dev/introduction)** - Guides complets et références API
