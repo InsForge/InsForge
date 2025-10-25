@@ -20,6 +20,10 @@ spec:
           type: STRING
           name: Admin Password
           description: Password for admin. Must be at least 8 characters.
+        - key: POSTGRES_PASSWORD
+          type: STRING
+          name: PostgreSQL Password
+          description: Password for PostgreSQL database and JWT secret. Auto-generated if not provided.
         - key: OPENROUTER_API_KEY
           type: STRING
           name: OpenRouter API Key
@@ -115,7 +119,7 @@ spec:
                     default: ${CONTAINER_HOSTNAME}
                     expose: true
                 POSTGRES_PASSWORD:
-                    default: ${PASSWORD}
+                    default: ${POSTGRES_PASSWORD}
                     expose: true
                     readonly: true
                 POSTGRES_PORT:
@@ -130,7 +134,9 @@ spec:
                     default: postgres
                     expose: true
                 JWT_SECRET:
-                    default: ${PASSWORD}
+                    default: ${POSTGRES_PASSWORD}
+                    expose: true
+                    readonly: true
                 JWT_EXP:
                     default: "3600"
             configs:
@@ -313,7 +319,7 @@ spec:
                 PGRST_DB_ANON_ROLE:
                     default: anon
                 PGRST_JWT_SECRET:
-                    default: ${PASSWORD}
+                    default: ${POSTGRES_PASSWORD}
                     expose: true
                     readonly: true
                 PGRST_DB_CHANNEL_ENABLED:
@@ -373,9 +379,9 @@ spec:
                 WORKER_TIMEOUT_MS:
                     default: "30000"
                 ENCRYPTION_KEY:
-                    default: ${PASSWORD}
+                    default: ${POSTGRES_PASSWORD}
                 JWT_SECRET:
-                    default: ${PASSWORD}
+                    default: ${POSTGRES_PASSWORD}
             configs:
                 - path: /app/functions/server.ts
                   template: |
@@ -840,7 +846,7 @@ spec:
           template: PREBUILT
           spec:
             source:
-                image: ghcr.io/insforge/insforge-oss:v1.0.2
+                image: ghcr.io/insforge/insforge-oss:v1.1.0
             ports:
                 - id: web
                   port: 7130
@@ -858,7 +864,7 @@ spec:
                 VITE_API_BASE_URL:
                     default: ${ZEABUR_WEB_URL}
                 JWT_SECRET:
-                    default: ${JWT_SECRET}
+                    default: ${POSTGRES_PASSWORD}
                 ADMIN_EMAIL:
                     default: ${ADMIN_EMAIL}
                 ADMIN_PASSWORD:
@@ -872,7 +878,7 @@ spec:
                     default: insforge
                 POSTGRES_USER:
                     default: postgres
-                POSTGRESDB_PASSWORD:
+                POSTGRES_PASSWORD:
                     default: ${POSTGRES_PASSWORD}
                 DATABASE_URL:
                     default: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/insforge
@@ -899,6 +905,10 @@ spec:
                     default: ""
                 AWS_REGION:
                     default: us-east-2
+                AWS_ACCESS_KEY_ID:
+                    default: ""
+                AWS_SECRET_ACCESS_KEY:
+                    default: ""
                 AWS_INSTANCE_PROFILE_NAME:
                     default: ""
                 # Multi-tenant Cloud Configuration
@@ -919,12 +929,136 @@ spec:
                     default: ""
                 OPENROUTER_API_KEY:
                     default: ${OPENROUTER_API_KEY}
+                # Logs Configuration
+                LOGS_DIR:
+                    default: /insforge-logs
+            volumes:
+                - id: logs
+                  dir: /insforge-logs
             healthCheck:
                 type: HTTP
                 port: web
                 http:
                     path: /
           domainKey: PUBLIC_DOMAIN
+
+        - name: vector
+          icon: https://vector.dev/img/logo.svg
+          dependencies:
+            - postgres
+            - postgrest
+            - insforge
+            - deno
+          template: PREBUILT
+          spec:
+            source:
+                image: timberio/vector:0.28.1-alpine
+                command:
+                    - vector
+                    - --config
+                    - /etc/vector/vector.yml
+            ports:
+                - id: api
+                  port: 7135
+                  type: HTTP
+            volumes:
+                - id: logs
+                  dir: /insforge-logs
+            env:
+                AWS_ACCESS_KEY_ID:
+                    default: ""
+                AWS_SECRET_ACCESS_KEY:
+                    default: ""
+                AWS_REGION:
+                    default: ""
+                PROJECT_ID:
+                    default: ${ZEABUR_PROJECT_ID}
+                HOSTNAME_OVERRIDE:
+                    default: ""
+            configs:
+                - path: /etc/vector/vector.yml
+                  template: |
+                    # Vector configuration for Zeabur deployment
+                    # Note: docker_logs source not available in Zeabur, using file-based logs
+                    api:
+                      enabled: true
+                      address: 0.0.0.0:7135
+
+                    sources:
+                      # Read InsForge application logs
+                      insforge_file:
+                        type: file
+                        include:
+                          - /insforge-logs/insforge.logs.jsonl
+                        read_from: beginning
+
+                      # Read Deno function logs
+                      deno_file:
+                        type: file
+                        include:
+                          - /insforge-logs/function.logs.jsonl
+                        read_from: beginning
+
+                      # Read PostgREST logs
+                      rest_file:
+                        type: file
+                        include:
+                          - /insforge-logs/postgrest.logs.jsonl
+                        read_from: beginning
+
+                      # Read Postgres logs
+                      db_file:
+                        type: file
+                        include:
+                          - /insforge-logs/postgres.logs.jsonl
+                        read_from: beginning
+
+                    sinks:
+                      # CloudWatch sinks (only active if AWS_REGION is set)
+                      cw_insforge:
+                        type: aws_cloudwatch_logs
+                        inputs:
+                          - insforge_file
+                        region: ${AWS_REGION:-skip}
+                        group_name: /insforge/zeabur
+                        stream_name: ${HOSTNAME_OVERRIDE:-zeabur}-insforge
+                        encoding:
+                          codec: json
+
+                      cw_deno:
+                        type: aws_cloudwatch_logs
+                        inputs:
+                          - deno_file
+                        region: ${AWS_REGION:-skip}
+                        group_name: /insforge/zeabur
+                        stream_name: ${HOSTNAME_OVERRIDE:-zeabur}-deno
+                        encoding:
+                          codec: json
+
+                      cw_rest:
+                        type: aws_cloudwatch_logs
+                        inputs:
+                          - rest_file
+                        region: ${AWS_REGION:-skip}
+                        group_name: /insforge/zeabur
+                        stream_name: ${HOSTNAME_OVERRIDE:-zeabur}-postgrest
+                        encoding:
+                          codec: json
+
+                      cw_db:
+                        type: aws_cloudwatch_logs
+                        inputs:
+                          - db_file
+                        region: ${AWS_REGION:-skip}
+                        group_name: /insforge/zeabur
+                        stream_name: ${HOSTNAME_OVERRIDE:-zeabur}-postgres
+                        encoding:
+                          codec: json
+            healthCheck:
+                type: HTTP
+                port: api
+                http:
+                    path: /health
 
 localization:
     zh-CN:
