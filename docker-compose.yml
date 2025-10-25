@@ -107,6 +107,8 @@ services:
       - LOGS_DIR=/insforge-logs
       # Storage directory (for local file storage when S3 is not configured)
       - STORAGE_DIR=/insforge-storage
+      # Deployment configuration
+      - DEPLOYMENT_BASE_URL=http://localhost:8080/deployments
     volumes:
       - ./package.json:/app/package.json
       - ./backend:/app/backend
@@ -163,6 +165,19 @@ services:
     restart: unless-stopped
     networks:
       - insforge-network
+
+  # Nginx for serving deployments
+  nginx-deployments:
+    image: nginx:alpine
+    container_name: insforge-nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - storage-data:/usr/share/nginx/html/deployments:ro
+      - ./docker-init/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - insforge-network
+    restart: unless-stopped
 
   # Vector.dev for log collection and shipping
   vector:
