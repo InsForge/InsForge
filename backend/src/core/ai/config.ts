@@ -2,7 +2,9 @@ import { Pool } from 'pg';
 import { DatabaseManager } from '@/core/database/manager.js';
 import logger from '@/utils/logger.js';
 import { AIConfigurationSchema, AIConfigurationWithUsageSchema } from '@insforge/shared-schemas';
-import {validateModelId} from "@/utils/validateModelId"
+import { validateModelId } from '@/utils/validateModelId';
+import { AppError } from '@/api/middleware/error';
+import { ERROR_CODES } from '@/types/error-constants';
 export class AIConfigService {
   private pool: Pool | null = null;
 
@@ -12,7 +14,6 @@ export class AIConfigService {
     }
     return this.pool;
   }
-  
 
   async create(
     inputModality: string[],
@@ -21,10 +22,15 @@ export class AIConfigService {
     modelId: string,
     systemPrompt?: string
   ): Promise<{ id: string }> {
-    const client = await this.getPool().connect();
-    try {
+    const isValid = await validateModelId(modelId);
+    if (!isValid) {
+      logger.error(`Invalid modelId: ${modelId} (not found on OpenRouter)`);
+      throw new AppError('Invalid modelId', 400, ERROR_CODES.INVALID_INPUT);
+    }
 
-     
+    const client = await this.getPool().connect();
+
+    try {
       const result = await client.query(
         `INSERT INTO _ai_configs (input_modality, output_modality, provider, model_id, system_prompt)
          VALUES ($1, $2, $3, $4, $5)
@@ -45,7 +51,6 @@ export class AIConfigService {
   async findAll(): Promise<AIConfigurationWithUsageSchema[]> {
     const client = await this.getPool().connect();
     try {
-      
       // Use a single query with aggregation to get configs with usage stats
       const result = await client.query(
         `SELECT 
@@ -133,12 +138,6 @@ export class AIConfigService {
   async findByModelId(modelId: string): Promise<AIConfigurationSchema | null> {
     const client = await this.getPool().connect();
     try {
-        const isValid = await validateModelId(modelId);
-        if (!isValid) {
-          logger.error(`Invalid modelId: ${modelId} (not found on OpenRouter)`);
-          throw new Error(`Invalid modelId '${modelId}' — not found on OpenRouter.`);
-        }
-      
       const result = await client.query(
         `SELECT id, input_modality as "inputModality", output_modality as "outputModality", provider, model_id as "modelId", system_prompt as "systemPrompt", created_at, updated_at
          FROM _ai_configs
