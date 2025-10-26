@@ -1,12 +1,15 @@
 services:
   postgres:
-    image: postgres:15.13
+    build:
+      context: ./docker-init/db
+      dockerfile: Dockerfile.postgres
     container_name: insforge-postgres
-    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf -c app.encryption_key='${DB_ENCRYPTION_KEY:-dev-key-change-in-production-your-strong-secret-key}'
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_DB=${POSTGRES_DB:-insforge}
+      - DB_ENCRYPTION_KEY=${DB_ENCRYPTION_KEY:-'dev-key-change-in-production-your-strong-secret-key'}
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./docker-init/db/db-init.sql:/docker-entrypoint-initdb.d/01-init.sql
@@ -66,6 +69,7 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-change-this-password}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - DB_ENCRYPTION_KEY=${DB_ENCRYPTION_KEY:-'your-strong-secret-key'}
       # PostgreSQL connection
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432

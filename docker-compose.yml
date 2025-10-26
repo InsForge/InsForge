@@ -2,9 +2,12 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:15.13
+    #image: postgres:15.13
+    build:
+      context: ./docker-init/db
+      dockerfile: Dockerfile.postgres
     container_name: insforge-postgres
-    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf -c app.encryption_key='${DB_ENCRYPTION_KEY:-your-strong-secret-key}'
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
@@ -65,6 +68,7 @@ services:
       - VITE_API_BASE_URL=${VITE_API_BASE_URL:-}
       - JWT_SECRET=${JWT_SECRET:-dev-secret-please-change-in-production}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      - DB_ENCRYPTION_KEY=${DB_ENCRYPTION_KEY:-'your-strong-secret-key'}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-change-this-password}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
