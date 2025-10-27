@@ -3,8 +3,6 @@
 # Test secrets API endpoints (refactored to use _secrets table)
 # Tests CRUD operations for secrets and edge function integration
 
-set -e  # Exit on error
-
 # Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "$SCRIPT_DIR/../test-config.sh"
@@ -177,13 +175,7 @@ if echo "$response" | grep -q "id"; then
     if [ -z "$response" ]; then
         print_info "Skipping edge function test - Deno not accessible (CI environment)"
     else
-        # Disable exit-on-error for this check since jq -e returns non-zero on false
-        set +e
-        echo "$response" | jq -e '.testSecretValue == true and .systemSecretFound == true' >/dev/null 2>&1
-        jq_result=$?
-        set -e
-
-        if [ $jq_result -eq 0 ]; then
+        if echo "$response" | jq -e '.testSecretValue == true and .systemSecretFound == true' >/dev/null 2>&1; then
             print_success "Edge function can access secrets"
         else
             print_fail "Edge function cannot access secrets properly"

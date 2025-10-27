@@ -15,9 +15,11 @@ RUN npm install && npm cache clean --force && rm -rf /tmp/*
 COPY . .
 
 # Build arguments for Vite environment variables
+# These must be defined as ARG because Vite replaces import.meta.env.VITE_* at build time
 ARG VITE_API_BASE_URL
+ARG VITE_PUBLIC_POSTHOG_KEY
 
-# Build frontend with the API URL baked in
+# Build frontend with environment variables baked in
 RUN npm run build
 
 # Expose ports

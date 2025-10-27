@@ -5,6 +5,7 @@ import {
   CreateOAuthConfigRequest,
   UpdateOAuthConfigRequest,
   ListOAuthConfigsResponse,
+  OAuthProvidersSchema,
 } from '@insforge/shared-schemas';
 import { oauthConfigService } from '../services/oauth.service';
 import { useToast } from '@/lib/hooks/useToast';
@@ -12,7 +13,7 @@ import { useToast } from '@/lib/hooks/useToast';
 export function useOAuthConfig() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
-  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<OAuthProvidersSchema | null>(null);
 
   // Query to fetch all OAuth configurations
   const {
@@ -82,7 +83,7 @@ export function useOAuthConfig() {
 
   // Helper to check if a provider is configured
   const isProviderConfigured = useCallback(
-    (provider: string): boolean => {
+    (provider: OAuthProvidersSchema): boolean => {
       return configs?.data?.some((config) => config.provider === provider) ?? false;
     },
     [configs]
@@ -90,7 +91,7 @@ export function useOAuthConfig() {
 
   // Helper to get config for a specific provider from the list
   const getProviderConfig = useCallback(
-    (provider: string): OAuthConfigSchema | undefined => {
+    (provider: OAuthProvidersSchema): OAuthConfigSchema | undefined => {
       return configs?.data?.find((config) => config.provider === provider);
     },
     [configs]

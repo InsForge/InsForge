@@ -1,0 +1,274 @@
+---
+title: SDK
+description: Built-in user management with OAuth and profile support
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+InsForge SDK provides complete authentication with JWT tokens, OAuth providers, and user profiles.
+
+<Installation />
+
+## Basic Authentication
+
+### Sign Up
+
+<CodeGroup>
+```javascript Basic Sign Up
+const { data, error } = await insforge.auth.signUp({
+  email: 'user@example.com',
+  password: 'secure_password123'
+})
+
+// Returns: { data: { user, accessToken }, error }
+```
+
+```javascript With Name
+const { data, error } = await insforge.auth.signUp({
+  email: 'user@example.com',
+  password: 'secure_password123',
+  name: 'John Doe'
+})
+```
+</CodeGroup>
+
+### Sign In
+
+```javascript
+const { data, error } = await insforge.auth.signInWithPassword({
+  email: 'user@example.com',
+  password: 'secure_password123'
+})
+
+if (data) {
+  // Token is automatically stored and used for future requests
+  console.log('Logged in:', data.user)
+  console.log('Token:', data.accessToken)
+}
+```
+
+### Sign Out
+
+```javascript
+const { error } = await insforge.auth.signOut()
+// Clears stored tokens and session
+```
+
+## OAuth Authentication
+
+The SDK includes automatic OAuth callback detection (v0.0.14+). When users return from OAuth providers, the SDK automatically handles the authentication.
+
+<CodeGroup>
+```javascript Google OAuth
+// Redirects to Google OAuth
+await insforge.auth.signInWithOAuth({
+  provider: 'google',
+  redirectTo: 'http://localhost:3000/dashboard'
+})
+
+// SDK automatically detects and handles the OAuth callback
+```
+
+```javascript GitHub OAuth
+// Redirects to GitHub OAuth
+await insforge.auth.signInWithOAuth({
+  provider: 'github',
+  redirectTo: 'http://localhost:3000/dashboard'
+})
+```
+
+```javascript Get URL Only
+// Returns URL without redirecting
+const { data } = await insforge.auth.signInWithOAuth({
+  provider: 'google',
+  skipBrowserRedirect: true
+})
+
+console.log('OAuth URL:', data.url)
+```
+</CodeGroup>
+
+<Note>
+OAuth requires environment variables to be configured on the backend:
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+- `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`
+</Note>
+
+## Session Management
+
+### Get Current User
+
+```javascript
+// Gets current authenticated user with profile
+const { data, error } = await insforge.auth.getCurrentUser()
+
+if (data) {
+  console.log('Auth info:', data.user)    // { id, email, role }
+  console.log('Profile:', data.profile)   // { nickname, avatar_url, bio, ... }
+}
+```
+
+### Get Current Session
+
+```javascript
+// Gets session from local storage (no API call)
+const { data, error } = await insforge.auth.getCurrentSession()
+
+if (data?.session) {
+  console.log('Token:', data.session.accessToken)
+  console.log('User:', data.session.user)
+}
+```
+
+## User Profiles
+
+InsForge separates authentication (system) from profiles (user data):
+
+### Get Any User's Profile
+
+```javascript
+// Get profile by user ID
+const { data: profile, error } = await insforge.auth.getProfile('user-id-123')
+
+console.log(profile)
+// { id, nickname, avatar_url, bio, birthday, ... }
+```
+
+### Update Current User's Profile
+
+```javascript
+const { data: profile, error } = await insforge.auth.setProfile({
+  nickname: 'CoolDev',
+  avatar_url: 'https://example.com/avatar.jpg',
+  bio: 'Full-stack developer',
+  birthday: '1990-01-01'
+})
+```
+
+## React Hook Example
+
+Create a reusable auth hook for React applications:
+
+```javascript
+import { createClient } from '@insforge/sdk';
+import { useState, useEffect } from 'react';
+
+const insforge = createClient({
+  baseUrl: 'https://your-app.us-east.insforge.app'
+});
+
+export function useAuth() {
+  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check for existing session
+    insforge.auth.getCurrentUser().then(({ data }) => {
+      if (data) {
+        setUser(data.user);
+        setProfile(data.profile);
+      }
+      setLoading(false);
+    });
+  }, []);
+
+  const signIn = async (email, password) => {
+    const { data, error } = await insforge.auth.signInWithPassword({
+      email,
+      password
+    });
+    
+    if (data) {
+      setUser(data.user);
+      // Fetch profile after login
+      const { data: profileData } = await insforge.auth.getCurrentUser();
+      setProfile(profileData?.profile);
+    }
+    
+    return { data, error };
+  };
+
+  const signOut = async () => {
+    await insforge.auth.signOut();
+    setUser(null);
+    setProfile(null);
+  };
+
+  return {
+    user,
+    profile,
+    loading,
+    signIn,
+    signOut,
+    signInWithOAuth: insforge.auth.signInWithOAuth,
+    updateProfile: insforge.auth.setProfile
+  };
+}
+```
+
+## Protected API Calls
+
+The SDK automatically includes authentication tokens for all requests:
+
+```javascript
+// No need to manually add Authorization header
+const { data, error } = await insforge.database
+  .from('posts')
+  .insert({ 
+    title: 'My Post',
+    content: 'This is automatically authenticated'
+  })
+  .select()
+```
+
+## Error Handling
+
+Auth operations return structured errors:
+
+```javascript
+const { data, error } = await insforge.auth.signInWithPassword({
+  email: 'user@example.com',
+  password: 'wrong_password'
+})
+
+if (error) {
+  console.error({
+    statusCode: error.statusCode,  // 401
+    error: error.error,            // 'INVALID_CREDENTIALS'
+    message: error.message,        // 'Invalid login credentials'
+    nextActions: error.nextActions // 'Check email and password'
+  })
+}
+```
+
+## Token Storage
+
+<CardGroup cols={2}>
+  <Card title="Browser" icon="browser">
+    Tokens stored in localStorage automatically
+  </Card>
+  
+  <Card title="Node.js" icon="node">
+    In-memory Map storage by default
+  </Card>
+  
+  <Card title="React Native" icon="mobile">
+    Provide custom storage via config
+  </Card>
+  
+  <Card title="Custom" icon="gear">
+    Implement your own storage adapter
+  </Card>
+</CardGroup>
+
+## Security Features
+
+- **JWT Tokens** - Access tokens valid for 7 days
+- **Automatic Refresh** - SDK handles token renewal
+- **Password Hashing** - Bcrypt with salt rounds
+- **Rate Limiting** - Built-in protection against brute force
+- **CSRF Protection** - Automatic for session-based auth
+
+
+The SDK handles all token storage, renewal, and header management automatically.

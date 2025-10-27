@@ -1,0 +1,386 @@
+---
+title: SDK
+description: Integrated AI services for chat completions and image generation
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+InsForge SDK provides seamless integration with multiple AI models through OpenRouter, supporting both chat completions and image generation.
+
+<Installation />
+
+## Chat Completions
+
+### Basic Chat
+
+<CodeGroup>
+```javascript Simple Message
+const { data, error } = await insforge.ai.chat.completions.create({
+  model: 'anthropic/claude-3.5-haiku',
+  message: 'What is the capital of France?'
+})
+
+console.log(data.response)
+// "The capital of France is Paris."
+```
+
+```javascript With System Prompt
+const { data, error } = await insforge.ai.chat.completions.create({
+  model: 'anthropic/claude-3.5-haiku',
+  systemPrompt: 'You are a helpful geography teacher',
+  message: 'Tell me about Paris'
+})
+```
+
+```javascript Full Conversation
+const { data, error } = await insforge.ai.chat.completions.create({
+  model: 'anthropic/claude-3.5-haiku',
+  messages: [
+    { role: 'system', content: 'You are a helpful assistant' },
+    { role: 'user', content: 'What is 2+2?' },
+    { role: 'assistant', content: '2+2 equals 4' },
+    { role: 'user', content: 'What about 3+3?' }
+  ],
+  temperature: 0.7,
+  maxTokens: 500
+})
+```
+</CodeGroup>
+
+### Streaming Responses
+
+Real-time streaming for better user experience:
+
+```javascript
+const stream = await insforge.ai.chat.completions.create({
+  model: 'anthropic/claude-3.5-haiku',
+  messages: [
+    { role: 'user', content: 'Write a story about a robot' }
+  ],
+  stream: true
+})
+
+// Process stream
+for await (const event of stream) {
+  if (event.chunk) {
+    // Display partial response as it arrives
+    process.stdout.write(event.chunk)
+  }
+  if (event.done) {
+    console.log('\nStream complete!')
+  }
+}
+```
+
+### React Streaming Example
+
+```jsx
+import { useState } from 'react';
+import { createClient } from '@insforge/sdk';
+
+const insforge = createClient({
+  baseUrl: 'https://your-app.us-east.insforge.app'
+});
+
+function ChatInterface() {
+  const [response, setResponse] = useState('');
+  const [loading, setLoading] = useState(false);
+  
+  const handleChat = async (message) => {
+    setLoading(true);
+    setResponse('');
+    
+    const stream = await insforge.ai.chat.completions.create({
+      model: 'anthropic/claude-3.5-haiku',
+      message,
+      stream: true
+    });
+    
+    for await (const event of stream) {
+      if (event.chunk) {
+        setResponse(prev => prev + event.chunk);
+      }
+      if (event.done) {
+        setLoading(false);
+      }
+    }
+  };
+  
+  return (
+    <div>
+      <button onClick={() => handleChat('Tell me a joke')}>
+        Get Response
+      </button>
+      <div>{loading ? 'Thinking...' : response}</div>
+    </div>
+  );
+}
+```
+
+## Image Generation
+
+Generate images with various AI models:
+
+<CodeGroup>
+```javascript Basic Generation
+const { data, error } = await insforge.ai.images.generate({
+  model: 'google/gemini-2.5-flash-image-preview',
+  prompt: 'A serene landscape with mountains at sunset',
+  size: '1024x1024',
+  quality: 'hd'
+})
+
+// Get generated image URL
+const imageUrl = data.images[0].url
+```
+
+```javascript Multiple Images
+const { data, error } = await insforge.ai.images.generate({
+  model: 'openai/dall-e-3',
+  prompt: 'Futuristic city with flying cars',
+  numImages: 4,
+  size: '512x512',
+  style: 'vivid'
+})
+
+// Array of generated images
+data.images.forEach((img, i) => {
+  console.log(`Image ${i + 1}: ${img.url}`)
+})
+```
+
+</CodeGroup>
+
+### Image Generation Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `model` | string | AI model to use (required) |
+| `prompt` | string | Text description of image (required) |
+| `negativePrompt` | string | What to avoid in the image |
+| `size` | string | Predefined size like '1024x1024' |
+| `width` | number | Custom width in pixels |
+| `height` | number | Custom height in pixels |
+| `numImages` | number | Number of images to generate |
+| `quality` | 'standard' \| 'hd' | Image quality setting |
+| `style` | 'vivid' \| 'natural' | Style preference |
+| `responseFormat` | 'url' \| 'b64_json' | Response format |
+
+## Available Models
+
+### Chat Models
+- **Anthropic**: `anthropic/claude-3.5-haiku`, `anthropic/claude-sonnet-4`, `anthropic/claude-opus-4.1`
+- **OpenAI**: `openai/gpt-5`, `openai/gpt-5-mini`, `openai/gpt-4o`
+- **Google**: `google/gemini-2.5-pro`
+
+### Image Models
+- **Google**: `google/gemini-2.5-flash-image-preview`
+
+## Chat Application Example
+
+Complete chat interface with conversation history:
+
+```javascript
+class ChatApp {
+  constructor() {
+    this.client = createClient({
+      baseUrl: 'https://your-app.us-east.insforge.app'
+    });
+    this.messages = [];
+  }
+
+  async sendMessage(userInput) {
+    // Add user message to history
+    this.messages.push({ role: 'user', content: userInput });
+    
+    // Get AI response
+    const { data, error } = await this.client.ai.chat.completions.create({
+      model: 'anthropic/claude-3.5-haiku',
+      messages: this.messages,
+      temperature: 0.7,
+      maxTokens: 1000
+    });
+    
+    if (error) {
+      console.error('Chat error:', error);
+      return null;
+    }
+    
+    // Add assistant response to history
+    this.messages.push({ 
+      role: 'assistant', 
+      content: data.response 
+    });
+    
+    return data.response;
+  }
+
+  async streamMessage(userInput) {
+    this.messages.push({ role: 'user', content: userInput });
+    
+    const stream = await this.client.ai.chat.completions.create({
+      model: 'anthropic/claude-3.5-haiku',
+      messages: this.messages,
+      stream: true
+    });
+    
+    let fullResponse = '';
+    
+    for await (const event of stream) {
+      if (event.chunk) {
+        fullResponse += event.chunk;
+        // Update UI with partial response
+        this.updateUI(event.chunk);
+      }
+    }
+    
+    this.messages.push({ 
+      role: 'assistant', 
+      content: fullResponse 
+    });
+    
+    return fullResponse;
+  }
+
+  updateUI(chunk) {
+    // Update your UI with streaming chunk
+    document.getElementById('response').innerHTML += chunk;
+  }
+
+  clearHistory() {
+    this.messages = [];
+  }
+}
+
+// Usage
+const chat = new ChatApp();
+const response = await chat.sendMessage('Hello!');
+```
+
+## Image Gallery Example
+
+```javascript
+async function createImageGallery(prompt, count = 4) {
+  const { data, error } = await insforge.ai.images.generate({
+    model: 'google/gemini-2.5-flash-image-preview',
+    prompt,
+    numImages: count,
+    size: '512x512',
+    quality: 'hd'
+  });
+  
+  if (error) {
+    console.error('Generation failed:', error);
+    return;
+  }
+  
+  // Create gallery HTML
+  const gallery = document.getElementById('gallery');
+  gallery.innerHTML = '';
+  
+  data.images.forEach((image, index) => {
+    const img = document.createElement('img');
+    img.src = image.url;
+    img.alt = `Generated image ${index + 1}`;
+    img.className = 'gallery-image';
+    gallery.appendChild(img);
+  });
+  
+  // Save to storage if needed
+  for (const image of data.images) {
+    const response = await fetch(image.url);
+    const blob = await response.blob();
+    
+    await insforge.storage
+      .from('generated-images')
+      .uploadAuto(blob);
+  }
+}
+
+// Generate gallery
+await createImageGallery('Cute puppies playing in a garden', 6);
+```
+
+## Error Handling
+
+AI operations return structured errors:
+
+```javascript
+const { data, error } = await insforge.ai.chat.completions.create({
+  model: 'invalid-model',
+  message: 'Hello'
+});
+
+if (error) {
+  console.error({
+    statusCode: error.statusCode,  // 400, 401, 500
+    error: error.error,            // Error code
+    message: error.message,        // Human-readable message
+    nextActions: error.nextActions // Suggested fix
+  });
+}
+```
+
+## Token Usage & Costs
+
+Monitor token usage for cost management:
+
+```javascript
+const { data, error } = await insforge.ai.chat.completions.create({
+  model: 'openai/gpt-4',
+  message: 'Explain quantum computing'
+});
+
+if (data) {
+  console.log('Token usage:', {
+    promptTokens: data.usage?.promptTokens,
+    completionTokens: data.usage?.completionTokens,
+    totalTokens: data.usage?.totalTokens
+  });
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Choose Right Model" icon="brain">
+    Use Haiku for speed, Sonnet for balance, Opus for complex tasks
+  </Card>
+  
+  <Card title="Stream Long Responses" icon="stream">
+    Use streaming for better UX with long responses
+  </Card>
+  
+  <Card title="Manage Context" icon="message">
+    Keep conversation history reasonable to control costs
+  </Card>
+  
+  <Card title="Handle Errors Gracefully" icon="shield">
+    Always check for errors and provide fallbacks
+  </Card>
+  
+  <Card title="Cache Responses" icon="database">
+    Cache common queries to reduce API calls
+  </Card>
+  
+  <Card title="Validate Images" icon="image">
+    Check generated images before displaying to users
+  </Card>
+</CardGroup>
+
+## Configuration
+
+Set default models and parameters:
+
+```javascript
+const insforge = createClient({
+  baseUrl: 'https://your-app.us-east.insforge.app',
+  ai: {
+    defaultModel: 'anthropic/claude-3.5-haiku',
+    defaultTemperature: 0.7,
+    defaultMaxTokens: 1000
+  }
+});
+```
+
+The SDK handles all authentication, streaming, and error management automatically.

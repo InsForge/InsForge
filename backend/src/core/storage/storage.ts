@@ -27,6 +27,12 @@ import { ERROR_CODES } from '@/types/error-constants';
 import { escapeSqlLikePattern, escapeRegexPattern } from '@/utils/validations.js';
 import { getApiBaseUrl } from '@/utils/environment';
 
+const ONE_HOUR_IN_SECONDS = 3600;
+const DEFAULT_MAX_UPLOAD_SIZE_BYTES = 10485760;
+const SEVEN_DAYS_IN_SECONDS = 604800;
+const DEFAULT_LIST_LIMIT = 100;
+const GIGABYTE_IN_BYTES = 1024 * 1024 * 1024;
+
 // Storage backend interface
 interface StorageBackend {
   initialize(): void | Promise<void>;
@@ -292,7 +298,7 @@ class S3StorageBackend implements StorageBackend {
     }
 
     const s3Key = this.getS3Key(bucket, key);
-    const expiresIn = 3600; // 1 hour
+    const expiresIn = ONE_HOUR_IN_SECONDS; // 1 hour
 
     try {
       // Generate presigned POST URL for multipart form upload
@@ -300,7 +306,7 @@ class S3StorageBackend implements StorageBackend {
         Bucket: this.s3Bucket,
         Key: s3Key,
         Conditions: [
-          ['content-length-range', 0, metadata.size || 10485760], // Max 10MB by default
+          ['content-length-range', 0, metadata.size || DEFAULT_MAX_UPLOAD_SIZE_BYTES], // Max 10MB by default
         ],
         Expires: expiresIn,
       });
@@ -327,7 +333,7 @@ class S3StorageBackend implements StorageBackend {
   async getDownloadStrategy(
     bucket: string,
     key: string,
-    expiresIn: number = 3600,
+    expiresIn: number = ONE_HOUR_IN_SECONDS,
     isPublic: boolean = false
   ): Promise<DownloadStrategyResponse> {
     if (!this.s3Client) {
@@ -336,7 +342,7 @@ class S3StorageBackend implements StorageBackend {
 
     const s3Key = this.getS3Key(bucket, key);
     // Public files get longer expiration (7 days), private files get shorter (1 hour default)
-    const actualExpiresIn = isPublic ? 604800 : expiresIn; // 604800 = 7 days
+    const actualExpiresIn = isPublic ? SEVEN_DAYS_IN_SECONDS : expiresIn; // 604800 = 7 days
     const cloudFrontUrl = process.env.AWS_CLOUDFRONT_URL;
 
     try {
@@ -667,7 +673,7 @@ export class StorageService {
   async listObjects(
     bucket: string,
     prefix?: string,
-    limit: number = 100,
+    limit: number = DEFAULT_LIST_LIMIT,
     offset: number = 0,
     searchQuery?: string
   ): Promise<{ objects: StorageFileSchema[]; total: number }> {
@@ -976,7 +982,7 @@ export class StorageService {
         .get()) as { total_size: number } | null;
 
       // Convert bytes to GB
-      return (result?.total_size || 0) / (1024 * 1024 * 1024);
+      return (result?.total_size || 0) / GIGABYTE_IN_BYTES;
     } catch (error) {
       logger.error('Error getting storage size', {
         error: error instanceof Error ? error.message : String(error),

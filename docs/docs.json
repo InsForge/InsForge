@@ -1,0 +1,179 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Insforge Documentation",
+  "colors": {
+    "primary": "#16A34A",
+    "light": "#07C983",
+    "dark": "#15803D"
+  },
+  "appearance": {
+    "default": "dark"
+  },
+  "styling": {
+    "eyebrows": "section"
+  },
+  "seo": {
+    "metatags": {
+      "og:site_name": "Insforge Documentation"
+    },
+    "indexing": "navigable"
+  },
+  "search": {
+    "prompt": "Search Insforge docs..."
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": ["introduction", "quickstart", "mcp-installation", "partnership"]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              {
+                "group": "Database",
+                "pages": [
+                  "core-concepts/database/architecture",
+                  "core-concepts/database/sdk"
+                ]
+              },
+              {
+                "group": "Authentication",
+                "pages": [
+                  "core-concepts/authentication/architecture",
+                  "core-concepts/authentication/sdk"
+                ]
+              },
+              {
+                "group": "Storage",
+                "pages": [
+                  "core-concepts/storage/architecture",
+                  "core-concepts/storage/sdk"
+                ]
+              },
+              {
+                "group": "AI Integration",
+                "pages": [
+                  "core-concepts/ai/architecture",
+                  "core-concepts/ai/sdk"
+                ]
+              },
+              {
+                "group": "Functions",
+                "pages": [
+                  "core-concepts/functions/architecture",
+                  "core-concepts/functions/sdk"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Showcase",
+            "pages": ["showcase"]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Tables",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/tables.yaml"
+          },
+          {
+            "group": "Authentication",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/auth.yaml"
+          },
+          {
+            "group": "Records",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/records.yaml"
+          },
+          {
+            "group": "Storage",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/storage.yaml"
+          },
+          {
+            "group": "AI Integration",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/ai.yaml"
+          },
+          {
+            "group": "Functions",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/functions.yaml"
+          },
+          {
+            "group": "Secrets",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/secrets.yaml"
+          },
+          {
+            "group": "Logs",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/logs.yaml"
+          },
+          {
+            "group": "Metadata",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/metadata.yaml"
+          },
+          {
+            "group": "Health",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/health.yaml"
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "Community",
+          "href": "https://discord.gg/MPxwj5xVvW",
+          "icon": "discord"
+        },
+        {
+          "anchor": "Blog",
+          "href": "https://insforge.dev/blog",
+          "icon": "newspaper"
+        }
+      ]
+    }
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg",
+    "href": "https://insforge.dev"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Support",
+        "href": "mailto:info@insforge.dev"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Dashboard",
+      "href": "https://insforge.dev/dashboard"
+    }
+  },
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
+  },
+  "footer": {
+    "socials": {
+      "x": "https://x.com/InsForge_dev",
+      "github": "https://github.com/insforge",
+      "linkedin": "https://linkedin.com/company/insforge"
+    }
+  }
+}

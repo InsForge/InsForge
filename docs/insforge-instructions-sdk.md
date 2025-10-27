@@ -25,7 +25,7 @@ Before ANY operation, call `get-backend-metadata` to get the current backend sta
 - Database operations (`run-raw-sql` for CREATE/ALTER/DROP tables, `get-table-schema` for inspection)
 - Backend metadata (`get-backend-metadata`)
 - Storage bucket creation (`create-bucket`, `list-buckets`, `delete-bucket`)
-- Edge Functions Creation and Upload (`create-function`, `get-function`, `update-function`, `delete-function`)
+- Edge Functions Creation and Upload (`create-function`, `get-function`, a`update-function`, `delete-function`)
   - **Important**: Edge functions should only be used for backend API services
   - **CRITICAL**: Edge functions do NOT support subpaths - single endpoint only per function
   - ❌ **Will NOT work**: `/functions/my-api/users`, `/functions/my-api/posts/123`, `/functions/my-api/admin/stats`
@@ -429,6 +429,6 @@ console.log(otherUser.nickname); // Direct access to properties
   - Chat message attachments
 - **Store in Database**:
   - Storage URLs only (not the actual data)
-  - Small text fields (<1KB)
+  - Small text fields (less than 1KB)
   - Metadata and references
 - **Example**: For chat with images, store image in storage bucket, save only the URL in database

@@ -3,6 +3,7 @@ import { AuthProvider } from '@/lib/contexts/AuthContext';
 import { AppRoutes } from '@/lib/routing/AppRoutes';
 import { ToastProvider } from '@/lib/hooks/useToast';
 import { SocketProvider } from '@/lib/contexts/SocketContext';
+import { PostHogAnalyticsProvider } from './lib/analytics/posthog';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,7 +21,9 @@ function App() {
       <AuthProvider>
         <SocketProvider>
           <ToastProvider>
-            <AppRoutes />
+            <PostHogAnalyticsProvider>
+              <AppRoutes />
+            </PostHogAnalyticsProvider>
           </ToastProvider>
         </SocketProvider>
       </AuthProvider>

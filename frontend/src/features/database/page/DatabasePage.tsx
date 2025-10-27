@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Plus, Upload } from 'lucide-react';
 import PencilIcon from '@/assets/icons/pencil.svg?react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import { useTables } from '@/features/database/hooks/useTables';
@@ -32,6 +32,7 @@ import {
   SocketMessage,
   useSocket,
 } from '@/lib/contexts/SocketContext';
+import { useCSVImport } from '@/features/database/hooks/useCSVImport';
 
 const PAGE_SIZE = 50;
 
@@ -55,12 +56,24 @@ function DatabasePageContent() {
   const { confirm, confirmDialogProps } = useConfirm();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { tables, isLoadingTables, tablesError, deleteTable, useTableSchema, refetchTables } =
     useTables();
 
   const recordsHook = useRecords(selectedTable || '');
 
   const { socket, isConnected } = useSocket();
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && selectedTable) {
+      importCSV(file);
+    }
+    // Reset file input to allow re-uploading the same file
+    if (event.target) {
+      event.target.value = '';
+    }
+  };
 
   // Persist selected table to localStorage when it changes
   useEffect(() => {
@@ -107,6 +120,32 @@ function DatabasePageContent() {
   const primaryKeyColumn = useMemo(() => {
     return schemaData?.columns.find((col) => col.isPrimaryKey)?.columnName;
   }, [schemaData]);
+
+  const {
+    mutate: importCSV,
+    isPending: isImporting,
+    reset: resetImport,
+  } = useCSVImport(selectedTable || '', {
+    onSuccess: (data) => {
+      if (data.success) {
+        showToast(data.message || 'Import successful!', 'success');
+        void refetchTableData();
+      } else {
+        // This case handles validation errors returned with a 200 OK but success: false
+        const errorMessage =
+          data.message || 'CSV import failed due to validation errors. Please check the file.';
+        showToast(errorMessage, 'error');
+      }
+      resetImport();
+    },
+    onError: (error: Error) => {
+      // This handles 400/500 errors from the API client
+      const message =
+        error?.message || 'An unexpected error occurred during import. Please try again.';
+      showToast(message, 'error');
+      resetImport();
+    },
+  });
 
   // Fetch table records using the hook
   const offset = (currentPage - 1) * PAGE_SIZE;
@@ -456,6 +495,15 @@ function DatabasePageContent() {
                       <div className="flex items-center gap-2 ml-4">
                         {selectedRows.size === 0 && selectedTable !== 'users' && (
                           <>
+                            {/* Import CSV Button */}
+                            <Button
+                              className="h-10 px-4 font-medium gap-1.5 dark:bg-emerald-300 dark:hover:bg-emerald-400 "
+                              onClick={() => fileInputRef.current?.click()}
+                              disabled={isImporting}
+                            >
+                              <Upload className="w-5 h-5" />
+                              {isImporting ? 'Importing...' : 'Import CSV'}
+                            </Button>
                             {/* Add Record Button */}
                             <Button
                               className="h-10 px-4 font-medium gap-1.5 dark:bg-emerald-300 dark:hover:bg-emerald-400"
@@ -519,6 +567,14 @@ function DatabasePageContent() {
           </>
         )}
       </div>
+
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileSelect}
+        accept=".csv,text/csv"
+        style={{ display: 'none' }}
+      />
 
       {/* Add Record Form */}
       {selectedTable && schemaData && (

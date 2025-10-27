@@ -14,6 +14,7 @@ import { ModelSelectionDialog } from '@/features/ai/components/ModelSelectionDia
 import { SystemPromptDialog } from '@/features/ai/components/SystemPromptDialog';
 import { AIModelCard } from '@/features/ai/components/AIConfigCard';
 import AIEmptyState from '@/features/ai/components/AIEmptyState';
+import { isInsForgeCloudProject } from '@/lib/utils/utils';
 
 export default function AIPage() {
   const {
@@ -24,7 +25,8 @@ export default function AIPage() {
     deleteConfiguration,
   } = useAIConfigs();
 
-  const { data: credits, error: getAICreditsError } = useAIRemainingCredits();
+  const { data: credits, error: getAICreditsError } =
+    useAIRemainingCredits(!isInsForgeCloudProject());
 
   const { confirm, confirmDialogProps } = useConfirm();
   const { showToast } = useToast();

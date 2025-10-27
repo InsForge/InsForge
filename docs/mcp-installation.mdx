@@ -1,0 +1,226 @@
+---
+title: MCP Installation
+description: Connect Insforge to your AI coding assistant using Model Context Protocol
+---
+
+## What is MCP?
+
+Model Context Protocol (MCP) is an open standard that allows AI assistants to interact with external tools and databases. Insforge provides an MCP server that gives your AI direct access to:
+
+- **Database Management**: Create/modify/delete tables, view schemas, manage table relationships
+- **Storage Buckets**: Create/list/delete storage buckets for file uploads
+- **Backend Metadata**: Get API keys, backend configuration, and system information
+- **SDK Documentation**: Access SDK usage instructions for database, auth, and storage, AI Integration operations
+
+
+## Quick Installation
+
+The easiest way to install MCP for your AI tool:
+
+<Tabs>
+  <Tab title="Cloud Backend">
+    <img src="/images/dashboard-connect.png" alt="Insforge Dashboard Connect" />
+    
+    <Steps>
+      <Step title="Create or select your project">
+        Visit [https://insforge.dev](https://insforge.dev) and either:
+        - Create a new project, or
+        - Select an existing project
+      </Step>
+      
+      <Step title="Click Connect">
+        Click the **Connect** button to integrate with Agents
+      </Step>
+      
+      <Step title="Install the MCP">
+        <img src="/images/dashboard-connect-expanded.png" alt="Insforge Connect Dialog" />
+        
+        Select your AI tool tab and use the **Copy** button to copy the command, then run it in your terminal.
+        
+        The command includes your API key and base URL automatically:
+        ```bash
+        npx @insforge/install --client cursor \
+          --env API_KEY=ik_d02a35cfd8056c18e9e59b34bf8bf773 \
+          --env API_BASE_URL=https://trqnn5z3.us-east.insforge.app
+        ```
+      </Step>
+    </Steps>
+    
+    <Note>
+      The Copy button provides a ready-to-run command with your API key and base URL already configured for your specific project
+    </Note>
+  </Tab>
+  
+  <Tab title="Local Backend">
+    ```bash
+    npx @insforge/install --client [your-tool] \
+      --env API_KEY=your-api-key \
+      --env API_BASE_URL=http://localhost:7130
+    ```
+    
+    <Note>
+      Get your API key from your local dashboard at `http://localhost:7131`
+    </Note>
+  </Tab>
+</Tabs>
+
+Replace `[your-tool]` with one of: `cursor`, `claude`, `windsurf`, `cline`, `roo-code`
+
+## Manual Installation
+
+For tools that support direct MCP configuration:
+
+### Step 1: Install the MCP server
+
+```bash
+npm install -g @insforge/mcp-server
+```
+
+### Step 2: Configure your AI tool
+
+<AccordionGroup>
+  <Accordion title="Claude Desktop" icon="robot">
+    Edit your Claude configuration file:
+    
+    **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+    **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+    
+    ```json
+    {
+      "mcpServers": {
+        "insforge": {
+          "command": "npx",
+          "args": ["-y", "@insforge/mcp-server"],
+          "env": {
+            "API_KEY": "your-api-key",
+            "API_BASE_URL": "https://your-app.us-east.insforge.app"
+          }
+        }
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Cline (VS Code)" icon="terminal">
+    1. Install the Cline extension in VS Code
+    2. Open Cline settings (`Cmd/Ctrl + Shift + P` → "Cline: Open Settings")
+    3. Go to MCP Servers section
+    4. Add new server:
+    
+    ```json
+    {
+      "insforge": {
+        "command": "npx",
+        "args": ["-y", "@insforge/mcp-server"],
+        "env": {
+          "API_KEY": "your-api-key",
+          "API_BASE_URL": "https://your-app.us-east.insforge.app"
+        }
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Cursor" icon="code">
+    Cursor uses a composer file. Run the installer:
+    
+    ```bash
+    npx @insforge/install --client cursor \
+      --env API_KEY=your-api-key \
+      --env API_BASE_URL=https://your-app.us-east.insforge.app
+    ```
+    
+    Or manually add to `.cursorrules` in your project:
+    
+    ```
+    You have access to Insforge backend at https://your-app.us-east.insforge.app
+    Use the MCP tools to interact with the database, auth, and storage.
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Verify Installation
+
+Test your MCP connection by asking your AI assistant:
+
+```
+"Using Insforge MCP, show me what database tables exist"
+```
+
+Or for a more comprehensive test:
+
+```
+"Create a new table called 'test_mcp' with id and name fields"
+```
+
+Your AI should be able to:
+- List existing tables
+- Create new tables
+- Query data
+- Manage authentication
+- Handle file uploads
+
+## Available MCP Tools
+
+Once connected, your AI assistant has access to these tool categories:
+
+<CardGroup cols={2}>
+  <Card title="Database Tools" icon="database">
+    Create, modify, and manage database tables and schemas
+  </Card>
+  
+  <Card title="Storage Tools" icon="folder">
+    Manage storage buckets for file uploads and organization
+  </Card>
+  
+  <Card title="Metadata Tools" icon="info">
+    Access backend configuration and system information
+  </Card>
+  
+  <Card title="Documentation Tools" icon="book">
+    Retrieve API documentation and implementation guides
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion icon="circle-exclamation" title="MCP tools not appearing">
+    1. Restart your AI tool after configuration
+    2. Check the configuration file path is correct
+    3. Verify your API key is valid
+    4. Ensure the API_BASE_URL is accessible
+  </Accordion>
+  
+  <Accordion icon="circle-exclamation" title="Authentication errors">
+    - Verify your API key in the dashboard
+    - Check that the API_BASE_URL matches your backend
+    - For local development, ensure Docker is running
+  </Accordion>
+  
+  <Accordion icon="circle-exclamation" title="Connection timeout">
+    - For cloud: Check your internet connection
+    - For local: Verify Docker is running with `docker ps`
+    - Test the backend directly: `curl [API_BASE_URL]/health`
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="AI Tools Setup" icon="wand-magic-sparkles" href="/setup-integration/ai-tools">
+    Detailed setup for each AI tool
+  </Card>
+  
+  <Card title="Database Overview" icon="database" href="/core-concepts/database/overview">
+    Learn about database operations
+  </Card>
+  
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Build your first app
+  </Card>
+  
+  <Card title="API Reference" icon="book" href="/api-reference/tables">
+    Explore all available APIs
+  </Card>
+</CardGroup>

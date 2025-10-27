@@ -19,10 +19,15 @@ This directory contains deployment guides for self-hosting InsForge on various p
   - Domain and SSL configuration
   - Production best practices
 
+- **[Google Cloud Compute Engine](./deploy-to-google-cloud-compute-engine.md)** - Deploy InsForge on Google Cloud Compute Engine with Docker Compose
+  - VM instance setup and configuration
+  - Docker Compose deployment
+  - Domain and SSL configuration
+  - Production best practices
+
 ### Coming Soon
 
 - **Digital Ocean** - Droplet deployment guide
-- **Google Cloud Platform** - GCE deployment guide
 - **Azure** - VM deployment guide
 - **Hetzner** - VPS deployment guide
 - **Kubernetes** - Production-grade Kubernetes deployment
@@ -87,4 +92,3 @@ See [CONTRIBUTING.md](../../CONTRIBUTING.md) for more details.
 - **Documentation**: [https://docs.insforge.dev](https://docs.insforge.dev)
 - **Discord Community**: [https://discord.com/invite/MPxwj5xVvW](https://discord.com/invite/MPxwj5xVvW)
 - **GitHub Issues**: [https://github.com/insforge/insforge/issues](https://github.com/insforge/insforge/issues)
-

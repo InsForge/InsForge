@@ -1,0 +1,76 @@
+---
+title: "Quickstart"
+description: "Get Insforge running in 5 minutes"
+---
+
+Choose your deployment method:
+
+<Tabs>
+  <Tab title="Cloud Platform">
+    ## Get started in three steps (Cloud)
+
+    ### Step 1: Create your project
+    
+    <Card title="Go to Insforge Cloud" icon="cloud" href="https://insforge.dev">
+      Visit [insforge.dev](https://insforge.dev) and create a free account
+    </Card>
+    
+    Once logged in:
+    1. Click **"Create New Project"**
+    2. Your backend will be ready in ~3 seconds
+
+    ### Step 2: Install MCP Server
+
+    <img src="/images/mcp-install.png" alt="InsForge MCP Installation" />
+
+    In your project dashboard:
+    1. Choose your IDE (Cursor, Claude Code, Windsurf, Cline, etc.)
+    2. Copy the installation command - it includes your API key and URL automatically
+    3. Run the command in your terminal
+
+    Example command (yours will have your actual API key and URL):
+    ```bash
+    npx @insforge/install --client cursor \
+      --env API_KEY=ik_your_actual_api_key_here \
+      --env API_BASE_URL=https://your-app.us-east.insforge.app
+    ```
+
+    4. Test in your coding IDE by asking: "InsForge is my backend platform, what is my current backend structure?"
+
+    ### Step 3: Build your first app
+
+    Tell your AI assistant to build something:
+
+    ```
+    "Build a todo app with user authentication using Insforge as the backend"
+    ```
+
+    Your AI will automatically:
+    - Create database tables
+    - Set up authentication
+    - Handle file uploads
+    - Generate a complete frontend
+  </Tab>
+  
+  <Tab title="Local Development">
+    ## Run Insforge locally
+    
+    For local development and self-hosting instructions, please visit the official OSS repository:
+    
+    <Card title="Insforge OSS Repository" icon="github" href="https://github.com/insforge/insforge">
+      **Complete local setup guide available at:**
+      
+      https://github.com/insforge/insforge
+      
+      The repository includes:
+      - Docker setup instructions
+      - Environment configuration
+      - AI agent integration guides
+      - Troubleshooting tips
+    </Card>
+    
+    <Note>
+      Local development requires Docker and provides the same features as the cloud platform.
+    </Note>
+  </Tab>
+</Tabs>

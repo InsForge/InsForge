@@ -1,0 +1,270 @@
+---
+title: SDK
+description: Type-safe database operations using the InsForge SDK
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+InsForge SDK provides a type-safe, developer-friendly interface to your PostgreSQL database with full PostgREST compatibility.
+
+<Installation />
+
+## Basic Operations
+
+The SDK uses a Supabase-like query builder that feels natural to JavaScript developers:
+
+### Querying Data
+
+<CodeGroup>
+```javascript All Records
+const { data, error } = await insforge.database
+  .from('products')
+  .select()
+```
+
+```javascript Specific Columns
+const { data, error } = await insforge.database
+  .from('products')
+  .select('id, name, price')
+```
+
+```javascript With Filters
+const { data, error } = await insforge.database
+  .from('products')
+  .select()
+  .eq('category', 'electronics')
+  .gte('price', 100)
+  .order('created_at', { ascending: false })
+  .limit(10)
+```
+</CodeGroup>
+
+### Inserting Data
+
+<CodeGroup>
+```javascript Single Record
+const { data, error } = await insforge.database
+  .from('products')
+  .insert({ 
+    name: 'Widget', 
+    price: 19.99, 
+    in_stock: true 
+  })
+  .select()
+```
+
+```javascript Multiple Records
+const { data, error } = await insforge.database
+  .from('products')
+  .insert([
+    { name: 'Product 1', price: 10.99 },
+    { name: 'Product 2', price: 20.99 }
+  ])
+  .select()
+```
+</CodeGroup>
+
+### Updating Data
+
+```javascript
+const { data, error } = await insforge.database
+  .from('products')
+  .update({ price: 24.99, on_sale: true })
+  .eq('id', '123')
+  .select()
+```
+
+### Deleting Data
+
+```javascript
+const { data, error } = await insforge.database
+  .from('products')
+  .delete()
+  .eq('id', '123')
+  .select()
+```
+
+## Advanced Filtering
+
+The SDK supports all PostgREST operators through chainable methods:
+
+```javascript
+// Comparison operators
+.eq('column', value)        // Equals
+.neq('column', value)       // Not equals
+.gt('column', value)        // Greater than
+.gte('column', value)       // Greater than or equal
+.lt('column', value)        // Less than
+.lte('column', value)       // Less than or equal
+
+// Pattern matching
+.like('name', '%Widget%')   // Case-sensitive pattern
+.ilike('name', '%widget%')  // Case-insensitive pattern
+
+// Array/NULL checks
+.in('status', ['active', 'pending'])
+.is('deleted_at', null)
+
+// Logical operators
+.or('status.eq.active,status.eq.pending')
+.not('archived', 'is.true')
+```
+
+### Complex Queries
+
+```javascript
+// Products on sale OR highly rated
+const { data, error } = await insforge.database
+  .from('products')
+  .select()
+  .eq('category', 'electronics')
+  .or('on_sale.eq.true,rating.gte.4.5')
+  .order('price', { ascending: true })
+```
+
+## Relationships & Joins
+
+The SDK supports PostgREST's powerful join syntax:
+
+<CodeGroup>
+```javascript Basic Join
+// Join with related data
+const { data, error } = await insforge.database
+  .from('posts')
+  .select('*, users(*)')  // Include all user data
+```
+
+```javascript Specific Columns
+// Select specific columns from joined tables
+const { data, error } = await insforge.database
+  .from('posts')
+  .select(`
+    id,
+    title,
+    content,
+    users (
+      nickname,
+      avatar_url
+    )
+  `)
+```
+
+```javascript Aliased Joins
+// Aliased joins
+const { data, error } = await insforge.database
+  .from('posts')
+  .select('*, author:users(nickname, avatar_url)')
+```
+</CodeGroup>
+
+## Counting & Pagination
+
+Get total counts alongside your data:
+
+<CodeGroup>
+```javascript With Data
+// Get data with exact count
+const { data, count, error } = await insforge.database
+  .from('products')
+  .select('*', { count: 'exact' })
+  .eq('in_stock', true)
+  .range(0, 9)  // First 10 items
+
+console.log(`Showing ${data.length} of ${count} products`)
+```
+
+```javascript Count Only
+// Count only (no data)
+const { count, error } = await insforge.database
+  .from('products')
+  .select('*', { count: 'exact', head: true })
+  .eq('category', 'electronics')
+```
+</CodeGroup>
+
+## Error Handling
+
+The SDK provides structured error responses:
+
+```javascript
+const { data, error } = await insforge.database
+  .from('products')
+  .insert({ name: 'Widget' })
+  .select()
+
+if (error) {
+  console.error('Database error:', {
+    code: error.code,      // PostgreSQL/PostgREST error code
+    message: error.message,
+    details: error.details,
+    hint: error.hint
+  })
+}
+```
+
+## Data Types
+
+The SDK validates data types but does NOT automatically convert JavaScript types. You must provide correctly formatted values:
+
+| JavaScript Input | PostgreSQL Type | Required Format |
+|-----------------|-----------------|-----------------|
+| string | TEXT | Any string value |
+| number | INTEGER | Whole numbers only (-2147483648 to 2147483647) |
+| number | DOUBLE PRECISION | Floating point numbers |
+| boolean | BOOLEAN | `true` or `false` |
+| string | DATE | `'YYYY-MM-DD'` format |
+| string | TIMESTAMPTZ | ISO 8601 format (e.g., `'2024-01-15T10:30:00Z'`) |
+| string | UUID | Valid UUID format |
+| object/array | JSONB | JSON-serializable objects/arrays |
+| null | NULL | `null` value |
+
+<Note>
+**Important:** 
+- Dates must be provided as ISO 8601 strings, not JavaScript Date objects
+- Empty strings are converted to `null` for non-text types
+- The backend uses `TEXT` (not `VARCHAR`) for all string columns
+- All timestamps are stored with timezone (`TIMESTAMPTZ`)
+</Note>
+
+## System Tables
+
+Access system tables (read-only for user data):
+
+```javascript
+// Read user profiles
+const { data: users, error } = await insforge.database
+  .from('users')
+  .select('id, nickname, avatar_url')
+
+// Join with user data
+const { data: posts, error } = await insforge.database
+  .from('posts')
+  .select('*, users(nickname, avatar_url)')
+```
+
+<Note>
+To modify user data, use the auth methods like `insforge.auth.setProfile()`. The system restricts each user to only update their own data - users cannot delete their own records or modify other users' data.
+</Note>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Handle Errors" icon="shield-exclamation">
+    Always check the `error` object from every operation
+  </Card>
+  
+  <Card title="Use Select" icon="database">
+    Add `.select()` to INSERT/UPDATE/DELETE to get affected records
+  </Card>
+  
+  <Card title="Batch Operations" icon="layer-group">
+    Insert multiple records in one call when possible
+  </Card>
+  
+  <Card title="Optimize Queries" icon="gauge-high">
+    Select only needed columns to reduce payload size
+  </Card>
+</CardGroup>
+
+
+The SDK handles authentication tokens, request formatting, and response parsing automatically.

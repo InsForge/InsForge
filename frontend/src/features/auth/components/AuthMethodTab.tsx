@@ -1,12 +1,6 @@
-import { useState, useCallback, useMemo, ReactElement } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/radix/Button';
 import { MoreHorizontal, Plus, Trash2, Pencil } from 'lucide-react';
-import Github from '@/assets/logos/github.svg?react';
-import Google from '@/assets/logos/google.svg?react';
-import Microsoft from '@/assets/logos/microsoft.svg?react';
-import Discord from '@/assets/logos/discord.svg?react';
-import LinkedIn from '@/assets/logos/linkedin.svg?react';
-import Facebook from '@/assets/logos/facebook.svg?react';
 import { OAuthEmptyState } from './OAuthEmptyState';
 import { OAuthConfigDialog } from './OAuthConfigDialog';
 import { AddOAuthDialog } from './AddOAuthDialog';
@@ -19,59 +13,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/radix/DropdownMenu';
-
-const providers: OAuthProviderInfo[] = [
-  {
-    id: 'google',
-    name: 'Google OAuth',
-    icon: <Google className="w-6 h-6" />,
-    description: 'Configure Google authentication for your users',
-    setupUrl: 'https://console.cloud.google.com/apis/credentials',
-  },
-  {
-    id: 'github',
-    name: 'GitHub OAuth',
-    icon: <Github className="w-6 h-6 dark:text-white" />,
-    description: 'Configure GitHub authentication for your users',
-    setupUrl: 'https://github.com/settings/developers',
-  },
-  {
-    id: 'microsoft',
-    name: 'Microsoft OAuth',
-    icon: <Microsoft className="w-6 h-6 dark:text-white" />,
-    description: 'Configure Microsoft authentication for your users',
-    setupUrl: 'https://portal.azure.com/',
-  },
-  {
-    id: 'discord',
-    name: 'Discord OAuth',
-    icon: <Discord className="w-6 h-6" />,
-    description: 'Configure Discord authentication for your users',
-    setupUrl: 'https://discord.com/developers/applications',
-  },
-  {
-    id: 'linkedin',
-    name: 'LinkedIn OAuth',
-    icon: <LinkedIn className="w-6 h-6 text-[#0A66C2] dark:text-[#0A66C2]" />,
-    description: 'Configure LinkedIn authentication for your users',
-    setupUrl: 'https://www.linkedin.com/developers/apps',
-  },
-  {
-    id: 'facebook',
-    name: 'Facebook OAuth',
-    icon: <Facebook className="w-6 h-6" />,
-    description: 'Configure Facebook authentication for your users',
-    setupUrl: 'https://developers.facebook.com/apps',
-  },
-];
-
-export interface OAuthProviderInfo {
-  id: 'google' | 'github' | 'discord' | 'linkedin' | 'facebook' | 'microsoft';
-  name: string;
-  icon: ReactElement;
-  description: string;
-  setupUrl: string;
-}
+import type { OAuthProvidersSchema } from '@insforge/shared-schemas';
+import { oauthProviders, type OAuthProviderInfo } from '@/features/auth/helpers';
 
 export function AuthMethodTab() {
   const [selectedProvider, setSelectedProvider] = useState<OAuthProviderInfo>();
@@ -92,10 +35,7 @@ export function AuthMethodTab() {
     setIsDialogOpen(true);
   };
 
-  const deleteOAuthConfig = async (
-    providerId: 'google' | 'github' | 'linkedin' | 'discord' | 'facebook' | 'microsoft',
-    providerName: string
-  ) => {
+  const deleteOAuthConfig = async (providerId: OAuthProvidersSchema, providerName: string) => {
     const shouldDelete = await confirm({
       title: `Delete ${providerName} OAuth`,
       description: `Are you sure you want to delete the ${providerName} configuration? This action cannot be undone.`,
@@ -127,26 +67,24 @@ export function AuthMethodTab() {
   };
 
   const enabledProviders = useMemo(() => {
-    return {
-      google: isProviderConfigured('google'),
-      github: isProviderConfigured('github'),
-      discord: isProviderConfigured('discord'),
-      linkedin: isProviderConfigured('linkedin'),
-      microsoft: isProviderConfigured('microsoft'),
-      facebook: isProviderConfigured('facebook'),
-    };
+    const enabled: Record<OAuthProvidersSchema, boolean> = {} as Record<
+      OAuthProvidersSchema,
+      boolean
+    >;
+    oauthProviders.forEach((provider) => {
+      enabled[provider.id] = isProviderConfigured(provider.id);
+    });
+    return enabled;
   }, [isProviderConfigured]);
 
   // Check if all providers are enabled
   const allProvidersEnabled = useMemo(() => {
-    return providers.every((provider) => enabledProviders[provider.id]);
+    return oauthProviders.every((provider) => enabledProviders[provider.id]);
   }, [enabledProviders]);
 
-  const handleConfirmSelected = (
-    selectedId: 'google' | 'github' | 'discord' | 'linkedin' | 'facebook' | 'microsoft'
-  ) => {
+  const handleConfirmSelected = (selectedId: OAuthProvidersSchema) => {
     // Find the selected provider
-    const selectedProvider = providers.find((p) => p.id === selectedId);
+    const selectedProvider = oauthProviders.find((p) => p.id === selectedId);
     if (!selectedProvider) {
       return;
     }
@@ -193,7 +131,7 @@ export function AuthMethodTab() {
         <div className="flex-1">
           {hasAuthMethods ? (
             <div className="grid grid-cols-2 gap-x-3 gap-y-6">
-              {providers.map((provider) => {
+              {oauthProviders.map((provider) => {
                 const providerConfig = getProviderConfig(provider.id);
                 if (!providerConfig) {
                   return null;
@@ -265,7 +203,7 @@ export function AuthMethodTab() {
       />
 
       <AddOAuthDialog
-        providers={providers}
+        providers={oauthProviders}
         open={isSelectDialogOpen}
         onOpenChange={setIsSelectDialogOpen}
         onConfirm={handleConfirmSelected}

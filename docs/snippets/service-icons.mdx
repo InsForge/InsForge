@@ -1,0 +1,27 @@
+export const ServiceIcons = ({ services }) => {
+  const iconMap = {
+    database: { src: '/images/icons/database.svg', title: 'Database' },
+    auth: { src: '/images/icons/auth.svg', title: 'Authentication' },
+    storage: { src: '/images/icons/storage.svg', title: 'Storage' },
+    ai: { src: '/images/icons/ai.svg', title: 'AI Services' },
+    functions: { src: '/images/icons/function.svg', title: 'Edge Functions' }
+  };
+
+  return (
+    <div className="flex gap-2 mt-3" style={{pointerEvents: 'none'}}>
+      {services.map((service) => {
+        const icon = iconMap[service.toLowerCase()];
+        return icon ? (
+          <img
+            key={service}
+            src={icon.src}
+            alt={icon.title}
+            title={icon.title}
+            className="w-5 h-5 opacity-70"
+            style={{pointerEvents: 'none'}}
+          />
+        ) : null;
+      })}
+    </div>
+  );
+};

@@ -1,9 +1,8 @@
 import { Lock, FormInput, Users } from 'lucide-react';
-import GoogleIcon from '@/assets/logos/google.svg';
-import GithubIcon from '@/assets/logos/github.svg';
 import { AuthMetadataSchema } from '@insforge/shared-schemas';
 import { cn } from '@/lib/utils/utils';
 import { useOAuthConfig } from '@/features/auth/hooks/useOAuthConfig';
+import { oauthProviders } from '@/features/auth/helpers';
 
 interface AuthNodeProps {
   data: {
@@ -51,45 +50,31 @@ export function AuthNode({ data }: AuthNodeProps) {
           </div>
         </div>
 
-        {/* Google OAuth */}
-        <div className="flex items-center justify-between p-2.5 bg-neutral-800 rounded">
-          <div className="flex items-center gap-2.5">
-            <img src={GoogleIcon} alt="google" className="h-5 w-5" />
-            <span className="text-sm text-neutral-300">Google OAuth</span>
-          </div>
-          <div
-            className={cn(
-              'px-1.5 py-0.5 rounded flex items-center',
-              isProviderConfigured('google')
-                ? 'bg-lime-200 text-lime-900'
-                : 'bg-neutral-700 text-neutral-300'
-            )}
-          >
-            <span className="text-xs font-medium">
-              {isProviderConfigured('google') ? 'Enabled' : 'Disabled'}
-            </span>
-          </div>
-        </div>
-
-        {/* GitHub OAuth */}
-        <div className="flex items-center justify-between p-2.5 bg-neutral-800 rounded">
-          <div className="flex items-center gap-2.5">
-            <img src={GithubIcon} alt="github" className="h-5 w-5" />
-            <span className="text-sm text-neutral-300">GitHub OAuth</span>
-          </div>
-          <div
-            className={cn(
-              'px-1.5 py-0.5 rounded flex items-center',
-              isProviderConfigured('github')
-                ? 'bg-lime-200 text-lime-900'
-                : 'bg-neutral-700 text-neutral-300'
-            )}
-          >
-            <span className="text-xs font-medium">
-              {isProviderConfigured('github') ? 'Enabled' : 'Disabled'}
-            </span>
-          </div>
-        </div>
+        {/* OAuth Providers */}
+        {oauthProviders.map((provider) => {
+          const isEnabled = isProviderConfigured(provider.id);
+          return (
+            <div
+              key={provider.id}
+              className="flex items-center justify-between p-2.5 bg-neutral-800 rounded"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-5 h-5 flex items-center justify-center [&>svg]:w-5 [&>svg]:h-5">
+                  {provider.icon}
+                </div>
+                <span className="text-sm text-neutral-300">{provider.name}</span>
+              </div>
+              <div
+                className={cn(
+                  'px-1.5 py-0.5 rounded flex items-center',
+                  isEnabled ? 'bg-lime-200 text-lime-900' : 'bg-neutral-700 text-neutral-300'
+                )}
+              >
+                <span className="text-xs font-medium">{isEnabled ? 'Enabled' : 'Disabled'}</span>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Users Section */}
