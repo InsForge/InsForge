@@ -45,6 +45,14 @@ export default function SignUpPage() {
     setLoading(true);
     setError('');
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address');
+      setLoading(false);
+      return;
+    }
+
     // Basic password validation
     if (password.length < 8) {
       setError('Password must be at least 8 characters long');
@@ -136,6 +144,7 @@ export default function SignUpPage() {
             onSubmit={(e) => {
               void handleSubmit(e);
             }}
+            noValidate
             className="flex flex-col items-stretch justify-center gap-6"
           >
             <AuthFormField
@@ -147,6 +156,7 @@ export default function SignUpPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
+              onInvalid={(e) => e.preventDefault()}
             />
 
             <AuthPasswordField
@@ -168,8 +178,8 @@ export default function SignUpPage() {
 
           <p className="text-center text-sm text-gray-600 dark:text-gray-400">
             Already have an account?{' '}
-            <Link 
-              to={`/auth/signin${redirectUrl ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`} 
+            <Link
+              to={`/auth/signin${redirectUrl ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`}
               className="text-black dark:text-white font-medium"
             >
               Sign In Now

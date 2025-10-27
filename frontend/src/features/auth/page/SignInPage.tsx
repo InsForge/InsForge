@@ -44,6 +44,14 @@ export default function SignInPage() {
     setLoading(true);
     setError('');
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address');
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch('/api/auth/sessions', {
         method: 'POST',
@@ -125,6 +133,7 @@ export default function SignInPage() {
             onSubmit={(e) => {
               void handleSubmit(e);
             }}
+            noValidate
             className="flex flex-col items-stretch justify-center gap-6"
           >
             <AuthFormField
@@ -146,10 +155,6 @@ export default function SignInPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="current-password"
-              forgotPasswordLink={{
-                href: '#',
-                text: 'Forgot Password?',
-              }}
             />
 
             <AuthSubmitButton isLoading={loading} disabled={loading || oauthLoading !== null}>
@@ -159,8 +164,8 @@ export default function SignInPage() {
 
           <p className="text-center text-sm text-gray-600 dark:text-gray-400">
             Don&apos;t have an account?{' '}
-            <Link 
-              to={`/auth/signup${redirectUrl ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`} 
+            <Link
+              to={`/auth/signup${redirectUrl ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`}
               className="text-black dark:text-white font-medium"
             >
               Sign Up Now
