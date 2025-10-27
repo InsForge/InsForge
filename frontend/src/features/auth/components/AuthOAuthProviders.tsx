@@ -31,7 +31,7 @@ const providerConfig: Record<OAuthProvidersSchema, { name: string; icon: React.R
   },
   discord: {
     name: 'Discord',
-    icon: <DiscordIcon className="w-6 h-6 text-black" />,
+    icon: <DiscordIcon className="w-6 h-6 text-[#3E4CD7]" />,
   },
   facebook: { name: 'Facebook', icon: <FacebookIcon className="w-6 h-6" /> },
   linkedin: { name: 'LinkedIn', icon: <LinkedInIcon className="w-6 h-6" /> },
