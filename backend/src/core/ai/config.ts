@@ -22,10 +22,26 @@ export class AIConfigService {
     modelId: string,
     systemPrompt?: string
   ): Promise<{ id: string }> {
-    const isValid = await validateModelId(modelId);
-    if (!isValid) {
-      logger.error(`Invalid modelId: ${modelId} (not found on OpenRouter)`);
-      throw new AppError('Invalid modelId', 400, ERROR_CODES.INVALID_INPUT);
+    const result = await validateModelId(modelId);
+    if (!result.valid) {
+      if (result.reason === 'not_found') {
+        logger.error(`Invalid modelId '${modelId}' - not found on OpenRouter`);
+        throw new AppError(
+          `Invalid modelId '${modelId}' - not found on OpenRouter`,
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      } else {
+        logger.error('Failed to validate modelId due to infrastructure issue', {
+          modelId,
+          reason: result.reason,
+        });
+        throw new AppError(
+          'Unable to validate modelId - service temporarily unavailable',
+          500,
+          ERROR_CODES.INTERNAL_ERROR
+        );
+      }
     }
 
     const client = await this.getPool().connect();
