@@ -112,7 +112,7 @@ services:
       # Auth app URL for development proxy
       - AUTH_APP_URL=${AUTH_APP_URL:-http://localhost:7132}
       # Deployment configuration
-      - DEPLOYMENT_BASE_URL=http://localhost:8080/deployments
+      - DEPLOYMENT_BASE_URL=http://localhost:8080
     volumes:
       - ./package.json:/app/package.json
       - ./backend:/app/backend
