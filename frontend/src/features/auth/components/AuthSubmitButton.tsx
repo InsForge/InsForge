@@ -19,12 +19,14 @@ export function AuthSubmitButton({
       {...props}
       type="submit"
       disabled={disabled || isLoading}
+      aria-busy={!!isLoading}
+      aria-live="polite"
       className={cn(
         'mt-4 px-4 py-2 rounded w-full h-10 bg-black hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-200 dark:text-black',
         className
       )}
     >
-      {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+      {isLoading && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
       {children}
     </Button>
   );

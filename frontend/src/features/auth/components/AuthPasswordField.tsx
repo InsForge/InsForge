@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { Input } from '@/components/radix/Input';
 import { Label } from '@/components/radix/Label';
@@ -9,9 +10,10 @@ interface AuthPasswordFieldProps extends React.InputHTMLAttributes<HTMLInputElem
   label?: string;
   showStrengthIndicator?: boolean;
   forgotPasswordLink?: {
-    href: string;
+    route: string;
     text?: string;
   };
+  inputClassName?: string;
 }
 
 export function AuthPasswordField({
@@ -22,8 +24,12 @@ export function AuthPasswordField({
   forgotPasswordLink,
   value,
   onFocus,
+  inputClassName,
   ...props
 }: AuthPasswordFieldProps) {
+  const generatedId = useId();
+  const inputId = id ?? generatedId;
+  const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [showStrength, setShowStrength] = useState(false);
 
@@ -38,22 +44,26 @@ export function AuthPasswordField({
     <div className={cn('space-y-1', className)}>
       <div className="flex items-center justify-between">
         {label && (
-          <Label htmlFor={id} className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <Label htmlFor={inputId} className="text-sm font-medium text-gray-700 dark:text-gray-300">
             {label}
           </Label>
         )}
         {forgotPasswordLink && (
-          <a href={forgotPasswordLink.href} className="text-sm text-[#828282]">
+          <button
+            type="button"
+            onClick={() => navigate(forgotPasswordLink.route)}
+            className="text-sm text-[#828282]"
+          >
             {forgotPasswordLink.text || 'Forgot password?'}
-          </a>
+          </button>
         )}
       </div>
       <div className="relative">
         <Input
           {...props}
-          id={id}
+          id={inputId}
           type={showPassword ? 'text' : 'password'}
-          className="pr-10"
+          className={cn('pr-10', inputClassName)}
           value={value}
           onFocus={handleFocus}
         />
@@ -62,6 +72,7 @@ export function AuthPasswordField({
           onClick={() => setShowPassword(!showPassword)}
           className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           aria-label={showPassword ? 'Hide password' : 'Show password'}
+          aria-pressed={showPassword}
         >
           {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
         </button>
