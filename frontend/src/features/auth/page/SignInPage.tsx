@@ -47,7 +47,7 @@ export default function SignInPage() {
 
     // Validate using Zod schema
     const validationResult = signInFormSchema.safeParse({ email, password });
-    
+
     if (!validationResult.success) {
       const firstError = validationResult.error.errors[0];
       setError(firstError.message);
