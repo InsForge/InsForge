@@ -47,12 +47,11 @@ export class DeploymentService {
   async createDeployment(request: CreateDeploymentRequest): Promise<Deployment> {
     const { projectName, files } = request;
 
-    // Check if deployment already exists
+    // Check if deployment already exists - if so, delete it first
     const existing = await this.db.prepare('SELECT id FROM _deployments LIMIT 1').get();
     if (existing) {
-      throw new Error(
-        'Deployment already exists. Delete existing deployment before creating a new one.'
-      );
+      logger.info('Overwriting existing deployment', { existingId: existing.id });
+      await this.deleteDeployment();
     }
 
     // Validate files
@@ -109,8 +108,8 @@ export class DeploymentService {
             : file.content,
       }));
 
-      // Deploy files to storage
-      const deploymentUrl = await this.storageAdapter.deploy(deploymentId, decodedFiles);
+      // Deploy files to storage (using subdomain as path identifier)
+      const deploymentUrl = await this.storageAdapter.deploy(deploymentId, decodedFiles, subdomain);
 
       // Update deployment status
       await this.db
@@ -119,7 +118,7 @@ export class DeploymentService {
            SET status = ?, deployment_url = ?, deployed_at = CURRENT_TIMESTAMP, storage_path = ?
            WHERE id = ?`
         )
-        .run('active', deploymentUrl, `deployments/${deploymentId}`, deploymentId);
+        .run('active', deploymentUrl, `deployments/${subdomain}`, deploymentId);
 
       logger.info('Deployment successful', { deploymentId, url: deploymentUrl });
 
@@ -169,17 +168,19 @@ export class DeploymentService {
    */
   async deleteDeployment(): Promise<void> {
     // Get deployment
-    const deployment = await this.db.prepare('SELECT id FROM _deployments LIMIT 1').get();
+    const deployment = await this.db
+      .prepare('SELECT id, subdomain FROM _deployments LIMIT 1')
+      .get();
 
     if (!deployment) {
       throw new Error('No deployment found');
     }
 
-    const id = deployment.id;
+    const { id, subdomain } = deployment;
 
     try {
-      // Delete from storage
-      await this.storageAdapter.delete(id);
+      // Delete from storage (using subdomain as path identifier)
+      await this.storageAdapter.delete(id, subdomain);
 
       // Delete from database
       await this.db.prepare('DELETE FROM _deployments').run();

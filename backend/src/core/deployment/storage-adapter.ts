@@ -21,8 +21,8 @@ export interface DeploymentFile {
 }
 
 export interface StorageAdapter {
-  deploy(deploymentId: string, files: DeploymentFile[]): Promise<string>;
-  delete(deploymentId: string): Promise<void>;
+  deploy(deploymentId: string, files: DeploymentFile[], subdomain?: string): Promise<string>;
+  delete(deploymentId: string, subdomain?: string): Promise<void>;
 }
 
 /**
@@ -35,8 +35,10 @@ export class LocalStorageAdapter implements StorageAdapter {
     this.baseDir = baseDir || process.env.STORAGE_DIR || '/insforge-storage/deployments';
   }
 
-  async deploy(deploymentId: string, files: DeploymentFile[]): Promise<string> {
-    const deployPath = path.join(this.baseDir, deploymentId);
+  async deploy(deploymentId: string, files: DeploymentFile[], subdomain?: string): Promise<string> {
+    // Use subdomain for path if provided, otherwise fall back to deploymentId
+    const pathIdentifier = subdomain || deploymentId;
+    const deployPath = path.join(this.baseDir, pathIdentifier);
 
     try {
       // Create deployment directory
@@ -61,9 +63,9 @@ export class LocalStorageAdapter implements StorageAdapter {
 
       logger.info('Local deployment successful', { deploymentId, fileCount: files.length });
 
-      // Return local URL
+      // Return local URL using subdomain
       const baseUrl = process.env.DEPLOYMENT_BASE_URL || 'http://localhost:8080/deployments';
-      return `${baseUrl}/${deploymentId}/`;
+      return `${baseUrl}/${pathIdentifier}/`;
     } catch (error) {
       logger.error('Local deployment failed', {
         deploymentId,
@@ -75,8 +77,10 @@ export class LocalStorageAdapter implements StorageAdapter {
     }
   }
 
-  async delete(deploymentId: string): Promise<void> {
-    const deployPath = path.join(this.baseDir, deploymentId);
+  async delete(deploymentId: string, subdomain?: string): Promise<void> {
+    // Use subdomain for path if provided, otherwise fall back to deploymentId
+    const pathIdentifier = subdomain || deploymentId;
+    const deployPath = path.join(this.baseDir, pathIdentifier);
 
     try {
       await fs.rm(deployPath, { recursive: true, force: true });
@@ -151,13 +155,15 @@ export class S3StorageAdapter implements StorageAdapter {
     return contentTypes[ext] || 'application/octet-stream';
   }
 
-  async deploy(deploymentId: string, files: DeploymentFile[]): Promise<string> {
+  async deploy(deploymentId: string, files: DeploymentFile[], subdomain?: string): Promise<string> {
     const region = process.env.AWS_REGION || DEFAULT_AWS_REGION;
+    // Use subdomain for S3 path if provided, otherwise fall back to deploymentId
+    const pathIdentifier = subdomain || deploymentId;
 
     try {
       // Upload all files to S3
       const uploadPromises = files.map(async (file) => {
-        const s3Key = this.getS3Key(deploymentId, file.path);
+        const s3Key = `${this.appKey}/deployments/${pathIdentifier}/${file.path}`;
         // Set no-cache for index.html, long cache for other assets
         const cacheControl = file.path === 'index.html' ? 'no-cache' : 'public, max-age=31536000';
 
@@ -180,11 +186,11 @@ export class S3StorageAdapter implements StorageAdapter {
       const cloudFrontUrl = process.env.AWS_CLOUDFRONT_URL;
       if (cloudFrontUrl) {
         const url = cloudFrontUrl.startsWith('http') ? cloudFrontUrl : `https://${cloudFrontUrl}`;
-        return `${url}/${this.appKey}/deployments/${deploymentId}/index.html`;
+        return `${url}/${this.appKey}/deployments/${pathIdentifier}/index.html`;
       }
 
       // Fallback to S3 URL (must include index.html since S3 doesn't support directory indexes)
-      return `https://${this.bucket}.s3.${region}.amazonaws.com/${this.appKey}/deployments/${deploymentId}/index.html`;
+      return `https://${this.bucket}.s3.${region}.amazonaws.com/${this.appKey}/deployments/${pathIdentifier}/index.html`;
     } catch (error) {
       logger.error('S3 deployment failed', {
         deploymentId,
@@ -196,10 +202,12 @@ export class S3StorageAdapter implements StorageAdapter {
     }
   }
 
-  async delete(deploymentId: string): Promise<void> {
+  async delete(deploymentId: string, subdomain?: string): Promise<void> {
     try {
+      // Use subdomain for prefix if provided, otherwise fall back to deploymentId
+      const pathIdentifier = subdomain || deploymentId;
       // Get deployment prefix
-      const prefix = `${this.appKey}/deployments/${deploymentId}/`;
+      const prefix = `${this.appKey}/deployments/${pathIdentifier}/`;
 
       // List all objects under the deployment prefix
       const objectsToDelete: { Key: string }[] = [];
