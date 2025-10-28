@@ -13,6 +13,7 @@ import {
   AuthOAuthProviders,
 } from '../components';
 import InsForgeLogo from '@/assets/logos/insforge_light.svg?react';
+import { signInFormSchema } from '@/lib/utils/validation-schemas';
 
 export default function SignInPage() {
   const [searchParams] = useSearchParams();
@@ -44,13 +45,17 @@ export default function SignInPage() {
     setLoading(true);
     setError('');
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setError('Please enter a valid email address');
+    // Validate using Zod schema
+    const validationResult = signInFormSchema.safeParse({ email, password });
+    
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0];
+      setError(firstError.message);
       setLoading(false);
       return;
     }
+
+    const validatedData = validationResult.data;
 
     try {
       const response = await fetch('/api/auth/sessions', {
@@ -58,7 +63,7 @@ export default function SignInPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(validatedData),
       });
 
       if (!response.ok) {

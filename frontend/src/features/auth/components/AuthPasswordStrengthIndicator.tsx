@@ -1,4 +1,5 @@
 import CheckedIcon from '@/assets/icons/checked.svg?react';
+import { z } from 'zod';
 
 interface AuthPasswordStrengthIndicatorProps {
   password: string;
@@ -9,22 +10,28 @@ interface PasswordRequirement {
   test: (password: string) => boolean;
 }
 
+// Zod schemas for individual password requirements
+const uppercaseSchema = z.string().regex(/[A-Z]/);
+const numberSchema = z.string().regex(/\d/);
+const specialCharSchema = z.string().regex(/[!@#$%^&*()_+\-=[\]{};\\|,.<>/?]/);
+const minLengthSchema = z.string().min(8);
+
 const requirements: PasswordRequirement[] = [
   {
     label: 'At least 1 Uppercase letter',
-    test: (pwd) => /[A-Z]/.test(pwd),
+    test: (pwd) => uppercaseSchema.safeParse(pwd).success,
   },
   {
     label: 'At least 1 Number',
-    test: (pwd) => /\d/.test(pwd),
+    test: (pwd) => numberSchema.safeParse(pwd).success,
   },
   {
     label: 'Special character (e.g. !?<>@#$%)',
-    test: (pwd) => /[!@#$%^&*()_+\-=[\]{};\\|,.<>/?]/.test(pwd),
+    test: (pwd) => specialCharSchema.safeParse(pwd).success,
   },
   {
     label: '8 characters or more',
-    test: (pwd) => pwd.length >= 8,
+    test: (pwd) => minLengthSchema.safeParse(pwd).success,
   },
 ];
 

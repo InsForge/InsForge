@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { RequireAuth } from '@/lib/routing/RequireAuth';
 import Layout from '@/components/layout/Layout';
 import CloudLayout from '@/components/layout/CloudLayout';
@@ -23,17 +23,12 @@ export function AppRoutes() {
     <Routes>
       <Route path="/dashboard/login" element={<LoginPage />} />
       <Route path="/cloud/login" element={<CloudLoginPage />} />
-      <Route
-        path="/auth/*"
-        element={
-          <Routes>
-            <Route path="/" element={<Navigate to="/auth/signin" replace />} />
-            <Route path="/signin" element={<SignInPage />} />
-            <Route path="/signup" element={<SignUpPage />} />
-            <Route path="*" element={<Navigate to="/auth/signin" replace />} />
-          </Routes>
-        }
-      />
+      <Route path="/auth" element={<Outlet />}>
+        <Route index element={<Navigate to="signin" replace />} />
+        <Route path="signin" element={<SignInPage />} />
+        <Route path="signup" element={<SignUpPage />} />
+        <Route path="*" element={<Navigate to="signin" replace />} />
+      </Route>
       <Route
         path="/cloud/*"
         element={
