@@ -1,5 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
-import { AuthRequest, verifyUser } from '@/api/middleware/auth.js';
+import { AuthRequest, verifyAdmin } from '@/api/middleware/auth.js';
 import { ScheduleService } from '@/core/schedule/schedule.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/api/middleware/error.js';
@@ -18,7 +18,7 @@ const router = Router();
 const scheduleService = ScheduleService.getInstance();
 
 // All schedule routes require authentication
-router.use(verifyUser);
+router.use(verifyAdmin);
 
 /**
  * GET /api/schedules
