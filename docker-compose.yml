@@ -2,10 +2,7 @@ version: '3.8'
 
 services:
   postgres:
-    #image: postgres:15.13
-    build:
-      context: ./docker-init/db
-      dockerfile: Dockerfile.postgres
+    image: ghcr.io/insforge/postgres:v15.13.0
     container_name: insforge-postgres
     command: postgres -c config_file=/etc/postgresql/postgresql.conf -c app.encryption_key='${DB_ENCRYPTION_KEY:-your-strong-secret-key}'
     environment:
