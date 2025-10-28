@@ -12,6 +12,7 @@ import {
   DeleteObjectsCommand,
 } from '@aws-sdk/client-s3';
 import { logger } from '@/utils/logger.js';
+import { AWSInfrastructureManager } from './aws-infrastructure.js';
 
 const DEFAULT_AWS_REGION = 'us-east-1';
 const RFC1123_LABEL_REGEX = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/i;
@@ -127,6 +128,7 @@ export class S3StorageAdapter implements StorageAdapter {
   private s3Client: S3Client;
   private bucket: string;
   private appKey: string;
+  private infrastructureManager: AWSInfrastructureManager | null;
 
   constructor() {
     const bucket = process.env.AWS_S3_BUCKET;
@@ -154,6 +156,22 @@ export class S3StorageAdapter implements StorageAdapter {
     }
 
     this.s3Client = new S3Client(s3Config);
+
+    // Initialize infrastructure manager only if both CloudFront URL and domain are configured
+    this.infrastructureManager = null;
+    const hasCloudFrontDomain = process.env.AWS_CLOUDFRONT_DOMAIN && process.env.AWS_CLOUDFRONT_DOMAIN.trim();
+    const hasCloudFrontUrl = process.env.AWS_CLOUDFRONT_URL && process.env.AWS_CLOUDFRONT_URL.trim();
+    
+    if (hasCloudFrontDomain && hasCloudFrontUrl) {
+      try {
+        this.infrastructureManager = new AWSInfrastructureManager();
+        logger.info('AWS Infrastructure Manager initialized for CloudFront subdomain routing');
+      } catch (error) {
+        logger.warn('Failed to initialize AWS Infrastructure Manager', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
   }
 
   private getS3Key(deploymentId: string, filePath: string): string {
@@ -205,11 +223,24 @@ export class S3StorageAdapter implements StorageAdapter {
 
       logger.info('S3 deployment successful', { deploymentId, fileCount: files.length });
 
-      // Return CloudFront URL if available
+      // Configure CloudFront and Route53 if infrastructure manager is available
+      if (this.infrastructureManager && subdomain) {
+        await this.infrastructureManager.addSubdomain(pathIdentifier);
+      }
+
+      // Return CloudFront URL based on configuration
+      const cloudFrontDomain = process.env.AWS_CLOUDFRONT_DOMAIN;
       const cloudFrontUrl = process.env.AWS_CLOUDFRONT_URL;
+
+      // If AWS_CLOUDFRONT_DOMAIN is set, use subdomain-based routing (auto-configures CloudFront + Route53)
+      if (cloudFrontDomain) {
+        return `https://${pathIdentifier}.${cloudFrontDomain}`;
+      }
+
+      // If AWS_CLOUDFRONT_URL is set, use path-based routing
       if (cloudFrontUrl) {
-        const url = cloudFrontUrl.startsWith('http') ? cloudFrontUrl : `https://${cloudFrontUrl}`;
-        return `${url}/${this.appKey}/deployments/${pathIdentifier}/index.html`;
+        const baseUrl = cloudFrontUrl.startsWith('http') ? cloudFrontUrl : `https://${cloudFrontUrl}`;
+        return `${baseUrl}/${this.appKey}/deployments/${pathIdentifier}/index.html`;
       }
 
       // Fallback to S3 URL (must include index.html since S3 doesn't support directory indexes)
@@ -273,6 +304,11 @@ export class S3StorageAdapter implements StorageAdapter {
       }
 
       logger.info('S3 deployment deleted', { deploymentId, filesDeleted: objectsToDelete.length });
+
+      // Remove from CloudFront and Route53 if infrastructure manager is available
+      if (this.infrastructureManager && subdomain) {
+        await this.infrastructureManager.removeSubdomain(pathIdentifier);
+      }
     } catch (error) {
       logger.error('Failed to delete S3 deployment', {
         deploymentId,
@@ -287,14 +323,18 @@ export class S3StorageAdapter implements StorageAdapter {
 
 /**
  * Factory function to get appropriate storage adapter
+ * Priority: S3 (if bucket configured) > Local
  */
 export function getStorageAdapter(): StorageAdapter {
   const bucket = process.env.AWS_S3_BUCKET;
-  const backend = bucket && bucket.trim() ? 's3' : 'local';
-
-  if (backend === 's3') {
+  
+  // Use S3 if bucket is configured
+  if (bucket && bucket.trim()) {
+    logger.info('Using S3 storage adapter');
     return new S3StorageAdapter();
   }
 
+  // Fallback to local storage
+  logger.info('Using local storage adapter');
   return new LocalStorageAdapter();
 }
