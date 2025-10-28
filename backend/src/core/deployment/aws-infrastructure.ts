@@ -263,7 +263,7 @@ export class AWSInfrastructureManager {
         await this.deleteRoute53Record(hostedZoneId, fullDomain);
         logger.info('Removed existing Route53 record', { fullDomain });
       }
-    } catch (error) {
+    } catch {
       // Ignore errors - record might not exist
       logger.debug('No existing record to remove', { fullDomain });
     }

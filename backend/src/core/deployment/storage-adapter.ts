@@ -159,9 +159,11 @@ export class S3StorageAdapter implements StorageAdapter {
 
     // Initialize infrastructure manager only if both CloudFront URL and domain are configured
     this.infrastructureManager = null;
-    const hasCloudFrontDomain = process.env.AWS_CLOUDFRONT_DOMAIN && process.env.AWS_CLOUDFRONT_DOMAIN.trim();
-    const hasCloudFrontUrl = process.env.AWS_CLOUDFRONT_URL && process.env.AWS_CLOUDFRONT_URL.trim();
-    
+    const hasCloudFrontDomain =
+      process.env.AWS_CLOUDFRONT_DOMAIN && process.env.AWS_CLOUDFRONT_DOMAIN.trim();
+    const hasCloudFrontUrl =
+      process.env.AWS_CLOUDFRONT_URL && process.env.AWS_CLOUDFRONT_URL.trim();
+
     if (hasCloudFrontDomain && hasCloudFrontUrl) {
       try {
         this.infrastructureManager = new AWSInfrastructureManager();
@@ -239,7 +241,9 @@ export class S3StorageAdapter implements StorageAdapter {
 
       // If AWS_CLOUDFRONT_URL is set, use path-based routing
       if (cloudFrontUrl) {
-        const baseUrl = cloudFrontUrl.startsWith('http') ? cloudFrontUrl : `https://${cloudFrontUrl}`;
+        const baseUrl = cloudFrontUrl.startsWith('http')
+          ? cloudFrontUrl
+          : `https://${cloudFrontUrl}`;
         return `${baseUrl}/${this.appKey}/deployments/${pathIdentifier}/index.html`;
       }
 
@@ -327,7 +331,7 @@ export class S3StorageAdapter implements StorageAdapter {
  */
 export function getStorageAdapter(): StorageAdapter {
   const bucket = process.env.AWS_S3_BUCKET;
-  
+
   // Use S3 if bucket is configured
   if (bucket && bucket.trim()) {
     logger.info('Using S3 storage adapter');
