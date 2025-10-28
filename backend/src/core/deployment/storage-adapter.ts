@@ -63,9 +63,10 @@ export class LocalStorageAdapter implements StorageAdapter {
 
       logger.info('Local deployment successful', { deploymentId, fileCount: files.length });
 
-      // Return local URL using subdomain
-      const baseUrl = process.env.DEPLOYMENT_BASE_URL || 'http://localhost:8080/deployments';
-      return `${baseUrl}/${pathIdentifier}/`;
+      // Return subdomain-based URL
+      const baseUrl = process.env.DEPLOYMENT_BASE_URL || 'http://localhost:8080';
+      // Format: http://subdomain.localhost:8080
+      return `http://${pathIdentifier}.${baseUrl.replace(/^https?:\/\//, '')}`;
     } catch (error) {
       logger.error('Local deployment failed', {
         deploymentId,
