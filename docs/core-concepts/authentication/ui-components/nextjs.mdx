@@ -1,0 +1,606 @@
+---
+title: Next.js
+description: Zero-configuration authentication for Next.js with built-in UI components
+---
+
+The `@insforge/nextjs` package provides **zero-configuration authentication** for Next.js applications. Authentication pages are hosted on your backend by default—no UI code needed.
+
+## Why Built-in Auth?
+
+<CardGroup cols={2}>
+  <Card title="Zero UI Code" icon="code">
+    No SignIn/SignUp pages to create
+  </Card>
+  
+  <Card title="5-Minute Setup" icon="clock">
+    Provider + API route + callback page = done
+  </Card>
+  
+  <Card title="Production Ready" icon="shield-check">
+    Battle-tested auth UI maintained by Insforge
+  </Card>
+  
+  <Card title="Auto OAuth" icon="key">
+    11 providers configured automatically from backend
+  </Card>
+</CardGroup>
+
+<Note>
+Use custom components only if you need highly customized branding or custom fields.
+</Note>
+
+## Features
+
+- **Built-in Authentication**: Backend-hosted sign-in/sign-up pages (default)
+- **OAuth Support**: Google, GitHub, Discord, Facebook, LinkedIn, Microsoft, Apple, X, Instagram, TikTok, Spotify
+- **React Hooks**: `useAuth()`, `useUser()`, `useSession()`
+- **Control Components**: `<SignedIn>`, `<SignedOut>`, `<Protect>`
+- **Next.js Middleware**: Server-side route protection
+- **TypeScript**: Full type safety
+
+## Installation
+
+```bash
+npm install @insforge/nextjs
+```
+
+## Quick Start (Built-in Auth)
+
+### Step 1: Add InsforgeProvider
+
+Wrap your application with the `InsforgeProvider` in your root layout:
+
+```tsx app/layout.tsx
+import { InsforgeProvider } from '@insforge/nextjs';
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        <InsforgeProvider baseUrl={process.env.NEXT_PUBLIC_INSFORGE_BASE_URL!}>
+          {children}
+        </InsforgeProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+### Step 2: Create API Route
+
+Create an API route to enable server-side rendering (SSR) and cookie-based authentication:
+
+```tsx app/api/auth/route.ts
+import { createAuthRouteHandlers } from '@insforge/nextjs/api';
+
+const handlers = createAuthRouteHandlers({
+  baseUrl: process.env.INSFORGE_BASE_URL || process.env.NEXT_PUBLIC_INSFORGE_BASE_URL!,
+  cookieName: 'insforge_token',
+});
+
+export const POST = handlers.POST;
+export const GET = handlers.GET;
+export const DELETE = handlers.DELETE;
+```
+
+<Info>
+**Why?** This route syncs auth tokens to HTTP-only cookies for server-side middleware.
+</Info>
+
+### Step 3: Create Callback Page
+
+Create a callback page to receive tokens from the backend auth pages:
+
+```tsx app/auth/callback/page.tsx
+'use client';
+
+import { useEffect, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+
+function CallbackContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const isProcessingRef = useRef(false);
+
+  useEffect(() => {
+    const processCallback = async () => {
+      if (isProcessingRef.current) return;
+      isProcessingRef.current = true;
+
+      const accessToken = searchParams.get('access_token');
+      const error = searchParams.get('error');
+
+      if (error) {
+        router.push('/?error=' + encodeURIComponent(error));
+        return;
+      }
+
+      if (accessToken) {
+        localStorage.setItem('insforge-auth-token', accessToken);
+        
+        await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'sync-token', token: accessToken }),
+        });
+        
+        const destination = sessionStorage.getItem('auth_destination') || '/dashboard';
+        sessionStorage.removeItem('auth_destination');
+        
+        setTimeout(() => router.push(destination), 100);
+      }
+    };
+
+    processCallback();
+  }, [searchParams, router]);
+
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="text-center">
+        <h2 className="text-2xl font-semibold mb-4">Completing authentication...</h2>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+      </div>
+    </div>
+  );
+}
+
+export default function CallbackPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <CallbackContent />
+    </Suspense>
+  );
+}
+```
+
+<Info>
+**Why?** This page receives the token from backend auth pages and syncs it to localStorage + cookie.
+</Info>
+
+### Step 4: Add Middleware
+
+Create middleware to protect routes:
+
+```ts middleware.ts
+import { InsforgeMiddleware } from '@insforge/nextjs/middleware';
+
+export default InsforgeMiddleware({
+  baseUrl: process.env.INSFORGE_BASE_URL!,
+  publicRoutes: ['/auth/callback', '/'],
+  cookieName: 'insforge_token',
+});
+
+export const config = {
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+};
+```
+
+### Step 5: Use in Components
+
+Use the provided components and hooks in your pages:
+
+```tsx app/page.tsx
+import { SignedIn, SignedOut, UserButton } from '@insforge/nextjs';
+
+export default function Home() {
+  return (
+    <div>
+      <SignedOut>
+        <a href="/sign-in">Sign In</a>
+      </SignedOut>
+
+      <SignedIn>
+        <UserButton afterSignOutUrl="/" />
+        <h1>Welcome back!</h1>
+      </SignedIn>
+    </div>
+  );
+}
+```
+
+**That's it!** When users click "Sign In", they'll be redirected to your backend's auth page automatically.
+
+## How It Works
+
+```
+1. User clicks "Sign In" → Middleware detects no auth
+   ↓
+2. Redirects to: https://backend.insforge.app/auth/signin?redirect=yourapp.com/auth/callback
+   ↓
+3. User signs in on backend's hosted page
+   ↓
+4. Backend redirects: yourapp.com/auth/callback?access_token=xxx
+   ↓
+5. Callback stores token (localStorage + cookie) → User sees /dashboard
+```
+
+<Note>
+**Why API route + callback?**
+- **API route**: Syncs tokens to HTTP-only cookies (enables server-side middleware)
+- **Callback page**: Receives tokens from backend auth pages (OAuth + email/password)
+</Note>
+
+## Local Development
+
+Backend typically runs on different port during local development:
+
+```bash .env.local
+NEXT_PUBLIC_INSFORGE_BASE_URL=http://localhost:7130       # Backend API
+NEXT_PUBLIC_INSFORGE_FRONTEND_URL=http://localhost:7131   # Backend Frontend (auth pages)
+INSFORGE_BASE_URL=http://localhost:7130                   # For middleware
+```
+
+<Info>
+The provider automatically uses `NEXT_PUBLIC_INSFORGE_FRONTEND_URL` for auth redirects if set.
+</Info>
+
+## React Hooks
+
+### useAuth()
+
+Access authentication state and methods:
+
+```tsx
+import { useAuth } from '@insforge/nextjs';
+
+function Component() {
+  const { user, isSignedIn, signOut } = useAuth();
+  
+  return (
+    <div>
+      {isSignedIn && (
+        <>
+          <p>Email: {user?.email}</p>
+          <button onClick={() => signOut()}>Sign Out</button>
+        </>
+      )}
+    </div>
+  );
+}
+```
+
+**Returns**: `user`, `session`, `isLoaded`, `isSignedIn`, `signIn()`, `signUp()`, `signOut()`, `updateUser()`
+
+### useUser()
+
+Access user information:
+
+```tsx
+import { useUser } from '@insforge/nextjs';
+
+function UserProfile() {
+  const { user, isLoaded } = useUser();
+  
+  if (!isLoaded) return <div>Loading...</div>;
+  if (!user) return <div>Not signed in</div>;
+  
+  return <div>Welcome, {user.email}</div>;
+}
+```
+
+### useSession()
+
+Access session information:
+
+```tsx
+import { useSession } from '@insforge/nextjs';
+
+function SessionInfo() {
+  const { session, isSignedIn } = useSession();
+  
+  return <div>{isSignedIn ? 'Signed In' : 'Signed Out'}</div>;
+}
+```
+
+## Control Components
+
+### SignedIn / SignedOut
+
+Conditionally render content based on authentication state:
+
+```tsx
+import { SignedIn, SignedOut } from '@insforge/nextjs';
+
+function NavBar() {
+  return (
+    <nav>
+      <SignedOut>
+        <a href="/sign-in">Sign In</a>
+      </SignedOut>
+
+      <SignedIn>
+        <UserButton />
+      </SignedIn>
+    </nav>
+  );
+}
+```
+
+### Protect
+
+Conditionally render content based on custom conditions:
+
+```tsx
+import { Protect } from '@insforge/nextjs';
+
+function AdminPanel() {
+  return (
+    <Protect condition={(user) => user.role === 'admin'}>
+      <div>Admin Dashboard</div>
+    </Protect>
+  );
+}
+```
+
+### UserButton
+
+Pre-built user menu with sign-out functionality:
+
+```tsx
+import { UserButton } from '@insforge/nextjs';
+
+function Header() {
+  return (
+    <header>
+      <UserButton 
+        afterSignOutUrl="/" 
+        showEmail={true} 
+      />
+    </header>
+  );
+}
+```
+
+## Server-Side Helpers
+
+Access authentication data in Server Components:
+
+```tsx app/dashboard/page.tsx
+import { headers } from 'next/headers';
+import { getAuthUserId, getAuthToken } from '@insforge/nextjs/middleware';
+
+export default async function Dashboard() {
+  const userId = getAuthUserId(headers());
+  const token = getAuthToken(headers());
+  
+  if (!userId) {
+    return <div>Not authenticated</div>;
+  }
+  
+  // Fetch user data server-side
+  return <div>User ID: {userId}</div>;
+}
+```
+
+## Advanced: Custom Components
+
+Need custom branding? Disable built-in auth and use custom components:
+
+### Enable Custom Components
+
+```tsx app/layout.tsx
+import { InsforgeProvider } from '@insforge/nextjs';
+import '@insforge/nextjs/styles.css';  // Required for custom components
+
+export default function RootLayout({ children }) {
+  return (
+    <InsforgeProvider 
+      baseUrl={process.env.NEXT_PUBLIC_INSFORGE_BASE_URL!}
+      useBuiltInAuth={false}
+    >
+      {children}
+    </InsforgeProvider>
+  );
+}
+```
+
+### Pre-built Components
+
+Use pre-built SignIn and SignUp components:
+
+<CodeGroup>
+```tsx app/sign-in/page.tsx
+import { SignIn } from '@insforge/nextjs';
+
+export default function SignInPage() {
+  return <SignIn afterSignInUrl="/dashboard" />;
+}
+```
+
+```tsx app/sign-up/page.tsx
+import { SignUp } from '@insforge/nextjs';
+
+export default function SignUpPage() {
+  return <SignUp afterSignUpUrl="/onboarding" />;
+}
+```
+</CodeGroup>
+
+<Info>
+OAuth providers are auto-detected from your backend config.
+</Info>
+
+### Component Props
+
+#### SignIn / SignUp
+
+```tsx
+<SignIn 
+  afterSignInUrl="/dashboard"
+  appearance={{ container: { background: '#f5f5f5' } }}
+  onSuccess={(user) => console.log('Signed in:', user)}
+  onError={(error) => console.error('Error:', error)}
+/>
+```
+
+### Build from Primitives
+
+For complete control, build custom UI with primitives:
+
+```tsx
+import {
+  AuthContainer,
+  AuthHeader,
+  AuthFormField,
+  AuthPasswordField,
+  AuthSubmitButton,
+  AuthOAuthProviders,
+  AuthDivider,
+  AuthLink,
+} from '@insforge/nextjs';
+
+function CustomSignIn() {
+  return (
+    <AuthContainer>
+      <AuthHeader 
+        title="Welcome Back" 
+        subtitle="Sign in to your account" 
+      />
+      
+      <AuthFormField 
+        label="Email"
+        type="email"
+        name="email"
+        required
+      />
+      
+      <AuthPasswordField 
+        label="Password"
+        name="password"
+        required
+      />
+      
+      <AuthSubmitButton>Sign In</AuthSubmitButton>
+      
+      <AuthDivider>or</AuthDivider>
+      
+      <AuthOAuthProviders />
+      
+      <AuthLink href="/sign-up">
+        Don't have an account? Sign up
+      </AuthLink>
+    </AuthContainer>
+  );
+}
+```
+
+**Available primitives**: 
+- `AuthContainer`
+- `AuthHeader`
+- `AuthErrorBanner`
+- `AuthFormField`
+- `AuthPasswordField`
+- `AuthSubmitButton`
+- `AuthDivider`
+- `AuthLink`
+- `AuthOAuthProviders`
+- `AuthBranding`
+
+### Update Middleware for Custom Components
+
+```ts middleware.ts
+import { InsforgeMiddleware } from '@insforge/nextjs/middleware';
+
+export default InsforgeMiddleware({
+  baseUrl: process.env.INSFORGE_BASE_URL!,
+  publicRoutes: ['/sign-in', '/sign-up', '/auth/callback', '/'],
+  signInUrl: '/sign-in',
+  useBuiltInAuth: false,  // Important!
+});
+```
+
+## Customization
+
+### Styling (Custom Components Only)
+
+When using `useBuiltInAuth={false}`, import styles and customize:
+
+```tsx app/layout.tsx
+import '@insforge/nextjs/styles.css';
+```
+
+Override with the `appearance` prop:
+
+```tsx
+<SignIn appearance={{ 
+  container: { background: '#f5f5f5' },
+  button: { background: '#8b5cf6' }
+}} />
+```
+
+Or use CSS classes:
+
+```css globals.css
+.insforge-btn-primary { 
+  background: #8b5cf6; 
+  border-radius: 0.5rem;
+}
+
+.insforge-input {
+  border: 2px solid #e5e7eb;
+}
+```
+
+### Auth Callbacks
+
+React to authentication state changes:
+
+```tsx app/layout.tsx
+<InsforgeProvider 
+  baseUrl={baseUrl}
+  onAuthChange={(user) => {
+    if (user) {
+      analytics.identify(user.id);
+      console.log('User signed in:', user.email);
+    }
+  }}
+/>
+```
+
+## TypeScript Support
+
+Full TypeScript support with type definitions:
+
+```tsx
+import type { 
+  InsforgeUser, 
+  InsforgeSession, 
+  AuthContextValue 
+} from '@insforge/nextjs';
+
+function MyComponent() {
+  const { user, session }: AuthContextValue = useAuth();
+  
+  // user: InsforgeUser | null
+  // session: InsforgeSession | null
+}
+```
+
+## Why @insforge/nextjs?
+
+<CardGroup cols={2}>
+  <Card title="For Developers" icon="user">
+    5-minute auth setup instead of hours. Production-ready security and session management included.
+  </Card>
+  
+  <Card title="For AI Agents" icon="robot">
+    Minimal code generation (5 files vs 20+ for custom auth). Reduced token usage. Consistent patterns across projects.
+  </Card>
+</CardGroup>
+
+## Resources
+
+<CardGroup cols={3}>
+  <Card title="Documentation" icon="book" href="https://docs.insforge.dev/introduction">
+    Full documentation
+  </Card>
+  
+  <Card title="GitHub Issues" icon="github" href="https://github.com/InsForge/InsForge/issues">
+    Report bugs & request features
+  </Card>
+  
+  <Card title="Discord Community" icon="discord" href="https://discord.com/invite/DvBtaEc9Jz">
+    Get help & share feedback
+  </Card>
+</CardGroup>
+
