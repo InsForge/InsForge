@@ -35,13 +35,13 @@ function normalizeSubdomain(subdomain: string, fallback: string): string {
     .replace(/[^a-z0-9-]/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '');
-  
+
   const result = normalized || fallback;
-  
+
   if (!RFC1123_LABEL_REGEX.test(result)) {
     throw new Error(`Invalid subdomain: ${subdomain} (normalized: ${result})`);
   }
-  
+
   return result;
 }
 
