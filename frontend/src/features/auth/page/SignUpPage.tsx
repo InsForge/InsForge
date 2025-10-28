@@ -78,12 +78,16 @@ export default function SignUpPage() {
 
       // Redirect back to user's app with token
       if (redirectUrl) {
-        const finalUrl = new URL(redirectUrl);
-        finalUrl.searchParams.set('access_token', accessToken);
-        window.location.href = finalUrl.toString();
+        try {
+          const finalUrl = new URL(redirectUrl, window.location.origin);
+          finalUrl.hash = `access_token=${encodeURIComponent(accessToken)}`;
+          window.location.assign(finalUrl.toString());
+        } catch {
+          // Invalid redirect; default to dashboard
+          window.location.assign('/dashboard');
+        }
       } else {
-        // Default: redirect to dashboard
-        void navigate('/dashboard');
+        window.location.assign('/dashboard');
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Sign up failed');

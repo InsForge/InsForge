@@ -83,7 +83,7 @@ export function AuthOAuthProviders({
 
     // 3 buttons: each spans 2 columns
     if (count === 3) {
-      return { gridColumn: 'span 2' };
+      return { gridColumn: 'span 2 / span 2' };
     }
 
     // 4 buttons: 2 rows, each button spans 3 columns
@@ -98,7 +98,7 @@ export function AuthOAuthProviders({
 
     if (!isInLastRow) {
       // Not in last row, use default span 2
-      return { gridColumn: 'span 2' };
+      return { gridColumn: 'span 2 / span 2' };
     }
 
     // Calculate position in last row (0-based)
@@ -117,7 +117,7 @@ export function AuthOAuthProviders({
       }
     } else {
       // Last row has 3 items: normal span 2
-      return { gridColumn: 'span 2' };
+      return { gridColumn: 'span 2 / span 2' };
     }
   };
 
@@ -136,6 +136,7 @@ export function AuthOAuthProviders({
             disabled={disabled || isLoading}
             className="h-11"
             style={getGridColumnStyle(index)}
+            aria-label={`Continue with ${config.name}`}
           >
             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : config.icon}
             {displayMode === 'full' && <span className="ml-2">Continue with {config.name}</span>}
