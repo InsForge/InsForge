@@ -14,6 +14,7 @@ import {
 import { logger } from '@/utils/logger.js';
 
 const DEFAULT_AWS_REGION = 'us-east-1';
+const RFC1123_LABEL_REGEX = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/i;
 
 export interface DeploymentFile {
   path: string;
@@ -23,6 +24,25 @@ export interface DeploymentFile {
 export interface StorageAdapter {
   deploy(deploymentId: string, files: DeploymentFile[], subdomain?: string): Promise<string>;
   delete(deploymentId: string, subdomain?: string): Promise<void>;
+}
+
+/**
+ * Normalize subdomain to RFC1123 compliant label
+ */
+function normalizeSubdomain(subdomain: string, fallback: string): string {
+  const normalized = subdomain
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  
+  const result = normalized || fallback;
+  
+  if (!RFC1123_LABEL_REGEX.test(result)) {
+    throw new Error(`Invalid subdomain: ${subdomain} (normalized: ${result})`);
+  }
+  
+  return result;
 }
 
 /**
@@ -36,8 +56,8 @@ export class LocalStorageAdapter implements StorageAdapter {
   }
 
   async deploy(deploymentId: string, files: DeploymentFile[], subdomain?: string): Promise<string> {
-    // Use subdomain for path if provided, otherwise fall back to deploymentId
-    const pathIdentifier = subdomain || deploymentId;
+    // Validate and normalize subdomain
+    const pathIdentifier = subdomain ? normalizeSubdomain(subdomain, deploymentId) : deploymentId;
     const deployPath = path.join(this.baseDir, pathIdentifier);
 
     try {
@@ -160,8 +180,8 @@ export class S3StorageAdapter implements StorageAdapter {
 
   async deploy(deploymentId: string, files: DeploymentFile[], subdomain?: string): Promise<string> {
     const region = process.env.AWS_REGION || DEFAULT_AWS_REGION;
-    // Use subdomain for S3 path if provided, otherwise fall back to deploymentId
-    const pathIdentifier = subdomain || deploymentId;
+    // Validate and normalize subdomain
+    const pathIdentifier = subdomain ? normalizeSubdomain(subdomain, deploymentId) : deploymentId;
 
     try {
       // Upload all files to S3
