@@ -51,7 +51,9 @@ export function AuthPasswordField({
         {forgotPasswordLink && (
           <button
             type="button"
-            onClick={() => navigate(forgotPasswordLink.route)}
+            onClick={() => {
+              void navigate(forgotPasswordLink.route);
+            }}
             className="text-sm text-[#828282]"
           >
             {forgotPasswordLink.text || 'Forgot password?'}
