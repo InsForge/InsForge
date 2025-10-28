@@ -123,9 +123,7 @@ export const emailSchema = z
   .toLowerCase()
   .trim();
 
-export const passwordSchema = z
-  .string()
-  .min(8, 'Password must be at least 8 characters');
+export const passwordSchema = z.string().min(8, 'Password must be at least 8 characters');
 
 // Strong password schema matching AuthPasswordStrengthIndicator requirements
 export const strongPasswordSchema = z
