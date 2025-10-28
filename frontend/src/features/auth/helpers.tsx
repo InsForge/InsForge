@@ -38,14 +38,14 @@ export const oauthProviders: OAuthProviderInfo[] = [
   {
     id: 'microsoft',
     name: 'Microsoft OAuth',
-    icon: <Microsoft className="w-6 h-6 dark:text-white" />,
+    icon: <Microsoft className="w-6 h-6" />,
     description: 'Configure Microsoft authentication for your users',
     setupUrl: 'https://portal.azure.com/',
   },
   {
     id: 'discord',
     name: 'Discord OAuth',
-    icon: <Discord className="w-6 h-6" />,
+    icon: <Discord className="w-6 h-6 text-[#5765F2] dark:text-[#5765F2]" />,
     description: 'Configure Discord authentication for your users',
     setupUrl: 'https://discord.com/developers/applications',
   },
