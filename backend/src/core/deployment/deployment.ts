@@ -204,12 +204,16 @@ export class DeploymentService {
       .toLowerCase()
       .replace(/[^a-z0-9-]/g, '-')
       .replace(/-+/g, '-')
-      .substring(0, 32);
+      .substring(0, 32)
+      .replace(/^-+|-+$/g, ''); // Strip leading/trailing hyphens
 
     // Add short ID suffix for uniqueness
     const shortId = deploymentId.substring(0, 8);
 
-    return `${sanitized}-${shortId}`;
+    // Combine and ensure not empty
+    const subdomain = sanitized ? `${sanitized}-${shortId}` : `deploy-${shortId}`;
+
+    return subdomain;
   }
 
   /**
