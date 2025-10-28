@@ -1,5 +1,5 @@
 import { useState, FormEvent, useEffect } from 'react';
-import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import {
   OAuthProvidersSchema,
   OAuthConfigSchema,
@@ -13,10 +13,10 @@ import {
   AuthOAuthProviders,
 } from '../components';
 import InsForgeLogo from '@/assets/logos/insforge_light.svg?react';
+import { signUpFormSchema } from '@/lib/utils/validation-schemas';
 
 export default function SignUpPage() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -45,20 +45,17 @@ export default function SignUpPage() {
     setLoading(true);
     setError('');
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setError('Please enter a valid email address');
+    // Validate using Zod schema
+    const validationResult = signUpFormSchema.safeParse({ email, password });
+    
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0];
+      setError(firstError.message);
       setLoading(false);
       return;
     }
 
-    // Basic password validation
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters long');
-      setLoading(false);
-      return;
-    }
+    const validatedData = validationResult.data;
 
     try {
       const response = await fetch('/api/auth/users', {
@@ -66,7 +63,7 @@ export default function SignUpPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(validatedData),
       });
 
       if (!response.ok) {
