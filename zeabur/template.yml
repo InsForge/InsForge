@@ -20,10 +20,6 @@ spec:
           type: STRING
           name: Admin Password
           description: Password for admin. Must be at least 8 characters.
-        - key: POSTGRES_PASSWORD
-          type: STRING
-          name: PostgreSQL Password
-          description: Password for PostgreSQL database and JWT secret. Auto-generated if not provided.
         - key: OPENROUTER_API_KEY
           type: STRING
           name: OpenRouter API Key
@@ -119,7 +115,7 @@ spec:
                     default: ${CONTAINER_HOSTNAME}
                     expose: true
                 POSTGRES_PASSWORD:
-                    default: ${POSTGRES_PASSWORD}
+                    default: ${PASSWORD}
                     expose: true
                     readonly: true
                 POSTGRES_PORT:
@@ -134,7 +130,7 @@ spec:
                     default: postgres
                     expose: true
                 JWT_SECRET:
-                    default: ${POSTGRES_PASSWORD}
+                    default: ${PASSWORD}
                     expose: true
                     readonly: true
                 JWT_EXP:
@@ -310,8 +306,18 @@ spec:
                   port: 3000
                   type: HTTP
             env:
+                PGHOST:
+                    default: postgres
+                PGPORT:
+                    default: "5432"
+                PGDATABASE:
+                    default: insforge
+                PGUSER:
+                    default: postgres
+                PGPASSWORD:
+                    default: ${POSTGRES_PASSWORD}
                 PGRST_DB_URI:
-                    default: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/insforge
+                    default: postgresql://
                 PGRST_OPENAPI_SERVER_PROXY_URI:
                     default: http://localhost:3000
                 PGRST_DB_SCHEMA:
@@ -319,7 +325,7 @@ spec:
                 PGRST_DB_ANON_ROLE:
                     default: anon
                 PGRST_JWT_SECRET:
-                    default: ${POSTGRES_PASSWORD}
+                    default: ${JWT_SECRET}
                     expose: true
                     readonly: true
                 PGRST_DB_CHANNEL_ENABLED:
@@ -379,9 +385,9 @@ spec:
                 WORKER_TIMEOUT_MS:
                     default: "30000"
                 ENCRYPTION_KEY:
-                    default: ${POSTGRES_PASSWORD}
+                    default: ${PASSWORD}
                 JWT_SECRET:
-                    default: ${POSTGRES_PASSWORD}
+                    default: ${PGRST_JWT_SECRET}
             configs:
                 - path: /app/functions/server.ts
                   template: |
@@ -846,7 +852,7 @@ spec:
           template: PREBUILT
           spec:
             source:
-                image: ghcr.io/insforge/insforge-oss:v1.1.0
+                image: ghcr.io/insforge/insforge-oss:v1.1.2
             ports:
                 - id: web
                   port: 7130
@@ -864,7 +870,7 @@ spec:
                 VITE_API_BASE_URL:
                     default: ${ZEABUR_WEB_URL}
                 JWT_SECRET:
-                    default: ${POSTGRES_PASSWORD}
+                    default: ${PGRST_JWT_SECRET}
                 ADMIN_EMAIL:
                     default: ${ADMIN_EMAIL}
                 ADMIN_PASSWORD:
@@ -878,7 +884,7 @@ spec:
                     default: insforge
                 POSTGRES_USER:
                     default: postgres
-                POSTGRES_PASSWORD:
+                POSTGRESDB_PASSWORD:
                     default: ${POSTGRES_PASSWORD}
                 DATABASE_URL:
                     default: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/insforge
