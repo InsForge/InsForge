@@ -194,6 +194,23 @@ export const listOAuthConfigsResponseSchema = z.object({
   count: z.number(),
 });
 
+/**
+ * Public OAuth provider schema - contains only safe, client-visible fields
+ */
+export const publicOAuthProviderSchema = z.object({
+  provider: z.string(),
+  scopes: z.array(z.string()).optional(),
+  isConfigured: z.boolean(),
+});
+
+/**
+ * Response for GET /api/auth/oauth/providers - Public endpoint
+ */
+export const listPublicOAuthProvidersResponseSchema = z.object({
+  data: z.array(publicOAuthProviderSchema),
+  count: z.number(),
+});
+
 // ============================================================================
 // Email Authentication Configuration schemas
 // ============================================================================
@@ -256,5 +273,9 @@ export type DeleteUsersResponse = z.infer<typeof deleteUsersResponseSchema>;
 export type GetOauthUrlResponse = z.infer<typeof getOauthUrlResponseSchema>;
 export type ListOAuthConfigsResponse = z.infer<typeof listOAuthConfigsResponseSchema>;
 export type GetEmailAuthConfigResponse = z.infer<typeof getEmailAuthConfigResponseSchema>;
+export type PublicOAuthProvider = z.infer<typeof publicOAuthProviderSchema>;
+export type ListPublicOAuthProvidersResponse = z.infer<
+  typeof listPublicOAuthProvidersResponseSchema
+>;
 
 export type AuthErrorResponse = z.infer<typeof authErrorResponseSchema>;

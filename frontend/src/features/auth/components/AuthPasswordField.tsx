@@ -5,10 +5,12 @@ import { Input } from '@/components/radix/Input';
 import { Label } from '@/components/radix/Label';
 import { cn } from '@/lib/utils/utils';
 import { AuthPasswordStrengthIndicator } from './AuthPasswordStrengthIndicator';
+import { EmailAuthConfigSchema } from '@insforge/shared-schemas';
 
 interface AuthPasswordFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   showStrengthIndicator?: boolean;
+  passwordConfig?: EmailAuthConfigSchema;
   forgotPasswordLink?: {
     route: string;
     text?: string;
@@ -21,6 +23,7 @@ export function AuthPasswordField({
   id,
   className,
   showStrengthIndicator = false,
+  passwordConfig,
   forgotPasswordLink,
   value,
   onFocus,
@@ -79,8 +82,8 @@ export function AuthPasswordField({
           {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
         </button>
       </div>
-      {showStrengthIndicator && showStrength && (
-        <AuthPasswordStrengthIndicator password={String(value || '')} />
+      {showStrengthIndicator && showStrength && passwordConfig && (
+        <AuthPasswordStrengthIndicator password={String(value || '')} config={passwordConfig} />
       )}
     </div>
   );
