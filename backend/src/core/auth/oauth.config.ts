@@ -4,7 +4,11 @@ import { SecretService } from '@/core/secrets/secrets.js';
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
-import { OAuthConfigSchema, OAuthProvidersSchema } from '@insforge/shared-schemas';
+import {
+  OAuthConfigSchema,
+  OAuthProvidersSchema,
+  PublicOAuthProvider,
+} from '@insforge/shared-schemas';
 
 export interface CreateOAuthConfigInput {
   provider: OAuthProvidersSchema;
@@ -71,6 +75,34 @@ export class OAuthConfigService {
     } catch (error) {
       logger.error('Failed to get OAuth configs', { error });
       throw new AppError('Failed to get OAuth configurations', 500, ERROR_CODES.INTERNAL_ERROR);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get public OAuth provider information (safe for public API)
+   * Only returns non-sensitive information about configured providers
+   */
+  async getPublicProviders(): Promise<PublicOAuthProvider[]> {
+    const client = await this.getPool().connect();
+    try {
+      const result = await client.query(
+        `SELECT
+          provider,
+          scopes
+         FROM _oauth_configs
+         ORDER BY provider ASC`
+      );
+
+      return result.rows.map((row) => ({
+        provider: row.provider,
+        scopes: row.scopes,
+        isConfigured: true,
+      }));
+    } catch (error) {
+      logger.error('Failed to get public OAuth providers', { error });
+      throw new AppError('Failed to get OAuth providers', 500, ERROR_CODES.INTERNAL_ERROR);
     } finally {
       client.release();
     }
