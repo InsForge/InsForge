@@ -37,7 +37,8 @@ export default function SignInPage() {
       if (redirectUrl) {
         try {
           const finalUrl = new URL(redirectUrl, window.location.origin);
-          finalUrl.hash = `access_token=${encodeURIComponent(accessToken)}`;
+          // Use query parameter to match OAuth flow (standard and consistent)
+          finalUrl.searchParams.set('access_token', accessToken);
           window.location.assign(finalUrl.toString());
         } catch {
           // Invalid redirect; default to dashboard
