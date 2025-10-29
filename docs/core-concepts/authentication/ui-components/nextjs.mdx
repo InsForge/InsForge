@@ -41,8 +41,12 @@ Use custom components only if you need highly customized branding or custom fiel
 ## Installation
 
 ```bash
-npm install @insforge/nextjs
+npm install @insforge/nextjs @insforge/sdk
 ```
+
+<Note>
+**SDK Integration**: `@insforge/nextjs` works seamlessly with `@insforge/sdk`. The SDK handles API calls, token management, and OAuth callback detection automatically. Always use SDK methods instead of raw `fetch` calls.
+</Note>
 
 ## Quick Start (Built-in Auth)
 
@@ -89,13 +93,32 @@ export const DELETE = handlers.DELETE;
 
 ### Step 3: Create Callback Page
 
-Create a callback page to receive tokens from the backend auth pages:
+<Warning>
+**Critical:** The callback page is essential for authentication to work. It receives tokens from backend auth pages (both OAuth and email/password flows) and stores them properly.
+</Warning>
+
+Create a callback page that receives authentication data from backend auth pages:
+
+**What Backend Returns:**
+After successful authentication (OAuth or email/password), backend redirects to your callback URL with these query parameters:
+- `access_token` - JWT token (required)
+- `user_id` - User ID (required)
+- `email` - User email (required)
+- `name` - User name (optional)
+- `error` - Error message (if authentication failed)
+
+**Complete Callback Implementation (SDK-powered):**
+
+<Warning>
+**Always use SDK**: The SDK automatically detects and handles URL parameters. Do not manually parse URL parameters or store tokens. The SDK handles this automatically when you create a client.
+</Warning>
 
 ```tsx app/auth/callback/page.tsx
 'use client';
 
 import { useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { createClient } from '@insforge/sdk';
 
 function CallbackContent() {
   const router = useRouter();
@@ -107,28 +130,46 @@ function CallbackContent() {
       if (isProcessingRef.current) return;
       isProcessingRef.current = true;
 
-      const accessToken = searchParams.get('access_token');
       const error = searchParams.get('error');
-
       if (error) {
         router.push('/?error=' + encodeURIComponent(error));
         return;
       }
 
-      if (accessToken) {
-        localStorage.setItem('insforge-auth-token', accessToken);
-        
+      // Step 1: Create SDK client - it automatically detects and stores URL parameters
+      // SDK's detectOAuthCallback() automatically handles: access_token, user_id, email, name
+      // This stores token in 'insforge-auth-token' and basic user in 'insforge-auth-user'
+      const insforge = createClient({
+        baseUrl: process.env.NEXT_PUBLIC_INSFORGE_BASE_URL!,
+      });
+
+      // Step 2: Fetch complete user data (including profile) using SDK method
+      // SDK ensures consistency and proper error handling
+      const { data: userData, error: userError } = await insforge.auth.getCurrentUser();
+
+      if (userError || !userData) {
+        router.push('/?error=authentication_failed');
+        return;
+      }
+
+      // Step 3: Store complete user profile for InsforgeProvider (enables instant UI updates)
+      localStorage.setItem('insforge-user-profile', JSON.stringify(userData));
+
+      // Step 4: Sync token to HTTP-only cookie (for server-side middleware)
+      const token = localStorage.getItem('insforge-auth-token');
+      if (token) {
         await fetch('/api/auth', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'sync-token', token: accessToken }),
+          body: JSON.stringify({ action: 'sync-token', token }),
         });
-        
-        const destination = sessionStorage.getItem('auth_destination') || '/dashboard';
-        sessionStorage.removeItem('auth_destination');
-        
-        setTimeout(() => router.push(destination), 100);
       }
+
+      // Step 5: Clean up URL and redirect
+      window.history.replaceState({}, '', '/auth/callback');
+      const destination = sessionStorage.getItem('auth_destination') || '/';
+      sessionStorage.removeItem('auth_destination');
+      setTimeout(() => router.push(destination), 100);
     };
 
     processCallback();
@@ -154,7 +195,14 @@ export default function CallbackPage() {
 ```
 
 <Info>
-**Why?** This page receives the token from backend auth pages and syncs it to localStorage + cookie.
+**Why SDK Integration Matters:**
+- **Automatic Detection**: SDK automatically detects URL parameters (`access_token`, `user_id`, `email`, `name`) and stores them
+- **Consistent Storage**: SDK handles token storage (`insforge-auth-token`) and basic user info (`insforge-auth-user`) automatically
+- **Type Safety**: SDK methods ensure type-safe API calls with proper error handling
+- **User Profile**: Use SDK's `getCurrentUser()` to fetch complete user data including profile fields
+- **Error Reduction**: Using SDK methods reduces manual errors compared to raw `fetch` calls
+
+**For AI Agents:** Always use SDK methods (`createClient()`, `getCurrentUser()`) instead of manually parsing URL parameters or making raw API calls. The SDK handles OAuth callback detection, token storage, and API communication automatically.
 </Info>
 
 ### Step 4: Add Middleware
@@ -202,22 +250,35 @@ export default function Home() {
 
 ## How It Works
 
+### Authentication Flow (Unified for OAuth and Email/Password)
+
 ```
 1. User clicks "Sign In" → Middleware detects no auth
    ↓
 2. Redirects to: https://backend.insforge.app/auth/signin?redirect=yourapp.com/auth/callback
    ↓
-3. User signs in on backend's hosted page
+3. User authenticates on backend's hosted page
+   - Option A: OAuth (Google, GitHub, etc.)
+   - Option B: Email + Password
    ↓
-4. Backend redirects: yourapp.com/auth/callback?access_token=xxx
+4. Backend processes authentication and redirects:
+   yourapp.com/auth/callback?access_token=xxx&user_id=xxx&email=xxx&name=xxx
    ↓
-5. Callback stores token (localStorage + cookie) → User sees /dashboard
+5. Callback page processes:
+   - Stores token in localStorage (client-side SDK)
+   - Stores user profile in localStorage (instant UI)
+   - Syncs token to HTTP-only cookie (server-side middleware)
+   - Cleans URL (removes sensitive data)
+   ↓
+6. Redirects to destination → User sees /dashboard
 ```
 
 <Note>
 **Why API route + callback?**
-- **API route**: Syncs tokens to HTTP-only cookies (enables server-side middleware)
-- **Callback page**: Receives tokens from backend auth pages (OAuth + email/password)
+- **API route** (`/api/auth`): Syncs tokens to HTTP-only cookies (enables server-side middleware protection)
+- **Callback page** (`/auth/callback`): Receives tokens and user data from backend auth pages (OAuth + email/password), stores them properly, and handles redirect
+
+**Unified Format:** Both OAuth and email/password flows return the same parameters, making the callback page simple and consistent.
 </Note>
 
 ## Local Development
@@ -234,63 +295,96 @@ INSFORGE_BASE_URL=http://localhost:7130                   # For middleware
 The provider automatically uses `NEXT_PUBLIC_INSFORGE_FRONTEND_URL` for auth redirects if set.
 </Info>
 
+## SDK + Next.js Package Integration
+
+<Note>
+**Important**: `@insforge/nextjs` works seamlessly with `@insforge/sdk`. The SDK handles all API calls, token management, and OAuth callback detection. Always use SDK methods instead of raw `fetch` calls.
+</Note>
+
+**What SDK handles:**
+- API calls to backend (`getCurrentUser()`, `signIn()`, `signUp()`, etc.)
+- Token storage and management (`insforge-auth-token`, `insforge-auth-user`)
+- OAuth callback parameter detection (automatic on `createClient()`)
+- Type-safe responses with proper error handling
+
+**What Next.js package handles:**
+- React components (`<SignedIn>`, `<SignedOut>`, `<Protect>`, `<UserButton>`)
+- React hooks (`useAuth()`, `useUser()`, `useSession()`)
+- Next.js middleware for route protection
+- SSR support via cookie sync
+
 ## React Hooks
 
 ### useAuth()
 
-Access authentication state and methods:
+Access authentication state and methods (wraps SDK methods):
 
 ```tsx
 import { useAuth } from '@insforge/nextjs';
 
 function Component() {
-  const { user, isSignedIn, signOut } = useAuth();
+  const { signIn, signUp, signOut, isSignedIn, isLoaded } = useAuth();
+  
+  async function handleSignIn(email: string, password: string) {
+    try {
+      await signIn(email, password); // Uses SDK internally
+    } catch (error) {
+      console.error('Sign in failed:', error);
+    }
+  }
   
   return (
     <div>
-      {isSignedIn && (
-        <>
-          <p>Email: {user?.email}</p>
-          <button onClick={() => signOut()}>Sign Out</button>
-        </>
-      )}
+      {isSignedIn && <button onClick={() => signOut()}>Sign Out</button>}
     </div>
   );
 }
 ```
 
-**Returns**: `user`, `session`, `isLoaded`, `isSignedIn`, `signIn()`, `signUp()`, `signOut()`, `updateUser()`
+**Returns**: `signIn()`, `signUp()`, `signOut()`, `isLoaded`, `isSignedIn`
 
 ### useUser()
 
-Access user information:
+Access current user data (from SDK-managed storage):
 
 ```tsx
 import { useUser } from '@insforge/nextjs';
 
 function UserProfile() {
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded, updateUser } = useUser();
   
   if (!isLoaded) return <div>Loading...</div>;
   if (!user) return <div>Not signed in</div>;
   
-  return <div>Welcome, {user.email}</div>;
+  return (
+    <div>
+      <p>Email: {user.email}</p>
+      {user.nickname && <p>Nickname: {user.nickname}</p>}
+    </div>
+  );
 }
 ```
 
+**Returns**: `user`, `isLoaded`, `updateUser()`
+
 ### useSession()
 
-Access session information:
+Access session data (from SDK-managed storage):
 
 ```tsx
 import { useSession } from '@insforge/nextjs';
 
 function SessionInfo() {
-  const { session, isSignedIn } = useSession();
+  const { session, isLoaded } = useSession();
   
-  return <div>{isSignedIn ? 'Signed In' : 'Signed Out'}</div>;
+  if (!isLoaded) return <div>Loading...</div>;
+  if (!session) return <div>No active session</div>;
+  
+  return <div>User ID: {session.userId}</div>;
 }
 ```
+
+**Returns**: `session`, `isLoaded`
 
 ## Control Components
 
@@ -353,11 +447,12 @@ function Header() {
 
 ## Server-Side Helpers
 
-Access authentication data in Server Components:
+Access authentication data in Server Components (uses middleware headers):
 
 ```tsx app/dashboard/page.tsx
 import { headers } from 'next/headers';
 import { getAuthUserId, getAuthToken } from '@insforge/nextjs/middleware';
+import { createClient } from '@insforge/sdk';
 
 export default async function Dashboard() {
   const userId = getAuthUserId(headers());
@@ -367,226 +462,37 @@ export default async function Dashboard() {
     return <div>Not authenticated</div>;
   }
   
-  // Fetch user data server-side
-  return <div>User ID: {userId}</div>;
-}
-```
-
-## Advanced: Custom Components
-
-Need custom branding? Disable built-in auth and use custom components:
-
-### Enable Custom Components
-
-```tsx app/layout.tsx
-import { InsforgeProvider } from '@insforge/nextjs';
-import '@insforge/nextjs/styles.css';  // Required for custom components
-
-export default function RootLayout({ children }) {
-  return (
-    <InsforgeProvider 
-      baseUrl={process.env.NEXT_PUBLIC_INSFORGE_BASE_URL!}
-      useBuiltInAuth={false}
-    >
-      {children}
-    </InsforgeProvider>
-  );
-}
-```
-
-### Pre-built Components
-
-Use pre-built SignIn and SignUp components:
-
-<CodeGroup>
-```tsx app/sign-in/page.tsx
-import { SignIn } from '@insforge/nextjs';
-
-export default function SignInPage() {
-  return <SignIn afterSignInUrl="/dashboard" />;
-}
-```
-
-```tsx app/sign-up/page.tsx
-import { SignUp } from '@insforge/nextjs';
-
-export default function SignUpPage() {
-  return <SignUp afterSignUpUrl="/onboarding" />;
-}
-```
-</CodeGroup>
-
-<Info>
-OAuth providers are auto-detected from your backend config.
-</Info>
-
-### Component Props
-
-#### SignIn / SignUp
-
-```tsx
-<SignIn 
-  afterSignInUrl="/dashboard"
-  appearance={{ container: { background: '#f5f5f5' } }}
-  onSuccess={(user) => console.log('Signed in:', user)}
-  onError={(error) => console.error('Error:', error)}
-/>
-```
-
-### Build from Primitives
-
-For complete control, build custom UI with primitives:
-
-```tsx
-import {
-  AuthContainer,
-  AuthHeader,
-  AuthFormField,
-  AuthPasswordField,
-  AuthSubmitButton,
-  AuthOAuthProviders,
-  AuthDivider,
-  AuthLink,
-} from '@insforge/nextjs';
-
-function CustomSignIn() {
-  return (
-    <AuthContainer>
-      <AuthHeader 
-        title="Welcome Back" 
-        subtitle="Sign in to your account" 
-      />
-      
-      <AuthFormField 
-        label="Email"
-        type="email"
-        name="email"
-        required
-      />
-      
-      <AuthPasswordField 
-        label="Password"
-        name="password"
-        required
-      />
-      
-      <AuthSubmitButton>Sign In</AuthSubmitButton>
-      
-      <AuthDivider>or</AuthDivider>
-      
-      <AuthOAuthProviders />
-      
-      <AuthLink href="/sign-up">
-        Don't have an account? Sign up
-      </AuthLink>
-    </AuthContainer>
-  );
-}
-```
-
-**Available primitives**: 
-- `AuthContainer`
-- `AuthHeader`
-- `AuthErrorBanner`
-- `AuthFormField`
-- `AuthPasswordField`
-- `AuthSubmitButton`
-- `AuthDivider`
-- `AuthLink`
-- `AuthOAuthProviders`
-- `AuthBranding`
-
-### Update Middleware for Custom Components
-
-```ts middleware.ts
-import { InsforgeMiddleware } from '@insforge/nextjs/middleware';
-
-export default InsforgeMiddleware({
-  baseUrl: process.env.INSFORGE_BASE_URL!,
-  publicRoutes: ['/sign-in', '/sign-up', '/auth/callback', '/'],
-  signInUrl: '/sign-in',
-  useBuiltInAuth: false,  // Important!
-});
-```
-
-## Customization
-
-### Styling (Custom Components Only)
-
-When using `useBuiltInAuth={false}`, import styles and customize:
-
-```tsx app/layout.tsx
-import '@insforge/nextjs/styles.css';
-```
-
-Override with the `appearance` prop:
-
-```tsx
-<SignIn appearance={{ 
-  container: { background: '#f5f5f5' },
-  button: { background: '#8b5cf6' }
-}} />
-```
-
-Or use CSS classes:
-
-```css globals.css
-.insforge-btn-primary { 
-  background: #8b5cf6; 
-  border-radius: 0.5rem;
-}
-
-.insforge-input {
-  border: 2px solid #e5e7eb;
-}
-```
-
-### Auth Callbacks
-
-React to authentication state changes:
-
-```tsx app/layout.tsx
-<InsforgeProvider 
-  baseUrl={baseUrl}
-  onAuthChange={(user) => {
-    if (user) {
-      analytics.identify(user.id);
-      console.log('User signed in:', user.email);
-    }
-  }}
-/>
-```
-
-## TypeScript Support
-
-Full TypeScript support with type definitions:
-
-```tsx
-import type { 
-  InsforgeUser, 
-  InsforgeSession, 
-  AuthContextValue 
-} from '@insforge/nextjs';
-
-function MyComponent() {
-  const { user, session }: AuthContextValue = useAuth();
+  // Use SDK to fetch user data server-side
+  const insforge = createClient({
+    baseUrl: process.env.INSFORGE_BASE_URL!,
+    edgeFunctionToken: token || undefined,
+  });
   
-  // user: InsforgeUser | null
-  // session: InsforgeSession | null
+  const { data: userData } = await insforge.auth.getCurrentUser();
+  
+  return <div>Welcome, {userData?.user.email}</div>;
 }
 ```
 
-## Why @insforge/nextjs?
+<Note>
+For server-side data fetching, use SDK with the token from middleware headers. This ensures consistent API access patterns.
+</Note>
+
+## Why @insforge/nextjs + SDK?
 
 <CardGroup cols={2}>
   <Card title="For Developers" icon="user">
-    5-minute auth setup instead of hours. Production-ready security and session management included.
+    5-minute auth setup instead of hours. SDK handles API calls automatically. Production-ready security included.
   </Card>
   
   <Card title="For AI Agents" icon="robot">
-    Minimal code generation (5 files vs 20+ for custom auth). Reduced token usage. Consistent patterns across projects.
+    SDK-first approach reduces errors. Minimal code generation (5 files vs 20+). Always use SDK methods instead of raw `fetch` calls.
   </Card>
 </CardGroup>
+
+<Note>
+**Key Principle**: Always use SDK methods (`insforge.auth.getCurrentUser()`, `insforge.auth.signIn()`, etc.) instead of raw `fetch` calls. The SDK ensures consistency, type safety, and automatic error handling. The Next.js package provides React components and hooks that work seamlessly with the SDK.
+</Note>
 
 ## Resources
 
