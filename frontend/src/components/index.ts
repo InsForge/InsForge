@@ -23,6 +23,14 @@ export * from './ConfirmDialog';
 export * from './ButtonWithLoading';
 
 // Custom UI components
+export { ButtonWithLoading } from './ButtonWithLoading';
+export { CodeBlock } from './CodeBlock';
+export { ConnectCTA } from './ConnectCTA';
+export { CopyButton } from './CopyButton';
+export { FeatureSidebar } from './FeatureSidebar';
+export { FeatureSidebarItem } from './FeatureSidebarItem';
+export { PromptDialog } from './PromptDialog';
+export { CircularStepper } from './Stepper';
 export { EmptyState } from './EmptyState';
 export { LoadingState } from './LoadingState';
 export { ErrorState } from './ErrorState';
@@ -33,6 +41,11 @@ export { SelectionClearButton } from './SelectionClearButton';
 export { DeleteActionButton } from './DeleteActionButton';
 export { Checkbox } from './Checkbox';
 export { TypeBadge } from './TypeBadge';
+export { ThemeToggle } from './ThemeToggle';
+export { ConfirmDialog } from './ConfirmDialog';
+export { LinearStepper } from './Stepper';
+export { VerticalStepper } from './Stepper';
+
 
 // Data Grid Components
 export { DataGrid, SortableHeaderRenderer } from './datagrid';
