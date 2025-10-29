@@ -894,6 +894,7 @@ export class DatabaseAdvanceService {
         records = parse(fileBuffer, {
           columns: true,
           skip_empty_lines: true,
+          bom: true,
         });
       } else if (fileExtension === '.json') {
         const jsonContent = fileBuffer.toString('utf-8');

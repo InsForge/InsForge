@@ -1,0 +1,105 @@
+---
+title: Architecture
+description: Serverless JavaScript functions running in isolated Deno runtime
+---
+
+## Overview
+
+InsForge Functions provide a secure, scalable serverless compute platform that runs JavaScript/TypeScript code in isolated Deno workers with full access to the InsForge SDK.
+
+## Technology Stack
+
+```mermaid
+graph TB
+    Client[Client Application] --> Backend[Backend API :7130]
+    Backend --> Proxy[Proxy Layer]
+    Proxy --> Deno[Deno Runtime :7133]
+    Deno --> Worker[Web Worker]
+    Worker --> Sandbox[Isolated Sandbox]
+
+    Backend --> DB[(PostgreSQL)]
+    Deno --> DB
+    Worker --> SDK[InsForge SDK]
+    SDK --> Backend
+
+    style Client fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style Backend fill:#166534,stroke:#22c55e,color:#dcfce7
+    style Proxy fill:#1e40af,stroke:#3b82f6,color:#dbeafe
+    style Deno fill:#c2410c,stroke:#fb923c,color:#fed7aa
+    style Worker fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
+    style Sandbox fill:#7c2d12,stroke:#f97316,color:#fed7aa
+    style DB fill:#0e7490,stroke:#06b6d4,color:#cffafe
+    style SDK fill:#1e40af,stroke:#3b82f6,color:#dbeafe
+```
+
+## Core Components
+
+| Component | Technology | Port | Purpose |
+|-----------|------------|------|---------|
+| **Backend API** | Node.js/Express | 7130 | Function management, authentication, proxy |
+| **Runtime** | Deno v2.0.6 | 7133 | Secure JavaScript/TypeScript execution |
+| **Sandbox** | Web Workers | - | Isolated execution environment |
+| **Database** | PostgreSQL | 5432 | Function code and metadata storage |
+| **SDK** | @insforge/sdk | - | Pre-injected client for backend access |
+| **Secrets** | AES-256-GCM | - | Encrypted environment variables |
+
+## How It Works
+
+When a client makes a request to `/functions/{slug}`:
+
+1. The backend API receives and validates the request
+2. Request is proxied to the Deno runtime
+3. Function code is executed in an isolated Web Worker
+4. The function has access to the InsForge SDK and environment variables
+5. Response is returned to the client
+
+### Authentication Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant B as Backend API
+    participant D as Deno Runtime
+    participant W as Worker
+    participant SDK as InsForge SDK
+
+    C->>B: POST /functions/my-api<br/>Authorization: Bearer TOKEN
+    B->>D: Proxy request with headers
+    D->>D: Fetch function code from DB
+    D->>D: Decrypt secrets
+    D->>W: Create worker with code + secrets
+    W->>SDK: createClient({token})
+    SDK->>B: Validate token
+    B-->>SDK: User data
+    W->>C: HTTP Response
+```
+
+## Performance Characteristics
+
+### Execution Limits
+
+| Limit | Value | Description |
+|-------|-------|-------------|
+| **Timeout** | 30 seconds | Maximum execution time per invocation |
+| **Memory** | Worker default | Depends on Deno worker allocation |
+| **Payload Size** | 10MB | Maximum request/response size |
+| **Concurrent Workers** | System dependent | Limited by server resources |
+| **Cold Start** | ~50-200ms | Time to create new worker |
+
+### Optimization Strategies
+
+1. **Worker Pooling**: Workers are created on-demand
+2. **Code Caching**: Function code cached in memory
+3. **Secret Caching**: Decrypted secrets cached per execution
+4. **SDK Reuse**: SDK client created once per worker
+
+## Best Practices
+
+1. **Keep Functions Small**: Single responsibility per function
+2. **Handle Errors Gracefully**: Always return proper HTTP responses
+3. **Validate Input**: Check request data before processing
+4. **Use Caching**: Cache frequently accessed data
+5. **Optimize Queries**: Use efficient database queries
+6. **Monitor Performance**: Track execution times and errors
+7. **Secure Secrets**: Never log sensitive data
+8. **Test Locally**: Test functions before deployment

@@ -37,7 +37,7 @@ test_endpoint() {
             -d "$data")
     fi
 
-    body=$(echo "$response" | head -n -1)
+    body=$(echo "$response" | sed '$d')
     status=$(echo "$response" | tail -n 1)
 
     if [ "$status" -ge 200 ] && [ "$status" -lt 300 ]; then

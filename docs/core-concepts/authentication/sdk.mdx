@@ -1,0 +1,414 @@
+---
+title: Authentication SDK Reference
+description: User authentication and profile management with the InsForge SDK
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+<Installation />
+
+## signUp()
+
+Create a new user account with email and password.
+
+### Parameters
+
+- `email` (string, required) - User's email address
+- `password` (string, required) - User's password
+- `name` (string, optional) - User's display name
+
+### Returns
+
+```typescript
+{
+  data: {
+    user: { id, email, name, emailVerified, createdAt, updatedAt },
+    accessToken: string
+  } | null,
+  error: Error | null
+}
+```
+
+### Example
+
+```javascript
+const { data, error } = await insforge.auth.signUp({
+  email: 'user@example.com',
+  password: 'secure_password123',
+  name: 'John Doe'
+})
+```
+
+### Output
+
+```json
+{
+  "data": {
+    "user": {
+      "id": "usr_abc123",
+      "email": "user@example.com",
+      "name": "John Doe",
+      "emailVerified": false,
+      "createdAt": "2024-01-15T10:00:00Z",
+      "updatedAt": "2024-01-15T10:00:00Z"
+    },
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  },
+  "error": null
+}
+```
+
+---
+
+## signInWithPassword()
+
+Sign in an existing user with email and password.
+
+### Parameters
+
+- `email` (string, required) - User's email address
+- `password` (string, required) - User's password
+
+### Returns
+
+```typescript
+{
+  data: {
+    user: { id, email, name, emailVerified, createdAt, updatedAt },
+    accessToken: string
+  } | null,
+  error: Error | null
+}
+```
+
+### Example
+
+```javascript
+const { data, error } = await insforge.auth.signInWithPassword({
+  email: 'user@example.com',
+  password: 'secure_password123'
+})
+```
+
+### Output
+
+```json
+{
+  "data": {
+    "user": {
+      "id": "usr_abc123",
+      "email": "user@example.com",
+      "name": "John Doe",
+      "emailVerified": true,
+      "createdAt": "2024-01-15T10:00:00Z",
+      "updatedAt": "2024-01-15T10:00:00Z"
+    },
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  },
+  "error": null
+}
+```
+
+---
+
+## signInWithOAuth()
+
+Start OAuth authentication flow with Google or GitHub.
+
+### Parameters
+
+- `provider` ('google' | 'github', required) - OAuth provider
+- `redirectTo` (string, optional) - URL to redirect after authentication
+- `skipBrowserRedirect` (boolean, optional) - If true, returns OAuth URL without auto-redirecting (for mobile apps)
+
+### Returns
+
+```typescript
+{
+  data: { url?: string, provider?: string },
+  error: Error | null
+}
+```
+
+<Note>
+After OAuth redirect, SDK automatically detects callback parameters and saves session. No manual handling needed.
+</Note>
+
+### Example
+
+```javascript
+// Default: auto-redirect
+await insforge.auth.signInWithOAuth({
+  provider: 'google',
+  redirectTo: 'http://localhost:3000/dashboard'
+})
+// Browser immediately redirects to Google
+
+// skipBrowserRedirect: get URL for manual handling
+const { data } = await insforge.auth.signInWithOAuth({
+  provider: 'google',
+  skipBrowserRedirect: true
+})
+
+window.location.href = data.url // Redirect when ready
+```
+
+### Output
+
+```json
+{
+  "data": {
+    "url": "https://accounts.google.com/o/oauth2/v2/auth?client_id=...",
+    "provider": "google"
+  },
+  "error": null
+}
+```
+
+---
+
+## signOut()
+
+Sign out the current user and clear session.
+
+### Parameters
+
+None
+
+### Returns
+
+```typescript
+{
+  error: Error | null
+}
+```
+
+### Example
+
+```javascript
+const { error } = await insforge.auth.signOut()
+```
+
+### Output
+
+```json
+{
+  "error": null
+}
+```
+
+---
+
+## getCurrentUser()
+
+Get authenticated user with profile data from users table.
+
+### Parameters
+
+None
+
+### Returns
+
+```typescript
+{
+  data: {
+    user: { id, email, role },
+    profile: { id, nickname, avatar_url, bio, birthday, ... }
+  } | null,
+  error: Error | null
+}
+```
+
+### Example
+
+```javascript
+const { data, error } = await insforge.auth.getCurrentUser()
+
+if (data) {
+  console.log(data.user.email)        // Auth info
+  console.log(data.profile.nickname)  // Profile from users table
+}
+```
+
+### Output
+
+```json
+{
+  "data": {
+    "user": {
+      "id": "usr_abc123",
+      "email": "user@example.com",
+      "role": "authenticated"
+    },
+    "profile": {
+      "id": "usr_abc123",
+      "nickname": "JohnDoe",
+      "avatar_url": "https://example.com/avatar.jpg",
+      "bio": "Full-stack developer",
+      "birthday": "1990-01-01"
+    }
+  },
+  "error": null
+}
+```
+
+---
+
+## getCurrentSession()
+
+Get current session from local storage (no API call).
+
+### Parameters
+
+None
+
+### Returns
+
+```typescript
+{
+  data: {
+    session: {
+      accessToken: string,
+      user: { id, email, name, ... }
+    } | null
+  },
+  error: Error | null
+}
+```
+
+### Example
+
+```javascript
+const { data, error } = await insforge.auth.getCurrentSession()
+
+if (data.session) {
+  console.log('Token:', data.session.accessToken)
+}
+```
+
+### Output
+
+```json
+{
+  "data": {
+    "session": {
+      "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "user": {
+        "id": "usr_abc123",
+        "email": "user@example.com",
+        "name": "John Doe"
+      }
+    }
+  },
+  "error": null
+}
+```
+
+---
+
+## getProfile()
+
+Get any user's public profile by ID.
+
+### Parameters
+
+- `userId` (string, required) - User ID to fetch profile for
+
+### Returns
+
+```typescript
+{
+  data: { id, nickname, avatar_url, bio, birthday, ... } | null,
+  error: Error | null
+}
+```
+
+### Example
+
+```javascript
+const { data: profile, error } = await insforge.auth.getProfile('usr_xyz789')
+
+console.log(profile.nickname)
+```
+
+### Output
+
+```json
+{
+  "data": {
+    "id": "usr_xyz789",
+    "nickname": "JaneDoe",
+    "avatar_url": "https://example.com/jane.jpg",
+    "bio": "Designer and developer",
+    "birthday": "1992-05-15"
+  },
+  "error": null
+}
+```
+
+---
+
+## setProfile()
+
+Update current user's profile in users table.
+
+### Parameters
+
+- `nickname` (string, optional) - User's display name
+- `avatar_url` (string, optional) - Profile picture URL
+- `bio` (string, optional) - User biography
+- `birthday` (string, optional) - Birth date (YYYY-MM-DD format)
+
+### Returns
+
+```typescript
+{
+  data: { id, nickname, avatar_url, bio, birthday, ... } | null,
+  error: Error | null
+}
+```
+
+### Example
+
+```javascript
+const { data: profile, error } = await insforge.auth.setProfile({
+  nickname: 'JohnDev',
+  bio: 'Full-stack developer',
+  avatar_url: 'https://example.com/avatar.jpg'
+})
+```
+
+### Output
+
+```json
+{
+  "data": {
+    "id": "usr_abc123",
+    "nickname": "JohnDev",
+    "avatar_url": "https://example.com/avatar.jpg",
+    "bio": "Full-stack developer",
+    "birthday": null
+  },
+  "error": null
+}
+```
+
+---
+
+## Error Handling
+
+All auth methods return structured errors:
+
+```javascript
+const { data, error } = await insforge.auth.signInWithPassword({
+  email: 'user@example.com',
+  password: 'wrong_password'
+})
+
+if (error) {
+  console.error(error.statusCode)    // 401
+  console.error(error.error)         // 'INVALID_CREDENTIALS'
+  console.error(error.message)       // 'Invalid login credentials'
+  console.error(error.nextActions)   // 'Check email and password'
+}
+```

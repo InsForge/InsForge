@@ -4,6 +4,8 @@ import { isCloudEnvironment } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
 import { SecretService } from '@/core/secrets/secrets';
 import { OAuthConfigService } from '@/core/auth/oauth.js';
+import { OAuthProvidersSchema } from '@insforge/shared-schemas';
+import { AuthService } from '@/core/auth/auth.js';
 
 /**
  * Validates admin credentials are configured
@@ -54,7 +56,7 @@ async function seedDefaultAIConfigs(): Promise<void> {
 }
 
 /**
- * Seeds default OAuth configurations for Google and GitHub
+ * Seeds default OAuth configurations for supported providers
  */
 async function seedDefaultOAuthConfigs(): Promise<void> {
   const oauthService = OAuthConfigService.getInstance();
@@ -64,22 +66,17 @@ async function seedDefaultOAuthConfigs(): Promise<void> {
     const existingConfigs = await oauthService.getAllConfigs();
     const existingProviders = existingConfigs.map((config) => config.provider.toLowerCase());
 
-    // Seed Google OAuth config if not exists
-    if (!existingProviders.includes('google')) {
-      await oauthService.createConfig({
-        provider: 'google',
-        useSharedKey: true,
-      });
-      logger.info('✅ Default Google OAuth config created');
-    }
+    // Default providers to seed
+    const defaultProviders: OAuthProvidersSchema[] = ['google', 'github'];
 
-    // Seed GitHub OAuth config if not exists
-    if (!existingProviders.includes('github')) {
-      await oauthService.createConfig({
-        provider: 'github',
-        useSharedKey: true,
-      });
-      logger.info('✅ Default GitHub OAuth config created');
+    for (const provider of defaultProviders) {
+      if (!existingProviders.includes(provider)) {
+        await oauthService.createConfig({
+          provider,
+          useSharedKey: true,
+        });
+        logger.info(`✅ Default ${provider} OAuth config created`);
+      }
     }
   } catch (error) {
     logger.warn('Failed to seed OAuth configs', {
@@ -100,34 +97,52 @@ async function seedLocalOAuthConfigs(): Promise<void> {
     const existingConfigs = await oauthService.getAllConfigs();
     const existingProviders = existingConfigs.map((config) => config.provider.toLowerCase());
 
-    // Seed Google OAuth config from environment variables if credentials exist
-    const googleClientId = process.env.GOOGLE_CLIENT_ID;
-    const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
-
-    if (googleClientId && googleClientSecret && !existingProviders.includes('google')) {
-      await oauthService.createConfig({
+    // Environment variable mappings for OAuth providers
+    const envMappings: Array<{
+      provider: OAuthProvidersSchema;
+      clientIdEnv: string;
+      clientSecretEnv: string;
+    }> = [
+      {
         provider: 'google',
-        clientId: googleClientId,
-        clientSecret: googleClientSecret,
-        scopes: ['openid', 'email', 'profile'],
-        useSharedKey: false,
-      });
-      logger.info('✅ Google OAuth config loaded from environment variables');
-    }
-
-    // Seed GitHub OAuth config from environment variables if credentials exist
-    const githubClientId = process.env.GITHUB_CLIENT_ID;
-    const githubClientSecret = process.env.GITHUB_CLIENT_SECRET;
-
-    if (githubClientId && githubClientSecret && !existingProviders.includes('github')) {
-      await oauthService.createConfig({
+        clientIdEnv: 'GOOGLE_CLIENT_ID',
+        clientSecretEnv: 'GOOGLE_CLIENT_SECRET',
+      },
+      {
         provider: 'github',
-        clientId: githubClientId,
-        clientSecret: githubClientSecret,
-        scopes: ['user:email'],
-        useSharedKey: false,
-      });
-      logger.info('✅ GitHub OAuth config loaded from environment variables');
+        clientIdEnv: 'GITHUB_CLIENT_ID',
+        clientSecretEnv: 'GITHUB_CLIENT_SECRET',
+      },
+      {
+        provider: 'discord',
+        clientIdEnv: 'DISCORD_CLIENT_ID',
+        clientSecretEnv: 'DISCORD_CLIENT_SECRET',
+      },
+      {
+        provider: 'linkedin',
+        clientIdEnv: 'LINKEDIN_CLIENT_ID',
+        clientSecretEnv: 'LINKEDIN_CLIENT_SECRET',
+      },
+      {
+        provider: 'microsoft',
+        clientIdEnv: 'MICROSOFT_CLIENT_ID',
+        clientSecretEnv: 'MICROSOFT_CLIENT_SECRET',
+      },
+    ];
+
+    for (const { provider, clientIdEnv, clientSecretEnv } of envMappings) {
+      const clientId = process.env[clientIdEnv];
+      const clientSecret = process.env[clientSecretEnv];
+
+      if (clientId && clientSecret && !existingProviders.includes(provider)) {
+        await oauthService.createConfig({
+          provider,
+          clientId,
+          clientSecret,
+          useSharedKey: false,
+        });
+        logger.info(`✅ ${provider} OAuth config loaded from environment variables`);
+      }
     }
   } catch (error) {
     logger.warn('Failed to seed local OAuth configs', {
@@ -139,6 +154,8 @@ async function seedLocalOAuthConfigs(): Promise<void> {
 // Create api key, admin user, and default AI configs
 export async function seedBackend(): Promise<void> {
   const secretService = new SecretService();
+  const authService = AuthService.getInstance();
+
   const dbManager = DatabaseManager.getInstance();
 
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
@@ -180,15 +197,29 @@ export async function seedBackend(): Promise<void> {
     // Initialize reserved secrets for edge functions
     // Add INSFORGE_INTERNAL_URL for Deno-to-backend container communication
     const insforgInternalUrl = 'http://insforge:7130';
-    const existingSecret = await secretService.getSecretByKey('INSFORGE_INTERNAL_URL');
+    const existingInternalUrlSecret = await secretService.getSecretByKey('INSFORGE_INTERNAL_URL');
 
-    if (existingSecret === null) {
+    if (existingInternalUrlSecret === null) {
       await secretService.createSecret({
         key: 'INSFORGE_INTERNAL_URL',
         isReserved: true,
         value: insforgInternalUrl,
       });
-      logger.info('✅ System secrets initialized');
+      logger.info('✅ INSFORGE_INTERNAL_URL secret initialized');
+    }
+
+    // Add ANON_KEY for public edge function access
+    const existingAnonKeySecret = await secretService.getSecretByKey('ANON_KEY');
+
+    if (existingAnonKeySecret === null) {
+      const anonToken = authService.generateAnonToken();
+
+      await secretService.createSecret({
+        key: 'ANON_KEY',
+        isReserved: true,
+        value: anonToken,
+      });
+      logger.info('✅ ANON_KEY secret initialized');
     }
 
     logger.info(`API key generated: ${apiKey}`);

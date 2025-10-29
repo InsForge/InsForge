@@ -1,0 +1,22 @@
+<CodeGroup>
+```bash npm
+npm install @insforge/sdk@latest
+```
+
+```bash yarn
+yarn add @insforge/sdk@latest
+```
+
+```bash pnpm
+pnpm add @insforge/sdk@latest
+```
+</CodeGroup>
+
+```javascript
+import { createClient } from '@insforge/sdk';
+
+const insforge = createClient({
+  baseUrl: 'https://your-app.us-east.insforge.app',
+  anonKey: 'your-anon-key'  // Optional: for public/unauthenticated requests
+});
+```

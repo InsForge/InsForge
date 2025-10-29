@@ -3,6 +3,15 @@ import { apiClient } from '@/lib/api/client';
 import { ColumnSchema } from '@insforge/shared-schemas';
 import { tableService } from './table.service';
 
+export interface CSVImportResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    rowCount: number;
+  };
+  error?: string; // For backend error messages
+}
+
 export class RecordService {
   /**
    * Data fetching method with built-in search, sorting, and pagination for UI components.
@@ -168,6 +177,42 @@ export class RecordService {
       method: 'DELETE',
       headers: apiClient.withAccessToken(),
     });
+  }
+
+  validateCSVFile(file: File): { valid: boolean; error?: string } {
+    if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
+      return { valid: false, error: 'Invalid file type. Please upload a CSV file.' };
+    }
+    const maxSizeInBytes = 50 * 1024 * 1024;
+    if (file.size > maxSizeInBytes) {
+      return { valid: false, error: `File size exceeds the limit of ${maxSizeInBytes} bytes.` };
+    }
+    return { valid: true };
+  }
+
+  async importCSV(tableName: string, file: File): Promise<CSVImportResponse> {
+    const validation = this.validateCSVFile(file);
+    if (!validation.valid) {
+      throw new Error(validation.error || 'Invalid CSV file.');
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('table', tableName);
+
+    const response = await apiClient.request(`/database/advance/bulk-upsert`, {
+      method: 'POST',
+      headers: apiClient.withAccessToken(),
+      body: formData,
+    });
+    return {
+      success: response.success,
+      message: response.message,
+      data: {
+        rowCount: response.rowsAffected,
+      },
+      error: response.error,
+    };
   }
 }
 
