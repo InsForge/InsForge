@@ -7,6 +7,7 @@ import {
   roleSchema,
   userSchema,
   oAuthConfigSchema,
+  oAuthProvidersSchema,
   emailAuthConfigSchema,
 } from './auth.schema';
 
@@ -234,9 +235,7 @@ export const listOAuthConfigsResponseSchema = z.object({
  * Public OAuth provider schema - contains only safe, client-visible fields
  */
 export const publicOAuthProviderSchema = z.object({
-  provider: z.string(),
-  scopes: z.array(z.string()).optional(),
-  isConfigured: z.boolean(),
+  provider: oAuthProvidersSchema,
 });
 
 /**
@@ -264,6 +263,24 @@ export const updateEmailAuthConfigRequestSchema = emailAuthConfigSchema.omit({
  * Response for GET /api/auth/email/config
  */
 export const getEmailAuthConfigResponseSchema = emailAuthConfigSchema;
+
+/**
+ * Public email auth config schema - contains only safe, client-visible fields
+ * Excludes id, createdAt, updatedAt and other sensitive information
+ */
+export const publicEmailAuthConfigSchema = z.object({
+  requireEmailVerification: z.boolean(),
+  passwordMinLength: z.number().min(4).max(128),
+  requireNumber: z.boolean(),
+  requireLowercase: z.boolean(),
+  requireUppercase: z.boolean(),
+  requireSpecialChar: z.boolean(),
+});
+
+/**
+ * Response for GET /api/auth/email/public-config - Public endpoint
+ */
+export const getPublicEmailAuthConfigResponseSchema = publicEmailAuthConfigSchema;
 
 // ============================================================================
 // Error response schema
@@ -312,6 +329,10 @@ export type GetEmailAuthConfigResponse = z.infer<typeof getEmailAuthConfigRespon
 export type PublicOAuthProvider = z.infer<typeof publicOAuthProviderSchema>;
 export type ListPublicOAuthProvidersResponse = z.infer<
   typeof listPublicOAuthProvidersResponseSchema
+>;
+export type PublicEmailAuthConfig = z.infer<typeof publicEmailAuthConfigSchema>;
+export type GetPublicEmailAuthConfigResponse = z.infer<
+  typeof getPublicEmailAuthConfigResponseSchema
 >;
 
 export type AuthErrorResponse = z.infer<typeof authErrorResponseSchema>;

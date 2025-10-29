@@ -5,12 +5,12 @@ import { Input } from '@/components/radix/Input';
 import { Label } from '@/components/radix/Label';
 import { cn } from '@/lib/utils/utils';
 import { AuthPasswordStrengthIndicator } from './AuthPasswordStrengthIndicator';
-import { EmailAuthConfigSchema } from '@insforge/shared-schemas';
+import { PublicEmailAuthConfig } from '@insforge/shared-schemas';
 
 interface AuthPasswordFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   showStrengthIndicator?: boolean;
-  passwordConfig?: EmailAuthConfigSchema;
+  passwordConfig?: PublicEmailAuthConfig;
   forgotPasswordLink?: {
     route: string;
     text?: string;

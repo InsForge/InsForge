@@ -89,16 +89,13 @@ export class OAuthConfigService {
     try {
       const result = await client.query(
         `SELECT
-          provider,
-          scopes
+          provider
          FROM _oauth_configs
          ORDER BY provider ASC`
       );
 
       return result.rows.map((row) => ({
         provider: row.provider,
-        scopes: row.scopes,
-        isConfigured: true,
       }));
     } catch (error) {
       logger.error('Failed to get public OAuth providers', { error });

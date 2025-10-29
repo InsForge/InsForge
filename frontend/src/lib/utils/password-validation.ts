@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { EmailAuthConfigSchema } from '@insforge/shared-schemas';
+import { PublicEmailAuthConfig } from '@insforge/shared-schemas';
 
 /**
  * Creates a dynamic password schema based on email auth configuration
  */
-export function createDynamicPasswordSchema(config: EmailAuthConfigSchema) {
+export function createDynamicPasswordSchema(config: PublicEmailAuthConfig) {
   let schema = z.string();
 
   // Apply minimum length
@@ -50,7 +50,7 @@ export interface PasswordRequirement {
 /**
  * Generates password requirements array based on email auth configuration
  */
-export function getPasswordRequirements(config: EmailAuthConfigSchema): PasswordRequirement[] {
+export function getPasswordRequirements(config: PublicEmailAuthConfig): PasswordRequirement[] {
   const requirements: PasswordRequirement[] = [];
 
   if (config.requireUppercase) {
@@ -100,7 +100,7 @@ export function getPasswordRequirements(config: EmailAuthConfigSchema): Password
  */
 export function validatePasswordAgainstConfig(
   password: string,
-  config: EmailAuthConfigSchema
+  config: PublicEmailAuthConfig
 ): boolean {
   if (!password) {
     return false;

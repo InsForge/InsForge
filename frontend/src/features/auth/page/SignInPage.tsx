@@ -1,10 +1,6 @@
 import { useState, FormEvent, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import {
-  OAuthProvidersSchema,
-  ListPublicOAuthProvidersResponse,
-  CreateSessionResponse,
-} from '@insforge/shared-schemas';
+import { OAuthProvidersSchema, UserSchema } from '@insforge/shared-schemas';
 import { AlertTriangle } from 'lucide-react';
 import {
   AuthFormField,
@@ -16,6 +12,8 @@ import {
 import InsForgeLogo from '@/assets/logos/insforge_light.svg?react';
 import { signInFormSchema } from '@/lib/utils/validation-schemas';
 import broadcastService, { BroadcastEventType } from '@/lib/services/broadcastService';
+import { oauthConfigService } from '../services/oauth-config.service';
+import { authService } from '../services/auth.service';
 
 type SignInStep = 'form' | 'awaiting-verification';
 
@@ -32,13 +30,23 @@ export default function SignInPage() {
   const redirectUrl = searchParams.get('redirect');
 
   const handleSuccessfulAuth = useCallback(
-    (accessToken: string) => {
-      // Redirect back to user's app with token
+    (data: { accessToken: string; user?: UserSchema }) => {
+      // Redirect back to user's app with token and user info (consistent with OAuth flow)
       if (redirectUrl) {
         try {
           const finalUrl = new URL(redirectUrl, window.location.origin);
-          // Use query parameter to match OAuth flow (standard and consistent)
-          finalUrl.searchParams.set('access_token', accessToken);
+          const params = new URLSearchParams();
+          params.set('access_token', data.accessToken);
+          if (data.user?.id) {
+            params.set('user_id', data.user.id);
+          }
+          if (data.user?.email) {
+            params.set('email', data.user.email);
+          }
+          if (data.user?.name) {
+            params.set('name', data.user.name);
+          }
+          finalUrl.search = params.toString();
           window.location.assign(finalUrl.toString());
         } catch {
           // Invalid redirect; default to dashboard
@@ -56,9 +64,12 @@ export default function SignInPage() {
     const unsubscribe = broadcastService.subscribe(
       BroadcastEventType.EMAIL_VERIFIED_SUCCESS,
       (event) => {
-        // Email was verified in another tab, redirect with token
+        // Email was verified in another tab, redirect with token and user info
         if (event.data?.accessToken) {
-          handleSuccessfulAuth(event.data.accessToken as string);
+          handleSuccessfulAuth({
+            accessToken: event.data.accessToken as string,
+            user: event.data.user,
+          });
         }
       }
     );
@@ -68,9 +79,9 @@ export default function SignInPage() {
 
   // Fetch available OAuth providers on mount
   useEffect(() => {
-    void fetch('/api/auth/oauth/providers')
-      .then((res) => res.json())
-      .then((data: ListPublicOAuthProvidersResponse) => {
+    void oauthConfigService
+      .getPublicProviders()
+      .then((data) => {
         if (data?.data && Array.isArray(data.data)) {
           setAvailableProviders(
             data.data.map((provider) => provider.provider as OAuthProvidersSchema)
@@ -98,40 +109,25 @@ export default function SignInPage() {
     const validatedData = validationResult.data;
 
     try {
-      const response = await fetch('/api/auth/sessions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(validatedData),
-      });
+      const data = await authService.createSession(validatedData);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        const errorMessage = (errorData as { message?: string }).message || 'Sign in failed';
-
-        // Check if email verification is required
-        if (
-          response.status === 403 &&
-          (errorMessage.toLowerCase().includes('email verification') ||
-            errorMessage.toLowerCase().includes('verify your email') ||
-            errorMessage.toLowerCase().includes('email not verified'))
-        ) {
+      if (data.accessToken) {
+        handleSuccessfulAuth({
+          accessToken: data.accessToken,
+          user: data.user,
+        });
+      }
+    } catch (err: unknown) {
+      // Check if email verification is required (403 status code)
+      if (err instanceof Error && 'response' in err) {
+        const apiError = err as { response?: { status: number } };
+        if (apiError.response?.status === 403) {
           // User needs to verify email - show message box
           setStep('awaiting-verification');
           setLoading(false);
           return;
         }
-
-        throw new Error(errorMessage);
       }
-
-      const data: CreateSessionResponse = await response.json();
-
-      if (data.accessToken) {
-        handleSuccessfulAuth(data.accessToken);
-      }
-    } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Sign in failed');
     } finally {
       setLoading(false);
@@ -139,14 +135,11 @@ export default function SignInPage() {
   }
 
   const handleResendVerificationEmail = useCallback(async () => {
-    await fetch('/api/auth/resend-verification-email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email }),
-    });
-    // Always succeed silently to prevent email enumeration
+    try {
+      await authService.resendVerificationEmail({ email });
+    } catch {
+      // Always succeed silently to prevent email enumeration
+    }
   }, [email]);
 
   async function handleOAuth(provider: OAuthProvidersSchema) {
@@ -157,19 +150,9 @@ export default function SignInPage() {
       // Always provide a redirect_uri (backend requires it)
       // Use the provided redirect URL or default to application root
       const finalRedirectUri = redirectUrl || window.location.origin;
-      const apiUrl = `/api/auth/oauth/${provider}?redirect_uri=${encodeURIComponent(finalRedirectUri)}`;
 
-      // Fetch the OAuth URL from backend
-      const response = await fetch(apiUrl);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          (errorData as { message?: string }).message || `${provider} OAuth initialization failed`
-        );
-      }
-
-      const { authUrl } = await response.json();
+      // Get OAuth authorization URL from backend
+      const { authUrl } = await authService.getOAuthUrl(provider, finalRedirectUri);
 
       // Redirect to OAuth provider's authorization page
       window.location.href = authUrl;
