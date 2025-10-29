@@ -46,7 +46,6 @@ export { ConfirmDialog } from './ConfirmDialog';
 export { LinearStepper } from './Stepper';
 export { VerticalStepper } from './Stepper';
 
-
 // Data Grid Components
 export { DataGrid, SortableHeaderRenderer } from './datagrid';
 export type { DataGridProps } from './datagrid';
