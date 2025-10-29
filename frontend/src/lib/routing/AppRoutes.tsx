@@ -17,6 +17,7 @@ import FunctionsPage from '@/features/functions/page/FunctionsPage';
 import AIPage from '@/features/ai/page/AIPage';
 import SignInPage from '@/features/auth/page/SignInPage';
 import SignUpPage from '@/features/auth/page/SignUpPage';
+import VerifyEmailPage from '@/features/auth/page/VerifyEmailPage';
 
 export function AppRoutes() {
   return (
@@ -27,6 +28,7 @@ export function AppRoutes() {
         <Route index element={<Navigate to="signin" replace />} />
         <Route path="signin" element={<SignInPage />} />
         <Route path="signup" element={<SignUpPage />} />
+        <Route path="verify-email" element={<VerifyEmailPage />} />
         <Route path="*" element={<Navigate to="signin" replace />} />
       </Route>
       <Route
