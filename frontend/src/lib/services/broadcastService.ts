@@ -1,3 +1,5 @@
+import { UserSchema } from '@insforge/shared-schemas';
+
 /**
  * Broadcast event types for cross-tab communication
  */
@@ -14,9 +16,7 @@ export interface BroadcastEvent {
   timestamp: number;
   data?: {
     accessToken?: string;
-    userId?: string;
-    email?: string;
-    [key: string]: unknown;
+    user?: UserSchema;
   };
 }
 
