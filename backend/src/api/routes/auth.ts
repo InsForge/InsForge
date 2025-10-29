@@ -42,19 +42,15 @@ const auditService = AuditService.getInstance();
 router.use('/oauth', oauthRouter);
 
 // Email Authentication Configuration Routes
-// GET /api/auth/email/config - Get email authentication configuration (admin only)
-router.get(
-  '/email/config',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const config: GetEmailAuthConfigResponse = await authConfigService.getEmailConfig();
-      res.json(config);
-    } catch (error) {
-      next(error);
-    }
+// GET /api/auth/email/config - Get email authentication configuration (public)
+router.get('/email/config', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const config: GetEmailAuthConfigResponse = await authConfigService.getEmailConfig();
+    res.json(config);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 // PUT /api/auth/email/config - Update email authentication configuration (admin only)
 router.put(
