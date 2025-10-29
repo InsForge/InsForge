@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { Home } from 'lucide-react';
 import InsForgeLogo from '@/assets/logos/insforge_light.svg?react';
 import broadcastService, { BroadcastEventType } from '@/lib/services/broadcastService';
+import { authService } from '../services/auth.service';
 
 /**
  * Email verification page
@@ -13,24 +14,23 @@ import broadcastService, { BroadcastEventType } from '@/lib/services/broadcastSe
  *
  * Flow:
  * 1. User clicks verification link in email → arrives at this page with token
+ *    - Default: URL contains `token` parameter (64-char hex token)
  * 2. Page calls backend to verify email with token
- * 3. Backend returns access token
- * 4. Page broadcasts success event to signin/signup tabs
- * 5. Those tabs receive the token and redirect to user's app
+ * 3. Backend returns access token and user profile info
+ * 4. Page broadcasts success event with full response data to signin/signup tabs
  */
 export default function VerifyEmailPage() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const [verifying, setVerifying] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     const verifyEmail = async () => {
-      const email = searchParams.get('email');
-      const code = searchParams.get('code');
+      // Get token from URL
+      const token = searchParams.get('token');
 
       // Validate required parameters
-      if (!email || !code) {
+      if (!token) {
         setError('Invalid verification link. Missing required parameters.');
         setVerifying(false);
         return;
@@ -38,45 +38,24 @@ export default function VerifyEmailPage() {
 
       try {
         // Call backend to verify email
-        const response = await fetch('/api/auth/verify-email', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email,
-            verificationCode: code,
-          }),
+        const result = await authService.verifyEmail({
+          otp: token,
         });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            (errorData as { message?: string }).message ||
-              'Email verification failed. Please try again.'
-          );
-        }
-
-        const data = await response.json();
-        const accessToken = (data as { accessToken?: string }).accessToken;
+        const accessToken = result.accessToken;
 
         if (!accessToken) {
           throw new Error('Verification succeeded but no access token received');
         }
 
-        // Broadcast success to other tabs (signin/signup pages)
+        // Pass complete response data including user profile
         broadcastService.broadcast(BroadcastEventType.EMAIL_VERIFIED_SUCCESS, {
           accessToken,
-          email,
+          user: result.user,
         });
 
-        // Show success message briefly
+        // Show success message (user can close this tab)
         setVerifying(false);
-
-        // Redirect to dashboard after short delay
-        setTimeout(() => {
-          void navigate('/dashboard');
-        }, 1500);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Email verification failed');
         setVerifying(false);
@@ -84,7 +63,7 @@ export default function VerifyEmailPage() {
     };
 
     void verifyEmail();
-  }, [searchParams, navigate]);
+  }, [searchParams]);
 
   if (verifying) {
     return (
@@ -167,7 +146,8 @@ export default function VerifyEmailPage() {
               Email Verified!
             </h2>
             <p className="text-sm text-neutral-600 dark:text-neutral-400 text-center">
-              Redirecting to dashboard...
+              Your email has been verified successfully. You can close this page and return to your
+              app.
             </p>
           </div>
         </div>

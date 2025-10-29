@@ -3,7 +3,11 @@ import { DatabaseManager } from '@/core/database/manager.js';
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
-import type { EmailAuthConfigSchema, UpdateEmailAuthConfigRequest } from '@insforge/shared-schemas';
+import type {
+  EmailAuthConfigSchema,
+  UpdateEmailAuthConfigRequest,
+  PublicEmailAuthConfig,
+} from '@insforge/shared-schemas';
 
 export class AuthConfigService {
   private static instance: AuthConfigService;
@@ -25,6 +29,52 @@ export class AuthConfigService {
       this.pool = DatabaseManager.getInstance().getPool();
     }
     return this.pool;
+  }
+
+  /**
+   * Get public email authentication configuration (safe for public API)
+   * Only returns non-sensitive configuration settings without id, timestamps, etc.
+   */
+  async getPublicEmailConfig(): Promise<PublicEmailAuthConfig> {
+    const client = await this.getPool().connect();
+    try {
+      const result = await client.query(
+        `SELECT
+          require_email_verification as "requireEmailVerification",
+          password_min_length as "passwordMinLength",
+          require_number as "requireNumber",
+          require_lowercase as "requireLowercase",
+          require_uppercase as "requireUppercase",
+          require_special_char as "requireSpecialChar"
+         FROM _auth_configs
+         LIMIT 1`
+      );
+
+      // If no config exists, create default and return it
+      if (!result.rows.length) {
+        logger.warn('No auth config found, creating default configuration');
+        const defaultConfig = await this.createDefaultConfig();
+        return {
+          requireEmailVerification: defaultConfig.requireEmailVerification,
+          passwordMinLength: defaultConfig.passwordMinLength,
+          requireNumber: defaultConfig.requireNumber,
+          requireLowercase: defaultConfig.requireLowercase,
+          requireUppercase: defaultConfig.requireUppercase,
+          requireSpecialChar: defaultConfig.requireSpecialChar,
+        };
+      }
+
+      return result.rows[0];
+    } catch (error) {
+      logger.error('Failed to get public auth config', { error });
+      throw new AppError(
+        'Failed to get email authentication configuration',
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    } finally {
+      client.release();
+    }
   }
 
   /**

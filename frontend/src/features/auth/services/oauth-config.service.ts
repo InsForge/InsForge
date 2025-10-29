@@ -4,9 +4,17 @@ import {
   CreateOAuthConfigRequest,
   UpdateOAuthConfigRequest,
   ListOAuthConfigsResponse,
+  ListPublicOAuthProvidersResponse,
 } from '@insforge/shared-schemas';
 
 export class OAuthConfigService {
+  // Get public OAuth providers (safe for public API)
+  async getPublicProviders(): Promise<ListPublicOAuthProvidersResponse> {
+    return apiClient.request('/auth/oauth/providers', {
+      skipAuth: true,
+    });
+  }
+
   // List all OAuth configurations
   async getAllConfigs(): Promise<ListOAuthConfigsResponse> {
     return apiClient.request('/auth/oauth/configs');

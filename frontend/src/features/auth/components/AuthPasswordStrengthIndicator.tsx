@@ -1,5 +1,5 @@
 import CheckedIcon from '@/assets/icons/checked.svg?react';
-import { EmailAuthConfigSchema } from '@insforge/shared-schemas';
+import { PublicEmailAuthConfig } from '@insforge/shared-schemas';
 import {
   getPasswordRequirements,
   validatePasswordAgainstConfig,
@@ -7,14 +7,14 @@ import {
 
 interface AuthPasswordStrengthIndicatorProps {
   password: string;
-  config: EmailAuthConfigSchema;
+  config: PublicEmailAuthConfig;
 }
 
 /**
  * Validates that a password meets all strength requirements.
  * @deprecated Use validatePasswordAgainstConfig from dynamic-password-validation instead
  */
-export function validatePasswordStrength(password: string, config: EmailAuthConfigSchema): boolean {
+export function validatePasswordStrength(password: string, config: PublicEmailAuthConfig): boolean {
   return validatePasswordAgainstConfig(password, config);
 }
 
