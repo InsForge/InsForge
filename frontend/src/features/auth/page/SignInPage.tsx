@@ -7,7 +7,7 @@ import {
   AuthPasswordField,
   AuthSubmitButton,
   AuthOAuthProviders,
-  AuthEmailMessageBox,
+  AuthEmailVerificationStep,
 } from '../components';
 import InsForgeLogo from '@/assets/logos/insforge_light.svg?react';
 import { signInFormSchema } from '@/lib/utils/validation-schemas';
@@ -122,7 +122,7 @@ export default function SignInPage() {
       if (err instanceof Error && 'response' in err) {
         const apiError = err as { response?: { status: number } };
         if (apiError.response?.status === 403) {
-          // User needs to verify email - show message box
+          // User needs to verify email - show verification step
           setStep('awaiting-verification');
           setLoading(false);
           return;
@@ -134,13 +134,19 @@ export default function SignInPage() {
     }
   }
 
-  const handleResendVerificationEmail = useCallback(async () => {
-    try {
-      await authService.resendVerificationEmail({ email });
-    } catch {
-      // Always succeed silently to prevent email enumeration
+  async function handleVerifyCode(code: string) {
+    const result = await authService.verifyEmail({
+      email,
+      otp: code,
+    });
+
+    if (result.accessToken) {
+      handleSuccessfulAuth({
+        accessToken: result.accessToken,
+        user: result.user,
+      });
     }
-  }, [email]);
+  }
 
   async function handleOAuth(provider: OAuthProvidersSchema) {
     try {
@@ -244,13 +250,7 @@ export default function SignInPage() {
               )}
             </>
           ) : (
-            <AuthEmailMessageBox
-              email={email}
-              onResend={handleResendVerificationEmail}
-              title="Verify Your Email"
-              description="We've sent a verification link to {email}. Please check your email and click the link to verify your account before signing in. The link will expire in 10 minutes."
-              initiallyDisabled={false}
-            />
+            <AuthEmailVerificationStep email={email} onVerifyCode={handleVerifyCode} />
           )}
         </div>
 

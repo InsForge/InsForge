@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
-import { Home } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import InsForgeLogo from '@/assets/logos/insforge_light.svg?react';
 import broadcastService, { BroadcastEventType } from '@/lib/services/broadcastService';
 import { authService } from '../services/auth.service';
@@ -54,7 +53,7 @@ export default function VerifyEmailPage() {
           user: result.user,
         });
 
-        // Show success message (user can close this tab)
+        // Show success message
         setVerifying(false);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Email verification failed');
@@ -98,17 +97,10 @@ export default function VerifyEmailPage() {
                 Verification Failed
               </h1>
               <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                {error}
+                {error} Please try again or contact support if the problem persists. You can close
+                this page and return to your app.
               </p>
             </div>
-
-            <Link
-              to="/"
-              className="flex items-center justify-center gap-2 w-full h-10 px-4 py-2 rounded bg-black hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-200 dark:text-black text-white font-medium transition-colors"
-            >
-              <Home className="w-5 h-5" />
-              Go to Home
-            </Link>
           </div>
 
           {/* Insforge Branding */}
@@ -127,7 +119,7 @@ export default function VerifyEmailPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800">
       <div className="max-w-[400px] w-full flex flex-col items-stretch justify-center bg-white dark:bg-neutral-900 rounded-xl shadow-[0_4px_12px_0_rgba(0,0,0,0.05)]">
-        <div className="w-full p-6 flex flex-col items-center justify-center gap-6">
+        <div className="w-full p-6 flex flex-col items-stretch justify-center gap-6">
           <div className="flex flex-col items-center gap-4">
             <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
               <svg
