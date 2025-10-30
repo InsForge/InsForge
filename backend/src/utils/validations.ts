@@ -34,7 +34,7 @@ export function validatePassword(password: string, config: EmailAuthConfigSchema
   }
 
   // Check for special character requirement
-  if (config.requireSpecialChar && !/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+  if (config.requireSpecialChar && !/[!@#$%^&*()_+\-=[\]{};\\|,.<>/?]/.test(password)) {
     return false;
   }
 
