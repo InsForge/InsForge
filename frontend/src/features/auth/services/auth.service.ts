@@ -5,7 +5,7 @@ import {
   CreateSessionResponse,
   CreateUserRequest,
   CreateUserResponse,
-  ResendVerificationEmailRequest,
+  SendVerificationEmailRequest,
   GetOauthUrlResponse,
   OAuthProvidersSchema,
 } from '@insforge/shared-schemas';
@@ -64,8 +64,8 @@ export class AuthService {
   /**
    * Resend verification email (sends numeric OTP code)
    */
-  async resendVerificationEmail(input: ResendVerificationEmailRequest): Promise<void> {
-    return apiClient.request('/auth/resend-verification-email', {
+  async resendVerificationEmail(input: SendVerificationEmailRequest): Promise<void> {
+    return apiClient.request('/auth/email/send-verification-link', {
       method: 'POST',
       body: JSON.stringify(input),
       skipAuth: true,
