@@ -1,6 +1,6 @@
 import logger from '@/utils/logger.js';
 
-type ValidationResult = {
+export type ValidationResult = {
   valid: boolean;
   reason?: 'not_found' | 'infra_error';
 };
@@ -25,7 +25,7 @@ export async function validateModelId(modelId: string): Promise<ValidationResult
     const response = await fetch('https://openrouter.ai/api/v1/models');
     if (!response.ok) {
       logger.error(`Failed to fetch models from OpenRouter (status ${response.status})`);
-      return { valid: true, reason: 'infra_error' };
+      return { valid: false, reason: 'infra_error' };
     }
 
     //  Explicitly type the response
@@ -33,7 +33,7 @@ export async function validateModelId(modelId: string): Promise<ValidationResult
 
     if (!data.data || !Array.isArray(data.data)) {
       logger.error('Unexpected response structure from OpenRouter');
-      return { valid: true, reason: 'infra_error' };
+      return { valid: false, reason: 'infra_error' };
     }
 
     //  Update cache
@@ -46,6 +46,6 @@ export async function validateModelId(modelId: string): Promise<ValidationResult
     };
   } catch (err) {
     logger.error('Error validating modelId from OpenRouter', { error: err });
-    return { valid: true, reason: 'infra_error' };
+    return { valid: false, reason: 'infra_error' };
   }
 }
