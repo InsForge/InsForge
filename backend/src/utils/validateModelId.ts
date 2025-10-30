@@ -1,65 +1,51 @@
-import logger from './logger';
+import logger from '@/utils/logger.js';
 
-export type ValidationResult =
-  | { valid: true }
-  | { valid: false; reason: 'not_found' | 'network_error' | 'timeout' | 'missing_api_key' };
+type ValidationResult = {
+  valid: boolean;
+  reason?: 'not_found' | 'infra_error';
+};
 
-interface OpenRouterModel {
-  id: string;
-}
-
-interface OpenRouterResponse {
-  data: OpenRouterModel[];
-}
+let cachedModels: string[] = [];
+let lastUpdated = 0;
+const CACHE_TTL_MS = 10 * 60 * 1000;
 
 export async function validateModelId(modelId: string): Promise<ValidationResult> {
-  if (!process.env.OPENROUTER_API_KEY) {
-    logger.error('OPENROUTER_API_KEY environment variable is not set');
-    return { valid: false, reason: 'missing_api_key' };
+  const now = Date.now();
+
+  if (cachedModels.length > 0 && now - lastUpdated < CACHE_TTL_MS) {
+    return {
+      valid: cachedModels.includes(modelId),
+      reason: cachedModels.includes(modelId) ? undefined : 'not_found',
+    };
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
-
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/models', {
-      headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
+    logger.info('Fetching model list from OpenRouter (refreshing cache)...');
 
+    const response = await fetch('https://openrouter.ai/api/v1/models');
     if (!response.ok) {
-      logger.warn('Failed to fetch models from OpenRouter', { statusCode: response.status });
-      return { valid: false, reason: 'network_error' };
+      logger.error(`Failed to fetch models from OpenRouter (status ${response.status})`);
+      return { valid: true, reason: 'infra_error' };
     }
 
-    const data: unknown = await response.json();
+    //  Explicitly type the response
+    const data = (await response.json()) as { data?: { id: string }[] };
 
-    if (typeof data !== 'object' || data === null) {
-      logger.warn('Unexpected response structure from OpenRouter');
-      return { valid: false, reason: 'network_error' };
+    if (!data.data || !Array.isArray(data.data)) {
+      logger.error('Unexpected response structure from OpenRouter');
+      return { valid: true, reason: 'infra_error' };
     }
 
-    const responseData = data as OpenRouterResponse;
+    //  Update cache
+    cachedModels = data.data.map((m) => m.id);
+    lastUpdated = now;
 
-    if (!Array.isArray(responseData.data)) {
-      logger.warn('Unexpected response structure from OpenRouter');
-      return { valid: false, reason: 'network_error' };
-    }
-
-    const found = responseData.data.some((m) => typeof m.id === 'string' && m.id === modelId);
-    return found ? { valid: true } : { valid: false, reason: 'not_found' };
+    return {
+      valid: cachedModels.includes(modelId),
+      reason: cachedModels.includes(modelId) ? undefined : 'not_found',
+    };
   } catch (err) {
-    clearTimeout(timeoutId);
-    if (err instanceof Error && err.name === 'AbortError') {
-      logger.warn('Timeout validating modelId with OpenRouter', { modelId });
-      return { valid: false, reason: 'timeout' };
-    } else {
-      logger.error('Error validating modelId', { error: err, modelId });
-      return { valid: false, reason: 'network_error' };
-    }
+    logger.error('Error validating modelId from OpenRouter', { error: err });
+    return { valid: true, reason: 'infra_error' };
   }
 }
