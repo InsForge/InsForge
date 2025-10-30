@@ -144,7 +144,9 @@ export function AuthEmailVerificationStep({
               value={verificationCode}
               onChange={setVerificationCode}
               disabled={isVerifying}
-              onComplete={handleVerifyCode}
+              onComplete={(code) => {
+                void handleVerifyCode(code);
+              }}
             />
             {verificationError && (
               <p className="text-sm text-red-600 dark:text-red-400 text-center">

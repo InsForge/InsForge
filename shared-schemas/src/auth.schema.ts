@@ -121,11 +121,11 @@ export const tokenPayloadSchema = z.object({
 export const profileSchema = z.object({
   id: userIdSchema, // References _accounts(id)
   nickname: z.string().nullable().optional(),
-  avatar_url: z.string().nullable().optional(),
+  avatarUrl: z.string().nullable().optional(),
   bio: z.string().nullable().optional(),
   birthday: z.string().nullable().optional(), // PostgreSQL DATE as ISO string (YYYY-MM-DD)
-  created_at: z.string(), // PostgreSQL TIMESTAMPTZ
-  updated_at: z.string(), // PostgreSQL TIMESTAMPTZ
+  createdAt: z.string(), // PostgreSQL TIMESTAMPTZ
+  updatedAt: z.string(), // PostgreSQL TIMESTAMPTZ
 });
 
 /**
@@ -134,8 +134,8 @@ export const profileSchema = z.object({
 export const updateProfileSchema = profileSchema
   .omit({
     id: true,
-    created_at: true,
-    updated_at: true,
+    createdAt: true,
+    updatedAt: true,
   })
   .partial();
 

@@ -156,7 +156,6 @@ export class AuthService {
 
   /**
    * User registration
-   * If email verification is required, sends verification email and returns user without token
    * Otherwise, returns user with access token for immediate login
    */
   async register(email: string, password: string, name?: string): Promise<CreateUserResponse> {
@@ -206,14 +205,7 @@ export class AuthService {
       .get(userId);
     const user = this.dbUserToApiUser(dbUser);
 
-    // If email verification is required, send verification email and don't provide access token
     if (emailAuthConfig.requireEmailVerification) {
-      try {
-        await this.sendVerificationEmailWithLink(email);
-      } catch (error) {
-        logger.warn('Verification email send failed during register', { error });
-      }
-
       return {
         accessToken: null,
         requiresEmailVerification: true,
