@@ -62,10 +62,21 @@ export class AuthService {
   }
 
   /**
-   * Resend verification email (sends numeric OTP code)
+   * Send verification email with link (magic link)
    */
-  async resendVerificationEmail(input: SendVerificationEmailRequest): Promise<void> {
+  async sendVerificationLink(input: SendVerificationEmailRequest): Promise<void> {
     return apiClient.request('/auth/email/send-verification-link', {
+      method: 'POST',
+      body: JSON.stringify(input),
+      skipAuth: true,
+    });
+  }
+
+  /**
+   * Send verification email with code (6-digit OTP)
+   */
+  async sendVerificationCode(input: SendVerificationEmailRequest): Promise<void> {
+    return apiClient.request('/auth/email/send-verification-code', {
       method: 'POST',
       body: JSON.stringify(input),
       skipAuth: true,

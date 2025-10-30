@@ -7,7 +7,7 @@ import {
   AuthPasswordField,
   AuthSubmitButton,
   AuthOAuthProviders,
-  AuthEmailMessageBox,
+  AuthEmailVerificationStep,
 } from '../components';
 import InsForgeLogo from '@/assets/logos/insforge_light.svg?react';
 import { emailSchema } from '@/lib/utils/validation-schemas';
@@ -157,13 +157,19 @@ export default function SignUpPage() {
     }
   }
 
-  const handleResendVerificationEmail = useCallback(async () => {
-    try {
-      await authService.resendVerificationEmail({ email });
-    } catch {
-      // Always succeed silently to prevent email enumeration
+  async function handleVerifyCode(code: string) {
+    const result = await authService.verifyEmail({
+      email,
+      otp: code,
+    });
+
+    if (result.accessToken) {
+      handleSuccessfulAuth({
+        accessToken: result.accessToken,
+        user: result.user,
+      });
     }
-  }, [email]);
+  }
 
   async function handleOAuth(provider: OAuthProvidersSchema) {
     try {
@@ -271,13 +277,7 @@ export default function SignUpPage() {
               )}
             </>
           ) : (
-            <AuthEmailMessageBox
-              email={email}
-              onResend={handleResendVerificationEmail}
-              title="Verify Your Email"
-              description="We've sent a verification link to {email}. Please check your email and click the link to verify your account. The link will expire in 10 minutes."
-              initiallyDisabled={true}
-            />
+            <AuthEmailVerificationStep email={email} onVerifyCode={handleVerifyCode} />
           )}
         </div>
 

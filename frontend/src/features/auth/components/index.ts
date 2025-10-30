@@ -6,4 +6,5 @@ export {
 } from './AuthPasswordStrengthIndicator';
 export { AuthSubmitButton } from './AuthSubmitButton';
 export { AuthOAuthProviders } from './AuthOAuthProviders';
-export { AuthEmailMessageBox } from './AuthEmailMessageBox';
+export { AuthEmailVerificationStep } from './AuthEmailVerificationStep';
+export { AuthVerificationCodeInput } from './AuthVerificationCodeInput';
