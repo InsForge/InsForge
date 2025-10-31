@@ -604,7 +604,7 @@ components:
           example: openrouter
         modelId:
           type: string
-          example: openai/gpt-4
+          example: openai/gpt-4o-mini
         systemPrompt:
           type: string
           description: Optional system prompt for the configuration
