@@ -31,7 +31,7 @@ export async function validateModelId(modelId: string): Promise<ValidationResult
   }
 
   // Otherwise, start a new refresh
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  let hadError = false;
   refreshPromise = (async () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -40,7 +40,6 @@ export async function validateModelId(modelId: string): Promise<ValidationResult
       logger.info('Fetching model list from OpenRouter (refreshing cache)...');
       const response = await fetch('https://openrouter.ai/api/v1/models', {
         signal: controller.signal,
-        headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
       });
       clearTimeout(timeoutId);
 
@@ -60,6 +59,7 @@ export async function validateModelId(modelId: string): Promise<ValidationResult
       lastUpdated = Date.now();
       return cachedModels;
     } catch (err) {
+      hadError = true;
       if (err instanceof Error && err.name === 'AbortError') {
         logger.warn('Timeout validating modelId with OpenRouter', { modelId });
       } else {
@@ -72,6 +72,11 @@ export async function validateModelId(modelId: string): Promise<ValidationResult
   })();
 
   cachedModels = await refreshPromise;
+
+  // ✅ Handle case: infra failure + empty cache
+  if (hadError && cachedModels.length === 0) {
+    return { valid: false, reason: 'infra_error' };
+  }
 
   return {
     valid: cachedModels.includes(modelId),
