@@ -25,7 +25,7 @@ import { OAuthConfigService } from './oauth.config';
 import { AuthConfigService } from './auth.config';
 import { AuthOTPService, EmailOTPPurpose, EmailOTPType } from './auth.otp';
 import { validatePassword } from '@/utils/validations';
-import { getPasswordRequirementsMessage } from '@/utils/utils';
+import { getPasswordRequirementsMessage, generateSecureToken } from '@/utils/utils';
 import {
   FacebookUserInfo,
   GitHubEmailInfo,
@@ -499,28 +499,14 @@ export class AuthService {
   }
 
   /**
-   * Reset password with numeric code
-   * Verifies the numeric OTP code and updates the password in a single transaction
-   * Note: Does not return access token - user must login again with new password
+   * Verify reset password code and return a temporary reset token
+   * This separates code verification from password reset for better security
+   * The reset token can be used later to reset the password without needing email
    */
-  async resetPasswordWithCode(
+  async verifyResetPasswordCode(
     email: string,
-    newPassword: string,
     verificationCode: string
-  ): Promise<ResetPasswordResponse> {
-    // Validate password first before verifying OTP
-    // This allows the user to retry with the same OTP if password is invalid
-    const authConfigService = AuthConfigService.getInstance();
-    const emailAuthConfig = await authConfigService.getEmailConfig();
-
-    if (!validatePassword(newPassword, emailAuthConfig)) {
-      throw new AppError(
-        getPasswordRequirementsMessage(emailAuthConfig),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
-
+  ): Promise<{ resetToken: string; expiresAt: Date }> {
     const dbManager = DatabaseManager.getInstance();
     const pool = dbManager.getPool();
     const client = await pool.connect();
@@ -528,7 +514,7 @@ export class AuthService {
     try {
       await client.query('BEGIN');
 
-      // Verify OTP using the OTP service (within the same transaction)
+      // Verify the numeric code
       const otpService = AuthOTPService.getInstance();
       await otpService.verifyNumericCode(
         email,
@@ -537,32 +523,31 @@ export class AuthService {
         client
       );
 
-      // Hash the new password
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      // Create a temporary reset token (similar to LINK_TOKEN) within the same transaction
+      const resetToken = generateSecureToken(32); // 32 bytes = 64 hex characters
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours expiry
+      const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
 
-      // Update password in the database
-      const result = await client.query(
-        `UPDATE _accounts
-         SET password = $1, updated_at = NOW()
-         WHERE email = $2
-         RETURNING id`,
-        [hashedPassword, email]
+      // Insert reset token within the same transaction
+      // Uses RESET_PASSWORD purpose (will overwrite the consumed numeric code, which is safe)
+      await client.query(
+        `INSERT INTO _email_otps (email, purpose, otp_hash, expires_at, consumed_at, attempts_count)
+         VALUES ($1, $2, $3, $4, NULL, 0)
+         ON CONFLICT (email, purpose)
+         DO UPDATE SET
+           otp_hash = EXCLUDED.otp_hash,
+           expires_at = EXCLUDED.expires_at,
+           consumed_at = NULL,
+           attempts_count = 0,
+           updated_at = NOW()`,
+        [email, EmailOTPPurpose.RESET_PASSWORD, tokenHash, expiresAt]
       );
-
-      if (result.rows.length === 0) {
-        throw new Error('User not found');
-      }
-
-      const userId = result.rows[0].id;
 
       await client.query('COMMIT');
 
-      logger.info('Password reset successfully with code', { userId });
+      logger.info('Reset password code verified, reset token created', { email });
 
-      return {
-        message: 'Password reset successfully. Please login with your new password.',
-        redirectTo: emailAuthConfig.resetPasswordRedirectTo || undefined,
-      };
+      return { resetToken, expiresAt };
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -572,8 +557,9 @@ export class AuthService {
   }
 
   /**
-   * Reset password with magic link token
+   * Reset password with token (magic link or reset token from code verification)
    * Verifies the token (without needing email), looks up the email, and updates the password
+   * Both magic link tokens and code-verified reset tokens use RESET_PASSWORD purpose
    * Note: Does not return access token - user must login again with new password
    */
   async resetPasswordWithLinkToken(
@@ -601,6 +587,7 @@ export class AuthService {
       await client.query('BEGIN');
 
       // Verify token and get the associated email
+      // Both magic link tokens and code-verified reset tokens use RESET_PASSWORD purpose
       const otpService = AuthOTPService.getInstance();
       const { email } = await otpService.verifyLinkToken(
         EmailOTPPurpose.RESET_PASSWORD,
@@ -628,7 +615,7 @@ export class AuthService {
 
       await client.query('COMMIT');
 
-      logger.info('Password reset successfully with link', { userId });
+      logger.info('Password reset successfully with token', { userId });
 
       return {
         message: 'Password reset successfully. Please login with your new password.',
