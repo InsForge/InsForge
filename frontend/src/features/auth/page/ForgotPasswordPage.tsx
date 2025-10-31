@@ -18,6 +18,7 @@ export default function ForgotPasswordPage() {
   const [step, setStep] = useState<ForgotPasswordStep>('email');
   const [email, setEmail] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
+  const [resetToken, setResetToken] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resendDisabled, setResendDisabled] = useState(true);
@@ -68,15 +69,22 @@ export default function ForgotPasswordPage() {
     }
   }, [resendCountdown, step]);
 
-  const handleVerifyCode = (code: string): void => {
+  const handleVerifyCode = async (code: string): Promise<void> => {
     setIsVerifyingCode(true);
     setError('');
-
-    // Store the code and move to password step
-    // The code will be verified when resetting the password
     setVerificationCode(code);
-    setStep('password');
-    setIsVerifyingCode(false);
+
+    try {
+      // Verify code and get reset token
+      const result = await authService.verifyResetPasswordCode({ email, code });
+      setResetToken(result.resetToken);
+      setStep('password');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to verify code');
+      setVerificationCode('');
+    } finally {
+      setIsVerifyingCode(false);
+    }
   };
 
   const handleResendCode = useCallback(async () => {
@@ -228,11 +236,7 @@ export default function ForgotPasswordPage() {
               </p>
             </>
           ) : (
-            <ResetPasswordForm
-              email={email}
-              otp={verificationCode}
-              onSuccess={handlePasswordResetSuccess}
-            />
+            <ResetPasswordForm otp={resetToken} onSuccess={handlePasswordResetSuccess} />
           )}
         </div>
 

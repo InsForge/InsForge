@@ -8,16 +8,16 @@ import { PublicEmailAuthConfig } from '@insforge/shared-schemas';
 import { validatePasswordAgainstConfig } from '@/lib/utils/password-validation';
 
 interface ResetPasswordFormProps {
-  email?: string;
-  otp?: string;
+  otp: string; // Token (magic link token or reset token from code verification)
   onSuccess?: () => void;
 }
 
 /**
  * Reusable reset password form component
- * Supports both code-based (email + otp) and link-based (otp only) password reset flows
+ * Accepts a token (can be magic link token or reset token from code verification)
+ * Both use RESET_PASSWORD purpose and are verified the same way
  */
-export function ResetPasswordForm({ email, otp, onSuccess }: ResetPasswordFormProps) {
+export function ResetPasswordForm({ otp, onSuccess }: ResetPasswordFormProps) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [newPassword, setNewPassword] = useState('');
@@ -63,19 +63,15 @@ export function ResetPasswordForm({ email, otp, onSuccess }: ResetPasswordFormPr
     }
 
     try {
-      // Validate otp is provided
+      // Validate token is provided
       if (!otp) {
-        setError('Verification code or token is required');
+        setError('Token is required');
         setLoading(false);
         return;
       }
 
-      // Build reset password request
-      // If email is provided, use code-based reset (email + otp + newPassword)
-      // Otherwise use link token reset (otp + newPassword, no email)
-      const resetRequest = email ? { email, newPassword, otp } : { newPassword, otp };
-
-      await authService.resetPassword(resetRequest);
+      // Reset password with token (magic link or reset token from code verification)
+      await authService.resetPassword({ newPassword, otp });
 
       // Call success callback if provided, otherwise redirect to sign in
       if (onSuccess) {
