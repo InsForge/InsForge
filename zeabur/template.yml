@@ -945,17 +945,6 @@ spec:
                     default: ""
                 GITHUB_REDIRECT_URI:
                     default: ${ZEABUR_WEB_URL}/api/auth/v1/callback
-                # Storage Configuration (optional)
-                AWS_S3_BUCKET:
-                    default: ""
-                AWS_REGION:
-                    default: us-east-2
-                AWS_ACCESS_KEY_ID:
-                    default: ""
-                AWS_SECRET_ACCESS_KEY:
-                    default: ""
-                AWS_INSTANCE_PROFILE_NAME:
-                    default: ""
                 # Multi-tenant Cloud Configuration
                 DEPLOYMENT_ID:
                     default: ${ZEABUR_SERVICE_ID}
@@ -965,21 +954,8 @@ spec:
                     default: ""
                 ACCESS_API_KEY:
                     default: ""
-                # Analytics Configuration
-                ANALYTICS_PROVIDER:
-                    default: cloudwatch
-                CLOUDWATCH_LOG_GROUP:
-                    default: ""
-                HOSTNAME_OVERRIDE:
-                    default: ""
                 OPENROUTER_API_KEY:
                     default: ${OPENROUTER_API_KEY}
-                # Logs Configuration
-                LOGS_DIR:
-                    default: /insforge-logs
-            volumes:
-                - id: logs
-                  dir: /insforge-logs
             healthCheck:
                 type: HTTP
                 port: web
