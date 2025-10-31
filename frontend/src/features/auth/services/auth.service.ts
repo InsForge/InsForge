@@ -9,6 +9,8 @@ import {
   GetOauthUrlResponse,
   OAuthProvidersSchema,
   SendResetPasswordEmailRequest,
+  VerifyResetPasswordCodeRequest,
+  VerifyResetPasswordCodeResponse,
   ResetPasswordRequest,
   ResetPasswordResponse,
 } from '@insforge/shared-schemas';
@@ -98,9 +100,22 @@ export class AuthService {
   }
 
   /**
-   * Reset password with code or link token
-   * - With email: uses numeric code verification (email + otp where otp is 6-digit code)
-   * - Without email: uses link token verification (otp is 64-char hex token)
+   * Verify reset password code and get reset token
+   * Step 1 of two-step password reset flow: verify code → get reset token
+   */
+  async verifyResetPasswordCode(
+    input: VerifyResetPasswordCodeRequest
+  ): Promise<VerifyResetPasswordCodeResponse> {
+    return apiClient.request('/auth/verify-reset-password-code', {
+      method: 'POST',
+      body: JSON.stringify(input),
+      skipAuth: true,
+    });
+  }
+
+  /**
+   * Reset password with token
+   * Token can be magic link token or reset token from code verification
    */
   async resetPassword(input: ResetPasswordRequest): Promise<ResetPasswordResponse> {
     return apiClient.request('/auth/reset-password', {
