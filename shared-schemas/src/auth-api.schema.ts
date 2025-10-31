@@ -94,18 +94,29 @@ export const sendResetPasswordEmailRequestSchema = z.object({
 });
 
 /**
- * POST /api/auth/reset-password - Reset password with OTP
- * - With email: numeric OTP reset (email + otp + newPassword required, otp is 6-digit code)
- * - Without email: link OTP reset (otp + newPassword required, otp is 64-char hex token)
+ * POST /api/auth/verify-reset-password-code - Verify reset password code and get reset token
+ * Used in two-step password reset flow: verify code first, then reset password with token
+ */
+export const verifyResetPasswordCodeRequestSchema = z.object({
+  email: emailSchema,
+  code: z.string().min(1),
+});
+
+/**
+ * POST /api/auth/reset-password - Reset password with token
+ * Token can be:
+ * - Magic link token (from send-reset-password-link endpoint)
+ * - Reset token (from verify-reset-password-code endpoint after code verification)
+ * Both use RESET_PASSWORD purpose and are verified the same way
+ * resetToken is an alias for otp (for backward compatibility)
  */
 export const resetPasswordRequestSchema = z
   .object({
-    email: emailSchema.optional(),
     newPassword: passwordSchema,
-    otp: z.string().min(1),
+    otp: z.string().min(1).optional(),
   })
-  .refine((data) => data.email || data.otp, {
-    message: 'Either email or otp must be provided',
+  .refine((data) => data.otp, {
+    message: 'otp must be provided',
   });
 
 // ============================================================================
@@ -137,6 +148,15 @@ export const verifyEmailResponseSchema = z.object({
   user: userSchema,
   accessToken: z.string(),
   redirectTo: z.string().url().optional(),
+});
+
+/**
+ * Response for POST /api/auth/verify-reset-password-code
+ * Returns reset token that can be used to reset password
+ */
+export const verifyResetPasswordCodeResponseSchema = z.object({
+  resetToken: z.string(),
+  expiresAt: z.string().datetime(),
 });
 
 /**
@@ -324,12 +344,14 @@ export type UpdateEmailAuthConfigRequest = z.infer<typeof updateEmailAuthConfigR
 export type SendVerificationEmailRequest = z.infer<typeof sendVerificationEmailRequestSchema>;
 export type VerifyEmailRequest = z.infer<typeof verifyEmailRequestSchema>;
 export type SendResetPasswordEmailRequest = z.infer<typeof sendResetPasswordEmailRequestSchema>;
+export type VerifyResetPasswordCodeRequest = z.infer<typeof verifyResetPasswordCodeRequestSchema>;
 export type ResetPasswordRequest = z.infer<typeof resetPasswordRequestSchema>;
 
 // Response types for type-safe responses
 export type CreateUserResponse = z.infer<typeof createUserResponseSchema>;
 export type CreateSessionResponse = z.infer<typeof createSessionResponseSchema>;
 export type VerifyEmailResponse = z.infer<typeof verifyEmailResponseSchema>;
+export type VerifyResetPasswordCodeResponse = z.infer<typeof verifyResetPasswordCodeResponseSchema>;
 export type ResetPasswordResponse = z.infer<typeof resetPasswordResponseSchema>;
 export type CreateAdminSessionResponse = z.infer<typeof createAdminSessionResponseSchema>;
 export type GetCurrentSessionResponse = z.infer<typeof getCurrentSessionResponseSchema>;

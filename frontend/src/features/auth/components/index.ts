@@ -8,3 +8,4 @@ export { AuthSubmitButton } from './AuthSubmitButton';
 export { AuthOAuthProviders } from './AuthOAuthProviders';
 export { AuthEmailVerificationStep } from './AuthEmailVerificationStep';
 export { AuthVerificationCodeInput } from './AuthVerificationCodeInput';
+export { ResetPasswordForm } from './ResetPasswordForm';

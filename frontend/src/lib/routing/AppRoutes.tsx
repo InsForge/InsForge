@@ -19,6 +19,7 @@ import SignInPage from '@/features/auth/page/SignInPage';
 import SignUpPage from '@/features/auth/page/SignUpPage';
 import VerifyEmailPage from '@/features/auth/page/VerifyEmailPage';
 import ForgotPasswordPage from '@/features/auth/page/ForgotPasswordPage';
+import ResetPasswordPage from '@/features/auth/page/ResetPasswordPage';
 
 export function AppRoutes() {
   return (
@@ -31,6 +32,7 @@ export function AppRoutes() {
         <Route path="signup" element={<SignUpPage />} />
         <Route path="verify-email" element={<VerifyEmailPage />} />
         <Route path="forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="reset-password" element={<ResetPasswordPage />} />
         <Route path="*" element={<Navigate to="signin" replace />} />
       </Route>
       <Route

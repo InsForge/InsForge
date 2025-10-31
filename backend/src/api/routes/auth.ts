@@ -21,10 +21,12 @@ import {
   verifyEmailRequestSchema,
   updateEmailAuthConfigRequestSchema,
   sendResetPasswordEmailRequestSchema,
+  verifyResetPasswordCodeRequestSchema,
   resetPasswordRequestSchema,
   type CreateUserResponse,
   type CreateSessionResponse,
   type VerifyEmailResponse,
+  type VerifyResetPasswordCodeResponse,
   type ResetPasswordResponse,
   type CreateAdminSessionResponse,
   type GetCurrentSessionResponse,
@@ -640,9 +642,46 @@ router.post(
   }
 );
 
-// POST /api/auth/reset-password - Reset password with code or link token
-// If email is provided: uses numeric code verification (resetPasswordWithCode)
-// If email is NOT provided: uses link token verification (resetPasswordWithLinkToken)
+// POST /api/auth/verify-reset-password-code - Verify reset password code and get reset token
+// Step 1 of two-step password reset flow: verify code → get reset token
+router.post(
+  '/verify-reset-password-code',
+  verifyOTPLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const validationResult = verifyResetPasswordCodeRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const { email, code } = validationResult.data;
+
+      const result = await authService.verifyResetPasswordCode(email, code);
+
+      const response: VerifyResetPasswordCodeResponse = {
+        resetToken: result.resetToken,
+        expiresAt: result.expiresAt.toISOString(),
+      };
+
+      successResponse(res, response);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /api/auth/reset-password - Reset password with token
+// Token can be:
+// - Magic link token (from send-reset-password-link endpoint)
+// - Reset token (from verify-reset-password-code endpoint after code verification)
+// Both use RESET_PASSWORD purpose and are verified the same way
+// Flow:
+//   Code: email → code → (email+code) → resetToken → (resetToken+newPassword)
+//   Link: email → link → (token+newPassword)
 router.post(
   '/reset-password',
   verifyOTPLimiter,
@@ -657,17 +696,17 @@ router.post(
         );
       }
 
-      const { email, newPassword, otp } = validationResult.data;
+      const { newPassword, otp } = validationResult.data;
 
-      let result: ResetPasswordResponse;
-
-      if (email) {
-        // Code-based reset (email + otp where otp is 6-digit code)
-        result = await authService.resetPasswordWithCode(email, newPassword, otp);
-      } else {
-        // Link token-based reset (otp is 64-char hex)
-        result = await authService.resetPasswordWithLinkToken(newPassword, otp);
+      if (!otp) {
+        throw new AppError('Token is required', 400, ERROR_CODES.INVALID_INPUT);
       }
+
+      // Both magic link tokens and code-verified reset tokens use RESET_PASSWORD purpose
+      const result: ResetPasswordResponse = await authService.resetPasswordWithLinkToken(
+        newPassword,
+        otp
+      );
 
       successResponse(res, result); // Return message with optional redirectTo
     } catch (error) {
