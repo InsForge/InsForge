@@ -4,6 +4,16 @@ This directory contains deployment guides for self-hosting InsForge on various p
 
 ## 📚 Available Guides
 
+### Self-Hosted Platforms
+
+- **[Coolify](./deploy-to-coolify.md)** - Deploy InsForge on Coolify (open-source self-hosted PaaS)
+  - 100% free and open source
+  - Docker Compose deployment
+  - Automatic SSL certificates (Let's Encrypt)
+  - Built-in monitoring and backups
+  - No vendor lock-in
+  - Lowest cost option (~$5/month for VPS only)
+
 ### Cloud Platforms
 
 - **[Render](./deploy-to-render.md)** - Deploy InsForge on Render with managed services
@@ -37,19 +47,28 @@ This directory contains deployment guides for self-hosting InsForge on various p
 ## 🎯 Choosing a Platform
 
 ### For Beginners
+- **Coolify** - Easiest self-hosted option with web UI and automatic SSL
 - **Render** - Easiest managed deployment with auto-SSL and Git integration
 - **Railway** (Coming Soon) - One-click deployment
 - **AWS EC2** - Well-documented, widely used
 
 ### For Production
+- **Coolify** - Self-hosted control with professional features
 - **Render** - Managed services, auto-scaling, simple operations
 - **AWS EC2** - Reliable, scalable, extensive features
 - **Kubernetes** (Coming Soon) - High availability, auto-scaling
 
 ### For Cost-Conscious
+- **Coolify** - Most affordable (~$5/month VPS only, software is free)
 - **Render** - Competitive pricing, free tier available (~$28/month for production)
 - **Hetzner** (Coming Soon) - Best price-to-performance ratio
 - **Digital Ocean** (Coming Soon) - Simple pricing, good performance
+
+### For Self-Hosting & Privacy
+- **Coolify** - Complete control, your infrastructure, your data
+- **AWS EC2** - Self-managed on your own EC2 instances
+- **Google Cloud Compute Engine** - Self-managed on your own VMs
+- **Hetzner** (Coming Soon) - Privacy-focused European provider
 
 ### For Global Distribution
 - **Render** - Multi-region deployment with automatic CDN
