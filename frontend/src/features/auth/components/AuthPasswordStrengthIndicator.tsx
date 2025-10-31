@@ -43,7 +43,7 @@ export function AuthPasswordStrengthIndicator({
             ) : (
               <div className="ml-0.5 w-5 h-5 rounded-full border-2 border-neutral-400" />
             )}
-            <span className="text-sm text-neutral-600 dark:text-neutral-400">
+            <span className="text-sm font-normal text-[#525252] dark:text-neutral-400">
               {requirement.label}
             </span>
           </div>
