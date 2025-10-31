@@ -891,7 +891,7 @@ spec:
           template: PREBUILT
           spec:
             source:
-                image: ghcr.io/insforge/insforge-oss:v1.1.2
+                image: ghcr.io/insforge/insforge-oss:v1.1.6
             ports:
                 - id: web
                   port: 7130
@@ -986,124 +986,6 @@ spec:
                 http:
                     path: /
           domainKey: PUBLIC_DOMAIN
-
-        - name: vector
-          icon: https://vector.dev/img/logo.svg
-          dependencies:
-            - postgres
-            - postgrest
-            - insforge
-            - deno
-          template: PREBUILT
-          spec:
-            source:
-                image: timberio/vector:0.28.1-alpine
-                command:
-                    - vector
-                    - --config
-                    - /etc/vector/vector.yml
-            ports:
-                - id: api
-                  port: 7135
-                  type: HTTP
-            volumes:
-                - id: logs
-                  dir: /insforge-logs
-            env:
-                AWS_ACCESS_KEY_ID:
-                    default: ""
-                AWS_SECRET_ACCESS_KEY:
-                    default: ""
-                AWS_REGION:
-                    default: ""
-                PROJECT_ID:
-                    default: ${ZEABUR_PROJECT_ID}
-                HOSTNAME_OVERRIDE:
-                    default: ""
-            configs:
-                - path: /etc/vector/vector.yml
-                  template: |
-                    # Vector configuration for Zeabur deployment
-                    # Note: docker_logs source not available in Zeabur, using file-based logs
-                    api:
-                      enabled: true
-                      address: 0.0.0.0:7135
-
-                    sources:
-                      # Read InsForge application logs
-                      insforge_file:
-                        type: file
-                        include:
-                          - /insforge-logs/insforge.logs.jsonl
-                        read_from: beginning
-
-                      # Read Deno function logs
-                      deno_file:
-                        type: file
-                        include:
-                          - /insforge-logs/function.logs.jsonl
-                        read_from: beginning
-
-                      # Read PostgREST logs
-                      rest_file:
-                        type: file
-                        include:
-                          - /insforge-logs/postgrest.logs.jsonl
-                        read_from: beginning
-
-                      # Read Postgres logs
-                      db_file:
-                        type: file
-                        include:
-                          - /insforge-logs/postgres.logs.jsonl
-                        read_from: beginning
-
-                    sinks:
-                      # CloudWatch sinks (only active if AWS_REGION is set)
-                      cw_insforge:
-                        type: aws_cloudwatch_logs
-                        inputs:
-                          - insforge_file
-                        region: ${AWS_REGION:-skip}
-                        group_name: /insforge/zeabur
-                        stream_name: ${HOSTNAME_OVERRIDE:-zeabur}-insforge
-                        encoding:
-                          codec: json
-
-                      cw_deno:
-                        type: aws_cloudwatch_logs
-                        inputs:
-                          - deno_file
-                        region: ${AWS_REGION:-skip}
-                        group_name: /insforge/zeabur
-                        stream_name: ${HOSTNAME_OVERRIDE:-zeabur}-deno
-                        encoding:
-                          codec: json
-
-                      cw_rest:
-                        type: aws_cloudwatch_logs
-                        inputs:
-                          - rest_file
-                        region: ${AWS_REGION:-skip}
-                        group_name: /insforge/zeabur
-                        stream_name: ${HOSTNAME_OVERRIDE:-zeabur}-postgrest
-                        encoding:
-                          codec: json
-
-                      cw_db:
-                        type: aws_cloudwatch_logs
-                        inputs:
-                          - db_file
-                        region: ${AWS_REGION:-skip}
-                        group_name: /insforge/zeabur
-                        stream_name: ${HOSTNAME_OVERRIDE:-zeabur}-postgres
-                        encoding:
-                          codec: json
-            healthCheck:
-                type: HTTP
-                port: api
-                http:
-                    path: /health
 
 localization:
     zh-CN:
