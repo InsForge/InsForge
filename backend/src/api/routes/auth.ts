@@ -1,12 +1,14 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { AuthService } from '@/core/auth/auth.js';
 import { AuthConfigService } from '@/core/auth/auth.config.js';
+import { OAuthConfigService } from '@/core/auth/oauth.config.js';
 import { AuditService } from '@/core/logs/audit.js';
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin } from '@/api/middleware/auth.js';
 import oauthRouter from './auth.oauth.js';
+import logger from '@/utils/logger.js';
 import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middleware/rate-limiters.js';
 import {
   userIdSchema,
@@ -29,7 +31,7 @@ import {
   type ListUsersResponse,
   type DeleteUsersResponse,
   type GetEmailAuthConfigResponse,
-  type GetPublicEmailAuthConfigResponse,
+  type GetPublicAuthConfigResponse,
   exchangeAdminSessionRequestSchema,
 } from '@insforge/shared-schemas';
 import { UserRecord } from '@/types/auth.js';
@@ -37,22 +39,37 @@ import { UserRecord } from '@/types/auth.js';
 const router = Router();
 const authService = AuthService.getInstance();
 const authConfigService = AuthConfigService.getInstance();
+const oauthConfigService = OAuthConfigService.getInstance();
 const auditService = AuditService.getInstance();
 
 // Mount OAuth routes
 router.use('/oauth', oauthRouter);
 
-// Email Authentication Configuration Routes
-// GET /api/auth/email/public-config - Get public email authentication configuration (public endpoint)
-router.get('/email/public-config', async (req: Request, res: Response, next: NextFunction) => {
+// Public Authentication Configuration Routes
+// GET /api/auth/public-config - Get all public authentication configuration (public endpoint)
+router.get('/public-config', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const config: GetPublicEmailAuthConfigResponse = await authConfigService.getPublicEmailConfig();
-    res.json(config);
+    const [oauthProviders, emailConfig] = await Promise.all([
+      oauthConfigService.getPublicProviders(),
+      authConfigService.getPublicEmailConfig(),
+    ]);
+
+    const response: GetPublicAuthConfigResponse = {
+      oauth: {
+        data: oauthProviders,
+        count: oauthProviders.length,
+      },
+      email: emailConfig,
+    };
+
+    res.json(response);
   } catch (error) {
+    logger.error('Failed to get public auth config', { error });
     next(error);
   }
 });
 
+// Email Authentication Configuration Routes
 // GET /api/auth/email/config - Get email authentication configuration (admin only)
 router.get(
   '/email/config',

@@ -13,7 +13,6 @@ import InsForgeLogo from '@/assets/logos/insforge_light.svg?react';
 import { emailSchema } from '@/lib/utils/validation-schemas';
 import { createDynamicPasswordSchema } from '@/lib/utils/password-validation';
 import broadcastService, { BroadcastEventType } from '@/lib/services/broadcastService';
-import { oauthConfigService } from '../services/oauth-config.service';
 import { emailConfigService } from '../services/email-config.service';
 import { authService } from '../services/auth.service';
 
@@ -82,25 +81,22 @@ export default function SignUpPage() {
 
   // Fetch available OAuth providers and email config on mount
   useEffect(() => {
-    // Fetch OAuth providers
-    void oauthConfigService
-      .getPublicProviders()
+    // Fetch all public auth configuration in one request
+    void emailConfigService
+      .getPublicAuthConfig()
       .then((data) => {
-        if (data?.data && Array.isArray(data.data)) {
+        // Set OAuth providers
+        if (data?.oauth?.data && Array.isArray(data.oauth.data)) {
           setAvailableProviders(
-            data.data.map((provider) => provider.provider as OAuthProvidersSchema)
+            data.oauth.data.map((provider) => provider.provider as OAuthProvidersSchema)
           );
         }
+        // Set email config
+        if (data?.email) {
+          setEmailConfig(data.email);
+        }
       })
-      .catch((err: unknown) => console.error('Failed to fetch OAuth providers:', err));
-
-    // Fetch email auth configuration
-    void emailConfigService
-      .getPublicConfig()
-      .then((data) => {
-        setEmailConfig(data);
-      })
-      .catch((err: unknown) => console.error('Failed to fetch email config:', err));
+      .catch((err: unknown) => console.error('Failed to fetch public auth config:', err));
   }, []);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {

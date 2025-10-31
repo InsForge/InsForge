@@ -43,7 +43,7 @@ Use custom components only if you need highly customized branding or custom fiel
 
 - **Built-in Authentication**: Backend-hosted sign-in/sign-up pages (default)
 - **OAuth Support**: Google, GitHub, Discord, Facebook, LinkedIn, Microsoft, Apple, X, Instagram, TikTok, Spotify
-- **React Hooks**: `useAuth()`, `useUser()`, `useSession()`
+- **React Hooks**: `useAuth()`, `useUser()`
 - **Control Components**: `<SignedIn>`, `<SignedOut>`, `<Protect>`
 - **Next.js Middleware**: Server-side route protection
 - **TypeScript**: Full type safety
@@ -51,11 +51,16 @@ Use custom components only if you need highly customized branding or custom fiel
 ## Installation
 
 ```bash
-npm install @insforge/nextjs @insforge/sdk
+npm install @insforge/nextjs
 ```
 
 <Note>
-**SDK Integration**: `@insforge/nextjs` works seamlessly with `@insforge/sdk`. The SDK handles API calls, token management, and OAuth callback detection automatically. Always use SDK methods instead of raw `fetch` calls.
+**SDK Included**: `@insforge/sdk` is automatically installed as a dependency. For authentication features, you don't need to install it separately. The SDK handles API calls, token management, and OAuth callback detection automatically.
+
+**Optional**: Explicitly install `@insforge/sdk` if you need direct access to database, storage, AI, or edge function features:
+```bash
+npm install @insforge/sdk
+```
 </Note>
 
 ## Quick Start (Built-in Auth)
@@ -111,83 +116,23 @@ export const DELETE = handlers.DELETE;
 **Critical:** The callback page is essential for authentication to work. It handles OAuth and email/password returns from InsForge-hosted auth pages.
 </Warning>
 
+Use the `<InsforgeCallback>` component to handle the entire authentication callback flow:
+
 ```tsx app/auth/callback/page.tsx
 'use client';
 
-import { useEffect, useRef, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { createClient } from '@insforge/sdk';
-
-function CallbackContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const isProcessingRef = useRef(false);
-
-  useEffect(() => {
-    const processCallback = async () => {
-      if (isProcessingRef.current) return;
-      isProcessingRef.current = true;
-
-      const error = searchParams.get('error');
-      if (error) {
-        router.push('/?error=' + encodeURIComponent(error));
-        return;
-      }
-
-      // SDK automatically detects and stores URL parameters
-      const insforge = createClient({
-        baseUrl: process.env.NEXT_PUBLIC_INSFORGE_BASE_URL!,
-      });
-
-      // Fetch complete user profile
-      const { data: userData, error: userError } = await insforge.auth.getCurrentUser();
-
-      if (userError || !userData) {
-        router.push('/?error=authentication_failed');
-        return;
-      }
-
-      // Store user profile for instant UI updates
-      localStorage.setItem('insforge-user-profile', JSON.stringify(userData));
-
-      // Sync token to HTTP-only cookie for server-side middleware
-      const token = localStorage.getItem('insforge-auth-token');
-      if (token) {
-        await fetch('/api/auth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'sync-token', token }),
-        });
-      }
-
-      // Clean up URL and redirect
-      window.history.replaceState({}, '', '/auth/callback');
-      const destination = sessionStorage.getItem('auth_destination') || '/';
-      sessionStorage.removeItem('auth_destination');
-      setTimeout(() => router.push(destination), 100);
-    };
-
-    processCallback();
-  }, [searchParams, router]);
-
-  return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="text-center">
-        <h2 className="text-2xl font-semibold mb-4">Completing authentication...</h2>
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-      </div>
-    </div>
-  );
-}
+import { InsforgeCallback } from '@insforge/nextjs';
 
 export default function CallbackPage() {
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <CallbackContent />
-    </Suspense>
-  );
+  return <InsforgeCallback />;
 }
 ```
+
+**That's it!** The component automatically:
+- Handles authentication errors from backend
+- Validates and syncs authentication tokens
+- Updates the provider's auth state
+- Redirects to the destination page
 
 ### Step 4: Add Middleware
 
@@ -249,8 +194,8 @@ export default function Home() {
    yourapp.com/auth/callback?access_token=xxx&user_id=xxx&email=xxx&name=xxx
    ↓
 5. Callback page processes:
-   - Stores token in localStorage (client-side SDK)
-   - Stores user profile in localStorage (instant UI)
+   - SDK automatically detects and stores token in localStorage
+   - Fetches complete user data from backend
    - Syncs token to HTTP-only cookie (server-side middleware)
    - Cleans URL (removes sensitive data)
    ↓
@@ -292,7 +237,7 @@ The provider automatically uses `NEXT_PUBLIC_INSFORGE_FRONTEND_URL` for auth red
 
 **What Next.js package handles:**
 - React components (`<SignedIn>`, `<SignedOut>`, `<Protect>`, `<UserButton>`)
-- React hooks (`useAuth()`, `useUser()`, `useSession()`)
+- React hooks (`useAuth()`, `useUser()`)
 - Next.js middleware for route protection
 - SSR support via cookie sync
 
@@ -306,30 +251,7 @@ Only use custom components if you need highly customized branding or additional 
 
 ### Custom Auth Components
 
-Want custom branding or additional fields? Disable built-in auth and use custom components:
-
-**Step 1: Disable built-in auth**
-
-```tsx app/layout.tsx
-import { InsforgeProvider } from '@insforge/nextjs';
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <body>
-        <InsforgeProvider 
-          baseUrl={process.env.NEXT_PUBLIC_INSFORGE_BASE_URL!}
-          useBuiltInAuth={false}
-        >
-          {children}
-        </InsforgeProvider>
-      </body>
-    </html>
-  );
-}
-```
-
-**Step 2: Create custom auth pages**
+Want custom branding or additional fields? Create custom auth pages:
 
 ```tsx app/sign-in/page.tsx
 'use client';
@@ -646,26 +568,6 @@ function UserProfile() {
 - `user` - Current user object (id, email, nickname, avatarUrl, role, emailVerified)
 - `isLoaded` - Boolean loading state
 - `updateUser(data)` - Update user profile
-
-### useSession()
-
-Access session information:
-
-```tsx
-import { useSession } from '@insforge/nextjs';
-
-function SessionInfo() {
-  const { session, isLoaded } = useSession();
-  
-  if (!session) return <div>No active session</div>;
-  
-  return <div>User ID: {session.userId}</div>;
-}
-```
-
-**Returns:**
-- `session` - Current session (userId, token, expiresAt, createdAt)
-- `isLoaded` - Boolean loading state
 
 ## Control Components
 

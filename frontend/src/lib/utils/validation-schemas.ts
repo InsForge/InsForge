@@ -123,24 +123,15 @@ export const emailSchema = z
   .toLowerCase()
   .trim();
 
-export const passwordSchema = z.string().min(8, 'Password must be at least 8 characters');
-
-// Strong password schema matching AuthPasswordStrengthIndicator requirements
-export const strongPasswordSchema = z
-  .string()
-  .min(8, '8 characters or more')
-  .regex(/[A-Z]/, 'At least 1 Uppercase letter')
-  .regex(/\d/, 'At least 1 Number')
-  .regex(/[!@#$%^&*()_+\-=[\]{};\\|,.<>/?]/, 'Special character (e.g. !?<>@#$%)');
-
 export const signInFormSchema = z.object({
   email: emailSchema,
-  password: passwordSchema,
+  password: z.string(),
 });
 
 export const signUpFormSchema = z.object({
+  name: z.string().optional(),
   email: emailSchema,
-  password: strongPasswordSchema,
+  password: z.string(),
 });
 
 // Keep backward compatibility - loginFormSchema is an alias for signInFormSchema
@@ -148,4 +139,4 @@ export const loginFormSchema = signInFormSchema;
 
 export type SignInFormData = z.infer<typeof signInFormSchema>;
 export type SignUpFormData = z.infer<typeof signUpFormSchema>;
-export type LoginFormData = SignInFormData; // Backward compatibility
+export type LoginForm = z.infer<typeof loginFormSchema>;

@@ -14,7 +14,6 @@ import {
   createOAuthConfigRequestSchema,
   updateOAuthConfigRequestSchema,
   type ListOAuthConfigsResponse,
-  type ListPublicOAuthProvidersResponse,
   oAuthProvidersSchema,
 } from '@insforge/shared-schemas';
 import { isOAuthSharedKeysAvailable } from '@/utils/environment.js';
@@ -38,21 +37,6 @@ const validateJwtSecret = (): string => {
 };
 
 // OAuth Configuration Management Routes (must come before wildcard routes)
-// GET /api/auth/oauth/providers - List all OAuth providers (public endpoint)
-router.get('/providers', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const providers = await oauthConfigService.getPublicProviders();
-    const response: ListPublicOAuthProvidersResponse = {
-      data: providers,
-      count: providers.length,
-    };
-    res.json(response);
-  } catch (error) {
-    logger.error('Failed to list OAuth providers', { error });
-    next(error);
-  }
-});
-
 // GET /api/auth/oauth/configs - List all OAuth configurations (admin only)
 router.get('/configs', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
