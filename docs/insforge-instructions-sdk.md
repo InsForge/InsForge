@@ -42,6 +42,7 @@ Available documentation types:
 - `"instructions"` - Essential backend setup (START HERE)
 - `"db-sdk"` - Database operations with SDK
 - `"auth-sdk"` - Authentication methods
+- `"auth-components-nextjs"` - Authentication components (fastest way to add authentication for Next.js applications)
 - `"storage-sdk"` - File storage operations
 - `"functions-sdk"` - Serverless functions invocation
 - `"ai-integration-sdk"` - AI chat and image generation
@@ -61,15 +62,30 @@ Available documentation types:
 - Storage bucket creation (`create-bucket`, `list-buckets`, `delete-bucket`)
 - Serverless function deployment (`create-function`, `update-function`, `delete-function`)
 
+### When to Use Pre-Built Components
+InsForge provides framework-specific UI packages (e.g. `@insforge/nextjs`) that wrap SDK methods into production-ready authentication interfaces.
+
+**Use pre-built components when:**
+- You want automatic session management and auto-configured OAuth providers
+- You want TypeScript-safe, battle-tested authentication flows
+- You want spend less tokens and time to build authentication system
+
+**Components provide:**
+- Complete auth pages (SignIn, SignUp) with email/password + OAuth
+- Session hooks (`useAuth()`, `useUser()`, `useSession()`)
+- Route protection (middleware, conditional rendering)
+- Production security (HTTP-only cookies, token sync, email verification)
+
 ## Quick Start
 
 1. **First**: Call `get-backend-metadata` to check current backend state
 2. **Fetch docs**: Use the `fetch-docs` tool with appropriate doc type
 3. **Initialize SDK**: Create client with your backend URL
-4. **Build**: Use SDK methods for auth, database, storage, AI as needed
+4. **Build**: Use Auth Components for auth and SDK methods for database, storage, AI as needed
 
 ## Important Notes
 
+- Use the right framework-specific component package for production-ready auth
 - SDK returns `{data, error}` structure for all operations
 - Database inserts require array format: `[{...}]`
 - Serverless functions have single endpoint (no subpaths)
