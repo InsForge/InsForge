@@ -8,6 +8,9 @@ import {
   SendVerificationEmailRequest,
   GetOauthUrlResponse,
   OAuthProvidersSchema,
+  SendResetPasswordEmailRequest,
+  ResetPasswordRequest,
+  ResetPasswordResponse,
 } from '@insforge/shared-schemas';
 
 export class AuthService {
@@ -77,6 +80,30 @@ export class AuthService {
    */
   async sendVerificationCode(input: SendVerificationEmailRequest): Promise<void> {
     return apiClient.request('/auth/email/send-verification-code', {
+      method: 'POST',
+      body: JSON.stringify(input),
+      skipAuth: true,
+    });
+  }
+
+  /**
+   * Send password reset code via email
+   */
+  async sendResetPasswordCode(input: SendResetPasswordEmailRequest): Promise<void> {
+    return apiClient.request('/auth/email/send-reset-password-code', {
+      method: 'POST',
+      body: JSON.stringify(input),
+      skipAuth: true,
+    });
+  }
+
+  /**
+   * Reset password with code or link token
+   * - With email: uses numeric code verification (email + otp where otp is 6-digit code)
+   * - Without email: uses link token verification (otp is 64-char hex token)
+   */
+  async resetPassword(input: ResetPasswordRequest): Promise<ResetPasswordResponse> {
+    return apiClient.request('/auth/reset-password', {
       method: 'POST',
       body: JSON.stringify(input),
       skipAuth: true,

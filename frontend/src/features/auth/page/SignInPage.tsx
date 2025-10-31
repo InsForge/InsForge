@@ -12,7 +12,7 @@ import {
 import InsForgeLogo from '@/assets/logos/insforge_light.svg?react';
 import { signInFormSchema } from '@/lib/utils/validation-schemas';
 import broadcastService, { BroadcastEventType } from '@/lib/services/broadcastService';
-import { oauthConfigService } from '../services/oauth-config.service';
+import { emailConfigService } from '../services/email-config.service';
 import { authService } from '../services/auth.service';
 
 type SignInStep = 'form' | 'awaiting-verification';
@@ -79,16 +79,17 @@ export default function SignInPage() {
 
   // Fetch available OAuth providers on mount
   useEffect(() => {
-    void oauthConfigService
-      .getPublicProviders()
+    void emailConfigService
+      .getPublicAuthConfig()
       .then((data) => {
-        if (data?.data && Array.isArray(data.data)) {
+        // Set OAuth providers
+        if (data?.oauth?.data && Array.isArray(data.oauth.data)) {
           setAvailableProviders(
-            data.data.map((provider) => provider.provider as OAuthProvidersSchema)
+            data.oauth.data.map((provider) => provider.provider as OAuthProvidersSchema)
           );
         }
       })
-      .catch((err: unknown) => console.error('Failed to fetch OAuth providers:', err));
+      .catch((err: unknown) => console.error('Failed to fetch public auth config:', err));
   }, []);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -214,6 +215,10 @@ export default function SignInPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
+                  forgotPasswordLink={{
+                    route: `/auth/forgot-password${redirectUrl ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`,
+                    text: 'Forgot password?',
+                  }}
                 />
 
                 <AuthSubmitButton isLoading={loading} disabled={loading || oauthLoading !== null}>

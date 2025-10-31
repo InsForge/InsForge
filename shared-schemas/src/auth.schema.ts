@@ -114,31 +114,6 @@ export const tokenPayloadSchema = z.object({
   exp: z.number().optional(), // Expiration
 });
 
-/**
- * User profile schema - represents the users table in PostgreSQL
- * This table stores additional user profile information (nickname, avatar, bio, etc.)
- */
-export const profileSchema = z.object({
-  id: userIdSchema, // References _accounts(id)
-  nickname: z.string().nullable().optional(),
-  avatarUrl: z.string().nullable().optional(),
-  bio: z.string().nullable().optional(),
-  birthday: z.string().nullable().optional(), // PostgreSQL DATE as ISO string (YYYY-MM-DD)
-  createdAt: z.string(), // PostgreSQL TIMESTAMPTZ
-  updatedAt: z.string(), // PostgreSQL TIMESTAMPTZ
-});
-
-/**
- * User profile update schema - for updating profile fields
- */
-export const updateProfileSchema = profileSchema
-  .omit({
-    id: true,
-    createdAt: true,
-    updatedAt: true,
-  })
-  .partial();
-
 // ============================================================================
 // Type exports
 // ============================================================================
@@ -152,5 +127,3 @@ export type TokenPayloadSchema = z.infer<typeof tokenPayloadSchema>;
 export type OAuthConfigSchema = z.infer<typeof oAuthConfigSchema>;
 export type OAuthProvidersSchema = z.infer<typeof oAuthProvidersSchema>;
 export type EmailAuthConfigSchema = z.infer<typeof emailAuthConfigSchema>;
-export type ProfileSchema = z.infer<typeof profileSchema>;
-export type UpdateProfileSchema = z.infer<typeof updateProfileSchema>;

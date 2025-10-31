@@ -2,13 +2,13 @@ import { apiClient } from '@/lib/api/client';
 import {
   EmailAuthConfigSchema,
   UpdateEmailAuthConfigRequest,
-  PublicEmailAuthConfig,
+  GetPublicAuthConfigResponse,
 } from '@insforge/shared-schemas';
 
 export class EmailConfigService {
-  // Get public email authentication configuration (safe for public API)
-  async getPublicConfig(): Promise<PublicEmailAuthConfig> {
-    return apiClient.request('/auth/email/public-config', {
+  // Get all public authentication configuration (OAuth + Email)
+  async getPublicAuthConfig(): Promise<GetPublicAuthConfigResponse> {
+    return apiClient.request('/auth/public-config', {
       skipAuth: true,
     });
   }
