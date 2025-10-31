@@ -316,8 +316,6 @@ spec:
                     default: postgres
                 PGPASSWORD:
                     default: ${POSTGRES_PASSWORD}
-                PGRST_DB_URI:
-                    default: postgresql://
                 PGRST_OPENAPI_SERVER_PROXY_URI:
                     default: http://localhost:3000
                 PGRST_DB_SCHEMA:
