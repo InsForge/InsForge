@@ -123,20 +123,9 @@ export const emailSchema = z
   .toLowerCase()
   .trim();
 
-export const signInFormSchema = z.object({
+export const loginFormSchema = z.object({
   email: emailSchema,
   password: z.string(),
 });
 
-export const signUpFormSchema = z.object({
-  name: z.string().optional(),
-  email: emailSchema,
-  password: z.string(),
-});
-
-// Keep backward compatibility - loginFormSchema is an alias for signInFormSchema
-export const loginFormSchema = signInFormSchema;
-
-export type SignInFormData = z.infer<typeof signInFormSchema>;
-export type SignUpFormData = z.infer<typeof signUpFormSchema>;
 export type LoginForm = z.infer<typeof loginFormSchema>;

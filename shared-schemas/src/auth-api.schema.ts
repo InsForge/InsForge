@@ -298,19 +298,11 @@ export const publicEmailAuthConfigSchema = z.object({
 });
 
 /**
- * Response for GET /api/auth/email/public-config - Public endpoint
- */
-export const getPublicEmailAuthConfigResponseSchema = publicEmailAuthConfigSchema;
-
-/**
  * Response for GET /api/auth/public-config - Unified public auth configuration endpoint
  * Combines OAuth providers and email auth configuration
  */
 export const getPublicAuthConfigResponseSchema = z.object({
-  oauth: z.object({
-    data: z.array(publicOAuthProviderSchema),
-    count: z.number(),
-  }),
+  providers: z.array(publicOAuthProviderSchema),
   email: publicEmailAuthConfigSchema,
 });
 
@@ -361,13 +353,7 @@ export type GetOauthUrlResponse = z.infer<typeof getOauthUrlResponseSchema>;
 export type ListOAuthConfigsResponse = z.infer<typeof listOAuthConfigsResponseSchema>;
 export type GetEmailAuthConfigResponse = z.infer<typeof getEmailAuthConfigResponseSchema>;
 export type PublicOAuthProvider = z.infer<typeof publicOAuthProviderSchema>;
-export type ListPublicOAuthProvidersResponse = z.infer<
-  typeof listPublicOAuthProvidersResponseSchema
->;
 export type PublicEmailAuthConfig = z.infer<typeof publicEmailAuthConfigSchema>;
-export type GetPublicEmailAuthConfigResponse = z.infer<
-  typeof getPublicEmailAuthConfigResponseSchema
->;
 export type GetPublicAuthConfigResponse = z.infer<typeof getPublicAuthConfigResponseSchema>;
 
 export type AuthErrorResponse = z.infer<typeof authErrorResponseSchema>;
