@@ -29,15 +29,11 @@ services:
     container_name: insforge-postgrest
     restart: unless-stopped
     environment:
-      # POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      # POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      # POSTGRES_DB: ${POSTGRES_DB:-insforge}
       PGRST_DB_URI: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
       PGRST_OPENAPI_SERVER_PROXY_URI: http://localhost:3000
       PGRST_DB_SCHEMA: public
       PGRST_DB_ANON_ROLE: anon
       PGRST_JWT_SECRET: ${JWT_SECRET:-dev-secret-please-change-in-production}
-      # Enable schema reloading via NOTIFY
       PGRST_DB_CHANNEL_ENABLED: true
       PGRST_DB_CHANNEL: pgrst
     ports:
@@ -69,7 +65,6 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-change-this-password}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
-      # PostgreSQL connection
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - POSTGRES_DB=${POSTGRES_DB:-insforge}
@@ -77,23 +72,18 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
       - POSTGREST_BASE_URL=http://postgrest:3000
-      # Deno Runtime URL for serverless functions
       - DENO_RUNTIME_URL=http://deno:7133
-      # Storage Configuration
       - AWS_S3_BUCKET=${AWS_S3_BUCKET:-}
       - AWS_REGION=${AWS_REGION:-}
       - AWS_CLOUDFRONT_URL=${AWS_CLOUDFRONT_URL:-}
       - AWS_CLOUDFRONT_KEY_PAIR_ID=${AWS_CLOUDFRONT_KEY_PAIR_ID:-}
       - AWS_CLOUDFRONT_PRIVATE_KEY=${AWS_CLOUDFRONT_PRIVATE_KEY:-}
-      # Multi-tenant Cloud Configuration
       - DEPLOYMENT_ID=${DEPLOYMENT_ID:-}
       - PROJECT_ID=${PROJECT_ID:-}
       - APP_KEY=${APP_KEY:-}
       - ACCESS_API_KEY=${ACCESS_API_KEY:-}
       - CLOUD_API_HOST=${CLOUD_API_HOST:-}
-      # LLM Model API keys
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-      # OAuth Configuration
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
@@ -104,9 +94,7 @@ services:
       - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET:-}
       - LINKEDIN_CLIENT_ID=${LINKEDIN_CLIENT_ID:-}
       - LINKEDIN_CLIENT_SECRET=${LINKEDIN_CLIENT_SECRET:-}
-      # Logs directory
       - LOGS_DIR=/insforge-logs
-      # Storage directory (for local file storage when S3 is not configured)
       - STORAGE_DIR=/insforge-storage
     volumes:
       - ./package.json:/app/package.json
@@ -125,7 +113,6 @@ services:
     networks:
       - insforge-network
 
-  # Deno serverless runtime for edge functions
   deno:
     image: denoland/deno:alpine-2.0.6
     container_name: insforge-deno
@@ -139,16 +126,13 @@ services:
       - PORT=7133
       - DENO_ENV=${DENO_ENV:-development}
       - DENO_DIR=/deno-dir
-      # PostgreSQL connection
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - POSTGRES_DB=${POSTGRES_DB:-insforge}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGREST_BASE_URL=http://postgrest:3000
-      # Worker timeout (30 seconds default)
       - WORKER_TIMEOUT_MS=${WORKER_TIMEOUT_MS:-30000}
-      # Encryption keys for decrypting function secrets
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - JWT_SECRET=${JWT_SECRET:-dev-secret-please-change-in-production}
     volumes:
@@ -165,7 +149,6 @@ services:
     networks:
       - insforge-network
 
-  # Vector.dev for log collection and shipping
   vector:
     container_name: insforge-vector
     image: timberio/vector:0.28.1-alpine
@@ -200,21 +183,13 @@ services:
 
 volumes:
   postgres-data:
-    driver: local
   node_modules:
-    driver: local
   backend_node_modules:
-    driver: local
   frontend_node_modules:
-    driver: local
   shared_schemas_node_modules:
-    driver: local
   deno_cache:
-    driver: local
   shared-logs:
-    driver: local
   storage-data:
-    driver: local
 
 networks:
   insforge-network:
