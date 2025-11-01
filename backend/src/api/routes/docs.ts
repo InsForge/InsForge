@@ -15,7 +15,9 @@ const DOCS_MAP: Record<string, string> = {
   instructions: 'insforge-instructions-sdk.md',
   'db-sdk': 'core-concepts/database/sdk.mdx',
   'auth-sdk': 'core-concepts/authentication/sdk.mdx',
+  // UI Components - Framework-specific
   'auth-components-nextjs': 'core-concepts/authentication/ui-components/nextjs.mdx',
+  'auth-components-react': 'core-concepts/authentication/ui-components/react.mdx',
   'storage-sdk': 'core-concepts/storage/sdk.mdx',
   'functions-sdk': 'core-concepts/functions/sdk.mdx',
   'ai-integration-sdk': 'core-concepts/ai/sdk.mdx',

@@ -50,7 +50,8 @@
                   {
                     "group": "UI Components",
                     "pages": [
-                      "core-concepts/authentication/ui-components/nextjs"
+                      "core-concepts/authentication/ui-components/nextjs",
+                      "core-concepts/authentication/ui-components/react"
                     ]
                   }
                 ]

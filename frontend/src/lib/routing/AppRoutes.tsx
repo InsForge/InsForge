@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { RequireAuth } from '@/lib/routing/RequireAuth';
 import Layout from '@/components/layout/Layout';
 import CloudLayout from '@/components/layout/CloudLayout';
@@ -15,26 +15,12 @@ import OnBoardPage from '@/features/onboard/page/OnBoardPage';
 import VisualizerPage from '@/features/visualizer/page/VisualizerPage';
 import FunctionsPage from '@/features/functions/page/FunctionsPage';
 import AIPage from '@/features/ai/page/AIPage';
-import SignInPage from '@/features/auth/page/SignInPage';
-import SignUpPage from '@/features/auth/page/SignUpPage';
-import VerifyEmailPage from '@/features/auth/page/VerifyEmailPage';
-import ForgotPasswordPage from '@/features/auth/page/ForgotPasswordPage';
-import ResetPasswordPage from '@/features/auth/page/ResetPasswordPage';
 
 export function AppRoutes() {
   return (
     <Routes>
       <Route path="/dashboard/login" element={<LoginPage />} />
       <Route path="/cloud/login" element={<CloudLoginPage />} />
-      <Route path="/auth" element={<Outlet />}>
-        <Route index element={<Navigate to="signin" replace />} />
-        <Route path="signin" element={<SignInPage />} />
-        <Route path="signup" element={<SignUpPage />} />
-        <Route path="verify-email" element={<VerifyEmailPage />} />
-        <Route path="forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="reset-password" element={<ResetPasswordPage />} />
-        <Route path="*" element={<Navigate to="signin" replace />} />
-      </Route>
       <Route
         path="/cloud/*"
         element={
