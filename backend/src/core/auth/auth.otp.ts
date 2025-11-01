@@ -12,7 +12,7 @@ import { generateNumericCode, generateSecureToken } from '@/utils/utils.js';
  */
 export enum EmailOTPPurpose {
   VERIFY_EMAIL = 'VERIFY_EMAIL',
-  RESET_PASSWORD = 'RESET_PASSWORD', // Used for both numeric code and reset tokens (magic link or code-verified)
+  RESET_PASSWORD = 'RESET_PASSWORD',
 }
 
 /**

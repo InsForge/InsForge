@@ -57,10 +57,7 @@ router.get('/public-config', async (req: Request, res: Response, next: NextFunct
     ]);
 
     const response: GetPublicAuthConfigResponse = {
-      oauth: {
-        data: oauthProviders,
-        count: oauthProviders.length,
-      },
+      providers: oauthProviders,
       email: emailConfig,
     };
 

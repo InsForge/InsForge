@@ -21,7 +21,6 @@ ARG VITE_API_BASE_URL
 ARG VITE_PUBLIC_POSTHOG_KEY
 
 # Build frontend and auth app with environment variables baked in
-# Frontend outputs to dist/frontend, Auth outputs to dist/auth
 RUN npm run build
 
 # Expose ports
