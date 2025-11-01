@@ -8,8 +8,8 @@ import { ResetPasswordPage } from './pages/ResetPasswordPage';
 export function App() {
   return (
     <Routes>
-      <Route path="/auth/signin" element={<SignInPage />} />
-      <Route path="/auth/signup" element={<SignUpPage />} />
+      <Route path="/auth/sign-in" element={<SignInPage />} />
+      <Route path="/auth/sign-up" element={<SignUpPage />} />
       <Route path="/auth/verify-email" element={<VerifyEmailPage />} />
       <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
