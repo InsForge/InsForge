@@ -569,6 +569,36 @@ function UserProfile() {
 - `isLoaded` - Boolean loading state
 - `updateUser(data)` - Update user profile
 
+### usePublicAuthConfig()
+
+Get your authentication config in InsForge:
+
+```tsx
+import { usePublicAuthConfig } from '@insforge/nextjs';
+
+function SignInPage() {
+  const { oauthProviders, emailConfig, isLoaded } = usePublicAuthConfig();
+
+  if (!isLoaded) return <div>Loading...</div>;
+
+  return (
+    <div>
+      <p>Available OAuth: {oauthProviders.join(', ')}</p>
+      <p>Password min length: {emailConfig?.passwordMinLength}</p>
+    </div>
+  );
+}
+```
+
+**Returns:**
+- `oauthProviders` - OAuth providers enabled by you
+- `emailConfig` - Your email auth config like password length
+- `isLoaded` - Boolean loading state
+
+<Warning>
+**Performance**: Only use this hook in SignIn/SignUp components to avoid unnecessary API calls.
+</Warning>
+
 ## Control Components
 
 ### SignedIn / SignedOut

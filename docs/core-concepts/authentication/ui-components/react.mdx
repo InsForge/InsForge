@@ -1,0 +1,872 @@
+---
+title: React
+description: Framework-agnostic authentication components for any React application
+---
+
+The `@insforge/react` package provides **complete authentication solution for React applications**. Framework-agnostic components with full business logic included—works with Vite, Remix, or any React framework.
+
+<Tip>
+**For AI Agents - Quick Navigation:**
+- **Complete components (recommended)**: Follow [Quick Start](#quick-start) → 5-minute setup with pre-built SignIn/SignUp
+- **Form components**: Jump to [Form Components](#form-components-pure-ui) for controlled UI
+- **Atomic components**: See [Atomic Components](#atomic-components-maximum-flexibility) for custom layouts
+- **Hooks only**: See [Hooks](#hooks) for headless auth
+
+**Key principle**: All components use `@insforge/sdk` methods internally. Framework-agnostic by design.
+</Tip>
+
+## Why @insforge/react?
+
+<CardGroup cols={2}>
+  <Card title="Complete Package" icon="box">
+    Not just UI—includes SDK integration, providers, and hooks
+  </Card>
+  
+  <Card title="Framework Agnostic" icon="wand-magic-sparkles">
+    Works with Vite, Remix, or any React framework
+  </Card>
+  
+  <Card title="5-Minute Setup" icon="clock">
+    Provider + Components = production-ready auth
+  </Card>
+  
+  <Card title="Full TypeScript" icon="shield-check">
+    Complete type safety out of the box
+  </Card>
+</CardGroup>
+
+<Note>
+**Flexibility**: All components are exported separately. Use complete components for quick setup, or build custom UIs with atomic components.
+</Note>
+
+## Features
+
+- **Complete Components**: Pre-built `<SignIn>`, `<SignUp>`, `<UserButton>` with business logic
+- **OAuth Support**: Google, GitHub, Discord, Facebook, LinkedIn, Microsoft, Apple, X, Instagram, TikTok, Spotify
+- **React Hooks**: `useAuth()`, `useUser()`, `usePublicAuthConfig()`
+- **Control Components**: `<SignedIn>`, `<SignedOut>`, `<Protect>`
+- **Form Components**: Pure UI forms for custom logic
+- **Atomic Components**: Building blocks for complete customization
+- **TypeScript**: Full type safety
+
+## Installation
+
+```bash
+npm install @insforge/react
+```
+
+<Note>
+**SDK Included**: `@insforge/sdk` is automatically installed as a dependency. The SDK handles API calls, token management, and OAuth callback detection automatically.
+
+**CSS Import Required**: Import the styles in your app:
+```bash
+import '@insforge/react/styles.css';
+```
+</Note>
+
+## Quick Start
+
+### Step 1: Setup Provider
+
+Wrap your app with `InsforgeProvider` in the root:
+
+**Vite / React:**
+```tsx src/main.tsx
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { InsforgeProvider } from '@insforge/react';
+import '@insforge/react/styles.css';
+import App from './App';
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <InsforgeProvider baseUrl={import.meta.env.VITE_INSFORGE_BASE_URL}>
+      <App />
+    </InsforgeProvider>
+  </StrictMode>
+);
+```
+
+**Remix:**
+```tsx app/root.tsx
+import { InsforgeProvider } from '@insforge/react';
+import '@insforge/react/styles.css';
+import { Outlet } from '@remix-run/react';
+
+export default function App() {
+  return (
+    <html>
+      <body>
+        <InsforgeProvider baseUrl={process.env.INSFORGE_BASE_URL}>
+          <Outlet />
+        </InsforgeProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+**Provider Props:**
+- `baseUrl` (required): Your Insforge backend URL
+- `onAuthChange` (optional): Callback when auth state changes
+- `clearCookie` (optional): Custom function to clear cookie on sign out
+
+### Step 2: Create Auth Pages
+
+Use pre-built components for sign-in and sign-up:
+
+```tsx SignInPage.tsx
+import { SignIn } from '@insforge/react';
+import { useNavigate } from 'react-router-dom';
+
+export default function SignInPage() {
+  const navigate = useNavigate();
+
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <SignIn 
+        afterSignInUrl="/dashboard"
+        signUpUrl="/sign-up"
+        forgotPasswordUrl="/forgot-password"
+        onSuccess={(user, accessToken) => {
+          console.log('Signed in:', user);
+        }}
+        onError={(error) => {
+          console.error('Error:', error);
+        }}
+        onRedirect={(url) => navigate(url)}
+      />
+    </div>
+  );
+}
+```
+
+```tsx SignUpPage.tsx
+import { SignUp } from '@insforge/react';
+
+export default function SignUpPage() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <SignUp 
+        afterSignUpUrl="/onboarding"
+        signInUrl="/sign-in"
+        onSuccess={(user, accessToken) => {
+          console.log('Account created:', user);
+        }}
+      />
+    </div>
+  );
+}
+```
+
+### Step 3: Create Callback Page
+
+<Warning>
+**Critical:** The callback page is essential for OAuth to work. It handles OAuth redirects and completes the authentication flow.
+</Warning>
+
+```tsx CallbackPage.tsx
+import { InsforgeCallback } from '@insforge/react';
+
+export default function CallbackPage() {
+  return <InsforgeCallback redirectTo="/dashboard" />;
+}
+```
+
+**That's it!** The component automatically:
+- Validates and stores authentication tokens
+- Fetches complete user data from backend
+- Updates the provider's auth state
+- Redirects to the destination page
+
+### Step 4: Use Hooks & Components
+
+```tsx HomePage.tsx
+import { SignedIn, SignedOut, UserButton, useAuth, useUser } from '@insforge/react';
+
+export default function Home() {
+  const { isSignedIn } = useAuth();
+  const { user } = useUser();
+
+  return (
+    <div>
+      <SignedOut>
+        <a href="/sign-in">Sign In</a>
+      </SignedOut>
+
+      <SignedIn>
+        <UserButton afterSignOutUrl="/" />
+        <h1>Welcome, {user?.email}!</h1>
+      </SignedIn>
+    </div>
+  );
+}
+```
+
+**That's it!** 🎉 Your React app now has production-ready authentication.
+
+## How It Works
+
+```
+1. User visits Sign In page → Renders <SignIn> component
+   ↓
+2. User enters credentials → Component calls SDK methods
+   ↓
+3. SDK communicates with backend → Returns auth token
+   ↓
+4. Provider updates auth state → Components re-render
+   ↓
+5. User sees authenticated UI → Redirect to dashboard
+```
+
+**Architecture:**
+- **InsforgeProvider**: Manages authentication state globally using React Context
+- **SDK Integration**: All auth operations go through `@insforge/sdk`
+- **React Context**: Provides auth state to all child components
+- **Hooks**: Easy access to auth methods and user data
+
+<Note>
+**OAuth Flow**: When using OAuth, users are redirected to the provider, then back to your callback page with auth tokens. The `<InsforgeCallback>` component handles this automatically.
+</Note>
+
+## Environment Variables
+
+```bash .env
+# Vite / Create React App
+VITE_INSFORGE_BASE_URL=your-backend-url
+
+# Remix
+INSFORGE_BASE_URL=your-backend-url
+```
+
+---
+
+## Complete Components (with Business Logic)
+
+These components include full authentication logic and work out of the box.
+
+### `<SignIn />`
+
+Complete sign-in component with email/password and OAuth:
+
+```tsx
+import { SignIn } from '@insforge/react';
+
+function SignInPage() {
+  return (
+    <SignIn
+      afterSignInUrl="/dashboard"
+      signUpUrl="/sign-up"
+      forgotPasswordUrl="/forgot-password"
+      onSuccess={(user, accessToken) => {
+        console.log('Signed in:', user);
+      }}
+      onError={(error) => {
+        console.error('Error:', error);
+      }}
+      // Customization
+      title="Welcome Back"
+      subtitle="Sign in to continue"
+      appearance={{
+        containerClassName: "shadow-xl",
+        buttonClassName: "bg-blue-600"
+      }}
+    />
+  );
+}
+```
+
+**Key Features:**
+- Email/password authentication
+- OAuth provider buttons (auto-detected from backend)
+- Password visibility toggle
+- Error handling
+- Loading states
+- Customizable text and styling
+
+**Props:**
+- `afterSignInUrl` - Redirect URL after successful sign in
+- `signUpUrl` - Link to sign up page
+- `forgotPasswordUrl` - Link to forgot password page
+- `onSuccess` - Callback on successful authentication
+- `onError` - Callback on error
+- `onRedirect` - Custom redirect handler
+- `title` / `subtitle` - Custom heading text
+- `appearance` - Tailwind CSS classes for styling
+
+### `<SignUp />`
+
+Complete sign-up component with password strength validation:
+
+```tsx
+import { SignUp } from '@insforge/react';
+
+function SignUpPage() {
+  return (
+    <SignUp
+      afterSignUpUrl="/onboarding"
+      signInUrl="/sign-in"
+      onSuccess={(user, accessToken) => {
+        console.log('Account created:', user);
+      }}
+      title="Create Account"
+      subtitle="Get started with your free account"
+    />
+  );
+}
+```
+
+**Key Features:**
+- Email/password registration
+- Real-time password strength indicator
+- OAuth provider buttons
+- Form validation
+- Customizable requirements
+
+**Props:** Same as `<SignIn>`, plus:
+- `afterSignUpUrl` - Redirect URL after successful sign up
+
+### `<UserButton />`
+
+User profile dropdown with sign-out:
+
+```tsx
+import { UserButton } from '@insforge/react';
+
+function Header() {
+  return (
+    <header>
+      <nav>
+        {/* Your navigation */}
+      </nav>
+      <UserButton 
+        afterSignOutUrl="/"
+        mode="detailed"
+        appearance={{
+          buttonClassName: "hover:bg-gray-100",
+          nameClassName: "text-gray-900",
+          emailClassName: "text-gray-600"
+        }}
+      />
+    </header>
+  );
+}
+```
+
+**Modes:**
+- `detailed` (default): Shows avatar + name + email
+- `simple`: Shows avatar only
+
+**Props:**
+- `mode` - Display mode: `"detailed"` or `"simple"`
+- `afterSignOutUrl` - Redirect URL after sign out
+- `appearance` - Tailwind classes for styling
+
+### `<Protect />`
+
+Protected content with conditional rendering:
+
+```tsx
+import { Protect } from '@insforge/react';
+
+function Dashboard() {
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      
+      {/* Simple protection */}
+      <Protect redirectTo="/sign-in">
+        <UserContent />
+      </Protect>
+
+      {/* Role-based protection */}
+      <Protect
+        redirectTo="/unauthorized"
+        condition={(user) => user.role === 'admin'}
+      >
+        <AdminPanel />
+      </Protect>
+
+      {/* With fallback */}
+      <Protect 
+        condition={(user) => user.emailVerified}
+        fallback={<VerifyEmailPrompt />}
+      >
+        <VerifiedUserFeature />
+      </Protect>
+    </div>
+  );
+}
+```
+
+**Props:**
+- `redirectTo` - URL to redirect if not authorized
+- `condition` - Custom condition function `(user) => boolean`
+- `fallback` - React node to show if not authorized
+
+### `<SignedIn>` / `<SignedOut>`
+
+Conditional rendering based on auth state:
+
+```tsx
+import { SignedIn, SignedOut } from '@insforge/react';
+
+function NavBar() {
+  return (
+    <nav>
+      <SignedOut>
+        <a href="/sign-in">Sign In</a>
+        <a href="/sign-up">Sign Up</a>
+      </SignedOut>
+
+      <SignedIn>
+        <a href="/dashboard">Dashboard</a>
+        <UserButton />
+      </SignedIn>
+    </nav>
+  );
+}
+```
+
+### `<InsforgeCallback />`
+
+OAuth callback handler (3 lines instead of 70+):
+
+```tsx
+'use client';
+import { InsforgeCallback } from '@insforge/react';
+
+export default function CallbackPage() {
+  return <InsforgeCallback redirectTo="/dashboard" />;
+}
+```
+
+**Props:**
+- `redirectTo` - Custom redirect destination (default: "/")
+- `onSuccess` - Success callback
+- `onError` - Error callback with error message
+- `loadingComponent` - Custom loading UI
+- `onRedirect` - Custom redirect handler
+
+---
+
+## Hooks
+
+### `useAuth()`
+
+Access authentication methods and state:
+
+```tsx
+import { useAuth } from '@insforge/react';
+
+function LoginButton() {
+  const { signIn, signUp, signOut, isSignedIn, isLoaded } = useAuth();
+
+  const handleSignIn = async () => {
+    try {
+      await signIn('user@example.com', 'password');
+    } catch (error) {
+      console.error('Sign in failed:', error);
+    }
+  };
+
+  if (!isLoaded) return <div>Loading...</div>;
+
+  return (
+    <button onClick={isSignedIn ? signOut : handleSignIn}>
+      {isSignedIn ? 'Sign Out' : 'Sign In'}
+    </button>
+  );
+}
+```
+
+**Returns:**
+- `signIn(email, password)` - Sign in with email/password
+- `signUp(email, password)` - Sign up new user
+- `signOut()` - Sign out current user
+- `isSignedIn` - Boolean auth state
+- `isLoaded` - Boolean loading state
+
+### `useUser()`
+
+Access current user data:
+
+```tsx
+import { useUser } from '@insforge/react';
+
+function UserProfile() {
+  const { user, isLoaded, updateUser } = useUser();
+
+  if (!isLoaded) return <div>Loading...</div>;
+  if (!user) return <div>Not signed in</div>;
+
+  const handleUpdate = async () => {
+    await updateUser({ name: 'New Name' });
+  };
+
+  return (
+    <div>
+      <p>Email: {user.email}</p>
+      <p>Name: {user.name}</p>
+      <img src={user.avatarUrl} alt="Avatar" />
+      <button onClick={handleUpdate}>Update Name</button>
+    </div>
+  );
+}
+```
+
+**Returns:**
+- `user` - User object with id, email, name, avatarUrl
+- `isLoaded` - Boolean loading state
+- `updateUser(data)` - Update user profile
+- `setUser(user)` - Manually set user state
+
+### `usePublicAuthConfig()`
+
+Get Your authenication config in InsForge:
+
+```tsx
+import { usePublicAuthConfig } from '@insforge/react';
+
+function SignInPage() {
+  const { oauthProviders, emailConfig, isLoaded } = usePublicAuthConfig();
+
+  if (!isLoaded) return <div>Loading...</div>;
+
+  return (
+    <div>
+      <p>Available OAuth: {oauthProviders.join(', ')}</p>
+      <p>Password min length: {emailConfig?.passwordMinLength}</p>
+    </div>
+  );
+}
+```
+
+**Returns:**
+- `oauthProviders` - Oauth providers enabled by you.
+- `emailConfig` - Your email auth config like password length
+- `isLoaded` - Boolean loading state
+
+<Warning>
+**Performance**: Only use this hook in SignIn/SignUp components to avoid unnecessary API calls.
+</Warning>
+
+---
+
+## Form Components (Pure UI)
+
+Build custom auth flows with pre-built forms. These components are controlled—you manage the state and logic.
+
+### `<SignInForm />`
+
+Pure UI form for sign-in:
+
+```tsx
+import { SignInForm } from '@insforge/react';
+import { useState } from 'react';
+
+function CustomSignIn() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    // Your auth logic
+  };
+
+  return (
+    <SignInForm
+      email={email}
+      password={password}
+      onEmailChange={setEmail}
+      onPasswordChange={setPassword}
+      onSubmit={handleSubmit}
+      error={error}
+      loading={loading}
+      availableProviders={['google', 'github']}
+      onOAuthClick={(provider) => handleOAuth(provider)}
+    />
+  );
+}
+```
+
+**Other Form Components:**
+- `<SignUpForm />` - Sign up with password strength indicator
+- `<ForgotPasswordForm />` - Request password reset
+- `<ResetPasswordForm />` - Reset password with token
+- `<VerifyEmailStatus />` - Email verification status
+
+---
+
+## Atomic Components (Maximum Flexibility)
+
+Build completely custom UIs with atomic building blocks:
+
+```tsx
+import {
+  AuthContainer,
+  AuthHeader,
+  AuthFormField,
+  AuthPasswordField,
+  AuthSubmitButton,
+  AuthErrorBanner,
+  AuthDivider,
+  AuthOAuthProviders,
+  AuthLink,
+} from '@insforge/react';
+
+function CompletelyCustomAuth() {
+  return (
+    <AuthContainer
+      appearance={{
+        containerClassName: "max-w-md",
+        cardClassName: "bg-white shadow-2xl"
+      }}
+    >
+      <AuthHeader
+        title="Welcome to MyApp"
+        subtitle="Sign in to continue"
+        appearance={{
+          titleClassName: "text-3xl text-blue-900"
+        }}
+      />
+
+      <AuthErrorBanner error={error} />
+
+      <form onSubmit={handleSubmit}>
+        <AuthFormField
+          id="email"
+          type="email"
+          label="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          appearance={{
+            inputClassName: "border-blue-500"
+          }}
+        />
+
+        <AuthPasswordField
+          id="password"
+          label="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          emailAuthConfig={config}
+          showStrengthIndicator
+        />
+
+        <AuthSubmitButton isLoading={loading}>
+          Sign In
+        </AuthSubmitButton>
+      </form>
+
+      <AuthDivider text="or" />
+
+      <AuthOAuthProviders
+        providers={['google', 'github', 'discord']}
+        onClick={handleOAuth}
+        loading={oauthLoading}
+      />
+
+      <AuthLink
+        text="Don't have an account?"
+        linkText="Sign up"
+        href="/sign-up"
+      />
+    </AuthContainer>
+  );
+}
+```
+
+**Available Atomic Components:**
+- `AuthContainer` - Main wrapper with branding
+- `AuthHeader` - Title and subtitle
+- `AuthErrorBanner` - Error messages
+- `AuthFormField` - Standard input
+- `AuthPasswordField` - Password with toggle
+- `AuthPasswordStrengthIndicator` - Password checklist
+- `AuthSubmitButton` - Loading button
+- `AuthLink` - Navigation link
+- `AuthDivider` - Visual separator
+- `AuthOAuthButton` - Single OAuth button
+- `AuthOAuthProviders` - OAuth grid
+- `AuthVerificationCodeInput` - 6-digit OTP
+- `AuthBranding` - Insforge branding
+
+<Note>
+All atomic components support the `appearance` prop for complete styling control.
+</Note>
+
+---
+
+## Customization
+
+### Appearance Props
+
+All components support Tailwind className overrides:
+
+```tsx
+<SignIn
+  appearance={{
+    containerClassName: "shadow-2xl max-w-lg",
+    cardClassName: "bg-gradient-to-br from-blue-50 to-white",
+    formClassName: "space-y-6",
+    buttonClassName: "bg-blue-600 hover:bg-blue-700 h-12"
+  }}
+/>
+
+<UserButton
+  appearance={{
+    buttonClassName: "hover:bg-gray-100 rounded-full",
+    nameClassName: "text-gray-900 font-semibold",
+    emailClassName: "text-gray-500",
+    dropdownClassName: "shadow-xl"
+  }}
+/>
+```
+
+### Text Customization
+
+All text is customizable:
+
+```tsx
+<SignIn
+  title="Welcome Back!"
+  subtitle="We're happy to see you again"
+  emailLabel="Your Email Address"
+  emailPlaceholder="you@company.com"
+  passwordLabel="Your Password"
+  submitButtonText="Login Now"
+  loadingButtonText="Signing you in..."
+  signUpText="New to our platform?"
+  signUpLinkText="Create an account"
+  dividerText="or continue with"
+/>
+```
+
+---
+
+## Advanced Features
+
+### Auth Change Callback
+
+Track authentication state changes:
+
+```tsx
+<InsforgeProvider
+  baseUrl={baseUrl}
+  onAuthChange={(user) => {
+    if (user) {
+      console.log('User signed in:', user.email);
+      analytics.identify(user.id);
+    } else {
+      console.log('User signed out');
+      analytics.reset();
+    }
+  }}
+>
+  {children}
+</InsforgeProvider>
+```
+
+## TypeScript
+
+Full TypeScript support with exported types:
+
+```tsx
+import type {
+  InsforgeUser,
+  SignInProps,
+  SignUpProps,
+  UserButtonProps,
+  ProtectProps,
+  ConditionalProps,
+  InsforgeCallbackProps,
+  SignInFormProps,
+  SignUpFormProps,
+  AuthFormFieldProps,
+  OAuthProvider,
+  EmailAuthConfig,
+  InsforgeProviderProps,
+} from '@insforge/react';
+```
+
+---
+
+## OAuth Providers
+
+Built-in support for 10+ OAuth providers:
+- Google
+- GitHub
+- Discord
+- Apple
+- Microsoft
+- Facebook
+- LinkedIn
+- Instagram
+- TikTok
+- Spotify
+- X (Twitter)
+
+Providers are auto-detected from your backend configuration.
+
+---
+
+## Validation Utilities
+
+```tsx
+import { emailSchema, cn } from '@insforge/react';
+
+// Validate email with Zod
+const result = emailSchema.safeParse('user@example.com');
+
+// Merge Tailwind classes
+const className = cn('px-4 py-2', 'bg-blue-500', conditionalClass);
+```
+
+---
+
+## Why @insforge/react?
+
+<CardGroup cols={2}>
+  <Card title="vs. Building Custom" icon="hammer">
+    5 minutes vs 2+ days of development. Production-ready security built-in.
+  </Card>
+  
+  <Card title="vs. Other Libraries" icon="scale-balanced">
+    Complete package (not just UI). Framework agnostic. Self-hosted.
+  </Card>
+  
+  <Card title="For Developers" icon="user">
+    Customizable when needed, works out of the box. No framework lock-in.
+  </Card>
+  
+  <Card title="For AI Agents" icon="robot">
+    SDK-first approach ensures consistent API. Complete type safety reduces errors.
+  </Card>
+</CardGroup>
+
+<Note>
+**Key Architecture**: This package is framework-agnostic. It works with any React setup and uses `@insforge/sdk` for all backend communication.
+</Note>
+
+---
+
+## Resources
+
+<CardGroup cols={3}>
+  <Card title="Documentation" icon="book" href="https://docs.insforge.dev/introduction">
+    Full documentation
+  </Card>
+  
+  <Card title="GitHub Issues" icon="github" href="https://github.com/InsForge/InsForge/issues">
+    Report bugs & request features
+  </Card>
+  
+  <Card title="Discord Community" icon="discord" href="https://discord.com/invite/DvBtaEc9Jz">
+    Get help & share feedback
+  </Card>
+</CardGroup>
+

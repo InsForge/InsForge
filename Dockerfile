@@ -6,6 +6,7 @@ WORKDIR /app
 COPY package.json ./
 COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
+COPY auth/package.json ./auth/
 COPY shared-schemas/package.json ./shared-schemas/
 
 # Install all dependencies - will generate Linux-compatible lock file
@@ -19,7 +20,8 @@ COPY . .
 ARG VITE_API_BASE_URL
 ARG VITE_PUBLIC_POSTHOG_KEY
 
-# Build frontend with environment variables baked in
+# Build frontend and auth app with environment variables baked in
+# Frontend outputs to dist/frontend, Auth outputs to dist/auth
 RUN npm run build
 
 # Expose ports
