@@ -3,13 +3,14 @@ title: React
 description: Framework-agnostic authentication components for any React application
 ---
 
-The `@insforge/react` package provides **complete authentication solution for React applications**. Framework-agnostic components with full business logic included—works with Vite, Remix, or any React framework.
+The `@insforge/react` package provides **complete authentication solution for React applications**. Use deployed auth pages (built-in auth) or custom UI components—works with Vite + React Router.
 
 <Tip>
 **For AI Agents - Quick Navigation:**
-- **Complete components (recommended)**: Follow [Quick Start](#quick-start) → 5-minute setup with pre-built SignIn/SignUp
+- **Built-in auth (recommended)**: Follow [Quick Start](#quick-start) → 5-minute setup with deployed auth pages
+- **Custom UI needed**: See [Alternative: Custom UI Components](#alternative-custom-ui-components)
+- **Styling & customization**: See [Customization Guide](/core-concepts/authentication/ui-components/customization)
 - **Form components**: Jump to [Form Components](#form-components-pure-ui) for controlled UI
-- **Atomic components**: See [Atomic Components](#atomic-components-maximum-flexibility) for custom layouts
 - **Hooks only**: See [Hooks](#hooks) for headless auth
 
 **Key principle**: All components use `@insforge/sdk` methods internally. Framework-agnostic by design.
@@ -18,16 +19,16 @@ The `@insforge/react` package provides **complete authentication solution for Re
 ## Why @insforge/react?
 
 <CardGroup cols={2}>
-  <Card title="Complete Package" icon="box">
-    Not just UI—includes SDK integration, providers, and hooks
-  </Card>
-  
-  <Card title="Framework Agnostic" icon="wand-magic-sparkles">
-    Works with Vite, Remix, or any React framework
+  <Card title="Built-in Auth Pages" icon="code">
+    Deployed auth UI, easy to implement
   </Card>
   
   <Card title="5-Minute Setup" icon="clock">
-    Provider + Components = production-ready auth
+    Provider + Router config = production-ready auth
+  </Card>
+  
+  <Card title="Complete Package" icon="box">
+    SDK integration, providers, hooks, and UI components
   </Card>
   
   <Card title="Full TypeScript" icon="shield-check">
@@ -36,11 +37,12 @@ The `@insforge/react` package provides **complete authentication solution for Re
 </CardGroup>
 
 <Note>
-**Flexibility**: All components are exported separately. Use complete components for quick setup, or build custom UIs with atomic components.
+**Built-in auth (recommended)**: Use deployed authentication pages for zero UI code. Switch to custom components only if you need highly customized branding or additional form fields.
 </Note>
 
 ## Features
 
+- **Built-in Auth**: React Router integration with deployed auth pages (like Next.js middleware)
 - **Complete Components**: Pre-built `<SignIn>`, `<SignUp>`, `<UserButton>` with business logic
 - **OAuth Support**: Google, GitHub, Discord, Facebook, LinkedIn, Microsoft, Apple, X, Instagram, TikTok, Spotify
 - **React Hooks**: `useAuth()`, `useUser()`, `usePublicAuthConfig()`
@@ -55,22 +57,12 @@ The `@insforge/react` package provides **complete authentication solution for Re
 npm install @insforge/react
 ```
 
-<Note>
-**SDK Included**: `@insforge/sdk` is automatically installed as a dependency. The SDK handles API calls, token management, and OAuth callback detection automatically.
-
-**CSS Import Required**: Import the styles in your app:
-```bash
-import '@insforge/react/styles.css';
-```
-</Note>
-
 ## Quick Start
 
 ### Step 1: Setup Provider
 
 Wrap your app with `InsforgeProvider` in the root:
 
-**Vite / React:**
 ```tsx src/main.tsx
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -87,101 +79,50 @@ createRoot(document.getElementById('root')!).render(
 );
 ```
 
-**Remix:**
-```tsx app/root.tsx
-import { InsforgeProvider } from '@insforge/react';
-import '@insforge/react/styles.css';
-import { Outlet } from '@remix-run/react';
-
-export default function App() {
-  return (
-    <html>
-      <body>
-        <InsforgeProvider baseUrl={process.env.INSFORGE_BASE_URL}>
-          <Outlet />
-        </InsforgeProvider>
-      </body>
-    </html>
-  );
-}
-```
-
 **Provider Props:**
 - `baseUrl` (required): Your Insforge backend URL
 - `onAuthChange` (optional): Callback when auth state changes
 - `clearCookie` (optional): Custom function to clear cookie on sign out
 
-### Step 2: Create Auth Pages
+### Step 2: Configure Router (Built-in Auth)
 
-Use pre-built components for sign-in and sign-up:
+**The fastest way** - Use deployed auth pages with one line:
 
-```tsx SignInPage.tsx
-import { SignIn } from '@insforge/react';
-import { useNavigate } from 'react-router-dom';
+```tsx src/App.tsx
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { getInsforgeRoutes } from '@insforge/react/router';
+import Home from './pages/Home';
+import Dashboard from './pages/Dashboard';
 
-export default function SignInPage() {
-  const navigate = useNavigate();
+const router = createBrowserRouter([
+  { path: '/', element: <Home /> },
+  
+  // One line adds all auth routes with built-in auth
+  ...getInsforgeRoutes({
+    baseUrl: import.meta.env.VITE_INSFORGE_BASE_URL,
+    builtInAuth: true  // Redirects to deployed auth pages
+  }),
+  
+  { path: '/dashboard', element: <Dashboard /> }
+]);
 
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <SignIn 
-        afterSignInUrl="/dashboard"
-        signUpUrl="/sign-up"
-        forgotPasswordUrl="/forgot-password"
-        onSuccess={(user, accessToken) => {
-          console.log('Signed in:', user);
-        }}
-        onError={(error) => {
-          console.error('Error:', error);
-        }}
-        onRedirect={(url) => navigate(url)}
-      />
-    </div>
-  );
+export default function App() {
+  return <RouterProvider router={router} />;
 }
 ```
 
-```tsx SignUpPage.tsx
-import { SignUp } from '@insforge/react';
+**What this does:**
+- Visiting `/sign-in` → Redirects to `your-project.insforge.app/auth/sign-in`
+- Visiting `/sign-up` → Redirects to `your-project.insforge.app/auth/sign-up`
+- After auth → Redirects back to `/auth/callback` → Goes to dashboard
 
-export default function SignUpPage() {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <SignUp 
-        afterSignUpUrl="/onboarding"
-        signInUrl="/sign-in"
-        onSuccess={(user, accessToken) => {
-          console.log('Account created:', user);
-        }}
-      />
-    </div>
-  );
-}
-```
+<Info>
+**Built-in auth** means using your deployed Insforge authentication pages, just like `@insforge/nextjs` middleware. No UI code needed!
+</Info>
 
-### Step 3: Create Callback Page
+### Step 3: Use Hooks & Components
 
-<Warning>
-**Critical:** The callback page is essential for OAuth to work. It handles OAuth redirects and completes the authentication flow.
-</Warning>
-
-```tsx CallbackPage.tsx
-import { InsforgeCallback } from '@insforge/react';
-
-export default function CallbackPage() {
-  return <InsforgeCallback redirectTo="/dashboard" />;
-}
-```
-
-**That's it!** The component automatically:
-- Validates and stores authentication tokens
-- Fetches complete user data from backend
-- Updates the provider's auth state
-- Redirects to the destination page
-
-### Step 4: Use Hooks & Components
-
-```tsx HomePage.tsx
+```tsx src/pages/Home.tsx
 import { SignedIn, SignedOut, UserButton, useAuth, useUser } from '@insforge/react';
 
 export default function Home() {
@@ -203,12 +144,85 @@ export default function Home() {
 }
 ```
 
-**That's it!** 🎉 Your React app now has production-ready authentication.
+**That's it!** 🎉 Your React app now has production-ready authentication with built-in auth pages.
+
+---
+
+## Alternative: Custom UI Components
+
+Want to use package components instead of built-in auth pages? Create custom auth pages:
+
+```tsx src/App.tsx
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { getInsforgeRoutes } from '@insforge/react/router';
+import { SignIn, SignUp } from '@insforge/react';
+import Home from './pages/Home';
+import Dashboard from './pages/Dashboard';
+
+const router = createBrowserRouter([
+  { path: '/', element: <Home /> },
+  
+  // Still need callback route for OAuth
+  ...getInsforgeRoutes({
+    baseUrl: import.meta.env.VITE_INSFORGE_BASE_URL,
+    builtInAuth: false  // Don't redirect to deployed UI
+  }),
+  
+  // Use package components
+  { 
+    path: '/sign-in', 
+    element: (
+      <div className="min-h-screen flex items-center justify-center">
+        <SignIn afterSignInUrl="/dashboard" />
+      </div>
+    )
+  },
+  { 
+    path: '/sign-up', 
+    element: (
+      <div className="min-h-screen flex items-center justify-center">
+        <SignUp afterSignUpUrl="/dashboard" />
+      </div>
+    )
+  },
+  
+  { path: '/dashboard', element: <Dashboard /> }
+]);
+
+export default function App() {
+  return <RouterProvider router={router} />;
+}
+```
+
+<Note>
+With `builtInAuth: false`, `getInsforgeRoutes()` only adds the `/auth/callback` route for OAuth, allowing you to define custom sign-in/sign-up pages.
+</Note>
 
 ## How It Works
 
+### Built-in Auth Flow
+
 ```
-1. User visits Sign In page → Renders <SignIn> component
+1. User clicks "Sign In" → Visits /sign-in route
+   ↓
+2. getInsforgeRoutes() redirects → your-project.insforge.app/auth/sign-in
+   ↓
+3. User signs in on deployed page → Backend processes authentication
+   ↓
+4. Backend redirects → yourapp.com/auth/callback?access_token=xxx&user_id=xxx
+   ↓
+5. Callback route processes:
+   - SDK auto-detects and stores token
+   - Reloads auth state in provider
+   - Redirects to destination
+   ↓
+6. User sees authenticated UI → Dashboard
+```
+
+### Custom UI Flow
+
+```
+1. User visits /sign-in route → Renders <SignIn> component
    ↓
 2. User enters credentials → Component calls SDK methods
    ↓
@@ -221,22 +235,15 @@ export default function Home() {
 
 **Architecture:**
 - **InsforgeProvider**: Manages authentication state globally using React Context
+- **getInsforgeRoutes()**: React Router helper for built-in auth (similar to Next.js middleware)
 - **SDK Integration**: All auth operations go through `@insforge/sdk`
 - **React Context**: Provides auth state to all child components
 - **Hooks**: Easy access to auth methods and user data
 
-<Note>
-**OAuth Flow**: When using OAuth, users are redirected to the provider, then back to your callback page with auth tokens. The `<InsforgeCallback>` component handles this automatically.
-</Note>
-
 ## Environment Variables
 
 ```bash .env
-# Vite / Create React App
-VITE_INSFORGE_BASE_URL=your-backend-url
-
-# Remix
-INSFORGE_BASE_URL=your-backend-url
+VITE_INSFORGE_BASE_URL=https://your-project.insforge.app/
 ```
 
 ---
@@ -258,18 +265,13 @@ function SignInPage() {
       afterSignInUrl="/dashboard"
       signUpUrl="/sign-up"
       forgotPasswordUrl="/forgot-password"
+      title="Welcome Back"
+      subtitle="Sign in to continue"
       onSuccess={(user, accessToken) => {
         console.log('Signed in:', user);
       }}
       onError={(error) => {
         console.error('Error:', error);
-      }}
-      // Customization
-      title="Welcome Back"
-      subtitle="Sign in to continue"
-      appearance={{
-        containerClassName: "shadow-xl",
-        buttonClassName: "bg-blue-600"
       }}
     />
   );
@@ -292,7 +294,7 @@ function SignInPage() {
 - `onError` - Callback on error
 - `onRedirect` - Custom redirect handler
 - `title` / `subtitle` - Custom heading text
-- `appearance` - Tailwind CSS classes for styling
+- `appearance` - Tailwind CSS classes for styling (see [Customization](/core-concepts/authentication/ui-components/customization))
 
 ### `<SignUp />`
 
@@ -342,11 +344,6 @@ function Header() {
       <UserButton 
         afterSignOutUrl="/"
         mode="detailed"
-        appearance={{
-          buttonClassName: "hover:bg-gray-100",
-          nameClassName: "text-gray-900",
-          emailClassName: "text-gray-600"
-        }}
       />
     </header>
   );
@@ -360,7 +357,7 @@ function Header() {
 **Props:**
 - `mode` - Display mode: `"detailed"` or `"simple"`
 - `afterSignOutUrl` - Redirect URL after sign out
-- `appearance` - Tailwind classes for styling
+- `appearance` - Tailwind classes for styling (see [Customization](/core-concepts/authentication/ui-components/customization))
 
 ### `<Protect />`
 
@@ -599,152 +596,9 @@ function CustomSignIn() {
 - `<ResetPasswordForm />` - Reset password with token
 - `<VerifyEmailStatus />` - Email verification status
 
----
-
-## Atomic Components (Maximum Flexibility)
-
-Build completely custom UIs with atomic building blocks:
-
-```tsx
-import {
-  AuthContainer,
-  AuthHeader,
-  AuthFormField,
-  AuthPasswordField,
-  AuthSubmitButton,
-  AuthErrorBanner,
-  AuthDivider,
-  AuthOAuthProviders,
-  AuthLink,
-} from '@insforge/react';
-
-function CompletelyCustomAuth() {
-  return (
-    <AuthContainer
-      appearance={{
-        containerClassName: "max-w-md",
-        cardClassName: "bg-white shadow-2xl"
-      }}
-    >
-      <AuthHeader
-        title="Welcome to MyApp"
-        subtitle="Sign in to continue"
-        appearance={{
-          titleClassName: "text-3xl text-blue-900"
-        }}
-      />
-
-      <AuthErrorBanner error={error} />
-
-      <form onSubmit={handleSubmit}>
-        <AuthFormField
-          id="email"
-          type="email"
-          label="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          appearance={{
-            inputClassName: "border-blue-500"
-          }}
-        />
-
-        <AuthPasswordField
-          id="password"
-          label="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          emailAuthConfig={config}
-          showStrengthIndicator
-        />
-
-        <AuthSubmitButton isLoading={loading}>
-          Sign In
-        </AuthSubmitButton>
-      </form>
-
-      <AuthDivider text="or" />
-
-      <AuthOAuthProviders
-        providers={['google', 'github', 'discord']}
-        onClick={handleOAuth}
-        loading={oauthLoading}
-      />
-
-      <AuthLink
-        text="Don't have an account?"
-        linkText="Sign up"
-        href="/sign-up"
-      />
-    </AuthContainer>
-  );
-}
-```
-
-**Available Atomic Components:**
-- `AuthContainer` - Main wrapper with branding
-- `AuthHeader` - Title and subtitle
-- `AuthErrorBanner` - Error messages
-- `AuthFormField` - Standard input
-- `AuthPasswordField` - Password with toggle
-- `AuthPasswordStrengthIndicator` - Password checklist
-- `AuthSubmitButton` - Loading button
-- `AuthLink` - Navigation link
-- `AuthDivider` - Visual separator
-- `AuthOAuthButton` - Single OAuth button
-- `AuthOAuthProviders` - OAuth grid
-- `AuthVerificationCodeInput` - 6-digit OTP
-- `AuthBranding` - Insforge branding
-
-<Note>
-All atomic components support the `appearance` prop for complete styling control.
-</Note>
-
----
-
-## Customization
-
-### Appearance Props
-
-All components support Tailwind className overrides:
-
-```tsx
-<SignIn
-  appearance={{
-    containerClassName: "shadow-2xl max-w-lg",
-    cardClassName: "bg-gradient-to-br from-blue-50 to-white",
-    formClassName: "space-y-6",
-    buttonClassName: "bg-blue-600 hover:bg-blue-700 h-12"
-  }}
-/>
-
-<UserButton
-  appearance={{
-    buttonClassName: "hover:bg-gray-100 rounded-full",
-    nameClassName: "text-gray-900 font-semibold",
-    emailClassName: "text-gray-500",
-    dropdownClassName: "shadow-xl"
-  }}
-/>
-```
-
-### Text Customization
-
-All text is customizable:
-
-```tsx
-<SignIn
-  title="Welcome Back!"
-  subtitle="We're happy to see you again"
-  emailLabel="Your Email Address"
-  emailPlaceholder="you@company.com"
-  passwordLabel="Your Password"
-  submitButtonText="Login Now"
-  loadingButtonText="Signing you in..."
-  signUpText="New to our platform?"
-  signUpLinkText="Create an account"
-  dividerText="or continue with"
-/>
-```
+<Info>
+**Need atomic components?** See the [Customization Guide](/core-concepts/authentication/ui-components/customization) for building completely custom UIs with atomic building blocks.
+</Info>
 
 ---
 
@@ -790,6 +644,7 @@ import type {
   OAuthProvider,
   EmailAuthConfig,
   InsforgeProviderProps,
+  GetInsforgeRoutesConfig,  // Router config type
 } from '@insforge/react';
 ```
 
@@ -811,20 +666,6 @@ Built-in support for 10+ OAuth providers:
 - X (Twitter)
 
 Providers are auto-detected from your backend configuration.
-
----
-
-## Validation Utilities
-
-```tsx
-import { emailSchema, cn } from '@insforge/react';
-
-// Validate email with Zod
-const result = emailSchema.safeParse('user@example.com');
-
-// Merge Tailwind classes
-const className = cn('px-4 py-2', 'bg-blue-500', conditionalClass);
-```
 
 ---
 

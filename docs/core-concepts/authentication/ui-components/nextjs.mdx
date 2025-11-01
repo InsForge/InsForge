@@ -9,8 +9,8 @@ The `@insforge/nextjs` package provides **zero-configuration authentication** fo
 **For AI Agents - Quick Navigation:**
 - **Built-in auth (recommended)**: Follow [Quick Start](#quick-start-built-in-auth) → 5-minute setup with backend-hosted auth pages
 - **Custom UI needed**: Jump to [Advanced Usage](#advanced-usage) for custom components
-- **Styling only**: See [Styling Components](#styling-components)
-- **Full control**: See [Primitive Components](#primitive-components)
+- **Styling & customization**: See [Customization Guide](/core-concepts/authentication/ui-components/customization)
+- **Full control**: See [Building Custom Forms](#building-custom-forms-with-atomic-components)
 
 **Key principle**: Always use `@insforge/sdk` methods with these components. Never use raw `fetch` calls.
 </Tip>
@@ -210,48 +210,28 @@ export default function Home() {
 **Unified Format:** Both OAuth and email/password flows return the same parameters, making the callback page simple and consistent.
 </Note>
 
-## Local Development
-
-Backend typically runs on different port during local development:
+## Environment Variables
 
 ```bash .env.local
-NEXT_PUBLIC_INSFORGE_BASE_URL=        # Copy InsForge's api base url from instalation command
-INSFORGE_BASE_URL=                    # Copy InsForge's api base url from instalation command
+NEXT_PUBLIC_INSFORGE_BASE_URL=https://your-project.insforge.app/
+INSFORGE_BASE_URL=https://your-project.insforge.app/
 ```
 
-<Info>
-The provider automatically uses `NEXT_PUBLIC_INSFORGE_FRONTEND_URL` for auth redirects if set.
-</Info>
-
-## SDK + Next.js Package Integration
-
-<Note>
-**Important**: `@insforge/nextjs` works seamlessly with `@insforge/sdk`. The SDK handles all API calls, token management, and OAuth callback detection. Always use SDK methods instead of raw `fetch` calls.
-</Note>
-
-**What SDK handles:**
-- API calls to backend (`getCurrentUser()`, `signIn()`, `signUp()`, etc.)
-- Token storage and management (`insforge-auth-token`, `insforge-auth-user`)
-- OAuth callback parameter detection (automatic on `createClient()`)
-- Type-safe responses with proper error handling
-
-**What Next.js package handles:**
-- React components (`<SignedIn>`, `<SignedOut>`, `<Protect>`, `<UserButton>`)
-- React hooks (`useAuth()`, `useUser()`)
-- Next.js middleware for route protection
-- SSR support via cookie sync
+**Two Variables:**
+- `NEXT_PUBLIC_INSFORGE_BASE_URL` - For client-side (Provider, components)
+- `INSFORGE_BASE_URL` - For server-side (middleware, Server Components)
 
 ---
 
-## Advanced Usage
+## Complete Components (with Business Logic)
 
-<Warning>
-Only use custom components if you need highly customized branding or additional form fields. Built-in auth is faster, requires zero UI code, and needs less maintenance.
-</Warning>
+<Note>
+**Recommendation**: Use built-in auth pages (Quick Start) for most cases. Only create custom components if you need highly customized branding or additional form fields.
+</Note>
 
-### Custom Auth Components
+### Custom Auth Pages
 
-Want custom branding or additional fields? Create custom auth pages:
+Create custom auth pages using pre-built components:
 
 ```tsx app/sign-in/page.tsx
 'use client';
@@ -308,161 +288,160 @@ export default function SignUpPage() {
 - `title` / `subtitle` - Custom heading text
 - `emailLabel` / `passwordLabel` - Custom field labels
 - `submitButtonText` / `loadingButtonText` - Custom button text
-- `appearance` - Tailwind CSS classes for styling
+- `appearance` - Tailwind CSS classes for styling (see [Customization](/core-concepts/authentication/ui-components/customization))
 - `onSuccess` / `onError` - Callback functions
 
 **SignUp Component Props:** Same as SignIn, plus:
 - `afterSignUpUrl` - Redirect URL after successful sign up
 - Additional text customization options
 
-### Styling Components
+<Info>
+**Customization**: See the [Customization Guide](/core-concepts/authentication/ui-components/customization) for styling, text customization, and building custom forms with atomic components.
+</Info>
 
-All components support an `appearance` prop for Tailwind CSS customization:
+---
 
-```tsx
-<SignIn
-  appearance={{
-    containerClassName: "shadow-2xl",
-    cardClassName: "bg-white border-2 border-gray-200",
-    buttonClassName: "bg-blue-600 hover:bg-blue-700",
-    inputClassName: "border-gray-300 focus:border-blue-500"
-  }}
-/>
+## Hooks
 
-<UserButton
-  mode="detailed"
-  appearance={{
-    containerClassName: "ml-auto",
-    buttonClassName: "hover:bg-gray-100 rounded-lg",
-    nameClassName: "text-white font-semibold",
-    emailClassName: "text-gray-300 text-sm"
-  }}
-/>
-```
+### useAuth()
 
-**UserButton Display Modes:**
-- `detailed` (default): Shows avatar + name + email
-- `simple`: Shows avatar only
-
-<Tip>
-Use `appearance` prop to match your app's design system without rebuilding components from scratch.
-</Tip>
-
-### Primitive Components
-
-For complete customization, use primitive building blocks to create your own auth forms:
+Access authentication methods and state:
 
 ```tsx
-import {
-  AuthContainer,
-  AuthHeader,
-  AuthFormField,
-  AuthPasswordField,
-  AuthSubmitButton,
-  AuthDivider,
-  AuthOAuthProviders,
-  AuthLink,
-  cn,
-} from '@insforge/nextjs';
+import { useAuth } from '@insforge/nextjs';
 
-function CustomSignIn() {
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // Your custom sign-in logic with SDK
-  };
-
+function Component() {
+  const { signIn, signUp, signOut, isSignedIn, isLoaded } = useAuth();
+  
+  async function handleSignIn(email: string, password: string) {
+    await signIn(email, password);
+  }
+  
   return (
-    <AuthContainer
-      appearance={{
-        containerClassName: "max-w-md",
-        cardClassName: "bg-white shadow-xl"
-      }}
-    >
-      <AuthHeader
-        title="Welcome Back"
-        subtitle="Sign in to continue"
-        appearance={{
-          titleClassName: "text-3xl text-blue-900",
-          subtitleClassName: "text-gray-600"
-        }}
-      />
-
-      <form onSubmit={handleSubmit}>
-        <AuthFormField
-          id="email"
-          type="email"
-          label="Email Address"
-          placeholder="you@example.com"
-          appearance={{
-            labelClassName: "text-gray-700 font-medium",
-            inputClassName: "border-blue-500 focus:ring-blue-500"
-          }}
-        />
-
-        <AuthPasswordField
-          id="password"
-          label="Password"
-          appearance={{
-            inputClassName: "border-blue-500"
-          }}
-        />
-
-        <AuthSubmitButton
-          isLoading={loading}
-          className="bg-blue-600 hover:bg-blue-700 w-full"
-        >
-          Sign In
-        </AuthSubmitButton>
-      </form>
-
-      <AuthDivider text="or continue with" />
-
-      <AuthOAuthProviders
-        providers={['google', 'github']}
-        onClick={handleOAuth}
-        appearance={{
-          buttonClassName: "hover:bg-gray-50 border-gray-300"
-        }}
-      />
-
-      <AuthLink
-        text="Don't have an account?"
-        linkText="Sign up"
-        href="/sign-up"
-        appearance={{
-          containerClassName: "text-center",
-          linkClassName: "text-blue-600 hover:underline"
-        }}
-      />
-    </AuthContainer>
+    <div>
+      {isSignedIn && <button onClick={() => signOut()}>Sign Out</button>}
+    </div>
   );
 }
 ```
 
-**Available Primitive Components:**
-- `AuthContainer` - Main form container with responsive layout
-- `AuthHeader` - Title and subtitle section
-- `AuthFormField` - Standard input field with label
-- `AuthPasswordField` - Password field with visibility toggle
-- `AuthPasswordStrengthIndicator` - Password requirement checklist
-- `AuthSubmitButton` - Submit button with loading states
-- `AuthErrorBanner` - Error message display banner
-- `AuthDivider` - Visual separator with text
-- `AuthOAuthProviders` - OAuth provider buttons grid
-- `AuthOAuthButton` - Individual OAuth provider button
-- `AuthVerificationCodeInput` - OTP/2FA code input
-- `AuthLink` - Navigation link with styling
-- `AuthBranding` - Insforge branding footer
+**Returns:**
+- `signIn(email, password)` - Sign in user
+- `signUp(email, password)` - Register new user
+- `signOut()` - Sign out current user
+- `isSignedIn` - Boolean auth state
+- `isLoaded` - Boolean loading state
 
-<Note>
-All primitive components support the `appearance` prop with specific `className` options for each element, allowing complete styling control while maintaining consistent behavior.
-</Note>
+### useUser()
 
-### Conditional Rendering
+Access current user profile:
 
-Use the `<Protect>` component for custom access control logic:
+```tsx
+import { useUser } from '@insforge/nextjs';
+
+function UserProfile() {
+  const { user, isLoaded, updateUser } = useUser();
+  
+  if (!isLoaded) return <div>Loading...</div>;
+  if (!user) return <div>Not signed in</div>;
+  
+  return (
+    <div>
+      <p>Email: {user.email}</p>
+      <p>ID: {user.id}</p>
+    </div>
+  );
+}
+```
+
+**Returns:**
+- `user` - Current user object (id, email, nickname, avatarUrl, role, emailVerified)
+- `isLoaded` - Boolean loading state
+- `updateUser(data)` - Update user profile
+
+### usePublicAuthConfig()
+
+Get your authentication config in InsForge:
+
+```tsx
+import { usePublicAuthConfig } from '@insforge/nextjs';
+
+function SignInPage() {
+  const { oauthProviders, emailConfig, isLoaded } = usePublicAuthConfig();
+
+  if (!isLoaded) return <div>Loading...</div>;
+
+  return (
+    <div>
+      <p>Available OAuth: {oauthProviders.join(', ')}</p>
+      <p>Password min length: {emailConfig?.passwordMinLength}</p>
+    </div>
+  );
+}
+```
+
+**Returns:**
+- `oauthProviders` - OAuth providers enabled by you
+- `emailConfig` - Your email auth config like password length
+- `isLoaded` - Boolean loading state
+
+<Warning>
+**Performance**: Only use this hook in SignIn/SignUp components to avoid unnecessary API calls.
+</Warning>
+
+---
+
+## Control Components
+
+### SignedIn / SignedOut
+
+Show/hide content based on authentication:
+
+```tsx
+import { SignedIn, SignedOut } from '@insforge/nextjs';
+
+function NavBar() {
+  return (
+    <nav>
+      <SignedOut>
+        <a href="/sign-in">Sign In</a>
+      </SignedOut>
+
+      <SignedIn>
+        <UserButton />
+      </SignedIn>
+    </nav>
+  );
+}
+```
+
+### UserButton
+
+Pre-built user profile button with dropdown menu:
+
+```tsx
+import { UserButton } from '@insforge/nextjs';
+
+function Header() {
+  return (
+    <header>
+      <UserButton 
+        mode="detailed"
+        afterSignOutUrl="/" 
+      />
+    </header>
+  );
+}
+```
+
+**Props:**
+- `mode` - Display mode: `"detailed"` (avatar + name + email) or `"simple"` (avatar only)
+- `afterSignOutUrl` - Redirect URL after sign out
+- `appearance` - Tailwind classes for styling (see [Customization](/core-concepts/authentication/ui-components/customization))
+
+### Protect
+
+Conditional rendering with custom logic:
 
 ```tsx
 import { Protect } from '@insforge/nextjs';
@@ -484,6 +463,65 @@ import { Protect } from '@insforge/nextjs';
 >
   <PremiumFeature />
 </Protect>
+```
+
+---
+
+## Server-Side Access
+
+Access auth data in Server Components using middleware helpers:
+
+```tsx app/dashboard/page.tsx
+import { headers } from 'next/headers';
+import { getAuthUserId, getAuthToken } from '@insforge/nextjs/middleware';
+import { createClient } from '@insforge/sdk';
+
+export default async function Dashboard() {
+  const userId = getAuthUserId(headers());
+  const token = getAuthToken(headers());
+  
+  if (!userId) {
+    return <div>Not authenticated</div>;
+  }
+  
+  // Create SDK client with token for server-side API calls
+  const insforge = createClient({
+    baseUrl: process.env.INSFORGE_BASE_URL!,
+    edgeFunctionToken: token || undefined,
+  });
+  
+  const { data: userData } = await insforge.auth.getCurrentUser();
+  
+  return <div>Welcome, {userData?.user.email}</div>;
+}
+```
+
+**Available helpers:**
+- `getAuthUserId(headers())` - Returns user ID or null
+- `getAuthToken(headers())` - Returns auth token or null
+
+---
+
+## Advanced Features
+
+### InsforgeCallback Options
+
+Customize the OAuth callback component:
+
+```tsx
+<InsforgeCallback
+  redirectTo="/dashboard"
+  onSuccess={() => console.log('Authentication successful!')}
+  onError={(error) => console.error('Authentication failed:', error)}
+  loadingComponent={
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="text-center">
+        <h2 className="text-2xl font-semibold mb-4">Signing you in...</h2>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+      </div>
+    </div>
+  }
+/>
 ```
 
 ### Auth Change Callback
