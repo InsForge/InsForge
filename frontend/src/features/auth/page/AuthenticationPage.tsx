@@ -5,6 +5,7 @@ import { Button, SearchInput, SelectionClearButton, DeleteActionButton } from '@
 import { UsersTab } from '@/features/auth/components/UsersTab';
 import { Tooltip, TooltipContent, TooltipProvider } from '@/components/radix/Tooltip';
 import { UserFormDialog } from '@/features/auth/components/UserFormDialog';
+import { AuthMethodsTab } from '@/features/auth/components/AuthMethodsTab';
 import { ConfigurationTab } from '@/features/auth/components/ConfigurationTab';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useToast } from '@/lib/hooks/useToast';
@@ -52,10 +53,16 @@ export default function AuthenticationPage() {
       description: 'Manage user accounts',
     },
     {
+      id: AuthTab.AUTH_METHODS,
+      name: 'Auth Methods',
+      icon: Key,
+      description: 'Configure authentication methods',
+    },
+    {
       id: AuthTab.CONFIGURATION,
       name: 'Configuration',
       icon: Key,
-      description: 'Configure authentication',
+      description: 'Configure authentication settings',
     },
   ];
 
@@ -83,7 +90,7 @@ export default function AuthenticationPage() {
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-y-auto">
         {/* Users Section Header */}
         {selectedSection === AuthTab.USERS && (
           <div className="px-3 py-4 dark:bg-neutral-800">
@@ -143,6 +150,8 @@ export default function AuthenticationPage() {
             onSelectedRowsChange={setSelectedRows}
           />
         )}
+
+        {selectedSection === AuthTab.AUTH_METHODS && <AuthMethodsTab />}
 
         {selectedSection === AuthTab.CONFIGURATION && <ConfigurationTab />}
       </div>

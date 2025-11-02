@@ -156,6 +156,7 @@ export function isEmptyValue(value: unknown): boolean {
 }
 
 export const isInsForgeCloudProject = () => {
+  return true;
   return window.location.hostname.endsWith('.insforge.app');
 };
 

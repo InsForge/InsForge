@@ -60,6 +60,7 @@
     --fontFamilyBase:
       'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --fontFamilyMono: 'Ubuntu Mono', ui-monospace, monospace;
+    --fontFamilyManrope: 'Manrope', sans-serif;
   }
 
   /* Prevent document-level scrolling */

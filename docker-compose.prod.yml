@@ -57,6 +57,7 @@ services:
     ports:
       - "7130:7130"
       - "7131:7131"
+      - "7132:7132"
     environment:
       - PORT=7130
       - PROJECT_ROOT=/app

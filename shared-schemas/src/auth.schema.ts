@@ -83,7 +83,7 @@ export const oAuthConfigSchema = z.object({
 });
 
 // Email authentication configuration schema
-export const emailAuthConfigSchema = z.object({
+export const authConfigSchema = z.object({
   id: z.string().uuid(),
   requireEmailVerification: z.boolean(),
   passwordMinLength: z.number().min(4).max(128),
@@ -91,6 +91,8 @@ export const emailAuthConfigSchema = z.object({
   requireLowercase: z.boolean(),
   requireUppercase: z.boolean(),
   requireSpecialChar: z.boolean(),
+  verifyEmailMethod: z.enum(['code', 'link']),
+  resetPasswordMethod: z.enum(['code', 'link']),
   verifyEmailRedirectTo: z
     .union([z.string().url(), z.literal(''), z.null()])
     .optional()
@@ -126,4 +128,4 @@ export type UserSchema = z.infer<typeof userSchema>;
 export type TokenPayloadSchema = z.infer<typeof tokenPayloadSchema>;
 export type OAuthConfigSchema = z.infer<typeof oAuthConfigSchema>;
 export type OAuthProvidersSchema = z.infer<typeof oAuthProvidersSchema>;
-export type EmailAuthConfigSchema = z.infer<typeof emailAuthConfigSchema>;
+export type AuthConfigSchema = z.infer<typeof authConfigSchema>;

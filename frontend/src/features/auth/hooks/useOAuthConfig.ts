@@ -7,7 +7,7 @@ import {
   ListOAuthConfigsResponse,
   OAuthProvidersSchema,
 } from '@insforge/shared-schemas';
-import { oauthConfigService } from '../services/oauth-config.service';
+import { oAuthConfigService } from '../services/oauth-config.service';
 import { useToast } from '@/lib/hooks/useToast';
 
 export function useOAuthConfig() {
@@ -23,7 +23,7 @@ export function useOAuthConfig() {
     refetch: refetchConfigs,
   } = useQuery<ListOAuthConfigsResponse>({
     queryKey: ['oauth-configs'],
-    queryFn: () => oauthConfigService.getAllConfigs(),
+    queryFn: () => oAuthConfigService.getAllConfigs(),
   });
 
   // Query to fetch specific provider config
@@ -34,7 +34,7 @@ export function useOAuthConfig() {
     refetch: refetchProvider,
   } = useQuery<OAuthConfigSchema & { clientSecret?: string }>({
     queryKey: ['oauth-config', selectedProvider],
-    queryFn: () => oauthConfigService.getConfigByProvider(selectedProvider ?? ''),
+    queryFn: () => oAuthConfigService.getConfigByProvider(selectedProvider ?? ''),
     enabled:
       !!selectedProvider &&
       !!configs &&
@@ -43,7 +43,7 @@ export function useOAuthConfig() {
 
   // Mutation to create OAuth configuration
   const createConfigMutation = useMutation({
-    mutationFn: (config: CreateOAuthConfigRequest) => oauthConfigService.createConfig(config),
+    mutationFn: (config: CreateOAuthConfigRequest) => oAuthConfigService.createConfig(config),
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ['oauth-configs'] });
       void queryClient.invalidateQueries({ queryKey: ['oauth-config', data.provider] });
@@ -57,7 +57,7 @@ export function useOAuthConfig() {
   // Mutation to update OAuth configuration
   const updateConfigMutation = useMutation({
     mutationFn: ({ provider, config }: { provider: string; config: UpdateOAuthConfigRequest }) =>
-      oauthConfigService.updateConfig(provider, config),
+      oAuthConfigService.updateConfig(provider, config),
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ['oauth-configs'] });
       void queryClient.invalidateQueries({ queryKey: ['oauth-config', data.provider] });
@@ -70,7 +70,7 @@ export function useOAuthConfig() {
 
   // Mutation to delete OAuth configuration
   const deleteConfigMutation = useMutation({
-    mutationFn: (provider: string) => oauthConfigService.deleteConfig(provider),
+    mutationFn: (provider: string) => oAuthConfigService.deleteConfig(provider),
     onSuccess: (_, provider) => {
       queryClient.removeQueries({ queryKey: ['oauth-configs'] });
       queryClient.removeQueries({ queryKey: ['oauth-config', provider] });

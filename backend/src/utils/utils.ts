@@ -1,12 +1,12 @@
 import crypto from 'crypto';
-import { ColumnType, type EmailAuthConfigSchema } from '@insforge/shared-schemas';
+import { ColumnType, type AuthConfigSchema } from '@insforge/shared-schemas';
 
 /**
  * Generates a user-friendly error message listing all password requirements
- * @param config - Email authentication configuration with password requirements
+ * @param config - Authentication configuration with password requirements
  * @returns A formatted message listing all enabled password requirements
  */
-export function getPasswordRequirementsMessage(config: EmailAuthConfigSchema): string {
+export function getPasswordRequirementsMessage(config: AuthConfigSchema): string {
   const requirements: string[] = [];
 
   requirements.push(`at least ${config.passwordMinLength} characters long`);
