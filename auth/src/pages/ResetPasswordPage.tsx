@@ -1,61 +1,15 @@
-import { useState, FormEvent } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { ResetPasswordForm, usePublicAuthConfig, useInsforge } from '@insforge/react';
+import { useSearchParams } from 'react-router-dom';
+import { ResetPassword } from '@insforge/react';
 import { AuthRouterPath } from '@/App';
 
 export function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const { emailConfig } = usePublicAuthConfig();
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const { resetPassword } = useInsforge();
+  
   const token = searchParams.get('token');
   const redirectUrl = searchParams.get('redirect');
-
-  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    if (newPassword !== confirmPassword) {
-      setError('Passwords do not match');
-      setLoading(false);
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      setError('Password must be at least 6 characters');
-      setLoading(false);
-      return;
-    }
-
-    if (!token) {
-      setError('Token is required');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const result = await resetPassword(token, newPassword);
-
-      if (result?.redirectTo) {
-        void navigate(result.redirectTo);
-      } else {
-        setError('Failed to reset password');
-      }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to reset password');
-    } finally {
-      setLoading(false);
-    }
-  }
-
   const backToSignInUrl = `${AuthRouterPath.SIGN_IN}${redirectUrl ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`;
 
+  // Handle missing token
   if (!token) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800">
@@ -65,8 +19,7 @@ export function ResetPasswordPage() {
               Invalid Reset Link
             </h1>
             <p className="text-sm text-[#828282]">
-              The password reset link is invalid or has expired. Please request a new password
-              reset.
+              The password reset link is invalid or has expired. Please request a new password reset.
             </p>
           </div>
         </div>
@@ -74,22 +27,14 @@ export function ResetPasswordPage() {
     );
   }
 
-  if (!emailConfig) {
-    return;
-  }
-  
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800">
-      <ResetPasswordForm
-        newPassword={newPassword}
-        confirmPassword={confirmPassword}
-        onNewPasswordChange={setNewPassword}
-        onConfirmPasswordChange={setConfirmPassword}
-        onSubmit={(e) => void handleSubmit(e)}
-        error={error}
-        loading={loading}
-        emailAuthConfig={emailConfig}
+      <ResetPassword
+        token={token}
         backToSignInUrl={backToSignInUrl}
+        onError={(error) => {
+          console.error('Failed to reset password:', error);
+        }}
       />
     </div>
   );
