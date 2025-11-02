@@ -208,14 +208,19 @@ export class AuthService {
     if (emailAuthConfig.requireEmailVerification) {
       return {
         accessToken: null,
-        requiresEmailVerification: true,
+        requireEmailVerification: true,
       };
     }
 
     // Email verification not required, provide access token for immediate login
     const accessToken = this.generateToken({ sub: userId, email, role: 'authenticated' });
 
-    return { user, accessToken, requiresEmailVerification: false };
+    return {
+      user,
+      accessToken,
+      requireEmailVerification: false,
+      redirectTo: emailAuthConfig.signInRedirectTo || undefined,
+    };
   }
 
   /**
@@ -253,7 +258,14 @@ export class AuthService {
       role: 'authenticated',
     });
 
-    return { user, accessToken };
+    // Include redirect URL if configured
+    const response: CreateSessionResponse = {
+      user,
+      accessToken,
+      redirectTo: emailAuthConfig.signInRedirectTo || undefined,
+    };
+
+    return response;
   }
 
   /**
@@ -367,7 +379,7 @@ export class AuthService {
       return {
         user,
         accessToken,
-        redirectTo: emailAuthConfig.verifyEmailRedirectTo || undefined,
+        redirectTo: emailAuthConfig.signInRedirectTo || undefined,
       };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -428,7 +440,7 @@ export class AuthService {
       return {
         user,
         accessToken,
-        redirectTo: emailAuthConfig.verifyEmailRedirectTo || undefined,
+        redirectTo: emailAuthConfig.signInRedirectTo || undefined,
       };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -583,7 +595,6 @@ export class AuthService {
 
       return {
         message: 'Password reset successfully. Please login with your new password.',
-        redirectTo: emailAuthConfig.resetPasswordRedirectTo || undefined,
       };
     } catch (error) {
       await client.query('ROLLBACK');

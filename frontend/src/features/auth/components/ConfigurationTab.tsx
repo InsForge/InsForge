@@ -27,8 +27,7 @@ export function ConfigurationTab() {
       requireSpecialChar: false,
       verifyEmailMethod: 'code',
       resetPasswordMethod: 'code',
-      verifyEmailRedirectTo: null,
-      resetPasswordRedirectTo: null,
+      signInRedirectTo: null,
     },
   });
 
@@ -44,8 +43,7 @@ export function ConfigurationTab() {
         requireSpecialChar: config.requireSpecialChar,
         verifyEmailMethod: config.verifyEmailMethod,
         resetPasswordMethod: config.resetPasswordMethod,
-        verifyEmailRedirectTo: config.verifyEmailRedirectTo ?? null,
-        resetPasswordRedirectTo: config.resetPasswordRedirectTo ?? null,
+        signInRedirectTo: config.signInRedirectTo ?? null,
       });
     }
   }, [config, form]);
@@ -69,8 +67,7 @@ export function ConfigurationTab() {
         requireSpecialChar: config.requireSpecialChar,
         verifyEmailMethod: config.verifyEmailMethod,
         resetPasswordMethod: config.resetPasswordMethod,
-        verifyEmailRedirectTo: config.verifyEmailRedirectTo ?? null,
-        resetPasswordRedirectTo: config.resetPasswordRedirectTo ?? null,
+        signInRedirectTo: config.signInRedirectTo ?? null,
       });
     }
   };
@@ -95,6 +92,35 @@ export function ConfigurationTab() {
         </div>
 
         <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-12">
+          {/* Sign In Redirect URL - Only shown for InsForge Cloud projects */}
+          {isInsForgeCloudProject() && (
+            <div className="space-y-6">
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-gray-900 dark:text-white">
+                  Redirect URL After Sign In
+                </label>
+                <span className="text-xs text-zinc-500 dark:text-neutral-400">
+                  Your app url after successful authentication
+                </span>
+                <Input
+                  type="url"
+                  placeholder="https://yourapp.com/dashboard"
+                  {...form.register('signInRedirectTo')}
+                  className={`bg-white dark:bg-neutral-900 dark:placeholder:text-neutral-400 dark:border-neutral-700 dark:text-white ${
+                    form.formState.errors.signInRedirectTo
+                      ? 'border-red-500 dark:border-red-500'
+                      : ''
+                  }`}
+                />
+                {form.formState.errors.signInRedirectTo && (
+                  <span className="text-xs text-red-500">
+                    {form.formState.errors.signInRedirectTo.message || 'Please enter a valid URL'}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           {isInsForgeCloudProject() && (
             <div className="space-y-6">
               <div>
@@ -163,34 +189,6 @@ export function ConfigurationTab() {
                       </Select>
                     )}
                   />
-                </div>
-              )}
-
-              {/* Verify Email Redirect URL - Only shown when email verification is enabled */}
-              {form.watch('requireEmailVerification') && (
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium text-gray-900 dark:text-white">
-                    Redirect URL After Email Verification
-                  </label>
-                  <span className="text-xs text-zinc-500 dark:text-neutral-400">
-                    Your app url after successful verification
-                  </span>
-                  <Input
-                    type="url"
-                    placeholder="https://yourapp.com/welcome"
-                    {...form.register('verifyEmailRedirectTo')}
-                    className={`bg-white dark:bg-neutral-900 dark:placeholder:text-neutral-400 dark:border-neutral-700 dark:text-white ${
-                      form.formState.errors.verifyEmailRedirectTo
-                        ? 'border-red-500 dark:border-red-500'
-                        : ''
-                    }`}
-                  />
-                  {form.formState.errors.verifyEmailRedirectTo && (
-                    <span className="text-xs text-red-500">
-                      {form.formState.errors.verifyEmailRedirectTo.message ||
-                        'Please enter a valid URL'}
-                    </span>
-                  )}
                 </div>
               )}
             </div>
@@ -339,34 +337,6 @@ export function ConfigurationTab() {
                     </Select>
                   )}
                 />
-              </div>
-            )}
-
-            {/* Password Reset Redirect URL - Only shown for InsForge Cloud projects */}
-            {isInsForgeCloudProject() && (
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-gray-900 dark:text-white">
-                  Redirect URL After Password Reset
-                </label>
-                <span className="text-xs text-zinc-500 dark:text-neutral-400">
-                  Your app url after successful reset
-                </span>
-                <Input
-                  type="url"
-                  placeholder="https://yourapp.com/login"
-                  {...form.register('resetPasswordRedirectTo')}
-                  className={`bg-white dark:bg-neutral-900 dark:placeholder:text-neutral-400 dark:border-neutral-700 dark:text-white ${
-                    form.formState.errors.resetPasswordRedirectTo
-                      ? 'border-red-500 dark:border-red-500'
-                      : ''
-                  }`}
-                />
-                {form.formState.errors.resetPasswordRedirectTo && (
-                  <span className="text-xs text-red-500">
-                    {form.formState.errors.resetPasswordRedirectTo.message ||
-                      'Please enter a valid URL'}
-                  </span>
-                )}
               </div>
             )}
           </div>

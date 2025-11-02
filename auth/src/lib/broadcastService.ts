@@ -25,7 +25,9 @@ class BroadcastService {
   }
 
   init(): void {
-    if (this.isInitialized) return;
+    if (this.isInitialized) {
+      return;
+    }
 
     if (!this.isSupported()) {
       console.warn('BroadcastChannel API is not supported in this browser');

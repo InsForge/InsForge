@@ -45,8 +45,7 @@ CREATE TABLE IF NOT EXISTS _auth_configs (
   require_special_char BOOLEAN DEFAULT FALSE NOT NULL,
   verify_email_method TEXT DEFAULT 'code' NOT NULL CHECK (verify_email_method IN ('code', 'link')),
   reset_password_method TEXT DEFAULT 'code' NOT NULL CHECK (reset_password_method IN ('code', 'link')),
-  verify_email_redirect_to TEXT, -- Custom URL to redirect after successful email verification (defaults to no redirect if NULL)
-  reset_password_redirect_to TEXT, -- Custom URL to redirect after successful password reset (defaults to no redirect if NULL)
+  sign_in_redirect_to TEXT, -- Custom URL to redirect after successful sign in (defaults to no redirect if NULL)
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -71,8 +70,7 @@ INSERT INTO _auth_configs (
   require_special_char,
   verify_email_method,
   reset_password_method,
-  verify_email_redirect_to,
-  reset_password_redirect_to
+  sign_in_redirect_to
 ) VALUES (
   FALSE,  -- require_email_verification
   6,      -- password_min_length
@@ -82,6 +80,5 @@ INSERT INTO _auth_configs (
   FALSE,  -- require_special_char
   'code', -- verify_email_method (default to code-based verification)
   'code', -- reset_password_method (default to code-based reset)
-  NULL,   -- verify_email_redirect_to (NULL = no redirect after verification)
-  NULL    -- reset_password_redirect_to (NULL = no redirect after reset)
+  NULL    -- sign_in_redirect_to (NULL = no redirect after sign in)
 ) ON CONFLICT DO NOTHING;

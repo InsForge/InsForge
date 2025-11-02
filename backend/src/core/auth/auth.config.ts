@@ -43,7 +43,7 @@ export class AuthConfigService {
           require_uppercase as "requireUppercase",
           require_special_char as "requireSpecialChar",
           verify_email_method as "verifyEmailMethod",
-          reset_password_method as "resetPasswordMethod",
+          reset_password_method as "resetPasswordMethod"
          FROM _auth_configs
          LIMIT 1`
       );
@@ -94,8 +94,7 @@ export class AuthConfigService {
           require_special_char as "requireSpecialChar",
           verify_email_method as "verifyEmailMethod",
           reset_password_method as "resetPasswordMethod",
-          verify_email_redirect_to as "verifyEmailRedirectTo",
-          reset_password_redirect_to as "resetPasswordRedirectTo",
+          sign_in_redirect_to as "signInRedirectTo",
           created_at as "createdAt",
           updated_at as "updatedAt"
          FROM _auth_configs
@@ -116,8 +115,7 @@ export class AuthConfigService {
           requireSpecialChar: false,
           verifyEmailMethod: 'code' as const,
           resetPasswordMethod: 'code' as const,
-          verifyEmailRedirectTo: null,
-          resetPasswordRedirectTo: null,
+          signInRedirectTo: null,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -204,14 +202,9 @@ export class AuthConfigService {
         values.push(input.resetPasswordMethod);
       }
 
-      if (input.verifyEmailRedirectTo !== undefined) {
-        updates.push(`verify_email_redirect_to = $${paramCount++}`);
-        values.push(input.verifyEmailRedirectTo);
-      }
-
-      if (input.resetPasswordRedirectTo !== undefined) {
-        updates.push(`reset_password_redirect_to = $${paramCount++}`);
-        values.push(input.resetPasswordRedirectTo);
+      if (input.signInRedirectTo !== undefined) {
+        updates.push(`sign_in_redirect_to = $${paramCount++}`);
+        values.push(input.signInRedirectTo);
       }
 
       if (!updates.length) {
@@ -236,8 +229,7 @@ export class AuthConfigService {
            require_special_char as "requireSpecialChar",
            verify_email_method as "verifyEmailMethod",
            reset_password_method as "resetPasswordMethod",
-           verify_email_redirect_to as "verifyEmailRedirectTo",
-           reset_password_redirect_to as "resetPasswordRedirectTo",
+           sign_in_redirect_to as "signInRedirectTo",
            created_at as "createdAt",
            updated_at as "updatedAt"`,
         values

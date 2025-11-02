@@ -121,19 +121,23 @@ export const resetPasswordRequestSchema = z.object({
 
 /**
  * Response for POST /api/auth/users
+ * Includes optional redirectTo URL when user is successfully registered and email verification is not required
  */
 export const createUserResponseSchema = z.object({
   user: userSchema.optional(),
   accessToken: z.string().nullable(),
-  requiresEmailVerification: z.boolean().optional(),
+  requireEmailVerification: z.boolean().optional(),
+  redirectTo: z.string().url().optional(),
 });
 
 /**
  * Response for POST /api/auth/sessions
+ * Includes user and access token, plus optional redirectTo URL for frontend navigation
  */
 export const createSessionResponseSchema = z.object({
   user: userSchema,
   accessToken: z.string(),
+  redirectTo: z.string().url().optional(),
 });
 
 /**
@@ -157,11 +161,10 @@ export const exchangeResetPasswordTokenResponseSchema = z.object({
 
 /**
  * Response for POST /api/auth/email/reset-password
- * Includes success message and optional redirectTo URL for frontend navigation
+ * Includes success message
  */
 export const resetPasswordResponseSchema = z.object({
   message: z.string(),
-  redirectTo: z.string().url().optional(),
 });
 
 /**
@@ -277,8 +280,7 @@ export const getPublicAuthConfigResponseSchema = z.object({
     id: true,
     updatedAt: true,
     createdAt: true,
-    verifyEmailRedirectTo: true,
-    resetPasswordRedirectTo: true,
+    signInRedirectTo: true,
   }).shape,
 });
 

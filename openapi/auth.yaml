@@ -180,7 +180,7 @@ paths:
                     type: string
                     nullable: true
                     description: JWT authentication token (null if email verification required)
-                  requiresEmailVerification:
+                  requireEmailVerification:
                     type: boolean
                     description: Whether email verification is required before login
         '400':

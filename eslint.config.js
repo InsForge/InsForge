@@ -18,7 +18,14 @@ export default defineConfig(
   // Frontend configuration
   {
     files: ['frontend/**/*.ts', 'frontend/**/*.tsx', 'auth/**/*.ts', 'auth/**/*.tsx'],
-    ignores: ['frontend/tests/**/*', 'frontend/**/*.test.*', 'frontend/**/*.spec.*', 'auth/tests/**/*', 'auth/**/*.test.*', 'auth/**/*.spec.*'],
+    ignores: [
+      'frontend/tests/**/*',
+      'frontend/**/*.test.*',
+      'frontend/**/*.spec.*',
+      'auth/tests/**/*',
+      'auth/**/*.test.*',
+      'auth/**/*.spec.*',
+    ],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',

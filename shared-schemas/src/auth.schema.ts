@@ -93,11 +93,7 @@ export const authConfigSchema = z.object({
   requireSpecialChar: z.boolean(),
   verifyEmailMethod: z.enum(['code', 'link']),
   resetPasswordMethod: z.enum(['code', 'link']),
-  verifyEmailRedirectTo: z
-    .union([z.string().url(), z.literal(''), z.null()])
-    .optional()
-    .transform((val) => (val === '' ? null : val)),
-  resetPasswordRedirectTo: z
+  signInRedirectTo: z
     .union([z.string().url(), z.literal(''), z.null()])
     .optional()
     .transform((val) => (val === '' ? null : val)),
