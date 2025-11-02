@@ -10,7 +10,9 @@ export function SignInPage() {
 
   // Listen for email verification success from other tabs
   useEffect(() => {
-    if (!redirectUrl) return;
+    if (!redirectUrl) {
+      return;
+    }
 
     const unsubscribe = broadcastService.subscribe(
       BroadcastEventType.EMAIL_VERIFIED_SUCCESS,
