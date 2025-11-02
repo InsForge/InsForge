@@ -63,6 +63,7 @@ export function SignUpPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800">
       <SignUp
+        afterSignUpUrl={redirectUrl || ""}
         onSuccess={handleSuccessfulAuth}
         onError={handleError}
         signInUrl={AuthRouterPath.SIGN_IN}
