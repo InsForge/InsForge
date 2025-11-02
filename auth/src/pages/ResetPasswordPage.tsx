@@ -4,7 +4,7 @@ import { AuthRouterPath } from '@/App';
 
 export function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
-  
+
   const token = searchParams.get('token');
   const redirectUrl = searchParams.get('redirect');
   const backToSignInUrl = `${AuthRouterPath.SIGN_IN}${redirectUrl ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`;
@@ -19,7 +19,8 @@ export function ResetPasswordPage() {
               Invalid Reset Link
             </h1>
             <p className="text-sm text-[#828282]">
-              The password reset link is invalid or has expired. Please request a new password reset.
+              The password reset link is invalid or has expired. Please request a new password
+              reset.
             </p>
           </div>
         </div>
