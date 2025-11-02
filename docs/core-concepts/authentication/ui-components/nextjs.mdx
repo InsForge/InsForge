@@ -55,9 +55,11 @@ npm install @insforge/nextjs
 ```
 
 <Note>
-**Required Dependencies:**
+**SDK Included**: `@insforge/sdk` is automatically installed as a dependency. For authentication features, you don't need to install it separately. The SDK handles API calls, token management, and OAuth callback detection automatically.
+
+**Optional**: Explicitly install `@insforge/sdk` if you need direct access to database, storage, AI, or edge function features:
 ```bash
-npm install react@^19.0.0 react-dom@^19.0.0 next@^15.0.0 tailwindcss@^4.1.0
+npm install @insforge/sdk
 ```
 </Note>
 
@@ -277,42 +279,8 @@ export default function SignUpPage() {
 }
 ```
 
-**Additional Auth Pages:**
-
-```tsx
-// Password reset and email verification
-import { ForgotPassword, ResetPassword, VerifyEmail } from '@insforge/nextjs';
-
-// app/forgot-password/page.tsx
-export default function ForgotPasswordPage() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <ForgotPassword backToSignInUrl="/sign-in" />
-    </div>
-  );
-}
-
-// app/reset-password/page.tsx
-export default function ResetPasswordPage({ searchParams }: { searchParams: { token?: string } }) {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <ResetPassword token={searchParams.token || ''} backToSignInUrl="/sign-in" />
-    </div>
-  );
-}
-
-// app/verify-email/page.tsx
-export default function VerifyEmailPage({ searchParams }: { searchParams: { token?: string } }) {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <VerifyEmail token={searchParams.token || ''} />
-    </div>
-  );
-}
-```
-
 <Info>
-**For AI Agents**: Always use these pre-built components (`<SignIn>`, `<SignUp>`, `<ForgotPassword>`, `<ResetPassword>`, `<VerifyEmail>`) instead of building forms from scratch. They handle OAuth, email/password validation, and SDK integration automatically.
+**For AI Agents**: Always use these pre-built components (`<SignIn>`, `<SignUp>`) instead of building forms from scratch. They handle OAuth, email/password validation, and SDK integration automatically.
 </Info>
 
 **SignIn Component Props:**
