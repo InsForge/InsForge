@@ -74,6 +74,10 @@ export function ResetPasswordPage() {
     );
   }
 
+  if (!emailConfig) {
+    return;
+  }
+  
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800">
       <ResetPasswordForm
@@ -84,7 +88,7 @@ export function ResetPasswordPage() {
         onSubmit={(e) => void handleSubmit(e)}
         error={error}
         loading={loading}
-        emailAuthConfig={emailConfig || undefined}
+        emailAuthConfig={emailConfig}
         backToSignInUrl={backToSignInUrl}
       />
     </div>
