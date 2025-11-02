@@ -91,35 +91,32 @@ export function ConfigurationTab() {
           </h2>
         </div>
 
-        <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-12">
+        <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-8">
           {/* Sign In Redirect URL - Only shown for InsForge Cloud projects */}
-          {isInsForgeCloudProject() && (
-            <div className="space-y-6">
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-gray-900 dark:text-white">
-                  Redirect URL After Sign In
-                </label>
-                <span className="text-xs text-zinc-500 dark:text-neutral-400">
-                  Your app url after successful authentication
+
+          <div className="space-y-6">
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-gray-900 dark:text-white">
+                Redirect URL After Sign In
+              </label>
+              <span className="text-xs text-zinc-500 dark:text-neutral-400">
+                Your app url after successful authentication
+              </span>
+              <Input
+                type="url"
+                placeholder="https://yourapp.com/dashboard"
+                {...form.register('signInRedirectTo')}
+                className={`bg-white dark:bg-neutral-900 dark:placeholder:text-neutral-400 dark:border-neutral-700 dark:text-white ${
+                  form.formState.errors.signInRedirectTo ? 'border-red-500 dark:border-red-500' : ''
+                }`}
+              />
+              {form.formState.errors.signInRedirectTo && (
+                <span className="text-xs text-red-500">
+                  {form.formState.errors.signInRedirectTo.message || 'Please enter a valid URL'}
                 </span>
-                <Input
-                  type="url"
-                  placeholder="https://yourapp.com/dashboard"
-                  {...form.register('signInRedirectTo')}
-                  className={`bg-white dark:bg-neutral-900 dark:placeholder:text-neutral-400 dark:border-neutral-700 dark:text-white ${
-                    form.formState.errors.signInRedirectTo
-                      ? 'border-red-500 dark:border-red-500'
-                      : ''
-                  }`}
-                />
-                {form.formState.errors.signInRedirectTo && (
-                  <span className="text-xs text-red-500">
-                    {form.formState.errors.signInRedirectTo.message || 'Please enter a valid URL'}
-                  </span>
-                )}
-              </div>
+              )}
             </div>
-          )}
+          </div>
 
           {isInsForgeCloudProject() && (
             <div className="space-y-6">
