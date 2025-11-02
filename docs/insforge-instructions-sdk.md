@@ -41,18 +41,18 @@ const client = createClient({
 Available documentation types:
 - `"instructions"` - Essential backend setup (START HERE)
 - `"db-sdk"` - Database operations with SDK
-- `"auth-sdk"` - Authentication methods (headless SDK)
-- **Authentication UI Components** (framework-specific, production-ready):
-  - `"auth-components-nextjs"` - For Next.js applications (App Router + Pages Router)
-  - `"auth-components-react"` - For React applications (Vite, Remix, or any React setup)
+- **Authentication** - Choose based on implementation:
+  - `"auth-sdk"` - Backend/headless auth (SDK methods only)
+  - `"auth-components-nextjs"` - Frontend auth for Next.js (built-in auth pages + UI)
+  - `"auth-components-react"` - Frontend auth for React/Vite (built-in auth pages + UI)
 - `"storage-sdk"` - File storage operations
 - `"functions-sdk"` - Serverless functions invocation
 - `"ai-integration-sdk"` - AI chat and image generation
 
 **🎯 How to Choose Authentication Documentation:**
-1. **Need custom auth logic or headless auth?** → Use `"auth-sdk"`
-2. **Building with Next.js?** → Use `"auth-components-nextjs"` (includes middleware, SSR support)
-3. **Building with React (Vite/Remix/CRA)?** → Use `"auth-components-react"` (framework-agnostic)
+1. **Building with Next.js?** → Use `"auth-components-nextjs"` (frontend: built-in auth pages)
+2. **Building with React (Vite+React Router)?** → Use `"auth-components-react"` (frontend: built-in auth pages)
+3. **Need backend/headless auth only?** → Use `"auth-sdk"` (backend: SDK methods)
 
 ## When to Use SDK vs MCP Tools
 
@@ -70,25 +70,9 @@ Available documentation types:
 - Serverless function deployment (`create-function`, `update-function`, `delete-function`)
 
 ### When to Use Pre-Built Components
-InsForge provides framework-specific UI packages that wrap SDK methods into production-ready authentication interfaces:
-- `@insforge/nextjs` - Next.js (App Router + Pages Router)
-- `@insforge/react` - React (Vite, Remix, or any React setup)
-- More frameworks coming soon (Vue, Svelte)
-
-**Use pre-built components when:**
-- You want automatic session management and auto-configured OAuth providers
-- You want TypeScript-safe, battle-tested authentication flows
-- You want to spend less tokens and time to build authentication system
-
-**Components provide:**
-- Complete auth pages (SignIn, SignUp) with email/password + OAuth
-- Session hooks (`useAuth()`, `useUser()`)
-- Route protection (middleware for Next.js, conditional rendering for all)
-- Production security (HTTP-only cookies, token sync, email verification)
-
-**Framework selection guide:**
-- **Next.js projects** → `@insforge/nextjs` (includes middleware, SSR support, cookie sync)
-- **React projects (Vite/Remix/CRA)** → `@insforge/react` (framework-agnostic, works everywhere)
+InsForge provides framework-specific UI packages with **built-in auth pages** (zero UI code):
+- `@insforge/nextjs` - Next.js (built-in auth + middleware + SSR)
+- `@insforge/react` - React (built-in auth + framework-agnostic)
 
 ## Quick Start
 
