@@ -7,7 +7,9 @@ import './index.css';
 import App from './App';
 
 // Get backend URL from window.origin
-const backendUrl = window.location.hostname.includes('localhost') ? 'http://localhost:7130' : window.location.origin;
+const backendUrl = window.location.hostname.includes('localhost')
+  ? 'http://localhost:7130'
+  : window.location.origin;
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

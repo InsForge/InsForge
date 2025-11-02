@@ -4,7 +4,7 @@ import { AuthRouterPath } from '@/App';
 
 export function ForgotPasswordPage() {
   const [searchParams] = useSearchParams();
-  
+
   const redirectUrl = searchParams.get('redirect');
   const backToSignInUrl = `${AuthRouterPath.SIGN_IN}${redirectUrl ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`;
 
