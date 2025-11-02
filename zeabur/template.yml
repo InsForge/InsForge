@@ -316,6 +316,7 @@ spec:
                     default: postgres
                 PGPASSWORD:
                     default: ${POSTGRES_PASSWORD}
+                    expose: true
                 PGRST_OPENAPI_SERVER_PROXY_URI:
                     default: http://localhost:3000
                 PGRST_DB_SCHEMA:
@@ -377,7 +378,7 @@ spec:
                 POSTGRES_USER:
                     default: postgres
                 POSTGRES_PASSWORD:
-                    default: ${POSTGRES_PASSWORD}
+                    default: ${PGPASSWORD}
                 POSTGREST_BASE_URL:
                     default: http://postgrest:3000
                 WORKER_TIMEOUT_MS:
@@ -922,9 +923,9 @@ spec:
                 POSTGRES_USER:
                     default: postgres
                 POSTGRESDB_PASSWORD:
-                    default: ${POSTGRES_PASSWORD}
+                    default: ${PGPASSWORD}
                 DATABASE_URL:
-                    default: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/insforge
+                    default: postgres://postgres:${PGPASSWORD}@postgres:5432/insforge
                 POSTGREST_BASE_URL:
                     default: http://postgrest:3000
                 # Deno Runtime URL for serverless functions
