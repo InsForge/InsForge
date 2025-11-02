@@ -18,6 +18,7 @@ const DOCS_MAP: Record<string, string> = {
   // UI Components - Framework-specific
   'auth-components-nextjs': 'core-concepts/authentication/ui-components/nextjs.mdx',
   'auth-components-react': 'core-concepts/authentication/ui-components/react.mdx',
+  'auth-components-customization': 'core-concepts/authentication/ui-components/customization.mdx',
   'storage-sdk': 'core-concepts/storage/sdk.mdx',
   'functions-sdk': 'core-concepts/functions/sdk.mdx',
   'ai-integration-sdk': 'core-concepts/ai/sdk.mdx',
