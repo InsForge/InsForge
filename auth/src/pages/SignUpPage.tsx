@@ -38,12 +38,15 @@ export function SignUpPage() {
   }, [redirectUrl]);
 
   const handleSuccessfulAuth = useCallback(
-    (_user: { id: string; email: string; name: string }, accessToken: string) => {
+    (user: { id: string; email: string; name: string }, accessToken: string) => {
       if (redirectUrl) {
         try {
           const finalUrl = new URL(redirectUrl, window.location.origin);
           const params = new URLSearchParams();
           params.set('access_token', accessToken);
+          params.set('user_id', user.id);
+          params.set('email', user.email);
+          params.set('name', user.name);
           finalUrl.search = params.toString();
           window.location.href = finalUrl.toString();
         } catch {
