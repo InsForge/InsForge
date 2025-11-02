@@ -131,6 +131,8 @@ spec:
                     expose: true
                 JWT_SECRET:
                     default: ${PASSWORD}
+                    expose: true
+                    readonly: true
                 JWT_EXP:
                     default: "3600"
             configs:
@@ -304,8 +306,17 @@ spec:
                   port: 3000
                   type: HTTP
             env:
-                PGRST_DB_URI:
-                    default: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/insforge
+                PGHOST:
+                    default: postgres
+                PGPORT:
+                    default: "5432"
+                PGDATABASE:
+                    default: insforge
+                PGUSER:
+                    default: postgres
+                PGPASSWORD:
+                    default: ${POSTGRES_PASSWORD}
+                    expose: true
                 PGRST_OPENAPI_SERVER_PROXY_URI:
                     default: http://localhost:3000
                 PGRST_DB_SCHEMA:
@@ -313,7 +324,7 @@ spec:
                 PGRST_DB_ANON_ROLE:
                     default: anon
                 PGRST_JWT_SECRET:
-                    default: ${PASSWORD}
+                    default: ${JWT_SECRET}
                     expose: true
                     readonly: true
                 PGRST_DB_CHANNEL_ENABLED:
@@ -367,7 +378,7 @@ spec:
                 POSTGRES_USER:
                     default: postgres
                 POSTGRES_PASSWORD:
-                    default: ${POSTGRES_PASSWORD}
+                    default: ${PGPASSWORD}
                 POSTGREST_BASE_URL:
                     default: http://postgrest:3000
                 WORKER_TIMEOUT_MS:
@@ -375,7 +386,7 @@ spec:
                 ENCRYPTION_KEY:
                     default: ${PASSWORD}
                 JWT_SECRET:
-                    default: ${PASSWORD}
+                    default: ${PGRST_JWT_SECRET}
             configs:
                 - path: /app/functions/server.ts
                   template: |
@@ -478,7 +489,7 @@ spec:
                       }
                     }
 
-                    // Get all function secrets from database and decrypt them
+                    // Get all secrets from main secrets table and decrypt them
                     async function getFunctionSecrets(): Promise<Record<string, string>> {
                       const client = new Client(dbConfig);
 
@@ -492,13 +503,15 @@ spec:
                           return {};
                         }
 
-                        // Fetch all function secrets
+                        // Fetch all active secrets from _secrets table
                         const result = await client.queryObject<{
                           key: string;
-                          value_ciphertext: string
+                          value_ciphertext: string;
                         }>`
                           SELECT key, value_ciphertext
-                          FROM _function_secrets
+                          FROM _secrets
+                          WHERE is_active = true
+                            AND (expires_at IS NULL OR expires_at > NOW())
                         `;
 
                         const secrets: Record<string, string> = {};
@@ -515,7 +528,7 @@ spec:
 
                         return secrets;
                       } catch (error) {
-                        console.error('Error fetching function secrets:', error);
+                        console.error('Error fetching secrets:', error);
                         return {};
                       } finally {
                         await client.end();
@@ -627,6 +640,7 @@ spec:
                       const slugMatch = pathname.match(/^\/([a-zA-Z0-9_-]+)$/);
                       if (slugMatch) {
                         const slug = slugMatch[1];
+                        const startTime = Date.now();
 
                         // Get function code from database
                         const code = await getFunctionCode(slug);
@@ -640,9 +654,33 @@ spec:
 
                         // Execute in worker with original request
                         try {
-                          return await executeInWorker(code, req);
+                          const response = await executeInWorker(code, req);
+                          const duration = Date.now() - startTime;
+
+                          // Log completed invocations only
+                          console.log(
+                            JSON.stringify({
+                              timestamp: new Date().toISOString(),
+                              level: 'info',
+                              slug,
+                              method: req.method,
+                              status: response.status,
+                              duration: `${duration}ms`,
+                            })
+                          );
+
+                          return response;
                         } catch (error) {
-                          console.error(`Failed to execute function ${slug}:`, error);
+                          const duration = Date.now() - startTime;
+                          console.error(
+                            JSON.stringify({
+                              timestamp: new Date().toISOString(),
+                              level: 'error',
+                              slug,
+                              error: error instanceof Error ? error.message : String(error),
+                              duration: `${duration}ms`,
+                            })
+                          );
                           return new Response(JSON.stringify({ error: 'Function execution failed' }), {
                             status: 500,
                             headers: { 'Content-Type': 'application/json' },
@@ -711,6 +749,8 @@ spec:
 
                     // Import SDK at worker level - this will be available to all functions
                     import { createClient } from 'npm:@insforge/sdk';
+                    // Import base64 utilities for encoding/decoding
+                    import { encodeBase64, decodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
 
                     // Handle the single message with code, request data, and secrets
                     self.onmessage = async (e) => {
@@ -726,19 +766,20 @@ spec:
                          * - We need to provide Deno.env functionality so functions can access secrets
                          *
                          * How it works:
-                         * 1. The main server (server.ts) fetches all secrets from the database
-                         * 2. Secrets are decrypted and passed to this worker via the 'secrets' object
-                         * 3. We create a mock Deno object that provides Deno.env.get()
-                         * 4. When user code calls Deno.env.get('MY_SECRET'), it reads from our secrets object
+                         * 1. The main server (server.ts) fetches all active secrets from the _secrets table
+                         * 2. Only active (is_active=true) and non-expired secrets are included
+                         * 3. Secrets are decrypted and passed to this worker via the 'secrets' object
+                         * 4. We create a mock Deno object that provides Deno.env.get()
+                         * 5. When user code calls Deno.env.get('MY_SECRET'), it reads from our secrets object
                          *
                          * This allows edge functions to use familiar Deno.env syntax while maintaining security
+                         * Secrets are managed via the /api/secrets endpoint
                          */
                         const mockDeno = {
                           // Mock the Deno.env API - only get() is needed for reading secrets
                           env: {
-                            get: (key) => secrets[key] || undefined
+                            get: (key) => secrets[key] || undefined,
                           },
-
                         };
 
                         /**
@@ -749,17 +790,26 @@ spec:
                          * - module.exports (to export their function)
                          * - createClient (the Insforge SDK)
                          * - Deno (for Deno.env.get() etc.)
+                         * - encodeBase64, decodeBase64 (base64 encoding utilities)
                          *
                          * We inject our mockDeno as the 'Deno' parameter, so when the user's code
                          * calls Deno.env.get('MY_SECRET'), it's actually calling mockDeno.env.get('MY_SECRET')
                          */
-                        const wrapper = new Function('exports', 'module', 'createClient', 'Deno', code);
+                        const wrapper = new Function(
+                          'exports',
+                          'module',
+                          'createClient',
+                          'Deno',
+                          'encodeBase64',
+                          'decodeBase64',
+                          code
+                        );
                         const exports = {};
                         const module = { exports };
 
-                        // Execute the wrapper, passing mockDeno as the Deno global
-                        // This makes Deno.env.get() available inside the user's function
-                        wrapper(exports, module, createClient, mockDeno);
+                        // Execute the wrapper, passing mockDeno as the Deno global and utility functions
+                        // This makes Deno.env.get(), encodeBase64(), and decodeBase64() available inside the user's function
+                        wrapper(exports, module, createClient, mockDeno, encodeBase64, decodeBase64);
 
                         // Get the exported function
                         const functionHandler = module.exports || exports.default || exports;
@@ -840,7 +890,7 @@ spec:
           template: PREBUILT
           spec:
             source:
-                image: ghcr.io/insforge/insforge-oss:v1.0.2
+                image: ghcr.io/insforge/insforge-oss:v1.1.6
             ports:
                 - id: web
                   port: 7130
@@ -858,7 +908,7 @@ spec:
                 VITE_API_BASE_URL:
                     default: ${ZEABUR_WEB_URL}
                 JWT_SECRET:
-                    default: ${JWT_SECRET}
+                    default: ${PGRST_JWT_SECRET}
                 ADMIN_EMAIL:
                     default: ${ADMIN_EMAIL}
                 ADMIN_PASSWORD:
@@ -873,9 +923,9 @@ spec:
                 POSTGRES_USER:
                     default: postgres
                 POSTGRESDB_PASSWORD:
-                    default: ${POSTGRES_PASSWORD}
+                    default: ${PGPASSWORD}
                 DATABASE_URL:
-                    default: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/insforge
+                    default: postgres://postgres:${PGPASSWORD}@postgres:5432/insforge
                 POSTGREST_BASE_URL:
                     default: http://postgrest:3000
                 # Deno Runtime URL for serverless functions
@@ -894,13 +944,6 @@ spec:
                     default: ""
                 GITHUB_REDIRECT_URI:
                     default: ${ZEABUR_WEB_URL}/api/auth/v1/callback
-                # Storage Configuration (optional)
-                AWS_S3_BUCKET:
-                    default: ""
-                AWS_REGION:
-                    default: us-east-2
-                AWS_INSTANCE_PROFILE_NAME:
-                    default: ""
                 # Multi-tenant Cloud Configuration
                 DEPLOYMENT_ID:
                     default: ${ZEABUR_SERVICE_ID}
@@ -909,13 +952,6 @@ spec:
                 APP_KEY:
                     default: ""
                 ACCESS_API_KEY:
-                    default: ""
-                # Analytics Configuration
-                ANALYTICS_PROVIDER:
-                    default: cloudwatch
-                CLOUDWATCH_LOG_GROUP:
-                    default: ""
-                HOSTNAME_OVERRIDE:
                     default: ""
                 OPENROUTER_API_KEY:
                     default: ${OPENROUTER_API_KEY}
