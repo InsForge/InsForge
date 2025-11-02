@@ -54,7 +54,7 @@ export function SignInPage() {
         onSuccess={handleSuccessfulAuth}
         onError={handleError}
         onRedirect={handleRedirect}
-        signUpUrl="/auth/signup"
+        signUpUrl="/auth/sign-up"
         forgotPasswordUrl="/auth/forgot-password"
       />
     </div>

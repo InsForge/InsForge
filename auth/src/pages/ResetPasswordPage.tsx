@@ -53,7 +53,7 @@ export function ResetPasswordPage() {
     }
   }
 
-  const backToSignInUrl = `/auth/signin${redirectUrl ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`;
+  const backToSignInUrl = `/auth/sign-in${redirectUrl ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`;
 
   if (!token) {
     return (

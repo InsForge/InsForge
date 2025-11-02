@@ -42,7 +42,7 @@ export function ForgotPasswordPage() {
     }
   }
 
-  const backToSignInUrl = `/auth/signin${redirectUrl ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`;
+  const backToSignInUrl = `/auth/sign-in${redirectUrl ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800">
