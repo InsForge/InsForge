@@ -690,7 +690,7 @@ router.post(
       }
 
       // Both magic link tokens and code-verified reset tokens use RESET_PASSWORD purpose
-      const result: ResetPasswordResponse = await authService.resetPasswordWithLinkToken(
+      const result: ResetPasswordResponse = await authService.resetPasswordWithToken(
         newPassword,
         otp
       );

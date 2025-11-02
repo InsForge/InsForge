@@ -23,7 +23,7 @@ import type {
 } from '@insforge/shared-schemas';
 import { OAuthConfigService } from './oauth.config';
 import { AuthConfigService } from './auth.config';
-import { AuthOTPService, EmailOTPPurpose, EmailOTPType } from './auth.otp';
+import { AuthOTPService, OTPPurpose, OTPType } from './auth.otp';
 import { validatePassword } from '@/utils/validations';
 import { getPasswordRequirementsMessage, generateSecureToken } from '@/utils/utils';
 import {
@@ -273,8 +273,8 @@ export class AuthService {
     const otpService = AuthOTPService.getInstance();
     const { otp: code } = await otpService.createEmailOTP(
       email,
-      EmailOTPPurpose.VERIFY_EMAIL,
-      EmailOTPType.NUMERIC_CODE
+      OTPPurpose.VERIFY_EMAIL,
+      OTPType.NUMERIC_CODE
     );
 
     // Send email with verification code
@@ -285,7 +285,7 @@ export class AuthService {
   }
 
   /**
-   * Send verification email with magic link
+   * Send verification email with clickable link
    * Creates a long cryptographic token and sends it via email as a clickable link
    * The link contains only the token (no email) for better privacy and security
    */
@@ -298,18 +298,18 @@ export class AuthService {
       return;
     }
 
-    // Create long cryptographic token for magic link
+    // Create long cryptographic token for clickable verification link
     const otpService = AuthOTPService.getInstance();
     const { otp: token } = await otpService.createEmailOTP(
       email,
-      EmailOTPPurpose.VERIFY_EMAIL,
-      EmailOTPType.LINK_TOKEN
+      OTPPurpose.VERIFY_EMAIL,
+      OTPType.HASH_TOKEN
     );
 
-    // Build magic link URL using backend API endpoint
+    // Build verification link URL using backend API endpoint
     const linkUrl = `${getApiBaseUrl()}/auth/verify-email?token=${token}`;
 
-    // Send email with magic link
+    // Send email with verification link
     const emailService = EmailService.getInstance();
     await emailService.sendWithTemplate(email, dbUser.name || 'User', 'email-verification-link', {
       link: linkUrl,
@@ -330,9 +330,9 @@ export class AuthService {
 
       // Verify OTP using the OTP service (within the same transaction)
       const otpService = AuthOTPService.getInstance();
-      await otpService.verifyNumericCode(
+      await otpService.verifyEmailOTPWithCode(
         email,
-        EmailOTPPurpose.VERIFY_EMAIL,
+        OTPPurpose.VERIFY_EMAIL,
         verificationCode,
         client
       );
@@ -378,7 +378,7 @@ export class AuthService {
   }
 
   /**
-   * Verify email with magic link token
+   * Verify email with hash token from clickable link
    * Verifies the token (without needing email), looks up the email, and updates the account
    * This is more secure as the email is not exposed in the URL
    */
@@ -392,8 +392,8 @@ export class AuthService {
 
       // Verify token and get the associated email
       const otpService = AuthOTPService.getInstance();
-      const { email } = await otpService.verifyLinkToken(
-        EmailOTPPurpose.VERIFY_EMAIL,
+      const { email } = await otpService.verifyEmailOTPWithToken(
+        OTPPurpose.VERIFY_EMAIL,
         token,
         client
       );
@@ -455,8 +455,8 @@ export class AuthService {
     const otpService = AuthOTPService.getInstance();
     const { otp: code } = await otpService.createEmailOTP(
       email,
-      EmailOTPPurpose.RESET_PASSWORD,
-      EmailOTPType.NUMERIC_CODE
+      OTPPurpose.RESET_PASSWORD,
+      OTPType.NUMERIC_CODE
     );
 
     // Send email with reset password code
@@ -467,7 +467,7 @@ export class AuthService {
   }
 
   /**
-   * Send reset password email with magic link
+   * Send reset password email with clickable link
    * Creates a long cryptographic token and sends it via email as a clickable link
    * The link contains only the token (no email) for better privacy and security
    */
@@ -480,18 +480,18 @@ export class AuthService {
       return;
     }
 
-    // Create long cryptographic token for magic link
+    // Create long cryptographic token for clickable reset link
     const otpService = AuthOTPService.getInstance();
     const { otp: token } = await otpService.createEmailOTP(
       email,
-      EmailOTPPurpose.RESET_PASSWORD,
-      EmailOTPType.LINK_TOKEN
+      OTPPurpose.RESET_PASSWORD,
+      OTPType.HASH_TOKEN
     );
 
-    // Build magic link URL using backend API endpoint
+    // Build password reset link URL using backend API endpoint
     const linkUrl = `${getApiBaseUrl()}/auth/reset-password?token=${token}`;
 
-    // Send email with magic link
+    // Send email with password reset link
     const emailService = EmailService.getInstance();
     await emailService.sendWithTemplate(email, dbUser.name || 'User', 'reset-password-link', {
       link: linkUrl,
@@ -516,14 +516,14 @@ export class AuthService {
 
       // Verify the numeric code
       const otpService = AuthOTPService.getInstance();
-      await otpService.verifyNumericCode(
+      await otpService.verifyEmailOTPWithCode(
         email,
-        EmailOTPPurpose.RESET_PASSWORD,
+        OTPPurpose.RESET_PASSWORD,
         verificationCode,
         client
       );
 
-      // Create a temporary reset token (similar to LINK_TOKEN) within the same transaction
+      // Create a temporary reset token (similar to HASH_TOKEN) within the same transaction
       const resetToken = generateSecureToken(32); // 32 bytes = 64 hex characters
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours expiry
       const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
@@ -540,7 +540,7 @@ export class AuthService {
            consumed_at = NULL,
            attempts_count = 0,
            updated_at = NOW()`,
-        [email, EmailOTPPurpose.RESET_PASSWORD, tokenHash, expiresAt]
+        [email, OTPPurpose.RESET_PASSWORD, tokenHash, expiresAt]
       );
 
       await client.query('COMMIT');
@@ -557,15 +557,12 @@ export class AuthService {
   }
 
   /**
-   * Reset password with token (magic link or reset token from code verification)
+   * Reset password with token (from clickable link or code verification)
    * Verifies the token (without needing email), looks up the email, and updates the password
-   * Both magic link tokens and code-verified reset tokens use RESET_PASSWORD purpose
+   * Both clickable link tokens and code-verified reset tokens use RESET_PASSWORD purpose
    * Note: Does not return access token - user must login again with new password
    */
-  async resetPasswordWithLinkToken(
-    newPassword: string,
-    token: string
-  ): Promise<ResetPasswordResponse> {
+  async resetPasswordWithToken(newPassword: string, token: string): Promise<ResetPasswordResponse> {
     // Validate password first before verifying token
     // This allows the user to retry with the same token if password is invalid
     const authConfigService = AuthConfigService.getInstance();
@@ -587,10 +584,10 @@ export class AuthService {
       await client.query('BEGIN');
 
       // Verify token and get the associated email
-      // Both magic link tokens and code-verified reset tokens use RESET_PASSWORD purpose
+      // Both clickable link tokens and code-verified reset tokens use RESET_PASSWORD purpose
       const otpService = AuthOTPService.getInstance();
-      const { email } = await otpService.verifyLinkToken(
-        EmailOTPPurpose.RESET_PASSWORD,
+      const { email } = await otpService.verifyEmailOTPWithToken(
+        OTPPurpose.RESET_PASSWORD,
         token,
         client
       );

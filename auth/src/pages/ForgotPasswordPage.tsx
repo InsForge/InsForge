@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ForgotPasswordForm } from '@insforge/react';
 import { useInsforge } from '@insforge/react';
+import { AuthRouterPath } from '@/App';
 
 export function ForgotPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -42,7 +43,7 @@ export function ForgotPasswordPage() {
     }
   }
 
-  const backToSignInUrl = `/auth/signin${redirectUrl ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`;
+  const backToSignInUrl = `${AuthRouterPath.SIGN_IN}${redirectUrl ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800">

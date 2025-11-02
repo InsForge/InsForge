@@ -4,10 +4,7 @@ import { SecretService } from '@/core/secrets/secrets.js';
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
-import {
-  OAuthConfigSchema,
-  OAuthProvidersSchema,
-} from '@insforge/shared-schemas';
+import { OAuthConfigSchema, OAuthProvidersSchema } from '@insforge/shared-schemas';
 
 export interface CreateOAuthConfigInput {
   provider: OAuthProvidersSchema;

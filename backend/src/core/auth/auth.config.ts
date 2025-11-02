@@ -3,10 +3,7 @@ import { DatabaseManager } from '@/core/database/manager.js';
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
-import type {
-  AuthConfigSchema,
-  UpdateAuthConfigRequest,
-} from '@insforge/shared-schemas';
+import type { AuthConfigSchema, UpdateAuthConfigRequest } from '@insforge/shared-schemas';
 
 export class AuthConfigService {
   private static instance: AuthConfigService;

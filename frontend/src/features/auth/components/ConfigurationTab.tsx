@@ -136,7 +136,7 @@ export function ConfigurationTab() {
                       Email Verification Method
                     </label>
                     <span className="text-xs text-zinc-500 dark:text-neutral-400">
-                      Choose between 6-digit code or magic link
+                      Choose between 6-digit verification code or verification link
                     </span>
                   </div>
                   <Controller
@@ -311,7 +311,7 @@ export function ConfigurationTab() {
                   Password Reset Method
                 </label>
                 <span className="text-xs text-zinc-500 dark:text-neutral-400">
-                  Choose between 6-digit code or magic link
+                  Choose between 6-digit reset code or reset link
                 </span>
               </div>
               <Controller

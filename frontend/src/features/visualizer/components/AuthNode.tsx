@@ -15,7 +15,7 @@ export function AuthNode({ data }: AuthNodeProps) {
   const { authMetadata, userCount } = data;
   const { isProviderConfigured } = useOAuthConfig();
 
-  const enabledCount = authMetadata.oauths.length;
+  const enabledCount = authMetadata.oauths.length + 1;
 
   return (
     <div className="bg-neutral-900 rounded-lg border border-[#363636] min-w-[280px]">

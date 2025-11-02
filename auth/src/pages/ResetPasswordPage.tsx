@@ -1,6 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ResetPasswordForm, usePublicAuthConfig, useInsforge } from '@insforge/react';
+import { AuthRouterPath } from '@/App';
 
 export function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -53,7 +54,7 @@ export function ResetPasswordPage() {
     }
   }
 
-  const backToSignInUrl = `/auth/signin${redirectUrl ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`;
+  const backToSignInUrl = `${AuthRouterPath.SIGN_IN}${redirectUrl ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`;
 
   if (!token) {
     return (

@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { SignUp } from '@insforge/react';
 import broadcastService, { BroadcastEventType } from '../lib/broadcastService';
+import { AuthRouterPath } from '@/App';
 
 export function SignUpPage() {
   const [searchParams] = useSearchParams();
@@ -54,7 +55,7 @@ export function SignUpPage() {
         onSuccess={handleSuccessfulAuth}
         onError={handleError}
         onRedirect={handleRedirect}
-        signInUrl="/auth/signin"
+        signInUrl={AuthRouterPath.SIGN_IN}
       />
     </div>
   );

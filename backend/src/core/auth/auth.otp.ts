@@ -10,7 +10,7 @@ import { generateNumericCode, generateSecureToken } from '@/utils/utils.js';
 /**
  * OTP purpose types - used to categorize different OTP use cases
  */
-export enum EmailOTPPurpose {
+export enum OTPPurpose {
   VERIFY_EMAIL = 'VERIFY_EMAIL',
   RESET_PASSWORD = 'RESET_PASSWORD',
 }
@@ -18,9 +18,9 @@ export enum EmailOTPPurpose {
 /**
  * Token type - determines token format and expiration
  */
-export enum EmailOTPType {
+export enum OTPType {
   NUMERIC_CODE = 'NUMERIC_CODE', // Short 6-digit numeric code for manual entry
-  LINK_TOKEN = 'LINK_TOKEN', // Long cryptographic token for magic links
+  HASH_TOKEN = 'HASH_TOKEN', // Long cryptographic token with hash-based lookup
 }
 
 /**
@@ -38,7 +38,7 @@ export interface CreateOTPResult {
 export interface VerifyOTPResult {
   success: boolean;
   email: string;
-  purpose: EmailOTPPurpose;
+  purpose: OTPPurpose;
 }
 
 /**
@@ -48,23 +48,23 @@ export interface VerifyOTPResult {
  * 1. Short numeric codes (6 digits) - displayed in email for manual entry
  *    - Stored as bcrypt hash (defense against brute force if DB compromised)
  *    - Has attempt counting and rate limiting (we know which record to update)
- * 2. Long cryptographic tokens (64 chars) - embedded in magic links for click-to-verify
+ * 2. Long cryptographic tokens (64 chars) - embedded in clickable links for one-click verification
  *    - Stored as SHA-256 hash (high entropy makes bcrypt unnecessary, allows direct lookup)
  *    - NO attempt counting possible (can't identify which record on failed attempt)
  *
  * The dual hashing strategy balances security and performance:
  * - NUMERIC_CODE: Low entropy (10^6 combinations) requires slow bcrypt + rate limiting
- * - LINK_TOKEN: High entropy (2^256 combinations) only needs fast SHA-256, no rate limiting needed
+ * - HASH_TOKEN: High entropy (2^256 combinations) only needs fast SHA-256, no rate limiting needed
  */
 export class AuthOTPService {
   private static instance: AuthOTPService;
   private pool: Pool | null = null;
 
   // Configuration constants
-  private readonly DIGIT_CODE_LENGTH = 6; // 6 digits = 1 million combinations
-  private readonly DIGIT_CODE_EXPIRY_MINUTES = 15; // 15 minutes expiry for numeric codes
-  private readonly LINK_TOKEN_BYTES = 32; // 32 bytes = 64 hex characters = 256 bits entropy
-  private readonly LINK_TOKEN_EXPIRY_HOURS = 24; // 24 hours expiry for magic link tokens
+  private readonly NUMERIC_CODE_LENGTH = 6; // 6 digits = 1 million combinations
+  private readonly NUMERIC_CODE_EXPIRY_MINUTES = 15; // 15 minutes expiry for numeric codes
+  private readonly HASH_TOKEN_BYTES = 32; // 32 bytes = 64 hex characters = 256 bits entropy
+  private readonly HASH_TOKEN_EXPIRY_HOURS = 24; // 24 hours expiry for hash tokens
   private readonly MAX_ATTEMPTS = 5; // Maximum verification attempts (for numeric codes only)
   private readonly BCRYPT_SALT_ROUNDS = 10; // Salt rounds for numeric codes (2^10 iterations)
 
@@ -87,23 +87,23 @@ export class AuthOTPService {
   }
 
   /**
-   * Create or update an email verification token
-   * Supports both short numeric codes (for manual entry) and long cryptographic tokens (for magic links)
+   * Create or update an email OTP
+   * Supports both short numeric codes (for manual entry) and long cryptographic tokens (for clickable links)
    * Uses upsert to ensure only one active token exists per email/purpose combination
    *
    * Hashing strategy:
    * - NUMERIC_CODE: Uses bcrypt (slow hash) due to low entropy (10^6 combinations)
-   * - LINK_TOKEN: Uses SHA-256 (fast hash) - high entropy (2^256) makes bcrypt unnecessary
+   * - HASH_TOKEN: Uses SHA-256 (fast hash) - high entropy (2^256) makes bcrypt unnecessary
    *
    * @param email - The email address for the token
    * @param purpose - The purpose of the token (e.g., 'VERIFY_EMAIL', 'RESET_PASSWORD')
-   * @param otpType - The type of token to generate ('NUMERIC_CODE' or 'LINK_TOKEN')
+   * @param otpType - The type of token to generate ('NUMERIC_CODE' or 'HASH_TOKEN')
    * @returns Promise with creation result including the token and expiry time
    */
   async createEmailOTP(
     email: string,
-    purpose: EmailOTPPurpose,
-    otpType: EmailOTPType = EmailOTPType.NUMERIC_CODE
+    purpose: OTPPurpose,
+    otpType: OTPType = OTPType.NUMERIC_CODE
   ): Promise<CreateOTPResult> {
     const client = await this.getPool().connect();
     try {
@@ -112,16 +112,16 @@ export class AuthOTPService {
       let expiresAt: Date;
       let otpHash: string;
 
-      if (otpType === EmailOTPType.NUMERIC_CODE) {
+      if (otpType === OTPType.NUMERIC_CODE) {
         // Generate 6-digit numeric code for manual entry
-        otp = generateNumericCode(this.DIGIT_CODE_LENGTH);
-        expiresAt = new Date(Date.now() + this.DIGIT_CODE_EXPIRY_MINUTES * 60 * 1000);
+        otp = generateNumericCode(this.NUMERIC_CODE_LENGTH);
+        expiresAt = new Date(Date.now() + this.NUMERIC_CODE_EXPIRY_MINUTES * 60 * 1000);
         // Use bcrypt for low-entropy codes (defense against brute force)
         otpHash = await bcrypt.hash(otp, this.BCRYPT_SALT_ROUNDS);
       } else {
-        // Generate cryptographically secure token for magic links
-        otp = generateSecureToken(this.LINK_TOKEN_BYTES);
-        expiresAt = new Date(Date.now() + this.LINK_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
+        // Generate cryptographically secure token for hash-based lookup
+        otp = generateSecureToken(this.HASH_TOKEN_BYTES);
+        expiresAt = new Date(Date.now() + this.HASH_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
         // Use SHA-256 for high-entropy tokens (enables direct lookup)
         otpHash = crypto.createHash('sha256').update(otp).digest('hex');
       }
@@ -174,9 +174,9 @@ export class AuthOTPService {
    * @returns Promise with verification result
    * @throws AppError if verification fails (with generic error message)
    */
-  async verifyNumericCode(
+  async verifyEmailOTPWithCode(
     email: string,
-    purpose: EmailOTPPurpose,
+    purpose: OTPPurpose,
     code: string,
     externalClient?: PoolClient
   ): Promise<VerifyOTPResult> {
@@ -293,7 +293,7 @@ export class AuthOTPService {
   }
 
   /**
-   * Verify a link token (64 hex characters)
+   * Verify a hash token (64 hex characters)
    * Performs direct lookup using SHA-256 hash without knowing the email
    *
    * @param purpose - The purpose of the OTP
@@ -302,8 +302,8 @@ export class AuthOTPService {
    * @returns Promise with verification result including the associated email
    * @throws AppError if verification fails (with generic error message)
    */
-  async verifyLinkToken(
-    purpose: EmailOTPPurpose,
+  async verifyEmailOTPWithToken(
+    purpose: OTPPurpose,
     token: string,
     externalClient?: PoolClient
   ): Promise<VerifyOTPResult> {
@@ -361,7 +361,7 @@ export class AuthOTPService {
         transactionActive = false;
       }
 
-      logger.info('Link token verified successfully', { purpose });
+      logger.info('Hash token verified successfully', { purpose });
 
       return {
         success: true,
@@ -377,7 +377,7 @@ export class AuthOTPService {
         throw error;
       }
 
-      logger.error('Failed to verify link token', { error, purpose });
+      logger.error('Failed to verify hash token', { error, purpose });
       throw new AppError('Failed to verify token', 500, ERROR_CODES.INTERNAL_ERROR);
     } finally {
       if (shouldManageTransaction) {
