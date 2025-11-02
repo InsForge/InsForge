@@ -1,259 +1,399 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useEffect } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/radix/Button';
-import { MoreHorizontal, Plus, Trash2, Pencil, Mail } from 'lucide-react';
-import { OAuthEmptyState } from './OAuthEmptyState';
-import { OAuthConfigDialog } from './OAuthConfigDialog';
-import { AddOAuthDialog } from './AddOAuthDialog';
-import { EmailConfigDialog } from './EmailConfigDialog';
-import { useOAuthConfig } from '@/features/auth/hooks/useOAuthConfig';
-import { useConfirm } from '@/lib/hooks/useConfirm';
-import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { Input } from '@/components/radix/Input';
+import { Switch } from '@/components/radix/Switch';
+import { Checkbox } from '@/components/Checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/radix/Select';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/radix/DropdownMenu';
-import type { OAuthProvidersSchema } from '@insforge/shared-schemas';
-import { oauthProviders, type OAuthProviderInfo } from '@/features/auth/helpers';
+  updateAuthConfigRequestSchema,
+  type UpdateAuthConfigRequest,
+} from '@insforge/shared-schemas';
+import { useAuthConfig } from '@/features/auth/hooks/useAuthConfig';
+import { isInsForgeCloudProject } from '@/lib/utils/utils';
 
 export function ConfigurationTab() {
-  const [selectedProvider, setSelectedProvider] = useState<OAuthProviderInfo>();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isSelectDialogOpen, setIsSelectDialogOpen] = useState(false);
-  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
-  const { confirm, confirmDialogProps } = useConfirm();
-  const {
-    configs,
-    isLoadingConfigs,
-    deleteConfig,
-    refetchConfigs,
-    getProviderConfig,
-    isProviderConfigured,
-  } = useOAuthConfig();
+  const { config, isLoading, isUpdating, updateConfig } = useAuthConfig();
 
-  const handleConfigureProvider = (provider: OAuthProviderInfo) => {
-    setSelectedProvider(provider);
-    setIsDialogOpen(true);
+  const form = useForm<UpdateAuthConfigRequest>({
+    resolver: zodResolver(updateAuthConfigRequestSchema),
+    defaultValues: {
+      requireEmailVerification: false,
+      passwordMinLength: 6,
+      requireNumber: false,
+      requireLowercase: false,
+      requireUppercase: false,
+      requireSpecialChar: false,
+      verifyEmailMethod: 'code',
+      resetPasswordMethod: 'code',
+      verifyEmailRedirectTo: null,
+      resetPasswordRedirectTo: null,
+    },
+  });
+
+  // Load configuration when config changes
+  useEffect(() => {
+    if (config) {
+      form.reset({
+        requireEmailVerification: config.requireEmailVerification,
+        passwordMinLength: config.passwordMinLength,
+        requireNumber: config.requireNumber,
+        requireLowercase: config.requireLowercase,
+        requireUppercase: config.requireUppercase,
+        requireSpecialChar: config.requireSpecialChar,
+        verifyEmailMethod: config.verifyEmailMethod,
+        resetPasswordMethod: config.resetPasswordMethod,
+        verifyEmailRedirectTo: config.verifyEmailRedirectTo ?? null,
+        resetPasswordRedirectTo: config.resetPasswordRedirectTo ?? null,
+      });
+    }
+  }, [config, form]);
+
+  const handleSubmitData = (data: UpdateAuthConfigRequest) => {
+    updateConfig(data);
   };
 
-  const deleteOAuthConfig = async (providerId: OAuthProvidersSchema, providerName: string) => {
-    const shouldDelete = await confirm({
-      title: `Delete ${providerName} OAuth`,
-      description: `Are you sure you want to delete the ${providerName} configuration? This action cannot be undone.`,
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
-      destructive: true,
-    });
+  const handleSubmit = () => {
+    void form.handleSubmit(handleSubmitData)();
+  };
 
-    if (shouldDelete) {
-      deleteConfig(providerId);
+  const handleReset = () => {
+    if (config) {
+      form.reset({
+        requireEmailVerification: config.requireEmailVerification,
+        passwordMinLength: config.passwordMinLength,
+        requireNumber: config.requireNumber,
+        requireLowercase: config.requireLowercase,
+        requireUppercase: config.requireUppercase,
+        requireSpecialChar: config.requireSpecialChar,
+        verifyEmailMethod: config.verifyEmailMethod,
+        resetPasswordMethod: config.resetPasswordMethod,
+        verifyEmailRedirectTo: config.verifyEmailRedirectTo ?? null,
+        resetPasswordRedirectTo: config.resetPasswordRedirectTo ?? null,
+      });
     }
   };
 
-  const handleCloseDialog = () => {
-    setIsDialogOpen(false);
-    setSelectedProvider(undefined);
-  };
-
-  const hasAuthMethods = useMemo(() => {
-    return !!configs.length;
-  }, [configs]);
-
-  const openSelectDialog = () => {
-    setIsSelectDialogOpen(true);
-  };
-
-  const enabledProviders = useMemo(() => {
-    const enabled: Record<OAuthProvidersSchema, boolean> = {} as Record<
-      OAuthProvidersSchema,
-      boolean
-    >;
-    oauthProviders.forEach((provider) => {
-      enabled[provider.id] = isProviderConfigured(provider.id);
-    });
-    return enabled;
-  }, [isProviderConfigured]);
-
-  // Check if all providers are enabled
-  const allProvidersEnabled = useMemo(() => {
-    return oauthProviders.every((provider) => enabledProviders[provider.id]);
-  }, [enabledProviders]);
-
-  const handleConfirmSelected = (selectedId: OAuthProvidersSchema) => {
-    // Find the selected provider
-    const selectedProvider = oauthProviders.find((p) => p.id === selectedId);
-    if (!selectedProvider) {
-      return;
-    }
-
-    // Close the select dialog and open the method dialog
-    setIsSelectDialogOpen(false);
-    setSelectedProvider(selectedProvider);
-    setIsDialogOpen(true);
-  };
-
-  const handleSuccess = useCallback(() => {
-    // Refresh configuration after successful update
-    void refetchConfigs();
-  }, [refetchConfigs]);
-
-  if (isLoadingConfigs) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
         <div className="text-center">
-          <div className="text-sm text-gray-500 dark:text-zinc-400">
-            Loading OAuth configuration...
-          </div>
+          <div className="text-sm text-gray-500 dark:text-zinc-400">Loading configuration...</div>
         </div>
       </div>
     );
   }
 
   return (
-    <>
-      <div className="flex flex-col gap-12 h-full overflow-auto p-6 w-full max-w-[1080px] mx-auto">
-        {/* Email Section */}
-        <div className="flex flex-col gap-4">
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">Email Sign-in</h2>
-          <div className="grid grid-cols-2 gap-x-3 gap-y-6">
-            <div className="flex items-center justify-between h-15 p-4 bg-white rounded-[8px] border border-gray-200 dark:border-transparent dark:bg-[#333333]">
-              <div className="flex-1 flex items-center gap-3">
-                <Mail className="w-6 h-6 text-gray-700 dark:text-white" />
-                <div className="text-sm font-medium text-black dark:text-white">Email Auth</div>
+    <div className="p-6 w-full max-w-[800px] mx-auto">
+      <div className="flex flex-col gap-8">
+        <div>
+          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+            Authentication Configuration
+          </h2>
+        </div>
+
+        <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-12">
+          {isInsForgeCloudProject() && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">
+                  Email Verification
+                </h3>
+                <div className="h-px bg-gray-200 dark:bg-neutral-700" />
               </div>
-              <div className="flex items-center gap-3">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      className="h-7 w-7 p-1 text-gray-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-                      variant="ghost"
-                      size="sm"
-                    >
-                      <MoreHorizontal className="w-5 h-5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-40 py-1 px-2">
-                    <DropdownMenuItem
-                      onClick={() => setIsEmailDialogOpen(true)}
-                      className="py-2 px-3 flex items-center gap-3 cursor-pointer"
-                    >
-                      <Pencil className="w-5 h-5" />
-                      Edit
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+
+              {/* Email Verification Toggle */}
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    Require Email Verification
+                  </span>
+                  <span className="text-xs text-zinc-500 dark:text-neutral-400">
+                    Users must verify their email address before they can sign in
+                  </span>
+                </div>
+                <Controller
+                  name="requireEmailVerification"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={(value) => {
+                        field.onChange(value);
+                      }}
+                    />
+                  )}
+                />
+              </div>
+
+              {/* Verify Email Method - Only shown when email verification is enabled */}
+              {form.watch('requireEmailVerification') && (
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-sm font-medium text-gray-900 dark:text-white">
+                      Email Verification Method
+                    </label>
+                    <span className="text-xs text-zinc-500 dark:text-neutral-400">
+                      Choose between 6-digit code or magic link
+                    </span>
+                  </div>
+                  <Controller
+                    name="verifyEmailMethod"
+                    control={form.control}
+                    render={({ field }) => (
+                      <Select
+                        value={field.value}
+                        onValueChange={(value) => {
+                          if (value) {
+                            field.onChange(value);
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-[240px]">
+                          <span className="text-black dark:text-white">
+                            {field.value === 'code' ? 'Code' : 'Link'}
+                          </span>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="code">Code</SelectItem>
+                          <SelectItem value="link">Link</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+              )}
+
+              {/* Verify Email Redirect URL - Only shown when email verification is enabled */}
+              {form.watch('requireEmailVerification') && (
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-gray-900 dark:text-white">
+                    Redirect URL After Email Verification
+                  </label>
+                  <span className="text-xs text-zinc-500 dark:text-neutral-400">
+                    Your app url after successful verification
+                  </span>
+                  <Input
+                    type="url"
+                    placeholder="https://yourapp.com/welcome"
+                    {...form.register('verifyEmailRedirectTo')}
+                    className={`bg-white dark:bg-neutral-900 dark:placeholder:text-neutral-400 dark:border-neutral-700 dark:text-white ${
+                      form.formState.errors.verifyEmailRedirectTo
+                        ? 'border-red-500 dark:border-red-500'
+                        : ''
+                    }`}
+                  />
+                  {form.formState.errors.verifyEmailRedirectTo && (
+                    <span className="text-xs text-red-500">
+                      {form.formState.errors.verifyEmailRedirectTo.message ||
+                        'Please enter a valid URL'}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Password Requirements Section */}
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">
+                Password Requirements
+              </h3>
+              <div className="h-px bg-gray-200 dark:bg-neutral-700" />
+            </div>
+
+            {/* Password Length */}
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-gray-900 dark:text-white">
+                Minimum Password Length
+              </label>
+              <span className="text-xs text-zinc-500 dark:text-neutral-400">
+                Must be between 4 and 128 characters
+              </span>
+              <Input
+                type="number"
+                min="4"
+                max="128"
+                {...form.register('passwordMinLength', { valueAsNumber: true })}
+                className={`max-w-xs bg-white dark:bg-neutral-900 dark:placeholder:text-neutral-400 dark:border-neutral-700 dark:text-white ${
+                  form.formState.errors.passwordMinLength
+                    ? 'border-red-500 dark:border-red-500'
+                    : ''
+                }`}
+              />
+              {form.formState.errors.passwordMinLength && (
+                <span className="text-xs text-red-500">
+                  {form.formState.errors.passwordMinLength.message ||
+                    'Must be between 4 and 128 characters'}
+                </span>
+              )}
+            </div>
+
+            {/* Password Strength Checkboxes */}
+            <div className="flex flex-col gap-3">
+              <label className="text-sm font-medium text-gray-900 dark:text-white">
+                Password Strength Requirements
+              </label>
+              <div className="grid grid-cols-2 gap-4">
+                <Controller
+                  name="requireNumber"
+                  control={form.control}
+                  render={({ field }) => (
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <Checkbox
+                        checked={field.value ?? false}
+                        onChange={(checked) => field.onChange(checked)}
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        At least 1 number
+                      </span>
+                    </label>
+                  )}
+                />
+
+                <Controller
+                  name="requireSpecialChar"
+                  control={form.control}
+                  render={({ field }) => (
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <Checkbox
+                        checked={field.value ?? false}
+                        onChange={(checked) => field.onChange(checked)}
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        At least 1 special character
+                      </span>
+                    </label>
+                  )}
+                />
+
+                <Controller
+                  name="requireLowercase"
+                  control={form.control}
+                  render={({ field }) => (
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <Checkbox
+                        checked={field.value ?? false}
+                        onChange={(checked) => field.onChange(checked)}
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        At least 1 lowercase character
+                      </span>
+                    </label>
+                  )}
+                />
+
+                <Controller
+                  name="requireUppercase"
+                  control={form.control}
+                  render={({ field }) => (
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <Checkbox
+                        checked={field.value ?? false}
+                        onChange={(checked) => field.onChange(checked)}
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        At least 1 uppercase character
+                      </span>
+                    </label>
+                  )}
+                />
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* OAuth Sign-in Section */}
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">OAuth Sign-in</h2>
-            {!allProvidersEnabled && (
-              <Button
-                className="h-9 pr-3 pl-2 py-2 gap-2 dark:bg-neutral-700 dark:text-white dark:hover:bg-neutral-600 text-sm font-medium rounded-sm"
-                onClick={openSelectDialog}
-              >
-                <Plus className="w-5 h-5" />
-                Add Provider
-              </Button>
-            )}
-          </div>
-
-          <div className="flex-1">
-            {hasAuthMethods ? (
-              <div className="grid grid-cols-2 gap-x-3 gap-y-6">
-                {oauthProviders.map((provider) => {
-                  const providerConfig = getProviderConfig(provider.id);
-                  if (!providerConfig) {
-                    return null;
-                  }
-
-                  return (
-                    <div
-                      key={provider.id}
-                      className="flex items-center justify-between h-15 p-4 bg-white rounded-[8px] border border-gray-200 dark:border-transparent dark:bg-[#333333]"
-                    >
-                      <div className="flex-1 flex items-center gap-3">
-                        {provider.icon}
-
-                        <div className="text-sm font-medium text-black dark:text-white">
-                          {provider.name}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        {providerConfig.useSharedKey && (
-                          <span className="px-2 py-0.5 text-xs font-medium text-neutral-500 dark:text-neutral-400 border border-neutral-500 dark:border-neutral-400 rounded">
-                            Shared Keys
-                          </span>
-                        )}
-
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              className="h-7 w-7 p-1 text-gray-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-                              variant="ghost"
-                              size="sm"
-                            >
-                              <MoreHorizontal className="w-5 h-5" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-40 py-1 px-2">
-                            <DropdownMenuItem
-                              onClick={() => handleConfigureProvider(provider)}
-                              className="py-2 px-3 flex items-center gap-3 cursor-pointer"
-                            >
-                              <Pencil className="w-5 h-5" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => void deleteOAuthConfig(provider.id, provider.name)}
-                              className="py-2 px-3 flex items-center gap-3 cursor-pointer text-red-600 dark:text-red-400"
-                            >
-                              <Trash2 className="w-5 h-5" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  );
-                })}
+            {/* Reset Password Method */}
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-gray-900 dark:text-white">
+                  Password Reset Method
+                </label>
+                <span className="text-xs text-zinc-500 dark:text-neutral-400">
+                  Choose between 6-digit code or magic link
+                </span>
               </div>
-            ) : (
-              <OAuthEmptyState />
+              <Controller
+                name="resetPasswordMethod"
+                control={form.control}
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={(value) => {
+                      if (value) {
+                        field.onChange(value);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-[240px]">
+                      <span className="text-black dark:text-white">
+                        {field.value === 'code' ? 'Code' : 'Link'}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="code">Code</SelectItem>
+                      <SelectItem value="link">Link</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+
+            {/* Password Reset Redirect URL - Only shown for InsForge Cloud projects */}
+            {isInsForgeCloudProject() && (
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-gray-900 dark:text-white">
+                  Redirect URL After Password Reset
+                </label>
+                <span className="text-xs text-zinc-500 dark:text-neutral-400">
+                  Your app url after successful reset
+                </span>
+                <Input
+                  type="url"
+                  placeholder="https://yourapp.com/login"
+                  {...form.register('resetPasswordRedirectTo')}
+                  className={`bg-white dark:bg-neutral-900 dark:placeholder:text-neutral-400 dark:border-neutral-700 dark:text-white ${
+                    form.formState.errors.resetPasswordRedirectTo
+                      ? 'border-red-500 dark:border-red-500'
+                      : ''
+                  }`}
+                />
+                {form.formState.errors.resetPasswordRedirectTo && (
+                  <span className="text-xs text-red-500">
+                    {form.formState.errors.resetPasswordRedirectTo.message ||
+                      'Please enter a valid URL'}
+                  </span>
+                )}
+              </div>
             )}
           </div>
-        </div>
+
+          {/* Action Buttons - Reserve space even when hidden */}
+          <div className="flex justify-end gap-3 min-h-10">
+            {form.formState.isDirty && (
+              <>
+                <Button
+                  type="button"
+                  onClick={handleReset}
+                  disabled={isUpdating}
+                  className="h-10 px-6 bg-white border border-zinc-200 shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] text-zinc-950 hover:bg-zinc-50 dark:bg-neutral-600 dark:border-neutral-600 dark:text-white dark:hover:bg-neutral-700"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={isUpdating}
+                  className="h-10 px-6 dark:bg-emerald-300 dark:text-black dark:hover:bg-emerald-400"
+                >
+                  {isUpdating ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </>
+            )}
+          </div>
+        </form>
       </div>
-
-      <EmailConfigDialog
-        isOpen={isEmailDialogOpen}
-        onClose={() => setIsEmailDialogOpen(false)}
-        onSuccess={handleSuccess}
-      />
-
-      <OAuthConfigDialog
-        provider={selectedProvider}
-        isOpen={isDialogOpen}
-        onClose={handleCloseDialog}
-        onSuccess={handleSuccess}
-      />
-
-      <AddOAuthDialog
-        providers={oauthProviders}
-        open={isSelectDialogOpen}
-        onOpenChange={setIsSelectDialogOpen}
-        onConfirm={handleConfirmSelected}
-        enabledProviders={enabledProviders}
-      />
-
-      {/* Confirm Dialog */}
-      <ConfirmDialog {...confirmDialogProps} />
-    </>
+    </div>
   );
 }

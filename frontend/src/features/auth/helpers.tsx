@@ -9,6 +9,7 @@ import type { OAuthProvidersSchema } from '@insforge/shared-schemas';
 
 export enum AuthTab {
   USERS = 'users',
+  AUTH_METHODS = 'auth-methods',
   CONFIGURATION = 'configuration',
 }
 
@@ -45,7 +46,7 @@ export const oauthProviders: OAuthProviderInfo[] = [
   {
     id: 'discord',
     name: 'Discord OAuth',
-    icon: <Discord className="w-6 h-6 text-[#5765F2] dark:text-[#5765F2]" />,
+    icon: <Discord className="w-6 h-6 text-[#5765F2] dark:text-white" />,
     description: 'Configure Discord authentication for your users',
     setupUrl: 'https://discord.com/developers/applications',
   },

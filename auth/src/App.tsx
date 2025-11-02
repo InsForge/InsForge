@@ -5,14 +5,23 @@ import { VerifyEmailPage } from './pages/VerifyEmailPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 
+export enum AuthRouterPath {
+  SIGN_IN = '/auth/sign-in',
+  SIGN_UP = '/auth/sign-up',
+  VERIFY_EMAIL = '/auth/verify-email',
+  FORGOT_PASSWORD = '/auth/forgot-password',
+  RESET_PASSWORD = '/auth/reset-password'
+
+}
+
 export function App() {
   return (
     <Routes>
-      <Route path="/auth/sign-in" element={<SignInPage />} />
-      <Route path="/auth/sign-up" element={<SignUpPage />} />
-      <Route path="/auth/verify-email" element={<VerifyEmailPage />} />
-      <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+      <Route path={AuthRouterPath.SIGN_IN} element={<SignInPage />} />
+      <Route path={AuthRouterPath.SIGN_UP} element={<SignUpPage />} />
+      <Route path={AuthRouterPath.VERIFY_EMAIL} element={<VerifyEmailPage />} />
+      <Route path={AuthRouterPath.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
+      <Route path={AuthRouterPath.RESET_PASSWORD} element={<ResetPasswordPage />} />
     </Routes>
   );
 }

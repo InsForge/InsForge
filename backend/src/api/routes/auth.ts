@@ -8,7 +8,6 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin } from '@/api/middleware/auth.js';
 import oauthRouter from './auth.oauth.js';
-import logger from '@/utils/logger.js';
 import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middleware/rate-limiters.js';
 import {
   userIdSchema,
@@ -19,7 +18,6 @@ import {
   listUsersRequestSchema,
   sendVerificationEmailRequestSchema,
   verifyEmailRequestSchema,
-  updateEmailAuthConfigRequestSchema,
   sendResetPasswordEmailRequestSchema,
   verifyResetPasswordCodeRequestSchema,
   resetPasswordRequestSchema,
@@ -32,16 +30,17 @@ import {
   type GetCurrentSessionResponse,
   type ListUsersResponse,
   type DeleteUsersResponse,
-  type GetEmailAuthConfigResponse,
   type GetPublicAuthConfigResponse,
   exchangeAdminSessionRequestSchema,
+  type GetAuthConfigResponse,
+  updateAuthConfigRequestSchema,
 } from '@insforge/shared-schemas';
 import { UserRecord } from '@/types/auth.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
 const authConfigService = AuthConfigService.getInstance();
-const oauthConfigService = OAuthConfigService.getInstance();
+const oAuthConfigService = OAuthConfigService.getInstance();
 const auditService = AuditService.getInstance();
 
 // Mount OAuth routes
@@ -51,72 +50,63 @@ router.use('/oauth', oauthRouter);
 // GET /api/auth/public-config - Get all public authentication configuration (public endpoint)
 router.get('/public-config', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const [oauthProviders, emailConfig] = await Promise.all([
-      oauthConfigService.getPublicProviders(),
-      authConfigService.getPublicEmailConfig(),
+    const [oAuthProviders, authConfigs] = await Promise.all([
+      oAuthConfigService.getConfiguredProviders(),
+      authConfigService.getPublicAuthConfig(),
     ]);
 
     const response: GetPublicAuthConfigResponse = {
-      providers: oauthProviders,
-      email: emailConfig,
+      oAuthProviders,
+      ...authConfigs,
     };
 
     res.json(response);
   } catch (error) {
-    logger.error('Failed to get public auth config', { error });
     next(error);
   }
 });
 
 // Email Authentication Configuration Routes
-// GET /api/auth/email/config - Get email authentication configuration (admin only)
-router.get(
-  '/email/config',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const config: GetEmailAuthConfigResponse = await authConfigService.getEmailConfig();
-      res.json(config);
-    } catch (error) {
-      next(error);
-    }
+// GET /api/auth/config - Get authentication configurations (admin only)
+router.get('/config', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const config: GetAuthConfigResponse = await authConfigService.getAuthConfig();
+    res.json(config);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
-// PUT /api/auth/email/config - Update email authentication configuration (admin only)
-router.put(
-  '/email/config',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const validationResult = updateEmailAuthConfigRequestSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        throw new AppError(
-          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
-
-      const input = validationResult.data;
-      const config: GetEmailAuthConfigResponse = await authConfigService.updateEmailConfig(input);
-
-      await auditService.log({
-        actor: req.user?.email || 'api-key',
-        action: 'UPDATE_EMAIL_AUTH_CONFIG',
-        module: 'AUTH',
-        details: {
-          updatedFields: Object.keys(input),
-        },
-        ip_address: req.ip,
-      });
-
-      successResponse(res, config);
-    } catch (error) {
-      next(error);
+// PUT /api/auth/config - Update authentication configurations (admin only)
+router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const validationResult = updateAuthConfigRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      throw new AppError(
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
     }
+
+    const input = validationResult.data;
+    const config: GetAuthConfigResponse = await authConfigService.updateAuthConfig(input);
+
+    await auditService.log({
+      actor: req.user?.email || 'api-key',
+      action: 'UPDATE_AUTH_CONFIG',
+      module: 'AUTH',
+      details: {
+        updatedFields: Object.keys(input),
+      },
+      ip_address: req.ip,
+    });
+
+    successResponse(res, config);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 // POST /api/auth/users - Create a new user (registration)
 router.post('/users', async (req: Request, res: Response, next: NextFunction) => {

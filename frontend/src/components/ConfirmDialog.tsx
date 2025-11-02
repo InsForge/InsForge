@@ -72,7 +72,7 @@ export function ConfirmDialog({
         <AlertDialogFooter className="p-6 flex-row justify-end gap-3 border-t border-zinc-200 dark:border-neutral-700">
           <AlertDialogCancel
             disabled={isLoading}
-            className="h-9 w-30 px-3 py-2 text-sm font-medium bg-white border border-zinc-200 shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] rounded hover:bg-zinc-50 dark:bg-neutral-600 dark:border-neutral-600 dark:text-white dark:hover:bg-neutral-700"
+            className="h-9 w-30 px-3 py-2 text-sm font-medium bg-white border border-zinc-200 shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] text-zinc-950 rounded hover:bg-zinc-50 dark:bg-neutral-600 dark:border-neutral-600 dark:text-white dark:hover:bg-neutral-700"
           >
             {cancelText}
           </AlertDialogCancel>

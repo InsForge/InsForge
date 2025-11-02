@@ -161,7 +161,7 @@ export class AuthService {
   async register(email: string, password: string, name?: string): Promise<CreateUserResponse> {
     // Get email auth configuration and validate password
     const authConfigService = AuthConfigService.getInstance();
-    const emailAuthConfig = await authConfigService.getEmailConfig();
+    const emailAuthConfig = await authConfigService.getAuthConfig();
 
     if (!validatePassword(password, emailAuthConfig)) {
       throw new AppError(
@@ -235,7 +235,7 @@ export class AuthService {
 
     // Check if email verification is required
     const authConfigService = AuthConfigService.getInstance();
-    const emailAuthConfig = await authConfigService.getEmailConfig();
+    const emailAuthConfig = await authConfigService.getAuthConfig();
 
     if (emailAuthConfig.requireEmailVerification && !dbUser.email_verified) {
       throw new AppError(
@@ -362,7 +362,7 @@ export class AuthService {
 
       // Get redirect URL from auth config if configured
       const authConfigService = AuthConfigService.getInstance();
-      const emailAuthConfig = await authConfigService.getEmailConfig();
+      const emailAuthConfig = await authConfigService.getAuthConfig();
 
       return {
         user,
@@ -423,7 +423,7 @@ export class AuthService {
 
       // Get redirect URL from auth config if configured
       const authConfigService = AuthConfigService.getInstance();
-      const emailAuthConfig = await authConfigService.getEmailConfig();
+      const emailAuthConfig = await authConfigService.getAuthConfig();
 
       return {
         user,
@@ -569,7 +569,7 @@ export class AuthService {
     // Validate password first before verifying token
     // This allows the user to retry with the same token if password is invalid
     const authConfigService = AuthConfigService.getInstance();
-    const emailAuthConfig = await authConfigService.getEmailConfig();
+    const emailAuthConfig = await authConfigService.getAuthConfig();
 
     if (!validatePassword(newPassword, emailAuthConfig)) {
       throw new AppError(
@@ -867,8 +867,8 @@ export class AuthService {
    * Generate Google OAuth authorization URL
    */
   async generateGoogleOAuthUrl(state?: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('google');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('google');
 
     if (!config) {
       throw new Error('Google OAuth not configured');
@@ -919,8 +919,8 @@ export class AuthService {
    * Generate GitHub OAuth authorization URL - ALWAYS reads fresh from DB
    */
   async generateGitHubOAuthUrl(state?: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('github');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('github');
 
     if (!config) {
       throw new Error('GitHub OAuth not configured');
@@ -966,8 +966,8 @@ export class AuthService {
    * Generate Discord OAuth authorization URL
    */
   async generateDiscordOAuthUrl(state?: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('discord');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('discord');
 
     if (!config) {
       throw new Error('Discord OAuth not configured');
@@ -1035,8 +1035,8 @@ export class AuthService {
       throw new Error('Authorization code is currently being processed.');
     }
 
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('google');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('google');
 
     if (!config) {
       throw new Error('Google OAuth not configured');
@@ -1050,7 +1050,7 @@ export class AuthService {
         clientId: config.clientId?.substring(0, 10) + '...',
       });
 
-      const clientSecret = await oauthConfigService.getClientSecretByProvider('google');
+      const clientSecret = await oAuthConfigService.getClientSecretByProvider('google');
       const selfBaseUrl = getApiBaseUrl();
       const response = await axios.post('https://oauth2.googleapis.com/token', {
         code,
@@ -1098,14 +1098,14 @@ export class AuthService {
    * Verify Google ID token and get user info
    */
   async verifyGoogleToken(idToken: string) {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('google');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('google');
 
     if (!config) {
       throw new Error('Google OAuth not configured');
     }
 
-    const clientSecret = await oauthConfigService.getClientSecretByProvider('google');
+    const clientSecret = await oAuthConfigService.getClientSecretByProvider('google');
 
     if (!clientSecret) {
       throw new Error('Google Client Secret not conifgured.');
@@ -1161,14 +1161,14 @@ export class AuthService {
    * Exchange GitHub code for access token
    */
   async exchangeGitHubCodeForToken(code: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('github');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('github');
 
     if (!config) {
       throw new Error('GitHub OAuth not configured');
     }
 
-    const clientSecret = await oauthConfigService.getClientSecretByProvider('github');
+    const clientSecret = await oAuthConfigService.getClientSecretByProvider('github');
     const selfBaseUrl = getApiBaseUrl();
     const response = await axios.post(
       'https://github.com/login/oauth/access_token',
@@ -1243,8 +1243,8 @@ export class AuthService {
   }
   // NEW: Generate Microsoft OAuth authorization URL
   async generateMicrosoftOAuthUrl(state?: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('microsoft');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('microsoft');
     if (!config) {
       throw new Error('Microsoft OAuth not configured');
     }
@@ -1272,12 +1272,12 @@ export class AuthService {
   async exchangeCodeToTokenByMicrosoft(
     code: string
   ): Promise<{ access_token: string; id_token?: string }> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('microsoft');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('microsoft');
     if (!config) {
       throw new Error('Microsoft OAuth not configured');
     }
-    const clientSecret = await oauthConfigService.getClientSecretByProvider('microsoft');
+    const clientSecret = await oAuthConfigService.getClientSecretByProvider('microsoft');
     const selfBaseUrl = getApiBaseUrl();
 
     const body = new URLSearchParams({
@@ -1355,14 +1355,14 @@ export class AuthService {
    * Exchange Discord code for access token
    */
   async exchangeDiscordCodeForToken(code: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('discord');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('discord');
 
     if (!config) {
       throw new Error('Discord OAuth not configured');
     }
 
-    const clientSecret = await oauthConfigService.getClientSecretByProvider('discord');
+    const clientSecret = await oAuthConfigService.getClientSecretByProvider('discord');
     const selfBaseUrl = getApiBaseUrl();
     const response = await axios.post(
       'https://discord.com/api/oauth2/token',
@@ -1428,8 +1428,8 @@ export class AuthService {
    * Generate LinkedIn OAuth authorization URL
    */
   async generateLinkedInOAuthUrl(state?: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('linkedin');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('linkedin');
 
     if (!config) {
       throw new Error('LinkedIn OAuth not configured');
@@ -1489,8 +1489,8 @@ export class AuthService {
       throw new Error('Authorization code is currently being processed.');
     }
 
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('linkedin');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('linkedin');
 
     if (!config) {
       throw new Error('LinkedIn OAuth not configured');
@@ -1504,7 +1504,7 @@ export class AuthService {
         clientId: config.clientId?.substring(0, 10) + '...',
       });
 
-      const clientSecret = await oauthConfigService.getClientSecretByProvider('linkedin');
+      const clientSecret = await oAuthConfigService.getClientSecretByProvider('linkedin');
       const selfBaseUrl = getApiBaseUrl();
       const response = await axios.post(
         'https://www.linkedin.com/oauth/v2/accessToken',
@@ -1557,8 +1557,8 @@ export class AuthService {
    * Verify LinkedIn ID token and get user info
    */
   async verifyLinkedInToken(idToken: string) {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('linkedin');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('linkedin');
 
     if (!config) {
       throw new Error('LinkedIn OAuth not configured');
@@ -1610,8 +1610,8 @@ export class AuthService {
    * Generate Facebook OAuth authorization URL
    */
   async generateFacebookOAuthUrl(state?: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('facebook');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('facebook');
 
     if (!config) {
       throw new Error('Facebook OAuth not configured');
@@ -1660,14 +1660,14 @@ export class AuthService {
    * Exchange Facebook code for access token
    */
   async exchangeFacebookCodeForToken(code: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('facebook');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('facebook');
 
     if (!config) {
       throw new Error('Facebook OAuth not configured');
     }
 
-    const clientSecret = await oauthConfigService.getClientSecretByProvider('facebook');
+    const clientSecret = await oAuthConfigService.getClientSecretByProvider('facebook');
     const selfBaseUrl = getApiBaseUrl();
     const response = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
       params: {

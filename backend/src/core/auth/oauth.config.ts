@@ -7,7 +7,6 @@ import logger from '@/utils/logger.js';
 import {
   OAuthConfigSchema,
   OAuthProvidersSchema,
-  PublicOAuthProvider,
 } from '@insforge/shared-schemas';
 
 export interface CreateOAuthConfigInput {
@@ -84,7 +83,7 @@ export class OAuthConfigService {
    * Get public OAuth provider information (safe for public API)
    * Only returns non-sensitive information about configured providers
    */
-  async getPublicProviders(): Promise<PublicOAuthProvider[]> {
+  async getConfiguredProviders(): Promise<OAuthProvidersSchema[]> {
     const client = await this.getPool().connect();
     try {
       const result = await client.query(
@@ -94,9 +93,7 @@ export class OAuthConfigService {
          ORDER BY provider ASC`
       );
 
-      return result.rows.map((row) => ({
-        provider: row.provider,
-      }));
+      return result.rows.map((row) => row.provider);
     } catch (error) {
       logger.error('Failed to get public OAuth providers', { error });
       throw new AppError('Failed to get OAuth providers', 500, ERROR_CODES.INTERNAL_ERROR);

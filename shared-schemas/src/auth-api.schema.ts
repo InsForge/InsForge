@@ -8,7 +8,7 @@ import {
   userSchema,
   oAuthConfigSchema,
   oAuthProvidersSchema,
-  emailAuthConfigSchema,
+  authConfigSchema,
 } from './auth.schema';
 
 // ============================================================================
@@ -251,59 +251,37 @@ export const listOAuthConfigsResponseSchema = z.object({
   count: z.number(),
 });
 
-/**
- * Public OAuth provider schema - contains only safe, client-visible fields
- */
-export const publicOAuthProviderSchema = z.object({
-  provider: oAuthProvidersSchema,
-});
-
-/**
- * Response for GET /api/auth/oauth/providers - Public endpoint
- */
-export const listPublicOAuthProvidersResponseSchema = z.object({
-  data: z.array(publicOAuthProviderSchema),
-  count: z.number(),
-});
-
 // ============================================================================
-// Email Authentication Configuration schemas
+// Authentication Configuration schemas
 // ============================================================================
 
 /**
- * PUT /api/auth/email/config - Update Email authentication configuration
+ * PUT /api/auth/config - Update authentication configuration
  */
-export const updateEmailAuthConfigRequestSchema = emailAuthConfigSchema.omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const updateAuthConfigRequestSchema = authConfigSchema
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .partial();
 
 /**
- * Response for GET /api/auth/email/config
+ * Response for GET /api/auth/config
  */
-export const getEmailAuthConfigResponseSchema = emailAuthConfigSchema;
-
-/**
- * Public email auth config schema - contains only safe, client-visible fields
- * Excludes id, createdAt, updatedAt and other sensitive information
- */
-export const publicEmailAuthConfigSchema = z.object({
-  requireEmailVerification: z.boolean(),
-  passwordMinLength: z.number().min(4).max(128),
-  requireNumber: z.boolean(),
-  requireLowercase: z.boolean(),
-  requireUppercase: z.boolean(),
-  requireSpecialChar: z.boolean(),
-});
+export const getAuthConfigResponseSchema = authConfigSchema;
 
 /**
  * Response for GET /api/auth/public-config - Unified public auth configuration endpoint
  * Combines OAuth providers and email auth configuration
  */
 export const getPublicAuthConfigResponseSchema = z.object({
-  providers: z.array(publicOAuthProviderSchema),
-  email: publicEmailAuthConfigSchema,
+  oAuthProviders: z.array(oAuthProvidersSchema),
+  ...authConfigSchema.omit({
+    id: true,
+    updatedAt: true,
+    createdAt: true,
+  }).shape,
 });
 
 // ============================================================================
@@ -332,7 +310,7 @@ export type ListUsersRequest = z.infer<typeof listUsersRequestSchema>;
 export type DeleteUsersRequest = z.infer<typeof deleteUsersRequestSchema>;
 export type CreateOAuthConfigRequest = z.infer<typeof createOAuthConfigRequestSchema>;
 export type UpdateOAuthConfigRequest = z.infer<typeof updateOAuthConfigRequestSchema>;
-export type UpdateEmailAuthConfigRequest = z.infer<typeof updateEmailAuthConfigRequestSchema>;
+export type UpdateAuthConfigRequest = z.infer<typeof updateAuthConfigRequestSchema>;
 export type SendVerificationEmailRequest = z.infer<typeof sendVerificationEmailRequestSchema>;
 export type VerifyEmailRequest = z.infer<typeof verifyEmailRequestSchema>;
 export type SendResetPasswordEmailRequest = z.infer<typeof sendResetPasswordEmailRequestSchema>;
@@ -351,9 +329,7 @@ export type ListUsersResponse = z.infer<typeof listUsersResponseSchema>;
 export type DeleteUsersResponse = z.infer<typeof deleteUsersResponseSchema>;
 export type GetOauthUrlResponse = z.infer<typeof getOauthUrlResponseSchema>;
 export type ListOAuthConfigsResponse = z.infer<typeof listOAuthConfigsResponseSchema>;
-export type GetEmailAuthConfigResponse = z.infer<typeof getEmailAuthConfigResponseSchema>;
-export type PublicOAuthProvider = z.infer<typeof publicOAuthProviderSchema>;
-export type PublicEmailAuthConfig = z.infer<typeof publicEmailAuthConfigSchema>;
+export type GetAuthConfigResponse = z.infer<typeof getAuthConfigResponseSchema>;
 export type GetPublicAuthConfigResponse = z.infer<typeof getPublicAuthConfigResponseSchema>;
 
 export type AuthErrorResponse = z.infer<typeof authErrorResponseSchema>;
