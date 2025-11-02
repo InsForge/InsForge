@@ -116,7 +116,7 @@ const router = createBrowserRouter([
     ]
   },
   
-  // Add built-in auth redirect routes (sign-in, sign-up, etc.)
+  // Add built-in auth redirect routes (sign-in, sign-up, forgot-password, etc.)
   ...getInsforgeRoutes({
     baseUrl: import.meta.env.VITE_INSFORGE_BASE_URL,
     builtInAuth: true  // Redirects to deployed auth pages
@@ -154,6 +154,9 @@ export default function Layout() {
 **What this does:**
 - Visiting `/sign-in` → Redirects to `your-project.insforge.app/auth/sign-in`
 - Visiting `/sign-up` → Redirects to `your-project.insforge.app/auth/sign-up`
+- Visiting `/forgot-password` → Redirects to `your-project.insforge.app/auth/forgot-password`
+- Visiting `/reset-password` → Redirects to `your-project.insforge.app/auth/reset-password`
+- Visiting `/verify-email` → Redirects to `your-project.insforge.app/auth/verify-email`
 - After auth → Redirects back to `/auth/callback` → `<InsforgeCallback />` processes token → Goes to dashboard
 
 <Info>
@@ -195,7 +198,7 @@ Want to use package components instead of built-in auth pages? Create custom aut
 ```tsx src/App.tsx
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { InsforgeCallback } from '@insforge/react';
-import { SignIn, SignUp } from '@insforge/react';
+import { SignIn, SignUp, ForgotPassword, ResetPassword, VerifyEmail } from '@insforge/react';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
@@ -227,6 +230,30 @@ const router = createBrowserRouter([
         element: (
           <div className="min-h-screen flex items-center justify-center">
             <SignUp afterSignUpUrl="/dashboard" />
+          </div>
+        )
+      },
+      { 
+        path: 'forgot-password', 
+        element: (
+          <div className="min-h-screen flex items-center justify-center">
+            <ForgotPassword backToSignInUrl="/sign-in" />
+          </div>
+        )
+      },
+      { 
+        path: 'reset-password', 
+        element: (
+          <div className="min-h-screen flex items-center justify-center">
+            <ResetPassword backToSignInUrl="/sign-in" />
+          </div>
+        )
+      },
+      { 
+        path: 'verify-email', 
+        element: (
+          <div className="min-h-screen flex items-center justify-center">
+            <VerifyEmail />
           </div>
         )
       },
@@ -408,6 +435,123 @@ function Header() {
 - `mode` - Display mode: `"detailed"` or `"simple"`
 - `afterSignOutUrl` - Redirect URL after sign out
 - `appearance` - Tailwind classes for styling (see [Customization](/core-concepts/authentication/ui-components/customization))
+
+### `<ForgotPassword />`
+
+Complete password reset flow with automatic method detection:
+
+```tsx
+import { ForgotPassword } from '@insforge/react';
+
+function ForgotPasswordPage() {
+  return (
+    <ForgotPassword
+      backToSignInUrl="/sign-in"
+      onSuccess={() => {
+        console.log('Password reset initiated');
+      }}
+      onError={(error) => {
+        console.error('Error:', error);
+      }}
+    />
+  );
+}
+```
+
+**Key Features:**
+- Auto-detects reset method (code or link) from backend config
+- **Link method**: Sends email with reset link
+- **Code method**: Three-step flow (email → verify code → reset password)
+- 60-second countdown timer for resend
+- Built-in form validation
+- Customizable text and styling
+
+**Props:**
+- `backToSignInUrl` - Link back to sign in page
+- `onSuccess` - Callback when password reset completes
+- `onError` - Callback on error
+- `title` / `subtitle` - Custom heading text
+- `appearance` - Tailwind CSS classes for styling
+
+### `<ResetPassword />`
+
+Complete password reset with token verification:
+
+```tsx
+import { ResetPassword } from '@insforge/react';
+import { useSearchParams } from 'react-router-dom';
+
+function ResetPasswordPage() {
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token');
+
+  return (
+    <ResetPassword
+      token={token || ''}
+      backToSignInUrl="/sign-in"
+      onSuccess={(redirectTo) => {
+        console.log('Password reset successful');
+        if (redirectTo) {
+          window.location.href = redirectTo;
+        }
+      }}
+    />
+  );
+}
+```
+
+**Key Features:**
+- Password strength validation based on backend config
+- Real-time password confirmation matching
+- Handles missing or invalid tokens
+- Auto-redirect after success
+- Customizable text and styling
+
+**Props:**
+- `token` - Reset token from URL (required)
+- `backToSignInUrl` - Link back to sign in page
+- `onSuccess` - Callback with optional redirect URL
+- `onError` - Callback on error
+- `appearance` - Tailwind CSS classes for styling
+
+### `<VerifyEmail />`
+
+Email verification with token handling:
+
+```tsx
+import { VerifyEmail } from '@insforge/react';
+import { useSearchParams } from 'react-router-dom';
+
+function VerifyEmailPage() {
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token');
+
+  return (
+    <VerifyEmail
+      token={token || ''}
+      onSuccess={(data) => {
+        console.log('Email verified!', data);
+        // Optionally save token and redirect
+        localStorage.setItem('insforge_token', data.accessToken);
+        window.location.href = '/dashboard';
+      }}
+    />
+  );
+}
+```
+
+**Key Features:**
+- Automatic verification on mount
+- Success/error/loading states
+- Returns access token and user data
+- Handles missing or invalid tokens
+- Customizable success/error messages
+
+**Props:**
+- `token` - Verification token from URL (required)
+- `onSuccess` - Callback with `{ accessToken, user, redirectTo? }`
+- `onError` - Callback on error
+- `appearance` - Tailwind CSS classes for styling
 
 ### `<Protect />`
 
@@ -687,6 +831,9 @@ import type {
   ProtectProps,
   ConditionalProps,
   InsforgeCallbackProps,
+  ForgotPasswordProps,
+  ResetPasswordProps,
+  VerifyEmailProps,
   SignInFormProps,
   SignUpFormProps,
   AuthFormFieldProps,
