@@ -305,40 +305,42 @@ export function ConfigurationTab() {
             </div>
 
             {/* Reset Password Method */}
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-gray-900 dark:text-white">
-                  Password Reset Method
-                </label>
-                <span className="text-xs text-zinc-500 dark:text-neutral-400">
-                  Choose between 6-digit reset code or reset link
-                </span>
+            {isInsForgeCloudProject() && (
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium text-gray-900 dark:text-white">
+                    Password Reset Method
+                  </label>
+                  <span className="text-xs text-zinc-500 dark:text-neutral-400">
+                    Choose between 6-digit reset code or reset link
+                  </span>
+                </div>
+                <Controller
+                  name="resetPasswordMethod"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={(value) => {
+                        if (value) {
+                          field.onChange(value);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-[240px]">
+                        <span className="text-black dark:text-white">
+                          {field.value === 'code' ? 'Code' : 'Link'}
+                        </span>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="code">Code</SelectItem>
+                        <SelectItem value="link">Link</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
-              <Controller
-                name="resetPasswordMethod"
-                control={form.control}
-                render={({ field }) => (
-                  <Select
-                    value={field.value}
-                    onValueChange={(value) => {
-                      if (value) {
-                        field.onChange(value);
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="w-[240px]">
-                      <span className="text-black dark:text-white">
-                        {field.value === 'code' ? 'Code' : 'Link'}
-                      </span>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="code">Code</SelectItem>
-                      <SelectItem value="link">Link</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </div>
+            )}
 
             {/* Password Reset Redirect URL - Only shown for InsForge Cloud projects */}
             {isInsForgeCloudProject() && (

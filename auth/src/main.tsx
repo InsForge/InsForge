@@ -8,13 +8,15 @@ import App from './App';
 
 // Get backend URL from environment or use default
 const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:7132';
-
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <BrowserRouter>
-      <InsforgeProvider baseUrl={backendUrl}>
-        <App />
-      </InsforgeProvider>
-    </BrowserRouter>
-  </StrictMode>
-);
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  createRoot(rootElement).render(
+    <StrictMode>
+      <BrowserRouter>
+        <InsforgeProvider baseUrl={backendUrl}>
+          <App />
+        </InsforgeProvider>
+      </BrowserRouter>
+    </StrictMode>
+  );
+}

@@ -1,7 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ForgotPasswordForm } from '@insforge/react';
-import { useInsforge } from '@insforge/react';
+import { useInsforge, ForgotPasswordForm } from '@insforge/react';
 import { AuthRouterPath } from '@/App';
 
 export function ForgotPasswordPage() {
@@ -50,7 +49,7 @@ export function ForgotPasswordPage() {
       <ForgotPasswordForm
         email={email}
         onEmailChange={setEmail}
-        onSubmit={handleSubmit}
+        onSubmit={(e) => void handleSubmit(e)}
         error={error}
         loading={loading}
         success={success}

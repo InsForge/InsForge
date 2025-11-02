@@ -43,7 +43,7 @@ export function ResetPasswordPage() {
       const result = await resetPassword(token, newPassword);
 
       if (result?.redirectTo) {
-        navigate(result.redirectTo);
+        void navigate(result.redirectTo);
       } else {
         setError('Failed to reset password');
       }
@@ -81,7 +81,7 @@ export function ResetPasswordPage() {
         confirmPassword={confirmPassword}
         onNewPasswordChange={setNewPassword}
         onConfirmPasswordChange={setConfirmPassword}
-        onSubmit={handleSubmit}
+        onSubmit={(e) => void handleSubmit(e)}
         error={error}
         loading={loading}
         emailAuthConfig={emailConfig || undefined}

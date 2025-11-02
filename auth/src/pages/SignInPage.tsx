@@ -22,9 +22,15 @@ export function SignInPage() {
         try {
           const finalUrl = new URL(redirectUrl, window.location.origin);
           const params = new URLSearchParams();
-          if (user?.id) params.set('user_id', user.id);
-          if (user?.email) params.set('email', user.email);
-          if (user?.name) params.set('name', user.name);
+          if (user?.id) {
+            params.set('user_id', user.id);
+          }
+          if (user?.email) {
+            params.set('email', user.email);
+          }
+          if (user?.name) {
+            params.set('name', user.name);
+          }
           finalUrl.search = params.toString();
           window.location.assign(finalUrl.toString());
         } catch {
@@ -43,7 +49,7 @@ export function SignInPage() {
 
   const handleRedirect = useCallback(
     (url: string) => {
-      navigate(url);
+      void navigate(url);
     },
     [navigate]
   );
