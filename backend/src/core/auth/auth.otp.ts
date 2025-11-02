@@ -385,4 +385,91 @@ export class AuthOTPService {
       }
     }
   }
+
+  /**
+   * Exchange a verified numeric code for a long-lived hash token
+   * This is a common pattern in multi-step verification flows:
+   * 1. User receives numeric code via email
+   * 2. User submits code to verify
+   * 3. System issues a long-lived token for subsequent operations
+   *
+   * The entire exchange happens atomically within a single transaction to ensure:
+   * - Numeric code is consumed only if token creation succeeds
+   * - No race conditions between verification and token issuance
+   *
+   * Example use cases:
+   * - Password reset: verify code → get reset token → reset password
+   * - Email verification: verify code → get session token → auto-login
+   *
+   * @param email - The email address associated with the code
+   * @param purpose - The purpose of the OTP (e.g., RESET_PASSWORD)
+   * @param numericCode - The 6-digit numeric code to verify
+   * @param externalClient - Optional external database client for broader transaction support
+   * @returns Promise with the long-lived token and its expiration
+   * @throws AppError if verification fails or token creation fails
+   */
+  async exchangeCodeForToken(
+    email: string,
+    purpose: OTPPurpose,
+    numericCode: string,
+    externalClient?: PoolClient
+  ): Promise<{ token: string; expiresAt: Date }> {
+    const client = externalClient || (await this.getPool().connect());
+    const shouldManageTransaction = !externalClient;
+    let transactionActive = false;
+
+    try {
+      if (shouldManageTransaction) {
+        await client.query('BEGIN');
+        transactionActive = true;
+      }
+
+      // Step 1: Verify the numeric code (consumes it atomically)
+      await this.verifyEmailOTPWithCode(email, purpose, numericCode, client);
+
+      // Step 2: Generate a long-lived hash token
+      const token = generateSecureToken(this.HASH_TOKEN_BYTES);
+      const expiresAt = new Date(Date.now() + this.HASH_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+      // Step 3: Insert the new token (replaces the consumed numeric code)
+      // Uses upsert to overwrite the consumed code record with the new token
+      await client.query(
+        `INSERT INTO _email_otps (email, purpose, otp_hash, expires_at, consumed_at, attempts_count)
+         VALUES ($1, $2, $3, $4, NULL, 0)
+         ON CONFLICT (email, purpose)
+         DO UPDATE SET
+           otp_hash = EXCLUDED.otp_hash,
+           expires_at = EXCLUDED.expires_at,
+           consumed_at = NULL,
+           attempts_count = 0,
+           updated_at = NOW()`,
+        [email, purpose, tokenHash, expiresAt]
+      );
+
+      if (shouldManageTransaction) {
+        await client.query('COMMIT');
+        transactionActive = false;
+      }
+
+      logger.info('Successfully exchanged numeric code for hash token', { email, purpose });
+
+      return { token, expiresAt };
+    } catch (error) {
+      if (shouldManageTransaction && transactionActive) {
+        await client.query('ROLLBACK');
+      }
+
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      logger.error('Failed to exchange code for token', { error, email, purpose });
+      throw new AppError('Failed to exchange verification code', 500, ERROR_CODES.INTERNAL_ERROR);
+    } finally {
+      if (shouldManageTransaction) {
+        client.release();
+      }
+    }
+  }
 }

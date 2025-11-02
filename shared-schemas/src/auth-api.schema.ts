@@ -66,16 +66,17 @@ export const deleteUsersRequestSchema = z.object({
 });
 
 /**
- * POST /api/auth/resend-verification-email - Resend verification email
+ * POST /api/auth/email/send-verification - Send verification email (code or link based on config)
  */
 export const sendVerificationEmailRequestSchema = z.object({
   email: emailSchema,
 });
 
 /**
- * POST /api/auth/verify-email - Verify email with OTP
- * - With email: numeric OTP verification (email + otp required, otp is 6-digit code)
- * - Without email: link OTP verification (otp required, otp is 64-char hex token)
+ * POST /api/auth/email/verify - Verify email with OTP
+ * Uses verifyEmailMethod from auth config to determine verification type:
+ * - 'code': expects email + 6-digit numeric code
+ * - 'link': expects 64-char hex token only
  */
 export const verifyEmailRequestSchema = z
   .object({
@@ -87,37 +88,32 @@ export const verifyEmailRequestSchema = z
   });
 
 /**
- * POST /api/auth/send-reset-password-email - Send reset password email
+ * POST /api/auth/email/send-reset-password - Send reset password email (code or link based on config)
  */
 export const sendResetPasswordEmailRequestSchema = z.object({
   email: emailSchema,
 });
 
 /**
- * POST /api/auth/verify-reset-password-code - Verify reset password code and get reset token
- * Used in two-step password reset flow: verify code first, then reset password with token
+ * POST /api/auth/email/exchange-reset-password-token - Exchange reset password code for reset token
+ * Used in two-step password reset flow (code method only): exchange code for token, then reset password with token
  */
-export const verifyResetPasswordCodeRequestSchema = z.object({
+export const exchangeResetPasswordTokenRequestSchema = z.object({
   email: emailSchema,
   code: z.string().min(1),
 });
 
 /**
- * POST /api/auth/reset-password - Reset password with token
+ * POST /api/auth/email/reset-password - Reset password with token
  * Token can be:
- * - Magic link token (from send-reset-password-link endpoint)
- * - Reset token (from verify-reset-password-code endpoint after code verification)
+ * - Magic link token (from send-reset-password endpoint when method is 'link')
+ * - Reset token (from exchange-reset-password-token endpoint after code verification)
  * Both use RESET_PASSWORD purpose and are verified the same way
- * resetToken is an alias for otp (for backward compatibility)
  */
-export const resetPasswordRequestSchema = z
-  .object({
-    newPassword: passwordSchema,
-    otp: z.string().min(1).optional(),
-  })
-  .refine((data) => data.otp, {
-    message: 'otp must be provided',
-  });
+export const resetPasswordRequestSchema = z.object({
+  newPassword: passwordSchema,
+  otp: z.string().min(1, 'OTP/token is required'),
+});
 
 // ============================================================================
 // Response schemas
@@ -141,7 +137,7 @@ export const createSessionResponseSchema = z.object({
 });
 
 /**
- * Response for POST /api/auth/verify-email
+ * Response for POST /api/auth/email/verify
  * Includes user and access token, plus optional redirectTo URL for frontend navigation
  */
 export const verifyEmailResponseSchema = z.object({
@@ -151,16 +147,16 @@ export const verifyEmailResponseSchema = z.object({
 });
 
 /**
- * Response for POST /api/auth/verify-reset-password-code
+ * Response for POST /api/auth/email/exchange-reset-password-token
  * Returns reset token that can be used to reset password
  */
-export const verifyResetPasswordCodeResponseSchema = z.object({
-  resetToken: z.string(),
+export const exchangeResetPasswordTokenResponseSchema = z.object({
+  token: z.string(),
   expiresAt: z.string().datetime(),
 });
 
 /**
- * Response for POST /api/auth/reset-password
+ * Response for POST /api/auth/email/reset-password
  * Includes success message and optional redirectTo URL for frontend navigation
  */
 export const resetPasswordResponseSchema = z.object({
@@ -281,6 +277,8 @@ export const getPublicAuthConfigResponseSchema = z.object({
     id: true,
     updatedAt: true,
     createdAt: true,
+    verifyEmailRedirectTo: true,
+    resetPasswordRedirectTo: true,
   }).shape,
 });
 
@@ -314,14 +312,18 @@ export type UpdateAuthConfigRequest = z.infer<typeof updateAuthConfigRequestSche
 export type SendVerificationEmailRequest = z.infer<typeof sendVerificationEmailRequestSchema>;
 export type VerifyEmailRequest = z.infer<typeof verifyEmailRequestSchema>;
 export type SendResetPasswordEmailRequest = z.infer<typeof sendResetPasswordEmailRequestSchema>;
-export type VerifyResetPasswordCodeRequest = z.infer<typeof verifyResetPasswordCodeRequestSchema>;
+export type ExchangeResetPasswordTokenRequest = z.infer<
+  typeof exchangeResetPasswordTokenRequestSchema
+>;
 export type ResetPasswordRequest = z.infer<typeof resetPasswordRequestSchema>;
 
 // Response types for type-safe responses
 export type CreateUserResponse = z.infer<typeof createUserResponseSchema>;
 export type CreateSessionResponse = z.infer<typeof createSessionResponseSchema>;
 export type VerifyEmailResponse = z.infer<typeof verifyEmailResponseSchema>;
-export type VerifyResetPasswordCodeResponse = z.infer<typeof verifyResetPasswordCodeResponseSchema>;
+export type ExchangeResetPasswordTokenResponse = z.infer<
+  typeof exchangeResetPasswordTokenResponseSchema
+>;
 export type ResetPasswordResponse = z.infer<typeof resetPasswordResponseSchema>;
 export type CreateAdminSessionResponse = z.infer<typeof createAdminSessionResponseSchema>;
 export type GetCurrentSessionResponse = z.infer<typeof getCurrentSessionResponseSchema>;

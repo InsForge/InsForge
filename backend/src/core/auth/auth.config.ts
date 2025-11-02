@@ -44,8 +44,6 @@ export class AuthConfigService {
           require_special_char as "requireSpecialChar",
           verify_email_method as "verifyEmailMethod",
           reset_password_method as "resetPasswordMethod",
-          verify_email_redirect_to as "verifyEmailRedirectTo",
-          reset_password_redirect_to as "resetPasswordRedirectTo"
          FROM _auth_configs
          LIMIT 1`
       );
@@ -62,8 +60,6 @@ export class AuthConfigService {
           requireSpecialChar: false,
           verifyEmailMethod: 'code' as const,
           resetPasswordMethod: 'code' as const,
-          verifyEmailRedirectTo: null,
-          resetPasswordRedirectTo: null,
         };
       }
 

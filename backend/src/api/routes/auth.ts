@@ -19,12 +19,12 @@ import {
   sendVerificationEmailRequestSchema,
   verifyEmailRequestSchema,
   sendResetPasswordEmailRequestSchema,
-  verifyResetPasswordCodeRequestSchema,
+  exchangeResetPasswordTokenRequestSchema,
   resetPasswordRequestSchema,
   type CreateUserResponse,
   type CreateSessionResponse,
   type VerifyEmailResponse,
-  type VerifyResetPasswordCodeResponse,
+  type ExchangeResetPasswordTokenResponse,
   type ResetPasswordResponse,
   type CreateAdminSessionResponse,
   type GetCurrentSessionResponse,
@@ -461,9 +461,9 @@ router.post('/tokens/anon', verifyAdmin, (_req: Request, res: Response, next: Ne
   }
 });
 
-// POST /api/auth/email/send-verification-code - Send email verification code
+// POST /api/auth/email/send-verification - Send email verification (code or link based on config)
 router.post(
-  '/email/send-verification-code',
+  '/email/send-verification',
   sendEmailOTPLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -478,48 +478,27 @@ router.post(
 
       const { email } = validationResult.data;
 
+      // Get auth config to determine verification method
+      const authConfig = await authConfigService.getAuthConfig();
+      const method = authConfig.verifyEmailMethod;
+
       // Note: User enumeration is prevented at service layer
       // Service returns gracefully (no error) if user not found
-      await authService.sendVerificationEmailWithCode(email);
-
-      // Always return 202 Accepted with generic message
-      res.status(202).json({
-        success: true,
-        message:
-          'If your email is registered, we have sent you a verification code. Please check your inbox.',
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-// POST /api/auth/email/send-verification-link - Send email verification magic link
-router.post(
-  '/email/send-verification-link',
-  sendEmailOTPLimiter,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const validationResult = sendVerificationEmailRequestSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        throw new AppError(
-          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
+      if (method === 'link') {
+        await authService.sendVerificationEmailWithLink(email);
+      } else {
+        await authService.sendVerificationEmailWithCode(email);
       }
 
-      const { email } = validationResult.data;
-
-      // Note: User enumeration is prevented at service layer
-      // Service returns gracefully (no error) if user not found
-      await authService.sendVerificationEmailWithLink(email);
-
       // Always return 202 Accepted with generic message
+      const message =
+        method === 'link'
+          ? 'If your email is registered, we have sent you a verification link. Please check your inbox.'
+          : 'If your email is registered, we have sent you a verification code. Please check your inbox.';
+
       res.status(202).json({
         success: true,
-        message:
-          'If your email is registered, we have sent you a verification link. Please check your inbox.',
+        message,
       });
     } catch (error) {
       next(error);
@@ -527,11 +506,12 @@ router.post(
   }
 );
 
-// POST /api/auth/verify-email - Verify email with OTP
-// If email is provided: uses numeric OTP verification (6-digit code)
-// If email is NOT provided: uses link OTP verification (64-char token)
+// POST /api/auth/email/verify - Verify email with OTP
+// Uses verifyEmailMethod from auth config to determine verification type:
+// - 'code': expects email + 6-digit numeric code
+// - 'link': expects 64-char hex token only
 router.post(
-  '/verify-email',
+  '/email/verify',
   verifyOTPLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -546,14 +526,25 @@ router.post(
 
       const { email, otp } = validationResult.data;
 
+      // Get auth config to determine verification method
+      const authConfig = await authConfigService.getAuthConfig();
+      const method = authConfig.verifyEmailMethod;
+
       let result: VerifyEmailResponse;
 
-      if (email) {
-        // Numeric OTP verification (email + otp where otp is 6-digit code)
-        result = await authService.verifyEmailWithCode(email, otp);
+      if (method === 'link') {
+        // Link verification: otp is 64-char hex token
+        result = await authService.verifyEmailWithToken(otp);
       } else {
-        // Link OTP verification (otp is 64-char hex token)
-        result = await authService.verifyEmailWithLinkToken(otp);
+        // Code verification: requires email + 6-digit code
+        if (!email) {
+          throw new AppError(
+            'Email is required for code verification',
+            400,
+            ERROR_CODES.INVALID_INPUT
+          );
+        }
+        result = await authService.verifyEmailWithCode(email, otp);
       }
 
       successResponse(res, result); // Return session info with optional redirectTo upon successful verification
@@ -563,9 +554,9 @@ router.post(
   }
 );
 
-// POST /api/auth/email/send-reset-password-code - Send password reset code
+// POST /api/auth/email/send-reset-password - Send password reset (code or link based on config)
 router.post(
-  '/email/send-reset-password-code',
+  '/email/send-reset-password',
   sendEmailOTPLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -580,48 +571,27 @@ router.post(
 
       const { email } = validationResult.data;
 
+      // Get auth config to determine reset password method
+      const authConfig = await authConfigService.getAuthConfig();
+      const method = authConfig.resetPasswordMethod;
+
       // Note: User enumeration is prevented at service layer
       // Service returns gracefully (no error) if user not found
-      await authService.sendResetPasswordEmailWithCode(email);
-
-      // Always return 202 Accepted with generic message
-      res.status(202).json({
-        success: true,
-        message:
-          'If your email is registered, we have sent you a password reset code. Please check your inbox.',
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-// POST /api/auth/email/send-reset-password-link - Send password reset magic link
-router.post(
-  '/email/send-reset-password-link',
-  sendEmailOTPLimiter,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const validationResult = sendResetPasswordEmailRequestSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        throw new AppError(
-          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
+      if (method === 'link') {
+        await authService.sendResetPasswordEmailWithLink(email);
+      } else {
+        await authService.sendResetPasswordEmailWithCode(email);
       }
 
-      const { email } = validationResult.data;
-
-      // Note: User enumeration is prevented at service layer
-      // Service returns gracefully (no error) if user not found
-      await authService.sendResetPasswordEmailWithLink(email);
-
       // Always return 202 Accepted with generic message
+      const message =
+        method === 'link'
+          ? 'If your email is registered, we have sent you a password reset link. Please check your inbox.'
+          : 'If your email is registered, we have sent you a password reset code. Please check your inbox.';
+
       res.status(202).json({
         success: true,
-        message:
-          'If your email is registered, we have sent you a password reset link. Please check your inbox.',
+        message,
       });
     } catch (error) {
       next(error);
@@ -629,14 +599,15 @@ router.post(
   }
 );
 
-// POST /api/auth/verify-reset-password-code - Verify reset password code and get reset token
+// POST /api/auth/email/exchange-reset-password-token - Exchange reset password code for reset token
 // Step 1 of two-step password reset flow: verify code → get reset token
+// Only used when resetPasswordMethod is 'code'
 router.post(
-  '/verify-reset-password-code',
+  '/email/exchange-reset-password-token',
   verifyOTPLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const validationResult = verifyResetPasswordCodeRequestSchema.safeParse(req.body);
+      const validationResult = exchangeResetPasswordTokenRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
         throw new AppError(
           validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
@@ -647,10 +618,10 @@ router.post(
 
       const { email, code } = validationResult.data;
 
-      const result = await authService.verifyResetPasswordCode(email, code);
+      const result = await authService.exchangeResetPasswordToken(email, code);
 
-      const response: VerifyResetPasswordCodeResponse = {
-        resetToken: result.resetToken,
+      const response: ExchangeResetPasswordTokenResponse = {
+        token: result.token,
         expiresAt: result.expiresAt.toISOString(),
       };
 
@@ -661,16 +632,16 @@ router.post(
   }
 );
 
-// POST /api/auth/reset-password - Reset password with token
+// POST /api/auth/email/reset-password - Reset password with token
 // Token can be:
-// - Magic link token (from send-reset-password-link endpoint)
-// - Reset token (from verify-reset-password-code endpoint after code verification)
+// - Magic link token (from send-reset-password endpoint when method is 'link')
+// - Reset token (from exchange-reset-password-token endpoint after code verification)
 // Both use RESET_PASSWORD purpose and are verified the same way
 // Flow:
-//   Code: email → code → (email+code) → resetToken → (resetToken+newPassword)
-//   Link: email → link → (token+newPassword)
+//   Code: send-reset-password → exchange-reset-password-token → reset-password (with resetToken)
+//   Link: send-reset-password → reset-password (with link token)
 router.post(
-  '/reset-password',
+  '/email/reset-password',
   verifyOTPLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -684,10 +655,6 @@ router.post(
       }
 
       const { newPassword, otp } = validationResult.data;
-
-      if (!otp) {
-        throw new AppError('Token is required', 400, ERROR_CODES.INVALID_INPUT);
-      }
 
       // Both magic link tokens and code-verified reset tokens use RESET_PASSWORD purpose
       const result: ResetPasswordResponse = await authService.resetPasswordWithToken(

@@ -25,7 +25,7 @@ import { OAuthConfigService } from './oauth.config';
 import { AuthConfigService } from './auth.config';
 import { AuthOTPService, OTPPurpose, OTPType } from './auth.otp';
 import { validatePassword } from '@/utils/validations';
-import { getPasswordRequirementsMessage, generateSecureToken } from '@/utils/utils';
+import { getPasswordRequirementsMessage } from '@/utils/utils';
 import {
   FacebookUserInfo,
   GitHubEmailInfo,
@@ -382,7 +382,7 @@ export class AuthService {
    * Verifies the token (without needing email), looks up the email, and updates the account
    * This is more secure as the email is not exposed in the URL
    */
-  async verifyEmailWithLinkToken(token: string): Promise<VerifyEmailResponse> {
+  async verifyEmailWithToken(token: string): Promise<VerifyEmailResponse> {
     const dbManager = DatabaseManager.getInstance();
     const pool = dbManager.getPool();
     const client = await pool.connect();
@@ -499,65 +499,32 @@ export class AuthService {
   }
 
   /**
-   * Verify reset password code and return a temporary reset token
+   * Exchange reset password code for a temporary reset token
    * This separates code verification from password reset for better security
    * The reset token can be used later to reset the password without needing email
    */
-  async verifyResetPasswordCode(
+  async exchangeResetPasswordToken(
     email: string,
     verificationCode: string
-  ): Promise<{ resetToken: string; expiresAt: Date }> {
-    const dbManager = DatabaseManager.getInstance();
-    const pool = dbManager.getPool();
-    const client = await pool.connect();
+  ): Promise<{ token: string; expiresAt: Date }> {
+    const otpService = AuthOTPService.getInstance();
 
-    try {
-      await client.query('BEGIN');
+    // Exchange the numeric verification code for a long-lived reset token
+    // All OTP logic (verification, consumption, token generation) is handled by AuthOTPService
+    const result = await otpService.exchangeCodeForToken(
+      email,
+      OTPPurpose.RESET_PASSWORD,
+      verificationCode
+    );
 
-      // Verify the numeric code
-      const otpService = AuthOTPService.getInstance();
-      await otpService.verifyEmailOTPWithCode(
-        email,
-        OTPPurpose.RESET_PASSWORD,
-        verificationCode,
-        client
-      );
-
-      // Create a temporary reset token (similar to HASH_TOKEN) within the same transaction
-      const resetToken = generateSecureToken(32); // 32 bytes = 64 hex characters
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours expiry
-      const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
-
-      // Insert reset token within the same transaction
-      // Uses RESET_PASSWORD purpose (will overwrite the consumed numeric code, which is safe)
-      await client.query(
-        `INSERT INTO _email_otps (email, purpose, otp_hash, expires_at, consumed_at, attempts_count)
-         VALUES ($1, $2, $3, $4, NULL, 0)
-         ON CONFLICT (email, purpose)
-         DO UPDATE SET
-           otp_hash = EXCLUDED.otp_hash,
-           expires_at = EXCLUDED.expires_at,
-           consumed_at = NULL,
-           attempts_count = 0,
-           updated_at = NOW()`,
-        [email, OTPPurpose.RESET_PASSWORD, tokenHash, expiresAt]
-      );
-
-      await client.query('COMMIT');
-
-      logger.info('Reset password code verified, reset token created', { email });
-
-      return { resetToken, expiresAt };
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+    return {
+      token: result.token,
+      expiresAt: result.expiresAt,
+    };
   }
 
   /**
-   * Reset password with token (from clickable link or code verification)
+   * Reset password with token
    * Verifies the token (without needing email), looks up the email, and updates the password
    * Both clickable link tokens and code-verified reset tokens use RESET_PASSWORD purpose
    * Note: Does not return access token - user must login again with new password
