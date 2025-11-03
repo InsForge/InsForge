@@ -23,6 +23,8 @@ export const nameSchema = z
 
 export const roleSchema = z.enum(['authenticated', 'project_admin']);
 
+export const verificationMethodSchema = z.enum(['code', 'link']);
+
 // ============================================================================
 // Core entity schemas
 // ============================================================================
@@ -91,8 +93,8 @@ export const authConfigSchema = z.object({
   requireLowercase: z.boolean(),
   requireUppercase: z.boolean(),
   requireSpecialChar: z.boolean(),
-  verifyEmailMethod: z.enum(['code', 'link']),
-  resetPasswordMethod: z.enum(['code', 'link']),
+  verifyEmailMethod: verificationMethodSchema,
+  resetPasswordMethod: verificationMethodSchema,
   signInRedirectTo: z
     .union([z.string().url(), z.literal(''), z.null()])
     .optional()
@@ -120,6 +122,7 @@ export type UserIdSchema = z.infer<typeof userIdSchema>;
 export type EmailSchema = z.infer<typeof emailSchema>;
 export type PasswordSchema = z.infer<typeof passwordSchema>;
 export type RoleSchema = z.infer<typeof roleSchema>;
+export type VerificationMethodSchema = z.infer<typeof verificationMethodSchema>;
 export type UserSchema = z.infer<typeof userSchema>;
 export type TokenPayloadSchema = z.infer<typeof tokenPayloadSchema>;
 export type OAuthConfigSchema = z.infer<typeof oAuthConfigSchema>;

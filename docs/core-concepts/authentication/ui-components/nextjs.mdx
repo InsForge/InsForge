@@ -9,8 +9,6 @@ The `@insforge/nextjs` package provides **zero-configuration authentication** fo
 **For AI Agents - Quick Navigation:**
 - **Built-in auth (recommended)**: Follow [Quick Start](#quick-start-built-in-auth) → 5-minute setup with backend-hosted auth pages
 - **Custom UI needed**: Jump to [Advanced Usage](#advanced-usage) for custom components
-- **Styling & customization**: See [Customization Guide](/core-concepts/authentication/ui-components/customization)
-- **Full control**: See [Building Custom Forms](#building-custom-forms-with-atomic-components)
 
 **Key principle**: Always use `@insforge/sdk` methods with these components. Never use raw `fetch` calls.
 </Tip>
@@ -36,7 +34,7 @@ The `@insforge/nextjs` package provides **zero-configuration authentication** fo
 </CardGroup>
 
 <Note>
-Use custom components only if you need highly customized branding or custom fields.
+Use custom components only if you need custom form fields or different workflow.
 </Note>
 
 ## Features
@@ -108,31 +106,7 @@ export const DELETE = handlers.DELETE;
 **Why?** This route syncs auth tokens to HTTP-only cookies for server-side middleware.
 </Info>
 
-### Step 3: Create Callback Page
-
-<Warning>
-**Critical:** The callback page is essential for authentication to work. It handles OAuth and email/password returns from InsForge-hosted auth pages.
-</Warning>
-
-Use the `<InsforgeCallback>` component to handle the entire authentication callback flow:
-
-```tsx app/auth/callback/page.tsx
-'use client';
-
-import { InsforgeCallback } from '@insforge/nextjs';
-
-export default function CallbackPage() {
-  return <InsforgeCallback />;
-}
-```
-
-**That's it!** The component automatically:
-- Handles authentication errors from backend
-- Validates and syncs authentication tokens
-- Updates the provider's auth state
-- Redirects to the destination page
-
-### Step 4: Add Middleware
+### Step 3: Add Middleware
 
 Create middleware to protect routes:
 
@@ -224,7 +198,7 @@ INSFORGE_BASE_URL=https://your-project.insforge.app/
 ## Complete Components (with Business Logic)
 
 <Note>
-**Recommendation**: Use built-in auth pages (Quick Start) for most cases. Only create custom components if you need highly customized branding or additional form fields.
+**Recommendation**: Use built-in auth pages (Quick Start) for most cases. Only create custom components if you need additional form fields or different workflow.
 </Note>
 
 ### Custom Auth Pages
@@ -320,16 +294,11 @@ export default function VerifyEmailPage({ searchParams }: { searchParams: { toke
 - `title` / `subtitle` - Custom heading text
 - `emailLabel` / `passwordLabel` - Custom field labels
 - `submitButtonText` / `loadingButtonText` - Custom button text
-- `appearance` - Tailwind CSS classes for styling (see [Customization](/core-concepts/authentication/ui-components/customization))
 - `onSuccess` / `onError` - Callback functions
 
 **SignUp Component Props:** Same as SignIn, plus:
 - `afterSignUpUrl` - Redirect URL after successful sign up
 - Additional text customization options
-
-<Info>
-**Customization**: See the [Customization Guide](/core-concepts/authentication/ui-components/customization) for styling, text customization, and building custom forms with atomic components.
-</Info>
 
 ---
 
@@ -469,7 +438,6 @@ function Header() {
 **Props:**
 - `mode` - Display mode: `"detailed"` (avatar + name + email) or `"simple"` (avatar only)
 - `afterSignOutUrl` - Redirect URL after sign out
-- `appearance` - Tailwind classes for styling (see [Customization](/core-concepts/authentication/ui-components/customization))
 
 ### Protect
 
@@ -535,26 +503,6 @@ export default async function Dashboard() {
 ---
 
 ## Advanced Features
-
-### InsforgeCallback Options
-
-Customize the OAuth callback component:
-
-```tsx
-<InsforgeCallback
-  redirectTo="/dashboard"
-  onSuccess={() => console.log('Authentication successful!')}
-  onError={(error) => console.error('Authentication failed:', error)}
-  loadingComponent={
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="text-center">
-        <h2 className="text-2xl font-semibold mb-4">Signing you in...</h2>
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-      </div>
-    </div>
-  }
-/>
-```
 
 ### Auth Change Callback
 
@@ -715,7 +663,6 @@ function Header() {
 **Props:**
 - `mode` - Display mode: `"detailed"` (avatar + name + email) or `"simple"` (avatar only)
 - `afterSignOutUrl` - Redirect URL after sign out
-- `appearance` - Tailwind classes for styling
 
 ### Protect
 
