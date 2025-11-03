@@ -360,14 +360,14 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     switch (validatedProvider) {
       case 'google': {
         // Handle Google OAuth payload
-        const googleUserInfo = {
-          sub: payloadData.providerId,
-          email: payloadData.email,
-          name: payloadData.name || '',
-          userName: payloadData.userName || '',
-          picture: payloadData.avatar || '',
-        };
-        result = await authService.findOrCreateGoogleUser(googleUserInfo);
+        result = await authService.findOrCreateThirdPartyUser(
+          'google',
+          payloadData.providerId,
+          payloadData.email,
+          payloadData.name || payloadData.email.split('@')[0],
+          payloadData.avatar,
+          payloadData
+        );
         break;
       }
       case 'github': {
