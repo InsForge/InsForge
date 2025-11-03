@@ -76,7 +76,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <InsforgeProvider baseUrl={process.env.NEXT_PUBLIC_INSFORGE_BASE_URL!}>
+        <InsforgeProvider 
+          baseUrl={process.env.NEXT_PUBLIC_INSFORGE_BASE_URL!}
+          afterSignInUrl="/dashboard"
+        >
           {children}
         </InsforgeProvider>
       </body>
