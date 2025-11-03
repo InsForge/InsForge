@@ -47,14 +47,13 @@ export interface VerifyOTPResult {
  * Supports two delivery methods:
  * 1. Short numeric codes (6 digits) - displayed in email for manual entry
  *    - Stored as bcrypt hash (defense against brute force if DB compromised)
- *    - Has attempt counting and rate limiting (we know which record to update)
+ *    - Brute force protection handled by API-level rate limiting
  * 2. Long cryptographic tokens (64 chars) - embedded in clickable links for one-click verification
  *    - Stored as SHA-256 hash (high entropy makes bcrypt unnecessary, allows direct lookup)
- *    - NO attempt counting possible (can't identify which record on failed attempt)
  *
  * The dual hashing strategy balances security and performance:
- * - NUMERIC_CODE: Low entropy (10^6 combinations) requires slow bcrypt + rate limiting
- * - HASH_TOKEN: High entropy (2^256 combinations) only needs fast SHA-256, no rate limiting needed
+ * - NUMERIC_CODE: Low entropy (10^6 combinations) requires slow bcrypt + API rate limiting
+ * - HASH_TOKEN: High entropy (2^256 combinations) only needs fast SHA-256
  */
 export class AuthOTPService {
   private static instance: AuthOTPService;
@@ -65,7 +64,6 @@ export class AuthOTPService {
   private readonly NUMERIC_CODE_EXPIRY_MINUTES = 15; // 15 minutes expiry for numeric codes
   private readonly HASH_TOKEN_BYTES = 32; // 32 bytes = 64 hex characters = 256 bits entropy
   private readonly HASH_TOKEN_EXPIRY_HOURS = 24; // 24 hours expiry for hash tokens
-  private readonly MAX_ATTEMPTS = 5; // Maximum verification attempts (for numeric codes only)
   private readonly BCRYPT_SALT_ROUNDS = 10; // Salt rounds for numeric codes (2^10 iterations)
 
   private constructor() {
@@ -129,14 +127,13 @@ export class AuthOTPService {
       // Upsert token record - insert or update if email+purpose combination already exists
       // This ensures only one active token per email/purpose (replaces any existing token)
       await client.query(
-        `INSERT INTO _email_otps (email, purpose, otp_hash, expires_at, consumed_at, attempts_count)
-         VALUES ($1, $2, $3, $4, NULL, 0)
+        `INSERT INTO _email_otps (email, purpose, otp_hash, expires_at, consumed_at)
+         VALUES ($1, $2, $3, $4, NULL)
          ON CONFLICT (email, purpose)
          DO UPDATE SET
            otp_hash = EXCLUDED.otp_hash,
            expires_at = EXCLUDED.expires_at,
            consumed_at = NULL,
-           attempts_count = 0,
            updated_at = NOW()`,
         [email, purpose, otpHash, expiresAt]
       );
@@ -164,8 +161,7 @@ export class AuthOTPService {
    * Verify a numeric OTP code (6 digits)
    * Looks up by email and verifies the bcrypt-hashed code
    *
-   * - Failed attempts are tracked per email/purpose
-   * - After MAX_ATTEMPTS (5), the code becomes invalid
+   * Brute force protection is handled by API-level rate limiting.
    *
    * @param email - The email address associated with the OTP
    * @param purpose - The purpose of the OTP
@@ -182,17 +178,15 @@ export class AuthOTPService {
   ): Promise<VerifyOTPResult> {
     const client = externalClient || (await this.getPool().connect());
     const shouldManageTransaction = !externalClient;
-    let transactionActive = false;
 
     try {
       if (shouldManageTransaction) {
         await client.query('BEGIN');
-        transactionActive = true;
       }
 
       // Lookup by email and lock the row
       const result = await client.query(
-        `SELECT id, email, purpose, otp_hash, expires_at, consumed_at, attempts_count
+        `SELECT id, email, purpose, otp_hash, expires_at, consumed_at
          FROM _email_otps
          WHERE email = $1 AND purpose = $2
          FOR UPDATE`,
@@ -207,11 +201,7 @@ export class AuthOTPService {
       const otpRecord = result.rows[0];
 
       // Validate OTP record is still usable
-      if (
-        otpRecord.attempts_count >= this.MAX_ATTEMPTS ||
-        new Date() > new Date(otpRecord.expires_at) ||
-        otpRecord.consumed_at !== null
-      ) {
+      if (new Date() > new Date(otpRecord.expires_at) || otpRecord.consumed_at !== null) {
         throw new AppError('Invalid or expired verification code', 400, ERROR_CODES.INVALID_INPUT);
       }
 
@@ -219,30 +209,6 @@ export class AuthOTPService {
       const isValid = await bcrypt.compare(code, otpRecord.otp_hash);
 
       if (!isValid) {
-        // Increment attempt count on failed verification
-        // Use separate connection if using external client to prevent rollback from undoing the increment
-        if (shouldManageTransaction) {
-          await client.query(
-            `UPDATE _email_otps
-             SET attempts_count = attempts_count + 1, updated_at = NOW()
-             WHERE id = $1`,
-            [otpRecord.id]
-          );
-          await client.query('COMMIT');
-          transactionActive = false;
-        } else {
-          const tmp = await this.getPool().connect();
-          try {
-            await tmp.query(
-              `UPDATE _email_otps
-               SET attempts_count = attempts_count + 1, updated_at = NOW()
-               WHERE id = $1`,
-              [otpRecord.id]
-            );
-          } finally {
-            tmp.release();
-          }
-        }
         throw new AppError('Invalid or expired verification code', 400, ERROR_CODES.INVALID_INPUT);
       }
 
@@ -255,16 +221,11 @@ export class AuthOTPService {
       );
 
       if (consume.rowCount !== 1) {
-        if (shouldManageTransaction && transactionActive) {
-          await client.query('ROLLBACK');
-          transactionActive = false;
-        }
         throw new AppError('Invalid or expired verification code', 400, ERROR_CODES.INVALID_INPUT);
       }
 
       if (shouldManageTransaction) {
         await client.query('COMMIT');
-        transactionActive = false;
       }
 
       logger.info('Numeric OTP code verified successfully', { purpose });
@@ -275,7 +236,7 @@ export class AuthOTPService {
         purpose: otpRecord.purpose,
       };
     } catch (error) {
-      if (shouldManageTransaction && transactionActive) {
+      if (shouldManageTransaction) {
         await client.query('ROLLBACK');
       }
 
@@ -309,21 +270,18 @@ export class AuthOTPService {
   ): Promise<VerifyOTPResult> {
     const client = externalClient || (await this.getPool().connect());
     const shouldManageTransaction = !externalClient;
-    let transactionActive = false;
 
     try {
       if (shouldManageTransaction) {
         await client.query('BEGIN');
-        transactionActive = true;
       }
 
       // Hash the token and perform direct lookup
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
       // Direct lookup by hash - O(1) with index on otp_hash
-      // Note: We don't filter by attempts_count because we can't increment it on failure anyway
       const result = await client.query(
-        `SELECT id, email, purpose, otp_hash, expires_at, consumed_at, attempts_count
+        `SELECT id, email, purpose, otp_hash, expires_at, consumed_at
          FROM _email_otps
          WHERE purpose = $1
            AND otp_hash = $2
@@ -349,16 +307,11 @@ export class AuthOTPService {
       );
 
       if (consume.rowCount !== 1) {
-        if (shouldManageTransaction && transactionActive) {
-          await client.query('ROLLBACK');
-          transactionActive = false;
-        }
         throw new AppError('Invalid or expired verification token', 400, ERROR_CODES.INVALID_INPUT);
       }
 
       if (shouldManageTransaction) {
         await client.query('COMMIT');
-        transactionActive = false;
       }
 
       logger.info('Hash token verified successfully', { purpose });
@@ -369,7 +322,7 @@ export class AuthOTPService {
         purpose: otpRecord.purpose,
       };
     } catch (error) {
-      if (shouldManageTransaction && transactionActive) {
+      if (shouldManageTransaction) {
         await client.query('ROLLBACK');
       }
 
@@ -435,14 +388,13 @@ export class AuthOTPService {
       // Step 3: Insert the new token (replaces the consumed numeric code)
       // Uses upsert to overwrite the consumed code record with the new token
       await client.query(
-        `INSERT INTO _email_otps (email, purpose, otp_hash, expires_at, consumed_at, attempts_count)
-         VALUES ($1, $2, $3, $4, NULL, 0)
+        `INSERT INTO _email_otps (email, purpose, otp_hash, expires_at, consumed_at)
+         VALUES ($1, $2, $3, $4, NULL)
          ON CONFLICT (email, purpose)
          DO UPDATE SET
            otp_hash = EXCLUDED.otp_hash,
            expires_at = EXCLUDED.expires_at,
            consumed_at = NULL,
-           attempts_count = 0,
            updated_at = NOW()`,
         [email, purpose, tokenHash, expiresAt]
       );

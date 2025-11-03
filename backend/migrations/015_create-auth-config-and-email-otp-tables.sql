@@ -6,6 +6,7 @@
 --    - Uses dual hashing strategy:
 --      * NUMERIC_CODE (6 digits): Bcrypt hash (slow, defense against brute force)
 --      * LINK_TOKEN (64 hex chars): SHA-256 hash (fast, enables direct O(1) lookup)
+--    - Brute force protection handled by API rate limiter, not database attempt tracking
 -- 2. _auth_configs: Stores email authentication configuration (single-row table)
 
 -- 1. Create email OTP verification table
@@ -16,7 +17,6 @@ CREATE TABLE IF NOT EXISTS _email_otps (
   otp_hash TEXT NOT NULL, -- Hash of OTP: bcrypt for NUMERIC_CODE, SHA-256 for LINK_TOKEN
   expires_at TIMESTAMPTZ NOT NULL,
   consumed_at TIMESTAMPTZ,
-  attempts_count INTEGER DEFAULT 0 NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (email, purpose) -- Only one active token per email/purpose combination
