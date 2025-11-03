@@ -103,7 +103,6 @@ import { getInsforgeRoutes } from '@insforge/react/router';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
-import AuthCallback from './pages/AuthCallback';
 
 const router = createBrowserRouter([
   {
@@ -111,9 +110,6 @@ const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { index: true, element: <Home /> },
-      
-      // ✅ Required: Create callback route to handle authentication
-      { path: 'auth/callback', element: <AuthCallback /> },
       
       { path: 'dashboard', element: <Dashboard /> }
     ]
@@ -256,10 +252,6 @@ export default function App() {
 }
 ```
 
-<Note>
-With custom components, you don't need `getInsforgeRoutes()`. Just create the callback route manually for OAuth support.
-</Note>
-
 ## How It Works
 
 ### Built-in Auth Flow
@@ -267,20 +259,19 @@ With custom components, you don't need `getInsforgeRoutes()`. Just create the ca
 ```
 1. User clicks "Sign In" → Visits /sign-in route
    ↓
-2. getInsforgeRoutes() redirects → your-project.insforge.app/auth/sign-in
+2. getInsforgeRoutes() redirects → your-project.insforge.app/auth/sign-in?redirect=yourapp.com/you-defined-destination-after-sign-in
    ↓
 3. User signs in on deployed page → Backend processes authentication
    ↓
-4. Backend redirects → yourapp.com/auth/callback?access_token=xxx&user_id=xxx
+4. Backend redirects → yourapp.com/you-defined-destination-after-sign-in?access_token=xxx&user_id=xxx
    ↓
-5. <InsforgeCallback /> component:
+5. InsForge SDK will:
    - Extracts token from URL
    - Saves to localStorage
    - Verifies with getCurrentUser()
    - Updates Provider state
-   - Redirects to destination
    ↓
-6. User sees authenticated UI → Dashboard
+6. User sees the destination page (e.g /dashboard)
 ```
 
 ### Custom UI Flow

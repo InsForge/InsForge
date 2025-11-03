@@ -21,7 +21,7 @@ The `@insforge/nextjs` package provides **zero-configuration authentication** fo
   </Card>
   
   <Card title="5-Minute Setup" icon="clock">
-    Provider + API route + callback page = done
+    Provider + API route + Middleware = done
   </Card>
   
   <Card title="Production Ready" icon="shield-check">
@@ -118,7 +118,7 @@ import { InsforgeMiddleware } from '@insforge/nextjs/middleware';
 
 export default InsforgeMiddleware({
   baseUrl: process.env.INSFORGE_BASE_URL!,
-  publicRoutes: ['/auth/callback', '/'],
+  publicRoutes: ['/'],
   cookieName: 'insforge_token',
 });
 
@@ -157,33 +157,23 @@ export default function Home() {
 ### Authentication Flow (Unified for OAuth and Email/Password)
 
 ```
-1. User clicks "Sign In" → Middleware detects no auth
+1. User clicks "Sign In" → Middleware detects using built-in auth
    ↓
-2. Redirects to: https://backend.insforge.app/auth/signin?redirect=yourapp.com/auth/callback
+2. Middleware redirects : your-project.insforge.app/auth/signin?redirect=yourapp.com/you-defined-destination-after-sign-in
    ↓
-3. User authenticates on backend's hosted page
-   - Option A: OAuth (Google, GitHub, etc.)
-   - Option B: Email + Password
+3. User signs in on deployed page → Backend processes authentication
    ↓
-4. Backend processes authentication and redirects:
-   yourapp.com/auth/callback?access_token=xxx&user_id=xxx&email=xxx&name=xxx
+4. Backend redirects → yourapp.com/you-defined-destination-after-sign-in?access_token=xxx&user_id=xxx
    ↓
-5. Callback page processes:
-   - SDK automatically detects and stores token in localStorage
-   - Fetches complete user data from backend
-   - Syncs token to HTTP-only cookie (server-side middleware)
-   - Cleans URL (removes sensitive data)
+5. Middlware & InsForge SDK will processes:
+   - Extracts token from URL
+   - Saves to localStorage
+   - Verifies with getCurrentUser()
+   - Updates Provider state
+   - Syncs token to HTTP-only cookie
    ↓
-6. Redirects to destination → User sees /dashboard
+6. User sees the destination page (e.g /dashboard)
 ```
-
-<Note>
-**Why API route + callback?**
-- **API route** (`/api/auth`): Syncs tokens to HTTP-only cookies (enables server-side middleware protection)
-- **Callback page** (`/auth/callback`): Receives tokens and user data from backend auth pages (OAuth + email/password), stores them properly, and handles redirect
-
-**Unified Format:** Both OAuth and email/password flows return the same parameters, making the callback page simple and consistent.
-</Note>
 
 ## Environment Variables
 

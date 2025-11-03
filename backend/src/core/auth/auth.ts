@@ -698,6 +698,13 @@ export class AuthService {
         )
         .run(provider, providerId);
 
+      // Update email_verified to true if not already verified (OAuth login means email is trusted)
+      await this.db
+        .prepare(
+          'UPDATE _accounts SET email_verified = true WHERE id = ? AND email_verified = false'
+        )
+        .run(account.user_id);
+
       const dbUser = await this.db
         .prepare(
           'SELECT id, email, name, email_verified, created_at, updated_at FROM _accounts WHERE id = ?'
@@ -733,7 +740,19 @@ export class AuthService {
         )
         .run(existingUser.id, provider, providerId, JSON.stringify(identityData));
 
-      const user = this.dbUserToApiUser(existingUser);
+      // Update email_verified to true (OAuth login means email is trusted)
+      await this.db
+        .prepare(
+          'UPDATE _accounts SET email_verified = true WHERE id = ? AND email_verified = false'
+        )
+        .run(existingUser.id);
+
+      // Fetch updated user data
+      const updatedUser = await this.db
+        .prepare('SELECT * FROM _accounts WHERE id = ?')
+        .get(existingUser.id);
+
+      const user = this.dbUserToApiUser(updatedUser);
       const accessToken = this.generateToken({
         sub: existingUser.id,
         email: existingUser.email,
