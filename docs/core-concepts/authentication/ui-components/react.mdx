@@ -62,6 +62,12 @@ npm install @insforge/react
   react-router-dom@^7.9.0 ```
 </Note>
 
+## Environment Variables
+
+```bash .env
+VITE_INSFORGE_BASE_URL=https://your-project.insforge.app/
+```
+
 ## Quick Start
 
 ### Step 1: Setup Provider
@@ -77,7 +83,7 @@ import App from './App';
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <InsforgeProvider
-      baseUrl={https://your-project.insforge.app}
+      baseUrl={import.meta.env.VITE_INSFORGE_BASE_URL}
       afterSignInUrl="/dashboard"
     >
       <App />
@@ -117,7 +123,7 @@ const router = createBrowserRouter([
 
   // Add built-in auth redirect routes (sign-in, sign-up, forgot-password, etc.)
   ...getInsforgeRoutes({
-    baseUrl: https://your-project.insforge.app,
+    baseUrl: import.meta.env.VITE_INSFORGE,
     afterSignInUrl="/dashboard"
     builtInAuth: true  // Redirects to deployed auth pages
   })
@@ -226,12 +232,6 @@ export default function Home() {
 - **SDK Integration**: All auth operations go through `@insforge/sdk`, which auto-detects tokens from URL
 - **React Context**: Provides auth state to all child components
 - **Hooks**: Easy access to auth methods and user data
-
-## Environment Variables (Optional if you directly inserted)
-
-```bash .env
-VITE_INSFORGE_BASE_URL=https://your-project.insforge.app/
-```
 
 ---
 
