@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { sql } from '@codemirror/lang-sql';
 import { javascript } from '@codemirror/lang-javascript';
 import { EditorView } from '@codemirror/view';
 import { vscodeDark, vscodeLight } from '@uiw/codemirror-theme-vscode';
+import { useTheme } from '@/lib/contexts/ThemeContext';
 
 interface CodeEditorProps {
   code?: string;
@@ -25,24 +25,8 @@ export function CodeEditor({
   language = 'javascript',
   className = '',
 }: CodeEditorProps) {
-  // Detect theme from the document
-  const [isDark, setIsDark] = useState(() => {
-    return document.documentElement.classList.contains('dark');
-  });
-
-  useEffect(() => {
-    // Watch for theme changes
-    const observer = new MutationObserver(() => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    });
-
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class'],
-    });
-
-    return () => observer.disconnect();
-  }, []);
+  // Use the theme context
+  const { resolvedTheme } = useTheme();
 
   // Support both 'code' (read-only) and 'value' (editable) props
   const displayValue = editable ? value || '' : code || '';
@@ -62,14 +46,14 @@ export function CodeEditor({
         border: 'none',
       },
       '.cm-placeholder': {
-        color: isDark ? '#737373' : '#9ca3af',
+        color: resolvedTheme === 'dark' ? '#737373' : '#9ca3af',
       },
     },
-    { dark: isDark }
+    { dark: resolvedTheme === 'dark' }
   );
 
   // Select base theme based on current theme
-  const baseTheme = isDark ? vscodeDark : vscodeLight;
+  const baseTheme = resolvedTheme === 'dark' ? vscodeDark : vscodeLight;
 
   return (
     <div className={`h-full overflow-auto ${className}`}>
