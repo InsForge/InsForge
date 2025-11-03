@@ -2,7 +2,6 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import axios from 'axios';
-import { OAuth2Client } from 'google-auth-library';
 import dotenv from 'dotenv';
 import { verifyCloudToken } from '@/utils/cloud-token.js';
 import path from 'path';
@@ -24,6 +23,7 @@ import type {
 import { OAuthConfigService } from './oauth.config';
 import { AuthConfigService } from './auth.config';
 import { AuthOTPService, EmailOTPPurpose, EmailOTPType } from './auth.otp';
+import { GoogleOAuthService } from './oauth.google';
 import { validatePassword } from '@/utils/validations';
 import { getPasswordRequirementsMessage } from '@/utils/utils';
 import {
@@ -54,6 +54,7 @@ export class AuthService {
   private adminEmail: string;
   private adminPassword: string;
   private db;
+  // OAuth helpers for LinkedIn (TODO: refactor LinkedIn OAuth into separate service)
   private processedCodes: Set<string>;
   private tokenCache: Map<string, { access_token: string; id_token: string }>;
 
@@ -85,7 +86,7 @@ export class AuthService {
     const dbManager = DatabaseManager.getInstance();
     this.db = dbManager.getDb();
 
-    // Initialize OAuth helpers
+    // Initialize OAuth helpers for LinkedIn
     this.processedCodes = new Set();
     this.tokenCache = new Map();
 
@@ -888,52 +889,8 @@ export class AuthService {
    * Generate Google OAuth authorization URL
    */
   async generateGoogleOAuthUrl(state?: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('google');
-
-    if (!config) {
-      throw new Error('Google OAuth not configured');
-    }
-
-    const selfBaseUrl = getApiBaseUrl();
-
-    if (config?.useSharedKey) {
-      if (!state) {
-        logger.warn('Shared Google OAuth called without state parameter');
-        throw new Error('State parameter is required for shared Google OAuth');
-      }
-      // Use shared keys if configured
-      const cloudBaseUrl = process.env.CLOUD_API_HOST || 'https://api.insforge.dev';
-      const redirectUri = `${selfBaseUrl}/api/auth/oauth/shared/callback/${state}`;
-      const response = await axios.get(
-        `${cloudBaseUrl}/auth/v1/shared/google?redirect_uri=${encodeURIComponent(redirectUri)}`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      return response.data.auth_url || response.data.url || '';
-    }
-
-    logger.debug('Google OAuth Config (fresh from DB):', {
-      clientId: config.clientId ? 'SET' : 'NOT SET',
-    });
-
-    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    authUrl.searchParams.set('client_id', config.clientId ?? '');
-    authUrl.searchParams.set('redirect_uri', `${selfBaseUrl}/api/auth/oauth/google/callback`);
-    authUrl.searchParams.set('response_type', 'code');
-    authUrl.searchParams.set(
-      'scope',
-      config.scopes ? config.scopes.join(' ') : 'openid email profile'
-    );
-    authUrl.searchParams.set('access_type', 'offline');
-    if (state) {
-      authUrl.searchParams.set('state', state);
-    }
-
-    return authUrl.toString();
+    const googleOAuthService = GoogleOAuthService.getInstance();
+    return googleOAuthService.generateOAuthUrl(state);
   }
 
   /**
@@ -1046,121 +1003,16 @@ export class AuthService {
   async exchangeCodeToTokenByGoogle(
     code: string
   ): Promise<{ access_token: string; id_token: string }> {
-    // Check cache first
-    if (this.processedCodes.has(code)) {
-      const cachedTokens = this.tokenCache.get(code);
-      if (cachedTokens) {
-        logger.debug('Returning cached tokens for already processed code.');
-        return cachedTokens;
-      }
-      throw new Error('Authorization code is currently being processed.');
-    }
-
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('google');
-
-    if (!config) {
-      throw new Error('Google OAuth not configured');
-    }
-
-    try {
-      this.processedCodes.add(code);
-
-      logger.info('Exchanging Google code for tokens', {
-        hasCode: !!code,
-        clientId: config.clientId?.substring(0, 10) + '...',
-      });
-
-      const clientSecret = await oauthConfigService.getClientSecretByProvider('google');
-      const selfBaseUrl = getApiBaseUrl();
-      const response = await axios.post('https://oauth2.googleapis.com/token', {
-        code,
-        client_id: config.clientId,
-        client_secret: clientSecret,
-        redirect_uri: `${selfBaseUrl}/api/auth/oauth/google/callback`,
-        grant_type: 'authorization_code',
-      });
-
-      if (!response.data.access_token || !response.data.id_token) {
-        throw new Error('Failed to get tokens from Google');
-      }
-
-      const result = {
-        access_token: response.data.access_token,
-        id_token: response.data.id_token,
-      };
-
-      // Cache the successful token exchange
-      this.tokenCache.set(code, result);
-
-      // Set a timeout to clear the code and cache to prevent memory leaks
-      setTimeout(() => {
-        this.processedCodes.delete(code);
-        this.tokenCache.delete(code);
-      }, 60000); // 1 minute timeout
-
-      return result;
-    } catch (error) {
-      // If the request fails, remove the code immediately to allow for a retry
-      this.processedCodes.delete(code);
-
-      if (axios.isAxiosError(error) && error.response) {
-        logger.error('Google token exchange failed', {
-          status: error.response.status,
-          error: error.response.data,
-        });
-        throw new Error(`Google OAuth error: ${JSON.stringify(error.response.data)}`);
-      }
-      throw error;
-    }
+    const googleOAuthService = GoogleOAuthService.getInstance();
+    return googleOAuthService.exchangeCodeToToken(code);
   }
 
   /**
    * Verify Google ID token and get user info
    */
   async verifyGoogleToken(idToken: string) {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('google');
-
-    if (!config) {
-      throw new Error('Google OAuth not configured');
-    }
-
-    const clientSecret = await oauthConfigService.getClientSecretByProvider('google');
-
-    if (!clientSecret) {
-      throw new Error('Google Client Secret not conifgured.');
-    }
-
-    // Create OAuth2Client with fresh config
-    const googleClient = new OAuth2Client(config.clientId, clientSecret, config.redirectUri);
-
-    try {
-      // Properly verify the ID token with Google's servers
-      const ticket = await googleClient.verifyIdToken({
-        idToken,
-        audience: config.clientId,
-      });
-
-      const payload = ticket.getPayload();
-      if (!payload) {
-        throw new Error('Invalid Google token payload');
-      }
-
-      return {
-        sub: payload.sub,
-        email: payload.email || '',
-        email_verified: payload.email_verified || false,
-        name: payload.name || '',
-        picture: payload.picture || '',
-        given_name: payload.given_name || '',
-        family_name: payload.family_name || '',
-        locale: payload.locale || '',
-      };
-    } catch (error) {
-      logger.error('Google token verification failed:', error);
-      throw new Error(`Google token verification failed: ${error}`);
-    }
+    const googleOAuthService = GoogleOAuthService.getInstance();
+    return googleOAuthService.verifyToken(idToken);
   }
 
   /**
@@ -1805,18 +1657,10 @@ export class AuthService {
     code?: string;
     token?: string;
   }): Promise<CreateSessionResponse> {
-    if (payload.token) {
-      const googleUserInfo = await this.verifyGoogleToken(payload.token);
-      return this.findOrCreateGoogleUser(googleUserInfo);
-    }
-
-    if (payload.code) {
-      const tokens = await this.exchangeCodeToTokenByGoogle(payload.code);
-      const googleUserInfo = await this.verifyGoogleToken(tokens.id_token);
-      return this.findOrCreateGoogleUser(googleUserInfo);
-    }
-
-    throw new Error('No authorization code or token provided');
+    const googleOAuthService = GoogleOAuthService.getInstance();
+    return googleOAuthService.handleCallback(payload, (googleUserInfo) =>
+      this.findOrCreateGoogleUser(googleUserInfo)
+    );
   }
 
   /**
