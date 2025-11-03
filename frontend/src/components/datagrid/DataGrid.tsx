@@ -39,6 +39,7 @@ export interface DataGridProps<TRow extends DataGridRowType = DataGridRow> {
   showSelection?: boolean;
   showPagination?: boolean;
   showTypeBadge?: boolean;
+  noPadding?: boolean;
 }
 
 // Main DataGrid component
@@ -64,6 +65,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
   showSelection = false,
   showPagination = true,
   showTypeBadge = true,
+  noPadding = false,
 }: DataGridProps<TRow>) {
   const { resolvedTheme } = useTheme();
 
@@ -198,7 +200,12 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
         className
       )}
     >
-      <div className="flex-1 overflow-hidden relative mx-3 border border-border-gray dark:border-0">
+      <div
+        className={cn(
+          'flex-1 overflow-hidden relative border border-border-gray dark:border-0',
+          !noPadding && 'mx-3'
+        )}
+      >
         <ReactDataGrid
           columns={gridColumns}
           rows={isRefreshing ? [] : data}
