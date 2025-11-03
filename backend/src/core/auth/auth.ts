@@ -886,14 +886,6 @@ export class AuthService {
   }
 
   /**
-   * Generate Google OAuth authorization URL
-   */
-  async generateGoogleOAuthUrl(state?: string): Promise<string> {
-    const googleOAuthService = GoogleOAuthService.getInstance();
-    return googleOAuthService.generateOAuthUrl(state);
-  }
-
-  /**
    * Generate GitHub OAuth authorization URL - ALWAYS reads fresh from DB
    */
   async generateGitHubOAuthUrl(state?: string): Promise<string> {
@@ -995,39 +987,6 @@ export class AuthService {
     }
 
     return authUrl.toString();
-  }
-
-  /**
-   * Exchange Google code for tokens
-   */
-  async exchangeCodeToTokenByGoogle(
-    code: string
-  ): Promise<{ access_token: string; id_token: string }> {
-    const googleOAuthService = GoogleOAuthService.getInstance();
-    return googleOAuthService.exchangeCodeToToken(code);
-  }
-
-  /**
-   * Verify Google ID token and get user info
-   */
-  async verifyGoogleToken(idToken: string) {
-    const googleOAuthService = GoogleOAuthService.getInstance();
-    return googleOAuthService.verifyToken(idToken);
-  }
-
-  /**
-   * Find or create Google user
-   */
-  async findOrCreateGoogleUser(googleUserInfo: GoogleUserInfo): Promise<CreateSessionResponse> {
-    const userName = googleUserInfo.name || googleUserInfo.email.split('@')[0];
-    return this.findOrCreateThirdPartyUser(
-      'google',
-      googleUserInfo.sub,
-      googleUserInfo.email,
-      userName,
-      googleUserInfo.picture || '',
-      googleUserInfo
-    );
   }
 
   /**
@@ -1608,8 +1567,10 @@ export class AuthService {
    */
   async generateOAuthUrl(provider: OAuthProvidersSchema, state?: string): Promise<string> {
     switch (provider) {
-      case 'google':
-        return this.generateGoogleOAuthUrl(state);
+      case 'google': {
+        const googleOAuthService = GoogleOAuthService.getInstance();
+        return googleOAuthService.generateOAuthUrl(state);
+      }
       case 'github':
         return this.generateGitHubOAuthUrl(state);
       case 'discord':
@@ -1633,8 +1594,20 @@ export class AuthService {
     payload: { code?: string; token?: string }
   ): Promise<CreateSessionResponse> {
     switch (provider) {
-      case 'google':
-        return this.handleGoogleCallback(payload);
+      case 'google': {
+        const googleOAuthService = GoogleOAuthService.getInstance();
+        return googleOAuthService.handleCallback(payload, (googleUserInfo) => {
+          const userName = googleUserInfo.name || googleUserInfo.email.split('@')[0];
+          return this.findOrCreateThirdPartyUser(
+            'google',
+            googleUserInfo.sub,
+            googleUserInfo.email,
+            userName,
+            googleUserInfo.picture || '',
+            googleUserInfo
+          );
+        });
+      }
       case 'github':
         return this.handleGitHubCallback(payload);
       case 'discord':
@@ -1648,19 +1621,6 @@ export class AuthService {
       default:
         throw new Error(`OAuth provider ${provider} is not implemented yet.`);
     }
-  }
-
-  /**
-   * Handle Google OAuth callback
-   */
-  private async handleGoogleCallback(payload: {
-    code?: string;
-    token?: string;
-  }): Promise<CreateSessionResponse> {
-    const googleOAuthService = GoogleOAuthService.getInstance();
-    return googleOAuthService.handleCallback(payload, (googleUserInfo) =>
-      this.findOrCreateGoogleUser(googleUserInfo)
-    );
   }
 
   /**
