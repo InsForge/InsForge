@@ -13,6 +13,7 @@ import {
   Code2,
   ChartLine,
   Link2,
+  Terminal,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/utils';
 import { Button } from '@/components/radix/Button';
@@ -41,6 +42,7 @@ const navigation: NavigationProps[] = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
   { name: 'Authentication', href: '/dashboard/authentication', icon: UserRoundCog },
   { name: 'Database', href: '/dashboard/database', icon: Database },
+  { name: 'SQL Editor', href: '/dashboard/database/sql-editor', icon: Terminal },
   { name: 'Storage', href: '/dashboard/storage', icon: HardDrive },
   { name: 'Functions', href: '/dashboard/functions', icon: Code2 },
   { name: 'AI', href: '/dashboard/ai', icon: Sparkles },
