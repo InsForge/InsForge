@@ -1,7 +1,7 @@
 import { ChevronRight } from 'lucide-react';
 import { Skeleton } from '@/components/radix/Skeleton';
 import { FunctionRow } from './FunctionRow';
-import { CodeEditor } from './FunctionViewer';
+import { CodeEditor } from '@/components/CodeEditor';
 import FunctionEmptyState from './FunctionEmptyState';
 import { useFunctions } from '../hooks/useFunctions';
 import { useToast } from '@/lib/hooks/useToast';

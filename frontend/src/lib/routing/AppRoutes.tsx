@@ -15,6 +15,7 @@ import OnBoardPage from '@/features/onboard/page/OnBoardPage';
 import VisualizerPage from '@/features/visualizer/page/VisualizerPage';
 import FunctionsPage from '@/features/functions/page/FunctionsPage';
 import AIPage from '@/features/ai/page/AIPage';
+import SQLEditorPage from '@/features/database/page/SQLEditorPage';
 
 export function AppRoutes() {
   return (
@@ -32,6 +33,7 @@ export function AppRoutes() {
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/authentication" element={<AuthenticationPage />} />
                 <Route path="/database" element={<DatabasePage />} />
+                <Route path="/database/sql-editor" element={<SQLEditorPage />} />
                 <Route path="/storage" element={<StoragePage />} />
                 <Route path="/logs" element={<LogsPage />} />
                 <Route path="/functions" element={<FunctionsPage />} />
@@ -53,6 +55,7 @@ export function AppRoutes() {
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/dashboard/authentication" element={<AuthenticationPage />} />
                 <Route path="/dashboard/database" element={<DatabasePage />} />
+                <Route path="/dashboard/database/sql-editor" element={<SQLEditorPage />} />
                 <Route path="/dashboard/storage" element={<StoragePage />} />
                 <Route path="/dashboard/audits" element={<AuditsPage />} />
                 <Route path="/dashboard/logs" element={<LogsPage />} />
