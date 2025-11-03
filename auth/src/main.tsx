@@ -2,7 +2,6 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { InsforgeProvider } from '@insforge/react';
-import '@insforge/react/styles.css';
 import './index.css';
 import App from './App';
 import { getBackendUrl } from './lib/utils';

@@ -9,10 +9,9 @@ The `@insforge/nextjs` package provides **zero-configuration authentication** fo
 **For AI Agents - Quick Navigation:**
 - **Built-in auth (recommended)**: Follow [Quick Start](#quick-start-built-in-auth) → 5-minute setup with backend-hosted auth pages
 - **Custom UI needed**: Jump to [Advanced Usage](#advanced-usage) for custom components
-- **Styling & customization**: See [Customization Guide](/core-concepts/authentication/ui-components/customization)
-- **Full control**: See [Building Custom Forms](#building-custom-forms-with-atomic-components)
 
 **Key principle**: Always use `@insforge/sdk` methods with these components. Never use raw `fetch` calls.
+
 </Tip>
 
 ## Why Built-in Auth?
@@ -21,29 +20,28 @@ The `@insforge/nextjs` package provides **zero-configuration authentication** fo
   <Card title="Zero UI Code" icon="code">
     No SignIn/SignUp pages to create
   </Card>
-  
-  <Card title="5-Minute Setup" icon="clock">
-    Provider + API route + callback page = done
-  </Card>
-  
-  <Card title="Production Ready" icon="shield-check">
-    Battle-tested auth UI maintained by Insforge
-  </Card>
-  
+
+<Card title="5-Minute Setup" icon="clock">
+  Provider + API route + Middleware = done
+</Card>
+
+<Card title="Production Ready" icon="shield-check">
+  Battle-tested auth UI maintained by Insforge
+</Card>
+
   <Card title="Auto OAuth" icon="key">
     11 providers configured automatically from backend
   </Card>
 </CardGroup>
 
-<Note>
-Use custom components only if you need highly customized branding or custom fields.
-</Note>
+<Note>Use custom components only if you need custom form fields or different workflow.</Note>
 
 ## Features
 
 - **Built-in Authentication**: Backend-hosted sign-in/sign-up pages (default)
+- **Complete Components**: Pre-built `<SignIn>`, `<SignUp>`, `<UserButton>` with business logic
 - **OAuth Support**: Google, GitHub, Discord, Facebook, LinkedIn, Microsoft, Apple, X, Instagram, TikTok, Spotify
-- **React Hooks**: `useAuth()`, `useUser()`
+- **React Hooks**: `useAuth()`, `useUser()`, `usePublicAuthConfig()`
 - **Control Components**: `<SignedIn>`, `<SignedOut>`, `<Protect>`
 - **Next.js Middleware**: Server-side route protection
 - **TypeScript**: Full type safety
@@ -54,18 +52,19 @@ Use custom components only if you need highly customized branding or custom fiel
 npm install @insforge/nextjs
 ```
 
-<Note>
-**Required Dependencies:**
-```bash
-npm install react@^19.0.0 react-dom@^19.0.0 next@^15.0.0 tailwindcss@^4.1.0
+## Environment Variables
+
+```bash .env.local
+NEXT_PUBLIC_INSFORGE_BASE_URL=https://your-project.insforge.app/
 ```
+
+<Note>
+  **Required Dependencies:** ```bash npm install react@^19.0.0 react-dom@^19.0.0 next@^15.0.0 ```
 </Note>
 
 ## Quick Start (Built-in Auth)
 
-<Note>
-**Recommended for most use cases**: InsForge-hosted auth pages with zero UI code. Switch to [Advanced Usage](#advanced-usage) only if you need custom branding or additional form fields.
-</Note>
+<Note>**Recommended for most use cases**: InsForge-hosted auth pages with zero UI code.</Note>
 
 ### Step 1: Add InsforgeProvider
 
@@ -78,7 +77,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <InsforgeProvider baseUrl={process.env.NEXT_PUBLIC_INSFORGE_BASE_URL!}>
+        <InsforgeProvider
+          baseUrl={process.env.NEXT_PUBLIC_INSFORGE_BASE_URL}
+          afterSignInUrl="/dashboard"
+        >
           {children}
         </InsforgeProvider>
       </body>
@@ -95,7 +97,7 @@ Create an API route to enable server-side rendering (SSR) and cookie-based authe
 import { createAuthRouteHandlers } from '@insforge/nextjs/api';
 
 const handlers = createAuthRouteHandlers({
-  baseUrl: process.env.INSFORGE_BASE_URL || process.env.NEXT_PUBLIC_INSFORGE_BASE_URL!,
+  baseUrl: process.env.NEXT_PUBLIC_INSFORGE_BASE_URL,
   cookieName: 'insforge_token',
 });
 
@@ -104,35 +106,9 @@ export const GET = handlers.GET;
 export const DELETE = handlers.DELETE;
 ```
 
-<Info>
-**Why?** This route syncs auth tokens to HTTP-only cookies for server-side middleware.
-</Info>
+<Info>**Why?** This route syncs auth tokens to HTTP-only cookies for server-side middleware.</Info>
 
-### Step 3: Create Callback Page
-
-<Warning>
-**Critical:** The callback page is essential for authentication to work. It handles OAuth and email/password returns from InsForge-hosted auth pages.
-</Warning>
-
-Use the `<InsforgeCallback>` component to handle the entire authentication callback flow:
-
-```tsx app/auth/callback/page.tsx
-'use client';
-
-import { InsforgeCallback } from '@insforge/nextjs';
-
-export default function CallbackPage() {
-  return <InsforgeCallback />;
-}
-```
-
-**That's it!** The component automatically:
-- Handles authentication errors from backend
-- Validates and syncs authentication tokens
-- Updates the provider's auth state
-- Redirects to the destination page
-
-### Step 4: Add Middleware
+### Step 3: Add Middleware
 
 Create middleware to protect routes:
 
@@ -140,24 +116,27 @@ Create middleware to protect routes:
 import { InsforgeMiddleware } from '@insforge/nextjs/middleware';
 
 export default InsforgeMiddleware({
-  baseUrl: process.env.INSFORGE_BASE_URL!,
-  publicRoutes: ['/auth/callback', '/'],
+  baseUrl: process.env.NEXT_PUBLIC_INSFORGE_BASE_URL,
+  publicRoutes: ['/'],
   cookieName: 'insforge_token',
 });
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: [
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
 };
 ```
 
-### Step 5: Use in Components
-
-Use the provided components and hooks in your pages:
+### Step 5: Use Hooks & Components
 
 ```tsx app/page.tsx
-import { SignedIn, SignedOut, UserButton } from '@insforge/nextjs';
+import { SignedIn, SignedOut, UserButton, useAuth, useUser } from '@insforge/nextjs';
 
 export default function Home() {
+  const { isSignedIn } = useAuth();
+  const { user } = useUser();
+
   return (
     <div>
       <SignedOut>
@@ -166,7 +145,7 @@ export default function Home() {
 
       <SignedIn>
         <UserButton afterSignOutUrl="/" />
-        <h1>Welcome back!</h1>
+        <h1>Welcome, {user?.email}!</h1>
       </SignedIn>
     </div>
   );
@@ -180,51 +159,31 @@ export default function Home() {
 ### Authentication Flow (Unified for OAuth and Email/Password)
 
 ```
-1. User clicks "Sign In" → Middleware detects no auth
+1. User clicks "Sign In" → Middleware detects using built-in auth
    ↓
-2. Redirects to: https://backend.insforge.app/auth/signin?redirect=yourapp.com/auth/callback
+2. Middleware redirects : your-project.insforge.app/auth/signin?redirect=yourapp.com/you-defined-destination-after-sign-in
    ↓
-3. User authenticates on backend's hosted page
-   - Option A: OAuth (Google, GitHub, etc.)
-   - Option B: Email + Password
+3. User signs in on deployed page → Backend processes authentication
    ↓
-4. Backend processes authentication and redirects:
-   yourapp.com/auth/callback?access_token=xxx&user_id=xxx&email=xxx&name=xxx
+4. Backend redirects → yourapp.com/you-defined-destination-after-sign-in?access_token=xxx&user_id=xxx
    ↓
-5. Callback page processes:
-   - SDK automatically detects and stores token in localStorage
-   - Fetches complete user data from backend
-   - Syncs token to HTTP-only cookie (server-side middleware)
-   - Cleans URL (removes sensitive data)
+5. Middlware & InsForge SDK will processes:
+   - Extracts token from URL
+   - Saves to localStorage
+   - Verifies with getCurrentUser()
+   - Updates Provider state
+   - Syncs token to HTTP-only cookie
    ↓
-6. Redirects to destination → User sees /dashboard
+6. User sees the destination page (e.g /dashboard)
 ```
-
-<Note>
-**Why API route + callback?**
-- **API route** (`/api/auth`): Syncs tokens to HTTP-only cookies (enables server-side middleware protection)
-- **Callback page** (`/auth/callback`): Receives tokens and user data from backend auth pages (OAuth + email/password), stores them properly, and handles redirect
-
-**Unified Format:** Both OAuth and email/password flows return the same parameters, making the callback page simple and consistent.
-</Note>
-
-## Environment Variables
-
-```bash .env.local
-NEXT_PUBLIC_INSFORGE_BASE_URL=https://your-project.insforge.app/
-INSFORGE_BASE_URL=https://your-project.insforge.app/
-```
-
-**Two Variables:**
-- `NEXT_PUBLIC_INSFORGE_BASE_URL` - For client-side (Provider, components)
-- `INSFORGE_BASE_URL` - For server-side (middleware, Server Components)
 
 ---
 
 ## Complete Components (with Business Logic)
 
 <Note>
-**Recommendation**: Use built-in auth pages (Quick Start) for most cases. Only create custom components if you need highly customized branding or additional form fields.
+  **Recommendation**: Use built-in auth pages (Quick Start) for most cases. Only create custom
+  components if you need additional form fields or different workflow.
 </Note>
 
 ### Custom Auth Pages
@@ -243,13 +202,8 @@ export default function SignInPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <SignIn
-        afterSignInUrl="/dashboard"
         title="Welcome Back"
         subtitle="Sign in to your account"
-        onSuccess={(user) => {
-          console.log('Signed in:', user);
-          router.push('/dashboard');
-        }}
         onError={(error) => {
           console.error('Sign in error:', error);
         }}
@@ -267,10 +221,12 @@ import { SignUp } from '@insforge/nextjs';
 export default function SignUpPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <SignUp 
-        afterSignUpUrl="/onboarding"
+      <SignUp
         title="Create Account"
         subtitle="Get started with your free account"
+        onError={(error) => {
+          console.error('Sign in error:', error);
+        }}
       />
     </div>
   );
@@ -280,56 +236,29 @@ export default function SignUpPage() {
 **Additional Auth Pages:**
 
 ```tsx
-// Password reset and email verification
+// Forgot password
 import { ForgotPassword, ResetPassword, VerifyEmail } from '@insforge/nextjs';
 
 // app/forgot-password/page.tsx
 export default function ForgotPasswordPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <ForgotPassword backToSignInUrl="/sign-in" />
-    </div>
-  );
-}
-
-// app/reset-password/page.tsx
-export default function ResetPasswordPage({ searchParams }: { searchParams: { token?: string } }) {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <ResetPassword token={searchParams.token || ''} backToSignInUrl="/sign-in" />
-    </div>
-  );
-}
-
-// app/verify-email/page.tsx
-export default function VerifyEmailPage({ searchParams }: { searchParams: { token?: string } }) {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <VerifyEmail token={searchParams.token || ''} />
+      <ForgotPassword />
     </div>
   );
 }
 ```
 
 <Info>
-**For AI Agents**: Always use these pre-built components (`<SignIn>`, `<SignUp>`, `<ForgotPassword>`, `<ResetPassword>`, `<VerifyEmail>`) instead of building forms from scratch. They handle OAuth, email/password validation, and SDK integration automatically.
+**For AI Agents**: Always use these pre-built components (`<SignIn>`, `<SignUp>`, `<ForgotPassword>`) instead of building forms from scratch. They handle OAuth, email/password validation, and SDK integration automatically.
 </Info>
 
 **SignIn Component Props:**
-- `afterSignInUrl` - Redirect URL after successful sign in
+
 - `title` / `subtitle` - Custom heading text
-- `emailLabel` / `passwordLabel` - Custom field labels
-- `submitButtonText` / `loadingButtonText` - Custom button text
-- `appearance` - Tailwind CSS classes for styling (see [Customization](/core-concepts/authentication/ui-components/customization))
-- `onSuccess` / `onError` - Callback functions
+- `onError` - Callback functions
 
-**SignUp Component Props:** Same as SignIn, plus:
-- `afterSignUpUrl` - Redirect URL after successful sign up
-- Additional text customization options
-
-<Info>
-**Customization**: See the [Customization Guide](/core-concepts/authentication/ui-components/customization) for styling, text customization, and building custom forms with atomic components.
-</Info>
+**SignUp Component Props:** Same as SignIn.
 
 ---
 
@@ -344,20 +273,17 @@ import { useAuth } from '@insforge/nextjs';
 
 function Component() {
   const { signIn, signUp, signOut, isSignedIn, isLoaded } = useAuth();
-  
+
   async function handleSignIn(email: string, password: string) {
     await signIn(email, password);
   }
-  
-  return (
-    <div>
-      {isSignedIn && <button onClick={() => signOut()}>Sign Out</button>}
-    </div>
-  );
+
+  return <div>{isSignedIn && <button onClick={() => signOut()}>Sign Out</button>}</div>;
 }
 ```
 
 **Returns:**
+
 - `signIn(email, password)` - Sign in user
 - `signUp(email, password)` - Register new user
 - `signOut()` - Sign out current user
@@ -373,10 +299,10 @@ import { useUser } from '@insforge/nextjs';
 
 function UserProfile() {
   const { user, isLoaded, updateUser } = useUser();
-  
+
   if (!isLoaded) return <div>Loading...</div>;
   if (!user) return <div>Not signed in</div>;
-  
+
   return (
     <div>
       <p>Email: {user.email}</p>
@@ -387,6 +313,7 @@ function UserProfile() {
 ```
 
 **Returns:**
+
 - `user` - Current user object (id, email, nickname, avatarUrl, role, emailVerified)
 - `isLoaded` - Boolean loading state
 - `updateUser(data)` - Update user profile
@@ -413,12 +340,13 @@ function SignInPage() {
 ```
 
 **Returns:**
+
 - `oauthProviders` - OAuth providers enabled by you
 - `emailConfig` - Your email auth config like password length
 - `isLoaded` - Boolean loading state
 
 <Warning>
-**Performance**: Only use this hook in SignIn/SignUp components to avoid unnecessary API calls.
+  **Performance**: Only use this hook in SignIn/SignUp components to avoid unnecessary API calls.
 </Warning>
 
 ---
@@ -457,19 +385,16 @@ import { UserButton } from '@insforge/nextjs';
 function Header() {
   return (
     <header>
-      <UserButton 
-        mode="detailed"
-        afterSignOutUrl="/" 
-      />
+      <UserButton mode="detailed" afterSignOutUrl="/" />
     </header>
   );
 }
 ```
 
 **Props:**
+
 - `mode` - Display mode: `"detailed"` (avatar + name + email) or `"simple"` (avatar only)
 - `afterSignOutUrl` - Redirect URL after sign out
-- `appearance` - Tailwind classes for styling (see [Customization](/core-concepts/authentication/ui-components/customization))
 
 ### Protect
 
@@ -489,7 +414,7 @@ import { Protect } from '@insforge/nextjs';
 </Protect>
 
 // Custom logic
-<Protect 
+<Protect
   condition={(user) => user.subscription === 'premium'}
   fallback={<UpgradePrompt />}
 >
@@ -499,62 +424,7 @@ import { Protect } from '@insforge/nextjs';
 
 ---
 
-## Server-Side Access
-
-Access auth data in Server Components using middleware helpers:
-
-```tsx app/dashboard/page.tsx
-import { headers } from 'next/headers';
-import { getAuthUserId, getAuthToken } from '@insforge/nextjs/middleware';
-import { createClient } from '@insforge/sdk';
-
-export default async function Dashboard() {
-  const userId = getAuthUserId(headers());
-  const token = getAuthToken(headers());
-  
-  if (!userId) {
-    return <div>Not authenticated</div>;
-  }
-  
-  // Create SDK client with token for server-side API calls
-  const insforge = createClient({
-    baseUrl: process.env.INSFORGE_BASE_URL!,
-    edgeFunctionToken: token || undefined,
-  });
-  
-  const { data: userData } = await insforge.auth.getCurrentUser();
-  
-  return <div>Welcome, {userData?.user.email}</div>;
-}
-```
-
-**Available helpers:**
-- `getAuthUserId(headers())` - Returns user ID or null
-- `getAuthToken(headers())` - Returns auth token or null
-
----
-
 ## Advanced Features
-
-### InsforgeCallback Options
-
-Customize the OAuth callback component:
-
-```tsx
-<InsforgeCallback
-  redirectTo="/dashboard"
-  onSuccess={() => console.log('Authentication successful!')}
-  onError={(error) => console.error('Authentication failed:', error)}
-  loadingComponent={
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="text-center">
-        <h2 className="text-2xl font-semibold mb-4">Signing you in...</h2>
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-      </div>
-    </div>
-  }
-/>
-```
 
 ### Auth Change Callback
 
@@ -581,193 +451,23 @@ Track authentication state changes for analytics or other side effects:
 
 ---
 
-## React Hooks
-
-### useAuth()
-
-Access authentication methods and state:
-
-```tsx
-import { useAuth } from '@insforge/nextjs';
-
-function Component() {
-  const { signIn, signUp, signOut, isSignedIn, isLoaded } = useAuth();
-  
-  async function handleSignIn(email: string, password: string) {
-    await signIn(email, password);
-  }
-  
-  return (
-    <div>
-      {isSignedIn && <button onClick={() => signOut()}>Sign Out</button>}
-    </div>
-  );
-}
-```
-
-**Returns:**
-- `signIn(email, password)` - Sign in user
-- `signUp(email, password)` - Register new user
-- `signOut()` - Sign out current user
-- `isSignedIn` - Boolean auth state
-- `isLoaded` - Boolean loading state
-
-### useUser()
-
-Access current user profile:
-
-```tsx
-import { useUser } from '@insforge/nextjs';
-
-function UserProfile() {
-  const { user, isLoaded, updateUser } = useUser();
-  
-  if (!isLoaded) return <div>Loading...</div>;
-  if (!user) return <div>Not signed in</div>;
-  
-  return (
-    <div>
-      <p>Email: {user.email}</p>
-      <p>ID: {user.id}</p>
-    </div>
-  );
-}
-```
-
-**Returns:**
-- `user` - Current user object (id, email, nickname, avatarUrl, role, emailVerified)
-- `isLoaded` - Boolean loading state
-- `updateUser(data)` - Update user profile
-
-### usePublicAuthConfig()
-
-Get your authentication config in InsForge:
-
-```tsx
-import { usePublicAuthConfig } from '@insforge/nextjs';
-
-function SignInPage() {
-  const { oauthProviders, emailConfig, isLoaded } = usePublicAuthConfig();
-
-  if (!isLoaded) return <div>Loading...</div>;
-
-  return (
-    <div>
-      <p>Available OAuth: {oauthProviders.join(', ')}</p>
-      <p>Password min length: {emailConfig?.passwordMinLength}</p>
-    </div>
-  );
-}
-```
-
-**Returns:**
-- `oauthProviders` - OAuth providers enabled by you
-- `emailConfig` - Your email auth config like password length
-- `isLoaded` - Boolean loading state
-
-<Warning>
-**Performance**: Only use this hook in SignIn/SignUp components to avoid unnecessary API calls.
-</Warning>
-
-## Control Components
-
-### SignedIn / SignedOut
-
-Show/hide content based on authentication:
-
-```tsx
-import { SignedIn, SignedOut } from '@insforge/nextjs';
-
-function NavBar() {
-  return (
-    <nav>
-      <SignedOut>
-        <a href="/sign-in">Sign In</a>
-      </SignedOut>
-
-      <SignedIn>
-        <UserButton />
-      </SignedIn>
-    </nav>
-  );
-}
-```
-
-### UserButton
-
-Pre-built user profile button with dropdown menu:
-
-```tsx
-import { UserButton } from '@insforge/nextjs';
-
-function Header() {
-  return (
-    <header>
-      <UserButton 
-        mode="detailed"
-        afterSignOutUrl="/" 
-      />
-    </header>
-  );
-}
-```
-
-**Props:**
-- `mode` - Display mode: `"detailed"` (avatar + name + email) or `"simple"` (avatar only)
-- `afterSignOutUrl` - Redirect URL after sign out
-- `appearance` - Tailwind classes for styling
-
-### Protect
-
-Conditional rendering with custom logic (see [Conditional Rendering](#conditional-rendering) in Advanced Usage for examples)
-
-## Server-Side Access
-
-Access auth data in Server Components using middleware helpers:
-
-```tsx app/dashboard/page.tsx
-import { headers } from 'next/headers';
-import { getAuthUserId, getAuthToken } from '@insforge/nextjs/middleware';
-import { createClient } from '@insforge/sdk';
-
-export default async function Dashboard() {
-  const userId = getAuthUserId(headers());
-  const token = getAuthToken(headers());
-  
-  if (!userId) {
-    return <div>Not authenticated</div>;
-  }
-  
-  // Create SDK client with token for server-side API calls
-  const insforge = createClient({
-    baseUrl: process.env.INSFORGE_BASE_URL!,
-    edgeFunctionToken: token || undefined,
-  });
-  
-  const { data: userData } = await insforge.auth.getCurrentUser();
-  
-  return <div>Welcome, {userData?.user.email}</div>;
-}
-```
-
-**Available helpers:**
-- `getAuthUserId(headers())` - Returns user ID or null
-- `getAuthToken(headers())` - Returns auth token or null
-
 ## Why @insforge/nextjs?
 
 <CardGroup cols={2}>
   <Card title="For Developers" icon="user">
-    5-minute auth setup vs hours of custom code. Production-ready security and OAuth support out of the box.
+    5-minute auth setup vs hours of custom code. Production-ready security and OAuth support out of
+    the box.
   </Card>
-  
+
   <Card title="For AI Agents" icon="robot">
-    Minimal code generation (5 files vs 20+). SDK-first approach ensures type safety and reduces errors.
+    Minimal code generation (5 files vs 20+). SDK-first approach ensures type safety and reduces
+    errors.
   </Card>
 </CardGroup>
 
 <Note>
-**Key Principle**: This package works with `@insforge/sdk`. Always use SDK methods for API calls—never raw `fetch`. Components handle UI, SDK handles data.
+  **Key Principle**: This package works with `@insforge/sdk`. Always use SDK methods for API
+  calls—never raw `fetch`. Components handle UI, SDK handles data.
 </Note>
 
 ## Resources
@@ -776,11 +476,11 @@ export default async function Dashboard() {
   <Card title="Documentation" icon="book" href="https://docs.insforge.dev/introduction">
     Full documentation
   </Card>
-  
-  <Card title="GitHub Issues" icon="github" href="https://github.com/InsForge/InsForge/issues">
-    Report bugs & request features
-  </Card>
-  
+
+<Card title="GitHub Issues" icon="github" href="https://github.com/InsForge/InsForge/issues">
+  Report bugs & request features
+</Card>
+
   <Card title="Discord Community" icon="discord" href="https://discord.com/invite/DvBtaEc9Jz">
     Get help & share feedback
   </Card>

@@ -16,6 +16,7 @@ export enum AuthRouterPath {
 export function App() {
   return (
     <Routes>
+      {/* Main routes */}
       <Route path={AuthRouterPath.SIGN_IN} element={<SignInPage />} />
       <Route path={AuthRouterPath.SIGN_UP} element={<SignUpPage />} />
       <Route path={AuthRouterPath.VERIFY_EMAIL} element={<VerifyEmailPage />} />
