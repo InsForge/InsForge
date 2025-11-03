@@ -94,7 +94,7 @@ export function ConfigurationTab() {
         <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-8">
           {/* Sign In Redirect URL */}
 
-          {/* <div className="space-y-6">
+          <div className="space-y-6">
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium text-gray-900 dark:text-white">
                 Redirect URL After Sign In
@@ -116,7 +116,7 @@ export function ConfigurationTab() {
                 </span>
               )}
             </div>
-          </div> */}
+          </div>
 
           {isInsForgeCloudProject() && (
             <div className="space-y-6">

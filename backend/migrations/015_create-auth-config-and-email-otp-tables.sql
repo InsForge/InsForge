@@ -6,7 +6,6 @@
 --    - Uses dual hashing strategy:
 --      * NUMERIC_CODE (6 digits): Bcrypt hash (slow, defense against brute force)
 --      * LINK_TOKEN (64 hex chars): SHA-256 hash (fast, enables direct O(1) lookup)
---    - Brute force protection handled by API rate limiter, not database attempt tracking
 -- 2. _auth_configs: Stores email authentication configuration (single-row table)
 
 -- 1. Create email OTP verification table
@@ -17,6 +16,7 @@ CREATE TABLE IF NOT EXISTS _email_otps (
   otp_hash TEXT NOT NULL, -- Hash of OTP: bcrypt for NUMERIC_CODE, SHA-256 for LINK_TOKEN
   expires_at TIMESTAMPTZ NOT NULL,
   consumed_at TIMESTAMPTZ,
+  attempts_count INTEGER DEFAULT 0 NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (email, purpose) -- Only one active token per email/purpose combination
@@ -43,9 +43,8 @@ CREATE TABLE IF NOT EXISTS _auth_configs (
   require_lowercase BOOLEAN DEFAULT FALSE NOT NULL,
   require_uppercase BOOLEAN DEFAULT FALSE NOT NULL,
   require_special_char BOOLEAN DEFAULT FALSE NOT NULL,
-  verify_email_method TEXT DEFAULT 'code' NOT NULL CHECK (verify_email_method IN ('code', 'link')),
-  reset_password_method TEXT DEFAULT 'code' NOT NULL CHECK (reset_password_method IN ('code', 'link')),
-  sign_in_redirect_to TEXT, -- Custom URL to redirect after successful sign in (defaults to no redirect if NULL)
+  verify_email_redirect_to TEXT, -- Custom URL to redirect after successful email verification (defaults to no redirect if NULL)
+  reset_password_redirect_to TEXT, -- Custom URL to redirect after successful password reset (defaults to no redirect if NULL)
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -68,9 +67,8 @@ INSERT INTO _auth_configs (
   require_lowercase,
   require_uppercase,
   require_special_char,
-  verify_email_method,
-  reset_password_method,
-  sign_in_redirect_to
+  verify_email_redirect_to,
+  reset_password_redirect_to
 ) VALUES (
   FALSE,  -- require_email_verification
   6,      -- password_min_length
@@ -78,7 +76,6 @@ INSERT INTO _auth_configs (
   FALSE,  -- require_lowercase
   FALSE,  -- require_uppercase
   FALSE,  -- require_special_char
-  'code', -- verify_email_method (default to code-based verification)
-  'code', -- reset_password_method (default to code-based reset)
-  NULL    -- sign_in_redirect_to (NULL = no redirect after sign in)
+  NULL,   -- verify_email_redirect_to (NULL = no redirect after verification)
+  NULL    -- reset_password_redirect_to (NULL = no redirect after reset)
 ) ON CONFLICT DO NOTHING;
