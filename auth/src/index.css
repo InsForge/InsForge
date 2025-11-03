@@ -16,9 +16,4 @@
   button {
     cursor: pointer;
   }
-
-  input:focus,
-  button:focus {
-    outline: none !important;
-  }
 }

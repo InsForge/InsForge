@@ -123,7 +123,7 @@ const router = createBrowserRouter([
 
   // Add built-in auth redirect routes (sign-in, sign-up, forgot-password, etc.)
   ...getInsforgeRoutes({
-    baseUrl: import.meta.env.VITE_INSFORGE,
+    baseUrl: import.meta.env.VITE_INSFORGE_BASE_URL,
     afterSignInUrl="/dashboard"
     builtInAuth: true  // Redirects to deployed auth pages
   })
@@ -499,7 +499,7 @@ function UserProfile() {
 
 ### `usePublicAuthConfig()`
 
-Get Your authenication config in InsForge:
+Get Your authentication config in InsForge:
 
 ```tsx
 import { usePublicAuthConfig } from '@insforge/react';

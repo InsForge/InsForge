@@ -207,6 +207,15 @@ export class AuthService {
     const user = this.dbUserToApiUser(dbUser);
 
     if (emailAuthConfig.requireEmailVerification) {
+      try {
+        if (emailAuthConfig.verifyEmailMethod === 'link') {
+          await this.sendVerificationEmailWithLink(email);
+        } else {
+          await this.sendVerificationEmailWithCode(email);
+        }
+      } catch (error) {
+        logger.warn('Verification email send failed during register', { error });
+      }
       return {
         accessToken: null,
         requireEmailVerification: true,
