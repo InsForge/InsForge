@@ -12,7 +12,6 @@ import {
   DeleteObjectsCommand,
 } from '@aws-sdk/client-s3';
 import { logger } from '@/utils/logger.js';
-import { AWSInfrastructureManager } from './aws-infrastructure.js';
 
 const DEFAULT_AWS_REGION = 'us-east-1';
 const RFC1123_LABEL_REGEX = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/i;
@@ -128,7 +127,6 @@ export class S3StorageAdapter implements StorageAdapter {
   private s3Client: S3Client;
   private bucket: string;
   private appKey: string;
-  private infrastructureManager: AWSInfrastructureManager | null;
 
   constructor() {
     const bucket = process.env.AWS_S3_BUCKET;
@@ -156,24 +154,6 @@ export class S3StorageAdapter implements StorageAdapter {
     }
 
     this.s3Client = new S3Client(s3Config);
-
-    // Initialize infrastructure manager only if both CloudFront URL and domain are configured
-    this.infrastructureManager = null;
-    const hasCloudFrontDomain =
-      process.env.AWS_CLOUDFRONT_DOMAIN && process.env.AWS_CLOUDFRONT_DOMAIN.trim();
-    const hasCloudFrontUrl =
-      process.env.AWS_CLOUDFRONT_URL && process.env.AWS_CLOUDFRONT_URL.trim();
-
-    if (hasCloudFrontDomain && hasCloudFrontUrl) {
-      try {
-        this.infrastructureManager = new AWSInfrastructureManager();
-        logger.info('AWS Infrastructure Manager initialized for CloudFront subdomain routing');
-      } catch (error) {
-        logger.warn('Failed to initialize AWS Infrastructure Manager', {
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
   }
 
   private getS3Key(deploymentId: string, filePath: string): string {
@@ -224,11 +204,6 @@ export class S3StorageAdapter implements StorageAdapter {
       await Promise.all(uploadPromises);
 
       logger.info('S3 deployment successful', { deploymentId, fileCount: files.length });
-
-      // Configure CloudFront and Route53 if infrastructure manager is available
-      if (this.infrastructureManager && subdomain) {
-        await this.infrastructureManager.addSubdomain(pathIdentifier);
-      }
 
       // Return CloudFront URL based on configuration
       const cloudFrontDomain = process.env.AWS_CLOUDFRONT_DOMAIN;
@@ -308,11 +283,6 @@ export class S3StorageAdapter implements StorageAdapter {
       }
 
       logger.info('S3 deployment deleted', { deploymentId, filesDeleted: objectsToDelete.length });
-
-      // Remove from CloudFront and Route53 if infrastructure manager is available
-      if (this.infrastructureManager && subdomain) {
-        await this.infrastructureManager.removeSubdomain(pathIdentifier);
-      }
     } catch (error) {
       logger.error('Failed to delete S3 deployment', {
         deploymentId,
