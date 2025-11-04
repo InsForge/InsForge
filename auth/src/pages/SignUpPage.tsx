@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { SignUp } from '@insforge/react';
 import broadcastService, { BroadcastEventType, BroadcastEvent } from '../lib/broadcastService';
+import { ErrorCard } from '../components/ErrorCard';
 
 export function SignUpPage() {
   const [searchParams] = useSearchParams();
@@ -43,12 +44,12 @@ export function SignUpPage() {
   }, []);
 
   if (!redirectUrl) {
-    return <div>No redirect URL provided. Please check the URL and try again.</div>;
+    return (
+      <ErrorCard title="Missing Redirect URL">
+        <p>No redirect URL provided. Please check the URL and try again.</p>
+      </ErrorCard>
+    );
   }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800">
-      <SignUp onError={handleError} />
-    </div>
-  );
+  return <SignUp onError={handleError} />;
 }
