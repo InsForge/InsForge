@@ -73,7 +73,7 @@ export class DeploymentService {
 
     let deploymentId: string | undefined;
     let newSubdomain: string | undefined;
-    
+
     try {
       // Generate deployment ID and subdomain
       deploymentId = randomUUID();
@@ -89,15 +89,19 @@ export class DeploymentService {
       }));
 
       // Deploy files to storage FIRST (outside transaction)
-      const deploymentUrl = await this.storageAdapter.deploy(deploymentId, decodedFiles, newSubdomain);
+      const deploymentUrl = await this.storageAdapter.deploy(
+        deploymentId,
+        decodedFiles,
+        newSubdomain
+      );
       logger.info('New deployment uploaded to storage', { deploymentId, url: deploymentUrl });
 
       // Now update database in transaction
       const pool = DatabaseManager.getInstance().getPool();
       const client = await pool.connect();
-      
+
       let existing: { id: string; subdomain: string } | undefined;
-      
+
       try {
         await client.query('BEGIN');
 
@@ -114,7 +118,15 @@ export class DeploymentService {
              SET id = $1, project_name = $2, subdomain = $3, status = $4, deployment_url = $5, 
                  deployed_at = CURRENT_TIMESTAMP, storage_path = $6, updated_at = CURRENT_TIMESTAMP
              WHERE id = $7`,
-            [deploymentId, projectName, newSubdomain, 'active', deploymentUrl, `deployments/${newSubdomain}`, existing.id]
+            [
+              deploymentId,
+              projectName,
+              newSubdomain,
+              'active',
+              deploymentUrl,
+              `deployments/${newSubdomain}`,
+              existing.id,
+            ]
           );
           logger.info('Deployment record updated', { oldId: existing.id, newId: deploymentId });
         } else {
@@ -122,7 +134,14 @@ export class DeploymentService {
           await client.query(
             `INSERT INTO _deployments (id, project_name, subdomain, status, deployment_url, deployed_at, storage_path)
              VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6)`,
-            [deploymentId, projectName, newSubdomain, 'active', deploymentUrl, `deployments/${newSubdomain}`]
+            [
+              deploymentId,
+              projectName,
+              newSubdomain,
+              'active',
+              deploymentUrl,
+              `deployments/${newSubdomain}`,
+            ]
           );
           logger.info('Deployment record created', { deploymentId, projectName });
         }
@@ -150,13 +169,12 @@ export class DeploymentService {
 
       logger.info('Deployment successful', { deploymentId, url: deploymentUrl });
       return this.getDeployment();
-      
     } catch (error) {
       logger.error('Deployment failed', {
         projectName,
         error: error instanceof Error ? error.message : String(error),
       });
-      
+
       // Cleanup failed deployment from storage
       if (deploymentId && newSubdomain) {
         try {
@@ -169,7 +187,7 @@ export class DeploymentService {
           });
         }
       }
-      
+
       throw error;
     }
   }

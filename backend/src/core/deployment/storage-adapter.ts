@@ -179,7 +179,6 @@ export class S3StorageAdapter implements StorageAdapter {
   }
 
   async deploy(deploymentId: string, files: DeploymentFile[], subdomain?: string): Promise<string> {
-    const region = process.env.AWS_REGION || DEFAULT_AWS_REGION;
     // Validate and normalize subdomain
     const pathIdentifier = subdomain ? normalizeSubdomain(subdomain, deploymentId) : deploymentId;
 
@@ -208,8 +207,10 @@ export class S3StorageAdapter implements StorageAdapter {
       // AWS_CLOUDFRONT_DOMAIN is required for deployments
       const cloudFrontDomain = process.env.AWS_CLOUDFRONT_DOMAIN;
 
-    if (!cloudFrontDomain) {
-        throw new Error('AWS_CLOUDFRONT_DOMAIN environment variable is required for site deployments');
+      if (!cloudFrontDomain) {
+        throw new Error(
+          'AWS_CLOUDFRONT_DOMAIN environment variable is required for site deployments'
+        );
       }
 
       return `https://${pathIdentifier}.${cloudFrontDomain}`;
