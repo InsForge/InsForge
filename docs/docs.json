@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Insforge Documentation",
+  "name": "InsForge Docs",
   "colors": {
     "primary": "#16A34A",
     "light": "#07C983",
@@ -15,18 +15,18 @@
   },
   "seo": {
     "metatags": {
-      "og:site_name": "Insforge Documentation"
+      "og:site_name": "InsForge Docs"
     },
     "indexing": "navigable"
   },
   "search": {
-    "prompt": "Search Insforge docs..."
+    "prompt": "Search InsForge docs..."
   },
   "favicon": "/favicon.svg",
   "navigation": {
     "tabs": [
       {
-        "tab": "Documentation",
+        "tab": "Docs",
         "groups": [
           {
             "group": "Getting Started",
@@ -75,6 +75,10 @@
           {
             "group": "Showcase",
             "pages": ["showcase"]
+          },
+          {
+            "group": "Changelog",
+            "pages": ["changelog"]
           }
         ]
       },
@@ -135,6 +139,11 @@
           "anchor": "Blog",
           "href": "https://insforge.dev/blog",
           "icon": "newspaper"
+        },
+        {
+          "anchor": "Roadmap",
+          "href": "https://feedback.insforge.dev/roadmap",
+          "icon": "route"
         }
       ]
     }
@@ -145,16 +154,10 @@
     "href": "https://insforge.dev"
   },
   "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:info@insforge.dev"
-      }
-    ],
     "primary": {
       "type": "button",
-      "label": "Dashboard",
-      "href": "https://insforge.dev/dashboard"
+      "label": "Get Started",
+      "href": "https://insforge.dev/auth/sign-up"
     }
   },
   "contextual": {
