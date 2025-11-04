@@ -124,7 +124,7 @@ const router = createBrowserRouter([
   // Add built-in auth redirect routes (sign-in, sign-up, forgot-password, etc.)
   ...getInsforgeRoutes({
     baseUrl: import.meta.env.VITE_INSFORGE_BASE_URL,
-    afterSignInUrl="/dashboard"
+    afterSignInUrl="/dashboard",
     builtInAuth: true  // Redirects to deployed auth pages
   })
 ]);
@@ -186,6 +186,159 @@ export default function Home() {
 ```
 
 **That's it!**  Your React app now has production-ready authentication with built-in auth pages.
+
+---
+
+## Alternative: Custom UI Components
+
+Use this approach when you need custom authentication pages in your application instead of redirecting to hosted pages.
+
+### Step-by-Step: Custom Auth Pages Setup
+
+#### Step 1: Setup Provider (Same as Quick Start)
+
+The provider setup is identical:
+
+```tsx src/main.tsx
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { InsforgeProvider } from '@insforge/react';
+import App from './App';
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <InsforgeProvider
+      baseUrl={import.meta.env.VITE_INSFORGE_BASE_URL}
+      afterSignInUrl="/dashboard"
+    >
+      <App />
+    </InsforgeProvider>
+  </StrictMode>
+);
+```
+
+#### Step 2: Configure Router with Custom Pages
+
+Set `builtInAuth: false` and provide your page components:
+
+```tsx src/App.tsx
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { getInsforgeRoutes } from '@insforge/react/router';
+import Layout from './components/Layout';
+import Home from './pages/Home';
+import Dashboard from './pages/Dashboard';
+// Import your custom auth pages
+import SignInPage from './pages/auth/SignInPage';
+import SignUpPage from './pages/auth/SignUpPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <Layout />,
+    children: [
+      { index: true, element: <Home /> },
+      { path: 'dashboard', element: <Dashboard /> }
+    ]
+  },
+
+  // Custom auth routes
+  ...getInsforgeRoutes({
+    baseUrl: import.meta.env.VITE_INSFORGE_BASE_URL,
+    afterSignInUrl: '/dashboard',
+    builtInAuth: false,  // Render custom components instead of redirecting
+    pages: {
+      signIn: <SignInPage />,
+      signUp: <SignUpPage />,
+      forgotPassword: <ForgotPasswordPage />
+    }
+  })
+]);
+
+export default function App() {
+  return <RouterProvider router={router} />;
+}
+```
+
+#### Step 3: Create Auth Page Components
+
+Use our complete authentication components directly. These components are **full-featured page-level components** with all business logic included:
+
+```tsx src/pages/auth/SignInPage.tsx
+import { SignIn } from '@insforge/react';
+
+export default function SignInPage() {
+  return (
+    <div className="auth-page">
+      <SignIn
+        title="Welcome Back"
+        subtitle="Sign in to your account"
+        onError={(error) => {
+          console.error('Sign in error:', error);
+        }}
+      />
+    </div>
+  );
+}
+```
+
+```tsx src/pages/auth/SignUpPage.tsx
+import { SignUp } from '@insforge/react';
+
+export default function SignUpPage() {
+  return (
+    <div className="auth-page">
+      <SignUp
+        title="Create Account"
+        subtitle="Get started for free"
+        onError={(error) => {
+          console.error('Sign up error:', error);
+        }}
+      />
+    </div>
+  );
+}
+```
+
+```tsx src/pages/auth/ForgotPasswordPage.tsx
+import { ForgotPassword } from '@insforge/react';
+
+export default function ForgotPasswordPage() {
+  return (
+    <div className="auth-page">
+      <ForgotPassword
+        onError={(error) => {
+          console.error('Password reset error:', error);
+        }}
+      />
+    </div>
+  );
+}
+```
+
+**That's it!** The `<SignIn>`, `<SignUp>`, and `<ForgotPassword>` components are complete page-level components that include:
+- Form UI with validation
+- OAuth provider buttons (auto-detected)
+- Error handling
+- Loading states
+- Password strength indicators (SignUp)
+- All authentication logic
+
+You only need to wrap them in your page components for layout/styling purposes.
+
+### Key Difference from Built-in Auth
+
+**Built-in Auth:**
+- `/sign-in` → Redirects to `your-project.insforge.app/auth/sign-in`
+- Authentication happens on hosted page
+- Returns to your app with token
+
+**Custom Components:**
+- `/sign-in` → Renders your `<SignInPage>` component
+- Authentication happens in your app
+- SDK handles token management automatically
+
+---
 
 ## How It Works
 
@@ -499,7 +652,7 @@ function UserProfile() {
 
 ### `usePublicAuthConfig()`
 
-Get Your authentication config in InsForge:
+Get your authentication config in InsForge:
 
 ```tsx
 import { usePublicAuthConfig } from '@insforge/react';
