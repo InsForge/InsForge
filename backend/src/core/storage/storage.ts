@@ -19,6 +19,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
+import { getSignedUrl as getCloudFrontSignedUrl } from '@aws-sdk/cloudfront-signer';
 import logger from '@/utils/logger.js';
 import { ADMIN_ID } from '@/utils/constants';
 import { AppError } from '@/api/middleware/error';
