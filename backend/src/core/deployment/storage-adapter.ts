@@ -205,24 +205,14 @@ export class S3StorageAdapter implements StorageAdapter {
 
       logger.info('S3 deployment successful', { deploymentId, fileCount: files.length });
 
-      // Return CloudFront URL based on configuration
+      // Return CloudFront domain if configured, otherwise fallback to S3
       const cloudFrontDomain = process.env.AWS_CLOUDFRONT_DOMAIN;
-      const cloudFrontUrl = process.env.AWS_CLOUDFRONT_URL;
 
-      // If AWS_CLOUDFRONT_DOMAIN is set, use subdomain-based routing (auto-configures CloudFront + Route53)
       if (cloudFrontDomain) {
         return `https://${pathIdentifier}.${cloudFrontDomain}`;
       }
 
-      // If AWS_CLOUDFRONT_URL is set, use path-based routing
-      if (cloudFrontUrl) {
-        const baseUrl = cloudFrontUrl.startsWith('http')
-          ? cloudFrontUrl
-          : `https://${cloudFrontUrl}`;
-        return `${baseUrl}/${this.appKey}/deployments/${pathIdentifier}/index.html`;
-      }
-
-      // Fallback to S3 URL (must include index.html since S3 doesn't support directory indexes)
+      // Fallback to S3 URL
       return `https://${this.bucket}.s3.${region}.amazonaws.com/${this.appKey}/deployments/${pathIdentifier}/index.html`;
     } catch (error) {
       logger.error('S3 deployment failed', {
