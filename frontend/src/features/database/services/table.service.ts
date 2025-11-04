@@ -13,7 +13,8 @@ export class TableService {
       headers: apiClient.withAccessToken(),
     });
     // data is already unwrapped by request method and should be an array
-    return Array.isArray(data) ? data : [];
+    // Filter out the 'users' table
+    return Array.isArray(data) ? data.filter((table) => table !== 'users') : [];
   }
 
   getAllTableSchemas(): Promise<GetTableSchemaResponse[]> {
