@@ -47,13 +47,6 @@ export class DeploymentService {
   async createDeployment(request: CreateDeploymentRequest): Promise<Deployment> {
     const { projectName, files } = request;
 
-    // Check if deployment already exists - if so, delete it first
-    const existing = await this.db.prepare('SELECT id FROM _deployments LIMIT 1').get();
-    if (existing) {
-      logger.info('Overwriting existing deployment', { existingId: existing.id });
-      await this.deleteDeployment();
-    }
-
     // Validate files
     if (!files || files.length === 0) {
       throw new Error('No files provided for deployment');
@@ -81,23 +74,18 @@ export class DeploymentService {
       throw new Error('Deployment must include an index.html file');
     }
 
+    // Check if deployment already exists
+    const existing = await this.db.prepare('SELECT id, subdomain FROM _deployments LIMIT 1').get() as { id: string; subdomain: string } | undefined;
+
     let deploymentId: string | undefined;
+    let newSubdomain: string | undefined;
+    
     try {
       // Generate deployment ID
       deploymentId = randomUUID();
 
       // Generate subdomain (simple slug from project name)
-      const subdomain = this.generateSubdomain(projectName, deploymentId);
-
-      // Create database record
-      await this.db
-        .prepare(
-          `INSERT INTO _deployments (id, project_name, subdomain, status)
-           VALUES (?, ?, ?, ?)`
-        )
-        .run(deploymentId, projectName, subdomain, 'deploying');
-
-      logger.info('Deployment record created', { deploymentId, projectName });
+      newSubdomain = this.generateSubdomain(projectName, deploymentId);
 
       // Decode base64 content if needed
       const decodedFiles = files.map((file) => ({
@@ -108,17 +96,50 @@ export class DeploymentService {
             : file.content,
       }));
 
-      // Deploy files to storage (using subdomain as path identifier)
-      const deploymentUrl = await this.storageAdapter.deploy(deploymentId, decodedFiles, subdomain);
+      // Deploy files to storage FIRST (using subdomain as path identifier)
+      // If this fails, we haven't touched the old deployment yet
+      const deploymentUrl = await this.storageAdapter.deploy(deploymentId, decodedFiles, newSubdomain);
 
-      // Update deployment status
-      await this.db
-        .prepare(
-          `UPDATE _deployments 
-           SET status = ?, deployment_url = ?, deployed_at = CURRENT_TIMESTAMP, storage_path = ?
-           WHERE id = ?`
-        )
-        .run('active', deploymentUrl, `deployments/${subdomain}`, deploymentId);
+      logger.info('New deployment uploaded to storage', { deploymentId, url: deploymentUrl });
+
+      // Now that new deployment succeeded, create/update database record
+      if (existing) {
+        // Update existing deployment record
+        await this.db
+          .prepare(
+            `UPDATE _deployments 
+             SET id = ?, project_name = ?, subdomain = ?, status = ?, deployment_url = ?, 
+                 deployed_at = CURRENT_TIMESTAMP, storage_path = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`
+          )
+          .run(deploymentId, projectName, newSubdomain, 'active', deploymentUrl, `deployments/${newSubdomain}`, existing.id);
+        
+        logger.info('Deployment record updated', { oldId: existing.id, newId: deploymentId });
+      } else {
+        // Create new deployment record
+        await this.db
+          .prepare(
+            `INSERT INTO _deployments (id, project_name, subdomain, status, deployment_url, deployed_at, storage_path)
+             VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)`
+          )
+          .run(deploymentId, projectName, newSubdomain, 'active', deploymentUrl, `deployments/${newSubdomain}`);
+        
+        logger.info('Deployment record created', { deploymentId, projectName });
+      }
+
+      // Only delete old deployment AFTER new one is fully successful
+      if (existing) {
+        try {
+          await this.storageAdapter.delete(existing.id, existing.subdomain);
+          logger.info('Old deployment cleaned up', { oldId: existing.id });
+        } catch (cleanupError) {
+          // Log but don't fail - new deployment is already live
+          logger.warn('Failed to cleanup old deployment', {
+            oldId: existing.id,
+            error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+          });
+        }
+      }
 
       logger.info('Deployment successful', { deploymentId, url: deploymentUrl });
 
@@ -129,16 +150,20 @@ export class DeploymentService {
         projectName,
         error: error instanceof Error ? error.message : String(error),
       });
-      // Set status to 'failed' if deployment was created
-      if (deploymentId) {
+      
+      // Cleanup failed deployment from storage if it was uploaded
+      if (deploymentId && newSubdomain) {
         try {
-          await this.db
-            .prepare(`UPDATE _deployments SET status = ?, deployed_at = NULL WHERE id = ?`)
-            .run('failed', deploymentId);
-        } catch {
-          // best-effort; swallow to not mask original error
+          await this.storageAdapter.delete(deploymentId, newSubdomain);
+          logger.info('Failed deployment cleaned up from storage', { deploymentId });
+        } catch (cleanupError) {
+          logger.warn('Failed to cleanup failed deployment', {
+            deploymentId,
+            error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+          });
         }
       }
+      
       throw error;
     }
   }

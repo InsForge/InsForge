@@ -205,15 +205,14 @@ export class S3StorageAdapter implements StorageAdapter {
 
       logger.info('S3 deployment successful', { deploymentId, fileCount: files.length });
 
-      // Return CloudFront domain if configured, otherwise fallback to S3
+      // AWS_CLOUDFRONT_DOMAIN is required for deployments
       const cloudFrontDomain = process.env.AWS_CLOUDFRONT_DOMAIN;
 
-      if (cloudFrontDomain) {
-        return `https://${pathIdentifier}.${cloudFrontDomain}`;
+    if (!cloudFrontDomain) {
+        throw new Error('AWS_CLOUDFRONT_DOMAIN environment variable is required for site deployments');
       }
 
-      // Fallback to S3 URL
-      return `https://${this.bucket}.s3.${region}.amazonaws.com/${this.appKey}/deployments/${pathIdentifier}/index.html`;
+      return `https://${pathIdentifier}.${cloudFrontDomain}`;
     } catch (error) {
       logger.error('S3 deployment failed', {
         deploymentId,
