@@ -41,10 +41,18 @@ const client = createClient({
 Available documentation types:
 - `"instructions"` - Essential backend setup (START HERE)
 - `"db-sdk"` - Database operations with SDK
-- `"auth-sdk"` - Authentication methods
+- **Authentication** - Choose based on implementation:
+  - `"auth-sdk"` - Backend/headless auth (SDK methods only)
+  - `"auth-components-nextjs"` - Frontend auth for Next.js (built-in auth pages + UI)
+  - `"auth-components-react"` - Frontend auth for React/Vite (built-in auth pages + UI)
 - `"storage-sdk"` - File storage operations
 - `"functions-sdk"` - Serverless functions invocation
 - `"ai-integration-sdk"` - AI chat and image generation
+
+**🎯 How to Choose Authentication Documentation:**
+1. **Building with Next.js?** → Use `"auth-components-nextjs"` (frontend: built-in auth pages)
+2. **Building with React (Vite+React Router)?** → Use `"auth-components-react"` (frontend: built-in auth pages)
+3. **Need backend/headless auth only?** → Use `"auth-sdk"` (backend: SDK methods)
 
 ## When to Use SDK vs MCP Tools
 
@@ -61,15 +69,24 @@ Available documentation types:
 - Storage bucket creation (`create-bucket`, `list-buckets`, `delete-bucket`)
 - Serverless function deployment (`create-function`, `update-function`, `delete-function`)
 
+### When to Use Pre-Built Components
+InsForge provides framework-specific UI packages with **built-in auth pages** (zero UI code):
+- `@insforge/nextjs` - Next.js (built-in auth + middleware + SSR)
+- `@insforge/react` - React (built-in auth + framework-agnostic)
+
 ## Quick Start
 
 1. **First**: Call `get-backend-metadata` to check current backend state
-2. **Fetch docs**: Use the `fetch-docs` tool with appropriate doc type
-3. **Initialize SDK**: Create client with your backend URL
-4. **Build**: Use SDK methods for auth, database, storage, AI as needed
+2. **Detect framework**: Check user's project to determine the framework (Next.js, React/Vite, etc.)
+3. **Fetch docs**: Use `fetch-docs` with the appropriate doc type based on framework:
+   - Next.js → `"auth-components-nextjs"`
+   - React/Vite/Remix → `"auth-components-react"`
+4. **Initialize SDK**: Create client with your backend URL
+5. **Build**: Use framework-specific Auth Components for auth, SDK methods for database, storage, AI
 
 ## Important Notes
 
+- Use the right framework-specific component package for production-ready auth
 - SDK returns `{data, error}` structure for all operations
 - Database inserts require array format: `[{...}]`
 - Serverless functions have single endpoint (no subpaths)

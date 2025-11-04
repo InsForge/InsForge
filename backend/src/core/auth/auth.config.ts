@@ -1,9 +1,9 @@
-import { Pool, PoolClient } from 'pg';
+import { Pool } from 'pg';
 import { DatabaseManager } from '@/core/database/manager.js';
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
-import type { EmailAuthConfigSchema, UpdateEmailAuthConfigRequest } from '@insforge/shared-schemas';
+import type { AuthConfigSchema, UpdateAuthConfigRequest } from '@insforge/shared-schemas';
 
 export class AuthConfigService {
   private static instance: AuthConfigService;
@@ -28,10 +28,59 @@ export class AuthConfigService {
   }
 
   /**
-   * Get email authentication configuration
-   * Returns the singleton configuration row
+   * Get public authentication configuration (safe for public API)
+   * Returns all configuration fields except metadata (id, created_at, updated_at)
    */
-  async getEmailConfig(): Promise<EmailAuthConfigSchema> {
+  async getPublicAuthConfig() {
+    const client = await this.getPool().connect();
+    try {
+      const result = await client.query(
+        `SELECT
+          require_email_verification as "requireEmailVerification",
+          password_min_length as "passwordMinLength",
+          require_number as "requireNumber",
+          require_lowercase as "requireLowercase",
+          require_uppercase as "requireUppercase",
+          require_special_char as "requireSpecialChar",
+          verify_email_method as "verifyEmailMethod",
+          reset_password_method as "resetPasswordMethod"
+         FROM _auth_configs
+         LIMIT 1`
+      );
+
+      // If no config exists, return fallback values
+      if (!result.rows.length) {
+        logger.warn('No auth config found, returning default fallback values');
+        return {
+          requireEmailVerification: false,
+          passwordMinLength: 6,
+          requireNumber: false,
+          requireLowercase: false,
+          requireUppercase: false,
+          requireSpecialChar: false,
+          verifyEmailMethod: 'code' as const,
+          resetPasswordMethod: 'code' as const,
+        };
+      }
+
+      return result.rows[0];
+    } catch (error) {
+      logger.error('Failed to get public auth config', { error });
+      throw new AppError(
+        'Failed to get authentication configuration',
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get authentication configuration
+   * Returns the singleton configuration row with all columns
+   */
+  async getAuthConfig(): Promise<AuthConfigSchema> {
     const client = await this.getPool().connect();
     try {
       const result = await client.query(
@@ -43,25 +92,40 @@ export class AuthConfigService {
           require_lowercase as "requireLowercase",
           require_uppercase as "requireUppercase",
           require_special_char as "requireSpecialChar",
-          verify_email_redirect_to as "verifyEmailRedirectTo",
-          reset_password_redirect_to as "resetPasswordRedirectTo",
+          verify_email_method as "verifyEmailMethod",
+          reset_password_method as "resetPasswordMethod",
+          sign_in_redirect_to as "signInRedirectTo",
           created_at as "createdAt",
           updated_at as "updatedAt"
          FROM _auth_configs
          LIMIT 1`
       );
 
-      // If no config exists, create default and return it
+      // If no config exists, return fallback values
       if (!result.rows.length) {
-        logger.warn('No auth config found, creating default configuration');
-        return await this.createDefaultConfig();
+        logger.warn('No auth config found, returning default fallback values');
+        // Return a config with fallback values and generate a temporary ID
+        return {
+          id: '00000000-0000-0000-0000-000000000000',
+          requireEmailVerification: false,
+          passwordMinLength: 6,
+          requireNumber: false,
+          requireLowercase: false,
+          requireUppercase: false,
+          requireSpecialChar: false,
+          verifyEmailMethod: 'code' as const,
+          resetPasswordMethod: 'code' as const,
+          signInRedirectTo: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
       }
 
       return result.rows[0];
     } catch (error) {
       logger.error('Failed to get auth config', { error });
       throw new AppError(
-        'Failed to get email authentication configuration',
+        'Failed to get authentication configuration',
         500,
         ERROR_CODES.INTERNAL_ERROR
       );
@@ -71,90 +135,10 @@ export class AuthConfigService {
   }
 
   /**
-   * Create default authentication configuration (idempotent and race-safe)
-   * Uses UPSERT to handle concurrent cold starts gracefully
-   * @param externalClient - Optional client to use (for transaction support)
-   */
-  private async createDefaultConfig(externalClient?: PoolClient): Promise<EmailAuthConfigSchema> {
-    const client = externalClient || (await this.getPool().connect());
-    const shouldReleaseClient = !externalClient;
-
-    try {
-      // Use ON CONFLICT DO NOTHING to make insert idempotent
-      // The singleton constraint (idx_auth_configs_singleton) prevents duplicates
-      const result = await client.query(
-        `INSERT INTO _auth_configs (
-          require_email_verification,
-          password_min_length,
-          require_number,
-          require_lowercase,
-          require_uppercase,
-          require_special_char,
-          verify_email_redirect_to,
-          reset_password_redirect_to
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        ON CONFLICT DO NOTHING
-        RETURNING
-          id,
-          require_email_verification as "requireEmailVerification",
-          password_min_length as "passwordMinLength",
-          require_number as "requireNumber",
-          require_lowercase as "requireLowercase",
-          require_uppercase as "requireUppercase",
-          require_special_char as "requireSpecialChar",
-          verify_email_redirect_to as "verifyEmailRedirectTo",
-          reset_password_redirect_to as "resetPasswordRedirectTo",
-          created_at as "createdAt",
-          updated_at as "updatedAt"`,
-        [false, 6, false, false, false, false, null, null]
-      );
-
-      // If insert was skipped due to conflict (concurrent insert won the race),
-      // read the existing row that was created by the other request
-      if (result.rows.length === 0) {
-        logger.info(
-          'Default auth config already exists (concurrent creation), reading existing row'
-        );
-        const existingResult = await client.query(
-          `SELECT
-            id,
-            require_email_verification as "requireEmailVerification",
-            password_min_length as "passwordMinLength",
-            require_number as "requireNumber",
-            require_lowercase as "requireLowercase",
-            require_uppercase as "requireUppercase",
-            require_special_char as "requireSpecialChar",
-            verify_email_redirect_to as "verifyEmailRedirectTo",
-            reset_password_redirect_to as "resetPasswordRedirectTo",
-            created_at as "createdAt",
-            updated_at as "updatedAt"
-           FROM _auth_configs
-           LIMIT 1`
-        );
-        return existingResult.rows[0];
-      }
-
-      logger.info('Default auth config created');
-      return result.rows[0];
-    } catch (error) {
-      logger.error('Failed to create default auth config', { error });
-      throw new AppError(
-        'Failed to create default authentication configuration',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    } finally {
-      if (shouldReleaseClient) {
-        client.release();
-      }
-    }
-  }
-
-  /**
-   * Update email authentication configuration
+   * Update authentication configuration
    * Updates the singleton configuration row
    */
-  async updateEmailConfig(input: UpdateEmailAuthConfigRequest): Promise<EmailAuthConfigSchema> {
+  async updateAuthConfig(input: UpdateAuthConfigRequest): Promise<AuthConfigSchema> {
     const client = await this.getPool().connect();
     try {
       await client.query('BEGIN');
@@ -163,8 +147,14 @@ export class AuthConfigService {
       const existingResult = await client.query('SELECT id FROM _auth_configs LIMIT 1 FOR UPDATE');
 
       if (!existingResult.rows.length) {
-        // Create default config if it doesn't exist, reusing the same client for transactional consistency
-        await this.createDefaultConfig(client);
+        // Config doesn't exist, rollback and throw error
+        // The migration should have created the default config
+        await client.query('ROLLBACK');
+        throw new AppError(
+          'Authentication configuration not found. Please run migrations.',
+          500,
+          ERROR_CODES.INTERNAL_ERROR
+        );
       }
 
       // Build update query
@@ -202,20 +192,25 @@ export class AuthConfigService {
         values.push(input.requireSpecialChar);
       }
 
-      if (input.verifyEmailRedirectTo !== undefined) {
-        updates.push(`verify_email_redirect_to = $${paramCount++}`);
-        values.push(input.verifyEmailRedirectTo);
+      if (input.verifyEmailMethod !== undefined) {
+        updates.push(`verify_email_method = $${paramCount++}`);
+        values.push(input.verifyEmailMethod);
       }
 
-      if (input.resetPasswordRedirectTo !== undefined) {
-        updates.push(`reset_password_redirect_to = $${paramCount++}`);
-        values.push(input.resetPasswordRedirectTo);
+      if (input.resetPasswordMethod !== undefined) {
+        updates.push(`reset_password_method = $${paramCount++}`);
+        values.push(input.resetPasswordMethod);
+      }
+
+      if (input.signInRedirectTo !== undefined) {
+        updates.push(`sign_in_redirect_to = $${paramCount++}`);
+        values.push(input.signInRedirectTo);
       }
 
       if (!updates.length) {
         await client.query('COMMIT');
         // Return current config if no updates
-        return await this.getEmailConfig();
+        return await this.getAuthConfig();
       }
 
       // Add updated_at to updates
@@ -232,8 +227,9 @@ export class AuthConfigService {
            require_lowercase as "requireLowercase",
            require_uppercase as "requireUppercase",
            require_special_char as "requireSpecialChar",
-           verify_email_redirect_to as "verifyEmailRedirectTo",
-           reset_password_redirect_to as "resetPasswordRedirectTo",
+           verify_email_method as "verifyEmailMethod",
+           reset_password_method as "resetPasswordMethod",
+           sign_in_redirect_to as "signInRedirectTo",
            created_at as "createdAt",
            updated_at as "updatedAt"`,
         values
@@ -249,7 +245,7 @@ export class AuthConfigService {
         throw error;
       }
       throw new AppError(
-        'Failed to update email authentication configuration',
+        'Failed to update authentication configuration',
         500,
         ERROR_CODES.INTERNAL_ERROR
       );

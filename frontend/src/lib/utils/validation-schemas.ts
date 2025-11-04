@@ -115,8 +115,16 @@ export const jsonSchema = z
 
 export const stringSchema = z.union([z.string(), z.null()]);
 
+// Auth validation schemas
+export const emailSchema = z
+  .string()
+  .min(1, 'Email is required')
+  .email('Please enter a valid email address')
+  .toLowerCase()
+  .trim();
+
 export const loginFormSchema = z.object({
-  email: z.string(),
+  email: emailSchema,
   password: z.string(),
 });
 

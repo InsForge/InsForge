@@ -22,7 +22,7 @@ import type {
 } from '@insforge/shared-schemas';
 import { OAuthConfigService } from './oauth.config';
 import { AuthConfigService } from './auth.config';
-import { AuthOTPService, EmailOTPPurpose, EmailOTPType } from './auth.otp';
+import { AuthOTPService, OTPPurpose, OTPType } from './auth.otp';
 import { GoogleOAuthService } from './oauth.google';
 import { validatePassword } from '@/utils/validations';
 import { getPasswordRequirementsMessage } from '@/utils/utils';
@@ -157,13 +157,12 @@ export class AuthService {
 
   /**
    * User registration
-   * If email verification is required, sends verification email and returns user without token
    * Otherwise, returns user with access token for immediate login
    */
   async register(email: string, password: string, name?: string): Promise<CreateUserResponse> {
     // Get email auth configuration and validate password
     const authConfigService = AuthConfigService.getInstance();
-    const emailAuthConfig = await authConfigService.getEmailConfig();
+    const emailAuthConfig = await authConfigService.getAuthConfig();
 
     if (!validatePassword(password, emailAuthConfig)) {
       throw new AppError(
@@ -207,24 +206,31 @@ export class AuthService {
       .get(userId);
     const user = this.dbUserToApiUser(dbUser);
 
-    // If email verification is required, send verification email and don't provide access token
     if (emailAuthConfig.requireEmailVerification) {
       try {
-        await this.sendVerificationEmailWithLink(email);
+        if (emailAuthConfig.verifyEmailMethod === 'link') {
+          await this.sendVerificationEmailWithLink(email);
+        } else {
+          await this.sendVerificationEmailWithCode(email);
+        }
       } catch (error) {
         logger.warn('Verification email send failed during register', { error });
       }
-
       return {
         accessToken: null,
-        requiresEmailVerification: true,
+        requireEmailVerification: true,
       };
     }
 
     // Email verification not required, provide access token for immediate login
     const accessToken = this.generateToken({ sub: userId, email, role: 'authenticated' });
 
-    return { user, accessToken, requiresEmailVerification: false };
+    return {
+      user,
+      accessToken,
+      requireEmailVerification: false,
+      redirectTo: emailAuthConfig.signInRedirectTo || undefined,
+    };
   }
 
   /**
@@ -244,7 +250,7 @@ export class AuthService {
 
     // Check if email verification is required
     const authConfigService = AuthConfigService.getInstance();
-    const emailAuthConfig = await authConfigService.getEmailConfig();
+    const emailAuthConfig = await authConfigService.getAuthConfig();
 
     if (emailAuthConfig.requireEmailVerification && !dbUser.email_verified) {
       throw new AppError(
@@ -262,7 +268,14 @@ export class AuthService {
       role: 'authenticated',
     });
 
-    return { user, accessToken };
+    // Include redirect URL if configured
+    const response: CreateSessionResponse = {
+      user,
+      accessToken,
+      redirectTo: emailAuthConfig.signInRedirectTo || undefined,
+    };
+
+    return response;
   }
 
   /**
@@ -282,8 +295,8 @@ export class AuthService {
     const otpService = AuthOTPService.getInstance();
     const { otp: code } = await otpService.createEmailOTP(
       email,
-      EmailOTPPurpose.VERIFY_EMAIL,
-      EmailOTPType.NUMERIC_CODE
+      OTPPurpose.VERIFY_EMAIL,
+      OTPType.NUMERIC_CODE
     );
 
     // Send email with verification code
@@ -294,7 +307,7 @@ export class AuthService {
   }
 
   /**
-   * Send verification email with magic link
+   * Send verification email with clickable link
    * Creates a long cryptographic token and sends it via email as a clickable link
    * The link contains only the token (no email) for better privacy and security
    */
@@ -307,18 +320,18 @@ export class AuthService {
       return;
     }
 
-    // Create long cryptographic token for magic link
+    // Create long cryptographic token for clickable verification link
     const otpService = AuthOTPService.getInstance();
     const { otp: token } = await otpService.createEmailOTP(
       email,
-      EmailOTPPurpose.VERIFY_EMAIL,
-      EmailOTPType.LINK_TOKEN
+      OTPPurpose.VERIFY_EMAIL,
+      OTPType.HASH_TOKEN
     );
 
-    // Build magic link URL using backend API endpoint
+    // Build verification link URL using backend API endpoint
     const linkUrl = `${getApiBaseUrl()}/auth/verify-email?token=${token}`;
 
-    // Send email with magic link
+    // Send email with verification link
     const emailService = EmailService.getInstance();
     await emailService.sendWithTemplate(email, dbUser.name || 'User', 'email-verification-link', {
       link: linkUrl,
@@ -339,9 +352,9 @@ export class AuthService {
 
       // Verify OTP using the OTP service (within the same transaction)
       const otpService = AuthOTPService.getInstance();
-      await otpService.verifyNumericCode(
+      await otpService.verifyEmailOTPWithCode(
         email,
-        EmailOTPPurpose.VERIFY_EMAIL,
+        OTPPurpose.VERIFY_EMAIL,
         verificationCode,
         client
       );
@@ -371,12 +384,12 @@ export class AuthService {
 
       // Get redirect URL from auth config if configured
       const authConfigService = AuthConfigService.getInstance();
-      const emailAuthConfig = await authConfigService.getEmailConfig();
+      const emailAuthConfig = await authConfigService.getAuthConfig();
 
       return {
         user,
         accessToken,
-        redirectTo: emailAuthConfig.verifyEmailRedirectTo || undefined,
+        redirectTo: emailAuthConfig.signInRedirectTo || undefined,
       };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -387,11 +400,11 @@ export class AuthService {
   }
 
   /**
-   * Verify email with magic link token
+   * Verify email with hash token from clickable link
    * Verifies the token (without needing email), looks up the email, and updates the account
    * This is more secure as the email is not exposed in the URL
    */
-  async verifyEmailWithLinkToken(token: string): Promise<VerifyEmailResponse> {
+  async verifyEmailWithToken(token: string): Promise<VerifyEmailResponse> {
     const dbManager = DatabaseManager.getInstance();
     const pool = dbManager.getPool();
     const client = await pool.connect();
@@ -401,8 +414,8 @@ export class AuthService {
 
       // Verify token and get the associated email
       const otpService = AuthOTPService.getInstance();
-      const { email } = await otpService.verifyLinkToken(
-        EmailOTPPurpose.VERIFY_EMAIL,
+      const { email } = await otpService.verifyEmailOTPWithToken(
+        OTPPurpose.VERIFY_EMAIL,
         token,
         client
       );
@@ -432,12 +445,12 @@ export class AuthService {
 
       // Get redirect URL from auth config if configured
       const authConfigService = AuthConfigService.getInstance();
-      const emailAuthConfig = await authConfigService.getEmailConfig();
+      const emailAuthConfig = await authConfigService.getAuthConfig();
 
       return {
         user,
         accessToken,
-        redirectTo: emailAuthConfig.verifyEmailRedirectTo || undefined,
+        redirectTo: emailAuthConfig.signInRedirectTo || undefined,
       };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -464,8 +477,8 @@ export class AuthService {
     const otpService = AuthOTPService.getInstance();
     const { otp: code } = await otpService.createEmailOTP(
       email,
-      EmailOTPPurpose.RESET_PASSWORD,
-      EmailOTPType.NUMERIC_CODE
+      OTPPurpose.RESET_PASSWORD,
+      OTPType.NUMERIC_CODE
     );
 
     // Send email with reset password code
@@ -476,7 +489,7 @@ export class AuthService {
   }
 
   /**
-   * Send reset password email with magic link
+   * Send reset password email with clickable link
    * Creates a long cryptographic token and sends it via email as a clickable link
    * The link contains only the token (no email) for better privacy and security
    */
@@ -489,18 +502,18 @@ export class AuthService {
       return;
     }
 
-    // Create long cryptographic token for magic link
+    // Create long cryptographic token for clickable reset link
     const otpService = AuthOTPService.getInstance();
     const { otp: token } = await otpService.createEmailOTP(
       email,
-      EmailOTPPurpose.RESET_PASSWORD,
-      EmailOTPType.LINK_TOKEN
+      OTPPurpose.RESET_PASSWORD,
+      OTPType.HASH_TOKEN
     );
 
-    // Build magic link URL using backend API endpoint
+    // Build password reset link URL using backend API endpoint
     const linkUrl = `${getApiBaseUrl()}/auth/reset-password?token=${token}`;
 
-    // Send email with magic link
+    // Send email with password reset link
     const emailService = EmailService.getInstance();
     await emailService.sendWithTemplate(email, dbUser.name || 'User', 'reset-password-link', {
       link: linkUrl,
@@ -508,91 +521,41 @@ export class AuthService {
   }
 
   /**
-   * Reset password with numeric code
-   * Verifies the numeric OTP code and updates the password in a single transaction
-   * Note: Does not return access token - user must login again with new password
+   * Exchange reset password code for a temporary reset token
+   * This separates code verification from password reset for better security
+   * The reset token can be used later to reset the password without needing email
    */
-  async resetPasswordWithCode(
+  async exchangeResetPasswordToken(
     email: string,
-    newPassword: string,
     verificationCode: string
-  ): Promise<ResetPasswordResponse> {
-    // Validate password first before verifying OTP
-    // This allows the user to retry with the same OTP if password is invalid
-    const authConfigService = AuthConfigService.getInstance();
-    const emailAuthConfig = await authConfigService.getEmailConfig();
+  ): Promise<{ token: string; expiresAt: Date }> {
+    const otpService = AuthOTPService.getInstance();
 
-    if (!validatePassword(newPassword, emailAuthConfig)) {
-      throw new AppError(
-        getPasswordRequirementsMessage(emailAuthConfig),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
+    // Exchange the numeric verification code for a long-lived reset token
+    // All OTP logic (verification, consumption, token generation) is handled by AuthOTPService
+    const result = await otpService.exchangeCodeForToken(
+      email,
+      OTPPurpose.RESET_PASSWORD,
+      verificationCode
+    );
 
-    const dbManager = DatabaseManager.getInstance();
-    const pool = dbManager.getPool();
-    const client = await pool.connect();
-
-    try {
-      await client.query('BEGIN');
-
-      // Verify OTP using the OTP service (within the same transaction)
-      const otpService = AuthOTPService.getInstance();
-      await otpService.verifyNumericCode(
-        email,
-        EmailOTPPurpose.RESET_PASSWORD,
-        verificationCode,
-        client
-      );
-
-      // Hash the new password
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-      // Update password in the database
-      const result = await client.query(
-        `UPDATE _accounts
-         SET password = $1, updated_at = NOW()
-         WHERE email = $2
-         RETURNING id`,
-        [hashedPassword, email]
-      );
-
-      if (result.rows.length === 0) {
-        throw new Error('User not found');
-      }
-
-      const userId = result.rows[0].id;
-
-      await client.query('COMMIT');
-
-      logger.info('Password reset successfully with code', { userId });
-
-      return {
-        message: 'Password reset successfully. Please login with your new password.',
-        redirectTo: emailAuthConfig.resetPasswordRedirectTo || undefined,
-      };
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+    return {
+      token: result.token,
+      expiresAt: result.expiresAt,
+    };
   }
 
   /**
-   * Reset password with magic link token
+   * Reset password with token
    * Verifies the token (without needing email), looks up the email, and updates the password
+   * Both clickable link tokens and code-verified reset tokens use RESET_PASSWORD purpose
    * Note: Does not return access token - user must login again with new password
    */
-  async resetPasswordWithLinkToken(
-    newPassword: string,
-    token: string
-  ): Promise<ResetPasswordResponse> {
+  async resetPasswordWithToken(newPassword: string, token: string): Promise<ResetPasswordResponse> {
     // Validate password first before verifying token
     // This allows the user to retry with the same token if password is invalid
     const authConfigService = AuthConfigService.getInstance();
-    const emailAuthConfig = await authConfigService.getEmailConfig();
+    const emailAuthConfig = await authConfigService.getAuthConfig();
 
     if (!validatePassword(newPassword, emailAuthConfig)) {
       throw new AppError(
@@ -610,9 +573,10 @@ export class AuthService {
       await client.query('BEGIN');
 
       // Verify token and get the associated email
+      // Both clickable link tokens and code-verified reset tokens use RESET_PASSWORD purpose
       const otpService = AuthOTPService.getInstance();
-      const { email } = await otpService.verifyLinkToken(
-        EmailOTPPurpose.RESET_PASSWORD,
+      const { email } = await otpService.verifyEmailOTPWithToken(
+        OTPPurpose.RESET_PASSWORD,
         token,
         client
       );
@@ -637,11 +601,10 @@ export class AuthService {
 
       await client.query('COMMIT');
 
-      logger.info('Password reset successfully with link', { userId });
+      logger.info('Password reset successfully with token', { userId });
 
       return {
         message: 'Password reset successfully. Please login with your new password.',
-        redirectTo: emailAuthConfig.resetPasswordRedirectTo || undefined,
       };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -745,6 +708,13 @@ export class AuthService {
         )
         .run(provider, providerId);
 
+      // Update email_verified to true if not already verified (OAuth login means email is trusted)
+      await this.db
+        .prepare(
+          'UPDATE _accounts SET email_verified = true WHERE id = ? AND email_verified = false'
+        )
+        .run(account.user_id);
+
       const dbUser = await this.db
         .prepare(
           'SELECT id, email, name, email_verified, created_at, updated_at FROM _accounts WHERE id = ?'
@@ -780,7 +750,19 @@ export class AuthService {
         )
         .run(existingUser.id, provider, providerId, JSON.stringify(identityData));
 
-      const user = this.dbUserToApiUser(existingUser);
+      // Update email_verified to true (OAuth login means email is trusted)
+      await this.db
+        .prepare(
+          'UPDATE _accounts SET email_verified = true WHERE id = ? AND email_verified = false'
+        )
+        .run(existingUser.id);
+
+      // Fetch updated user data
+      const updatedUser = await this.db
+        .prepare('SELECT * FROM _accounts WHERE id = ?')
+        .get(existingUser.id);
+
+      const user = this.dbUserToApiUser(updatedUser);
       const accessToken = this.generateToken({
         sub: existingUser.id,
         email: existingUser.email,
@@ -889,8 +871,8 @@ export class AuthService {
    * Generate GitHub OAuth authorization URL - ALWAYS reads fresh from DB
    */
   async generateGitHubOAuthUrl(state?: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('github');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('github');
 
     if (!config) {
       throw new Error('GitHub OAuth not configured');
@@ -936,8 +918,8 @@ export class AuthService {
    * Generate Discord OAuth authorization URL
    */
   async generateDiscordOAuthUrl(state?: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('discord');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('discord');
 
     if (!config) {
       throw new Error('Discord OAuth not configured');
@@ -993,14 +975,14 @@ export class AuthService {
    * Exchange GitHub code for access token
    */
   async exchangeGitHubCodeForToken(code: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('github');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('github');
 
     if (!config) {
       throw new Error('GitHub OAuth not configured');
     }
 
-    const clientSecret = await oauthConfigService.getClientSecretByProvider('github');
+    const clientSecret = await oAuthConfigService.getClientSecretByProvider('github');
     const selfBaseUrl = getApiBaseUrl();
     const response = await axios.post(
       'https://github.com/login/oauth/access_token',
@@ -1075,8 +1057,8 @@ export class AuthService {
   }
   // NEW: Generate Microsoft OAuth authorization URL
   async generateMicrosoftOAuthUrl(state?: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('microsoft');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('microsoft');
     if (!config) {
       throw new Error('Microsoft OAuth not configured');
     }
@@ -1104,12 +1086,12 @@ export class AuthService {
   async exchangeCodeToTokenByMicrosoft(
     code: string
   ): Promise<{ access_token: string; id_token?: string }> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('microsoft');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('microsoft');
     if (!config) {
       throw new Error('Microsoft OAuth not configured');
     }
-    const clientSecret = await oauthConfigService.getClientSecretByProvider('microsoft');
+    const clientSecret = await oAuthConfigService.getClientSecretByProvider('microsoft');
     const selfBaseUrl = getApiBaseUrl();
 
     const body = new URLSearchParams({
@@ -1187,14 +1169,14 @@ export class AuthService {
    * Exchange Discord code for access token
    */
   async exchangeDiscordCodeForToken(code: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('discord');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('discord');
 
     if (!config) {
       throw new Error('Discord OAuth not configured');
     }
 
-    const clientSecret = await oauthConfigService.getClientSecretByProvider('discord');
+    const clientSecret = await oAuthConfigService.getClientSecretByProvider('discord');
     const selfBaseUrl = getApiBaseUrl();
     const response = await axios.post(
       'https://discord.com/api/oauth2/token',
@@ -1260,8 +1242,8 @@ export class AuthService {
    * Generate LinkedIn OAuth authorization URL
    */
   async generateLinkedInOAuthUrl(state?: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('linkedin');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('linkedin');
 
     if (!config) {
       throw new Error('LinkedIn OAuth not configured');
@@ -1321,8 +1303,8 @@ export class AuthService {
       throw new Error('Authorization code is currently being processed.');
     }
 
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('linkedin');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('linkedin');
 
     if (!config) {
       throw new Error('LinkedIn OAuth not configured');
@@ -1336,7 +1318,7 @@ export class AuthService {
         clientId: config.clientId?.substring(0, 10) + '...',
       });
 
-      const clientSecret = await oauthConfigService.getClientSecretByProvider('linkedin');
+      const clientSecret = await oAuthConfigService.getClientSecretByProvider('linkedin');
       const selfBaseUrl = getApiBaseUrl();
       const response = await axios.post(
         'https://www.linkedin.com/oauth/v2/accessToken',
@@ -1389,8 +1371,8 @@ export class AuthService {
    * Verify LinkedIn ID token and get user info
    */
   async verifyLinkedInToken(idToken: string) {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('linkedin');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('linkedin');
 
     if (!config) {
       throw new Error('LinkedIn OAuth not configured');
@@ -1442,8 +1424,8 @@ export class AuthService {
    * Generate Facebook OAuth authorization URL
    */
   async generateFacebookOAuthUrl(state?: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('facebook');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('facebook');
 
     if (!config) {
       throw new Error('Facebook OAuth not configured');
@@ -1492,14 +1474,14 @@ export class AuthService {
    * Exchange Facebook code for access token
    */
   async exchangeFacebookCodeForToken(code: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('facebook');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('facebook');
 
     if (!config) {
       throw new Error('Facebook OAuth not configured');
     }
 
-    const clientSecret = await oauthConfigService.getClientSecretByProvider('facebook');
+    const clientSecret = await oAuthConfigService.getClientSecretByProvider('facebook');
     const selfBaseUrl = getApiBaseUrl();
     const response = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
       params: {

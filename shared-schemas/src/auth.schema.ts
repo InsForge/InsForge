@@ -23,6 +23,8 @@ export const nameSchema = z
 
 export const roleSchema = z.enum(['authenticated', 'project_admin']);
 
+export const verificationMethodSchema = z.enum(['code', 'link']);
+
 // ============================================================================
 // Core entity schemas
 // ============================================================================
@@ -83,7 +85,7 @@ export const oAuthConfigSchema = z.object({
 });
 
 // Email authentication configuration schema
-export const emailAuthConfigSchema = z.object({
+export const authConfigSchema = z.object({
   id: z.string().uuid(),
   requireEmailVerification: z.boolean(),
   passwordMinLength: z.number().min(4).max(128),
@@ -91,11 +93,9 @@ export const emailAuthConfigSchema = z.object({
   requireLowercase: z.boolean(),
   requireUppercase: z.boolean(),
   requireSpecialChar: z.boolean(),
-  verifyEmailRedirectTo: z
-    .union([z.string().url(), z.literal(''), z.null()])
-    .optional()
-    .transform((val) => (val === '' ? null : val)),
-  resetPasswordRedirectTo: z
+  verifyEmailMethod: verificationMethodSchema,
+  resetPasswordMethod: verificationMethodSchema,
+  signInRedirectTo: z
     .union([z.string().url(), z.literal(''), z.null()])
     .optional()
     .transform((val) => (val === '' ? null : val)),
@@ -122,8 +122,9 @@ export type UserIdSchema = z.infer<typeof userIdSchema>;
 export type EmailSchema = z.infer<typeof emailSchema>;
 export type PasswordSchema = z.infer<typeof passwordSchema>;
 export type RoleSchema = z.infer<typeof roleSchema>;
+export type VerificationMethodSchema = z.infer<typeof verificationMethodSchema>;
 export type UserSchema = z.infer<typeof userSchema>;
 export type TokenPayloadSchema = z.infer<typeof tokenPayloadSchema>;
 export type OAuthConfigSchema = z.infer<typeof oAuthConfigSchema>;
 export type OAuthProvidersSchema = z.infer<typeof oAuthProvidersSchema>;
-export type EmailAuthConfigSchema = z.infer<typeof emailAuthConfigSchema>;
+export type AuthConfigSchema = z.infer<typeof authConfigSchema>;

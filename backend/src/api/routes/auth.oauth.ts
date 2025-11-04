@@ -20,7 +20,7 @@ import { isOAuthSharedKeysAvailable } from '@/utils/environment.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
-const oauthConfigService = OAuthConfigService.getInstance();
+const oAuthConfigService = OAuthConfigService.getInstance();
 const auditService = AuditService.getInstance();
 
 // Helper function to validate JWT_SECRET
@@ -40,7 +40,7 @@ const validateJwtSecret = (): string => {
 // GET /api/auth/oauth/configs - List all OAuth configurations (admin only)
 router.get('/configs', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const configs = await oauthConfigService.getAllConfigs();
+    const configs = await oAuthConfigService.getAllConfigs();
     const response: ListOAuthConfigsResponse = {
       data: configs,
       count: configs.length,
@@ -59,8 +59,8 @@ router.get(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { provider } = req.params;
-      const config = await oauthConfigService.getConfigByProvider(provider);
-      const clientSecret = await oauthConfigService.getClientSecretByProvider(provider);
+      const config = await oAuthConfigService.getConfigByProvider(provider);
+      const clientSecret = await oAuthConfigService.getClientSecretByProvider(provider);
 
       if (!config) {
         throw new AppError(
@@ -110,7 +110,7 @@ router.post(
         );
       }
 
-      const config = await oauthConfigService.createConfig(input);
+      const config = await oAuthConfigService.createConfig(input);
 
       await auditService.log({
         actor: req.user?.email || 'api-key',
@@ -168,7 +168,7 @@ router.put(
         );
       }
 
-      const config = await oauthConfigService.updateConfig(provider, input);
+      const config = await oAuthConfigService.updateConfig(provider, input);
 
       await auditService.log({
         actor: req.user?.email || 'api-key',
@@ -208,7 +208,7 @@ router.delete(
       if (!provider || provider.length === 0 || provider.length > 50) {
         throw new AppError('Invalid provider name', 400, ERROR_CODES.INVALID_INPUT);
       }
-      const deleted = await oauthConfigService.deleteConfig(provider);
+      const deleted = await oAuthConfigService.deleteConfig(provider);
 
       if (!deleted) {
         throw new AppError(

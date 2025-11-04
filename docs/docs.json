@@ -46,7 +46,15 @@
                 "group": "Authentication",
                 "pages": [
                   "core-concepts/authentication/architecture",
-                  "core-concepts/authentication/sdk"
+                  "core-concepts/authentication/sdk",
+                  {
+                    "group": "UI Components",
+                    "pages": [
+                      "core-concepts/authentication/ui-components/nextjs",
+                      "core-concepts/authentication/ui-components/react",
+                      "core-concepts/authentication/ui-components/customization"
+                    ]
+                  }
                 ]
               },
               {

@@ -647,9 +647,8 @@ export function TableForm({
         <div className="flex justify-end gap-3 max-w-[1080px] mx-auto px-6">
           <Button
             type="button"
-            variant="outline"
             onClick={() => onOpenChange(false)}
-            className="h-10 px-4 text-sm font-medium border-zinc-200 shadow-sm dark:bg-neutral-800 dark:text-zinc-300 dark:border-neutral-700 dark:hover:bg-neutral-700"
+            className="h-10 px-4 text-sm font-medium bg-white border border-zinc-200 shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] text-zinc-950 hover:bg-zinc-50 dark:bg-neutral-600 dark:border-neutral-600 dark:text-white dark:hover:bg-neutral-700"
           >
             Cancel
           </Button>
