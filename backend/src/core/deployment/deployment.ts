@@ -54,15 +54,12 @@ export class DeploymentService {
 
     // Sanitize and validate file paths
     for (const file of files) {
-      // Disallow absolute paths
       if (file.path.startsWith('/')) {
         throw new Error(`Invalid file path: ${file.path} (absolute paths not allowed)`);
       }
-      // Disallow path traversal
       if (file.path.includes('..')) {
         throw new Error(`Invalid file path: ${file.path} (path traversal not allowed)`);
       }
-      // Disallow empty paths
       if (!file.path.trim()) {
         throw new Error('File path cannot be empty');
       }
@@ -74,17 +71,12 @@ export class DeploymentService {
       throw new Error('Deployment must include an index.html file');
     }
 
-    // Check if deployment already exists
-    const existing = await this.db.prepare('SELECT id, subdomain FROM _deployments LIMIT 1').get() as { id: string; subdomain: string } | undefined;
-
     let deploymentId: string | undefined;
     let newSubdomain: string | undefined;
     
     try {
-      // Generate deployment ID
+      // Generate deployment ID and subdomain
       deploymentId = randomUUID();
-
-      // Generate subdomain (simple slug from project name)
       newSubdomain = this.generateSubdomain(projectName, deploymentId);
 
       // Decode base64 content if needed
@@ -96,44 +88,59 @@ export class DeploymentService {
             : file.content,
       }));
 
-      // Deploy files to storage FIRST (using subdomain as path identifier)
-      // If this fails, we haven't touched the old deployment yet
+      // Deploy files to storage FIRST (outside transaction)
       const deploymentUrl = await this.storageAdapter.deploy(deploymentId, decodedFiles, newSubdomain);
-
       logger.info('New deployment uploaded to storage', { deploymentId, url: deploymentUrl });
 
-      // Now that new deployment succeeded, create/update database record
-      if (existing) {
-        // Update existing deployment record
-        await this.db
-          .prepare(
+      // Now update database in transaction
+      const pool = DatabaseManager.getInstance().getPool();
+      const client = await pool.connect();
+      
+      let existing: { id: string; subdomain: string } | undefined;
+      
+      try {
+        await client.query('BEGIN');
+
+        // Lock existing deployment row for update
+        const lockResult = await client.query(
+          'SELECT id, subdomain FROM _deployments LIMIT 1 FOR UPDATE'
+        );
+        existing = lockResult.rows[0];
+
+        if (existing) {
+          // Update existing deployment record
+          await client.query(
             `UPDATE _deployments 
-             SET id = ?, project_name = ?, subdomain = ?, status = ?, deployment_url = ?, 
-                 deployed_at = CURRENT_TIMESTAMP, storage_path = ?, updated_at = CURRENT_TIMESTAMP
-             WHERE id = ?`
-          )
-          .run(deploymentId, projectName, newSubdomain, 'active', deploymentUrl, `deployments/${newSubdomain}`, existing.id);
-        
-        logger.info('Deployment record updated', { oldId: existing.id, newId: deploymentId });
-      } else {
-        // Create new deployment record
-        await this.db
-          .prepare(
+             SET id = $1, project_name = $2, subdomain = $3, status = $4, deployment_url = $5, 
+                 deployed_at = CURRENT_TIMESTAMP, storage_path = $6, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $7`,
+            [deploymentId, projectName, newSubdomain, 'active', deploymentUrl, `deployments/${newSubdomain}`, existing.id]
+          );
+          logger.info('Deployment record updated', { oldId: existing.id, newId: deploymentId });
+        } else {
+          // Create new deployment record
+          await client.query(
             `INSERT INTO _deployments (id, project_name, subdomain, status, deployment_url, deployed_at, storage_path)
-             VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)`
-          )
-          .run(deploymentId, projectName, newSubdomain, 'active', deploymentUrl, `deployments/${newSubdomain}`);
-        
-        logger.info('Deployment record created', { deploymentId, projectName });
+             VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6)`,
+            [deploymentId, projectName, newSubdomain, 'active', deploymentUrl, `deployments/${newSubdomain}`]
+          );
+          logger.info('Deployment record created', { deploymentId, projectName });
+        }
+
+        await client.query('COMMIT');
+      } catch (dbError) {
+        await client.query('ROLLBACK');
+        throw dbError;
+      } finally {
+        client.release();
       }
 
-      // Only delete old deployment AFTER new one is fully successful
+      // Only delete old deployment AFTER transaction commits
       if (existing) {
         try {
           await this.storageAdapter.delete(existing.id, existing.subdomain);
           logger.info('Old deployment cleaned up', { oldId: existing.id });
         } catch (cleanupError) {
-          // Log but don't fail - new deployment is already live
           logger.warn('Failed to cleanup old deployment', {
             oldId: existing.id,
             error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
@@ -142,16 +149,15 @@ export class DeploymentService {
       }
 
       logger.info('Deployment successful', { deploymentId, url: deploymentUrl });
-
-      // Return deployment info
       return this.getDeployment();
+      
     } catch (error) {
       logger.error('Deployment failed', {
         projectName,
         error: error instanceof Error ? error.message : String(error),
       });
       
-      // Cleanup failed deployment from storage if it was uploaded
+      // Cleanup failed deployment from storage
       if (deploymentId && newSubdomain) {
         try {
           await this.storageAdapter.delete(deploymentId, newSubdomain);
