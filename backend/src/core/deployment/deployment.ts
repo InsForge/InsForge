@@ -89,7 +89,7 @@ export class DeploymentService {
             : file.content,
       }));
 
-      // Deploy files to storage FIRST (outside transaction) subdomain is not used yet, as we hardcoded it to APP_KEY
+      // Deploy files to storage FIRST (outside transaction)
       const deploymentUrl = await this.storageAdapter.deploy(
         deploymentId,
         decodedFiles,

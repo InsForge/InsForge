@@ -30,7 +30,6 @@ export interface StorageAdapter {
 export class S3StorageAdapter implements StorageAdapter {
   private s3Client: S3Client;
   private bucket: string;
-  private appKey: string;
 
   constructor() {
     const bucket = process.env.AWS_DEPLOYMENT_S3_BUCKET;
@@ -39,7 +38,6 @@ export class S3StorageAdapter implements StorageAdapter {
     }
 
     this.bucket = bucket;
-    this.appKey = process.env.APP_KEY || 'local';
 
     // Initialize S3 client
     const s3Config: {
@@ -80,9 +78,9 @@ export class S3StorageAdapter implements StorageAdapter {
 
   async deploy(deploymentId: string, files: DeploymentFile[], subdomain?: string): Promise<string> {
     try {
-      // Upload all files to S3 under APP_KEY path only
+      // Upload all files to S3 under subdomain path
       const uploadPromises = files.map(async (file) => {
-        const s3Key = `${this.appKey}/${file.path}`;
+        const s3Key = `${subdomain}/${file.path}`;
         // Set no-cache for index.html, long cache for other assets
         const cacheControl = file.path === 'index.html' ? 'no-cache' : 'public, max-age=31536000';
 
@@ -99,7 +97,7 @@ export class S3StorageAdapter implements StorageAdapter {
 
       await Promise.all(uploadPromises);
 
-      logger.info('S3 deployment successful', { deploymentId, fileCount: files.length });
+      logger.info('S3 deployment successful', { deploymentId, subdomain, fileCount: files.length });
 
       // AWS_CLOUDFRONT_DOMAIN is required for deployments
       const cloudFrontDomain = process.env.AWS_CLOUDFRONT_DOMAIN;
@@ -110,8 +108,8 @@ export class S3StorageAdapter implements StorageAdapter {
         );
       }
 
-      // Return URL with APP_KEY as subdomain
-      return `https://${this.appKey}.${cloudFrontDomain}`;
+      // Return URL with subdomain
+      return `https://${subdomain}.${cloudFrontDomain}`;
     } catch (error) {
       logger.error('S3 deployment failed', {
         deploymentId,
@@ -125,8 +123,8 @@ export class S3StorageAdapter implements StorageAdapter {
 
   async delete(deploymentId: string, subdomain?: string): Promise<void> {
     try {
-      // Delete all objects under APP_KEY prefix
-      const prefix = `${this.appKey}/`;
+      // Delete all objects under subdomain prefix
+      const prefix = `${subdomain}/`;
 
       // List all objects under the deployment prefix
       const objectsToDelete: { Key: string }[] = [];
