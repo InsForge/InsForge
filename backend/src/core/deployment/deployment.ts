@@ -75,9 +75,10 @@ export class DeploymentService {
     let newSubdomain: string | undefined;
 
     try {
-      // Generate deployment ID and subdomain
+      // Generate deployment ID
       deploymentId = randomUUID();
-      newSubdomain = this.generateSubdomain(projectName, deploymentId);
+      // Use APP_KEY as default subdomain (can be overridden in future)
+      newSubdomain = process.env.APP_KEY || 'default';
 
       // Decode base64 content if needed
       const decodedFiles = files.map((file) => ({
@@ -88,7 +89,7 @@ export class DeploymentService {
             : file.content,
       }));
 
-      // Deploy files to storage FIRST (outside transaction)
+      // Deploy files to storage FIRST (outside transaction) subdomain is not used yet, as we hardcoded it to APP_KEY
       const deploymentUrl = await this.storageAdapter.deploy(
         deploymentId,
         decodedFiles,
@@ -154,17 +155,9 @@ export class DeploymentService {
         client.release();
       }
 
-      // Only delete old deployment AFTER transaction commits
+      // No cleanup needed - new files overwrite old files at the same S3 path
       if (existing) {
-        try {
-          await this.storageAdapter.delete(existing.id, existing.subdomain);
-          logger.info('Old deployment cleaned up', { oldId: existing.id });
-        } catch (cleanupError) {
-          logger.warn('Failed to cleanup old deployment', {
-            oldId: existing.id,
-            error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-          });
-        }
+        logger.info('Old deployment replaced', { oldId: existing.id });
       }
 
       logger.info('Deployment successful', { deploymentId, url: deploymentUrl });
@@ -242,24 +235,6 @@ export class DeploymentService {
       });
       throw error;
     }
-  }
-
-  /**
-   * Generate subdomain from project name
-   */
-  private generateSubdomain(projectName: string, deploymentId: string): string {
-    // Sanitize project name
-    const sanitized = projectName
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, '-')
-      .replace(/-+/g, '-')
-      .substring(0, 63) // Max subdomain length
-      .replace(/^-+|-+$/g, ''); // Strip leading/trailing hyphens
-
-    // Use sanitized name or fallback to deploy-{shortId}
-    const subdomain = sanitized || `deploy-${deploymentId.substring(0, 8)}`;
-
-    return subdomain;
   }
 
   /**

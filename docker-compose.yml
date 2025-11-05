@@ -82,6 +82,7 @@ services:
       - DENO_RUNTIME_URL=http://deno:7133
       # Storage Configuration
       - AWS_S3_BUCKET=${AWS_S3_BUCKET:-}
+      - AWS_DEPLOYMENT_S3_BUCKET=${AWS_DEPLOYMENT_S3_BUCKET:-}
       - AWS_REGION=${AWS_REGION:-}
       - AWS_CLOUDFRONT_URL=${AWS_CLOUDFRONT_URL:-}
       - AWS_CLOUDFRONT_DOMAIN=${AWS_CLOUDFRONT_DOMAIN:-}
@@ -112,8 +113,6 @@ services:
       - STORAGE_DIR=/insforge-storage
       # Auth app URL for development proxy
       - AUTH_APP_URL=${AUTH_APP_URL:-http://localhost:7132}
-      # Deployment configuration
-      - DEPLOYMENT_BASE_URL=http://localhost:8080
     volumes:
       - ./package.json:/app/package.json
       - ./backend:/app/backend
@@ -172,19 +171,6 @@ services:
     restart: unless-stopped
     networks:
       - insforge-network
-
-  # Nginx for serving deployments
-  nginx-deployments:
-    image: nginx:alpine
-    container_name: insforge-nginx
-    ports:
-      - "8080:80"
-    volumes:
-      - storage-data:/usr/share/nginx/html/deployments:ro
-      - ./docker-init/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-    networks:
-      - insforge-network
-    restart: unless-stopped
 
   # Vector.dev for log collection and shipping
   vector:
