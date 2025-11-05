@@ -20,8 +20,8 @@ export interface DeploymentFile {
 }
 
 export interface StorageAdapter {
-  deploy(deploymentId: string, files: DeploymentFile[], subdomain?: string): Promise<string>;
-  delete(deploymentId: string, subdomain?: string): Promise<void>;
+  deploy(deploymentId: string, files: DeploymentFile[], subdomain: string): Promise<string>;
+  delete(deploymentId: string, subdomain: string): Promise<void>;
 }
 
 /**
@@ -76,7 +76,7 @@ export class S3StorageAdapter implements StorageAdapter {
     return contentTypes[ext] || 'application/octet-stream';
   }
 
-  async deploy(deploymentId: string, files: DeploymentFile[], subdomain?: string): Promise<string> {
+  async deploy(deploymentId: string, files: DeploymentFile[], subdomain: string): Promise<string> {
     try {
       // Upload all files to S3 under subdomain path
       const uploadPromises = files.map(async (file) => {
@@ -121,7 +121,7 @@ export class S3StorageAdapter implements StorageAdapter {
     }
   }
 
-  async delete(deploymentId: string, subdomain?: string): Promise<void> {
+  async delete(deploymentId: string, subdomain: string): Promise<void> {
     try {
       // Delete all objects under subdomain prefix
       const prefix = `${subdomain}/`;
