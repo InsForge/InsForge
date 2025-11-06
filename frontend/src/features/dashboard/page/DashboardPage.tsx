@@ -6,6 +6,7 @@ import { ConnectionSuccessBanner, StatsCard } from '../components';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { LogsDataGrid, type LogsColumnDef } from '@/features/logs/components/LogsDataGrid';
 import { formatTime } from '@/lib/utils/utils';
+import { Button } from '@/components';
 
 export default function DashboardPage() {
   const location = useLocation();
@@ -89,19 +90,17 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center justify-between w-full">
-          <p className="text-xl font-semibold text-gray-900 dark:text-white tracking-[-0.1px]">
-            MCP Call Records
-          </p>
-          <button
+          <p className="text-xl font-semibold text-gray-900 dark:text-white">MCP Call Records</p>
+          <Button
             onClick={handleViewMoreClick}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-white font-medium hover:bg-neutral-700 rounded-lg transition-colors"
+            className="h-10 px-4 font-medium dark:bg-emerald-300 dark:text-black"
           >
             View More
-          </button>
+          </Button>
         </div>
 
         {/* MCP Call Record Table */}
-        <div className="w-full rounded-[8px] overflow-hidden shadow-sm">
+        <div className="w-full overflow-hidden">
           <LogsDataGrid
             columnDefs={mcpColumns}
             data={records.slice(0, 5)}
@@ -110,6 +109,7 @@ export default function DashboardPage() {
                 No MCP call records found
               </div>
             }
+            noPadding
           />
         </div>
 

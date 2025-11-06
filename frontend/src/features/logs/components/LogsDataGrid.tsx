@@ -51,12 +51,14 @@ export interface LogsDataGridProps<T = Record<string, unknown>>
   extends Omit<DataGridProps<DataGridRowType>, 'columns' | 'data'> {
   columnDefs: LogsColumnDef[];
   data: T[];
+  noPadding?: boolean;
 }
 
 // Specialized DataGrid for logs
 export function LogsDataGrid<T = Record<string, unknown>>({
   columnDefs,
   data,
+  noPadding,
   ...restProps
 }: LogsDataGridProps<T>) {
   const columns = useMemo(() => {
@@ -81,6 +83,7 @@ export function LogsDataGrid<T = Record<string, unknown>>({
       columns={columns}
       showSelection={false}
       showPagination={true}
+      noPadding={noPadding}
     />
   );
 }
