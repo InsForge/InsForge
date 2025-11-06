@@ -11,7 +11,10 @@ import {
   Link2,
   BookOpen,
   GitFork,
+  Settings,
 } from 'lucide-react';
+import { LogsSecondaryMenu } from '@/features/logs/components/LogsSecondaryMenu';
+import { isInsForgeCloudProject } from './utils';
 
 export interface SecondaryMenuItem {
   id: string;
@@ -19,12 +22,26 @@ export interface SecondaryMenuItem {
   href: string;
 }
 
+export interface DynamicSecondaryMenuProps {
+  onItemsChange: (items: SecondaryMenuItem[]) => void;
+  onLoading?: (loading: boolean) => void;
+}
+
+export type SecondaryMenuConfig =
+  | SecondaryMenuItem[]
+  | {
+      type: 'dynamic';
+      component: React.ComponentType<DynamicSecondaryMenuProps>;
+    };
+
 export interface PrimaryMenuItem {
   id: string;
   label: string;
   href: string;
   icon: LucideIcon;
-  secondaryMenu?: SecondaryMenuItem[];
+  secondaryMenu?: SecondaryMenuConfig;
+  onClick?: () => void;
+  external?: boolean;
 }
 
 /**
@@ -115,6 +132,10 @@ export const menuConfig: PrimaryMenuItem[] = [
     label: 'Logs',
     href: '/dashboard/logs',
     icon: ChartLine,
+    secondaryMenu: {
+      type: 'dynamic',
+      component: LogsSecondaryMenu,
+    },
   },
   {
     id: 'visualizer',
@@ -129,15 +150,7 @@ export const menuConfig: PrimaryMenuItem[] = [
  */
 export const getMenuItems = (hasCompletedOnboarding: boolean): PrimaryMenuItem[] => {
   if (hasCompletedOnboarding) {
-    return [
-      ...menuConfig,
-      {
-        id: 'reinstall',
-        label: 'Reinstall',
-        href: '/dashboard/onboard',
-        icon: RotateCw,
-      },
-    ];
+    return menuConfig;
   }
 
   return [
@@ -154,12 +167,40 @@ export const getMenuItems = (hasCompletedOnboarding: boolean): PrimaryMenuItem[]
 /**
  * Bottom navigation items (external links, etc.)
  */
-export const bottomMenuItems = [
-  {
-    id: 'documentation',
-    label: 'Documentation',
-    href: 'https://docs.insforge.dev',
-    icon: BookOpen,
-    external: true,
-  },
-];
+export const getBottomMenuItems = (hasCompletedOnboarding: boolean): PrimaryMenuItem[] => {
+  const items: PrimaryMenuItem[] = [
+    {
+      id: 'documentation',
+      label: 'Documentation',
+      href: 'https://docs.insforge.dev',
+      icon: BookOpen,
+      external: true,
+    },
+  ];
+
+  // Add reinstall button if onboarding is completed
+  if (hasCompletedOnboarding) {
+    items.push({
+      id: 'reinstall',
+      label: 'Reinstall',
+      href: '/dashboard/onboard',
+      icon: RotateCw,
+      external: false,
+    });
+  }
+
+  // Add settings button if this is an InsForge Cloud project
+  if (isInsForgeCloudProject()) {
+    items.push({
+      id: 'settings',
+      label: 'Settings',
+      href: '',
+      icon: Settings,
+      onClick: () => {
+        window.parent.postMessage({ type: 'toggleSettingsOverlay' }, '*');
+      },
+    });
+  }
+
+  return items;
+};

@@ -24,7 +24,7 @@ export function TableSidebar({
 }: TableSidebarProps) {
   return (
     <FeatureSidebar
-      title="Database"
+      title="Tables"
       items={tables}
       selectedItem={selectedTable}
       onItemSelect={onTableSelect}

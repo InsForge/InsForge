@@ -6,6 +6,7 @@ import { SecondaryMenuItem as SecondaryMenuItemType } from '@/lib/utils/menuConf
 interface SecondaryMenuProps {
   title: string;
   items: SecondaryMenuItemType[];
+  loading?: boolean;
 }
 
 function SecondaryMenuItem({ item }: { item: SecondaryMenuItemType }) {
@@ -29,7 +30,7 @@ function SecondaryMenuItem({ item }: { item: SecondaryMenuItemType }) {
   );
 }
 
-export function SecondaryMenu({ title, items }: SecondaryMenuProps) {
+export function SecondaryMenu({ title, items, loading }: SecondaryMenuProps) {
   return (
     <aside
       className={cn(
@@ -43,11 +44,22 @@ export function SecondaryMenu({ title, items }: SecondaryMenuProps) {
 
       {/* Item List */}
       <ScrollArea className="flex-1 px-3 pb-3.5 dark:bg-neutral-800">
-        <div className="flex flex-col space-y-2">
-          {items.map((item) => (
-            <SecondaryMenuItem key={item.id} item={item} />
-          ))}
-        </div>
+        {loading ? (
+          <div className="flex flex-col space-y-2">
+            {[...Array(5)].map((_, i) => (
+              <div
+                key={i}
+                className="h-8 w-full rounded bg-zinc-100 dark:bg-neutral-700 animate-pulse"
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col space-y-2">
+            {items.map((item) => (
+              <SecondaryMenuItem key={item.id} item={item} />
+            ))}
+          </div>
+        )}
       </ScrollArea>
     </aside>
   );

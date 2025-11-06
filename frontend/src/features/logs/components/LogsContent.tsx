@@ -94,7 +94,7 @@ export function LogsContent({ source }: LogsContentProps) {
       {
         key: 'created_at',
         label: 'Time',
-        width: '250px',
+        width: '200px',
         render: (record) => (
           <p className="text-sm text-gray-900 dark:text-white font-normal leading-6">
             {formatTime(record.created_at)}
@@ -145,7 +145,7 @@ export function LogsContent({ source }: LogsContentProps) {
       {
         key: 'timestamp',
         label: 'Time',
-        width: '180px',
+        width: '200px',
         render: renderTime,
       },
     ],
@@ -153,7 +153,7 @@ export function LogsContent({ source }: LogsContentProps) {
   );
 
   return (
-    <div className="flex-1 flex flex-col h-full">
+    <div className="flex-1 flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="px-4 py-4">
         <p className="text-xl text-zinc-950 dark:text-white mb-4">{source}</p>
@@ -205,8 +205,8 @@ export function LogsContent({ source }: LogsContentProps) {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="flex-1 overflow-auto px-4">
+      {/* Table - Scrollable */}
+      <div className="flex-1 overflow-hidden px-4">
         {isMcpLogs ? (
           mcpError ? (
             <div className="flex items-center justify-center h-full">
@@ -238,28 +238,15 @@ export function LogsContent({ source }: LogsContentProps) {
         )}
       </div>
 
-      {/* Footer with Pagination */}
-      {isMcpLogs
-        ? !mcpLoading && (
-            <PaginationControls
-              currentPage={mcpCurrentPage}
-              totalPages={mcpTotalPages}
-              onPageChange={setMcpCurrentPage}
-              totalRecords={filteredMcpRecords.length}
-              pageSize={50}
-              recordLabel="logs"
-            />
-          )
-        : !logsLoading && (
-            <PaginationControls
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-              totalRecords={filteredLogs.length}
-              pageSize={50}
-              recordLabel="logs"
-            />
-          )}
+      {/* Pagination - Fixed at Bottom */}
+      <PaginationControls
+        currentPage={isMcpLogs ? mcpCurrentPage : currentPage}
+        totalPages={isMcpLogs ? mcpTotalPages : totalPages}
+        onPageChange={isMcpLogs ? setMcpCurrentPage : setCurrentPage}
+        totalRecords={isMcpLogs ? filteredMcpRecords.length : filteredLogs.length}
+        pageSize={50}
+        recordLabel="logs"
+      />
     </div>
   );
 }

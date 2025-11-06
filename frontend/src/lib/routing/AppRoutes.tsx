@@ -42,7 +42,8 @@ export function AppRoutes() {
                 <Route path="/database" element={<DatabasePage />} />
                 <Route path="/database/sql-editor" element={<SQLEditorPage />} />
                 <Route path="/storage" element={<StoragePage />} />
-                <Route path="/logs" element={<LogsPage />} />
+                <Route path="/logs" element={<Navigate to="/cloud/logs/MCP" replace />} />
+                <Route path="/logs/:source" element={<LogsPage />} />
                 <Route path="/functions" element={<FunctionsPage />} />
                 <Route path="/ai" element={<AIPage />} />
                 <Route path="/onboard" element={<OnBoardPage />} />
@@ -77,7 +78,11 @@ export function AppRoutes() {
                 <Route path="/dashboard/database/tables" element={<DatabasePage />} />
                 <Route path="/dashboard/database/sql-editor" element={<SQLEditorPage />} />
                 <Route path="/dashboard/storage" element={<StoragePage />} />
-                <Route path="/dashboard/logs" element={<LogsPage />} />
+                <Route
+                  path="/dashboard/logs"
+                  element={<Navigate to="/dashboard/logs/MCP" replace />}
+                />
+                <Route path="/dashboard/logs/:source" element={<LogsPage />} />
                 <Route
                   path="/dashboard/functions"
                   element={<Navigate to="/dashboard/functions/list" replace />}
