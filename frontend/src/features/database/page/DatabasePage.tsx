@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus, Upload } from 'lucide-react';
+import { Plus, Upload, CheckSquare, Square } from 'lucide-react';
 import PencilIcon from '@/assets/icons/pencil.svg?react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import { useTables } from '@/features/database/hooks/useTables';
@@ -519,14 +519,31 @@ function DatabasePageContent() {
                             size="sm"
                             onClick={() => void handleToggleSelectAll()}
                             disabled={isSelectingAll}
-                            className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                            className={`
+                              h-9 px-3 gap-2 font-medium transition-all
+                              ${isAllSelected 
+                                ? 'text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/30' 
+                                : 'text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/30'
+                              }
+                              ${isSelectingAll ? 'opacity-50 cursor-not-allowed' : ''}
+                            `}
                           >
-                            {isSelectingAll 
-                              ? 'Selecting...' 
-                              : isAllSelected 
-                                ? 'Deselect All' 
-                                : `Select All ${tableData?.totalRecords} Rows`
-                            }
+                            {isSelectingAll ? (
+                              <>
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                <span>Selecting...</span>
+                              </>
+                            ) : isAllSelected ? (
+                              <>
+                                <CheckSquare className="h-4 w-4" />
+                                <span>Deselect All</span>
+                              </>
+                            ) : (
+                              <>
+                                <Square className="h-4 w-4" />
+                                <span>Select All {tableData?.totalRecords} Rows</span>
+                              </>
+                            )}
                           </Button>
                         </div>
                       ) : (
