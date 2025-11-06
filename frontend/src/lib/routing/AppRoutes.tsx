@@ -1,7 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { RequireAuth } from '@/lib/routing/RequireAuth';
 import Layout from '@/components/layout/Layout';
-import CloudLayout from '@/components/layout/CloudLayout';
 import LoginPage from '@/features/login/page/LoginPage';
 import CloudLoginPage from '@/features/login/page/CloudLoginPage';
 import DashboardPage from '@/features/dashboard/page/DashboardPage';
@@ -25,40 +24,9 @@ export function AppRoutes() {
       <Route path="/dashboard/login" element={<LoginPage />} />
       <Route path="/cloud/login" element={<CloudLoginPage />} />
       <Route
-        path="/cloud/*"
-        element={
-          <RequireAuth redirectTo="/cloud/login">
-            <CloudLayout>
-              <Routes>
-                <Route path="/" element={<Navigate to="/cloud/dashboard" replace />} />
-                <Route path="/visualizer" element={<VisualizerPage />} />
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route
-                  path="/authentication"
-                  element={<Navigate to="/cloud/authentication/users" replace />}
-                />
-                <Route path="/authentication/users" element={<UsersPage />} />
-                <Route path="/authentication/methods" element={<AuthMethodsPage />} />
-                <Route path="/authentication/config" element={<ConfigurationPage />} />
-                <Route path="/database" element={<DatabasePage />} />
-                <Route path="/database/sql-editor" element={<SQLEditorPage />} />
-                <Route path="/storage" element={<StoragePage />} />
-                <Route path="/logs" element={<Navigate to="/cloud/logs/MCP" replace />} />
-                <Route path="/logs/MCP" element={<MCPLogsPage />} />
-                <Route path="/logs/:source" element={<LogsPage />} />
-                <Route path="/functions" element={<FunctionsPage />} />
-                <Route path="/ai" element={<AIPage />} />
-                <Route path="/onboard" element={<OnBoardPage />} />
-                <Route path="*" element={<Navigate to="/cloud/dashboard" replace />} />
-              </Routes>
-            </CloudLayout>
-          </RequireAuth>
-        }
-      />
-      <Route
         path="/*"
         element={
-          <RequireAuth redirectTo="/dashboard/login">
+          <RequireAuth>
             <Layout>
               <Routes>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />

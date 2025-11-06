@@ -18,16 +18,16 @@ export function AuthNode({ data }: AuthNodeProps) {
   const enabledCount = authMetadata.oauths.length + 1;
 
   return (
-    <div className="bg-neutral-900 rounded-lg border border-[#363636] min-w-[280px]">
+    <div className="bg-white dark:bg-neutral-900 rounded-lg border border-gray-300 dark:border-[#363636] min-w-[280px] shadow-sm">
       {/* Auth Header */}
-      <div className="flex items-center justify-between p-2 border-b border-neutral-800">
+      <div className="flex items-center justify-between p-2 border-b border-gray-200 dark:border-neutral-800">
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center w-11 h-11 bg-lime-300 rounded p-1.5">
             <Lock className="w-5 h-5 text-neutral-900" />
           </div>
           <div className="flex-1">
-            <h3 className="text-sm font-medium text-white">Authentication</h3>
-            <p className="text-xs text-neutral-300">
+            <h3 className="text-sm font-medium text-zinc-950 dark:text-white">Authentication</h3>
+            <p className="text-xs text-zinc-600 dark:text-neutral-300">
               {enabledCount} provider{enabledCount !== 1 ? 's' : ''} enabled
             </p>
           </div>
@@ -38,12 +38,12 @@ export function AuthNode({ data }: AuthNodeProps) {
       </div>
 
       {/* Auth Providers */}
-      <div className="p-2 space-y-2 border-b border-neutral-800">
+      <div className="p-2 space-y-2 border-b border-gray-200 dark:border-neutral-800">
         {/* Email/Password */}
-        <div className="flex items-center justify-between p-2.5 bg-neutral-800 rounded">
+        <div className="flex items-center justify-between p-2.5 bg-gray-100 dark:bg-neutral-800 rounded">
           <div className="flex items-center gap-2.5">
-            <FormInput className="w-5 h-5 text-neutral-300" />
-            <span className="text-sm text-neutral-300">Email/Password</span>
+            <FormInput className="w-5 h-5 text-zinc-700 dark:text-neutral-300" />
+            <span className="text-sm text-zinc-700 dark:text-neutral-300">Email/Password</span>
           </div>
           <div className="px-1.5 py-0.5 bg-lime-200 rounded flex items-center">
             <span className="text-xs font-medium text-lime-900">Enabled</span>
@@ -56,18 +56,20 @@ export function AuthNode({ data }: AuthNodeProps) {
           return (
             <div
               key={provider.id}
-              className="flex items-center justify-between p-2.5 bg-neutral-800 rounded"
+              className="flex items-center justify-between p-2.5 bg-gray-100 dark:bg-neutral-800 rounded"
             >
               <div className="flex items-center gap-2.5">
                 <div className="w-5 h-5 flex items-center justify-center [&>svg]:w-5 [&>svg]:h-5">
                   {provider.icon}
                 </div>
-                <span className="text-sm text-neutral-300">{provider.name}</span>
+                <span className="text-sm text-zinc-700 dark:text-neutral-300">{provider.name}</span>
               </div>
               <div
                 className={cn(
                   'px-1.5 py-0.5 rounded flex items-center',
-                  isEnabled ? 'bg-lime-200 text-lime-900' : 'bg-neutral-700 text-neutral-300'
+                  isEnabled
+                    ? 'bg-lime-200 text-lime-900'
+                    : 'bg-gray-200 dark:bg-neutral-700 text-gray-600 dark:text-neutral-300'
                 )}
               >
                 <span className="text-xs font-medium">{isEnabled ? 'Enabled' : 'Disabled'}</span>
@@ -78,13 +80,15 @@ export function AuthNode({ data }: AuthNodeProps) {
       </div>
 
       {/* Users Section */}
-      <div className="flex items-center justify-between p-3 border-t border-neutral-700">
+      <div className="flex items-center justify-between p-3 border-t border-gray-300 dark:border-neutral-700">
         <div className="flex items-center gap-2.5">
-          <Users className="w-5 h-5 text-neutral-300" />
-          <span className="text-sm text-neutral-300">Users</span>
+          <Users className="w-5 h-5 text-zinc-700 dark:text-neutral-300" />
+          <span className="text-sm text-zinc-700 dark:text-neutral-300">Users</span>
         </div>
         <div className="flex items-center">
-          {userCount !== undefined && <span className="text-xs text-neutral-400">{userCount}</span>}
+          {userCount !== undefined && (
+            <span className="text-xs text-zinc-500 dark:text-neutral-400">{userCount}</span>
+          )}
         </div>
       </div>
     </div>

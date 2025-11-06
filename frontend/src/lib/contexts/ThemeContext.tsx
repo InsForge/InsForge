@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { isInsForgeCloudProject } from '../utils/utils';
 
 type Theme = 'light' | 'dark' | 'system';
 type ResolvedTheme = 'light' | 'dark';
@@ -41,8 +40,8 @@ export function ThemeProvider({
   storageKey = STORAGE_KEY,
 }: ThemeProviderProps) {
   const [theme, setThemeState] = useState<Theme>(() => {
-    if (isInsForgeCloudProject()) {
-      return 'dark';
+    if (forcedTheme) {
+      return forcedTheme;
     }
 
     if (typeof window !== 'undefined') {
