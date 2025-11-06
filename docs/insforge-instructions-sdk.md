@@ -52,7 +52,6 @@ Available documentation types:
 **🎯 How to Choose Authentication Documentation:**
 1. **Building with Next.js?** → Use `"auth-components-nextjs"` (frontend: built-in auth pages)
 2. **Building with React (Vite+React Router)?** → Use `"auth-components-react"` (frontend: built-in auth pages)
-3. **Need backend/headless auth only?** → Use `"auth-sdk"` (backend: SDK methods)
 
 ## When to Use SDK vs MCP Tools
 

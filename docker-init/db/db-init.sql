@@ -15,13 +15,9 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 GRANT USAGE ON SCHEMA public TO project_admin;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO project_admin;
 
--- Grant permissions to project_admin role only
--- anon and authenticated roles have no default table permissions
--- Users must define their own policies when enabling RLS
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO project_admin;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO project_admin;
-
+-- Grant permissions to roles
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon, authenticated, project_admin;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated, project_admin;
 -- Create function to automatically create RLS policies for new tables
 CREATE OR REPLACE FUNCTION public.create_default_policies()
 RETURNS event_trigger AS $$
