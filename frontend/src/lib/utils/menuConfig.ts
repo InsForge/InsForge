@@ -14,6 +14,7 @@ import {
   Settings,
 } from 'lucide-react';
 import { isInsForgeCloudProject } from './utils';
+import { postMessageToParent } from './cloudMessaging';
 
 export interface SecondaryMenuItem {
   id: string;
@@ -163,7 +164,7 @@ export const getBottomMenuItems = (hasCompletedOnboarding: boolean): PrimaryMenu
   ];
 
   // Add reinstall button if onboarding is completed
-  if (hasCompletedOnboarding) {
+  if (hasCompletedOnboarding && !isInsForgeCloudProject()) {
     items.push({
       id: 'reinstall',
       label: 'Reinstall',
@@ -181,7 +182,7 @@ export const getBottomMenuItems = (hasCompletedOnboarding: boolean): PrimaryMenu
       href: '',
       icon: Settings,
       onClick: () => {
-        window.parent.postMessage({ type: 'toggleSettingsOverlay' }, '*');
+        postMessageToParent({ type: 'SHOW_SETTINGS_OVERLAY' }, '*');
       },
     });
   }

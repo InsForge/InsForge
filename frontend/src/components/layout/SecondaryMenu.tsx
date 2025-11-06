@@ -20,8 +20,8 @@ function SecondaryMenuItem({ item }: { item: SecondaryMenuItemType }) {
         className={cn(
           'h-8 w-full flex items-center px-3 py-1.5 rounded text-left transition-colors',
           isSelected
-            ? 'bg-neutral-700 text-white'
-            : 'hover:bg-neutral-700/50 text-white dark:text-white'
+            ? 'bg-zinc-200 text-zinc-950 dark:bg-neutral-700 dark:text-white'
+            : 'text-zinc-950 dark:text-white hover:bg-zinc-100 dark:hover:bg-neutral-700/50'
         )}
       >
         <p className="text-sm truncate">{item.label}</p>
@@ -39,7 +39,7 @@ export function SecondaryMenu({ title, items, loading }: SecondaryMenuProps) {
     >
       {/* Header */}
       <div className="px-3 py-3.5 bg-white dark:bg-neutral-800">
-        <p className="text-base font-normal text-neutral-400">{title}</p>
+        <p className="text-base font-normal text-zinc-950 dark:text-neutral-400">{title}</p>
       </div>
 
       {/* Item List */}

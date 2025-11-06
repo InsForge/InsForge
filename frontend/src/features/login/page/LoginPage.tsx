@@ -24,7 +24,7 @@ import { ButtonWithLoading } from '@/components/ButtonWithLoading';
 import { Alert, AlertDescription } from '@/components/radix/Alert';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
-import { loginFormSchema, LoginForm } from '@/lib/utils/validation-schemas';
+import { loginFormSchema, LoginForm } from '@/lib/utils/schemaValidations';
 
 export default function LoginPage() {
   const navigate = useNavigate();

@@ -12,7 +12,7 @@ import {
   dateTimeSchema,
   jsonSchema,
   stringSchema,
-} from './validation-schemas';
+} from './schemaValidations';
 import { v4 as uuidv4 } from 'uuid';
 import type { ConvertedValue, DisplayValue, ValueConversionResult } from '@/components/datagrid';
 
@@ -156,6 +156,7 @@ export function isEmptyValue(value: unknown): boolean {
 }
 
 export const isInsForgeCloudProject = () => {
+  return isIframe();
   return window.location.hostname.endsWith('.insforge.app');
 };
 
