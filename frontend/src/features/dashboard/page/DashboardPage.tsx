@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useMetadata } from '@/features/metadata/hooks/useMetadata';
+import { useMetadata } from '@/lib/hooks/useMetadata';
 import { useUsers } from '@/features/auth';
 import { Users, Database, HardDrive } from 'lucide-react';
 import { ConnectionSuccessBanner, StatsCard } from '../components';

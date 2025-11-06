@@ -1,6 +1,6 @@
 export function VisualizerSkeleton() {
   return (
-    <div className="relative min-h-screen bg-neutral-800 overflow-hidden">
+    <div className="relative h-full bg-neutral-800 overflow-hidden">
       {/* Dot Matrix Background */}
       <div
         className="absolute inset-0 opacity-50"

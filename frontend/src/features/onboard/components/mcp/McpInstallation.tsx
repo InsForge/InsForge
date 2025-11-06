@@ -12,7 +12,7 @@ import {
   type MCPAgent,
   type PlatformType,
 } from './helpers';
-import { useApiKey } from '@/features/metadata/hooks/useMetadata';
+import { useApiKey } from '@/lib/hooks/useMetadata';
 
 interface McpInstallerProps {
   className?: string;

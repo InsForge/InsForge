@@ -1,9 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
-import { cn } from '@/lib/utils/utils';
 import { useAuth } from '@/lib/contexts/AuthContext';
-import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 import { ThemeProvider } from '@/lib/contexts/ThemeContext';
 
 interface LayoutProps {
@@ -11,31 +9,17 @@ interface LayoutProps {
 }
 
 export default function Layout({ children }: LayoutProps) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [isHovering, setIsHovering] = useState(false);
   const { user, logout } = useAuth();
-  const is2xl = useMediaQuery('(min-width: 1536px)');
 
   return (
     <ThemeProvider>
       <div className="h-screen bg-gray-50 dark:bg-neutral-800 flex flex-col">
         <AppHeader currentUser={user} onLogout={logout} />
 
-        {/* Main content */}
-        <div
-          className={cn(
-            'flex-1 transition-all duration-300 ease-in-out overflow-y-auto ml-18',
-            !sidebarCollapsed && '2xl:ml-60'
-          )}
-        >
-          <AppSidebar
-            onLogout={logout}
-            isCollapsed={is2xl ? sidebarCollapsed : !isHovering}
-            onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-            onMouseEnter={() => setIsHovering(true)}
-            onMouseLeave={() => setIsHovering(false)}
-          />
-          {children}
+        {/* Main layout - sidebars + content in flexbox */}
+        <div className="flex-1 flex overflow-hidden">
+          <AppSidebar onLogout={logout} />
+          <main className="flex-1 overflow-y-auto">{children}</main>
         </div>
       </div>
     </ThemeProvider>

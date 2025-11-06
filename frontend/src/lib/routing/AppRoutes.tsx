@@ -6,14 +6,15 @@ import LoginPage from '@/features/login/page/LoginPage';
 import CloudLoginPage from '@/features/login/page/CloudLoginPage';
 import DashboardPage from '@/features/dashboard/page/DashboardPage';
 import DatabasePage from '@/features/database/page/DatabasePage';
-import AuthenticationPage from '@/features/auth/page/AuthenticationPage';
-import AuditsPage from '@/features/logs/page/AuditsPage';
+import UsersPage from '@/features/auth/page/UsersPage';
+import AuthMethodsPage from '@/features/auth/page/AuthMethodsPage';
+import ConfigurationPage from '@/features/auth/page/ConfigurationPage';
 import LogsPage from '@/features/logs/page/LogsPage';
 import StoragePage from '@/features/storage/page/StoragePage';
-import MetadataPage from '@/features/metadata/page/MetadataPage';
 import OnBoardPage from '@/features/onboard/page/OnBoardPage';
 import VisualizerPage from '@/features/visualizer/page/VisualizerPage';
 import FunctionsPage from '@/features/functions/page/FunctionsPage';
+import SecretsPage from '@/features/functions/page/SecretsPage';
 import AIPage from '@/features/ai/page/AIPage';
 import SQLEditorPage from '@/features/database/page/SQLEditorPage';
 
@@ -31,7 +32,13 @@ export function AppRoutes() {
                 <Route path="/" element={<Navigate to="/cloud/dashboard" replace />} />
                 <Route path="/visualizer" element={<VisualizerPage />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/authentication" element={<AuthenticationPage />} />
+                <Route
+                  path="/authentication"
+                  element={<Navigate to="/cloud/authentication/users" replace />}
+                />
+                <Route path="/authentication/users" element={<UsersPage />} />
+                <Route path="/authentication/methods" element={<AuthMethodsPage />} />
+                <Route path="/authentication/config" element={<ConfigurationPage />} />
                 <Route path="/database" element={<DatabasePage />} />
                 <Route path="/database/sql-editor" element={<SQLEditorPage />} />
                 <Route path="/storage" element={<StoragePage />} />
@@ -53,14 +60,31 @@ export function AppRoutes() {
               <Routes>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/dashboard/authentication" element={<AuthenticationPage />} />
-                <Route path="/dashboard/database" element={<DatabasePage />} />
+                <Route
+                  path="/dashboard/authentication"
+                  element={<Navigate to="/dashboard/authentication/users" replace />}
+                />
+                <Route path="/dashboard/authentication/users" element={<UsersPage />} />
+                <Route
+                  path="/dashboard/authentication/auth-methods"
+                  element={<AuthMethodsPage />}
+                />
+                <Route path="/dashboard/authentication/config" element={<ConfigurationPage />} />
+                <Route
+                  path="/dashboard/database"
+                  element={<Navigate to="/dashboard/database/tables" replace />}
+                />
+                <Route path="/dashboard/database/tables" element={<DatabasePage />} />
                 <Route path="/dashboard/database/sql-editor" element={<SQLEditorPage />} />
                 <Route path="/dashboard/storage" element={<StoragePage />} />
-                <Route path="/dashboard/audits" element={<AuditsPage />} />
                 <Route path="/dashboard/logs" element={<LogsPage />} />
-                <Route path="/dashboard/functions" element={<FunctionsPage />} />
-                <Route path="/dashboard/metadata" element={<MetadataPage />} />
+                <Route
+                  path="/dashboard/functions"
+                  element={<Navigate to="/dashboard/functions/list" replace />}
+                />
+                <Route path="/dashboard/functions/list" element={<FunctionsPage />} />
+                <Route path="/dashboard/functions/secrets" element={<SecretsPage />} />
+                <Route path="/dashboard/visualizer" element={<VisualizerPage />} />
                 <Route path="/dashboard/onboard" element={<OnBoardPage />} />
                 <Route path="/dashboard/ai" element={<AIPage />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />

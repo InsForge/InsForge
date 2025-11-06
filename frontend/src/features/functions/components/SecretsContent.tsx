@@ -6,7 +6,7 @@ import { SearchInput } from '@/components/SearchInput';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { SecretRow } from './SecretRow';
 import SecretEmptyState from './SecretEmptyState';
-import { useSecrets } from '@/features/secrets/hooks/useSecrets';
+import { useSecrets } from '@/features/functions/hooks/useSecrets';
 
 export function SecretsContent() {
   const [newSecretKey, setNewSecretKey] = useState('');
