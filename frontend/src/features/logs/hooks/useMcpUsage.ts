@@ -4,6 +4,7 @@ import { useSocket, ServerEvents } from '@/lib/contexts/SocketContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { usageService, McpUsageRecord } from '@/features/logs/services/usage.service';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
+import { LOGS_PAGE_SIZE } from '../helpers';
 
 // ============================================================================
 // Types
@@ -13,12 +14,6 @@ export interface McpConnectedPayload {
   tool_name: string;
   created_at: string;
 }
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-const PAGE_SIZE = 50;
 
 // ============================================================================
 // Main Hook
@@ -80,11 +75,11 @@ export function useMcpUsage() {
 
   // Calculate pagination
   const totalPages = useMemo(
-    () => Math.ceil(filteredRecords.length / PAGE_SIZE),
+    () => Math.ceil(filteredRecords.length / LOGS_PAGE_SIZE),
     [filteredRecords.length]
   );
-  const startIndex = useMemo(() => (currentPage - 1) * PAGE_SIZE, [currentPage]);
-  const endIndex = useMemo(() => startIndex + PAGE_SIZE, [startIndex]);
+  const startIndex = useMemo(() => (currentPage - 1) * LOGS_PAGE_SIZE, [currentPage]);
+  const endIndex = useMemo(() => startIndex + LOGS_PAGE_SIZE, [startIndex]);
   const paginatedRecords = useMemo(
     () => filteredRecords.slice(startIndex, endIndex),
     [filteredRecords, startIndex, endIndex]

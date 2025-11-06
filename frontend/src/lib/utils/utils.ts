@@ -167,3 +167,17 @@ export const getBackendUrl = () => {
 export const isIframe = () => {
   return window.self !== window.top;
 };
+
+/**
+ * Formats a timestamp string to a human-readable format
+ * Used consistently across the application for displaying timestamps
+ * @param timestamp - ISO timestamp string
+ * @returns Formatted date string (e.g., "Jan 15, 2025, 03:30 PM")
+ */
+export function formatTime(timestamp: string): string {
+  const date = parseISO(timestamp);
+  if (!isValid(date)) {
+    return timestamp; // Return original if invalid
+  }
+  return format(date, 'MMM dd, yyyy, hh:mm a');
+}

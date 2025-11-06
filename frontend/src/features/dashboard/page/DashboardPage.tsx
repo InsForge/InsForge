@@ -4,13 +4,8 @@ import { useUsers } from '@/features/auth';
 import { Users, Database, HardDrive } from 'lucide-react';
 import { ConnectionSuccessBanner, StatsCard } from '../components';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
-import { LogsTable, LogsTableColumn } from '@/features/logs/components/LogsTable';
-import { format } from 'date-fns';
-
-interface McpUsageRecord {
-  tool_name: string;
-  created_at: string;
-}
+import { LogsDataGrid, type LogsColumnDef } from '@/features/logs/components/LogsDataGrid';
+import { formatTime } from '@/lib/utils/utils';
 
 export default function DashboardPage() {
   const location = useLocation();
@@ -22,28 +17,23 @@ export default function DashboardPage() {
   const authCount = auth?.oauths.length || 0;
   const showBanner = location.state?.showSuccessBanner === true;
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return format(date, 'MMM dd, yyyy h:mm a');
-  };
-
-  const mcpColumns: LogsTableColumn<McpUsageRecord>[] = [
+  const mcpColumns: LogsColumnDef[] = [
     {
       key: 'tool_name',
-      label: 'MCP Call',
-      render: (row) => (
+      name: 'MCP Call',
+      renderCell: ({ row }) => (
         <p className="text-sm text-gray-900 dark:text-white font-normal leading-6">
-          {row.tool_name}
+          {String(row.tool_name ?? '')}
         </p>
       ),
     },
     {
       key: 'created_at',
-      label: 'Time',
+      name: 'Time',
       width: '216px',
-      render: (row) => (
+      renderCell: ({ row }) => (
         <p className="text-sm text-gray-900 dark:text-white font-normal leading-6">
-          {formatTime(row.created_at)}
+          {formatTime(String(row.created_at ?? ''))}
         </p>
       ),
     },
@@ -112,10 +102,14 @@ export default function DashboardPage() {
 
         {/* MCP Call Record Table */}
         <div className="w-full rounded-[8px] overflow-hidden shadow-sm">
-          <LogsTable
-            columns={mcpColumns}
+          <LogsDataGrid
+            columnDefs={mcpColumns}
             data={records.slice(0, 5)}
-            emptyMessage="No MCP call records found"
+            emptyState={
+              <div className="text-sm text-zinc-500 dark:text-zinc-400">
+                No MCP call records found
+              </div>
+            }
           />
         </div>
 

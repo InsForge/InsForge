@@ -2,8 +2,8 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { logService } from '../services/log.service';
 import type { LogSchema } from '@insforge/shared-schemas';
+import { LOGS_PAGE_SIZE } from '../helpers';
 
-const PAGE_SIZE = 50;
 const FETCH_SIZE = 200;
 
 export function useLogs(source: string) {
@@ -117,11 +117,11 @@ export function useLogs(source: string) {
 
   // Calculate pagination
   const totalPages = useMemo(
-    () => Math.ceil(filteredLogs.length / PAGE_SIZE),
+    () => Math.ceil(filteredLogs.length / LOGS_PAGE_SIZE),
     [filteredLogs.length]
   );
-  const startIndex = useMemo(() => (currentPage - 1) * PAGE_SIZE, [currentPage]);
-  const endIndex = useMemo(() => startIndex + PAGE_SIZE, [startIndex]);
+  const startIndex = useMemo(() => (currentPage - 1) * LOGS_PAGE_SIZE, [currentPage]);
+  const endIndex = useMemo(() => startIndex + LOGS_PAGE_SIZE, [startIndex]);
   const paginatedLogs = useMemo(
     () => filteredLogs.slice(startIndex, endIndex),
     [filteredLogs, startIndex, endIndex]

@@ -10,6 +10,7 @@ import UsersPage from '@/features/auth/page/UsersPage';
 import AuthMethodsPage from '@/features/auth/page/AuthMethodsPage';
 import ConfigurationPage from '@/features/auth/page/ConfigurationPage';
 import LogsPage from '@/features/logs/page/LogsPage';
+import MCPLogsPage from '@/features/logs/page/MCPLogsPage';
 import StoragePage from '@/features/storage/page/StoragePage';
 import OnBoardPage from '@/features/onboard/page/OnBoardPage';
 import VisualizerPage from '@/features/visualizer/page/VisualizerPage';
@@ -43,6 +44,7 @@ export function AppRoutes() {
                 <Route path="/database/sql-editor" element={<SQLEditorPage />} />
                 <Route path="/storage" element={<StoragePage />} />
                 <Route path="/logs" element={<Navigate to="/cloud/logs/MCP" replace />} />
+                <Route path="/logs/MCP" element={<MCPLogsPage />} />
                 <Route path="/logs/:source" element={<LogsPage />} />
                 <Route path="/functions" element={<FunctionsPage />} />
                 <Route path="/ai" element={<AIPage />} />
@@ -82,6 +84,7 @@ export function AppRoutes() {
                   path="/dashboard/logs"
                   element={<Navigate to="/dashboard/logs/MCP" replace />}
                 />
+                <Route path="/dashboard/logs/MCP" element={<MCPLogsPage />} />
                 <Route path="/dashboard/logs/:source" element={<LogsPage />} />
                 <Route
                   path="/dashboard/functions"

@@ -13,7 +13,6 @@ import {
   GitFork,
   Settings,
 } from 'lucide-react';
-import { LogsSecondaryMenu } from '@/features/logs/components/LogsSecondaryMenu';
 import { isInsForgeCloudProject } from './utils';
 
 export interface SecondaryMenuItem {
@@ -22,24 +21,12 @@ export interface SecondaryMenuItem {
   href: string;
 }
 
-export interface DynamicSecondaryMenuProps {
-  onItemsChange: (items: SecondaryMenuItem[]) => void;
-  onLoading?: (loading: boolean) => void;
-}
-
-export type SecondaryMenuConfig =
-  | SecondaryMenuItem[]
-  | {
-      type: 'dynamic';
-      component: React.ComponentType<DynamicSecondaryMenuProps>;
-    };
-
 export interface PrimaryMenuItem {
   id: string;
   label: string;
   href: string;
   icon: LucideIcon;
-  secondaryMenu?: SecondaryMenuConfig;
+  secondaryMenu?: SecondaryMenuItem[];
   onClick?: () => void;
   external?: boolean;
 }
@@ -132,10 +119,7 @@ export const menuConfig: PrimaryMenuItem[] = [
     label: 'Logs',
     href: '/dashboard/logs',
     icon: ChartLine,
-    secondaryMenu: {
-      type: 'dynamic',
-      component: LogsSecondaryMenu,
-    },
+    // Secondary menu is populated dynamically in AppSidebar using useLogSources
   },
   {
     id: 'visualizer',
