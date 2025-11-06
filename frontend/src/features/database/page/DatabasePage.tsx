@@ -53,8 +53,6 @@ function DatabasePageContent() {
   const [isSorting, setIsSorting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSelectingAll, setIsSelectingAll] = useState(false);
-
-
   const { confirm, confirmDialogProps } = useConfirm();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
@@ -346,27 +344,30 @@ function DatabasePageContent() {
   };
 
   const isAllSelected = useMemo(() => {
-    if (!tableData?.totalRecords || selectedRows.size === 0) return false;
+    if (!tableData?.totalRecords || selectedRows.size === 0) {
+      return false;
+    }
     return selectedRows.size === tableData.totalRecords;
-  },[selectedRows.size, tableData?.totalRecords])
-  
+  }, [selectedRows.size, tableData?.totalRecords]);
+
   const handleToggleSelectAll = async () => {
-    if (!selectedTable || !primaryKeyColumn) return;
-  
+    if (!selectedTable || !primaryKeyColumn) {
+      return;
+    }
+
     if (isAllSelected) {
       setSelectedRows(new Set());
       return;
     }
-  
+
     setIsSelectingAll(true);
     try {
-      const allIds = await recordsHook.getAllPrimaryKeys({ 
-        pkColumn: primaryKeyColumn, 
-        searchQuery: searchQuery 
+      const allIds = await recordsHook.getAllPrimaryKeys({
+        pkColumn: primaryKeyColumn,
+        searchQuery: searchQuery,
       });
       setSelectedRows(new Set(allIds));
     } catch (e) {
-      console.log('Error selecting all rows:', e);
       showToast('Failed to select all records', 'error');
     } finally {
       setIsSelectingAll(false);

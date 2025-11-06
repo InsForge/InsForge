@@ -14,6 +14,32 @@ export interface CSVImportResponse {
 
 export class RecordService {
   /**
+   * Helper method to build search filter for text columns
+   * @param tableName - Name of the table
+   * @param searchQuery - Search term to filter text columns
+   * @returns OR filter string or null if no filter needed
+   */
+  private async buildSearchFilter(
+    tableName: string,
+    searchQuery?: string
+  ): Promise<string | null> {
+    if (!searchQuery || !searchQuery.trim()) {
+      return null;
+    }
+
+    const searchValue = searchQuery.trim();
+    const schema = await tableService.getTableSchema(tableName);
+    const textColumns = schema.columns
+      .filter((col: ColumnSchema) => col.type.toLowerCase() === 'string')
+      .map((col: ColumnSchema) => col.columnName);
+
+    if (textColumns.length) {
+      return textColumns.map((column: string) => `${column}.ilike.*${searchValue}*`).join(',');
+    }
+    return null;
+  }
+
+  /**
    * Data fetching method with built-in search, sorting, and pagination for UI components.
    *
    * @param tableName - Name of the table
@@ -34,26 +60,10 @@ export class RecordService {
     params.set('limit', limit.toString());
     params.set('offset', offset.toString());
 
-    // Construct PostgREST filter directly in frontend if search query is provided
-    if (searchQuery && searchQuery.trim()) {
-      const searchValue = searchQuery.trim();
-
-      // Get table schema to identify text columns
-      const schema = await tableService.getTableSchema(tableName);
-      const textColumns = schema.columns
-        .filter((col: ColumnSchema) => {
-          const type = col.type.toLowerCase();
-          return type === 'string';
-        })
-        .map((col: ColumnSchema) => col.columnName);
-
-      if (textColumns.length) {
-        // Create PostgREST OR filter for text columns
-        const orFilters = textColumns
-          .map((column: string) => `${column}.ilike.*${searchValue}*`)
-          .join(',');
-        params.set('or', `(${orFilters})`);
-      }
+    // Apply search filter if provided
+    const orFilter = await this.buildSearchFilter(tableName, searchQuery);
+    if (orFilter) {
+      params.set('or', `(${orFilter})`);
     }
 
     // Add sorting if provided - PostgREST uses "order" parameter
@@ -127,37 +137,36 @@ export class RecordService {
     };
   }
 
-  async getAllPrimaryKeys(tableName:string,pkColumn:string,searchQuery?:string){
+  /**
+   * Get all primary key values for a table (for bulk selection)
+   * @param tableName - Name of the table
+   * @param pkColumn - Name of the primary key column
+   * @param searchQuery - Optional search filter
+   * @returns Array of primary key values
+   */
+  async getAllPrimaryKeys(tableName: string, pkColumn: string, searchQuery?: string) {
     const params = new URLSearchParams();
     params.set('select', pkColumn);
 
-    if(searchQuery && searchQuery.trim()){
-      const searchValue = searchQuery.trim();
-      const schema = await tableService.getTableSchema(tableName);
-      const textColumns = schema.columns.filter((col:ColumnSchema) => {
-        const type = col.type.toLowerCase();
-        return type === 'string'
-      }).map((col:ColumnSchema) => col.columnName);
-
-      if(textColumns.length){
-        const orFilters = textColumns.map((column:string) => `${column}.ilike.*${searchValue}*`).join(',');
-        params.set('or', `(${orFilters})`);
-      }
+    // Apply search filter if provided
+    const orFilter = await this.buildSearchFilter(tableName, searchQuery);
+    if (orFilter) {
+      params.set('or', `(${orFilter})`);
     }
 
-    const url = `/database/records/${tableName}?${params.toString()}`
-    const response = await apiClient.request(url,{
-      headers:{
+    const url = `/database/records/${tableName}?${params.toString()}`;
+    const response = await apiClient.request(url, {
+      headers: {
         Prefer: 'count=exact',
-      }
-    })
+      },
+    });
+
     if (Array.isArray(response)) {
       return response.map((row: { [key: string]: unknown }) => String(row[pkColumn]));
     } else if (response.data && Array.isArray(response.data)) {
       return response.data.map((row: { [key: string]: unknown }) => String(row[pkColumn]));
     }
     return [];
-
   }
 
   createRecords(table: string, records: { [key: string]: ConvertedValue }[]) {
