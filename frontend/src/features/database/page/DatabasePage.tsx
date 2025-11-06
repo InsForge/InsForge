@@ -52,6 +52,8 @@ function DatabasePageContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isSorting, setIsSorting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSelectingAll, setIsSelectingAll] = useState(false);
+
 
   const { confirm, confirmDialogProps } = useConfirm();
   const { showToast } = useToast();
@@ -343,6 +345,34 @@ function DatabasePageContent() {
     }
   };
 
+  const isAllSelected = useMemo(() => {
+    if (!tableData?.totalRecords || selectedRows.size === 0) return false;
+    return selectedRows.size === tableData.totalRecords;
+  },[selectedRows.size, tableData?.totalRecords])
+  
+  const handleToggleSelectAll = async () => {
+    if (!selectedTable || !primaryKeyColumn) return;
+  
+    if (isAllSelected) {
+      setSelectedRows(new Set());
+      return;
+    }
+  
+    setIsSelectingAll(true);
+    try {
+      const allIds = await recordsHook.getAllPrimaryKeys({ 
+        pkColumn: primaryKeyColumn, 
+        searchQuery: searchQuery 
+      });
+      setSelectedRows(new Set(allIds));
+    } catch (e) {
+      console.log('Error selecting all rows:', e);
+      showToast('Failed to select all records', 'error');
+    } finally {
+      setIsSelectingAll(false);
+    }
+  };
+
   // Handle bulk delete
   const handleBulkDelete = async (ids: string[]) => {
     if (!selectedTable || !ids.length) {
@@ -370,6 +400,8 @@ function DatabasePageContent() {
 
   // Calculate pagination
   const totalPages = Math.ceil((tableData?.totalRecords || 0) / PAGE_SIZE);
+
+
 
   return (
     <div className="flex h-full bg-bg-gray dark:bg-neutral-800">
@@ -482,6 +514,20 @@ function DatabasePageContent() {
                               onDelete={() => void handleBulkDelete(Array.from(selectedRows))}
                             />
                           )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void handleToggleSelectAll()}
+                            disabled={isSelectingAll}
+                            className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                          >
+                            {isSelectingAll 
+                              ? 'Selecting...' 
+                              : isAllSelected 
+                                ? 'Deselect All' 
+                                : `Select All ${tableData?.totalRecords} Rows`
+                            }
+                          </Button>
                         </div>
                       ) : (
                         <SearchInput

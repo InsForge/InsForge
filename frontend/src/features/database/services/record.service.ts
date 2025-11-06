@@ -127,6 +127,39 @@ export class RecordService {
     };
   }
 
+  async getAllPrimaryKeys(tableName:string,pkColumn:string,searchQuery?:string){
+    const params = new URLSearchParams();
+    params.set('select', pkColumn);
+
+    if(searchQuery && searchQuery.trim()){
+      const searchValue = searchQuery.trim();
+      const schema = await tableService.getTableSchema(tableName);
+      const textColumns = schema.columns.filter((col:ColumnSchema) => {
+        const type = col.type.toLowerCase();
+        return type === 'string'
+      }).map((col:ColumnSchema) => col.columnName);
+
+      if(textColumns.length){
+        const orFilters = textColumns.map((column:string) => `${column}.ilike.*${searchValue}*`).join(',');
+        params.set('or', `(${orFilters})`);
+      }
+    }
+
+    const url = `/database/records/${tableName}?${params.toString()}`
+    const response = await apiClient.request(url,{
+      headers:{
+        Prefer: 'count=exact',
+      }
+    })
+    if (Array.isArray(response)) {
+      return response.map((row: { [key: string]: unknown }) => String(row[pkColumn]));
+    } else if (response.data && Array.isArray(response.data)) {
+      return response.data.map((row: { [key: string]: unknown }) => String(row[pkColumn]));
+    }
+    return [];
+
+  }
+
   createRecords(table: string, records: { [key: string]: ConvertedValue }[]) {
     // if data is json and data[id] == "" then remove id from data, because can't assign '' to uuid
     records = records.map((record) => {

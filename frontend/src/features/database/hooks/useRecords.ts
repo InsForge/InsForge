@@ -119,6 +119,19 @@ export function useRecords(tableName: string) {
     },
   });
 
+  const getAllPrimaryKeys = useMutation({
+    mutationFn: (variables: { pkColumn: string; searchQuery?: string }) =>
+      recordService.getAllPrimaryKeys(tableName, variables.pkColumn, variables.searchQuery),
+    onSuccess: (data) => {
+      // Optional: show success toast
+      showToast(`Selected all ${data.length} records`, 'success');
+    },
+    onError: (error: Error) => {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to select all records';
+      showToast(errorMessage, 'error');
+    },
+  })
+
   return {
     // Hooks for fetching
     useTableRecords,
@@ -135,5 +148,6 @@ export function useRecords(tableName: string) {
     createRecord: createRecordMutation.mutateAsync,
     updateRecord: updateRecordMutation.mutateAsync,
     deleteRecords: deleteRecordsMutation.mutateAsync,
+    getAllPrimaryKeys: getAllPrimaryKeys.mutateAsync,
   };
 }
