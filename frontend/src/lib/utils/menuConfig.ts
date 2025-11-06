@@ -133,7 +133,7 @@ export const menuConfig: PrimaryMenuItem[] = [
  * Dynamic navigation items that appear based on user state
  */
 export const getMenuItems = (hasCompletedOnboarding: boolean): PrimaryMenuItem[] => {
-  if (hasCompletedOnboarding) {
+  if (hasCompletedOnboarding || isInsForgeCloudProject()) {
     return menuConfig;
   }
 
