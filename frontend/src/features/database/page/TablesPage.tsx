@@ -36,7 +36,7 @@ import { useCSVImport } from '@/features/database/hooks/useCSVImport';
 
 const PAGE_SIZE = 50;
 
-function DatabasePageContent() {
+export default function TablesPage() {
   // Load selected table from localStorage on mount
   const [selectedTable, setSelectedTable] = useState<string | null>(() => {
     return localStorage.getItem('selectedTable');
@@ -595,8 +595,4 @@ function DatabasePageContent() {
       <ConfirmDialog {...confirmDialogProps} />
     </div>
   );
-}
-
-export default function DatabasePage() {
-  return <DatabasePageContent />;
 }

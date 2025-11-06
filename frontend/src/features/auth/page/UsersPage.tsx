@@ -1,8 +1,14 @@
 import { useState } from 'react';
 import { UserPlus } from 'lucide-react';
+import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import { Button, SearchInput, SelectionClearButton, DeleteActionButton } from '@/components';
 import { UsersTab } from '@/features/auth/components/UsersTab';
-import { Tooltip, TooltipContent, TooltipProvider } from '@/components/radix/Tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/radix/Tooltip';
 import { UserFormDialog } from '@/features/auth/components/UserFormDialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useToast } from '@/lib/hooks/useToast';
@@ -13,6 +19,7 @@ export default function UsersPage() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const { showToast } = useToast();
   const { refetch, deleteUsers } = useUsers();
@@ -33,6 +40,17 @@ export default function UsersPage() {
       );
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Failed to delete users', 'error');
+    }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      setSelectedRows(new Set());
+      setSearchQuery('');
+      await refetch();
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -69,8 +87,19 @@ export default function UsersPage() {
                 <>
                   <TooltipProvider>
                     <Tooltip>
-                      <TooltipContent>
-                        <p>Refresh</p>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="p-1 h-9 w-9"
+                          onClick={() => void handleRefresh()}
+                          disabled={isRefreshing}
+                        >
+                          <RefreshIcon className="h-5 w-5 text-zinc-400 dark:text-neutral-400" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" align="center">
+                        <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>

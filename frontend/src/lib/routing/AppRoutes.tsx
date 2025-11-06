@@ -4,7 +4,7 @@ import Layout from '@/components/layout/Layout';
 import LoginPage from '@/features/login/page/LoginPage';
 import CloudLoginPage from '@/features/login/page/CloudLoginPage';
 import DashboardPage from '@/features/dashboard/page/DashboardPage';
-import DatabasePage from '@/features/database/page/DatabasePage';
+import TablesPage from '@/features/database/page/TablesPage';
 import UsersPage from '@/features/auth/page/UsersPage';
 import AuthMethodsPage from '@/features/auth/page/AuthMethodsPage';
 import ConfigurationPage from '@/features/auth/page/ConfigurationPage';
@@ -45,7 +45,7 @@ export function AppRoutes() {
                   path="/dashboard/database"
                   element={<Navigate to="/dashboard/database/tables" replace />}
                 />
-                <Route path="/dashboard/database/tables" element={<DatabasePage />} />
+                <Route path="/dashboard/database/tables" element={<TablesPage />} />
                 <Route path="/dashboard/database/sql-editor" element={<SQLEditorPage />} />
                 <Route path="/dashboard/storage" element={<StoragePage />} />
                 <Route
