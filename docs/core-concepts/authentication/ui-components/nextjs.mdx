@@ -5,37 +5,6 @@ description: Zero-configuration authentication for Next.js with built-in UI comp
 
 The `@insforge/nextjs` package provides **zero-configuration authentication** for Next.js applications. Authentication pages are hosted on your backend by default—no UI code needed.
 
-<Tip>
-**For AI Agents - Quick Navigation:**
-- **Built-in auth (recommended)**: Follow [Quick Start](#quick-start-built-in-auth) → 5-minute setup with backend-hosted auth pages
-- **Custom UI needed**: Jump to [Advanced Usage](#advanced-usage) for custom components
-
-**Key principle**: Always use `@insforge/sdk` methods with these components. Never use raw `fetch` calls.
-
-</Tip>
-
-## Why Built-in Auth?
-
-<CardGroup cols={2}>
-  <Card title="Zero UI Code" icon="code">
-    No SignIn/SignUp pages to create
-  </Card>
-
-<Card title="5-Minute Setup" icon="clock">
-  Provider + API route + Middleware = done
-</Card>
-
-<Card title="Production Ready" icon="shield-check">
-  Battle-tested auth UI maintained by Insforge
-</Card>
-
-  <Card title="Auto OAuth" icon="key">
-    11 providers configured automatically from backend
-  </Card>
-</CardGroup>
-
-<Note>Use custom components only if you need custom form fields or different workflow.</Note>
-
 ## Features
 
 - **Built-in Authentication**: Backend-hosted sign-in/sign-up pages (default)
@@ -46,27 +15,25 @@ The `@insforge/nextjs` package provides **zero-configuration authentication** fo
 - **Next.js Middleware**: Server-side route protection
 - **TypeScript**: Full type safety
 
-## Installation
+## Quick Start (Built-in Auth)
+
+<Note>**Recommended for most use cases**: InsForge-hosted auth pages with zero UI code.</Note>
+
+### Step 1: Install Package and Set Environment Variables
 
 ```bash
 npm install @insforge/nextjs
-```
-
-## Environment Variables
-
-```bash .env.local
-NEXT_PUBLIC_INSFORGE_BASE_URL=https://your-project.insforge.app/
 ```
 
 <Note>
   **Required Dependencies:** ```bash npm install react@^19.0.0 react-dom@^19.0.0 next@^15.0.0 ```
 </Note>
 
-## Quick Start (Built-in Auth)
+```bash .env.local
+NEXT_PUBLIC_INSFORGE_BASE_URL=https://your-project.insforge.app/
+```
 
-<Note>**Recommended for most use cases**: InsForge-hosted auth pages with zero UI code.</Note>
-
-### Step 1: Add InsforgeProvider
+### Step 2: Add InsforgeProvider
 
 Wrap your application with the `InsforgeProvider` in your root layout:
 
@@ -89,7 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
-### Step 2: Create API Route
+### Step 3: Create API Route
 
 Create an API route to enable server-side rendering (SSR) and cookie-based authentication:
 
@@ -108,7 +75,7 @@ export const DELETE = handlers.DELETE;
 
 <Info>**Why?** This route syncs auth tokens to HTTP-only cookies for server-side middleware.</Info>
 
-### Step 3: Add Middleware
+### Step 4: Add Middleware
 
 Create middleware to protect routes:
 
@@ -449,39 +416,3 @@ Track authentication state changes for analytics or other side effects:
 </InsforgeProvider>
 ```
 
----
-
-## Why @insforge/nextjs?
-
-<CardGroup cols={2}>
-  <Card title="For Developers" icon="user">
-    5-minute auth setup vs hours of custom code. Production-ready security and OAuth support out of
-    the box.
-  </Card>
-
-  <Card title="For AI Agents" icon="robot">
-    Minimal code generation (5 files vs 20+). SDK-first approach ensures type safety and reduces
-    errors.
-  </Card>
-</CardGroup>
-
-<Note>
-  **Key Principle**: This package works with `@insforge/sdk`. Always use SDK methods for API
-  calls—never raw `fetch`. Components handle UI, SDK handles data.
-</Note>
-
-## Resources
-
-<CardGroup cols={3}>
-  <Card title="Documentation" icon="book" href="https://docs.insforge.dev/introduction">
-    Full documentation
-  </Card>
-
-<Card title="GitHub Issues" icon="github" href="https://github.com/InsForge/InsForge/issues">
-  Report bugs & request features
-</Card>
-
-  <Card title="Discord Community" icon="discord" href="https://discord.com/invite/DvBtaEc9Jz">
-    Get help & share feedback
-  </Card>
-</CardGroup>

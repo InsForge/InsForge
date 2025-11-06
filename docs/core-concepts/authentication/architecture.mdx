@@ -26,7 +26,7 @@ graph TB
     
     DB --> Accounts[_accounts Table]
     DB --> Users[users Table]
-    DB --> OAuth[_oauth_connections]
+    DB --> OAuth[_account_providers]
     
     style Client fill:#1e293b,stroke:#475569,color:#e2e8f0
     style SDK fill:#1e40af,stroke:#3b82f6,color:#dbeafe
@@ -51,7 +51,7 @@ graph TB
 | **Signing Algorithm** | HMAC-SHA256 | Symmetric key signing with shared secret |
 | **Authentication** | Stateless JWT | No server-side session storage |
 | **Password Hashing** | bcryptjs (10 rounds) | Secure password storage |
-| **OAuth Providers** | Google, GitHub | Social authentication |
+| **OAuth Providers** | Google, GitHub, Microsoft, Discord, and more | Social authentication |
 | **Token Expiry** | Fixed | 7 days for user tokens, never for anon tokens |
 
 ## Authentication Flow
@@ -171,8 +171,7 @@ sequenceDiagram
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/api/auth/oauth/google` | Initiate Google OAuth flow |
-| GET | `/api/auth/oauth/github` | Initiate GitHub OAuth flow |
+| GET | `/api/auth/oauth/:provider` | Initiate OAuth flow for any supported provider |
 | GET | `/api/auth/oauth/:provider/callback` | OAuth callback handler |
 
 ### Admin Endpoints
@@ -184,14 +183,16 @@ sequenceDiagram
 
 ## OAuth Provider Configuration
 
-### Google OAuth 2.0
+InsForge supports multiple OAuth providers including Google, GitHub, Microsoft, Discord, LinkedIn, Facebook and more coming soon.
+
+### Example: Google OAuth 2.0
 
 - **Authorization URL**: `https://accounts.google.com/o/oauth2/v2/auth`
 - **Token URL**: `https://oauth2.googleapis.com/token`
 - **Scopes**: `openid`, `email`, `profile`
 - **Required**: Client ID, Client Secret, Redirect URI
 
-### GitHub OAuth
+### Example: GitHub OAuth
 
 - **Authorization URL**: `https://github.com/login/oauth/authorize`
 - **Token URL**: `https://github.com/login/oauth/access_token`

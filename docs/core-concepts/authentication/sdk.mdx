@@ -113,11 +113,11 @@ const { data, error } = await insforge.auth.signInWithPassword({
 
 ## signInWithOAuth()
 
-Start OAuth authentication flow with Google or GitHub.
+Start OAuth authentication flow with supported providers (Google, GitHub, Microsoft, Discord, and more).
 
 ### Parameters
 
-- `provider` ('google' | 'github', required) - OAuth provider
+- `provider` (string, required) - OAuth provider name (e.g., 'google', 'github', 'microsoft', 'discord')
 - `redirectTo` (string, optional) - URL to redirect after authentication
 - `skipBrowserRedirect` (boolean, optional) - If true, returns OAuth URL without auto-redirecting (for mobile apps)
 
