@@ -367,7 +367,7 @@ function DatabasePageContent() {
         searchQuery: searchQuery,
       });
       setSelectedRows(new Set(allIds));
-    } catch (e) {
+    } catch {
       showToast('Failed to select all records', 'error');
     } finally {
       setIsSelectingAll(false);
@@ -401,8 +401,6 @@ function DatabasePageContent() {
 
   // Calculate pagination
   const totalPages = Math.ceil((tableData?.totalRecords || 0) / PAGE_SIZE);
-
-
 
   return (
     <div className="flex h-full bg-bg-gray dark:bg-neutral-800">
@@ -522,9 +520,10 @@ function DatabasePageContent() {
                             disabled={isSelectingAll}
                             className={`
                               h-9 px-3 gap-2 font-medium transition-all
-                              ${isAllSelected 
-                                ? 'text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/30' 
-                                : 'text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/30'
+                              ${
+                                isAllSelected
+                                  ? 'text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/30'
+                                  : 'text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/30'
                               }
                               ${isSelectingAll ? 'opacity-50 cursor-not-allowed' : ''}
                             `}

@@ -19,10 +19,7 @@ export class RecordService {
    * @param searchQuery - Search term to filter text columns
    * @returns OR filter string or null if no filter needed
    */
-  private async buildSearchFilter(
-    tableName: string,
-    searchQuery?: string
-  ): Promise<string | null> {
+  private async buildSearchFilter(tableName: string, searchQuery?: string): Promise<string | null> {
     if (!searchQuery || !searchQuery.trim()) {
       return null;
     }
