@@ -5,42 +5,6 @@ description: Framework-agnostic authentication components for any React applicat
 
 The `@insforge/react` package provides **complete authentication solution for React applications**. Use deployed auth pages (built-in auth) or custom UI components—works with Vite + React Router.
 
-<Tip>
-**For AI Agents - Quick Navigation:**
-- **Built-in auth (recommended)**: Follow [Quick Start](#quick-start) → 5-minute setup with deployed auth pages
-- **Custom UI needed**: See [Alternative: Custom UI Components](#alternative-custom-ui-components)
-- **Form components**: Jump to [Form Components](#form-components-pure-ui) for controlled UI
-- **Hooks only**: See [Hooks](#hooks) for headless auth
-
-**Key principle**: All components use `@insforge/sdk` methods internally. Framework-agnostic by design.
-
-</Tip>
-
-## Why @insforge/react?
-
-<CardGroup cols={2}>
-  <Card title="Built-in Auth Pages" icon="code">
-    Deployed auth UI, easy to implement
-  </Card>
-
-  <Card title="5-Minute Setup" icon="clock">
-    Provider + Router config = production-ready auth
-  </Card>
-
-  <Card title="Complete Package" icon="box">
-    SDK integration, providers, hooks, and UI components
-  </Card>
-
-  <Card title="Full TypeScript" icon="shield-check">
-    Complete type safety out of the box
-  </Card>
-</CardGroup>
-
-<Note>
-  **Built-in auth (recommended)**: Use deployed authentication pages for zero UI code. Switch to
-  custom components only if you need highly customized branding or additional form fields.
-</Note>
-
 ## Features
 
 - **Built-in Auth**: React Router integration with deployed auth pages
@@ -51,7 +15,9 @@ The `@insforge/react` package provides **complete authentication solution for Re
 - **Form Components**: Pure UI forms for custom logic
 - **TypeScript**: Full type safety
 
-## Installation
+## Quick Start
+
+### Step 1: Install Package and Set Environment Variables
 
 ```bash
 npm install @insforge/react
@@ -62,15 +28,11 @@ npm install @insforge/react
   react-router-dom@^7.9.0 ```
 </Note>
 
-## Environment Variables
-
 ```bash .env
 VITE_INSFORGE_BASE_URL=https://your-project.insforge.app/
 ```
 
-## Quick Start
-
-### Step 1: Setup Provider
+### Step 2: Setup Provider
 
 Wrap your app with `InsforgeProvider` in the root:
 
@@ -99,7 +61,7 @@ createRoot(document.getElementById('root')!).render(
 - `onSignIn` (optional): Custom function to sync token on sign in
 - `onSignOut` (optional): Custom function to clear auth state on sign out
 
-### Step 2: Configure Router (Built-in Auth)
+### Step 3: Configure Router (Built-in Auth)
 
 **The fastest way** - Use deployed auth pages with Layout pattern:
 
@@ -161,7 +123,7 @@ export default function Layout() {
   needed!
 </Info>
 
-### Step 3: Use Hooks & Components
+### Step 4: Use Hooks & Components
 
 ```tsx src/pages/Home.tsx
 import { SignedIn, SignedOut, UserButton, useAuth, useUser } from '@insforge/react';
@@ -706,67 +668,3 @@ Track authentication state changes:
 </InsforgeProvider>
 ```
 
----
-
-## OAuth Providers
-
-Built-in support for 10+ OAuth providers:
-
-- Google
-- GitHub
-- Discord
-- Apple
-- Microsoft
-- Facebook
-- LinkedIn
-- Instagram
-- TikTok
-- Spotify
-- X (Twitter)
-
-Providers are auto-detected from your backend configuration.
-
----
-
-## Why @insforge/react?
-
-<CardGroup cols={2}>
-  <Card title="vs. Building Custom" icon="hammer">
-    5 minutes vs 2+ days of development. Production-ready security built-in.
-  </Card>
-
-  <Card title="vs. Other Libraries" icon="scale-balanced">
-    Complete package (not just UI). Framework agnostic. Self-hosted.
-  </Card>
-
-  <Card title="For Developers" icon="user">
-    Customizable when needed, works out of the box. No framework lock-in.
-  </Card>
-
-  <Card title="For AI Agents" icon="robot">
-    SDK-first approach ensures consistent API. Complete type safety reduces errors.
-  </Card>
-</CardGroup>
-
-<Note>
-  **Key Architecture**: This package is framework-agnostic. It works with any React setup and uses
-  `@insforge/sdk` for all backend communication.
-</Note>
-
----
-
-## Resources
-
-<CardGroup cols={3}>
-  <Card title="Documentation" icon="book" href="https://docs.insforge.dev/introduction">
-    Full documentation
-  </Card>
-
-  <Card title="GitHub Issues" icon="github" href="https://github.com/InsForge/InsForge/issues">
-    Report bugs & request features
-  </Card>
-
-  <Card title="Discord Community" icon="discord" href="https://discord.com/invite/DvBtaEc9Jz">
-    Get help & share feedback
-  </Card>
-</CardGroup>
