@@ -2,8 +2,8 @@ import { cn } from '@/lib/utils/utils';
 import { useFunctions } from '../hooks/useFunctions';
 
 interface FunctionsSidebarProps {
-  selectedSection: 'functions' | 'secrets';
-  onSectionSelect: (section: 'functions' | 'secrets') => void;
+  selectedSection: 'functions' | 'secrets' | 'cronjobs';
+  onSectionSelect: (section: 'functions' | 'secrets' | 'cronjobs') => void;
 }
 
 export function FunctionsSidebar({ selectedSection, onSectionSelect }: FunctionsSidebarProps) {
@@ -12,6 +12,10 @@ export function FunctionsSidebar({ selectedSection, onSectionSelect }: Functions
     {
       id: 'functions' as const,
       name: 'Functions',
+    },
+    {
+      id: 'cronjobs' as const,
+      name: 'Cron Jobs',
     },
     {
       id: 'secrets' as const,
