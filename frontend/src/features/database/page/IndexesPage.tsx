@@ -1,0 +1,182 @@
+import { useMemo, useState } from 'react';
+import { useFullMetadata } from '../hooks/useFullMetadata';
+import { SearchInput } from '@/components/SearchInput';
+import { EmptyState } from '@/components/EmptyState';
+import { DataGrid, type DataGridColumn, type DataGridRowType } from '@/components/datagrid';
+import type { ExportDatabaseResponse, ExportDatabaseJsonData } from '@insforge/shared-schemas';
+import type { ConvertedValue } from '@/components/datagrid/datagridTypes';
+import { isSystemTable } from '../constants';
+
+interface IndexRow extends DataGridRowType {
+  id: string;
+  schema: string;
+  tableName: string;
+  indexName: string;
+  indexDef: string;
+  isUnique: boolean | null;
+  isPrimary: boolean | null;
+  [key: string]: ConvertedValue | { [key: string]: string }[];
+}
+
+function parseIndexesFromMetadata(metadata: ExportDatabaseResponse | undefined): IndexRow[] {
+  if (!metadata || metadata.format !== 'json' || typeof metadata.data === 'string') {
+    return [];
+  }
+
+  const data = metadata.data as ExportDatabaseJsonData;
+  const indexes: IndexRow[] = [];
+
+  Object.entries(data.tables).forEach(([tableName, tableData]) => {
+    if (isSystemTable(tableName)) {
+      return;
+    }
+
+    tableData.indexes.forEach((index) => {
+      indexes.push({
+        id: `${tableName}_${index.indexname}`,
+        schema: 'public',
+        tableName,
+        indexName: index.indexname,
+        indexDef: index.indexdef,
+        isUnique: index.isUnique,
+        isPrimary: index.isPrimary,
+      });
+    });
+  });
+
+  return indexes;
+}
+
+export default function IndexesPage() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const { data: metadata, isLoading, error } = useFullMetadata(true);
+
+  const allIndexes = useMemo(() => parseIndexesFromMetadata(metadata), [metadata]);
+
+  const filteredIndexes = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return allIndexes;
+    }
+
+    const query = searchQuery.toLowerCase();
+    return allIndexes.filter(
+      (index) =>
+        index.indexName.toLowerCase().includes(query) ||
+        index.tableName.toLowerCase().includes(query) ||
+        index.schema.toLowerCase().includes(query)
+    );
+  }, [allIndexes, searchQuery]);
+
+  const columns: DataGridColumn<IndexRow>[] = useMemo(
+    () => [
+      {
+        key: 'schema',
+        name: 'Schema',
+        width: 'minmax(150px, 1fr)',
+        resizable: true,
+        sortable: true,
+      },
+      {
+        key: 'tableName',
+        name: 'Table',
+        width: 'minmax(180px, 1.5fr)',
+        resizable: true,
+        sortable: true,
+      },
+      {
+        key: 'indexName',
+        name: 'Name',
+        width: 'minmax(200px, 2fr)',
+        resizable: true,
+        sortable: true,
+      },
+      {
+        key: 'isPrimary',
+        name: 'Type',
+        width: 'minmax(120px, 1fr)',
+        resizable: true,
+        sortable: true,
+        renderCell: ({ row }) => {
+          if (row.isPrimary) {
+            return (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                Primary
+              </span>
+            );
+          }
+          if (row.isUnique) {
+            return (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                Unique
+              </span>
+            );
+          }
+          return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+              Index
+            </span>
+          );
+        },
+      },
+      {
+        key: 'indexDef',
+        name: 'Definition',
+        width: 'minmax(300px, 3fr)',
+        resizable: true,
+      },
+    ],
+    []
+  );
+
+  if (error) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <EmptyState
+          title="Failed to load indexes"
+          description={error instanceof Error ? error.message : 'An error occurred'}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4 h-full p-4 bg-bg-gray dark:bg-neutral-800">
+      <h1 className="text-xl font-normal text-zinc-950 dark:text-white">Database Indexes</h1>
+
+      <SearchInput
+        value={searchQuery}
+        onChange={setSearchQuery}
+        placeholder="Search for an index"
+        className="w-64"
+      />
+
+      {isLoading ? (
+        <div className="flex-1 flex items-center justify-center">
+          <EmptyState title="Loading indexes..." description="Please wait" />
+        </div>
+      ) : filteredIndexes.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center">
+          <EmptyState
+            title={searchQuery ? 'No indexes found' : 'No indexes'}
+            description={
+              searchQuery
+                ? 'Try adjusting your search query'
+                : 'Create indexes to improve query performance'
+            }
+          />
+        </div>
+      ) : (
+        <div className="flex-1 overflow-hidden">
+          <DataGrid
+            data={filteredIndexes}
+            columns={columns}
+            showSelection={false}
+            showPagination={false}
+            noPadding={true}
+            className="h-full"
+          />
+        </div>
+      )}
+    </div>
+  );
+}

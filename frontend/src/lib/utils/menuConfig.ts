@@ -79,6 +79,26 @@ export const menuConfig: PrimaryMenuItem[] = [
         href: '/dashboard/database/tables',
       },
       {
+        id: 'indexes',
+        label: 'Indexes',
+        href: '/dashboard/database/indexes',
+      },
+      {
+        id: 'functions',
+        label: 'Functions',
+        href: '/dashboard/database/functions',
+      },
+      {
+        id: 'triggers',
+        label: 'Triggers',
+        href: '/dashboard/database/triggers',
+      },
+      {
+        id: 'policies',
+        label: 'Policies',
+        href: '/dashboard/database/policies',
+      },
+      {
         id: 'sql-editor',
         label: 'SQL Editor',
         href: '/dashboard/database/sql-editor',
