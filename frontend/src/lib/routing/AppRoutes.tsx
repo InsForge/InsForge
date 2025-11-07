@@ -17,6 +17,10 @@ import FunctionsPage from '@/features/functions/page/FunctionsPage';
 import SecretsPage from '@/features/functions/page/SecretsPage';
 import AIPage from '@/features/ai/page/AIPage';
 import SQLEditorPage from '@/features/database/page/SQLEditorPage';
+import IndexesPage from '@/features/database/page/IndexesPage';
+import DatabaseFunctionsPage from '@/features/database/page/FunctionsPage';
+import TriggersPage from '@/features/database/page/TriggersPage';
+import PoliciesPage from '@/features/database/page/PoliciesPage';
 
 export function AppRoutes() {
   return (
@@ -46,6 +50,10 @@ export function AppRoutes() {
                   element={<Navigate to="/dashboard/database/tables" replace />}
                 />
                 <Route path="/dashboard/database/tables" element={<TablesPage />} />
+                <Route path="/dashboard/database/indexes" element={<IndexesPage />} />
+                <Route path="/dashboard/database/functions" element={<DatabaseFunctionsPage />} />
+                <Route path="/dashboard/database/triggers" element={<TriggersPage />} />
+                <Route path="/dashboard/database/policies" element={<PoliciesPage />} />
                 <Route path="/dashboard/database/sql-editor" element={<SQLEditorPage />} />
                 <Route path="/dashboard/storage" element={<StoragePage />} />
                 <Route
