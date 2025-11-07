@@ -573,8 +573,8 @@ function SignInPage() {
 
   return (
     <div>
-      <p>Available OAuth: {oauthProviders.join(', ')}</p>
-      <p>Password min length: {emailConfig?.passwordMinLength}</p>
+      <p>Available OAuth: {authConfig.oAuthProviders.join(', ')}</p>
+      <p>Password min length: {authConfig?.passwordMinLength}</p>
     </div>
   );
 }

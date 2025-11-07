@@ -292,7 +292,7 @@ function UserProfile() {
 Get your authentication config in InsForge:
 
 ```tsx
-import { usePublicAuthConfig } from '@insforge/react-router';
+import { usePublicAuthConfig } from '@insforge/nextjs';
 
 function SignInPage() {
   const { authConfig, isLoaded } = usePublicAuthConfig();
@@ -301,8 +301,8 @@ function SignInPage() {
 
   return (
     <div>
-      <p>Available OAuth: {oauthProviders.join(', ')}</p>
-      <p>Password min length: {emailConfig?.passwordMinLength}</p>
+      <p>Available OAuth: {authConfig.oAuthProviders.join(', ')}</p>
+      <p>Password min length: {authConfig?.passwordMinLength}</p>
     </div>
   );
 }
@@ -366,7 +366,7 @@ function Header() {
 
 ### Protect
 
-Only render when the user is signedin:
+Only render when the user is signed in:
 
 ```tsx
 import { Protect } from '@insforge/nextjs';
