@@ -1,6 +1,6 @@
 ---
-title: React
-description: Framework-agnostic authentication components for any React application
+title: React + React Router
+description: Framework-agnostic authentication components for React + React Router application
 ---
 
 The `@insforge/react-router` package provides **complete authentication solution for React applications**. Use deployed auth pages (built-in auth) or custom UI components—works with Vite + React Router.
@@ -88,7 +88,7 @@ const router = createBrowserRouter([
   // Add built-in auth redirect routes (sign-in, sign-up, forgot-password, etc.)
   ...getInsforgeRoutes({
     baseUrl: import.meta.env.VITE_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app', // Replace with your InsForge backend URL
-    afterSignInUrl = '/dashboard',
+    afterSignInUrl: '/dashboard',
     builtInAuth: true, // Redirects to deployed auth pages
   }),
 ]);
@@ -148,7 +148,7 @@ export default function Home() {
 }
 ```
 
-**That's it!** Your React + Ract Router app now has production-ready authentication with built-in auth pages.
+**That's it!** Your React + React Router app now has production-ready authentication with built-in auth pages.
 
 ---
 
