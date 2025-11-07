@@ -146,17 +146,6 @@ export default function TriggersPage() {
         <div className="flex-1 flex items-center justify-center">
           <EmptyState title="Loading triggers..." description="Please wait" />
         </div>
-      ) : filteredTriggers.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center">
-          <EmptyState
-            title={searchQuery ? 'No triggers found' : 'No triggers'}
-            description={
-              searchQuery
-                ? 'Try adjusting your search query'
-                : 'Create triggers to automate database operations'
-            }
-          />
-        </div>
       ) : (
         <div className="flex-1 overflow-hidden">
           <DataGrid
@@ -166,6 +155,11 @@ export default function TriggersPage() {
             showPagination={false}
             noPadding={true}
             className="h-full"
+            emptyState={
+              <div className="text-sm text-zinc-500 dark:text-zinc-400">
+                {searchQuery ? 'No triggers match your search criteria' : 'No triggers found'}
+              </div>
+            }
           />
         </div>
       )}

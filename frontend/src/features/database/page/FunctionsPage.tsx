@@ -115,17 +115,6 @@ export default function FunctionsPage() {
         <div className="flex-1 flex items-center justify-center">
           <EmptyState title="Loading functions..." description="Please wait" />
         </div>
-      ) : filteredFunctions.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center">
-          <EmptyState
-            title={searchQuery ? 'No functions found' : 'No functions'}
-            description={
-              searchQuery
-                ? 'Try adjusting your search query'
-                : 'Create functions to encapsulate business logic'
-            }
-          />
-        </div>
       ) : (
         <div className="flex-1 overflow-hidden">
           <DataGrid
@@ -135,6 +124,11 @@ export default function FunctionsPage() {
             showPagination={false}
             noPadding={true}
             className="h-full"
+            emptyState={
+              <div className="text-sm text-zinc-500 dark:text-zinc-400">
+                {searchQuery ? 'No functions match your search criteria' : 'No functions found'}
+              </div>
+            }
           />
         </div>
       )}

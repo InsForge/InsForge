@@ -154,17 +154,6 @@ export default function IndexesPage() {
         <div className="flex-1 flex items-center justify-center">
           <EmptyState title="Loading indexes..." description="Please wait" />
         </div>
-      ) : filteredIndexes.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center">
-          <EmptyState
-            title={searchQuery ? 'No indexes found' : 'No indexes'}
-            description={
-              searchQuery
-                ? 'Try adjusting your search query'
-                : 'Create indexes to improve query performance'
-            }
-          />
-        </div>
       ) : (
         <div className="flex-1 overflow-hidden">
           <DataGrid
@@ -174,6 +163,11 @@ export default function IndexesPage() {
             showPagination={false}
             noPadding={true}
             className="h-full"
+            emptyState={
+              <div className="text-sm text-zinc-500 dark:text-zinc-400">
+                {searchQuery ? 'No indexes match your search criteria' : 'No indexes found'}
+              </div>
+            }
           />
         </div>
       )}

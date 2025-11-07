@@ -152,17 +152,6 @@ export default function PoliciesPage() {
         <div className="flex-1 flex items-center justify-center">
           <EmptyState title="Loading policies..." description="Please wait" />
         </div>
-      ) : filteredPolicies.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center">
-          <EmptyState
-            title={searchQuery ? 'No policies found' : 'No policies'}
-            description={
-              searchQuery
-                ? 'Try adjusting your search query'
-                : 'Create RLS policies to control row-level access'
-            }
-          />
-        </div>
       ) : (
         <div className="flex-1 overflow-hidden">
           <DataGrid
@@ -172,6 +161,11 @@ export default function PoliciesPage() {
             showPagination={false}
             noPadding={true}
             className="h-full"
+            emptyState={
+              <div className="text-sm text-zinc-500 dark:text-zinc-400">
+                {searchQuery ? 'No policies match your search criteria' : 'No policies found'}
+              </div>
+            }
           />
         </div>
       )}
