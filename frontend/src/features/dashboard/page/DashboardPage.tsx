@@ -5,7 +5,7 @@ import { Users, Database, HardDrive } from 'lucide-react';
 import { ConnectionSuccessBanner, StatsCard } from '../components';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { LogsDataGrid, type LogsColumnDef } from '@/features/logs/components/LogsDataGrid';
-import { formatTime } from '@/lib/utils/utils';
+import { cn, formatTime } from '@/lib/utils/utils';
 import { Button } from '@/components';
 
 export default function DashboardPage() {
@@ -22,6 +22,7 @@ export default function DashboardPage() {
     {
       key: 'tool_name',
       name: 'MCP Call',
+      width: '12fr',
       renderCell: ({ row }) => (
         <p className="text-sm text-gray-900 dark:text-white font-normal leading-6">
           {String(row.tool_name ?? '')}
@@ -31,7 +32,7 @@ export default function DashboardPage() {
     {
       key: 'created_at',
       name: 'Time',
-      width: '216px',
+      width: 'minmax(200px, 1fr)',
       renderCell: ({ row }) => (
         <p className="text-sm text-gray-900 dark:text-white font-normal leading-6">
           {formatTime(String(row.created_at ?? ''))}
@@ -100,20 +101,18 @@ export default function DashboardPage() {
         </div>
 
         {/* MCP Call Record Table */}
-        <div className="w-full overflow-hidden">
+        <div className={cn('w-full overflow-hidden pb-8', !records.length && 'h-60')}>
           <LogsDataGrid
             columnDefs={mcpColumns}
             data={records.slice(0, 5)}
             emptyState={
-              <div className="text-sm text-zinc-500 dark:text-zinc-400">
+              <div className="h-20 text-sm text-zinc-500 dark:text-zinc-400">
                 No MCP call records found
               </div>
             }
             noPadding
           />
         </div>
-
-        <div className="h-8 flex-shrink-0" />
       </div>
     </main>
   );

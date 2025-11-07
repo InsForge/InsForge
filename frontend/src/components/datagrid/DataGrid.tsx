@@ -202,7 +202,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
     >
       <div
         className={cn(
-          'flex-1 overflow-hidden relative border-t border-l border-border-gray dark:border-neutral-700',
+          'flex-1 overflow-hidden relative border border-border-gray dark:border-neutral-700',
           !noPadding && 'mx-3'
         )}
       >
