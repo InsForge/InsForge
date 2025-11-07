@@ -21,11 +21,5 @@ export default defineConfig({
   },
   build: {
     outDir: '../dist/auth',
-    sourcemap: true,
-    rollupOptions: {
-      output: {
-        manualChunks: undefined,
-      },
-    },
   },
 });
