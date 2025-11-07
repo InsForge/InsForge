@@ -39,15 +39,14 @@ Wrap your app with `InsforgeProvider` in the root:
 ```tsx src/main.tsx
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { InsforgeProvider } from '@insforge/react';
+import { InsforgeProvider } from '@insforge/react-router';
 import App from './App';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <InsforgeProvider
       baseUrl={
-        import.meta.env.VITE_INSFORGE_BASE_URL ||
-        'https://your-app.region.insforge.app' // Replace with your InsForge backend URL
+        import.meta.env.VITE_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app' // Replace with your InsForge backend URL
       }
       afterSignInUrl="/dashboard"
     >
@@ -82,18 +81,16 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Home /> },
 
-      { path: 'dashboard', element: <Dashboard /> }
-    ]
+      { path: 'dashboard', element: <Dashboard /> },
+    ],
   },
 
   // Add built-in auth redirect routes (sign-in, sign-up, forgot-password, etc.)
   ...getInsforgeRoutes({
-    baseUrl:
-      import.meta.env.VITE_INSFORGE_BASE_URL ||
-      'https://your-app.region.insforge.app', // Replace with your InsForge backend URL
-    afterSignInUrl="/dashboard",
-    builtInAuth: true  // Redirects to deployed auth pages
-  })
+    baseUrl: import.meta.env.VITE_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app', // Replace with your InsForge backend URL
+    afterSignInUrl = '/dashboard',
+    builtInAuth: true, // Redirects to deployed auth pages
+  }),
 ]);
 
 export default function App() {
@@ -124,8 +121,7 @@ export default function Layout() {
 - After auth → Backend redirects with token in URL → SDK auto-detects and stores token → Goes to dashboard
 
 <Info>
-  **Built-in auth** means using authentication pages hosted in your InsForge App. No UI code
-  needed!
+  **Built-in auth** means using authentication pages hosted in your InsForge App. No UI code needed!
 </Info>
 
 ### Step 4: Use Hooks & Components
@@ -152,7 +148,7 @@ export default function Home() {
 }
 ```
 
-**That's it!**  Your React app now has production-ready authentication with built-in auth pages.
+**That's it!** Your React + Ract Router app now has production-ready authentication with built-in auth pages.
 
 ---
 
@@ -176,8 +172,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <InsforgeProvider
       baseUrl={
-        import.meta.env.VITE_INSFORGE_BASE_URL ||
-        'https://your-app.region.insforge.app' // Replace with your InsForge backend URL
+        import.meta.env.VITE_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app' // Replace with your InsForge backend URL
       }
       afterSignInUrl="/dashboard"
     >
@@ -208,23 +203,21 @@ const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { index: true, element: <Home /> },
-      { path: 'dashboard', element: <Dashboard /> }
-    ]
+      { path: 'dashboard', element: <Dashboard /> },
+    ],
   },
 
   // Custom auth routes
   ...getInsforgeRoutes({
-    baseUrl:
-      import.meta.env.VITE_INSFORGE_BASE_URL ||
-      'https://your-app.region.insforge.app', // Replace with your InsForge backend URL
+    baseUrl: import.meta.env.VITE_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app', // Replace with your InsForge backend URL
     afterSignInUrl: '/dashboard',
-    builtInAuth: false,  // Render custom components instead of redirecting
+    builtInAuth: false, // Render custom components instead of redirecting
     pages: {
       signIn: <SignInPage />,
       signUp: <SignUpPage />,
-      forgotPassword: <ForgotPasswordPage />
-    }
-  })
+      forgotPassword: <ForgotPasswordPage />,
+    },
+  }),
 ]);
 
 export default function App() {
@@ -289,6 +282,7 @@ export default function ForgotPasswordPage() {
 ```
 
 **That's it!** The `<SignIn>`, `<SignUp>`, and `<ForgotPassword>` components are complete page-level components that include:
+
 - Form UI with validation
 - OAuth provider buttons (auto-detected)
 - Error handling
@@ -301,11 +295,13 @@ You only need to wrap them in your page components for layout/styling purposes.
 ### Key Difference from Built-in Auth
 
 **Built-in Auth:**
+
 - `/sign-in` → Redirects to `your-project.insforge.app/auth/sign-in`
 - Authentication happens on hosted page
 - Returns to your app with token
 
 **Custom Components:**
+
 - `/sign-in` → Renders your `<SignInPage>` component
 - Authentication happens in your app
 - SDK handles token management automatically
@@ -497,20 +493,13 @@ function Dashboard() {
   return (
     <div>
       <h1>Dashboard</h1>
-
       {/* Simple protection */}
       <Protect redirectTo="/sign-in">
         <UserContent />
       </Protect>
-
-      {/* Role-based protection */}
-      <Protect redirectTo="/unauthorized" condition={(user) => user.role === 'admin'}>
-        <AdminPanel />
-      </Protect>
-
-      {/* With fallback */}
-      <Protect condition={(user) => user.emailVerified} fallback={<VerifyEmailPrompt />}>
-        <VerifiedUserFeature />
+      // Custom logic
+      <Protect condition={(user) => user.subscription === 'premium'} fallback={<UpgradePrompt />}>
+        <PremiumFeature />
       </Protect>
     </div>
   );
@@ -620,7 +609,6 @@ function UserProfile() {
 - `user` - User object with id, email, name, avatarUrl
 - `isLoaded` - Boolean loading state
 - `updateUser(data)` - Update user profile
-- `setUser(user)` - Manually set user state
 
 ### `usePublicAuthConfig()`
 
@@ -630,7 +618,7 @@ Get your authentication config in InsForge:
 import { usePublicAuthConfig } from '@insforge/react-router';
 
 function SignInPage() {
-  const { oauthProviders, emailConfig, isLoaded } = usePublicAuthConfig();
+  const { authConfig, isLoaded } = usePublicAuthConfig();
 
   if (!isLoaded) return <div>Loading...</div>;
 
@@ -645,8 +633,7 @@ function SignInPage() {
 
 **Returns:**
 
-- `oauthProviders` - List of OAuth providers enabled in your InsForge configuration
-- `emailConfig` - Your email auth config like password length
+- `authConfig` - Authentication Configuration you set in InsForge dashboard.
 - `isLoaded` - Boolean loading state
 
 <Warning>
@@ -677,4 +664,3 @@ Track authentication state changes:
   {children}
 </InsforgeProvider>
 ```
-

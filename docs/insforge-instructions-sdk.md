@@ -44,14 +44,14 @@ Available documentation types:
 - **Authentication** - Choose based on implementation:
   - `"auth-sdk"` - Backend/headless auth (SDK methods only)
   - `"auth-components-nextjs"` - Frontend auth for Next.js (built-in auth pages + UI)
-  - `"auth-components-react"` - Frontend auth for React/Vite (built-in auth pages + UI)
+  - `"auth-components-react-router"` - Frontend auth for React(Vite+React Router) (built-in auth pages + UI)
 - `"storage-sdk"` - File storage operations
 - `"functions-sdk"` - Serverless functions invocation
 - `"ai-integration-sdk"` - AI chat and image generation
 
 **🎯 How to Choose Authentication Documentation:**
 1. **Building with Next.js?** → Use `"auth-components-nextjs"` (frontend: built-in auth pages)
-2. **Building with React (Vite+React Router)?** → Use `"auth-components-react"` (frontend: built-in auth pages)
+2. **Building with React (Vite+React Router)?** → Use `"auth-components-react-router"` (frontend: built-in auth pages)
 
 ## When to Use SDK vs MCP Tools
 
@@ -71,15 +71,15 @@ Available documentation types:
 ### When to Use Pre-Built Components
 InsForge provides framework-specific UI packages with **built-in auth pages** (zero UI code):
 - `@insforge/nextjs` - Next.js (built-in auth + middleware + SSR)
-- `@insforge/react` - React (built-in auth + framework-agnostic)
+- `@insforge/react-router` - React (built-in auth + framework-agnostic)
 
 ## Quick Start
 
 1. **First**: Call `get-backend-metadata` to check current backend state
-2. **Detect framework**: Check user's project to determine the framework (Next.js, React/Vite, etc.)
+2. **Detect framework**: Check user's project to determine the framework (Next.js, React, etc.)
 3. **Fetch docs**: Use `fetch-docs` with the appropriate doc type based on framework:
    - Next.js → `"auth-components-nextjs"`
-   - React/Vite/Remix → `"auth-components-react"`
+   - React(Vite+React Router) → `"auth-components-react-router"`
 4. **Initialize SDK**: Create client with your backend URL
 5. **Build**: Use framework-specific Auth Components for auth, SDK methods for database, storage, AI
 

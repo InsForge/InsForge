@@ -46,8 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <InsforgeProvider
           baseUrl={
-            process.env.NEXT_PUBLIC_INSFORGE_BASE_URL ||
-            'https://your-app.region.insforge.app' // Replace with your InsForge backend URL
+            process.env.NEXT_PUBLIC_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app' // Replace with your InsForge backend URL
           }
           afterSignInUrl="/dashboard"
         >
@@ -67,9 +66,7 @@ Create an API route to enable server-side rendering (SSR) and cookie-based authe
 import { createAuthRouteHandlers } from '@insforge/nextjs/api';
 
 const handlers = createAuthRouteHandlers({
-  baseUrl:
-    process.env.NEXT_PUBLIC_INSFORGE_BASE_URL ||
-    'http://localhost:7130', // Replace with your InsForge backend URL
+  baseUrl: process.env.NEXT_PUBLIC_INSFORGE_BASE_URL || 'http://localhost:7130', // Replace with your InsForge backend URL
   cookieName: 'insforge_token',
 });
 
@@ -88,9 +85,7 @@ Create middleware to protect routes:
 import { InsforgeMiddleware } from '@insforge/nextjs/middleware';
 
 export default InsforgeMiddleware({
-  baseUrl:
-    process.env.NEXT_PUBLIC_INSFORGE_BASE_URL ||
-    'http://localhost:7130', // Replace with your InsForge backend URL
+  baseUrl: process.env.NEXT_PUBLIC_INSFORGE_BASE_URL || 'http://localhost:7130', // Replace with your InsForge backend URL
   publicRoutes: ['/'],
   cookieName: 'insforge_token',
 });
@@ -119,7 +114,7 @@ export default function Home() {
 
       <SignedIn>
         <UserButton afterSignOutUrl="/" />
-        <h1>Welcome, {user?.email}!</h1>
+        <h1>Welcome, {user.email}!</h1>
       </SignedIn>
     </div>
   );
@@ -288,7 +283,7 @@ function UserProfile() {
 
 **Returns:**
 
-- `user` - Current user object (id, email, nickname, avatarUrl, role, emailVerified)
+- `user` - Current user object (id, email, name?, avatarUrl?)
 - `isLoaded` - Boolean loading state
 - `updateUser(data)` - Update user profile
 
@@ -297,10 +292,10 @@ function UserProfile() {
 Get your authentication config in InsForge:
 
 ```tsx
-import { usePublicAuthConfig } from '@insforge/nextjs';
+import { usePublicAuthConfig } from '@insforge/react-router';
 
 function SignInPage() {
-  const { oauthProviders, emailConfig, isLoaded } = usePublicAuthConfig();
+  const { authConfig, isLoaded } = usePublicAuthConfig();
 
   if (!isLoaded) return <div>Loading...</div>;
 
@@ -315,8 +310,7 @@ function SignInPage() {
 
 **Returns:**
 
-- `oauthProviders` - OAuth providers enabled by you
-- `emailConfig` - Your email auth config like password length
+- `authConfig` - Authentication Configuration you set in InsForge dashboard.
 - `isLoaded` - Boolean loading state
 
 <Warning>
@@ -372,19 +366,14 @@ function Header() {
 
 ### Protect
 
-Conditional rendering with custom logic:
+Only render when the user is signedin:
 
 ```tsx
 import { Protect } from '@insforge/nextjs';
 
-// Role-based access
-<Protect condition={(user) => user.role === 'admin'}>
-  <AdminPanel />
-</Protect>
-
-// Email verification check
-<Protect condition={(user) => user.emailVerified}>
-  <VerifiedUserFeature />
+// Block unauthenticated access
+<Protect redirectTo='/sign-in'>
+  <VerifiedUserProfile />
 </Protect>
 
 // Custom logic
@@ -422,4 +411,3 @@ Track authentication state changes for analytics or other side effects:
   {children}
 </InsforgeProvider>
 ```
-
