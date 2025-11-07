@@ -47,7 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <InsforgeProvider
           baseUrl={
             process.env.NEXT_PUBLIC_INSFORGE_BASE_URL ||
-            'http://localhost:7130' // Replace with your InsForge backend URL
+            'https://your-app.region.insforge.app' // Replace with your InsForge backend URL
           }
           afterSignInUrl="/dashboard"
         >
