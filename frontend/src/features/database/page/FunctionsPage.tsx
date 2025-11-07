@@ -82,7 +82,7 @@ export default function FunctionsPage() {
       {
         key: 'functionDef',
         name: 'Definition',
-        width: 'minmax(400px, 4fr)',
+        width: 'minmax(400px, 8fr)',
         resizable: true,
       },
     ],

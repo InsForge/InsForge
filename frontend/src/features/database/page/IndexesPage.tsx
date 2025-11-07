@@ -9,7 +9,6 @@ import { isSystemTable } from '../constants';
 
 interface IndexRow extends DataGridRowType {
   id: string;
-  schema: string;
   tableName: string;
   indexName: string;
   indexDef: string;
@@ -34,7 +33,6 @@ function parseIndexesFromMetadata(metadata: ExportDatabaseResponse | undefined):
     tableData.indexes.forEach((index) => {
       indexes.push({
         id: `${tableName}_${index.indexname}`,
-        schema: 'public',
         tableName,
         indexName: index.indexname,
         indexDef: index.indexdef,
@@ -62,20 +60,12 @@ export default function IndexesPage() {
     return allIndexes.filter(
       (index) =>
         index.indexName.toLowerCase().includes(query) ||
-        index.tableName.toLowerCase().includes(query) ||
-        index.schema.toLowerCase().includes(query)
+        index.tableName.toLowerCase().includes(query)
     );
   }, [allIndexes, searchQuery]);
 
   const columns: DataGridColumn<IndexRow>[] = useMemo(
     () => [
-      {
-        key: 'schema',
-        name: 'Schema',
-        width: 'minmax(150px, 1fr)',
-        resizable: true,
-        sortable: true,
-      },
       {
         key: 'tableName',
         name: 'Table',
@@ -121,7 +111,7 @@ export default function IndexesPage() {
       {
         key: 'indexDef',
         name: 'Definition',
-        width: 'minmax(300px, 3fr)',
+        width: 'minmax(300px, 5fr)',
         resizable: true,
       },
     ],
