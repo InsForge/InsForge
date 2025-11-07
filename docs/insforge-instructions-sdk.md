@@ -27,12 +27,12 @@ You must create a client instance using `createClient()` with your base URL and 
 import { createClient } from '@insforge/sdk';
 
 const client = createClient({
-  baseUrl: 'http://localhost:7130',  // Your InsForge backend URL
+  baseUrl: 'https://your-app.region.insforge.app',  // Your InsForge backend URL
   anonKey: 'your-anon-key-here'       // Get this from backend metadata
 });
 ```
 
-**API BASE URL**: Your API base URL is `http://localhost:7130`.
+**API BASE URL**: Your API base URL is `https://your-app.region.insforge.app`.
 
 ## Getting Detailed Documentation
 
@@ -52,7 +52,6 @@ Available documentation types:
 **🎯 How to Choose Authentication Documentation:**
 1. **Building with Next.js?** → Use `"auth-components-nextjs"` (frontend: built-in auth pages)
 2. **Building with React (Vite+React Router)?** → Use `"auth-components-react"` (frontend: built-in auth pages)
-3. **Need backend/headless auth only?** → Use `"auth-sdk"` (backend: SDK methods)
 
 ## When to Use SDK vs MCP Tools
 
