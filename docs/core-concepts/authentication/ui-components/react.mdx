@@ -26,7 +26,7 @@ npm install @insforge/react@latest
 <Note>**Required Dependencies:** ```bash npm install react@^19.0.0 react-dom@^19.0.0 ```</Note>
 
 ```bash .env
-VITE_INSFORGE_BASE_URL=https://your-app.region.insforge.app/
+VITE_INSFORGE_BASE_URL=https://your-project.insforge.app/
 ```
 
 ### Step 2: Setup Provider
@@ -43,7 +43,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <InsforgeProvider
       baseUrl={
-        import.meta.env.VITE_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app' // Replace with your InsForge backend URL
+        import.meta.env.VITE_INSFORGE_BASE_URL || 'https://your-project.insforge.app/' // Replace with your InsForge backend URL
       }
       afterSignInUrl="/dashboard"
     >
@@ -121,7 +121,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <InsforgeProvider
       baseUrl={
-        import.meta.env.VITE_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app' // Replace with your InsForge backend URL
+        import.meta.env.VITE_INSFORGE_BASE_URL || 'https://your-project.insforge.app/' // Replace with your InsForge backend URL
       }
       afterSignInUrl="/dashboard"
     >
@@ -136,41 +136,32 @@ createRoot(document.getElementById('root')!).render(
 Set `builtInAuth: false` and provide your page components:
 
 ```tsx src/App.tsx
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-import { getInsforgeRoutes } from '@insforge/react/router';
-import Layout from './components/Layout';
-import Home from './pages/Home';
-import Dashboard from './pages/Dashboard';
-// Import your custom auth pages
+import { useAuth } from '@insforge/react';
 import SignInPage from './pages/auth/SignInPage';
 import SignUpPage from './pages/auth/SignUpPage';
-import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
-
-const router = createBrowserRouter([
-  {
-    path: '/',
-    element: <Layout />,
-    children: [
-      { index: true, element: <Home /> },
-      { path: 'dashboard', element: <Dashboard /> },
-    ],
-  },
-
-  // Custom auth routes
-  ...getInsforgeRoutes({
-    baseUrl: import.meta.env.VITE_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app', // Replace with your InsForge backend URL
-    afterSignInUrl: '/dashboard',
-    builtInAuth: false, // Render custom components instead of redirecting
-    pages: {
-      signIn: <SignInPage />,
-      signUp: <SignUpPage />,
-      forgotPassword: <ForgotPasswordPage />,
-    },
-  }),
-]);
+import Dashboard from './pages/Dashboard';
+import Home from './pages/Home';
 
 export default function App() {
-  return <RouterProvider router={router} />;
+  const { isSignedIn, isLoaded } = useAuth();
+  
+  // Simple path-based routing (or use a simpler router library)
+  const path = window.location.pathname;
+  
+  if (!isLoaded) return <div>Loading...</div>;
+  
+  // Route logic
+  if (path === '/sign-in') return <SignInPage />;
+  if (path === '/sign-up') return <SignUpPage />;
+  if (path === '/dashboard') {
+    if (!isSignedIn) {
+      window.location.href = '/sign-in';
+      return null;
+    }
+    return <Dashboard />;
+  }
+  
+  return <Home />;
 }
 ```
 
@@ -245,7 +236,7 @@ You only need to wrap them in your page components for layout/styling purposes.
 
 **Built-in Auth:**
 
-- `/sign-in` → Redirects to `https://your-app.region.insforge.app/auth/sign-in`
+- `/sign-in` → Redirects to `https://your-project.insforge.app/auth/sign-in`
 - Authentication happens on hosted page
 - Returns to your app with token
 
@@ -264,7 +255,7 @@ You only need to wrap them in your page components for layout/styling purposes.
 ```
 1. User clicks "Sign In" → Visits /sign-in route
    ↓
-2. getInsforgeRoutes() redirects → https://your-app.region.insforge.app/auth/sign-in?redirect=yourapp.com/you-defined-destination-after-sign-in
+2. getInsforgeRoutes() redirects → https://your-project.insforge.app/auth/sign-in?redirect=yourapp.com/you-defined-destination-after-sign-in
    ↓
 3. User signs in on deployed page → Backend processes authentication
    ↓
@@ -436,7 +427,7 @@ function ForgotPasswordPage() {
 Protected content with conditional rendering:
 
 ```tsx
-import { Protect } from '@insforge/react-router';
+import { Protect } from '@insforge/react';
 
 function Dashboard() {
   return (
@@ -564,7 +555,7 @@ function UserProfile() {
 Get your authentication config in InsForge:
 
 ```tsx
-import { usePublicAuthConfig } from '@insforge/react-router';
+import { usePublicAuthConfig } from '@insforge/react';
 
 function SignInPage() {
   const { authConfig, isLoaded } = usePublicAuthConfig();
