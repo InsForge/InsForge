@@ -437,7 +437,7 @@ function Dashboard() {
       <Protect redirectTo="/sign-in">
         <UserContent />
       </Protect>
-      // Custom logic
+      {/* Custom logic */}
       <Protect condition={(user) => user.subscription === 'premium'} fallback={<UpgradePrompt />}>
         <PremiumFeature />
       </Protect>
