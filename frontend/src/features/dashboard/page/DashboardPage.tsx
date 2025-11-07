@@ -1,16 +1,12 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useMetadata } from '@/features/metadata/hooks/useMetadata';
+import { useMetadata } from '@/lib/hooks/useMetadata';
 import { useUsers } from '@/features/auth';
 import { Users, Database, HardDrive } from 'lucide-react';
 import { ConnectionSuccessBanner, StatsCard } from '../components';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
-import { LogsTable, LogsTableColumn } from '@/features/logs/components/LogsTable';
-import { format } from 'date-fns';
-
-interface McpUsageRecord {
-  tool_name: string;
-  created_at: string;
-}
+import { LogsDataGrid, type LogsColumnDef } from '@/features/logs/components/LogsDataGrid';
+import { cn, formatTime } from '@/lib/utils/utils';
+import { Button } from '@/components';
 
 export default function DashboardPage() {
   const location = useLocation();
@@ -22,28 +18,24 @@ export default function DashboardPage() {
   const authCount = auth?.oauths.length || 0;
   const showBanner = location.state?.showSuccessBanner === true;
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return format(date, 'MMM dd, yyyy h:mm a');
-  };
-
-  const mcpColumns: LogsTableColumn<McpUsageRecord>[] = [
+  const mcpColumns: LogsColumnDef[] = [
     {
       key: 'tool_name',
-      label: 'MCP Call',
-      render: (row) => (
+      name: 'MCP Call',
+      width: '12fr',
+      renderCell: ({ row }) => (
         <p className="text-sm text-gray-900 dark:text-white font-normal leading-6">
-          {row.tool_name}
+          {String(row.tool_name ?? '')}
         </p>
       ),
     },
     {
       key: 'created_at',
-      label: 'Time',
-      width: '216px',
-      render: (row) => (
+      name: 'Time',
+      width: 'minmax(200px, 1fr)',
+      renderCell: ({ row }) => (
         <p className="text-sm text-gray-900 dark:text-white font-normal leading-6">
-          {formatTime(row.created_at)}
+          {formatTime(String(row.created_at ?? ''))}
         </p>
       ),
     },
@@ -99,27 +91,28 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center justify-between w-full">
-          <p className="text-xl font-semibold text-gray-900 dark:text-white tracking-[-0.1px]">
-            MCP Call Records
-          </p>
-          <button
+          <p className="text-xl font-semibold text-gray-900 dark:text-white">MCP Call Records</p>
+          <Button
             onClick={handleViewMoreClick}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-white font-medium hover:bg-neutral-700 rounded-lg transition-colors"
+            className="h-10 px-4 font-medium dark:bg-emerald-300 dark:text-black"
           >
             View More
-          </button>
+          </Button>
         </div>
 
         {/* MCP Call Record Table */}
-        <div className="w-full rounded-[8px] overflow-hidden shadow-sm">
-          <LogsTable
-            columns={mcpColumns}
+        <div className={cn('w-full overflow-hidden pb-8', !records.length && 'h-60')}>
+          <LogsDataGrid
+            columnDefs={mcpColumns}
             data={records.slice(0, 5)}
-            emptyMessage="No MCP call records found"
+            emptyState={
+              <div className="h-20 text-sm text-zinc-500 dark:text-zinc-400">
+                No MCP call records found
+              </div>
+            }
+            noPadding
           />
         </div>
-
-        <div className="h-8 flex-shrink-0" />
       </div>
     </main>
   );

@@ -24,7 +24,7 @@ import { DatabaseDataGrid } from '@/features/database/components/DatabaseDataGri
 import { SearchInput, SelectionClearButton, DeleteActionButton } from '@/components';
 import { ConnectCTA } from '@/components/ConnectCTA';
 import { SortColumn } from 'react-data-grid';
-import { convertValueForColumn, isIframe } from '@/lib/utils/utils';
+import { convertValueForColumn } from '@/lib/utils/utils';
 import {
   DataUpdatePayload,
   DataUpdateResourceType,
@@ -36,7 +36,7 @@ import { useCSVImport } from '@/features/database/hooks/useCSVImport';
 
 const PAGE_SIZE = 50;
 
-function DatabasePageContent() {
+export default function TablesPage() {
   // Load selected table from localStorage on mount
   const [selectedTable, setSelectedTable] = useState<string | null>(() => {
     return localStorage.getItem('selectedTable');
@@ -440,24 +440,22 @@ function DatabasePageContent() {
                               <p>Edit Table</p>
                             </TooltipContent>
                           </Tooltip>
-                          {!isIframe() && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="p-1 h-9 w-9"
-                                  onClick={() => void handleRefresh()}
-                                  disabled={isRefreshing}
-                                >
-                                  <RefreshIcon className="h-5 w-5 text-zinc-400 dark:text-neutral-400" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom" align="center">
-                                <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="p-1 h-9 w-9"
+                                onClick={() => void handleRefresh()}
+                                disabled={isRefreshing}
+                              >
+                                <RefreshIcon className="h-5 w-5 text-zinc-400 dark:text-neutral-400" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" align="center">
+                              <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
+                            </TooltipContent>
+                          </Tooltip>
                         </TooltipProvider>
                       </div>
                     </div>
@@ -597,8 +595,4 @@ function DatabasePageContent() {
       <ConfirmDialog {...confirmDialogProps} />
     </div>
   );
-}
-
-export default function DatabasePage() {
-  return <DatabasePageContent />;
 }

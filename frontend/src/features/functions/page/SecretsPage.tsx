@@ -4,11 +4,11 @@ import { Input } from '@/components/radix/Input';
 import { Skeleton } from '@/components/radix/Skeleton';
 import { SearchInput } from '@/components/SearchInput';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { SecretRow } from './SecretRow';
-import SecretEmptyState from './SecretEmptyState';
-import { useSecrets } from '@/features/secrets/hooks/useSecrets';
+import { SecretRow } from '../components/SecretRow';
+import SecretEmptyState from '../components/SecretEmptyState';
+import { useSecrets } from '@/features/functions/hooks/useSecrets';
 
-export function SecretsContent() {
+export default function SecretsPage() {
   const [newSecretKey, setNewSecretKey] = useState('');
   const [newSecretValue, setNewSecretValue] = useState('');
 
@@ -31,7 +31,7 @@ export function SecretsContent() {
   };
 
   return (
-    <>
+    <div className="h-full flex flex-col overflow-hidden">
       <div className="flex flex-col gap-6 p-4">
         {/* Header */}
         <p className="h-7 text-xl text-zinc-950 dark:text-white">Secrets</p>
@@ -115,6 +115,6 @@ export function SecretsContent() {
       </div>
 
       <ConfirmDialog {...confirmDialogProps} />
-    </>
+    </div>
   );
 }

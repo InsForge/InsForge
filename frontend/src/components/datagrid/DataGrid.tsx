@@ -187,7 +187,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
   // Loading state - only show full loading screen if not sorting
   if (loading && !isSorting) {
     return (
-      <div className="h-full flex items-center justify-center bg-white dark:bg-neutral-800">
+      <div className="h-full flex items-center justify-center bg-bg-gray dark:bg-neutral-800">
         <div className="text-gray-500 dark:text-zinc-400">Loading...</div>
       </div>
     );
@@ -196,13 +196,13 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
   return (
     <div
       className={cn(
-        'h-full flex flex-col bg-bg-gray dark:bg-neutral-800 overflow-hidden',
+        'h-full flex flex-col overflow-hidden bg-bg-gray dark:bg-neutral-800',
         className
       )}
     >
       <div
         className={cn(
-          'flex-1 overflow-hidden relative border border-border-gray dark:border-0',
+          'flex-1 overflow-hidden relative border border-border-gray dark:border-neutral-700',
           !noPadding && 'mx-3'
         )}
       >

@@ -2,13 +2,13 @@ import { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { LoadingState } from '@/components/LoadingState';
+import { isIframe } from '../utils/utils';
 
 interface RequireAuthProps {
   children: ReactNode;
-  redirectTo: string;
 }
 
-export const RequireAuth = ({ children, redirectTo }: RequireAuthProps) => {
+export const RequireAuth = ({ children }: RequireAuthProps) => {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
@@ -20,7 +20,7 @@ export const RequireAuth = ({ children, redirectTo }: RequireAuthProps) => {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to={redirectTo} replace />;
+    return <Navigate to={isIframe() ? '/cloud/login' : '/dashboard/login'} replace />;
   }
 
   return <>{children}</>;
