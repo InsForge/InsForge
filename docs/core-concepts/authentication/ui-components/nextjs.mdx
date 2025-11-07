@@ -30,7 +30,7 @@ npm install @insforge/nextjs@latest
 </Note>
 
 ```bash .env.local
-NEXT_PUBLIC_INSFORGE_BASE_URL=https://your-project.insforge.app/
+NEXT_PUBLIC_INSFORGE_BASE_URL=https://your-app.region.insforge.app/
 ```
 
 ### Step 2: Add InsforgeProvider
@@ -135,7 +135,7 @@ export default function Home() {
 ```
 1. User clicks "Sign In" → Middleware detects using built-in auth
    ↓
-2. Middleware redirects : your-project.insforge.app/auth/signin?redirect=yourapp.com/you-defined-destination-after-sign-in
+2. Middleware redirects : https://your-app.region.insforge.app/auth/signin?redirect=yourapp.com/you-defined-destination-after-sign-in
    ↓
 3. User signs in on deployed page → Backend processes authentication
    ↓

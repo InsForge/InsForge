@@ -29,7 +29,7 @@ npm install @insforge/react@latest
 </Note>
 
 ```bash .env
-VITE_INSFORGE_BASE_URL=https://your-project.insforge.app/
+VITE_INSFORGE_BASE_URL=https://your-app.region.insforge.app/
 ```
 
 ### Step 2: Setup Provider
@@ -118,9 +118,9 @@ export default function Layout() {
 
 **What this does:**
 
-- Visiting `/sign-in` → Redirects to `your-project.insforge.app/auth/sign-in`
-- Visiting `/sign-up` → Redirects to `your-project.insforge.app/auth/sign-up`
-- Visiting `/forgot-password` → Redirects to `your-project.insforge.app/auth/forgot-password`
+- Visiting `/sign-in` → Redirects to `https://your-app.region.insforge.app/auth/sign-in`
+- Visiting `/sign-up` → Redirects to `https://your-app.region.insforge.app/auth/sign-up`
+- Visiting `/forgot-password` → Redirects to `https://your-app.region.insforge.app/auth/forgot-password`
 - After auth → Backend redirects with token in URL → SDK auto-detects and stores token → Goes to dashboard
 
 <Info>
@@ -301,7 +301,7 @@ You only need to wrap them in your page components for layout/styling purposes.
 ### Key Difference from Built-in Auth
 
 **Built-in Auth:**
-- `/sign-in` → Redirects to `your-project.insforge.app/auth/sign-in`
+- `/sign-in` → Redirects to `https://your-app.region.insforge.app/auth/sign-in`
 - Authentication happens on hosted page
 - Returns to your app with token
 
@@ -319,7 +319,7 @@ You only need to wrap them in your page components for layout/styling purposes.
 ```
 1. User clicks "Sign In" → Visits /sign-in route
    ↓
-2. getInsforgeRoutes() redirects → your-project.insforge.app/auth/sign-in?redirect=yourapp.com/you-defined-destination-after-sign-in
+2. getInsforgeRoutes() redirects → https://your-app.region.insforge.app/auth/sign-in?redirect=yourapp.com/you-defined-destination-after-sign-in
    ↓
 3. User signs in on deployed page → Backend processes authentication
    ↓
