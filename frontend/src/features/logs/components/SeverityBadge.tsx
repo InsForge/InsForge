@@ -1,11 +1,11 @@
 import { SEVERITY_CONFIG, type SeverityType } from '../helpers';
 
 interface SeverityBadgeProps {
-  severity: string;
+  severity: SeverityType;
 }
 
 export function SeverityBadge({ severity }: SeverityBadgeProps) {
-  const config = SEVERITY_CONFIG[severity as SeverityType] || SEVERITY_CONFIG.informational;
+  const config = SEVERITY_CONFIG[severity] || SEVERITY_CONFIG.informational;
 
   return (
     <div className="flex items-center gap-2 pr-1">

@@ -44,4 +44,4 @@ export type AuthErrorEvent = z.infer<typeof authErrorEventSchema>;
 export type McpConnectionStatusEvent = z.infer<typeof mcpConnectionStatusEventSchema>;
 export type CloudEvent = z.infer<typeof cloudEventSchema>;
 export type ShowConnectOverlayEvent = z.infer<typeof showConnectOverlayEventSchema>;
-export type ShowSettingsOverlayEventSchema = z.infer<typeof showSettingsOverlayEventSchema>;
+export type ShowSettingsOverlayEvent = z.infer<typeof showSettingsOverlayEventSchema>;

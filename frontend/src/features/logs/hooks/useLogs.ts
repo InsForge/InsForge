@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { logService } from '../services/log.service';
 import type { LogSchema } from '@insforge/shared-schemas';
-import { LOGS_PAGE_SIZE } from '../helpers';
+import { LOGS_PAGE_SIZE, SeverityType } from '../helpers';
 
 const FETCH_SIZE = 200;
 
@@ -81,7 +81,7 @@ export function useLogs(source: string) {
   }, [source, loadedLogs, hasMore, isLoadingMore]);
 
   // Get severity from log
-  const getSeverity = useCallback((log: LogSchema): string => {
+  const getSeverity = useCallback((log: LogSchema): SeverityType => {
     // Parse from log.body.metadata.level set by Vector
     const metadata = log.body?.metadata as { level?: string } | undefined;
     const level = metadata?.level;
