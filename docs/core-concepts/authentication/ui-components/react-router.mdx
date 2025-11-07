@@ -3,7 +3,7 @@ title: React
 description: Framework-agnostic authentication components for any React application
 ---
 
-The `@insforge/react` package provides **complete authentication solution for React applications**. Use deployed auth pages (built-in auth) or custom UI components—works with Vite + React Router.
+The `@insforge/react-router` package provides **complete authentication solution for React applications**. Use deployed auth pages (built-in auth) or custom UI components—works with Vite + React Router.
 
 ## Features
 
@@ -20,7 +20,7 @@ The `@insforge/react` package provides **complete authentication solution for Re
 ### Step 1: Install Package and Set Environment Variables
 
 ```bash
-npm install @insforge/react@latest
+npm install @insforge/react-router@latest
 ```
 
 <Note>
@@ -70,7 +70,7 @@ createRoot(document.getElementById('root')!).render(
 
 ```tsx src/App.tsx
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-import { getInsforgeRoutes } from '@insforge/react/router';
+import { getInsforgeRoutes } from '@insforge/react-router/router';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
@@ -131,7 +131,7 @@ export default function Layout() {
 ### Step 4: Use Hooks & Components
 
 ```tsx src/pages/Home.tsx
-import { SignedIn, SignedOut, UserButton, useAuth, useUser } from '@insforge/react';
+import { SignedIn, SignedOut, UserButton, useAuth, useUser } from '@insforge/react-router';
 
 export default function Home() {
   const { isSignedIn } = useAuth();
@@ -169,7 +169,7 @@ The provider setup is identical:
 ```tsx src/main.tsx
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { InsforgeProvider } from '@insforge/react';
+import { InsforgeProvider } from '@insforge/react-router';
 import App from './App';
 
 createRoot(document.getElementById('root')!).render(
@@ -193,7 +193,7 @@ Set `builtInAuth: false` and provide your page components:
 
 ```tsx src/App.tsx
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-import { getInsforgeRoutes } from '@insforge/react/router';
+import { getInsforgeRoutes } from '@insforge/react-router/router';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
@@ -237,7 +237,7 @@ export default function App() {
 Use our complete authentication components directly. These components are **full-featured page-level components** with all business logic included:
 
 ```tsx src/pages/auth/SignInPage.tsx
-import { SignIn } from '@insforge/react';
+import { SignIn } from '@insforge/react-router';
 
 export default function SignInPage() {
   return (
@@ -255,7 +255,7 @@ export default function SignInPage() {
 ```
 
 ```tsx src/pages/auth/SignUpPage.tsx
-import { SignUp } from '@insforge/react';
+import { SignUp } from '@insforge/react-router';
 
 export default function SignUpPage() {
   return (
@@ -273,7 +273,7 @@ export default function SignUpPage() {
 ```
 
 ```tsx src/pages/auth/ForgotPasswordPage.tsx
-import { ForgotPassword } from '@insforge/react';
+import { ForgotPassword } from '@insforge/react-router';
 
 export default function ForgotPasswordPage() {
   return (
@@ -369,7 +369,7 @@ These components include full authentication logic and work out of the box.
 Complete sign-in component with email/password and OAuth:
 
 ```tsx
-import { SignIn } from '@insforge/react';
+import { SignIn } from '@insforge/react-router';
 
 function SignInPage() {
   return (
@@ -403,7 +403,7 @@ function SignInPage() {
 Complete sign-up component with password strength validation:
 
 ```tsx
-import { SignUp } from '@insforge/react';
+import { SignUp } from '@insforge/react-router';
 
 function SignUpPage() {
   return (
@@ -433,7 +433,7 @@ function SignUpPage() {
 User profile dropdown with sign-out:
 
 ```tsx
-import { UserButton } from '@insforge/react';
+import { UserButton } from '@insforge/react-router';
 
 function Header() {
   return (
@@ -460,7 +460,7 @@ function Header() {
 Complete password reset flow with automatic method detection:
 
 ```tsx
-import { ForgotPassword } from '@insforge/react';
+import { ForgotPassword } from '@insforge/react-router';
 
 function ForgotPasswordPage() {
   return (
@@ -491,7 +491,7 @@ function ForgotPasswordPage() {
 Protected content with conditional rendering:
 
 ```tsx
-import { Protect } from '@insforge/react';
+import { Protect } from '@insforge/react-router';
 
 function Dashboard() {
   return (
@@ -528,7 +528,7 @@ function Dashboard() {
 Conditional rendering based on auth state:
 
 ```tsx
-import { SignedIn, SignedOut } from '@insforge/react';
+import { SignedIn, SignedOut } from '@insforge/react-router';
 
 function NavBar() {
   return (
@@ -556,7 +556,7 @@ function NavBar() {
 Access authentication methods and state:
 
 ```tsx
-import { useAuth } from '@insforge/react';
+import { useAuth } from '@insforge/react-router';
 
 function LoginButton() {
   const { signIn, signUp, signOut, isSignedIn, isLoaded } = useAuth();
@@ -592,7 +592,7 @@ function LoginButton() {
 Access current user data:
 
 ```tsx
-import { useUser } from '@insforge/react';
+import { useUser } from '@insforge/react-router';
 
 function UserProfile() {
   const { user, isLoaded, updateUser } = useUser();
@@ -627,7 +627,7 @@ function UserProfile() {
 Get your authentication config in InsForge:
 
 ```tsx
-import { usePublicAuthConfig } from '@insforge/react';
+import { usePublicAuthConfig } from '@insforge/react-router';
 
 function SignInPage() {
   const { oauthProviders, emailConfig, isLoaded } = usePublicAuthConfig();
