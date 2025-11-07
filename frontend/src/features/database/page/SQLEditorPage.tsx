@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useRawSQL } from '@/features/database/hooks/useRawSQL';
+import { useSQLEditorContext } from '@/features/database/contexts/SQLEditorContext';
 import { Button } from '@/components/radix/Button';
 import { CodeEditor } from '@/components/CodeEditor';
 import { DataGrid, type DataGridColumn, type DataGridRow } from '@/components/datagrid';
@@ -101,24 +102,14 @@ function ErrorViewer({ error }: ErrorViewerProps) {
   );
 }
 
-const STORAGE_KEY = 'sql-editor-query';
-
 export default function SQLEditorPage() {
-  // Load query from localStorage on mount
-  const [query, setQuery] = useState(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved || '';
-  });
+  // Use context to persist query across navigation, but clear on refresh
+  const { query, setQuery } = useSQLEditorContext();
 
   const { executeSQL, isPending, data, isSuccess, error, isError } = useRawSQL({
     showSuccessToast: true,
     showErrorToast: false, // Don't show toast, we'll display in results
   });
-
-  // Save query to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, query);
-  }, [query]);
 
   const handleExecuteQuery = () => {
     if (!query.trim() || isPending) {
