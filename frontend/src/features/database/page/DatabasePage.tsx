@@ -367,8 +367,9 @@ function DatabasePageContent() {
         searchQuery: searchQuery,
       });
       setSelectedRows(new Set(allIds));
-    } catch {
-      showToast('Failed to select all records', 'error');
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : 'Failed to select all records';
+      showToast(errorMessage, 'error');
     } finally {
       setIsSelectingAll(false);
     }
@@ -541,7 +542,10 @@ function DatabasePageContent() {
                             ) : (
                               <>
                                 <Square className="h-4 w-4" />
-                                <span>Select All {tableData?.totalRecords} Rows</span>
+                                <span>
+                                  + Select All {searchQuery ? 'Filtered' : tableData?.totalRecords}
+                                  Rows
+                                </span>
                               </>
                             )}
                           </Button>
