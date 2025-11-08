@@ -48,10 +48,7 @@ function DeleteBulkActionButton({
       ) : (
         <>
           <Square className="h-4 w-4" />
-          <span>
-            + Select All {searchQuery ? 'Filtered' : totalRecords}
-            Rows
-          </span>
+          <span>Select All {searchQuery ? 'Filtered' : totalRecords} Rows</span>
         </>
       )}
     </Button>
