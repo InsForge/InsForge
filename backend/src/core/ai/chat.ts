@@ -31,8 +31,8 @@ export class ChatService {
 
     // Format conversation messages
     for (const msg of messages) {
-      // Check if message has images
-      if (msg.images && msg.images.length) {
+      // Check if message has images (legacy format), new format image is within the content array
+      if (msg.images && msg.images.length && typeof msg.content === 'string') {
         // Build multimodal content array
         const content = [
           { type: 'text', text: msg.content },
@@ -47,11 +47,11 @@ export class ChatService {
           content,
         } as OpenAI.Chat.ChatCompletionMessageParam);
       } else {
-        // Simple text message
+        // Simple text message or new format (content array)
         formattedMessages.push({
           role: msg.role as 'system' | 'user' | 'assistant',
           content: msg.content,
-        });
+        } as OpenAI.Chat.ChatCompletionMessageParam);
       }
     }
 

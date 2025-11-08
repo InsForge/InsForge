@@ -5,7 +5,6 @@ import { StepContent } from '../components/StepContent';
 import LoaderIcon from '@/assets/icons/loader.svg?react';
 import ConnectedIcon from '@/assets/icons/connected.svg?react';
 import { ServerEvents, useSocket } from '@/lib/contexts/SocketContext';
-import { isInsForgeCloudProject } from '@/lib/utils/utils';
 import type { McpConnectedPayload } from '@/features/logs/hooks/useMcpUsage';
 
 const STEP_DESCRIPTIONS = [
@@ -33,9 +32,7 @@ export default function OnBoardPage() {
     const handleMcpCallDetected = (_data: McpConnectedPayload) => {
       setMcpDetected(true);
       // Navigate to dashboard to show success message
-      // Determine the correct dashboard route based on environment
-      const dashboardRoute = isInsForgeCloudProject() ? '/cloud/dashboard' : '/dashboard';
-      void navigate(dashboardRoute, { state: { showSuccessBanner: true } });
+      void navigate('/dashboard', { state: { showSuccessBanner: true } });
     };
 
     socket.on(ServerEvents.MCP_CONNECTED, handleMcpCallDetected);

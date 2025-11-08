@@ -2,8 +2,8 @@
 import { useNavigate } from 'react-router-dom';
 import { LockIcon } from 'lucide-react';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
-import { postMessageToParent } from '@/lib/utils/cloud-messaging';
 
 export default function CloudLoginPage() {
   const navigate = useNavigate();
@@ -73,10 +73,12 @@ export default function CloudLoginPage() {
 
   useEffect(() => {
     if (isAuthenticated && !isMcpUsageLoading) {
-      const redirectPath = hasCompletedOnboarding ? '/cloud/dashboard' : '/cloud/onboard';
-      void navigate(redirectPath, { replace: true });
+      if (!hasCompletedOnboarding) {
+        postMessageToParent({ type: 'SHOW_ONBOARDING_OVERLAY' });
+      }
+      void navigate('/dashboard', { replace: true });
     }
-  }, [isAuthenticated, navigate, hasCompletedOnboarding, isMcpUsageLoading]);
+  }, [hasCompletedOnboarding, isAuthenticated, isMcpUsageLoading, navigate]);
 
   // Show error state if authentication failed
   if (authError) {

@@ -5,37 +5,6 @@ description: Zero-configuration authentication for Next.js with built-in UI comp
 
 The `@insforge/nextjs` package provides **zero-configuration authentication** for Next.js applications. Authentication pages are hosted on your backend by default—no UI code needed.
 
-<Tip>
-**For AI Agents - Quick Navigation:**
-- **Built-in auth (recommended)**: Follow [Quick Start](#quick-start-built-in-auth) → 5-minute setup with backend-hosted auth pages
-- **Custom UI needed**: Jump to [Advanced Usage](#advanced-usage) for custom components
-
-**Key principle**: Always use `@insforge/sdk` methods with these components. Never use raw `fetch` calls.
-
-</Tip>
-
-## Why Built-in Auth?
-
-<CardGroup cols={2}>
-  <Card title="Zero UI Code" icon="code">
-    No SignIn/SignUp pages to create
-  </Card>
-
-<Card title="5-Minute Setup" icon="clock">
-  Provider + API route + Middleware = done
-</Card>
-
-<Card title="Production Ready" icon="shield-check">
-  Battle-tested auth UI maintained by Insforge
-</Card>
-
-  <Card title="Auto OAuth" icon="key">
-    11 providers configured automatically from backend
-  </Card>
-</CardGroup>
-
-<Note>Use custom components only if you need custom form fields or different workflow.</Note>
-
 ## Features
 
 - **Built-in Authentication**: Backend-hosted sign-in/sign-up pages (default)
@@ -46,27 +15,25 @@ The `@insforge/nextjs` package provides **zero-configuration authentication** fo
 - **Next.js Middleware**: Server-side route protection
 - **TypeScript**: Full type safety
 
-## Installation
+## Quick Start (Built-in Auth)
+
+<Note>**Recommended for most use cases**: InsForge-hosted auth pages with zero UI code.</Note>
+
+### Step 1: Install Package and Set Environment Variables
 
 ```bash
-npm install @insforge/nextjs
-```
-
-## Environment Variables
-
-```bash .env.local
-NEXT_PUBLIC_INSFORGE_BASE_URL=https://your-project.insforge.app/
+npm install @insforge/nextjs@latest
 ```
 
 <Note>
   **Required Dependencies:** ```bash npm install react@^19.0.0 react-dom@^19.0.0 next@^15.0.0 ```
 </Note>
 
-## Quick Start (Built-in Auth)
+```bash .env.local
+NEXT_PUBLIC_INSFORGE_BASE_URL=https://your-app.region.insforge.app/
+```
 
-<Note>**Recommended for most use cases**: InsForge-hosted auth pages with zero UI code.</Note>
-
-### Step 1: Add InsforgeProvider
+### Step 2: Add InsforgeProvider
 
 Wrap your application with the `InsforgeProvider` in your root layout:
 
@@ -78,7 +45,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <InsforgeProvider
-          baseUrl={process.env.NEXT_PUBLIC_INSFORGE_BASE_URL}
+          baseUrl={
+            process.env.NEXT_PUBLIC_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app' // Replace with your InsForge backend URL
+          }
           afterSignInUrl="/dashboard"
         >
           {children}
@@ -89,7 +58,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
-### Step 2: Create API Route
+### Step 3: Create API Route
 
 Create an API route to enable server-side rendering (SSR) and cookie-based authentication:
 
@@ -97,7 +66,7 @@ Create an API route to enable server-side rendering (SSR) and cookie-based authe
 import { createAuthRouteHandlers } from '@insforge/nextjs/api';
 
 const handlers = createAuthRouteHandlers({
-  baseUrl: process.env.NEXT_PUBLIC_INSFORGE_BASE_URL,
+  baseUrl: process.env.NEXT_PUBLIC_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app', // Replace with your InsForge backend URL
   cookieName: 'insforge_token',
 });
 
@@ -108,7 +77,7 @@ export const DELETE = handlers.DELETE;
 
 <Info>**Why?** This route syncs auth tokens to HTTP-only cookies for server-side middleware.</Info>
 
-### Step 3: Add Middleware
+### Step 4: Add Middleware
 
 Create middleware to protect routes:
 
@@ -116,7 +85,7 @@ Create middleware to protect routes:
 import { InsforgeMiddleware } from '@insforge/nextjs/middleware';
 
 export default InsforgeMiddleware({
-  baseUrl: process.env.NEXT_PUBLIC_INSFORGE_BASE_URL,
+  baseUrl: process.env.NEXT_PUBLIC_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app', // Replace with your InsForge backend URL
   publicRoutes: ['/'],
   cookieName: 'insforge_token',
 });
@@ -145,7 +114,7 @@ export default function Home() {
 
       <SignedIn>
         <UserButton afterSignOutUrl="/" />
-        <h1>Welcome, {user?.email}!</h1>
+        <h1>Welcome, {user.email}!</h1>
       </SignedIn>
     </div>
   );
@@ -161,7 +130,7 @@ export default function Home() {
 ```
 1. User clicks "Sign In" → Middleware detects using built-in auth
    ↓
-2. Middleware redirects : your-project.insforge.app/auth/signin?redirect=yourapp.com/you-defined-destination-after-sign-in
+2. Middleware redirects : https://your-app.region.insforge.app/auth/signin?redirect=yourapp.com/you-defined-destination-after-sign-in
    ↓
 3. User signs in on deployed page → Backend processes authentication
    ↓
@@ -314,7 +283,7 @@ function UserProfile() {
 
 **Returns:**
 
-- `user` - Current user object (id, email, nickname, avatarUrl, role, emailVerified)
+- `user` - Current user object (id, email, name?, avatarUrl?)
 - `isLoaded` - Boolean loading state
 - `updateUser(data)` - Update user profile
 
@@ -326,14 +295,14 @@ Get your authentication config in InsForge:
 import { usePublicAuthConfig } from '@insforge/nextjs';
 
 function SignInPage() {
-  const { oauthProviders, emailConfig, isLoaded } = usePublicAuthConfig();
+  const { authConfig, isLoaded } = usePublicAuthConfig();
 
   if (!isLoaded) return <div>Loading...</div>;
 
   return (
     <div>
-      <p>Available OAuth: {oauthProviders.join(', ')}</p>
-      <p>Password min length: {emailConfig?.passwordMinLength}</p>
+      <p>Available OAuth: {authConfig.oAuthProviders.join(', ')}</p>
+      <p>Password min length: {authConfig?.passwordMinLength}</p>
     </div>
   );
 }
@@ -341,8 +310,7 @@ function SignInPage() {
 
 **Returns:**
 
-- `oauthProviders` - OAuth providers enabled by you
-- `emailConfig` - Your email auth config like password length
+- `authConfig` - Authentication Configuration you set in InsForge dashboard.
 - `isLoaded` - Boolean loading state
 
 <Warning>
@@ -398,19 +366,14 @@ function Header() {
 
 ### Protect
 
-Conditional rendering with custom logic:
+Only render when the user is signed in:
 
 ```tsx
 import { Protect } from '@insforge/nextjs';
 
-// Role-based access
-<Protect condition={(user) => user.role === 'admin'}>
-  <AdminPanel />
-</Protect>
-
-// Email verification check
-<Protect condition={(user) => user.emailVerified}>
-  <VerifiedUserFeature />
+// Block unauthenticated access
+<Protect redirectTo='/sign-in'>
+  <VerifiedUserProfile />
 </Protect>
 
 // Custom logic
@@ -448,40 +411,3 @@ Track authentication state changes for analytics or other side effects:
   {children}
 </InsforgeProvider>
 ```
-
----
-
-## Why @insforge/nextjs?
-
-<CardGroup cols={2}>
-  <Card title="For Developers" icon="user">
-    5-minute auth setup vs hours of custom code. Production-ready security and OAuth support out of
-    the box.
-  </Card>
-
-  <Card title="For AI Agents" icon="robot">
-    Minimal code generation (5 files vs 20+). SDK-first approach ensures type safety and reduces
-    errors.
-  </Card>
-</CardGroup>
-
-<Note>
-  **Key Principle**: This package works with `@insforge/sdk`. Always use SDK methods for API
-  calls—never raw `fetch`. Components handle UI, SDK handles data.
-</Note>
-
-## Resources
-
-<CardGroup cols={3}>
-  <Card title="Documentation" icon="book" href="https://docs.insforge.dev/introduction">
-    Full documentation
-  </Card>
-
-<Card title="GitHub Issues" icon="github" href="https://github.com/InsForge/InsForge/issues">
-  Report bugs & request features
-</Card>
-
-  <Card title="Discord Community" icon="discord" href="https://discord.com/invite/DvBtaEc9Jz">
-    Get help & share feedback
-  </Card>
-</CardGroup>

@@ -51,8 +51,7 @@
                     "group": "UI Components",
                     "pages": [
                       "core-concepts/authentication/ui-components/nextjs",
-                      "core-concepts/authentication/ui-components/react",
-                      "core-concepts/authentication/ui-components/customization"
+                      "core-concepts/authentication/ui-components/react"
                     ]
                   }
                 ]
@@ -81,12 +80,25 @@
             ]
           },
           {
+            "group": "Changelog",
+            "pages": ["changelog"]
+          }
+        ]
+      },
+      {
+        "tab": "Examples",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": ["examples/overview"]
+          },
+          {
             "group": "Showcase",
             "pages": ["showcase"]
           },
           {
-            "group": "Changelog",
-            "pages": ["changelog"]
+            "group": "Integration Guides",
+            "pages": ["examples/integration-guides/coming-soon"]
           }
         ]
       },

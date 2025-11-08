@@ -3,16 +3,34 @@ import { aiConfigurationSchema, aiUsageRecordSchema, modalitySchema } from './ai
 
 // ============= Chat Completion Schemas =============
 
+// OpenAI-compatible content schemas
+export const textContentSchema = z.object({
+  type: z.literal('text'),
+  text: z.string(),
+});
+
+export const imageContentSchema = z.object({
+  type: z.literal('image_url'),
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  image_url: z.object({
+    // URL can be either a public URL or base64-encoded data URI
+    // Examples:
+    // - Public URL: "https://example.com/image.jpg"
+    // - Base64: "data:image/jpeg;base64,/9j/4AAQ..."
+    url: z.string(),
+    detail: z.enum(['auto', 'low', 'high']).optional(),
+  }),
+});
+
+export const contentSchema = z.union([textContentSchema, imageContentSchema]);
+
+// Chat message supports both OpenAI format and legacy format for backward compatibility
 export const chatMessageSchema = z.object({
   role: z.enum(['user', 'assistant', 'system']),
-  content: z.string(),
-  images: z
-    .array(
-      z.object({
-        url: z.string(),
-      })
-    )
-    .optional(),
+  // New format: content can be string or array of content parts (OpenAI-compatible)
+  content: z.union([z.string(), z.array(contentSchema)]),
+  // Legacy format: separate images field (deprecated but supported for backward compatibility)
+  images: z.array(z.object({ url: z.string() })).optional(),
 });
 
 export const chatCompletionRequestSchema = z.object({

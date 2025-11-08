@@ -1,9 +1,11 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { RefreshCw, Search, FileText, Trash2 } from 'lucide-react';
 import { Button } from '@/components/radix/Button';
 import { Input } from '@/components/radix/Input';
 import { Alert, AlertDescription } from '@/components/radix/Alert';
-import { LogsTable, LogsTableColumn } from '@/features/logs/components/LogsTable';
+import { LogsDataGrid, type LogsColumnDef } from '@/features/logs/components/LogsDataGrid';
+import { formatTime } from '@/lib/utils/utils';
+import { LOGS_PAGE_SIZE } from '@/features/logs/helpers';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import {
@@ -13,30 +15,16 @@ import {
   TooltipTrigger,
 } from '@/components/radix/Tooltip';
 import { useAuditLogs, useClearAuditLogs } from '@/features/logs/hooks/useAuditLogs';
-import type { GetAuditLogsRequest, AuditLogSchema } from '@insforge/shared-schemas';
-import { PaginationControls } from '@/components/PaginationControls';
-
-function formatTime(timestamp: string): string {
-  const date = new Date(timestamp);
-  return date.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
-}
+import type { GetAuditLogsRequest } from '@insforge/shared-schemas';
 
 export default function AuditsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [filters, setFilters] = useState<Partial<GetAuditLogsRequest>>({});
-  const pageSize = 50;
   const { confirm, confirmDialogProps } = useConfirm();
 
   // Calculate offset based on current page
-  const offset = (currentPage - 1) * pageSize;
+  const offset = (currentPage - 1) * LOGS_PAGE_SIZE;
 
   // Fetch logs with pagination and filters
   const {
@@ -45,7 +33,7 @@ export default function AuditsPage() {
     error,
     refetch,
   } = useAuditLogs({
-    limit: pageSize,
+    limit: LOGS_PAGE_SIZE,
     offset,
     ...filters,
   });
@@ -88,84 +76,44 @@ export default function AuditsPage() {
   const totalRecords = logsResponse?.pagination?.total || 0;
 
   // Define columns for audit logs
-  const renderActor = useCallback(
-    (log: AuditLogSchema) => (
-      <p className="text-sm text-gray-900 dark:text-white font-normal leading-6 truncate">
-        {log.actor}
-      </p>
-    ),
-    []
-  );
-
-  const renderAction = useCallback(
-    (log: AuditLogSchema) => (
-      <p className="text-sm text-gray-900 dark:text-white font-normal leading-6 truncate">
-        {log.action}
-      </p>
-    ),
-    []
-  );
-
-  const renderModule = useCallback(
-    (log: AuditLogSchema) => (
-      <p className="text-sm text-gray-900 dark:text-white font-normal leading-6 truncate">
-        {log.module}
-      </p>
-    ),
-    []
-  );
-
-  const renderDetails = useCallback(
-    (log: AuditLogSchema) => (
-      <p className="text-sm text-gray-900 dark:text-white font-normal leading-6 break-all">
-        {log.details ? JSON.stringify(log.details) : '-'}
-      </p>
-    ),
-    []
-  );
-
-  const renderTime = useCallback(
-    (log: AuditLogSchema) => (
-      <p className="text-sm text-gray-900 dark:text-white font-normal leading-6">
-        {formatTime(log.createdAt)}
-      </p>
-    ),
-    []
-  );
-
-  const columns = useMemo(
-    (): LogsTableColumn<AuditLogSchema>[] => [
+  const columns: LogsColumnDef[] = useMemo(
+    () => [
       {
         key: 'actor',
-        label: 'Actor',
+        name: 'Actor',
         width: '200px',
-        render: renderActor,
       },
       {
         key: 'action',
-        label: 'Action',
+        name: 'Action',
         width: '200px',
-        render: renderAction,
       },
       {
         key: 'module',
-        label: 'Module',
+        name: 'Module',
         width: '150px',
-        render: renderModule,
       },
       {
         key: 'details',
-        label: 'Details',
-        render: renderDetails,
+        name: 'Details',
+        renderCell: ({ row }) => (
+          <p className="text-sm text-gray-900 dark:text-white font-normal leading-6 break-all">
+            {row.details ? JSON.stringify(row.details) : '-'}
+          </p>
+        ),
       },
       {
         key: 'createdAt',
-        label: 'Time',
+        name: 'Time',
         width: '250px',
-        render: renderTime,
+        renderCell: ({ row }) => (
+          <p className="text-sm text-gray-900 dark:text-white font-normal leading-6">
+            {formatTime(String(row.createdAt ?? ''))}
+          </p>
+        ),
       },
     ],
-    [renderActor, renderAction, renderModule, renderDetails, renderTime]
+    []
   );
   return (
     <div className="flex h-full bg-bg-gray dark:bg-neutral-800">
@@ -265,30 +213,25 @@ export default function AuditsPage() {
                 </div>
               </div>
             ) : (
-              <>
-                <div className="flex-1 overflow-hidden">
-                  <LogsTable<AuditLogSchema>
-                    columns={columns}
-                    data={logsData}
-                    isLoading={isLoading}
-                    emptyMessage={
-                      searchQuery
+              <div className="flex-1 overflow-hidden">
+                <LogsDataGrid
+                  columnDefs={columns}
+                  data={logsData}
+                  loading={isLoading}
+                  currentPage={currentPage}
+                  totalPages={Math.ceil(totalRecords / LOGS_PAGE_SIZE)}
+                  pageSize={LOGS_PAGE_SIZE}
+                  totalRecords={totalRecords}
+                  onPageChange={setCurrentPage}
+                  emptyState={
+                    <div className="text-sm text-zinc-500 dark:text-zinc-400">
+                      {searchQuery
                         ? 'No audit logs match your search criteria'
-                        : 'No audit logs found'
-                    }
-                  />
-                </div>
-                {!isLoading && (
-                  <PaginationControls
-                    currentPage={currentPage}
-                    totalPages={Math.ceil(totalRecords / pageSize)}
-                    onPageChange={setCurrentPage}
-                    totalRecords={totalRecords}
-                    pageSize={pageSize}
-                    recordLabel="Audit Logs"
-                  />
-                )}
-              </>
+                        : 'No audit logs found'}
+                    </div>
+                  }
+                />
+              </div>
             )}
           </div>
         </div>
