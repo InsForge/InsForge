@@ -1,30 +1,25 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { Plus, Upload, CheckSquare, Square } from 'lucide-react';
 import PencilIcon from '@/assets/icons/pencil.svg?react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
-import { useTables } from '@/features/database/hooks/useTables';
-import { useRecords } from '@/features/database/hooks/useRecords';
-import { Button } from '@/components/radix/Button';
-import { Alert, AlertDescription } from '@/components/radix/Alert';
-import { TableSidebar } from '@/features/database/components/TableSidebar';
-import { RecordFormDialog } from '@/features/database/components/RecordFormDialog';
-import { TableForm } from '@/features/database/components/TableForm';
+import { DeleteActionButton, SearchInput, SelectionClearButton } from '@/components';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { ConnectCTA } from '@/components/ConnectCTA';
+import DeleteBulkActionButton from '@/components/DeleteBulkActionButton';
 import { EmptyState } from '@/components/EmptyState';
+import { Alert, AlertDescription } from '@/components/radix/Alert';
+import { Button } from '@/components/radix/Button';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/radix/Tooltip';
-import { useConfirm } from '@/lib/hooks/useConfirm';
-import { useToast } from '@/lib/hooks/useToast';
 import { DatabaseDataGrid } from '@/features/database/components/DatabaseDataGrid';
-import { SearchInput, SelectionClearButton, DeleteActionButton } from '@/components';
-import { ConnectCTA } from '@/components/ConnectCTA';
-import { SortColumn } from 'react-data-grid';
-import { convertValueForColumn } from '@/lib/utils/utils';
+import { RecordFormDialog } from '@/features/database/components/RecordFormDialog';
+import { TableForm } from '@/features/database/components/TableForm';
+import { TableSidebar } from '@/features/database/components/TableSidebar';
+import { useCSVImport } from '@/features/database/hooks/useCSVImport';
+import { useRecords } from '@/features/database/hooks/useRecords';
+import { useTables } from '@/features/database/hooks/useTables';
 import {
   DataUpdatePayload,
   DataUpdateResourceType,
@@ -32,7 +27,13 @@ import {
   SocketMessage,
   useSocket,
 } from '@/lib/contexts/SocketContext';
-import { useCSVImport } from '@/features/database/hooks/useCSVImport';
+import { useConfirm } from '@/lib/hooks/useConfirm';
+import { useToast } from '@/lib/hooks/useToast';
+import { convertValueForColumn } from '@/lib/utils/utils';
+import { useQueryClient } from '@tanstack/react-query';
+import { Plus, Upload } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { SortColumn } from 'react-data-grid';
 
 const PAGE_SIZE = 50;
 
@@ -512,41 +513,13 @@ export default function TablesPage() {
                               onDelete={() => void handleBulkDelete(Array.from(selectedRows))}
                             />
                           )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => void handleToggleSelectAll()}
-                            disabled={isSelectingAll}
-                            className={`
-                              h-9 px-3 gap-2 font-medium transition-all
-                              ${
-                                isAllSelected
-                                  ? 'text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/30'
-                                  : 'text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/30'
-                              }
-                              ${isSelectingAll ? 'opacity-50 cursor-not-allowed' : ''}
-                            `}
-                          >
-                            {isSelectingAll ? (
-                              <>
-                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                <span>Selecting...</span>
-                              </>
-                            ) : isAllSelected ? (
-                              <>
-                                <CheckSquare className="h-4 w-4" />
-                                <span>Deselect All</span>
-                              </>
-                            ) : (
-                              <>
-                                <Square className="h-4 w-4" />
-                                <span>
-                                  + Select All {searchQuery ? 'Filtered' : tableData?.totalRecords}
-                                  Rows
-                                </span>
-                              </>
-                            )}
-                          </Button>
+                          <DeleteBulkActionButton
+                            isSelectingAll={isSelectingAll}
+                            totalRecords={tableData?.totalRecords || 0}
+                            filteredRecords={selectedRows.size}
+                            searchQuery={searchQuery}
+                            onToggleSelectAll={() => void handleToggleSelectAll()}
+                          />
                         </div>
                       ) : (
                         <SearchInput
