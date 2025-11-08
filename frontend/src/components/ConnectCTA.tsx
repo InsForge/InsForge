@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
+import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 
 interface ConnectCTAProps {
   className?: string;
@@ -16,7 +17,11 @@ export function ConnectCTA({ className, fallback }: ConnectCTAProps) {
   }
 
   const handleConnect = () => {
-    void navigate(isInsForgeCloudProject() ? '/cloud/onboard' : '/dashboard/onboard');
+    if (isInsForgeCloudProject()) {
+      postMessageToParent({ type: 'SHOW_ONBOARDING_OVERLAY' });
+    } else {
+      void navigate('/dashboard/onboard');
+    }
   };
 
   return (

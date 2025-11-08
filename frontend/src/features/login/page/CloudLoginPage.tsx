@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { LockIcon } from 'lucide-react';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
+import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 
 export default function CloudLoginPage() {
   const navigate = useNavigate();
   const { loginWithAuthorizationCode, isAuthenticated } = useAuth();
+  const { hasCompletedOnboarding, isLoading: isMcpUsageLoading } = useMcpUsage();
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Handle authorization code from postMessage
@@ -70,10 +72,13 @@ export default function CloudLoginPage() {
   }, [loginWithAuthorizationCode]);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !isMcpUsageLoading) {
+      if (!hasCompletedOnboarding) {
+        postMessageToParent({ type: 'SHOW_ONBOARDING_OVERLAY' });
+      }
       void navigate('/dashboard', { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [hasCompletedOnboarding, isAuthenticated, isMcpUsageLoading, navigate]);
 
   // Show error state if authentication failed
   if (authError) {
