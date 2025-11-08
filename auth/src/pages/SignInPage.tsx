@@ -14,11 +14,6 @@ export function SignInPage() {
       return;
     }
 
-    // Listen for PING and respond with PONG
-    const unsubscribePing = broadcastService.subscribe(BroadcastEventType.PING, () => {
-      broadcastService.broadcast(BroadcastEventType.PONG);
-    });
-
     const unsubscribeVerified = broadcastService.subscribe(
       BroadcastEventType.EMAIL_VERIFIED_SUCCESS,
       (event: BroadcastEvent) => {
@@ -42,7 +37,6 @@ export function SignInPage() {
     );
 
     return () => {
-      unsubscribePing();
       unsubscribeVerified();
     };
   }, [redirectUrl]);
