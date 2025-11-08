@@ -1,6 +1,8 @@
 export enum BroadcastEventType {
   EMAIL_VERIFIED_SUCCESS = 'EMAIL_VERIFIED_SUCCESS',
   PASSWORD_RESET_SUCCESS = 'PASSWORD_RESET_SUCCESS',
+  PING = 'PING',
+  PONG = 'PONG',
 }
 
 export interface BroadcastEvent {
@@ -99,6 +101,44 @@ class BroadcastService {
     } catch (error) {
       console.error('Failed to broadcast event:', error);
     }
+  }
+
+  /**
+   * Check if there are any listeners by sending a PING and waiting for PONG
+   * @param timeout - Timeout in milliseconds to wait for response
+   * @returns Promise that resolves to true if listeners found, false otherwise
+   */
+  async checkForListeners(timeout = 500): Promise<boolean> {
+    if (!this.isInitialized) {
+      this.init();
+    }
+
+    if (!this.channel) {
+      return false;
+    }
+
+    return new Promise((resolve) => {
+      let responded = false;
+      const unsubscribe = this.subscribe(BroadcastEventType.PONG, () => {
+        if (!responded) {
+          responded = true;
+          unsubscribe();
+          resolve(true);
+        }
+      });
+
+      // Send PING
+      this.broadcast(BroadcastEventType.PING);
+
+      // Set timeout
+      setTimeout(() => {
+        if (!responded) {
+          responded = true;
+          unsubscribe();
+          resolve(false);
+        }
+      }, timeout);
+    });
   }
 
   close(): void {

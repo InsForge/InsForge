@@ -14,7 +14,12 @@ export function SignInPage() {
       return;
     }
 
-    const unsubscribe = broadcastService.subscribe(
+    // Listen for PING and respond with PONG
+    const unsubscribePing = broadcastService.subscribe(BroadcastEventType.PING, () => {
+      broadcastService.broadcast(BroadcastEventType.PONG);
+    });
+
+    const unsubscribeVerified = broadcastService.subscribe(
       BroadcastEventType.EMAIL_VERIFIED_SUCCESS,
       (event: BroadcastEvent) => {
         const { accessToken, user } = event.data || {};
@@ -36,7 +41,10 @@ export function SignInPage() {
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribePing();
+      unsubscribeVerified();
+    };
   }, [redirectUrl]);
 
   const handleError = useCallback((error: Error) => {
