@@ -3,13 +3,13 @@ import { aiConfigurationSchema, aiUsageRecordSchema, modalitySchema } from './ai
 
 // ============= Chat Completion Schemas =============
 
-// OpenAI-compatible content part schemas
-export const textContentPartSchema = z.object({
+// OpenAI-compatible content schemas
+export const textContentSchema = z.object({
   type: z.literal('text'),
   text: z.string(),
 });
 
-export const imageUrlContentPartSchema = z.object({
+export const imageContentSchema = z.object({
   type: z.literal('image_url'),
   // eslint-disable-next-line @typescript-eslint/naming-convention
   image_url: z.object({
@@ -22,13 +22,13 @@ export const imageUrlContentPartSchema = z.object({
   }),
 });
 
-export const contentPartSchema = z.union([textContentPartSchema, imageUrlContentPartSchema]);
+export const contentSchema = z.union([textContentSchema, imageContentSchema]);
 
 // Chat message supports both OpenAI format and legacy format for backward compatibility
 export const chatMessageSchema = z.object({
   role: z.enum(['user', 'assistant', 'system']),
   // New format: content can be string or array of content parts (OpenAI-compatible)
-  content: z.union([z.string(), z.array(contentPartSchema)]),
+  content: z.union([z.string(), z.array(contentSchema)]),
   // Legacy format: separate images field (deprecated but supported for backward compatibility)
   images: z.array(z.object({ url: z.string() })).optional(),
 });

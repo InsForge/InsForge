@@ -32,7 +32,7 @@ export class ChatService {
     // Format conversation messages
     for (const msg of messages) {
       // Check if message has images (legacy format), new format image is within the content array
-      if (msg.images && msg.images.length && typeof msg.content !== 'object') {
+      if (msg.images && msg.images.length && typeof msg.content === 'string') {
         // Build multimodal content array
         const content = [
           { type: 'text', text: msg.content },
