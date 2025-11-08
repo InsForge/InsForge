@@ -3,6 +3,7 @@
 ## What is InsForge?
 
 Backend-as-a-service (BaaS) platform providing:
+
 - **Database**: PostgreSQL with PostgREST API
 - **Authentication**: Email/password + OAuth (Google, GitHub)
 - **Storage**: File upload/download
@@ -39,23 +40,27 @@ const client = createClient({
 **Use the InsForge `fetch-docs` MCP tool to get specific SDK documentation:**
 
 Available documentation types:
+
 - `"instructions"` - Essential backend setup (START HERE)
 - `"db-sdk"` - Database operations with SDK
 - **Authentication** - Choose based on implementation:
   - `"auth-sdk"` - Backend/headless auth (SDK methods only)
+  - `"auth-components-react"` - Frontend auth for React+Vite (built-in auth pages + UI)
   - `"auth-components-nextjs"` - Frontend auth for Next.js (built-in auth pages + UI)
-  - `"auth-components-react"` - Frontend auth for React/Vite (built-in auth pages + UI)
+  - `"auth-components-react-router"` - Frontend auth for React(Vite+React Router) (built-in auth pages + UI)
 - `"storage-sdk"` - File storage operations
 - `"functions-sdk"` - Serverless functions invocation
 - `"ai-integration-sdk"` - AI chat and image generation
 
 **🎯 How to Choose Authentication Documentation:**
+
 1. **Building with Next.js?** → Use `"auth-components-nextjs"` (frontend: built-in auth pages)
-2. **Building with React (Vite+React Router)?** → Use `"auth-components-react"` (frontend: built-in auth pages)
+2. **Building with React (Vite+React Router)?** → Use `"auth-components-react-router"` (frontend: built-in auth pages)
 
 ## When to Use SDK vs MCP Tools
 
 ### Always SDK for Application Logic:
+
 - Authentication (register, login, logout, profiles)
 - Database CRUD (select, insert, update, delete)
 - Storage operations (upload, download files)
@@ -63,23 +68,28 @@ Available documentation types:
 - Serverless function invocation
 
 ### Use MCP Tools for Infrastructure:
+
 - Backend setup and metadata (`get-backend-metadata`)
 - Database schema management (`run-raw-sql`, `get-table-schema`)
 - Storage bucket creation (`create-bucket`, `list-buckets`, `delete-bucket`)
 - Serverless function deployment (`create-function`, `update-function`, `delete-function`)
 
 ### When to Use Pre-Built Components
+
 InsForge provides framework-specific UI packages with **built-in auth pages** (zero UI code):
-- `@insforge/nextjs` - Next.js (built-in auth + middleware + SSR)
+
 - `@insforge/react` - React (built-in auth + framework-agnostic)
+- `@insforge/nextjs` - Next.js (built-in auth + middleware + SSR)
+- `@insforge/react-router` - React + React Router (built-in auth + framework-agnostic)
 
 ## Quick Start
 
 1. **First**: Call `get-backend-metadata` to check current backend state
-2. **Detect framework**: Check user's project to determine the framework (Next.js, React/Vite, etc.)
+2. **Detect framework**: Check user's project to determine the framework (Next.js, React, etc.)
 3. **Fetch docs**: Use `fetch-docs` with the appropriate doc type based on framework:
+   - React(Vite) → `"auth-components-react"`
    - Next.js → `"auth-components-nextjs"`
-   - React/Vite/Remix → `"auth-components-react"`
+   - React(Vite+React Router) → `"auth-components-react-router"`
 4. **Initialize SDK**: Create client with your backend URL
 5. **Build**: Use framework-specific Auth Components for auth, SDK methods for database, storage, AI
 
