@@ -56,7 +56,18 @@ AsyncIterableIterator<{
 const completion = await insforge.ai.chat.completions.create({
   model: 'anthropic/claude-3.5-haiku',
   messages: [
-    { role: 'user', content: 'What is the capital of France?' }
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'What do you see in this image?' },
+        {
+          type: 'image_url',
+          image_url: {
+            url: 'https://example.com/photo.jpg' // or base64: 'data:image/jpeg;base64,...'
+          }
+        }
+      ]
+    }
   ]
 })
 
