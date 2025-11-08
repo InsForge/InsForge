@@ -5,16 +5,6 @@ description: Framework-agnostic authentication components for React + React Rout
 
 The `@insforge/react-router` package provides **complete authentication solution for React applications**. Use deployed auth pages (built-in auth) or custom UI components—works with Vite + React Router.
 
-## Features
-
-- **Built-in Auth**: React Router integration with deployed auth pages
-- **Complete Components**: Pre-built `<SignIn>`, `<SignUp>`, `<UserButton>` with business logic
-- **OAuth Support**: Google, GitHub, Discord, Facebook, LinkedIn, Microsoft, Apple, X, Instagram, TikTok, Spotify
-- **React Hooks**: `useAuth()`, `useUser()`, `usePublicAuthConfig()`
-- **Control Components**: `<SignedIn>`, `<SignedOut>`, `<Protect>`
-- **Form Components**: Pure UI forms for custom logic
-- **TypeScript**: Full type safety
-
 ## Quick Start
 
 ### Step 1: Install Package and Set Environment Variables
@@ -56,13 +46,6 @@ createRoot(document.getElementById('root')!).render(
 );
 ```
 
-**Provider Props:**
-
-- `baseUrl` (required): Your Insforge backend URL
-- `afterSignInUrl` (required): Redirect URL after successful sign in (default: `'/'`)
-- `onSignIn` (optional): Custom function to sync token on sign in
-- `onSignOut` (optional): Custom function to clear auth state on sign out
-
 ### Step 3: Configure Router (Built-in Auth)
 
 **The fastest way** - Use deployed auth pages with Layout pattern:
@@ -80,16 +63,12 @@ const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { index: true, element: <Home /> },
-
       { path: 'dashboard', element: <Dashboard /> },
     ],
   },
-
-  // Add built-in auth redirect routes (sign-in, sign-up, forgot-password, etc.)
   ...getInsforgeRoutes({
     baseUrl: import.meta.env.VITE_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app', // Replace with your InsForge backend URL
     afterSignInUrl: '/dashboard',
-    builtInAuth: true, // Redirects to deployed auth pages
   }),
 ]);
 
@@ -147,12 +126,12 @@ export default function Home() {
   );
 }
 ```
-
 **That's it!** Your React + React Router app now has production-ready authentication with built-in auth pages.
-
+---
+ End of instructions for AI agents
 ---
 
-## Alternative: Custom UI Components
+## Custom Authentication system
 
 Use this approach when you need custom authentication pages in your application instead of redirecting to hosted pages.
 
@@ -234,7 +213,7 @@ import { SignIn } from '@insforge/react-router';
 
 export default function SignInPage() {
   return (
-    <div className="auth-page">
+    <div className="h-screen flex items-center justify-center">
       <SignIn
         title="Welcome Back"
         subtitle="Sign in to your account"
@@ -252,7 +231,7 @@ import { SignUp } from '@insforge/react-router';
 
 export default function SignUpPage() {
   return (
-    <div className="auth-page">
+    <div className="h-screen flex items-center justify-center">
       <SignUp
         title="Create Account"
         subtitle="Get started for free"
@@ -270,7 +249,7 @@ import { ForgotPassword } from '@insforge/react-router';
 
 export default function ForgotPasswordPage() {
   return (
-    <div className="auth-page">
+    <div className="h-screen flex items-center justify-center">
       <ForgotPassword
         onError={(error) => {
           console.error('Password reset error:', error);
@@ -296,7 +275,7 @@ You only need to wrap them in your page components for layout/styling purposes.
 
 **Built-in Auth:**
 
-- `/sign-in` → Redirects to `your-project.insforge.app/auth/sign-in`
+- `/sign-in` → Redirects to `https://your-app.region.insforge.app/auth/sign-in`
 - Authentication happens on hosted page
 - Returns to your app with token
 
@@ -308,6 +287,18 @@ You only need to wrap them in your page components for layout/styling purposes.
 
 ---
 
+## Features
+
+- **Built-in Auth**: React Router integration with deployed auth pages
+- **Complete Components**: Pre-built `<SignIn>`, `<SignUp>`, `<UserButton>` with business logic
+- **OAuth Support**: Google, GitHub, Discord, Facebook, LinkedIn, Microsoft, Apple, X, Instagram, TikTok, Spotify
+- **React Hooks**: `useAuth()`, `useUser()`, `usePublicAuthConfig()`
+- **Control Components**: `<SignedIn>`, `<SignedOut>`, `<Protect>`
+- **Form Components**: Pure UI forms for custom logic
+- **TypeScript**: Full type safety
+
+---
+
 ## How It Works
 
 ### Built-in Auth Flow
@@ -315,7 +306,7 @@ You only need to wrap them in your page components for layout/styling purposes.
 ```
 1. User clicks "Sign In" → Visits /sign-in route
    ↓
-2. getInsforgeRoutes() redirects → your-project.insforge.app/auth/sign-in?redirect=yourapp.com/you-defined-destination-after-sign-in
+2. getInsforgeRoutes() redirects → https://your-app.region.insforge.app/auth/sign-in?redirect=yourapp.com/you-defined-destination-after-sign-in
    ↓
 3. User signs in on deployed page → Backend processes authentication
    ↓

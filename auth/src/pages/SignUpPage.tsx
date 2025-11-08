@@ -14,7 +14,7 @@ export function SignUpPage() {
       return;
     }
 
-    const unsubscribe = broadcastService.subscribe(
+    const unsubscribeVerified = broadcastService.subscribe(
       BroadcastEventType.EMAIL_VERIFIED_SUCCESS,
       (event: BroadcastEvent) => {
         const { accessToken, user } = event.data || {};
@@ -36,7 +36,9 @@ export function SignUpPage() {
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeVerified();
+    };
   }, [redirectUrl]);
 
   const handleError = useCallback((error: Error) => {
