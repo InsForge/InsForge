@@ -93,12 +93,17 @@
             "pages": ["examples/overview"]
           },
           {
-            "group": "Showcase",
-            "pages": ["showcase"]
+            "group": "Framework Guides",
+            "pages": [
+              "examples/framework-guides/nextjs",
+              "examples/framework-guides/react",
+              "examples/framework-guides/vue",
+              "examples/framework-guides/nuxt"
+            ]
           },
           {
-            "group": "Integration Guides",
-            "pages": ["examples/integration-guides/coming-soon"]
+            "group": "Community Showcase",
+            "pages": ["showcase"]
           }
         ]
       },

@@ -1,0 +1,159 @@
+---
+title: Vue
+description: Learn how to create an InsForge project and build a Vue app using AI
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+Learn how to create an InsForge project and build a Vue app using AI tools like Cursor.
+
+## 1. Create an InsForge project
+
+Create a new InsForge project at [insforge.dev](https://insforge.dev).
+
+## 2. Connect InsForge MCP
+
+Follow the [MCP installation guide](/mcp-installation) to connect your AI assistant to your InsForge backend. This allows AI tools like Claude and Cursor to directly interact with your database, storage, and other InsForge services.
+
+## 3. Build your app with one prompt
+
+In Cursor or your AI assistant, use this prompt:
+
+```
+Create a new Vue app with TypeScript and Vite.
+Add Tailwind CSS 3.4 for styling.
+Install the InsForge SDK and set up the client configuration.
+
+In my InsForge database, create a sports table with id and name columns.
+Add sample data: basketball, soccer, and tennis. Make it publicly readable.
+
+Create a component that fetches and displays all sports from the database.
+```
+
+Your AI will generate the complete application including database setup and UI. No need to write code manually - the AI creates everything for you.
+
+## 4. What the AI generates
+
+Your AI assistant will automatically create files like these. You don't need to touch them manually.
+
+**InsForge client** at `src/lib/insforge.ts`:
+
+```typescript src/lib/insforge.ts
+import { createClient } from '@insforge/sdk';
+
+export const insforge = createClient({
+  baseUrl: 'https://your-project.us-east.insforge.app',
+  anonKey: 'your-anon-key'
+});
+```
+
+**Sports component** at `src/components/Sports.vue`:
+
+```vue src/components/Sports.vue
+<template>
+  <div class="container mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">Sports</h1>
+
+    <div v-if="loading" class="text-center py-8">
+      <p class="text-gray-600">Loading sports...</p>
+    </div>
+
+    <div v-else-if="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+      <p>Error: {{ error }}</p>
+    </div>
+
+    <div v-else-if="sports && sports.length > 0" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div
+        v-for="sport in sports"
+        :key="sport.id"
+        class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
+      >
+        <h2 class="text-xl font-semibold text-gray-800 capitalize">{{ sport.name }}</h2>
+        <p class="text-sm text-gray-500 mt-2">ID: {{ sport.id }}</p>
+      </div>
+    </div>
+
+    <div v-else class="text-center py-8">
+      <p class="text-gray-600">No sports found.</p>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import { insforge } from '../lib/insforge';
+
+interface Sport {
+  id: string;
+  name: string;
+  created_at?: string;
+}
+
+const sports = ref<Sport[]>([]);
+const loading = ref(true);
+const error = ref<string | null>(null);
+
+const fetchSports = async () => {
+  try {
+    loading.value = true;
+    error.value = null;
+
+    const { data, error: fetchError } = await insforge.database
+      .from('sports')
+      .select();
+
+    if (fetchError) {
+      error.value = fetchError.message || 'Failed to fetch sports';
+      return;
+    }
+
+    sports.value = data || [];
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'An unexpected error occurred';
+  } finally {
+    loading.value = false;
+  }
+};
+
+onMounted(() => {
+  fetchSports();
+});
+</script>
+```
+
+## 5. Start the app
+
+Run the development server, go to [http://localhost:5173](http://localhost:5173) in a browser and you should see the list of sports.
+
+```bash
+npm run dev
+```
+
+## Next: Extend your app with more prompts
+
+Try these prompts to add more features to your app:
+
+```
+Add a form to create new sports and save them to the database.
+Include validation and error handling.
+```
+
+```
+Add user authentication with sign up and login pages.
+Only allow authenticated users to add new sports.
+```
+
+```
+Add a favorites feature where users can mark their favorite sports.
+Store favorites in a user_favorites table with user_id and sport_id.
+```
+
+```
+Add images to each sport using InsForge Storage.
+Allow users to upload sport images and display them in the grid.
+```
+
+```
+Add an AI chat feature that can answer questions about sports.
+Use InsForge AI with streaming responses.
+```

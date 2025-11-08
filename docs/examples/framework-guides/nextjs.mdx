@@ -1,0 +1,131 @@
+---
+title: Next.js
+description: Learn how to create an InsForge project and build a Next.js app using AI
+---
+
+Learn how to create an InsForge project and build a Next.js app using AI tools like Cursor.
+
+## 1. Create an InsForge project
+
+Create a new InsForge project at [insforge.dev](https://insforge.dev).
+
+## 2. Connect InsForge MCP
+
+Follow the [MCP installation guide](/mcp-installation) to connect your AI assistant to your InsForge backend. This allows AI tools like Claude and Cursor to directly interact with your database, storage, and other InsForge services.
+
+## 3. Build your app with one prompt
+
+In Cursor or your AI assistant, use this prompt:
+
+```
+Create a new Next.js app with TypeScript and Tailwind CSS 3.4.
+Install the InsForge SDK and set up the client configuration.
+
+In my InsForge database, create a sports table with id and name columns.
+Add sample data: basketball, soccer, and tennis. Make it publicly readable.
+
+Create a page at /sports that fetches and displays all sports from the database.
+```
+
+Your AI will generate the complete application including database setup and UI. No need to write code manually - the AI creates everything for you.
+
+## 4. What the AI generates
+
+Your AI assistant will automatically create files like these. You don't need to touch them manually.
+
+**InsForge client** at `lib/insforge.ts`:
+
+```typescript lib/insforge.ts
+import { createClient } from '@insforge/sdk';
+
+export const insforge = createClient({
+  baseUrl: 'https://your-project.us-east.insforge.app',
+  anonKey: 'your-anon-key',
+});
+```
+
+**Sports page** at `app/sports/page.tsx`:
+
+```typescript app/sports/page.tsx
+import { insforge } from '@/lib/insforge';
+
+export default async function SportsPage() {
+  const { data: sports, error } = await insforge.database
+    .from('sports')
+    .select();
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-red-600">
+          <h1 className="text-2xl font-bold mb-2">Error</h1>
+          <p>{error.message}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen p-8">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-4xl font-bold mb-8">Sports</h1>
+
+        {sports && sports.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {sports.map((sport: { id: string; name: string }) => (
+              <div
+                key={sport.id}
+                className="p-6 bg-white rounded-lg shadow-md border border-gray-200 hover:shadow-lg transition-shadow"
+              >
+                <h2 className="text-xl font-semibold text-gray-800 capitalize">
+                  {sport.name}
+                </h2>
+                <p className="text-sm text-gray-500 mt-2">ID: {sport.id}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-600">No sports found.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+## 5. Start the app
+
+Run the development server, go to [http://localhost:3000/sports](http://localhost:3000/sports) in a browser and you should see the list of sports.
+
+```bash
+npm run dev
+```
+
+## Next: Extend your app with more prompts
+
+Try these prompts to add more features to your app:
+
+```
+Add a form to create new sports and save them to the database.
+Include validation and error handling.
+```
+
+```
+Add user authentication with sign up and login pages.
+Only allow authenticated users to add new sports.
+```
+
+```
+Add a favorites feature where users can mark their favorite sports.
+Store favorites in a user_favorites table with user_id and sport_id.
+```
+
+```
+Add images to each sport using InsForge Storage.
+Allow users to upload sport images and display them in the grid.
+```
+
+```
+Add an AI chat feature that can answer questions about sports.
+Use InsForge AI with streaming responses.
+```
