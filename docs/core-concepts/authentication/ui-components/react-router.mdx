@@ -5,16 +5,6 @@ description: Framework-agnostic authentication components for React + React Rout
 
 The `@insforge/react-router` package provides **complete authentication solution for React applications**. Use deployed auth pages (built-in auth) or custom UI components—works with Vite + React Router.
 
-## Features
-
-- **Built-in Auth**: React Router integration with deployed auth pages
-- **Complete Components**: Pre-built `<SignIn>`, `<SignUp>`, `<UserButton>` with business logic
-- **OAuth Support**: Google, GitHub, Discord, Facebook, LinkedIn, Microsoft, Apple, X, Instagram, TikTok, Spotify
-- **React Hooks**: `useAuth()`, `useUser()`, `usePublicAuthConfig()`
-- **Control Components**: `<SignedIn>`, `<SignedOut>`, `<Protect>`
-- **Form Components**: Pure UI forms for custom logic
-- **TypeScript**: Full type safety
-
 ## Quick Start
 
 ### Step 1: Install Package and Set Environment Variables
@@ -136,12 +126,12 @@ export default function Home() {
   );
 }
 ```
-
 **That's it!** Your React + React Router app now has production-ready authentication with built-in auth pages.
-
+---
+ End of instructions for AI agents
 ---
 
-## Alternative: Custom UI Components
+## Custom Authentication system
 
 Use this approach when you need custom authentication pages in your application instead of redirecting to hosted pages.
 
@@ -296,7 +286,17 @@ You only need to wrap them in your page components for layout/styling purposes.
 - SDK handles token management automatically
 
 ---
-End of instructions for AI agents
+
+## Features
+
+- **Built-in Auth**: React Router integration with deployed auth pages
+- **Complete Components**: Pre-built `<SignIn>`, `<SignUp>`, `<UserButton>` with business logic
+- **OAuth Support**: Google, GitHub, Discord, Facebook, LinkedIn, Microsoft, Apple, X, Instagram, TikTok, Spotify
+- **React Hooks**: `useAuth()`, `useUser()`, `usePublicAuthConfig()`
+- **Control Components**: `<SignedIn>`, `<SignedOut>`, `<Protect>`
+- **Form Components**: Pure UI forms for custom logic
+- **TypeScript**: Full type safety
+
 ---
 
 ## How It Works
