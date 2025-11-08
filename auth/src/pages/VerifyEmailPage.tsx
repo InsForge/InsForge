@@ -12,13 +12,19 @@ export function VerifyEmailPage() {
 
   useEffect(() => {
     const checkListeners = async () => {
-      setChecking(true);
-      const found = await broadcastService.checkForListeners();
-      setHasListeners(found);
-      setChecking(false);
+      try {
+        setChecking(true);
+        const found = await broadcastService.checkForListeners();
+        setHasListeners(found);
+      } catch (error) {
+        console.error('Failed to check for listeners:', error);
+        setHasListeners(false);
+      } finally {
+        setChecking(false);
+      }
     };
 
-    checkListeners();
+    void checkListeners();
   }, []);
 
   if (checking) {
