@@ -26,7 +26,7 @@ npm install @insforge/react@latest
 <Note>**Required Dependencies:** ```bash npm install react@^19.0.0 react-dom@^19.0.0 ```</Note>
 
 ```bash .env
-VITE_INSFORGE_BASE_URL=https://your-project.insforge.app/
+VITE_INSFORGE_BASE_URL=https://your-app.region.insforge.app
 ```
 
 ### Step 2: Setup Provider
@@ -43,7 +43,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <InsforgeProvider
       baseUrl={
-        import.meta.env.VITE_INSFORGE_BASE_URL || 'https://your-project.insforge.app/' // Replace with your InsForge backend URL
+        import.meta.env.VITE_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app' // Replace with your InsForge backend URL
       }
       afterSignInUrl="/dashboard"
     >
@@ -121,7 +121,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <InsforgeProvider
       baseUrl={
-        import.meta.env.VITE_INSFORGE_BASE_URL || 'https://your-project.insforge.app/' // Replace with your InsForge backend URL
+        import.meta.env.VITE_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app' // Replace with your InsForge backend URL
       }
       afterSignInUrl="/dashboard"
     >
@@ -236,7 +236,7 @@ You only need to wrap them in your page components for layout/styling purposes.
 
 **Built-in Auth:**
 
-- `/sign-in` → Redirects to `https://your-project.insforge.app/auth/sign-in`
+- `/sign-in` → Redirects to `https://your-app.region.insforge.app/auth/sign-in`
 - Authentication happens on hosted page
 - Returns to your app with token
 
@@ -255,7 +255,7 @@ You only need to wrap them in your page components for layout/styling purposes.
 ```
 1. User clicks "Sign In" → Visits /sign-in route
    ↓
-2. getInsforgeRoutes() redirects → https://your-project.insforge.app/auth/sign-in?redirect=yourapp.com/you-defined-destination-after-sign-in
+2. getInsforgeRoutes() redirects → https://your-app.region.insforge.app/auth/sign-in?redirect=yourapp.com/you-defined-destination-after-sign-in
    ↓
 3. User signs in on deployed page → Backend processes authentication
    ↓

@@ -66,7 +66,7 @@ Create an API route to enable server-side rendering (SSR) and cookie-based authe
 import { createAuthRouteHandlers } from '@insforge/nextjs/api';
 
 const handlers = createAuthRouteHandlers({
-  baseUrl: process.env.NEXT_PUBLIC_INSFORGE_BASE_URL || 'http://localhost:7130', // Replace with your InsForge backend URL
+  baseUrl: process.env.NEXT_PUBLIC_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app', // Replace with your InsForge backend URL
   cookieName: 'insforge_token',
 });
 
@@ -85,7 +85,7 @@ Create middleware to protect routes:
 import { InsforgeMiddleware } from '@insforge/nextjs/middleware';
 
 export default InsforgeMiddleware({
-  baseUrl: process.env.NEXT_PUBLIC_INSFORGE_BASE_URL || 'http://localhost:7130', // Replace with your InsForge backend URL
+  baseUrl: process.env.NEXT_PUBLIC_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app', // Replace with your InsForge backend URL
   publicRoutes: ['/'],
   cookieName: 'insforge_token',
 });
