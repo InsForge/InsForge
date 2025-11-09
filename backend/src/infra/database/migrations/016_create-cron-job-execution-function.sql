@@ -233,7 +233,7 @@ BEGIN
 
   -- Insert or update the schedule record in the `_schedules` table
   INSERT INTO _schedules (
-    id, name, cron_schedule, function_url, http_method, encrypted_headers, body, cron_job_id, created_at, updated_at
+    id, name, cron_schedule, function_url, http_method, encrypted_headers, body, cron_job_id, is_active, created_at, updated_at
   ) VALUES (
     p_schedule_id,
     p_name,
@@ -243,6 +243,7 @@ BEGIN
     v_encrypted_headers,
     p_body,
     v_new_cron_id,
+    TRUE,
     NOW(),
     NOW()
   ) ON CONFLICT (id) DO UPDATE SET
@@ -253,6 +254,7 @@ BEGIN
     encrypted_headers = EXCLUDED.encrypted_headers,
     body = EXCLUDED.body,
     cron_job_id = EXCLUDED.cron_job_id,
+    is_active = TRUE,
     updated_at = NOW();
 
   RETURN QUERY SELECT v_new_cron_id, TRUE, 'Cron job scheduled successfully';
@@ -281,10 +283,49 @@ BEGIN
   PERFORM cron.unschedule(v_cron_job_id);
 
   UPDATE _schedules
-  SET cron_job_id = NULL, updated_at = NOW()
+  SET cron_job_id = NULL, is_active = FALSE, updated_at = NOW()
   WHERE id = p_schedule_id;
 
   RETURN QUERY SELECT TRUE, 'Cron job disabled successfully';
+EXCEPTION WHEN OTHERS THEN
+  RETURN QUERY SELECT FALSE, SQLERRM;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ===============================================
+-- ENABLE CRON SCHEDULE
+-- Schedule an existing schedule's cron job without re-inserting the row.
+-- This will create a new cron job entry using the schedule's existing fields
+-- and set is_active = TRUE on the schedule row.
+-- ===============================================
+
+CREATE OR REPLACE FUNCTION enable_cron_schedule(p_schedule_id UUID)
+RETURNS TABLE(success BOOLEAN, message TEXT) AS $$
+DECLARE
+  v_schedule RECORD;
+  v_new_cron_id BIGINT;
+  v_function_call TEXT;
+BEGIN
+  SELECT id, cron_schedule, function_url
+  INTO v_schedule
+  FROM _schedules
+  WHERE id = p_schedule_id;
+
+  IF NOT FOUND THEN
+    RETURN QUERY SELECT FALSE, 'Schedule not found';
+    RETURN;
+  END IF;
+
+  v_function_call := format('SELECT execute_scheduled_request(%L::UUID)', p_schedule_id);
+  SELECT cron.schedule(v_schedule.cron_schedule, v_function_call) INTO v_new_cron_id;
+
+  UPDATE _schedules
+  SET cron_job_id = v_new_cron_id,
+      is_active = TRUE,
+      updated_at = NOW()
+  WHERE id = p_schedule_id;
+
+  RETURN QUERY SELECT TRUE, 'Cron job enabled successfully';
 EXCEPTION WHEN OTHERS THEN
   RETURN QUERY SELECT FALSE, SQLERRM;
 END;
