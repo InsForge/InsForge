@@ -1,0 +1,48 @@
+---
+title: "MCP Installation"
+description: "Connect your AI assistant to InsForge using the Model Context Protocol"
+---
+
+## Prerequisites
+
+Before connecting to the MCP server, you need to create an InsForge project:
+
+1. Visit [insforge.dev](https://insforge.dev) and create a free account
+2. Click **"Create New Project"**
+3. Your backend will be ready in ~3 seconds
+
+Once your project is created, you'll see the MCP installation instructions in your project dashboard.
+
+## Connect to InsForge MCP Server
+
+<img src="/images/mcp-install.png" alt="InsForge MCP Installation" />
+
+In your project dashboard:
+1. Choose your IDE (Cursor, Claude Code, Windsurf, Cline, etc.)
+2. Copy the installation command - it includes your API key and URL automatically
+3. Run the command in your terminal
+
+Example command (yours will have your actual API key and URL):
+```bash
+npx @insforge/install --client cursor \
+  --env API_KEY=ik_your_actual_api_key_here \
+  --env API_BASE_URL=https://your-app.us-east.insforge.app
+```
+
+4. Test in your coding IDE by asking: "InsForge is my backend platform, what is my current backend structure?"
+
+## What is MCP?
+
+The Model Context Protocol (MCP) allows AI assistants like Claude and Cursor to directly interact with your InsForge backend. This enables:
+
+- **Documentation access** - AI can fetch and read InsForge documentation as needed
+- **Automatic database operations** - AI can create tables, insert data, and query your database
+- **Storage management** - Upload files, create buckets, and manage assets
+- **Function deployment** - Deploy and manage serverless functions
+- **Backend structure access** - AI can see your current backend structure and data
+
+Learn more about MCP and how it works in our [detailed blog post](https://insforge.dev/blog/model-context-protocol).
+
+## Next Steps
+
+Once connected, check out our [framework examples](/examples/overview) to start building applications with AI assistance.
