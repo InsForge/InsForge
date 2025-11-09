@@ -102,9 +102,9 @@ export function useSchedules() {
     },
     onSuccess: () => {
       setErrorState(null);
+      showToast('Cron job deleted', 'success');
     },
     onSettled: () => {
-      showToast('Cron job deleted', 'success');
       void queryClient.invalidateQueries({ queryKey: SCHEDULES_QUERY_KEY });
     },
   });

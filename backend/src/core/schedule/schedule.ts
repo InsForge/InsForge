@@ -5,11 +5,8 @@ import { ERROR_CODES } from '@/types/error-constants';
 import { AppError } from '@/api/middleware/error.js';
 import { SetEncryptionKeyForClient } from '@/utils/db-encryption-helper.js';
 import { UpsertScheduleRequest, type Schedule } from '@insforge/shared-schemas';
-import * as parser from 'cron-parser';
-// Narrow parser type to avoid using `any` when calling parseExpression
-type CronParser = {
-  parseExpression: (expr: string, opts: { currentDate: Date }) => { next: () => Date };
-};
+import { CronExpressionParser } from 'cron-parser';
+
 import { QueryResult } from 'pg';
 
 type UpsertScheduleData = UpsertScheduleRequest & { scheduleId: string };
@@ -69,18 +66,6 @@ export class ScheduleService {
       client.release();
     }
   }
-
-  // Compute next run ISO string for a schedule using the following precedence for the
-  // base date ("after" / "starting from"): lastExecutedAt -> createdAt -> now.
-  // If updatedAt is greater than the chosen base, use updatedAt instead (to account for recent config changes).
-  //
-  // Precedence logic (pick the FIRST non-null, then check if updatedAt is newer):
-  // 1. If lastExecutedAt exists, use it (job has run before; compute next from last run)
-  // 2. Else if createdAt exists, use it (job is new; compute next from creation time)
-  // 3. Else use now (edge case; should not happen in normal flow)
-  // 4. If updatedAt > chosen base date, use updatedAt instead (e.g., cron expression changed after last run)
-  //
-  // Then use cron-parser to calculate the next execution time from the base date.
   private _computeNextRunForSchedule(s: Schedule | null): string | null {
     try {
       if (!s) {
@@ -109,16 +94,19 @@ export class ScheduleService {
         after = updatedAt;
       }
 
-      // Parse the cron expression and compute next execution
-      // Use a narrow cast to CronParser to avoid `any` while still calling into cron-parser
-      const interval = (parser as unknown as CronParser).parseExpression(s.cronSchedule, {
+      // Use the library's documented API: CronExpressionParser.parse(...)
+      const cronExpression = CronExpressionParser.parse(s.cronSchedule, {
         currentDate: after,
       });
-      const next = interval.next();
-      return next.toISOString();
+      const nextDate = cronExpression.next();
+      return nextDate.toISOString();
     } catch (err) {
       // If parsing fails or values are invalid, return null. Don't throw so listing still succeeds.
-      logger.warn('Failed to compute nextRun for schedule', { scheduleId: s?.id, error: err });
+      logger.warn('Failed to compute nextRun for schedule', {
+        scheduleId: s?.id,
+        rawError: String(err),
+        error: err instanceof Error ? { message: err.message, stack: err.stack } : err,
+      });
       return null;
     }
   }
