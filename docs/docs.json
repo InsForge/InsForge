@@ -30,7 +30,7 @@
         "groups": [
           {
             "group": "Getting Started",
-            "pages": ["introduction", "quickstart", "mcp-installation", "partnership"]
+            "pages": ["introduction", "mcp-installation", "partnership"]
           },
           {
             "group": "Core Concepts",
@@ -98,7 +98,8 @@
               "examples/framework-guides/nextjs",
               "examples/framework-guides/react",
               "examples/framework-guides/vue",
-              "examples/framework-guides/nuxt"
+              "examples/framework-guides/nuxt",
+              "examples/framework-guides/svelte"
             ]
           },
           {
