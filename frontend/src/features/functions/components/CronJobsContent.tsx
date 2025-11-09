@@ -1,61 +1,47 @@
-
-
-
-export interface Schedule {
-  id: string;
-  name: string;
-  cronSchedule: string;
-  functionUrl: string;
-  httpMethod: string;
-  cronJobId: string | null;
-  createdAt: string;
-  updatedAt: string;
-  lastExecutedAt?: string | null;
-  isActive: boolean;
-}
-
-export interface ScheduleRow extends Schedule {
-  [key: string]: any;
-}
+import type { ScheduleRow } from '../types/schedules';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus } from 'lucide-react';
-import { useSchedules, useToggleScheduleStatus, useDeleteSchedule } from '@/features/schedules/hooks/useSchedules';
-import { ScheduleActionsCell } from '../components/ScheduleActionsCell';
-import { ScheduleToggleCell } from '../components/ScheduleToggleCell';
+import { useSchedules } from '@/features/schedules/hooks/useSchedules';
 import { Button } from '@/components/radix/Button';
+import { CronJobFormDialog } from './CronJobFormDialog';
+import { getCronJobColumns } from './CronJobsColumns';
 import { Alert, AlertDescription } from '@/components/radix/Alert';
 import { SearchInput, SelectionClearButton, DeleteActionButton } from '@/components';
 import { EmptyState } from '@/components/EmptyState';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/radix/Tooltip';
-import { useConfirm } from '@/lib/hooks/useConfirm';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useToast } from '@/lib/hooks/useToast';
 import DataGrid from '@/components/datagrid/DataGrid';
-import type { DataGridColumn } from '@/components/datagrid/datagridTypes';
-import { formatDistanceToNow, parseISO } from 'date-fns';
 
 const PAGE_SIZE = 50;
 
 export function CronJobsContent() {
-  const [searchQuery, setSearchQuery] = useState('');
+  // use search query from the schedules hook to keep a single source of truth
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
 
-  const { confirm } = useConfirm();
   const { showToast } = useToast();
-
   const {
-    data: schedules = [],
+    schedules,
+    filteredSchedules,
+    searchQuery,
+    setSearchQuery,
     isLoading: isLoadingSchedules,
     error: schedulesError,
+    createOrUpdate,
+    deleteSchedule: deleteScheduleFn,
+    toggleSchedule: toggleScheduleFn,
+    isToggling: isTogglingStatus,
+    isDeleting: isDeletingSchedule,
   } = useSchedules();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmIds, setConfirmIds] = useState<string[]>([]);
+  const [confirmTitle, setConfirmTitle] = useState<string | undefined>(undefined);
+  const [confirmDescription, setConfirmDescription] = useState<string | undefined>(undefined);
 
-  const { mutate: toggleStatus, isPending: isTogglingStatus } = useToggleScheduleStatus();
-  const { mutate: deleteSchedule, isPending: isDeletingSchedule } = useDeleteSchedule();
+  // schedules, statuses and functions come from the single `useSchedules` hook above
 
   // Reset page when search query changes
   useEffect(() => {
@@ -67,20 +53,7 @@ export function CronJobsContent() {
     setSelectedRows(new Set());
   }, [schedules]);
 
-  // Filter schedules based on search query
-  const filteredSchedules = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return schedules;
-    }
-
-    const query = searchQuery.toLowerCase();
-    return schedules.filter(
-      (schedule) =>
-        schedule.name.toLowerCase().includes(query) ||
-        schedule.functionUrl.toLowerCase().includes(query) ||
-        schedule.cronSchedule.toLowerCase().includes(query)
-    );
-  }, [schedules, searchQuery]);
+  // use `filteredSchedules` from the hook (already memoized there)
 
   // Paginate filtered schedules
   const paginatedSchedules = useMemo(() => {
@@ -92,142 +65,45 @@ export function CronJobsContent() {
 
   const handleToggleStatus = useCallback(
     (scheduleId: string, isActive: boolean) => {
-      toggleStatus({ scheduleId, isActive });
+      void toggleScheduleFn(scheduleId, isActive);
     },
-    [toggleStatus]
+    [toggleScheduleFn]
   );
 
   const handleDeleteSchedule = useCallback(
-    async (scheduleId: string) => {
+    (scheduleId: string) => {
       const schedule = schedules.find((s) => s.id === scheduleId);
-      const shouldDelete = await confirm({
-        title: 'Delete Cron Job',
-        description: `Are you sure you want to delete the cron job "${schedule?.name}"? This action cannot be undone.`,
-        confirmText: 'Delete',
-        destructive: true,
-      });
-
-      if (shouldDelete) {
-        deleteSchedule(scheduleId);
-        setSelectedRows((prev) => {
-          const updated = new Set(prev);
-          updated.delete(scheduleId);
-          return updated;
-        });
-      }
+      setConfirmIds([scheduleId]);
+      setConfirmTitle('Delete Cron Job');
+      setConfirmDescription(
+        `Are you sure you want to delete the cron job "${schedule?.name}"? This action cannot be undone.`
+      );
+      setConfirmOpen(true);
     },
-    [schedules, confirm, deleteSchedule]
+    [schedules]
   );
 
-  const handleBulkDelete = useCallback(
-    async (ids: string[]) => {
-      const shouldDelete = await confirm({
-        title: `Delete ${ids.length} ${ids.length === 1 ? 'Cron Job' : 'Cron Jobs'}`,
-        description: `Are you sure you want to delete ${ids.length} ${ids.length === 1 ? 'cron job' : 'cron jobs'}? This action cannot be undone.`,
-        confirmText: 'Delete',
-        destructive: true,
-      });
+  const handleBulkDelete = useCallback((ids: string[]) => {
+    setConfirmIds(ids);
+    setConfirmTitle(`Delete ${ids.length} ${ids.length === 1 ? 'Cron Job' : 'Cron Jobs'}`);
+    setConfirmDescription(
+      `Are you sure you want to delete ${ids.length} ${ids.length === 1 ? 'cron job' : 'cron jobs'}? This action cannot be undone.`
+    );
+    setConfirmOpen(true);
+  }, []);
 
-      if (shouldDelete) {
-        ids.forEach((id) => {
-          deleteSchedule(id);
-        });
-        setSelectedRows(new Set());
-      }
-    },
-    [confirm, deleteSchedule]
-  );
+  const handleEditSchedule = useCallback((scheduleId: string) => {
+    setEditingScheduleId(scheduleId);
+    setEditOpen(true);
+  }, []);
 
-  const handleViewDetails = useCallback((schedule: ScheduleRow) => {
-    // TODO: Navigate to schedule details page
-    console.log('View details:', schedule);
-    showToast('View details coming soon', 'info');
-  }, [showToast]);
-
-  const columns: DataGridColumn<ScheduleRow>[] = [
-    {
-      key: 'name',
-      name: 'Name',
-      width: 200,
-      sortable: true,
-      renderCell: ({ row }) => (
-        <span className="font-medium dark:text-zinc-200">{row.name}</span>
-      ),
-    },
-    {
-      key: 'functionUrl',
-      name: 'Function URL',
-      width: 300,
-      sortable: true,
-      renderCell: ({ row }) => (
-        <span className="text-sm text-zinc-600 dark:text-zinc-400 truncate" title={row.functionUrl}>
-          {row.functionUrl}
-        </span>
-      ),
-    },
-    {
-      key: 'cronSchedule',
-      name: 'Schedule Period',
-      width: 150,
-      sortable: true,
-      renderCell: ({ row }) => (
-        <span className="font-mono text-sm bg-zinc-100 dark:bg-neutral-700 px-2 py-1 rounded text-zinc-900 dark:text-zinc-200">
-          {row.cronSchedule}
-        </span>
-      ),
-    },
-    {
-      key: 'lastExecutedAt',
-      name: 'Next Run',
-      width: 180,
-      sortable: true,
-      renderCell: ({ row }) => (
-        <span className="text-sm text-zinc-600 dark:text-zinc-400">
-          {row.lastExecutedAt
-            ? String(new Date(row.lastExecutedAt).toLocaleDateString() + ' ' + new Date(row.lastExecutedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
-            : 'Not executed yet'}
-        </span>
-      ),
-    },
-    {
-      key: 'createdAt',
-      name: 'Created At',
-      width: 180,
-      sortable: true,
-      renderCell: ({ row }) => (
-        <span className="text-sm text-zinc-600 dark:text-zinc-400">
-          {new Date(row.createdAt).toLocaleDateString()} {new Date(row.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </span>
-      ),
-    },
-    {
-      key: 'isActive',
-      name: 'Active',
-      width: 100,
-      sortable: false,
-      renderCell: ({ row }) => (
-        <ScheduleToggleCell
-          row={row}
-          isLoading={isTogglingStatus || isDeletingSchedule}
-          onToggle={handleToggleStatus}
-        />
-      ),
-    },
-    {
-      key: 'actions',
-      name: '',
-      width: 50,
-      sortable: false,
-      resizable: false,
-      renderCell: ({ row }) => (
-        <ScheduleActionsCell
-          row={row}
-          onViewDetails={handleViewDetails}
-          onDelete={handleDeleteSchedule}
-        />
-      ),
-    },
-  ];
+  const columns = getCronJobColumns({
+    handleEditSchedule,
+    handleDeleteSchedule,
+    isTogglingStatus,
+    isDeletingSchedule,
+    handleToggleStatus,
+  });
 
   return (
     <div className="h-full flex flex-col gap-4 p-4 bg-bg-gray dark:bg-neutral-800 overflow-hidden">
@@ -239,25 +115,22 @@ export function CronJobsContent() {
             Schedule recurring jobs in PostgreSQL
           </p>
         </div>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button className="h-10 px-4 font-medium gap-1.5 dark:bg-emerald-300 dark:hover:bg-emerald-400 dark:text-black">
-                <Plus className="w-5 h-5" />
-                Add Cron Job
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">Create a new cron job</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        {/* Avoid composing multiple refs via asChild — use a plain Button with native title to prevent
+            ref composition loops that can cause "Maximum update depth exceeded" errors. */}
+        <Button
+          title="Create a new cron job"
+          className="h-10 px-4 font-medium gap-1.5 dark:bg-emerald-300 dark:hover:bg-emerald-400 dark:text-black"
+          onClick={() => setCreateOpen(true)}
+        >
+          <Plus className="w-5 h-5" />
+          Add Cron Job
+        </Button>
       </div>
 
       {/* Error Alert */}
       {schedulesError && (
         <Alert variant="destructive">
-          <AlertDescription>
-            Failed to load cron jobs. Please try again.
-          </AlertDescription>
+          <AlertDescription>Failed to load cron jobs. Please try again.</AlertDescription>
         </Alert>
       )}
 
@@ -274,7 +147,6 @@ export function CronJobsContent() {
               selectedCount={selectedRows.size}
               itemType="cron job"
               onDelete={() => void handleBulkDelete(Array.from(selectedRows))}
-             
             />
           </div>
         ) : (
@@ -287,6 +159,156 @@ export function CronJobsContent() {
           />
         )}
       </div>
+      {/* Create dialog */}
+      <CronJobFormDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        mode="create"
+        onSubmit={async (values) => {
+          try {
+            const normalizeHeaders = (h: unknown): Record<string, string> | undefined => {
+              if (h === null) {
+                return undefined;
+              }
+              if (typeof h === 'string') {
+                try {
+                  const parsed = JSON.parse(h);
+                  if (parsed && typeof parsed === 'object') {
+                    return Object.fromEntries(
+                      Object.entries(parsed).map(([k, v]) => [k, String(v)])
+                    );
+                  }
+                  return undefined;
+                } catch {
+                  return undefined;
+                }
+              }
+              if (typeof h === 'object') {
+                return Object.fromEntries(
+                  Object.entries(h as Record<string, unknown>).map(([k, v]) => [k, String(v)])
+                );
+              }
+              return undefined;
+            };
+
+            const ok = await createOrUpdate({
+              name: values.name,
+              cronSchedule: values.cronSchedule,
+              functionUrl: values.functionUrl,
+              httpMethod: values.httpMethod || 'POST',
+              headers: normalizeHeaders(values.headers),
+              body: values.body ?? undefined,
+            });
+            if (!ok) {
+              showToast('Failed to create cron job', 'error');
+              throw new Error('create failed');
+            }
+          } catch (err) {
+            console.error('create cron job error', err);
+            throw err;
+          }
+        }}
+      />
+
+      {/* Edit dialog */}
+      {editingScheduleId && (
+        <CronJobFormDialog
+          open={editOpen}
+          onOpenChange={(open) => {
+            setEditOpen(open);
+            if (!open) {
+              setEditingScheduleId(null);
+            }
+          }}
+          mode="edit"
+          scheduleId={editingScheduleId}
+          onSubmit={async (values) => {
+            try {
+              if (!editingScheduleId) {
+                return;
+              }
+              const normalizeHeaders = (h: unknown): Record<string, string> | undefined => {
+                if (h === null) {
+                  return undefined;
+                }
+                if (typeof h === 'string') {
+                  try {
+                    const parsed = JSON.parse(h);
+                    if (parsed && typeof parsed === 'object') {
+                      return Object.fromEntries(
+                        Object.entries(parsed).map(([k, v]) => [k, String(v)])
+                      );
+                    }
+                    return undefined;
+                  } catch {
+                    return undefined;
+                  }
+                }
+                if (typeof h === 'object') {
+                  return Object.fromEntries(
+                    Object.entries(h as Record<string, unknown>).map(([k, v]) => [k, String(v)])
+                  );
+                }
+                return undefined;
+              };
+
+              const ok = await createOrUpdate({
+                id: editingScheduleId,
+                name: values.name,
+                cronSchedule: values.cronSchedule,
+                functionUrl: values.functionUrl,
+                httpMethod: values.httpMethod || 'POST',
+                headers: normalizeHeaders(values.headers),
+                body: values.body ?? undefined,
+              });
+              if (!ok) {
+                showToast('Failed to update cron job', 'error');
+                throw new Error('update failed');
+              }
+            } catch (err) {
+              console.error('update cron job error', err);
+              throw err;
+            }
+          }}
+        />
+      )}
+
+      {/* Confirm delete dialog (single or bulk) — reuse shared ConfirmDialog component */}
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={(open) => {
+          setConfirmOpen(open);
+          if (!open) {
+            setConfirmIds([]);
+            setConfirmTitle(undefined);
+            setConfirmDescription(undefined);
+          }
+        }}
+        title={confirmTitle ?? 'Delete'}
+        description={
+          confirmDescription ??
+          'Are you sure you want to delete the selected item(s)? This action cannot be undone.'
+        }
+        confirmText="Delete"
+        cancelText="Cancel"
+        destructive={true}
+        onConfirm={() => {
+          // perform deletions
+          confirmIds.forEach((id) => {
+            void deleteScheduleFn(id);
+          });
+          // clear selection if bulk delete
+          if (confirmIds.length > 1) {
+            setSelectedRows(new Set());
+          } else if (confirmIds.length === 1) {
+            setSelectedRows((prev) => {
+              const updated = new Set(prev);
+              updated.delete(confirmIds[0]);
+              return updated;
+            });
+          }
+        }}
+      />
 
       {/* DataGrid */}
       <div className="flex-1 min-h-0 overflow-hidden">
@@ -316,7 +338,9 @@ export function CronJobsContent() {
               <div className="text-center">
                 {searchQuery ? (
                   <>
-                    <p className="text-zinc-600 dark:text-zinc-400">No cron jobs match your search</p>
+                    <p className="text-zinc-600 dark:text-zinc-400">
+                      No cron jobs match your search
+                    </p>
                     <p className="text-sm text-zinc-500 dark:text-zinc-500 mt-1">
                       Try adjusting your search criteria
                     </p>

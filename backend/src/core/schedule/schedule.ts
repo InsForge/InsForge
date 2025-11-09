@@ -4,7 +4,12 @@ import { SecretService } from '@/core/secrets/secrets.js';
 import { ERROR_CODES } from '@/types/error-constants';
 import { AppError } from '@/api/middleware/error.js';
 import { SetEncryptionKeyForClient } from '@/utils/db-encryption-helper.js';
-import { UpsertScheduleRequest } from '@insforge/shared-schemas';
+import { UpsertScheduleRequest, type Schedule } from '@insforge/shared-schemas';
+import * as parser from 'cron-parser';
+// Narrow parser type to avoid using `any` when calling parseExpression
+type CronParser = {
+  parseExpression: (expr: string, opts: { currentDate: Date }) => { next: () => Date };
+};
 import { QueryResult } from 'pg';
 
 type UpsertScheduleData = UpsertScheduleRequest & { scheduleId: string };
@@ -17,6 +22,29 @@ export class ScheduleService {
   private constructor() {
     this.dbManager = DatabaseManager.getInstance();
     this.secretService = new SecretService();
+  }
+
+  // Validate that the cron expression is exactly 5 fields (minute, hour, day, month, day-of-week)
+  // pg_cron does not support 6-field expressions with seconds.
+  private _validateCronExpression(cronSchedule: string): void {
+    const fields = cronSchedule.trim().split(/\s+/);
+    if (fields.length !== 5) {
+      throw new AppError(
+        `Cron expression must be exactly 5 fields (minute, hour, day, month, day-of-week). Got ${fields.length} fields. Example: "*/5 * * * *" for every 5 minutes.`,
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+    // Basic validation: each field should not be empty
+    for (let i = 0; i < fields.length; i++) {
+      if (!fields[i]) {
+        throw new AppError(
+          `Cron expression field ${i + 1} is empty. Example: "*/5 * * * *".`,
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+    }
   }
 
   public static getInstance(): ScheduleService {
@@ -39,6 +67,59 @@ export class ScheduleService {
       return res;
     } finally {
       client.release();
+    }
+  }
+
+  // Compute next run ISO string for a schedule using the following precedence for the
+  // base date ("after" / "starting from"): lastExecutedAt -> createdAt -> now.
+  // If updatedAt is greater than the chosen base, use updatedAt instead (to account for recent config changes).
+  //
+  // Precedence logic (pick the FIRST non-null, then check if updatedAt is newer):
+  // 1. If lastExecutedAt exists, use it (job has run before; compute next from last run)
+  // 2. Else if createdAt exists, use it (job is new; compute next from creation time)
+  // 3. Else use now (edge case; should not happen in normal flow)
+  // 4. If updatedAt > chosen base date, use updatedAt instead (e.g., cron expression changed after last run)
+  //
+  // Then use cron-parser to calculate the next execution time from the base date.
+  private _computeNextRunForSchedule(s: Schedule | null): string | null {
+    try {
+      if (!s) {
+        return null;
+      }
+      if (!s.cronSchedule) {
+        return null;
+      }
+
+      const createdAt = s.createdAt ? new Date(s.createdAt) : null;
+      const updatedAt = s.updatedAt ? new Date(s.updatedAt) : null;
+      const lastExecutedAt = s.lastExecutedAt ? new Date(s.lastExecutedAt) : null;
+
+      // Determine base date using precedence
+      let after: Date;
+      if (lastExecutedAt) {
+        after = lastExecutedAt;
+      } else if (createdAt) {
+        after = createdAt;
+      } else {
+        after = new Date();
+      }
+
+      // Override if updatedAt is more recent (cron was modified after the base date)
+      if (updatedAt && updatedAt > after) {
+        after = updatedAt;
+      }
+
+      // Parse the cron expression and compute next execution
+      // Use a narrow cast to CronParser to avoid `any` while still calling into cron-parser
+      const interval = (parser as unknown as CronParser).parseExpression(s.cronSchedule, {
+        currentDate: after,
+      });
+      const next = interval.next();
+      return next.toISOString();
+    } catch (err) {
+      // If parsing fails or values are invalid, return null. Don't throw so listing still succeeds.
+      logger.warn('Failed to compute nextRun for schedule', { scheduleId: s?.id, error: err });
+      return null;
     }
   }
 
@@ -88,6 +169,8 @@ export class ScheduleService {
         cron_schedule AS "cronSchedule",
         function_url AS "functionUrl",
         http_method AS "httpMethod",
+        is_active AS "isActive",
+        body,
         cron_job_id AS "cronJobId",
         created_at AS "createdAt",
         updated_at AS "updatedAt",
@@ -95,9 +178,18 @@ export class ScheduleService {
       FROM _schedules
       ORDER BY created_at DESC
     `;
-      const schedules = await this.dbManager.prepare(sql).all();
-      logger.info(`Retrieved ${schedules.length} schedules`);
-      return schedules;
+      const schedules = (await this.dbManager.prepare(sql).all()) as Schedule[];
+
+      // Compute next execution run for each schedule using cron expression and
+      // the following precedence for the base date ("after"): lastExecutedAt -> createdAt -> now
+      // If updatedAt is greater than the chosen base, use updatedAt instead.
+      const enriched = schedules.map((s: Schedule) => ({
+        ...s,
+        nextRun: this._computeNextRunForSchedule(s),
+      }));
+
+      logger.info(`Retrieved ${enriched.length} schedules`);
+      return enriched;
     } catch (error) {
       logger.error('Error retrieving schedules:', error);
       throw error;
@@ -117,6 +209,8 @@ export class ScheduleService {
         cron_schedule AS "cronSchedule",
         function_url AS "functionUrl",
         http_method AS "httpMethod",
+        body,
+        is_active AS "isActive",
         cron_job_id AS "cronJobId",
         created_at AS "createdAt",
         updated_at AS "updatedAt",
@@ -124,7 +218,11 @@ export class ScheduleService {
       FROM _schedules
       WHERE id = ?
     `;
-      const schedule = await this.dbManager.prepare(sql).get(id);
+      const schedule = (await this.dbManager.prepare(sql).get(id)) as Schedule | null;
+      if (schedule) {
+        // compute next run using helper logic
+        schedule.nextRun = this._computeNextRunForSchedule(schedule);
+      }
       if (schedule) {
         logger.info('Successfully retrieved schedule by ID', { scheduleId: id });
       } else {
@@ -139,6 +237,9 @@ export class ScheduleService {
 
   async upsertSchedule(data: UpsertScheduleData) {
     try {
+      // Validate cron expression before proceeding
+      this._validateCronExpression(data.cronSchedule);
+
       const resolvedHeaders = data.headers ? await this._resolveHeaderSecrets(data.headers) : {};
       const existingSchedule = await this.getScheduleById(data.scheduleId);
       const isCreating = !existingSchedule;
@@ -157,7 +258,13 @@ export class ScheduleService {
         data.body || {},
       ];
       const result = await this.queryWithEncryption(sql, values);
-      const jobResult = result.rows[0];
+      const jobResult = (result.rows && result.rows[0]) as
+        | {
+            success?: boolean;
+            cron_job_id?: string;
+            message?: string;
+          }
+        | undefined;
 
       if (!jobResult || !jobResult.success) {
         logger.error('Failed to upsert schedule via database function', {
@@ -183,6 +290,25 @@ export class ScheduleService {
     }
   }
 
+  async toggleSchedule(id: string, isActive: boolean) {
+    if (!id) {
+      throw new AppError('Invalid schedule ID provided.', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
+    if (isActive) {
+      // Re-enable by creating a cron job using stored schedule fields without re-inserting.
+      // Use DB helper enable_cron_schedule which schedules the job and updates cron_job_id/is_active.
+      const sql = 'SELECT * FROM enable_cron_schedule($1::UUID)';
+      const result = await this.queryWithEncryption(sql, [id]);
+      return (result.rows && result.rows[0]) as Record<string, unknown>;
+    } else {
+      // Disable by calling disable_cron_schedule DB function
+      const sql = 'SELECT * FROM disable_cron_schedule($1::UUID)';
+      const result = await this.queryWithEncryption(sql, [id]);
+      return (result.rows && result.rows[0]) as Record<string, unknown>;
+    }
+  }
+
   async deleteSchedule(id: string) {
     if (!id) {
       throw new AppError('Invalid schedule ID provided.', 400, ERROR_CODES.INVALID_INPUT);
@@ -190,7 +316,12 @@ export class ScheduleService {
     try {
       const sql = 'SELECT * FROM delete_cron_schedule($1::UUID)';
       const result = await this.queryWithEncryption(sql, [id]);
-      const deleteResult = result.rows[0];
+      const deleteResult = (result.rows && result.rows[0]) as
+        | {
+            success?: boolean;
+            message?: string;
+          }
+        | undefined;
 
       if (!deleteResult || !deleteResult.success) {
         logger.error('Failed to delete schedule via database function', {
@@ -231,7 +362,21 @@ export class ScheduleService {
         ORDER BY executed_at DESC
         LIMIT $2 OFFSET $3
       `;
-      const logs = await this.queryWithEncryption(sql, [scheduleId, limit, offset]);
+      type ExecRow = {
+        id: string;
+        scheduleId: string;
+        executedAt: string;
+        statusCode: number;
+        success: boolean;
+        durationMs: string;
+        message: string | null;
+      };
+
+      const logs = (await this.queryWithEncryption(sql, [
+        scheduleId,
+        limit,
+        offset,
+      ])) as QueryResult<ExecRow>;
 
       // Get total count
       const countSql = `
@@ -239,10 +384,10 @@ export class ScheduleService {
         WHERE schedule_id = $1::UUID
       `;
       const countResult = await this.queryWithEncryption(countSql, [scheduleId]);
-      const total = parseInt(countResult.rows[0]?.total || '0', 10);
+      const total = parseInt((countResult.rows[0] as { total: string })?.total || '0', 10);
 
       // Convert string values to proper types
-      const formattedLogs = logs.rows.map((log) => ({
+      const formattedLogs = (logs.rows as ExecRow[]).map((log) => ({
         id: log.id,
         scheduleId: log.scheduleId,
         executedAt: log.executedAt,

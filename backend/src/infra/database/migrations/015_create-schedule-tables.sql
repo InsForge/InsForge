@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS _schedules (
     http_method TEXT NOT NULL DEFAULT 'POST',
    encrypted_headers TEXT DEFAULT NULL,
     body JSONB DEFAULT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     cron_job_id BIGINT,
     last_executed_at TIMESTAMPTZ DEFAULT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
