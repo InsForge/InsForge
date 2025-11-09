@@ -9,135 +9,47 @@ Model Context Protocol (MCP) is an open standard that allows AI assistants to in
 
 - **Database Management**: Create/modify/delete tables, view schemas, manage table relationships
 - **Storage Buckets**: Create/list/delete storage buckets for file uploads
-- **Backend Metadata**: Get API keys, backend configuration, and system information
-- **SDK Documentation**: Access SDK usage instructions for database, auth, and storage, AI Integration operations
+- **Edge Functions**: Create, update, and manage serverless functions
+- **Backend Metadata**: View overall backend structure, API keys, configuration, and system information
+- **SDK Documentation**: Access SDK usage instructions for database, auth, storage, AI integration, and edge functions
+
+<Note>
+  Learn more about MCP and how it works in our [blog post](https://insforge.dev/blog/model-context-protocol)
+</Note>
 
 
-## Quick Installation
+## Installation
 
-The easiest way to install MCP for your AI tool:
+<img src="/images/dashboard-connect.png" alt="Insforge Dashboard Connect" />
 
-<Tabs>
-  <Tab title="Cloud Backend">
-    <img src="/images/dashboard-connect.png" alt="Insforge Dashboard Connect" />
-    
-    <Steps>
-      <Step title="Create or select your project">
-        Visit [https://insforge.dev](https://insforge.dev) and either:
-        - Create a new project, or
-        - Select an existing project
-      </Step>
-      
-      <Step title="Click Connect">
-        Click the **Connect** button to integrate with Agents
-      </Step>
-      
-      <Step title="Install the MCP">
-        <img src="/images/dashboard-connect-expanded.png" alt="Insforge Connect Dialog" />
-        
-        Select your AI tool tab and use the **Copy** button to copy the command, then run it in your terminal.
-        
-        The command includes your API key and base URL automatically:
-        ```bash
-        npx @insforge/install --client cursor \
-          --env API_KEY=ik_d02a35cfd8056c18e9e59b34bf8bf773 \
-          --env API_BASE_URL=https://trqnn5z3.us-east.insforge.app
-        ```
-      </Step>
-    </Steps>
-    
-    <Note>
-      The Copy button provides a ready-to-run command with your API key and base URL already configured for your specific project
-    </Note>
-  </Tab>
-  
-  <Tab title="Local Backend">
-    ```bash
-    npx @insforge/install --client [your-tool] \
-      --env API_KEY=your-api-key \
-      --env API_BASE_URL=http://localhost:7130
-    ```
-    
-    <Note>
-      Get your API key from your local dashboard at `http://localhost:7131`
-    </Note>
-  </Tab>
-</Tabs>
+<Steps>
+  <Step title="Create or select your project">
+    Visit [https://insforge.dev](https://insforge.dev) and either:
+    - Create a new project, or
+    - Select an existing project
+  </Step>
 
-Replace `[your-tool]` with one of: `cursor`, `claude`, `windsurf`, `cline`, `roo-code`
+  <Step title="Click Connect">
+    Click the **Connect** button to integrate with Agents
+  </Step>
 
-## Manual Installation
+  <Step title="Install the MCP">
+    <img src="/images/dashboard-connect-expanded.png" alt="Insforge Connect Dialog" />
 
-For tools that support direct MCP configuration:
+    Select your AI tool tab and use the **Copy** button to copy the command, then run it in your terminal.
 
-### Step 1: Install the MCP server
-
-```bash
-npm install -g @insforge/mcp-server
-```
-
-### Step 2: Configure your AI tool
-
-<AccordionGroup>
-  <Accordion title="Claude Desktop" icon="robot">
-    Edit your Claude configuration file:
-    
-    **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-    **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-    
-    ```json
-    {
-      "mcpServers": {
-        "insforge": {
-          "command": "npx",
-          "args": ["-y", "@insforge/mcp-server"],
-          "env": {
-            "API_KEY": "your-api-key",
-            "API_BASE_URL": "https://your-app.us-east.insforge.app"
-          }
-        }
-      }
-    }
-    ```
-  </Accordion>
-  
-  <Accordion title="Cline (VS Code)" icon="terminal">
-    1. Install the Cline extension in VS Code
-    2. Open Cline settings (`Cmd/Ctrl + Shift + P` → "Cline: Open Settings")
-    3. Go to MCP Servers section
-    4. Add new server:
-    
-    ```json
-    {
-      "insforge": {
-        "command": "npx",
-        "args": ["-y", "@insforge/mcp-server"],
-        "env": {
-          "API_KEY": "your-api-key",
-          "API_BASE_URL": "https://your-app.us-east.insforge.app"
-        }
-      }
-    }
-    ```
-  </Accordion>
-  
-  <Accordion title="Cursor" icon="code">
-    Cursor uses a composer file. Run the installer:
-    
+    The command includes your API key and base URL automatically:
     ```bash
     npx @insforge/install --client cursor \
-      --env API_KEY=your-api-key \
-      --env API_BASE_URL=https://your-app.us-east.insforge.app
+      --env API_KEY=ik_d02a35cfd8056c18e9e59b34bf8bf773 \
+      --env API_BASE_URL=https://trqnn5z3.us-east.insforge.app
     ```
-    
-    Or manually add to `.cursorrules` in your project:
-    
-    ```
-    You have access to Insforge backend at https://your-app.us-east.insforge.app
-    Use the MCP tools to interact with the database, auth, and storage.
-    ```
-  </Accordion>
-</AccordionGroup>
+  </Step>
+</Steps>
+
+<Note>
+  The Copy button provides a ready-to-run command with your API key and base URL already configured for your specific project
+</Note>
 
 ## Verify Installation
 
@@ -159,28 +71,6 @@ Your AI should be able to:
 - Query data
 - Manage authentication
 - Handle file uploads
-
-## Available MCP Tools
-
-Once connected, your AI assistant has access to these tool categories:
-
-<CardGroup cols={2}>
-  <Card title="Database Tools" icon="database">
-    Create, modify, and manage database tables and schemas
-  </Card>
-  
-  <Card title="Storage Tools" icon="folder">
-    Manage storage buckets for file uploads and organization
-  </Card>
-  
-  <Card title="Metadata Tools" icon="info">
-    Access backend configuration and system information
-  </Card>
-  
-  <Card title="Documentation Tools" icon="book">
-    Retrieve API documentation and implementation guides
-  </Card>
-</CardGroup>
 
 ## Troubleshooting
 
