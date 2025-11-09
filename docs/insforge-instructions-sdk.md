@@ -24,7 +24,7 @@ npm install @insforge/sdk@latest
 
 You must create a client instance using `createClient()` with your base URL and anon key:
 
-```javascriptn
+```javascript
 import { createClient } from '@insforge/sdk';
 
 const client = createClient({
@@ -37,6 +37,10 @@ const client = createClient({
 
 ## Getting Detailed Documentation
 
+**🚨 CRITICAL: Always Fetch Documentation Before Writing Code**
+
+Before writing or editing any InsForge integration code, you **MUST** call the `fetch-docs` MCP tool to get the latest SDK documentation. This ensures you have accurate, up-to-date implementation patterns.
+
 **Use the InsForge `fetch-docs` MCP tool to get specific SDK documentation:**
 
 Available documentation types:
@@ -44,7 +48,6 @@ Available documentation types:
 - `"instructions"` - Essential backend setup (START HERE)
 - `"db-sdk"` - Database operations with SDK
 - **Authentication** - Choose based on implementation:
-  - `"auth-sdk"` - Backend/headless auth (SDK methods only)
   - `"auth-components-react"` - Frontend auth for React+Vite (built-in auth pages + UI)
   - `"auth-components-nextjs"` - Frontend auth for Next.js (built-in auth pages + UI)
   - `"auth-components-react-router"` - Frontend auth for React(Vite+React Router) (built-in auth pages + UI)
@@ -56,6 +59,7 @@ Available documentation types:
 
 1. **Building with Next.js?** → Use `"auth-components-nextjs"` (frontend: built-in auth pages)
 2. **Building with React (Vite+React Router)?** → Use `"auth-components-react-router"` (frontend: built-in auth pages)
+3. **Building with React (Vite)?** → Use `"auth-components-react"` (frontend: built-in auth pages)
 
 ## When to Use SDK vs MCP Tools
 
