@@ -27,15 +27,30 @@ router.use(verifyAdmin);
 router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const schedules = await scheduleService.listSchedules();
-    // Validate the response against the shared schema
+    // Convert date-like fields to ISO strings and compute isActive fallback
     const schedulesWithStringDates = schedules.map((schedule) => ({
       ...schedule,
-      lastExecutedAt: schedule.lastExecutedAt ? schedule.lastExecutedAt.toISOString() : null,
-      createdAt: schedule.createdAt.toISOString(),
-      updatedAt: schedule.updatedAt.toISOString(),
+      lastExecutedAt: schedule.lastExecutedAt
+        ? new Date(schedule.lastExecutedAt).toISOString()
+        : null,
+      createdAt: new Date(schedule.createdAt).toISOString(),
+      updatedAt: new Date(schedule.updatedAt).toISOString(),
+      nextRun: schedule.nextRun ? new Date(schedule.nextRun).toISOString() : null,
+      isActive: typeof schedule.isActive === 'boolean' ? schedule.isActive : !!schedule.cronJobId,
     }));
-    const validatedResponse = listSchedulesResponseSchema.parse(schedulesWithStringDates);
-    successResponse(res, validatedResponse);
+
+    // Validate the response against the shared schema using safeParse so we can return
+    // a useful error instead of throwing an uncaught validation exception.
+    const parsed = listSchedulesResponseSchema.safeParse(schedulesWithStringDates);
+    if (!parsed.success) {
+      throw new AppError(
+        parsed.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    successResponse(res, parsed.data);
   } catch (error) {
     next(error);
   }
@@ -55,13 +70,26 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
 
     const scheduleWithStringDates = {
       ...schedule,
-      lastExecutedAt: schedule.lastExecutedAt ? schedule.lastExecutedAt.toISOString() : null,
-      createdAt: schedule.createdAt.toISOString(),
-      updatedAt: schedule.updatedAt.toISOString(),
+      lastExecutedAt: schedule.lastExecutedAt
+        ? new Date(schedule.lastExecutedAt).toISOString()
+        : null,
+      createdAt: new Date(schedule.createdAt).toISOString(),
+      updatedAt: new Date(schedule.updatedAt).toISOString(),
+      nextRun: schedule.nextRun ? new Date(schedule.nextRun).toISOString() : null,
+      isActive: typeof schedule.isActive === 'boolean' ? schedule.isActive : !!schedule.cronJobId,
     };
-    // Validate the response against the shared schema
-    const validatedResponse = getScheduleResponseSchema.parse(scheduleWithStringDates);
-    successResponse(res, validatedResponse);
+
+    // Validate with safeParse to avoid throwing an uncontrolled exception on invalid data
+    const parsed = getScheduleResponseSchema.safeParse(scheduleWithStringDates);
+    if (!parsed.success) {
+      throw new AppError(
+        parsed.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    successResponse(res, parsed.data);
   } catch (error) {
     next(error);
   }
@@ -78,7 +106,7 @@ router.get('/:id/logs', async (req: AuthRequest, res: Response, next: NextFuncti
     const logsWithStringDates = {
       logs: logs.logs.map((log) => ({
         ...log,
-        executedAt: log.executedAt.toISOString(),
+        executedAt: log.executedAt,
       })),
       totalCount: logs.total,
       limit: logs.limit,
@@ -137,6 +165,28 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
     const validatedResponse = upsertScheduleResponseSchema.parse(responsePayload);
 
     successResponse(res, validatedResponse, statusCode);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PATCH /api/schedules/:id
+ * Toggle active state of a schedule (enable / disable)
+ */
+router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { isActive } = req.body as { isActive?: boolean };
+
+    if (typeof isActive !== 'boolean') {
+      throw new AppError('isActive must be a boolean', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
+    // Toggle via service
+    const result = await scheduleService.toggleSchedule(id, isActive);
+
+    successResponse(res, { message: isActive ? 'Schedule enabled' : 'Schedule disabled', result });
   } catch (error) {
     next(error);
   }
