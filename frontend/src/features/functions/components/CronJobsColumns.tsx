@@ -50,17 +50,17 @@ export function getCronJobColumns({
       ),
     },
     {
-      key: 'lastExecutedAt',
+      key: 'nextRun',
       name: 'Next Run',
       width: 180,
       sortable: true,
       renderCell: ({ row }) => (
         <span className="text-sm text-zinc-600 dark:text-zinc-400">
-          {row.lastExecutedAt
+          {row.nextRun
             ? String(
-                new Date(row.lastExecutedAt).toLocaleDateString() +
+                new Date(row.nextRun).toLocaleDateString() +
                   ' ' +
-                  new Date(row.lastExecutedAt).toLocaleTimeString([], {
+                  new Date(row.nextRun).toLocaleTimeString([], {
                     hour: '2-digit',
                     minute: '2-digit',
                   })
