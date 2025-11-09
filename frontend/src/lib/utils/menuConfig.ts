@@ -2,7 +2,7 @@ import {
   type LucideIcon,
   Home,
   Database,
-  UserRoundCog,
+  Lock,
   HardDrive,
   Code2,
   Sparkles,
@@ -12,6 +12,8 @@ import {
   BookOpen,
   GitFork,
   Settings,
+  Users,
+  Table,
 } from 'lucide-react';
 import { isInsForgeCloudProject } from './utils';
 import { postMessageToParent } from './cloudMessaging';
@@ -45,16 +47,23 @@ export const menuConfig: PrimaryMenuItem[] = [
     icon: Home,
   },
   {
+    id: 'users',
+    label: 'Users',
+    href: '/dashboard/users',
+    icon: Users,
+  },
+  {
+    id: 'tables',
+    label: 'Tables',
+    href: '/dashboard/tables',
+    icon: Table,
+  },
+  {
     id: 'authentication',
     label: 'Authentication',
     href: '/dashboard/authentication',
-    icon: UserRoundCog,
+    icon: Lock,
     secondaryMenu: [
-      {
-        id: 'users',
-        label: 'Users',
-        href: '/dashboard/authentication/users',
-      },
       {
         id: 'auth-methods',
         label: 'Auth Methods',
@@ -73,11 +82,6 @@ export const menuConfig: PrimaryMenuItem[] = [
     href: '/dashboard/database',
     icon: Database,
     secondaryMenu: [
-      {
-        id: 'tables',
-        label: 'Tables',
-        href: '/dashboard/database/tables',
-      },
       {
         id: 'indexes',
         label: 'Indexes',

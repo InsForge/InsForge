@@ -34,7 +34,8 @@ export function SecondaryMenu({ title, items, loading }: SecondaryMenuProps) {
   return (
     <aside
       className={cn(
-        'w-50 flex flex-col bg-white dark:bg-neutral-800 border-r border-gray-200 dark:border-neutral-700 flex-shrink-0'
+        'w-50 flex flex-col bg-white dark:bg-neutral-800 border-r border-gray-200 dark:border-neutral-700 flex-shrink-0',
+        'transition-all duration-300 ease-in-out'
       )}
     >
       {/* Header */}

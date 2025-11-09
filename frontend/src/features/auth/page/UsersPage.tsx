@@ -57,8 +57,40 @@ export default function UsersPage() {
   return (
     <div className="h-full bg-slate-50 dark:bg-neutral-800 flex flex-col overflow-hidden">
       <div className="flex-1 flex flex-col overflow-y-auto">
-        {/* Users Section Header */}
-        <div className="px-3 py-4 dark:bg-neutral-800">
+        {/* Page Header with Title and Actions */}
+        <div className="pl-4 pr-1.5 py-1.5 h-12 dark:bg-neutral-800">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h1 className="text-base font-bold text-black dark:text-white">Users</h1>
+
+              {/* Separator */}
+              <div className="h-6 w-px bg-gray-200 dark:bg-neutral-700" />
+
+              {/* Refresh button */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="p-1 h-9 w-9"
+                      onClick={() => void handleRefresh()}
+                      disabled={isRefreshing}
+                    >
+                      <RefreshIcon className="h-5 w-5 text-zinc-400 dark:text-neutral-400" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" align="center">
+                    <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </div>
+        </div>
+
+        {/* Search Bar and Actions */}
+        <div className="pt-2 pb-4 px-3 dark:bg-neutral-800">
           <div className="flex items-center justify-between">
             {selectedRows.size > 0 ? (
               <div className="flex items-center gap-3">
@@ -77,40 +109,20 @@ export default function UsersPage() {
               <SearchInput
                 value={searchQuery}
                 onChange={setSearchQuery}
-                placeholder="Search Users by Name or Email"
+                placeholder="Search user"
                 className="flex-1 max-w-80 dark:bg-neutral-800 dark:text-white dark:border-neutral-700"
                 debounceTime={300}
               />
             )}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 ml-4">
               {selectedRows.size === 0 && (
-                <>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="p-1 h-9 w-9"
-                          onClick={() => void handleRefresh()}
-                          disabled={isRefreshing}
-                        >
-                          <RefreshIcon className="h-5 w-5 text-zinc-400 dark:text-neutral-400" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" align="center">
-                        <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                  <Button
-                    className="h-10 px-4 font-medium dark:bg-emerald-300 dark:text-black"
-                    onClick={() => setAddDialogOpen(true)}
-                  >
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    New User
-                  </Button>
-                </>
+                <Button
+                  className="h-10 px-4 font-medium dark:bg-emerald-300 dark:text-black"
+                  onClick={() => setAddDialogOpen(true)}
+                >
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Add User
+                </Button>
               )}
             </div>
           </div>

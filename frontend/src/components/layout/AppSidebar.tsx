@@ -6,10 +6,11 @@ import { getMenuItems, getBottomMenuItems } from '@/lib/utils/menuConfig';
 import { useLocation, matchPath } from 'react-router-dom';
 
 interface AppSidebarProps extends React.HTMLAttributes<HTMLElement> {
-  onLogout: () => void;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
-export default function AppSidebar({ onLogout: _onLogout }: AppSidebarProps) {
+export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebarProps) {
   const { pathname } = useLocation();
   const { hasCompletedOnboarding } = useMcpUsage();
   const { menuItems: logsMenuItems, isLoading: logsLoading } = useLogSources();
@@ -30,9 +31,15 @@ export default function AppSidebar({ onLogout: _onLogout }: AppSidebarProps) {
 
   return (
     <div className="flex h-full">
-      <PrimaryMenu items={menuItems} bottomItems={bottomMenuItems} activeItemId={activeMenu?.id} />
+      <PrimaryMenu
+        items={menuItems}
+        bottomItems={bottomMenuItems}
+        activeItemId={activeMenu?.id}
+        isCollapsed={isCollapsed}
+        onToggleCollapse={onToggleCollapse}
+      />
 
-      {/* Render the secondary menu */}
+      {/* Render the secondary menu - always visible when there are items */}
       {secondaryMenuItems && activeMenu && (
         <SecondaryMenu title={activeMenu.label} items={secondaryMenuItems} loading={isLoading} />
       )}

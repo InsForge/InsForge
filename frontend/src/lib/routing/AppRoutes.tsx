@@ -35,9 +35,11 @@ export function AppRoutes() {
               <Routes>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/dashboard/users" element={<UsersPage />} />
+                <Route path="/dashboard/tables" element={<TablesPage />} />
                 <Route
                   path="/dashboard/authentication"
-                  element={<Navigate to="/dashboard/authentication/users" replace />}
+                  element={<Navigate to="/dashboard/authentication/auth-methods" replace />}
                 />
                 <Route path="/dashboard/authentication/users" element={<UsersPage />} />
                 <Route
@@ -47,7 +49,7 @@ export function AppRoutes() {
                 <Route path="/dashboard/authentication/config" element={<ConfigurationPage />} />
                 <Route
                   path="/dashboard/database"
-                  element={<Navigate to="/dashboard/database/tables" replace />}
+                  element={<Navigate to="/dashboard/database/indexes" replace />}
                 />
                 <Route path="/dashboard/database/tables" element={<TablesPage />} />
                 <Route path="/dashboard/database/indexes" element={<IndexesPage />} />
