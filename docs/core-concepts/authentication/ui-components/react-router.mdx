@@ -33,7 +33,6 @@ createRoot(document.getElementById('root')!).render(
       baseUrl={
         import.meta.env.VITE_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app' // Replace with your InsForge backend URL
       }
-      afterSignInUrl="/dashboard"
     >
       <App />
     </InsforgeProvider>
@@ -101,24 +100,22 @@ export default function Layout() {
 ### Step 4: Use Hooks & Components
 
 ```tsx src/pages/Home.tsx
-import { SignedIn, SignedOut, UserButton, useAuth, useUser } from '@insforge/react-router';
+import { SignInButton, SignedIn, SignedOut, UserButton } from '@insforge/react-router';
 
 export default function Home() {
-  const { isSignedIn } = useAuth();
-  const { user } = useUser();
-
   return (
     <div>
       <SignedOut>
-        <a href="/sign-in">Sign In</a>
+        <SignInButton />
       </SignedOut>
 
       <SignedIn>
-        <UserButton afterSignOutUrl="/" />
-        <h1>Welcome, {user?.email}!</h1>
+        <UserButton />
+        <h1>Welcome!</h1>
       </SignedIn>
     </div>
   );
 }
 ```
+
 **That's it!** Your React + React Router app now has production-ready authentication with built-in auth pages.
