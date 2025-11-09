@@ -7,7 +7,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/radix/Tooltip';
-import { PrimaryMenuItem } from '@/lib/utils/menuConfig';
+import { PrimaryMenuItem } from '@/lib/utils/menuItems';
 
 interface PrimaryMenuProps {
   items: PrimaryMenuItem[];
@@ -31,7 +31,7 @@ export function PrimaryMenu({
   };
 
   const baseButtonClasses = cn(
-    'relative h-9 rounded transition-all duration-200 ease-in-out overflow-hidden flex items-center',
+    'relative h-9 rounded duration-200 ease-in-out overflow-hidden flex items-center',
     isCollapsed ? 'w-9' : 'w-full',
     'hover:bg-zinc-100 dark:hover:bg-neutral-600 text-black dark:text-neutral-400'
   );
@@ -42,7 +42,7 @@ export function PrimaryMenu({
     const buttonContent = (
       <button
         className={cn(
-          'flex items-center gap-3 h-9 rounded transition-all duration-200 ease-in-out',
+          'flex items-center gap-3 h-9 rounded duration-200 ease-in-out',
           isCollapsed ? 'w-9 justify-center px-0' : 'w-full px-2',
           isActive
             ? 'bg-zinc-950 dark:bg-emerald-300 text-white dark:text-black'
@@ -74,7 +74,9 @@ export function PrimaryMenu({
     const buttonContent = (
       <button
         className={baseButtonClasses}
-        onClick={item.onClick || (() => window.open(item.href, '_blank'))}
+        onClick={
+          item.onClick || (item.external ? () => window.open(item.href, '_blank') : undefined)
+        }
       >
         <div className="absolute left-2 h-5 w-5">
           <item.icon className="w-5 h-5" />
@@ -122,7 +124,7 @@ export function PrimaryMenu({
       <aside
         className={cn(
           'bg-white dark:bg-neutral-800 border-r border-gray-200 dark:border-neutral-700 flex flex-col flex-shrink-0 pt-2 pb-6 px-2',
-          'transition-all duration-300 ease-in-out overflow-hidden',
+          'transition-[width] duration-300 ease-in-out overflow-hidden',
           isCollapsed ? 'w-[52px]' : 'w-[200px]'
         )}
       >

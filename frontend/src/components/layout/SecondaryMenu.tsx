@@ -1,7 +1,7 @@
 import { Link, useMatch } from 'react-router-dom';
 import { cn } from '@/lib/utils/utils';
 import { ScrollArea } from '@/components/radix/ScrollArea';
-import { SecondaryMenuItem as SecondaryMenuItemType } from '@/lib/utils/menuConfig';
+import { SecondaryMenuItem as SecondaryMenuItemType } from '@/lib/utils/menuItems';
 
 interface SecondaryMenuProps {
   title: string;

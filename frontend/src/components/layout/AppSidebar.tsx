@@ -1,9 +1,17 @@
+import { useMemo } from 'react';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { useLogSources } from '@/features/logs/hooks/useLogSources';
 import { PrimaryMenu } from './PrimaryMenu';
 import { SecondaryMenu } from './SecondaryMenu';
-import { getMenuItems, getBottomMenuItems } from '@/lib/utils/menuConfig';
+import {
+  staticMenuItems,
+  getStartedMenuItem,
+  documentationMenuItem,
+  reinstallMenuItem,
+  settingsMenuItem,
+} from '@/lib/utils/menuItems';
 import { useLocation, matchPath } from 'react-router-dom';
+import { isInsForgeCloudProject } from '@/lib/utils/utils';
 
 interface AppSidebarProps extends React.HTMLAttributes<HTMLElement> {
   isCollapsed: boolean;
@@ -12,10 +20,34 @@ interface AppSidebarProps extends React.HTMLAttributes<HTMLElement> {
 
 export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebarProps) {
   const { pathname } = useLocation();
-  const { hasCompletedOnboarding } = useMcpUsage();
+  const { hasCompletedOnboarding, isLoading: onboardingLoading } = useMcpUsage();
   const { menuItems: logsMenuItems, isLoading: logsLoading } = useLogSources();
-  const menuItems = getMenuItems(hasCompletedOnboarding);
-  const bottomMenuItems = getBottomMenuItems(hasCompletedOnboarding);
+
+  // Add "Get Started" item when user hasn't completed onboarding
+  const menuItems = useMemo(() => {
+    // While loading or if onboarding complete, show default menu
+    if (onboardingLoading || hasCompletedOnboarding || isInsForgeCloudProject()) {
+      return staticMenuItems;
+    }
+    return [getStartedMenuItem, ...staticMenuItems];
+  }, [hasCompletedOnboarding, onboardingLoading]);
+
+  // Build bottom menu items based on user state
+  const bottomMenuItems = useMemo(() => {
+    const items = [documentationMenuItem];
+
+    // Add reinstall button if onboarding is completed
+    if (hasCompletedOnboarding && !isInsForgeCloudProject()) {
+      items.push(reinstallMenuItem);
+    }
+
+    // Add settings button if this is an InsForge Cloud project
+    if (isInsForgeCloudProject()) {
+      items.push(settingsMenuItem);
+    }
+
+    return items;
+  }, [hasCompletedOnboarding]);
 
   // Find which primary menu item matches the current route
   // Items with secondary menus use prefix matching (end: false)

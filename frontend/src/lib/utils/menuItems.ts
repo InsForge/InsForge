@@ -15,7 +15,6 @@ import {
   Users,
   Table,
 } from 'lucide-react';
-import { isInsForgeCloudProject } from './utils';
 import { postMessageToParent } from './cloudMessaging';
 
 export interface SecondaryMenuItem {
@@ -35,11 +34,11 @@ export interface PrimaryMenuItem {
 }
 
 /**
- * Centralized menu configuration
+ * Static menu items configuration
  * Primary menu items appear as icons in the left sidebar
  * Secondary menu items appear in a collapsed sidebar when a primary item is selected
  */
-export const menuConfig: PrimaryMenuItem[] = [
+export const staticMenuItems: PrimaryMenuItem[] = [
   {
     id: 'dashboard',
     label: 'Dashboard',
@@ -155,61 +154,40 @@ export const menuConfig: PrimaryMenuItem[] = [
 ];
 
 /**
- * Dynamic navigation items that appear based on user state
+ * Get started menu item for onboarding
  */
-export const getMenuItems = (hasCompletedOnboarding: boolean): PrimaryMenuItem[] => {
-  if (hasCompletedOnboarding || isInsForgeCloudProject()) {
-    return menuConfig;
-  }
-
-  return [
-    {
-      id: 'get-started',
-      label: 'Get Started',
-      href: '/dashboard/onboard',
-      icon: Link2,
-    },
-    ...menuConfig,
-  ];
+export const getStartedMenuItem: PrimaryMenuItem = {
+  id: 'get-started',
+  label: 'Get Started',
+  href: '/dashboard/onboard',
+  icon: Link2,
 };
 
 /**
- * Bottom navigation items (external links, etc.)
+ * Bottom menu items that may be conditionally shown
  */
-export const getBottomMenuItems = (hasCompletedOnboarding: boolean): PrimaryMenuItem[] => {
-  const items: PrimaryMenuItem[] = [
-    {
-      id: 'documentation',
-      label: 'Documentation',
-      href: 'https://docs.insforge.dev',
-      icon: BookOpen,
-      external: true,
-    },
-  ];
+export const documentationMenuItem: PrimaryMenuItem = {
+  id: 'documentation',
+  label: 'Documentation',
+  href: 'https://docs.insforge.dev',
+  icon: BookOpen,
+  external: true,
+};
 
-  // Add reinstall button if onboarding is completed
-  if (hasCompletedOnboarding && !isInsForgeCloudProject()) {
-    items.push({
-      id: 'reinstall',
-      label: 'Reinstall',
-      href: '/dashboard/onboard',
-      icon: RotateCw,
-      external: false,
-    });
-  }
+export const reinstallMenuItem: PrimaryMenuItem = {
+  id: 'reinstall',
+  label: 'Reinstall',
+  href: '/dashboard/onboard',
+  icon: RotateCw,
+  external: false,
+};
 
-  // Add settings button if this is an InsForge Cloud project
-  if (isInsForgeCloudProject()) {
-    items.push({
-      id: 'settings',
-      label: 'Settings',
-      href: '',
-      icon: Settings,
-      onClick: () => {
-        postMessageToParent({ type: 'SHOW_SETTINGS_OVERLAY' }, '*');
-      },
-    });
-  }
-
-  return items;
+export const settingsMenuItem: PrimaryMenuItem = {
+  id: 'settings',
+  label: 'Settings',
+  href: '',
+  icon: Settings,
+  onClick: () => {
+    postMessageToParent({ type: 'SHOW_SETTINGS_OVERLAY' }, '*');
+  },
 };
