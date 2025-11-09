@@ -1,4 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { AuthRequest, verifyAdmin } from '@/api/middleware/auth.js';
 import { ScheduleService } from '@/core/schedule/schedule.js';
 import { successResponse } from '@/utils/response.js';
@@ -177,11 +178,18 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
 router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { isActive } = req.body as { isActive?: boolean };
 
-    if (typeof isActive !== 'boolean') {
-      throw new AppError('isActive must be a boolean', 400, ERROR_CODES.INVALID_INPUT);
+    const toggleSchema = z.object({ isActive: z.boolean() });
+    const parsed = toggleSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(
+        parsed.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
     }
+
+    const { isActive } = parsed.data;
 
     // Toggle via service
     const result = await scheduleService.toggleSchedule(id, isActive);
