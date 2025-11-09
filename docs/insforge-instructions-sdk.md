@@ -90,12 +90,17 @@ InsForge provides framework-specific UI packages with **built-in auth pages** (z
 
 1. **First**: Call `get-backend-metadata` to check current backend state
 2. **Detect framework**: Check user's project to determine the framework (Next.js, React, etc.)
-3. **Fetch docs**: Use `fetch-docs` with the appropriate doc type based on framework:
-   - React(Vite) → `"auth-components-react"`
-   - Next.js → `"auth-components-nextjs"`
-   - React(Vite+React Router) → `"auth-components-react-router"`
+3. **Fetch docs**: Use `fetch-docs` with the appropriate doc type based on what you're implementing:
+   - **Database**: `"db-sdk"` - For database operations
+   - **Authentication** (choose based on framework):
+     - React(Vite) → `"auth-components-react"`
+     - Next.js → `"auth-components-nextjs"`
+     - React(Vite+React Router) → `"auth-components-react-router"`
+   - **Storage**: `"storage-sdk"` - For file upload/download
+   - **AI**: `"ai-integration-sdk"` - For chat completions and image generation
+   - **Functions**: `"functions-sdk"` - For serverless functions
 4. **Initialize SDK**: Create client with your backend URL
-5. **Build**: Use framework-specific Auth Components for auth, SDK methods for database, storage, AI
+5. **Build**: Use framework-specific Auth Components for auth, SDK methods for database, storage, AI, and functions
 
 ## Important Notes
 
