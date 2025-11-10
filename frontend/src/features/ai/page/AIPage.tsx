@@ -117,10 +117,7 @@ export default function AIPage() {
         {/* Content Section */}
         <div className="flex-1 overflow-auto">
           {getAICreditsError ? (
-            <AIEmptyState
-              title="Configuration Error"
-              description={getAICreditsError.message}
-            />
+            <AIEmptyState title="Configuration Error" description={getAICreditsError.message} />
           ) : isLoadingConfigurations ? (
             <div className="flex-1 flex items-center justify-center h-full">
               <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
