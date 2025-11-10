@@ -65,3 +65,63 @@ export default function Home() {
 ```
 
 **That's it!** Your React app now has production-ready authentication with built-in auth pages.
+
+## Next Steps
+
+### Hooks
+
+### `useAuth()`
+
+Access authentication state:
+
+```tsx
+import { useAuth } from '@insforge/react';
+
+function LoginButton() {
+  const { isSignedIn, isLoaded } = useAuth();
+  
+  if (!isLoaded) return <div>Loading...</div>;
+
+  return (
+    <div>
+      {isSignedIn ? 'Welcome!' : 'Sign In'}
+    </div>
+  );
+}
+```
+
+**Returns:**
+
+- `isSignedIn` - Boolean auth state
+- `isLoaded` - Boolean loading state
+
+#### `useUser()`
+
+Access current user data:
+
+```tsx
+import { useUser } from '@insforge/react';
+
+function UserProfile() {
+  const { user, isLoaded, userId } = useUser();
+
+  if (!isLoaded) return <div>Loading...</div>;
+  if (!user) return <div>Not signed in</div>;
+
+
+  return (
+    <div>
+      <p>Id: {userId}</p>
+      <p>Email: {user.email}</p>
+      <p>Name: {user.name}</p>
+      <img src={user.avatarUrl} alt="Avatar" />
+    </div>
+  );
+}
+```
+
+**Returns:**
+
+- `user` - User object with id, email, name, avatarUrl
+- `userId` - User id
+- `isLoaded` - Boolean loading state

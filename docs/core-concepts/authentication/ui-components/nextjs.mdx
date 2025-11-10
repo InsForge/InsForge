@@ -96,3 +96,65 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 ```
 
 **That's it!** When users click "Sign In", they'll be redirected to your backend's auth page automatically.
+
+## Next Steps
+
+### Client-side Hooks
+
+### `useAuth()`
+
+Access authentication state:
+
+```tsx
+'use client';
+import { useAuth } from '@insforge/nextjs';
+
+function LoginButton() {
+  const { isSignedIn, isLoaded } = useAuth();
+  
+  if (!isLoaded) return <div>Loading...</div>;
+
+  return (
+    <div>
+      {isSignedIn ? 'Welcome!' : 'Sign In'}
+    </div>
+  );
+}
+```
+
+**Returns:**
+
+- `isSignedIn` - Boolean auth state
+- `isLoaded` - Boolean loading state
+
+#### `useUser()`
+
+Access current user data:
+
+```tsx
+'use client';
+import { useUser } from '@insforge/nextjs';
+
+function UserProfile() {
+  const { user, isLoaded, userId } = useUser();
+
+  if (!isLoaded) return <div>Loading...</div>;
+  if (!user) return <div>Not signed in</div>;
+
+
+  return (
+    <div>
+      <p>Id: {userId}</p>
+      <p>Email: {user.email}</p>
+      <p>Name: {user.name}</p>
+      <img src={user.avatarUrl} alt="Avatar" />
+    </div>
+  );
+}
+```
+
+**Returns:**
+
+- `user` - User object with id, email, name, avatarUrl
+- `userId` - User id
+- `isLoaded` - Boolean loading state
