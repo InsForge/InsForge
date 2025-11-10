@@ -13,7 +13,6 @@ import { ModelSelectionDialog } from '@/features/ai/components/ModelSelectionDia
 import { SystemPromptDialog } from '@/features/ai/components/SystemPromptDialog';
 import { AIModelCard } from '@/features/ai/components/AIConfigCard';
 import AIEmptyState from '@/features/ai/components/AIEmptyState';
-import AIErrorState from '@/features/ai/components/AIErrorState';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
 
 export default function AIPage() {
@@ -118,7 +117,10 @@ export default function AIPage() {
         {/* Content Section */}
         <div className="flex-1 overflow-auto">
           {getAICreditsError ? (
-            <AIErrorState message={getAICreditsError.message} />
+            <AIEmptyState
+              title="Configuration Error"
+              description={getAICreditsError.message}
+            />
           ) : isLoadingConfigurations ? (
             <div className="flex-1 flex items-center justify-center h-full">
               <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
@@ -136,7 +138,10 @@ export default function AIPage() {
               ))}
             </div>
           ) : (
-            <AIEmptyState />
+            <AIEmptyState
+              title="No AI Integration Yet"
+              description="Add your first integration to get started"
+            />
           )}
         </div>
       </div>
