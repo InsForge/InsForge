@@ -115,10 +115,6 @@ export function PrimaryMenu({
     );
   };
 
-  // Define section breaks - indices after which to add separators
-  const topSectionEnd = 2; // After Dashboard, Users, Tables (indices 0, 1, 2)
-  const middleSectionEnd = 7; // After Authentication, Database, Storage, Functions, AI (indices 3-7)
-
   return (
     <TooltipProvider disableHoverableContent delayDuration={300}>
       <aside
@@ -130,12 +126,10 @@ export function PrimaryMenu({
       >
         {/* Top navigation items with separators */}
         <nav className="flex flex-col gap-2">
-          {items.map((item, index) => (
+          {items.map((item) => (
             <div key={item.id}>
               <MenuItem item={item} />
-              {(index === topSectionEnd || index === middleSectionEnd) && (
-                <div className="h-px bg-neutral-700 my-2" />
-              )}
+              {item.sectionEnd && <div className="h-px bg-neutral-700 my-2" />}
             </div>
           ))}
         </nav>

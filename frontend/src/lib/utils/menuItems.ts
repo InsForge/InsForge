@@ -31,6 +31,7 @@ export interface PrimaryMenuItem {
   secondaryMenu?: SecondaryMenuItem[];
   onClick?: () => void;
   external?: boolean;
+  sectionEnd?: boolean;
 }
 
 /**
@@ -56,6 +57,7 @@ export const staticMenuItems: PrimaryMenuItem[] = [
     label: 'Tables',
     href: '/dashboard/tables',
     icon: Table,
+    sectionEnd: true,
   },
   {
     id: 'authentication',
@@ -137,6 +139,7 @@ export const staticMenuItems: PrimaryMenuItem[] = [
     label: 'AI',
     href: '/dashboard/ai',
     icon: Sparkles,
+    sectionEnd: true,
   },
   {
     id: 'logs',
