@@ -78,19 +78,26 @@ Available documentation types:
 - Storage bucket creation (`create-bucket`, `list-buckets`, `delete-bucket`)
 - Serverless function deployment (`create-function`, `update-function`, `delete-function`)
 
-### When to Use Pre-Built Components
+## Pre-built frame templates (e.g. React, React Router, Nextjs)
 
-InsForge provides framework-specific UI packages with **built-in auth pages** (zero UI code):
+```bash
+npx create-insforge-app my-app --frame {your frame} --base-url https://your-app.region.insforge.app --anon-key your-anon-key-here
+```
 
-- `@insforge/react` - React (built-in auth + framework-agnostic)
-- `@insforge/nextjs` - Next.js (built-in auth + middleware + SSR)
-- `@insforge/react-router` - React + React Router (built-in auth + framework-agnostic)
+### When to Use Pre-Built Template
+
+InsForge provides framework-specific start template contains both sdk and component packages for new project:
+
+- `--frame react` - React + Vite (sdk + built-in auth)
+- `--frame nextjs` - Next.js (sdk + built-in auth + SSR)
+- `--frame react-router` - React + Vite + React Router (sdk + built-in auth)
 
 ## Quick Start
 
 1. **First**: Call `get-backend-metadata` to check current backend state
 2. **Detect framework**: Check user's project to determine the framework (Next.js, React, etc.)
-3. **Fetch docs**: Use `fetch-docs` with the appropriate doc type based on what you're implementing:
+3. **Install pre-built template**: Start from frame-specific template if you are creating a new project 
+4. **Fetch docs**: Use `fetch-docs` with the appropriate doc type based on what you're implementing:
    - **Database**: `"db-sdk"` - For database operations
    - **Authentication** (choose based on framework):
      - React(Vite) → `"auth-components-react"`
@@ -99,8 +106,8 @@ InsForge provides framework-specific UI packages with **built-in auth pages** (z
    - **Storage**: `"storage-sdk"` - For file upload/download
    - **AI**: `"ai-integration-sdk"` - For chat completions and image generation
    - **Functions**: `"functions-sdk"` - For serverless functions
-4. **Initialize SDK**: Create client with your backend URL
-5. **Build**: Use framework-specific Auth Components for auth, SDK methods for database, storage, AI, and functions
+5. **Initialize SDK**: Create client with your backend URL
+6. **Build**: Use framework-specific Auth Components for auth, SDK methods for database, storage, AI, and functions
 
 ## Important Notes
 
