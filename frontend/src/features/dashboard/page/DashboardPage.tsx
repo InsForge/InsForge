@@ -1,16 +1,25 @@
+import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useMetadata } from '@/lib/hooks/useMetadata';
 import { useUsers } from '@/features/auth';
 import { Users, Database, HardDrive, Lock, ChevronRight } from 'lucide-react';
-import { ConnectionSuccessBanner, StatsCard } from '../components';
+import {
+  ConnectionSuccessBanner,
+  StatsCard,
+  PromptCard,
+  QuickStartPromptDialog,
+} from '../components';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { LogsDataGrid, type LogsColumnDef } from '@/features/logs/components/LogsDataGrid';
 import { cn, formatTime } from '@/lib/utils/utils';
 import { Button } from '@/components';
+import { quickStartPrompts, type PromptTemplate } from '../prompts';
 
 export default function DashboardPage() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [selectedPrompt, setSelectedPrompt] = useState<PromptTemplate | null>(null);
+  const [promptDialogOpen, setPromptDialogOpen] = useState(false);
   const { metadata, auth, tables, storage, isLoading } = useMetadata();
   const { totalUsers } = useUsers();
   const { records } = useMcpUsage();
@@ -42,14 +51,12 @@ export default function DashboardPage() {
   ];
 
   const handleViewMoreClick = () => {
-    localStorage.setItem('selectedLogSource', 'MCP');
-    const isCloudRoute = location.pathname.startsWith('/cloud');
-    void navigate(isCloudRoute ? '/cloud/logs' : '/dashboard/logs');
+    void navigate('/dashboard/logs/MCP');
   };
 
   return (
     <main className="h-full bg-white dark:bg-neutral-800 overflow-y-auto">
-      <div className="flex flex-col gap-6 w-full max-w-[1080px] mx-auto pt-6 h-full">
+      <div className="flex flex-col gap-6 w-full max-w-[1080px] mx-auto pt-6 pb-8">
         {/* Connection Success Banner - Only shows once on first connection */}
         {showBanner && <ConnectionSuccessBanner />}
 
@@ -61,7 +68,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="flex gap-6 w-full max-h-[280px] h-full grow">
+        <div className="flex gap-6 w-full h-[176px]">
           <StatsCard
             icon={Users}
             title="AUTH"
@@ -89,6 +96,37 @@ export default function DashboardPage() {
             isLoading={isLoading}
           />
         </div>
+
+        {/* Quick Start Prompt Section */}
+        <div className="flex flex-col gap-1 w-full">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white tracking-[-0.1px]">
+            Quick Start Prompt
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
+            Paste below prompts to your agent as a quick start for building real apps
+          </p>
+        </div>
+
+        {/* Prompt Cards Grid */}
+        <div className="grid grid-cols-3 gap-6 w-full">
+          {quickStartPrompts.map((prompt, index) => (
+            <PromptCard
+              key={index}
+              title={prompt.title}
+              onClick={() => {
+                setSelectedPrompt(prompt);
+                setPromptDialogOpen(true);
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Quick Start Prompt Dialog */}
+        <QuickStartPromptDialog
+          open={promptDialogOpen}
+          onOpenChange={setPromptDialogOpen}
+          promptTemplate={selectedPrompt}
+        />
 
         {/* Templates & Components Section */}
         <div className="flex flex-col gap-1 w-full">
@@ -155,7 +193,7 @@ export default function DashboardPage() {
         </div>
 
         {/* MCP Call Record Table */}
-        <div className={cn('w-full overflow-hidden pb-8', !records.length && 'h-60')}>
+        <div className={cn('w-full overflow-hidden', !records.length && 'h-60')}>
           <LogsDataGrid
             columnDefs={mcpColumns}
             data={records.slice(0, 5)}
