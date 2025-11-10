@@ -12,25 +12,10 @@ Backend-as-a-service (BaaS) platform providing:
 
 **Key Concept**: InsForge replaces your traditional backend - implement business logic by calling database operations directly instead of building API endpoints.
 
-## Installation
+## Installation of InsForge pre-built frame templates (e.g. React, React Router, Nextjs) with sdk and component package in it
 
 ```bash
-npm install @insforge/sdk@latest
-```
-
-## Initial Setup
-
-**🚨 CRITICAL: Initialize the SDK Client**
-
-You must create a client instance using `createClient()` with your base URL and anon key:
-
-```javascript
-import { createClient } from '@insforge/sdk';
-
-const client = createClient({
-  baseUrl: 'https://your-app.region.insforge.app',  // Your InsForge backend URL
-  anonKey: 'your-anon-key-here'       // Get this from backend metadata
-});
+npx create-insforge-app my-app --frame {your frame} --base-url https://your-app.region.insforge.app --anon-key your-anon-key-here
 ```
 
 **API BASE URL**: Your API base URL is `https://your-app.region.insforge.app`.
@@ -55,12 +40,6 @@ Available documentation types:
 - `"functions-sdk"` - Serverless functions invocation
 - `"ai-integration-sdk"` - AI chat and image generation
 
-**🎯 How to Choose Authentication Documentation:**
-
-1. **Building with Next.js?** → Use `"auth-components-nextjs"` (frontend: built-in auth pages)
-2. **Building with React (Vite+React Router)?** → Use `"auth-components-react-router"` (frontend: built-in auth pages)
-3. **Building with React (Vite)?** → Use `"auth-components-react"` (frontend: built-in auth pages)
-
 ## When to Use SDK vs MCP Tools
 
 ### Always SDK for Application Logic:
@@ -77,20 +56,6 @@ Available documentation types:
 - Database schema management (`run-raw-sql`, `get-table-schema`)
 - Storage bucket creation (`create-bucket`, `list-buckets`, `delete-bucket`)
 - Serverless function deployment (`create-function`, `update-function`, `delete-function`)
-
-## Pre-built frame templates (e.g. React, React Router, Nextjs)
-
-```bash
-npx create-insforge-app my-app --frame {your frame} --base-url https://your-app.region.insforge.app --anon-key your-anon-key-here
-```
-
-### When to Use Pre-Built Template
-
-InsForge provides framework-specific start template contains both sdk and component packages for new project:
-
-- `--frame react` - React + Vite (sdk + built-in auth)
-- `--frame nextjs` - Next.js (sdk + built-in auth + SSR)
-- `--frame react-router` - React + Vite + React Router (sdk + built-in auth)
 
 ## Quick Start
 
