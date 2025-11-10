@@ -25,6 +25,7 @@ export default function DashboardPage() {
   const { records } = useMcpUsage();
 
   const authCount = auth?.oauths.length || 0;
+  const tableCount = tables.filter((table) => table !== 'users').length;
   const showBanner = location.state?.showSuccessBanner === true;
 
   const mcpColumns: LogsColumnDef[] = [
@@ -83,7 +84,7 @@ export default function DashboardPage() {
             title="Database"
             value={(metadata?.database?.totalSizeInGB || 0).toFixed(2)}
             unit="GB"
-            description={`${tables.length || 0} ${tables.length === 1 ? 'Table' : 'Tables'}`}
+            description={`${tableCount} ${tableCount === 1 ? 'Table' : 'Tables'}`}
             isLoading={isLoading}
           />
 

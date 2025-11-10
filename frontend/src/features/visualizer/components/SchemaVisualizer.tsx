@@ -25,13 +25,19 @@ import {
 } from '@insforge/shared-schemas';
 
 interface SchemaVisualizerProps {
-  metadata: AppMetadataSchema;
+  metadata?: AppMetadataSchema;
   userCount?: number;
+  // Optional external schemas for templates
+  externalSchemas?: GetTableSchemaResponse[];
+  // Control visibility of components
+  showControls?: boolean;
+  showMiniMap?: boolean;
 }
 
 type TableNodeData = {
   table: GetTableSchemaResponse;
   referencedColumns: string[];
+  showRecordCount?: boolean;
 };
 
 type BucketNodeData = {
@@ -182,14 +188,20 @@ const getNodeColor = (node: Node<CustomNodeData>) => {
   }
 };
 
-export function SchemaVisualizer({ metadata, userCount }: SchemaVisualizerProps) {
+export function SchemaVisualizer({
+  metadata,
+  userCount,
+  externalSchemas,
+  showControls = true,
+  showMiniMap = true,
+}: SchemaVisualizerProps) {
   const { resolvedTheme } = useTheme();
 
-  // Fetch all table schemas
+  // Fetch all table schemas only if external schemas are not provided
   const { allSchemas, isLoadingSchemas } = useTables();
 
-  // Use the schemas from the hook instead of extracting from metadata
-  const tables = allSchemas;
+  // Use external schemas if provided, otherwise use fetched schemas
+  const tables = externalSchemas || allSchemas;
 
   const initialNodes = useMemo(() => {
     // First, collect all referenced columns for each table
@@ -218,28 +230,33 @@ export function SchemaVisualizer({ metadata, userCount }: SchemaVisualizerProps)
       data: {
         table,
         referencedColumns: referencedColumnsByTable[table.tableName] || [],
+        showRecordCount: !externalSchemas, // Hide record count when using external schemas (template preview)
       },
     }));
 
-    const bucketNodes: Node<BucketNodeData>[] = metadata.storage.buckets.map((bucket) => ({
-      id: `bucket-${bucket.name}`,
-      type: 'bucketNode',
-      position: { x: 0, y: 0 },
-      data: { bucket },
-    }));
+    const nodes: Node<CustomNodeData>[] = [...tableNodes];
 
-    const nodes: Node<CustomNodeData>[] = [...tableNodes, ...bucketNodes];
+    // Add bucket nodes if metadata is provided
+    if (metadata) {
+      const bucketNodes: Node<BucketNodeData>[] = metadata.storage.buckets.map((bucket) => ({
+        id: `bucket-${bucket.name}`,
+        type: 'bucketNode',
+        position: { x: 0, y: 0 },
+        data: { bucket },
+      }));
+      nodes.push(...bucketNodes);
 
-    // Add authentication node if authData is provided
-    nodes.push({
-      id: 'authentication',
-      type: 'authNode',
-      position: { x: 0, y: 0 },
-      data: {
-        authMetadata: metadata.auth,
-        userCount,
-      },
-    });
+      // Add authentication node
+      nodes.push({
+        id: 'authentication',
+        type: 'authNode',
+        position: { x: 0, y: 0 },
+        data: {
+          authMetadata: metadata.auth,
+          userCount,
+        },
+      });
+    }
 
     return nodes;
   }, [metadata, userCount, tables]);
@@ -295,8 +312,8 @@ export function SchemaVisualizer({ metadata, userCount }: SchemaVisualizerProps)
     [setEdges]
   );
 
-  // Don't render ReactFlow until data is loaded
-  if (isLoadingSchemas) {
+  // Don't render ReactFlow until data is loaded (only if not using external schemas)
+  if (!externalSchemas && isLoadingSchemas) {
     return (
       <div className="w-full h-full flex items-center justify-center text-white">
         Loading schemas...
@@ -323,12 +340,14 @@ export function SchemaVisualizer({ metadata, userCount }: SchemaVisualizerProps)
         colorMode={resolvedTheme === 'dark' ? 'dark' : 'light'}
         className="!bg-transparent"
       >
-        <Controls
-          showInteractive={false}
-          className="!border !border-neutral-700 !shadow-lg"
-          fitViewOptions={{ padding: 1, duration: 300, maxZoom: 2, minZoom: 1 }}
-        />
-        <MiniMap nodeColor={(node: Node<CustomNodeData>) => getNodeColor(node)} />
+        {showControls && (
+          <Controls
+            showInteractive={false}
+            className="!border !border-neutral-700 !shadow-lg"
+            fitViewOptions={{ padding: 1, duration: 300, maxZoom: 2, minZoom: 1 }}
+          />
+        )}
+        {showMiniMap && <MiniMap nodeColor={(node: Node<CustomNodeData>) => getNodeColor(node)} />}
       </ReactFlow>
     </div>
   );

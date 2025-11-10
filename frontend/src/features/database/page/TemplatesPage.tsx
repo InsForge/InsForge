@@ -1,29 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { DATABASE_TEMPLATES, type DatabaseTemplate } from '@/features/database/templates';
 import { useSQLEditorContext } from '@/features/database/contexts/SQLEditorContext';
-
-interface TemplateCardProps {
-  template: DatabaseTemplate;
-  onClick: () => void;
-}
-
-function TemplateCard({ template, onClick }: TemplateCardProps) {
-  return (
-    <button
-      onClick={onClick}
-      className="bg-white dark:bg-[#363636] border border-gray-200 dark:border-[#414141] rounded-[4px] px-6 py-4 text-left transition-colors hover:bg-gray-50 hover:border-gray-300 dark:hover:bg-neutral-700 dark:hover:border-[#525252] hover:shadow-sm"
-    >
-      <div className="flex flex-col gap-2">
-        <h3 className="text-base font-normal text-zinc-950 dark:text-white leading-6">
-          {template.title}
-        </h3>
-        <p className="text-sm font-normal text-zinc-500 dark:text-neutral-400 leading-6">
-          {template.description}
-        </p>
-      </div>
-    </button>
-  );
-}
+import { TemplateCard } from '@/features/database/components/TemplateCard';
 
 export default function TemplatesPage() {
   const navigate = useNavigate();
