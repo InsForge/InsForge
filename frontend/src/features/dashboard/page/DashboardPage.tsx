@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useMetadata } from '@/lib/hooks/useMetadata';
 import { useUsers } from '@/features/auth';
-import { Users, Database, HardDrive } from 'lucide-react';
+import { Users, Database, HardDrive, Lock, ChevronRight } from 'lucide-react';
 import { ConnectionSuccessBanner, StatsCard } from '../components';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { LogsDataGrid, type LogsColumnDef } from '@/features/logs/components/LogsDataGrid';
@@ -88,6 +88,60 @@ export default function DashboardPage() {
             description={`${storage?.buckets?.length || 0} ${storage?.buckets?.length === 1 ? 'Bucket' : 'Buckets'}`}
             isLoading={isLoading}
           />
+        </div>
+
+        {/* Templates & Components Section */}
+        <div className="flex flex-col gap-1 w-full">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white tracking-[-0.1px]">
+            Templates & Components
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
+            Pre-built components and schemas to accelerate development
+          </p>
+        </div>
+
+        <div className="flex gap-6 w-full">
+          {/* Sign-in Component Card */}
+          <button
+            onClick={() => void navigate('/dashboard/authentication/auth-methods')}
+            className="flex-1 bg-white dark:bg-[#363636] border border-gray-200 dark:border-[#414141] rounded-lg p-4 flex items-center gap-3 hover:bg-gray-50 hover:border-gray-300 dark:hover:bg-neutral-700 dark:hover:border-[#525252] hover:shadow-sm transition-all group"
+          >
+            <div className="flex-1 flex items-center gap-4">
+              <div className="bg-gray-100 dark:bg-neutral-800 rounded p-3.5 flex items-center justify-center shrink-0">
+                <Lock className="w-6 h-6 text-gray-600 dark:text-neutral-400" />
+              </div>
+              <div className="flex flex-col gap-1 items-start text-left">
+                <p className="text-base text-gray-900 dark:text-white font-normal leading-6">
+                  Sign-in Component
+                </p>
+                <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
+                  Authentication UI with OAuth support
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-gray-400 dark:text-neutral-400 shrink-0 group-hover:translate-x-0.5 transition-transform" />
+          </button>
+
+          {/* Database Templates Card */}
+          <button
+            onClick={() => void navigate('/dashboard/database/templates')}
+            className="flex-1 bg-white dark:bg-[#363636] border border-gray-200 dark:border-[#414141] rounded-lg p-4 flex items-center gap-3 hover:bg-gray-50 hover:border-gray-300 dark:hover:bg-neutral-700 dark:hover:border-[#525252] hover:shadow-sm transition-all group"
+          >
+            <div className="flex-1 flex items-center gap-4">
+              <div className="bg-gray-100 dark:bg-neutral-800 rounded p-3.5 flex items-center justify-center shrink-0">
+                <Database className="w-6 h-6 text-gray-600 dark:text-neutral-400" />
+              </div>
+              <div className="flex flex-col gap-1 items-start text-left">
+                <p className="text-base text-gray-900 dark:text-white font-normal leading-6">
+                  Database Templates
+                </p>
+                <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
+                  Pre-built schemas for common use cases
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-gray-400 dark:text-neutral-400 shrink-0 group-hover:translate-x-0.5 transition-transform" />
+          </button>
         </div>
 
         <div className="flex items-center justify-between w-full">

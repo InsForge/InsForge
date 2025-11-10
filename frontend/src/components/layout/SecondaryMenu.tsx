@@ -16,9 +16,7 @@ function SecondaryMenuItem({ item }: { item: SecondaryMenuItemType }) {
 
   return (
     <>
-      {item.separator && (
-        <div className="h-px bg-gray-200 dark:bg-neutral-700 my-2" />
-      )}
+      {item.sectionEnd && <div className="h-px bg-gray-200 dark:bg-neutral-700 my-2" />}
       <Link to={item.href}>
         <button
           className={cn(

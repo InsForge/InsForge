@@ -21,7 +21,7 @@ export interface SecondaryMenuItem {
   id: string;
   label: string;
   href: string;
-  separator?: boolean; // Add support for separator before the item
+  sectionEnd?: boolean; // Add support for separator after the item
 }
 
 export interface PrimaryMenuItem {
@@ -113,7 +113,7 @@ export const staticMenuItems: PrimaryMenuItem[] = [
         id: 'templates',
         label: 'Templates',
         href: '/dashboard/database/templates',
-        separator: true,
+        sectionEnd: true,
       },
     ],
   },
