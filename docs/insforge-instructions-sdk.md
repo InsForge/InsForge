@@ -10,12 +10,25 @@ Backend-as-a-service (BaaS) platform providing:
 - **AI**: Chat completions and image generation (OpenAI-compatible)
 - **Functions**: Serverless function deployment
 
-**Key Concept**: InsForge replaces your traditional backend - implement business logic by calling database operations directly instead of building API endpoints.
-
-## Installation of InsForge pre-built frame templates (e.g. React, React Router, Nextjs) with sdk and component package in it
+## Installation
 
 ```bash
-npx create-insforge-app my-app --frame {your frame} --base-url https://your-app.region.insforge.app --anon-key your-anon-key-here
+npm install @insforge/sdk@latest
+```
+
+## Initial Setup
+
+**🚨 CRITICAL: Initialize the SDK Client**
+
+You must create a client instance using `createClient()` with your base URL and anon key:
+
+```javascript
+import { createClient } from '@insforge/sdk';
+
+const client = createClient({
+  baseUrl: 'https://your-app.region.insforge.app',  // Your InsForge backend URL
+  anonKey: 'your-anon-key-here'       // Get this from backend metadata
+});```
 ```
 
 **API BASE URL**: Your API base URL is `https://your-app.region.insforge.app`.
@@ -56,23 +69,6 @@ Available documentation types:
 - Database schema management (`run-raw-sql`, `get-table-schema`)
 - Storage bucket creation (`create-bucket`, `list-buckets`, `delete-bucket`)
 - Serverless function deployment (`create-function`, `update-function`, `delete-function`)
-
-## Quick Start
-
-1. **First**: Call `get-backend-metadata` to check current backend state
-2. **Detect framework**: Check user's project to determine the framework (Next.js, React, etc.)
-3. **Install pre-built template**: Start from frame-specific template if you are creating a new project 
-4. **Fetch docs**: Use `fetch-docs` with the appropriate doc type based on what you're implementing:
-   - **Database**: `"db-sdk"` - For database operations
-   - **Authentication** (choose based on framework):
-     - React(Vite) → `"auth-components-react"`
-     - Next.js → `"auth-components-nextjs"`
-     - React(Vite+React Router) → `"auth-components-react-router"`
-   - **Storage**: `"storage-sdk"` - For file upload/download
-   - **AI**: `"ai-integration-sdk"` - For chat completions and image generation
-   - **Functions**: `"functions-sdk"` - For serverless functions
-5. **Initialize SDK**: Create client with your backend URL
-6. **Build**: Use framework-specific Auth Components for auth, SDK methods for database, storage, AI, and functions
 
 ## Important Notes
 
