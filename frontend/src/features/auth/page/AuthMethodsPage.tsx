@@ -238,7 +238,7 @@ export default function AuthMethodsPage() {
         <div className="flex-1 bg-gray-100 dark:bg-neutral-800 p-3 flex flex-col overflow-hidden">
           <div className="flex-1 bg-gray-200 dark:bg-neutral-700 rounded-xl overflow-hidden flex flex-col">
             {/* Preview Header */}
-            <div className="flex items-center justify-end px-6 py-3 border-b border-gray-300 dark:border-neutral-600 gap-3">
+            <div className="flex items-center justify-end px-6 py-3 gap-3">
               <p className="text-sm font-medium text-gray-700 dark:text-white">
                 Integrate Authentication to Your Application
               </p>

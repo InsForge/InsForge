@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { advanceService, RawSQLResponse } from '../services/advance.service';
 import { useToast } from '@/lib/hooks/useToast';
 
@@ -16,12 +16,17 @@ interface RawSQLParams {
 
 export function useRawSQL(options?: UseRawSQLOptions) {
   const { showToast } = useToast();
+  const queryClient = useQueryClient();
 
   const mutation = useMutation({
     mutationFn: async ({ query, params = [] }: RawSQLParams) => {
       return advanceService.runRawSQL(query, params);
     },
     onSuccess: (data) => {
+      // Invalidate database schema queries to ensure UI reflects any schema changes
+      void queryClient.invalidateQueries({ queryKey: ['tables'] });
+      void queryClient.invalidateQueries({ queryKey: ['tables', 'schemas'] });
+
       if (options?.showSuccessToast !== false) {
         const message = data.message || 'SQL query executed successfully';
         showToast(message, 'success');

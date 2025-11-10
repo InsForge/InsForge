@@ -15,18 +15,23 @@ function SecondaryMenuItem({ item }: { item: SecondaryMenuItemType }) {
   const isSelected = !!match;
 
   return (
-    <Link to={item.href}>
-      <button
-        className={cn(
-          'h-8 w-full flex items-center px-3 py-1.5 rounded text-left transition-colors',
-          isSelected
-            ? 'bg-zinc-200 text-zinc-950 dark:bg-neutral-700 dark:text-white'
-            : 'text-zinc-950 dark:text-white hover:bg-zinc-100 dark:hover:bg-neutral-700/50'
-        )}
-      >
-        <p className="text-sm truncate">{item.label}</p>
-      </button>
-    </Link>
+    <>
+      {item.separator && (
+        <div className="h-px bg-gray-200 dark:bg-neutral-700 my-2" />
+      )}
+      <Link to={item.href}>
+        <button
+          className={cn(
+            'h-8 w-full flex items-center px-3 py-1.5 rounded text-left transition-colors',
+            isSelected
+              ? 'bg-zinc-200 text-zinc-950 dark:bg-neutral-700 dark:text-white'
+              : 'text-zinc-950 dark:text-white hover:bg-zinc-100 dark:hover:bg-neutral-700/50'
+          )}
+        >
+          <p className="text-sm truncate">{item.label}</p>
+        </button>
+      </Link>
+    </>
   );
 }
 
