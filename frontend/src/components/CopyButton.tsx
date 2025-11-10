@@ -1,15 +1,13 @@
-import { useState } from 'react';
-import { Copy } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Copy, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/radix/Button';
 import { cn } from '@/lib/utils/utils';
-import CheckedIcon from '@/assets/icons/checked.svg?react';
 
 interface CopyButtonProps {
   text: string;
   onCopy?: (text: string) => void;
   className?: string;
-  variant?: 'ghost' | 'outline' | 'default';
-  size?: 'sm' | 'default' | 'lg' | 'icon';
+  variant?: 'primary' | 'secondary';
   showText?: boolean;
   copiedText?: string;
   copyText?: string;
@@ -20,14 +18,23 @@ export function CopyButton({
   text,
   onCopy,
   className,
-  variant = 'ghost',
-  size = 'sm',
+  variant = 'primary',
   showText = true,
   copiedText = 'Copied',
   copyText = 'Copy',
   disabled = false,
 }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
 
   const handleCopy = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
@@ -37,8 +44,19 @@ export function CopyButton({
 
     try {
       await navigator.clipboard.writeText(text);
+
+      // Clear existing timer if any
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+
+      // Set new timer
+      timerRef.current = setTimeout(() => {
+        setCopied(false);
+        timerRef.current = null;
+      }, 3000);
 
       if (onCopy) {
         onCopy(text);
@@ -49,21 +67,40 @@ export function CopyButton({
     }
   };
 
+  const isPrimary = variant === 'primary';
+
   return (
     <Button
-      variant={variant}
-      size={size}
       onClick={(e) => void handleCopy(e)}
       disabled={disabled}
-      data-copied={copied}
       className={cn(
-        'px-3 w-fit h-8 rounded-md bg-zinc-50 dark:bg-neutral-700 hover:bg-bg-gray-hover dark:hover:bg-neutral-700 border-border-gray dark:border-neutral-700 border text-zinc-950 dark:text-white shadow gap-1.5 transition-all duration-200',
-        'data-[copied=true]:bg-transparent data-[copied=true]:cursor-default data-[copied=true]:shadow-none data-[copied=true]:border-none data-[copied=true]:hover:bg-transparent',
+        'h-8 px-3 gap-2 text-sm font-medium rounded transition-colors',
+        // Icon-only mode (when showText is false)
+        !showText && 'w-8 px-0 justify-center',
+        // Primary variant (black/emerald)
+        isPrimary && !copied && 'bg-black text-white hover:bg-gray-800',
+        isPrimary && !copied && 'dark:bg-emerald-300 dark:text-black dark:hover:bg-emerald-400',
+        // Secondary variant (light gray/neutral)
+        !isPrimary &&
+          !copied &&
+          'bg-gray-100 text-gray-900 hover:bg-gray-200 dark:bg-neutral-700 dark:text-white dark:hover:bg-neutral-600',
+        // Copied state (same for both variants) - stone-600
+        copied && 'bg-stone-600 text-white cursor-default hover:bg-stone-600',
+        copied && 'dark:bg-stone-600 dark:text-white dark:hover:bg-stone-600',
         className
       )}
     >
-      {copied ? <CheckedIcon className="w-4 h-4" /> : <Copy className="w-4 h-4 " />}
-      {showText && <span className="font-medium text-sm">{copied ? copiedText : copyText}</span>}
+      {copied ? (
+        <>
+          <CheckCircle className="w-4 h-4" />
+          {showText && <span>{copiedText}</span>}
+        </>
+      ) : (
+        <>
+          <Copy className="w-4 h-4" />
+          {showText && <span>{copyText}</span>}
+        </>
+      )}
     </Button>
   );
 }

@@ -1,8 +1,9 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/radix/Button';
-import { MoreHorizontal, Plus, Trash2, Pencil, Mail } from 'lucide-react';
+import { MoreHorizontal, Plus, Trash2, Pencil, Mail, ChevronDown } from 'lucide-react';
 import { OAuthConfigDialog } from '@/features/auth/components/OAuthConfigDialog';
-import { AddOAuthDialog } from '@/features/auth/components/AddOAuthDialog';
+import { AuthPreview } from '@/features/auth/components/AuthPreview';
+import { CopyButton } from '@/components/CopyButton';
 import { useOAuthConfig } from '@/features/auth/hooks/useOAuthConfig';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -11,14 +12,18 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/radix/DropdownMenu';
 import type { OAuthProvidersSchema } from '@insforge/shared-schemas';
-import { oauthProviders, type OAuthProviderInfo } from '@/features/auth/helpers';
+import {
+  oauthProviders,
+  type OAuthProviderInfo,
+  AUTH_IMPLEMENTATION_PROMPT,
+} from '@/features/auth/helpers';
 
 export default function AuthMethodsPage() {
   const [selectedProvider, setSelectedProvider] = useState<OAuthProviderInfo>();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isSelectDialogOpen, setIsSelectDialogOpen] = useState(false);
   const { confirm, confirmDialogProps } = useConfirm();
   const {
     configs,
@@ -57,10 +62,6 @@ export default function AuthMethodsPage() {
     return !!configs.length;
   }, [configs]);
 
-  const openSelectDialog = () => {
-    setIsSelectDialogOpen(true);
-  };
-
   const enabledProviders = useMemo(() => {
     const enabled: Record<OAuthProvidersSchema, boolean> = {} as Record<
       OAuthProvidersSchema,
@@ -76,19 +77,6 @@ export default function AuthMethodsPage() {
   const allProvidersEnabled = useMemo(() => {
     return oauthProviders.every((provider) => enabledProviders[provider.id]);
   }, [enabledProviders]);
-
-  const handleConfirmSelected = (selectedId: OAuthProvidersSchema) => {
-    // Find the selected provider
-    const selectedProvider = oauthProviders.find((p) => p.id === selectedId);
-    if (!selectedProvider) {
-      return;
-    }
-
-    // Close the select dialog and open the method dialog
-    setIsSelectDialogOpen(false);
-    setSelectedProvider(selectedProvider);
-    setIsDialogOpen(true);
-  };
 
   const handleSuccess = useCallback(() => {
     // Refresh configuration after successful update
@@ -110,97 +98,164 @@ export default function AuthMethodsPage() {
   }
 
   return (
-    <div className="h-full bg-slate-50 dark:bg-neutral-800 flex flex-col overflow-hidden">
-      <div className="flex-1 flex flex-col overflow-y-auto">
-        <div className="flex flex-col gap-12 h-full overflow-auto p-6 w-full max-w-[1080px] mx-auto">
-          {/* Authentication Methods Section */}
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">Auth Methods</h2>
-              {!allProvidersEnabled && (
-                <Button
-                  className="h-9 pr-3 pl-2 py-2 gap-2 dark:bg-neutral-700 dark:text-white dark:hover:bg-neutral-600 text-sm font-medium rounded-sm"
-                  onClick={openSelectDialog}
-                >
-                  <Plus className="w-5 h-5" />
-                  Add Provider
-                </Button>
-              )}
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* Two column layout */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Section - Auth Methods List */}
+        <div className="w-[640px] bg-slate-50 dark:bg-[#2d2d2d] flex flex-col overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-6 gap-3 border-b border-gray-200 dark:border-neutral-700">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white tracking-tight">
+              Auth Methods
+            </h2>
+            {!allProvidersEnabled && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button className="h-8 px-2 py-0 gap-2 bg-black text-white dark:bg-neutral-600 dark:text-white hover:bg-gray-800 dark:hover:bg-neutral-500 text-sm font-medium rounded">
+                    <Plus className="w-5 h-5" />
+                    Add Provider
+                    <ChevronDown className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80">
+                  {/* Available providers (not enabled) */}
+                  {oauthProviders
+                    .filter((provider) => !enabledProviders[provider.id])
+                    .map((provider) => (
+                      <DropdownMenuItem
+                        key={provider.id}
+                        onClick={() => handleConfigureProvider(provider)}
+                        className="py-2 px-3 flex items-center gap-3 cursor-pointer"
+                      >
+                        {provider.icon}
+                        <span className="text-sm">{provider.name}</span>
+                      </DropdownMenuItem>
+                    ))}
+
+                  {/* Separator if there are both enabled and disabled providers */}
+                  {oauthProviders.some((p) => enabledProviders[p.id]) &&
+                    oauthProviders.some((p) => !enabledProviders[p.id]) && (
+                      <DropdownMenuSeparator />
+                    )}
+
+                  {/* Enabled providers (disabled from selection) */}
+                  {oauthProviders
+                    .filter((provider) => enabledProviders[provider.id])
+                    .map((provider) => (
+                      <DropdownMenuItem
+                        key={provider.id}
+                        disabled
+                        className="py-2 px-3 flex items-center justify-between gap-3 opacity-50 cursor-not-allowed"
+                      >
+                        <div className="flex items-center gap-3">
+                          {provider.icon}
+                          <span className="text-sm">{provider.name}</span>
+                        </div>
+                        <span className="text-xs px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded border border-emerald-300 dark:border-emerald-700">
+                          Enabled
+                        </span>
+                      </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+
+          {/* Auth Methods List */}
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex flex-col gap-3">
+              {/* Email Auth Card */}
+              <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-neutral-800 rounded-lg border border-gray-200 dark:border-transparent">
+                <div className="flex items-center gap-3">
+                  <Mail className="w-6 h-6 text-gray-700 dark:text-white" />
+                  <div className="text-sm font-medium text-black dark:text-white">Email Auth</div>
+                </div>
+              </div>
+
+              {/* OAuth Providers */}
+              {hasAuthMethods &&
+                oauthProviders.map((provider) => {
+                  const providerConfig = getProviderConfig(provider.id);
+                  if (!providerConfig) {
+                    return null;
+                  }
+
+                  return (
+                    <div
+                      key={provider.id}
+                      className="flex items-center justify-between px-6 py-4 bg-white dark:bg-neutral-800 rounded-lg border border-gray-200 dark:border-transparent"
+                    >
+                      <div className="flex items-center gap-3">
+                        {provider.icon}
+                        <div className="text-sm font-medium text-black dark:text-white">
+                          {provider.name}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        {providerConfig.useSharedKey && (
+                          <span className="px-2 py-0.5 text-xs font-medium text-neutral-500 dark:text-neutral-400 border border-neutral-500 dark:border-neutral-400 rounded">
+                            Shared Keys
+                          </span>
+                        )}
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              className="h-7 w-7 p-1 text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700"
+                              variant="ghost"
+                              size="sm"
+                            >
+                              <MoreHorizontal className="w-5 h-5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40 py-1 px-2">
+                            <DropdownMenuItem
+                              onClick={() => handleConfigureProvider(provider)}
+                              className="py-2 px-3 flex items-center gap-3 cursor-pointer"
+                            >
+                              <Pencil className="w-5 h-5" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => void deleteOAuthConfig(provider.id, provider.name)}
+                              className="py-2 px-3 flex items-center gap-3 cursor-pointer text-red-600 dark:text-red-400"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Section - Preview */}
+        <div className="flex-1 bg-gray-100 dark:bg-neutral-800 p-3 flex flex-col overflow-hidden">
+          <div className="flex-1 bg-gray-200 dark:bg-neutral-700 rounded-xl overflow-hidden flex flex-col">
+            {/* Preview Header */}
+            <div className="flex items-center justify-end px-6 py-3 border-b border-gray-300 dark:border-neutral-600 gap-3">
+              <p className="text-sm font-medium text-gray-700 dark:text-white">
+                Integrate Authentication to Your Application
+              </p>
+              <CopyButton
+                text={AUTH_IMPLEMENTATION_PROMPT}
+                copyText="Copy Prompt"
+                variant="primary"
+                className="w-34"
+              />
             </div>
 
-            <div className="flex-1">
-              <div className="grid grid-cols-2 gap-x-3 gap-y-6">
-                {/* Email Auth Card - Always visible, no actions */}
-                <div className="flex items-center justify-between h-15 p-4 bg-white rounded-[8px] border border-gray-200 dark:border-transparent dark:bg-[#333333]">
-                  <div className="flex-1 flex items-center gap-3">
-                    <Mail className="w-6 h-6 text-gray-700 dark:text-white" />
-                    <div className="text-sm font-medium text-black dark:text-white">Email Auth</div>
-                  </div>
-                </div>
-
-                {/* OAuth Providers */}
-                {hasAuthMethods ? (
-                  <>
-                    {oauthProviders.map((provider) => {
-                      const providerConfig = getProviderConfig(provider.id);
-                      if (!providerConfig) {
-                        return null;
-                      }
-
-                      return (
-                        <div
-                          key={provider.id}
-                          className="flex items-center justify-between h-15 p-4 bg-white rounded-[8px] border border-gray-200 dark:border-transparent dark:bg-[#333333]"
-                        >
-                          <div className="flex-1 flex items-center gap-3">
-                            {provider.icon}
-
-                            <div className="text-sm font-medium text-black dark:text-white">
-                              {provider.name}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-3">
-                            {providerConfig.useSharedKey && (
-                              <span className="px-2 py-0.5 text-xs font-medium text-neutral-500 dark:text-neutral-400 border border-neutral-500 dark:border-neutral-400 rounded">
-                                Shared Keys
-                              </span>
-                            )}
-
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  className="h-7 w-7 p-1 text-gray-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-                                  variant="ghost"
-                                  size="sm"
-                                >
-                                  <MoreHorizontal className="w-5 h-5" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-40 py-1 px-2">
-                                <DropdownMenuItem
-                                  onClick={() => handleConfigureProvider(provider)}
-                                  className="py-2 px-3 flex items-center gap-3 cursor-pointer"
-                                >
-                                  <Pencil className="w-5 h-5" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => void deleteOAuthConfig(provider.id, provider.name)}
-                                  className="py-2 px-3 flex items-center gap-3 cursor-pointer text-red-600 dark:text-red-400"
-                                >
-                                  <Trash2 className="w-5 h-5" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </>
-                ) : null}
-              </div>
+            {/* Preview Content */}
+            <div className="flex-1 overflow-y-auto pb-14 flex flex-col items-center justify-center gap-4">
+              <AuthPreview />
+              <p className="text-xs text-gray-500 dark:text-neutral-400 text-center">
+                Preview Mode
+              </p>
             </div>
           </div>
         </div>
@@ -211,14 +266,6 @@ export default function AuthMethodsPage() {
         isOpen={isDialogOpen}
         onClose={handleCloseDialog}
         onSuccess={handleSuccess}
-      />
-
-      <AddOAuthDialog
-        providers={oauthProviders}
-        open={isSelectDialogOpen}
-        onOpenChange={setIsSelectDialogOpen}
-        onConfirm={handleConfirmSelected}
-        enabledProviders={enabledProviders}
       />
 
       {/* Confirm Dialog */}

@@ -11,9 +11,7 @@ const AIErrorState: React.FC<AIErrorStateProps> = ({ message }) => {
       <AlertCircle size={40} className="text-red-500 dark:text-red-400" />
       <div className="flex flex-col items-center justify-center gap-1">
         <p className="text-sm font-medium text-zinc-950 dark:text-white">Configuration Error</p>
-        <p className="text-red-600 dark:text-red-400 text-xs max-w-md">
-          {message}
-        </p>
+        <p className="text-red-600 dark:text-red-400 text-xs max-w-md">{message}</p>
       </div>
     </div>
   );
