@@ -4,42 +4,8 @@ export const todoListTemplate: DatabaseTemplate = {
   id: 'todo-list',
   title: 'To-do List',
   description: 'A To-do List application with tasks, projects, tags, and collaboration features',
-  tableCount: 7,
+  tableCount: 6,
   visualizerSchema: [
-    {
-      tableName: 'users',
-      columns: [
-        { columnName: 'id', type: 'uuid', isPrimaryKey: true, isNullable: false, isUnique: true },
-        {
-          columnName: 'email',
-          type: 'varchar',
-          isPrimaryKey: false,
-          isNullable: false,
-          isUnique: true,
-        },
-        {
-          columnName: 'username',
-          type: 'varchar',
-          isPrimaryKey: false,
-          isNullable: false,
-          isUnique: true,
-        },
-        {
-          columnName: 'full_name',
-          type: 'varchar',
-          isPrimaryKey: false,
-          isNullable: true,
-          isUnique: false,
-        },
-        {
-          columnName: 'created_at',
-          type: 'timestamp',
-          isPrimaryKey: false,
-          isNullable: true,
-          isUnique: false,
-        },
-      ],
-    },
     {
       tableName: 'projects',
       columns: [
@@ -340,15 +306,6 @@ export const todoListTemplate: DatabaseTemplate = {
     },
   ],
   sql: `-- To-do List Database Schema
-
--- Users table
-CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email VARCHAR(255) UNIQUE NOT NULL,
-  username VARCHAR(100) UNIQUE NOT NULL,
-  full_name VARCHAR(255),
-  created_at TIMESTAMP DEFAULT NOW()
-);
 
 -- Projects table
 CREATE TABLE projects (

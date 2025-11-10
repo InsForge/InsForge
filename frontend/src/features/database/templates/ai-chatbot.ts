@@ -4,56 +4,8 @@ export const aiChatbotTemplate: DatabaseTemplate = {
   id: 'ai-chatbot',
   title: 'AI Chatbot',
   description: 'An AI Chatbot system with conversations, messages, and user interactions',
-  tableCount: 5,
+  tableCount: 4,
   visualizerSchema: [
-    {
-      tableName: 'users',
-      columns: [
-        { columnName: 'id', type: 'uuid', isPrimaryKey: true, isNullable: false, isUnique: true },
-        {
-          columnName: 'username',
-          type: 'varchar',
-          isPrimaryKey: false,
-          isNullable: false,
-          isUnique: true,
-        },
-        {
-          columnName: 'email',
-          type: 'varchar',
-          isPrimaryKey: false,
-          isNullable: false,
-          isUnique: true,
-        },
-        {
-          columnName: 'full_name',
-          type: 'varchar',
-          isPrimaryKey: false,
-          isNullable: true,
-          isUnique: false,
-        },
-        {
-          columnName: 'avatar_url',
-          type: 'varchar',
-          isPrimaryKey: false,
-          isNullable: true,
-          isUnique: false,
-        },
-        {
-          columnName: 'created_at',
-          type: 'timestamp',
-          isPrimaryKey: false,
-          isNullable: true,
-          isUnique: false,
-        },
-        {
-          columnName: 'last_active_at',
-          type: 'timestamp',
-          isPrimaryKey: false,
-          isNullable: true,
-          isUnique: false,
-        },
-      ],
-    },
     {
       tableName: 'conversations',
       columns: [
@@ -271,17 +223,6 @@ export const aiChatbotTemplate: DatabaseTemplate = {
     },
   ],
   sql: `-- AI Chatbot Database Schema
-
--- Users table
-CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  username VARCHAR(100) UNIQUE NOT NULL,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  full_name VARCHAR(255),
-  avatar_url VARCHAR(500),
-  created_at TIMESTAMP DEFAULT NOW(),
-  last_active_at TIMESTAMP DEFAULT NOW()
-);
 
 -- Conversations table
 CREATE TABLE conversations (

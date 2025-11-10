@@ -24,8 +24,8 @@ export default function DashboardPage() {
   const { totalUsers } = useUsers();
   const { records } = useMcpUsage();
 
-  const authCount = auth?.oauths.length || 0;
-  const tableCount = tables.filter((table) => table !== 'users').length;
+  const authCount = auth?.oauths.length ?? 0;
+  const tableCount = tables?.length ?? 0;
   const showBanner = location.state?.showSuccessBanner === true;
 
   const mcpColumns: LogsColumnDef[] = [

@@ -47,6 +47,7 @@ type BucketNodeData = {
 type AuthNodeData = {
   authMetadata: AuthMetadataSchema;
   userCount?: number;
+  isReferenced?: boolean;
 };
 
 type CustomNodeData = TableNodeData | BucketNodeData | AuthNodeData;
@@ -246,6 +247,16 @@ export function SchemaVisualizer({
       }));
       nodes.push(...bucketNodes);
 
+      // Check if any tables reference users.id
+      const isUsersReferenced = tables.some((table) =>
+        table.columns.some(
+          (column) =>
+            column.foreignKey &&
+            column.foreignKey.referenceTable === 'users' &&
+            column.foreignKey.referenceColumn === 'id'
+        )
+      );
+
       // Add authentication node
       nodes.push({
         id: 'authentication',
@@ -254,12 +265,13 @@ export function SchemaVisualizer({
         data: {
           authMetadata: metadata.auth,
           userCount,
+          isReferenced: isUsersReferenced,
         },
       });
     }
 
     return nodes;
-  }, [metadata, userCount, tables]);
+  }, [tables, metadata, externalSchemas, userCount]);
 
   const initialEdges = useMemo(() => {
     const edges: BuiltInEdge[] = [];
@@ -268,26 +280,49 @@ export function SchemaVisualizer({
     tables.forEach((table) => {
       table.columns.forEach((column) => {
         if (column.foreignKey) {
+          // Check if this is a reference to users.id
+          const isAuthReference =
+            column.foreignKey.referenceTable === 'users' &&
+            column.foreignKey.referenceColumn === 'id';
+
           const edgeId = `${table.tableName}-${column.columnName}-${column.foreignKey.referenceTable}`;
-          edges.push({
-            id: edgeId,
-            source: table.tableName,
-            target: column.foreignKey.referenceTable,
-            sourceHandle: `${column.columnName}-source`,
-            targetHandle: `${column.foreignKey.referenceColumn}-target`,
-            type: 'smoothstep',
-            animated: true,
-            style: { stroke: edgeColor, strokeWidth: 2, zIndex: 1000 },
-            zIndex: 1000,
-            pathOptions: {
-              offset: 40,
-            },
-          });
+
+          if (isAuthReference) {
+            // Connect to the authentication node
+            edges.push({
+              id: edgeId,
+              source: table.tableName,
+              target: 'authentication',
+              sourceHandle: `${column.columnName}-source`,
+              targetHandle: 'id-target',
+              type: 'smoothstep',
+              animated: true,
+              style: { stroke: edgeColor, strokeWidth: 2, zIndex: 1000 },
+              zIndex: 1000,
+              pathOptions: {
+                offset: 40,
+              },
+            });
+          } else {
+            // Regular table-to-table edge
+            edges.push({
+              id: edgeId,
+              source: table.tableName,
+              target: column.foreignKey.referenceTable,
+              sourceHandle: `${column.columnName}-source`,
+              targetHandle: `${column.foreignKey.referenceColumn}-target`,
+              type: 'smoothstep',
+              animated: true,
+              style: { stroke: edgeColor, strokeWidth: 2, zIndex: 1000 },
+              zIndex: 1000,
+              pathOptions: {
+                offset: 40,
+              },
+            });
+          }
         }
       });
     });
-
-    // Add authentication edges if authData exists
 
     return edges;
   }, [tables, resolvedTheme]);
@@ -332,7 +367,7 @@ export function SchemaVisualizer({
         nodeTypes={nodeTypes}
         connectionMode={ConnectionMode.Loose}
         fitView
-        fitViewOptions={{ padding: 1, maxZoom: 2, minZoom: 1 }}
+        fitViewOptions={{ padding: 1, maxZoom: 2, minZoom: 0.8 }}
         minZoom={0.1}
         maxZoom={2}
         proOptions={{ hideAttribution: true }}

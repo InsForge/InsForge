@@ -493,13 +493,13 @@ export default function TablesPage() {
                             itemType="record"
                             onClear={() => setSelectedRows(new Set())}
                           />
-                          {selectedTable !== 'users' && (
+                          {
                             <DeleteActionButton
                               selectedCount={selectedRows.size}
                               itemType="record"
                               onDelete={() => void handleBulkDelete(Array.from(selectedRows))}
                             />
-                          )}
+                          }
                         </div>
                       ) : (
                         <SearchInput
@@ -511,7 +511,7 @@ export default function TablesPage() {
                         />
                       )}
                       <div className="flex items-center gap-2 ml-4">
-                        {selectedRows.size === 0 && selectedTable !== 'users' && (
+                        {selectedRows.size === 0 && (
                           <>
                             {/* Import CSV Button */}
                             <Button

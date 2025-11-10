@@ -1,4 +1,5 @@
-import { Lock, FormInput, Users } from 'lucide-react';
+import { Lock, FormInput, Users, Circle } from 'lucide-react';
+import { Handle, Position } from '@xyflow/react';
 import { AuthMetadataSchema } from '@insforge/shared-schemas';
 import { cn } from '@/lib/utils/utils';
 import { useOAuthConfig } from '@/features/auth/hooks/useOAuthConfig';
@@ -8,11 +9,12 @@ interface AuthNodeProps {
   data: {
     authMetadata: AuthMetadataSchema;
     userCount?: number;
+    isReferenced?: boolean; // Whether any tables have foreign keys to users.id
   };
 }
 
 export function AuthNode({ data }: AuthNodeProps) {
-  const { authMetadata, userCount } = data;
+  const { authMetadata, userCount, isReferenced = false } = data;
   const { isProviderConfigured } = useOAuthConfig();
 
   const enabledCount = authMetadata.oauths.length + 1;
@@ -80,14 +82,39 @@ export function AuthNode({ data }: AuthNodeProps) {
       </div>
 
       {/* Users Section */}
-      <div className="flex items-center justify-between p-3 border-t border-gray-300 dark:border-neutral-700">
+      <div className="flex items-center justify-between p-3 border-t border-gray-300 dark:border-neutral-700 relative">
+        {/* Target handle for auth.id references - positioned at right bottom corner */}
+        <Handle
+          type="target"
+          position={Position.Right}
+          id="id-target"
+          className="!w-3 !h-3 !opacity-0 !border-0 !pointer-events-none"
+          style={{
+            right: 16,
+            bottom: 16,
+            top: 'auto',
+            transform: 'none',
+            pointerEvents: 'none',
+          }}
+          isConnectable={false}
+        />
+
         <div className="flex items-center gap-2.5">
           <Users className="w-5 h-5 text-zinc-700 dark:text-neutral-300" />
           <span className="text-sm text-zinc-700 dark:text-neutral-300">Users</span>
+          <span className="text-xs text-zinc-500 dark:text-neutral-400">{userCount ?? 0}</span>
         </div>
         <div className="flex items-center">
-          {userCount !== undefined && (
-            <span className="text-xs text-zinc-500 dark:text-neutral-400">{userCount}</span>
+          {isReferenced ? (
+            <div className="w-5 h-5 flex items-center justify-center relative">
+              <Circle
+                className="w-5 h-5 text-zinc-950 dark:text-white fill-none stroke-current"
+                strokeWidth={1.5}
+              />
+              <div className="w-2 h-2 bg-zinc-950 dark:bg-white rounded-full absolute" />
+            </div>
+          ) : (
+            <Circle className="w-5 h-5 text-gray-400 dark:text-neutral-700 fill-gray-100 dark:fill-neutral-800 stroke-current" />
           )}
         </div>
       </div>
