@@ -39,26 +39,21 @@ export function PrimaryMenu({
   const MenuItem = ({ item }: { item: PrimaryMenuItem }) => {
     const isActive = item.id === activeItemId;
 
-    const buttonContent = (
-      <button
-        className={cn(
-          'flex items-center gap-3 h-9 rounded duration-200 ease-in-out',
-          isCollapsed ? 'w-9 justify-center px-0' : 'w-full px-2',
-          isActive
-            ? 'bg-zinc-950 dark:bg-emerald-300 text-white dark:text-black'
-            : 'hover:bg-zinc-100 dark:hover:bg-neutral-600 text-black dark:text-neutral-400'
-        )}
-      >
-        <item.icon className="w-5 h-5 flex-shrink-0" />
-        {!isCollapsed && <span className="font-medium text-sm truncate">{item.label}</span>}
-      </button>
-    );
-
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <Link to={item.href} className="block">
-            {buttonContent}
+          <Link
+            to={item.href}
+            className={cn(
+              'flex items-center gap-3 h-9 rounded duration-200 ease-in-out',
+              isCollapsed ? 'w-9 justify-center px-0' : 'w-full px-2',
+              isActive
+                ? 'bg-zinc-950 dark:bg-emerald-300 text-white dark:text-black'
+                : 'hover:bg-zinc-100 dark:hover:bg-neutral-600 text-black dark:text-neutral-400'
+            )}
+          >
+            <item.icon className="w-5 h-5 flex-shrink-0" />
+            {!isCollapsed && <span className="font-medium text-sm truncate">{item.label}</span>}
           </Link>
         </TooltipTrigger>
         {isCollapsed && (
@@ -71,44 +66,62 @@ export function PrimaryMenu({
   };
 
   const BottomMenuItem = ({ item }: { item: PrimaryMenuItem }) => {
-    const buttonContent = (
-      <button
-        className={baseButtonClasses}
-        onClick={
-          item.onClick || (item.external ? () => window.open(item.href, '_blank') : undefined)
-        }
-      >
-        <div className="absolute left-2 h-5 w-5">
-          <item.icon className="w-5 h-5" />
-        </div>
-        {!isCollapsed && (
-          <>
-            <span className="font-medium text-sm truncate ml-9 mr-2 block text-left">
-              {item.label}
-            </span>
-            {item.external && (
-              <ExternalLink className="absolute left-40 h-4 w-4 text-neutral-500" />
-            )}
-          </>
-        )}
-      </button>
-    );
+    // For items with onClick handler or external links, use a button
+    if (item.onClick || item.external) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              className={baseButtonClasses}
+              onClick={
+                item.onClick || (item.external ? () => window.open(item.href, '_blank') : undefined)
+              }
+            >
+              <div className="absolute left-2 h-5 w-5">
+                <item.icon className="w-5 h-5" />
+              </div>
+              {!isCollapsed && (
+                <>
+                  <span className="font-medium text-sm truncate ml-9 mr-2 block text-left">
+                    {item.label}
+                  </span>
+                  {item.external && (
+                    <ExternalLink className="absolute left-40 h-4 w-4 text-neutral-500" />
+                  )}
+                </>
+              )}
+            </button>
+          </TooltipTrigger>
+          {isCollapsed && (
+            <TooltipContent side="right">
+              <div className="flex items-center gap-2">
+                <p>{item.label}</p>
+                {item.external && <ExternalLink className="h-3 w-3" />}
+              </div>
+            </TooltipContent>
+          )}
+        </Tooltip>
+      );
+    }
 
+    // For internal navigation, use a Link
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          {item.external || item.onClick ? (
-            buttonContent
-          ) : (
-            <Link to={item.href}>{buttonContent}</Link>
-          )}
+          <Link to={item.href} className={baseButtonClasses}>
+            <div className="absolute left-2 h-5 w-5">
+              <item.icon className="w-5 h-5" />
+            </div>
+            {!isCollapsed && (
+              <span className="font-medium text-sm truncate ml-9 mr-2 block text-left">
+                {item.label}
+              </span>
+            )}
+          </Link>
         </TooltipTrigger>
         {isCollapsed && (
           <TooltipContent side="right">
-            <div className="flex items-center gap-2">
-              <p>{item.label}</p>
-              {item.external && <ExternalLink className="h-3 w-3" />}
-            </div>
+            <p>{item.label}</p>
           </TooltipContent>
         )}
       </Tooltip>
