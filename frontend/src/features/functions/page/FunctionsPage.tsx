@@ -5,11 +5,13 @@ import { SecretsContent } from '@/features/functions/components/SecretsContent';
 import { CronJobsContent } from '@/features/functions/components/CronJobsContent';
 export default function FunctionsPage() {
   // Load selected section from localStorage on mount
-  const [selectedSection, setSelectedSection] = useState<'functions' | 'secrets' | 'cronjobs'>(
+  const [selectedSection, setSelectedSection] = useState<'functions' | 'secrets' | 'schedules'>(
     () => {
       return (
-        (localStorage.getItem('selectedFunctionSection') as 'functions' | 'secrets' | 'cronjobs') ||
-        'functions'
+        (localStorage.getItem('selectedFunctionSection') as
+          | 'functions'
+          | 'secrets'
+          | 'schedules') || 'functions'
       );
     }
   );
