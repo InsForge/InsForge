@@ -1,4 +1,4 @@
-import { jsonSchema } from '@/lib/utils/validation-schemas';
+import { jsonSchema } from '@/lib/utils/schemaValidations';
 import { ColumnSchema, ColumnType } from '@insforge/shared-schemas';
 import { z } from 'zod';
 

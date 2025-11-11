@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { AuthService } from '@/core/auth/auth.js';
 import { AuthConfigService } from '@/core/auth/auth.config.js';
+import { OAuthConfigService } from '@/core/auth/oauth.config.js';
 import { AuditService } from '@/core/logs/audit.js';
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -17,79 +18,95 @@ import {
   listUsersRequestSchema,
   sendVerificationEmailRequestSchema,
   verifyEmailRequestSchema,
-  updateEmailAuthConfigRequestSchema,
   sendResetPasswordEmailRequestSchema,
+  exchangeResetPasswordTokenRequestSchema,
   resetPasswordRequestSchema,
   type CreateUserResponse,
   type CreateSessionResponse,
   type VerifyEmailResponse,
+  type ExchangeResetPasswordTokenResponse,
   type ResetPasswordResponse,
   type CreateAdminSessionResponse,
   type GetCurrentSessionResponse,
   type ListUsersResponse,
   type DeleteUsersResponse,
-  type GetEmailAuthConfigResponse,
+  type GetPublicAuthConfigResponse,
   exchangeAdminSessionRequestSchema,
+  type GetAuthConfigResponse,
+  updateAuthConfigRequestSchema,
 } from '@insforge/shared-schemas';
 import { UserRecord } from '@/types/auth.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
 const authConfigService = AuthConfigService.getInstance();
+const oAuthConfigService = OAuthConfigService.getInstance();
 const auditService = AuditService.getInstance();
 
 // Mount OAuth routes
 router.use('/oauth', oauthRouter);
 
+// Public Authentication Configuration Routes
+// GET /api/auth/public-config - Get all public authentication configuration (public endpoint)
+router.get('/public-config', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const [oAuthProviders, authConfigs] = await Promise.all([
+      oAuthConfigService.getConfiguredProviders(),
+      authConfigService.getPublicAuthConfig(),
+    ]);
+
+    const response: GetPublicAuthConfigResponse = {
+      oAuthProviders,
+      ...authConfigs,
+    };
+
+    res.json(response);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Email Authentication Configuration Routes
-// GET /api/auth/email/config - Get email authentication configuration (admin only)
-router.get(
-  '/email/config',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const config: GetEmailAuthConfigResponse = await authConfigService.getEmailConfig();
-      res.json(config);
-    } catch (error) {
-      next(error);
-    }
+// GET /api/auth/config - Get authentication configurations (admin only)
+router.get('/config', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const config: GetAuthConfigResponse = await authConfigService.getAuthConfig();
+    res.json(config);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
-// PUT /api/auth/email/config - Update email authentication configuration (admin only)
-router.put(
-  '/email/config',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const validationResult = updateEmailAuthConfigRequestSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        throw new AppError(
-          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
-
-      const input = validationResult.data;
-      const config: GetEmailAuthConfigResponse = await authConfigService.updateEmailConfig(input);
-
-      await auditService.log({
-        actor: req.user?.email || 'api-key',
-        action: 'UPDATE_EMAIL_AUTH_CONFIG',
-        module: 'AUTH',
-        details: {
-          updatedFields: Object.keys(input),
-        },
-        ip_address: req.ip,
-      });
-
-      successResponse(res, config);
-    } catch (error) {
-      next(error);
+// PUT /api/auth/config - Update authentication configurations (admin only)
+router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const validationResult = updateAuthConfigRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      throw new AppError(
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
     }
+
+    const input = validationResult.data;
+    const config: GetAuthConfigResponse = await authConfigService.updateAuthConfig(input);
+
+    await auditService.log({
+      actor: req.user?.email || 'api-key',
+      action: 'UPDATE_AUTH_CONFIG',
+      module: 'AUTH',
+      details: {
+        updatedFields: Object.keys(input),
+      },
+      ip_address: req.ip,
+    });
+
+    successResponse(res, config);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 // POST /api/auth/users - Create a new user (registration)
 router.post('/users', async (req: Request, res: Response, next: NextFunction) => {
@@ -444,9 +461,9 @@ router.post('/tokens/anon', verifyAdmin, (_req: Request, res: Response, next: Ne
   }
 });
 
-// POST /api/auth/email/send-verification-code - Send email verification code
+// POST /api/auth/email/send-verification - Send email verification (code or link based on config)
 router.post(
-  '/email/send-verification-code',
+  '/email/send-verification',
   sendEmailOTPLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -461,48 +478,27 @@ router.post(
 
       const { email } = validationResult.data;
 
+      // Get auth config to determine verification method
+      const authConfig = await authConfigService.getAuthConfig();
+      const method = authConfig.verifyEmailMethod;
+
       // Note: User enumeration is prevented at service layer
       // Service returns gracefully (no error) if user not found
-      await authService.sendVerificationEmailWithCode(email);
-
-      // Always return 202 Accepted with generic message
-      res.status(202).json({
-        success: true,
-        message:
-          'If your email is registered, we have sent you a verification code. Please check your inbox.',
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-// POST /api/auth/email/send-verification-link - Send email verification magic link
-router.post(
-  '/email/send-verification-link',
-  sendEmailOTPLimiter,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const validationResult = sendVerificationEmailRequestSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        throw new AppError(
-          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
+      if (method === 'link') {
+        await authService.sendVerificationEmailWithLink(email);
+      } else {
+        await authService.sendVerificationEmailWithCode(email);
       }
 
-      const { email } = validationResult.data;
-
-      // Note: User enumeration is prevented at service layer
-      // Service returns gracefully (no error) if user not found
-      await authService.sendVerificationEmailWithLink(email);
-
       // Always return 202 Accepted with generic message
+      const message =
+        method === 'link'
+          ? 'If your email is registered, we have sent you a verification link. Please check your inbox.'
+          : 'If your email is registered, we have sent you a verification code. Please check your inbox.';
+
       res.status(202).json({
         success: true,
-        message:
-          'If your email is registered, we have sent you a verification link. Please check your inbox.',
+        message,
       });
     } catch (error) {
       next(error);
@@ -510,11 +506,12 @@ router.post(
   }
 );
 
-// POST /api/auth/verify-email - Verify email with OTP
-// If email is provided: uses numeric OTP verification (6-digit code)
-// If email is NOT provided: uses link OTP verification (64-char token)
+// POST /api/auth/email/verify - Verify email with OTP
+// Uses verifyEmailMethod from auth config to determine verification type:
+// - 'code': expects email + 6-digit numeric code
+// - 'link': expects 64-char hex token only
 router.post(
-  '/verify-email',
+  '/email/verify',
   verifyOTPLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -529,14 +526,25 @@ router.post(
 
       const { email, otp } = validationResult.data;
 
+      // Get auth config to determine verification method
+      const authConfig = await authConfigService.getAuthConfig();
+      const method = authConfig.verifyEmailMethod;
+
       let result: VerifyEmailResponse;
 
-      if (email) {
-        // Numeric OTP verification (email + otp where otp is 6-digit code)
-        result = await authService.verifyEmailWithCode(email, otp);
+      if (method === 'link') {
+        // Link verification: otp is 64-char hex token
+        result = await authService.verifyEmailWithToken(otp);
       } else {
-        // Link OTP verification (otp is 64-char hex token)
-        result = await authService.verifyEmailWithLinkToken(otp);
+        // Code verification: requires email + 6-digit code
+        if (!email) {
+          throw new AppError(
+            'Email is required for code verification',
+            400,
+            ERROR_CODES.INVALID_INPUT
+          );
+        }
+        result = await authService.verifyEmailWithCode(email, otp);
       }
 
       successResponse(res, result); // Return session info with optional redirectTo upon successful verification
@@ -546,9 +554,9 @@ router.post(
   }
 );
 
-// POST /api/auth/email/send-reset-password-code - Send password reset code
+// POST /api/auth/email/send-reset-password - Send password reset (code or link based on config)
 router.post(
-  '/email/send-reset-password-code',
+  '/email/send-reset-password',
   sendEmailOTPLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -563,15 +571,27 @@ router.post(
 
       const { email } = validationResult.data;
 
+      // Get auth config to determine reset password method
+      const authConfig = await authConfigService.getAuthConfig();
+      const method = authConfig.resetPasswordMethod;
+
       // Note: User enumeration is prevented at service layer
       // Service returns gracefully (no error) if user not found
-      await authService.sendResetPasswordEmailWithCode(email);
+      if (method === 'link') {
+        await authService.sendResetPasswordEmailWithLink(email);
+      } else {
+        await authService.sendResetPasswordEmailWithCode(email);
+      }
 
       // Always return 202 Accepted with generic message
+      const message =
+        method === 'link'
+          ? 'If your email is registered, we have sent you a password reset link. Please check your inbox.'
+          : 'If your email is registered, we have sent you a password reset code. Please check your inbox.';
+
       res.status(202).json({
         success: true,
-        message:
-          'If your email is registered, we have sent you a password reset code. Please check your inbox.',
+        message,
       });
     } catch (error) {
       next(error);
@@ -579,13 +599,15 @@ router.post(
   }
 );
 
-// POST /api/auth/email/send-reset-password-link - Send password reset magic link
+// POST /api/auth/email/exchange-reset-password-token - Exchange reset password code for reset token
+// Step 1 of two-step password reset flow: verify code → get reset token
+// Only used when resetPasswordMethod is 'code'
 router.post(
-  '/email/send-reset-password-link',
-  sendEmailOTPLimiter,
+  '/email/exchange-reset-password-token',
+  verifyOTPLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const validationResult = sendResetPasswordEmailRequestSchema.safeParse(req.body);
+      const validationResult = exchangeResetPasswordTokenRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
         throw new AppError(
           validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
@@ -594,29 +616,32 @@ router.post(
         );
       }
 
-      const { email } = validationResult.data;
+      const { email, code } = validationResult.data;
 
-      // Note: User enumeration is prevented at service layer
-      // Service returns gracefully (no error) if user not found
-      await authService.sendResetPasswordEmailWithLink(email);
+      const result = await authService.exchangeResetPasswordToken(email, code);
 
-      // Always return 202 Accepted with generic message
-      res.status(202).json({
-        success: true,
-        message:
-          'If your email is registered, we have sent you a password reset link. Please check your inbox.',
-      });
+      const response: ExchangeResetPasswordTokenResponse = {
+        token: result.token,
+        expiresAt: result.expiresAt.toISOString(),
+      };
+
+      successResponse(res, response);
     } catch (error) {
       next(error);
     }
   }
 );
 
-// POST /api/auth/reset-password - Reset password with code or link token
-// If email is provided: uses numeric code verification (resetPasswordWithCode)
-// If email is NOT provided: uses link token verification (resetPasswordWithLinkToken)
+// POST /api/auth/email/reset-password - Reset password with token
+// Token can be:
+// - Magic link token (from send-reset-password endpoint when method is 'link')
+// - Reset token (from exchange-reset-password-token endpoint after code verification)
+// Both use RESET_PASSWORD purpose and are verified the same way
+// Flow:
+//   Code: send-reset-password → exchange-reset-password-token → reset-password (with resetToken)
+//   Link: send-reset-password → reset-password (with link token)
 router.post(
-  '/reset-password',
+  '/email/reset-password',
   verifyOTPLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -629,17 +654,13 @@ router.post(
         );
       }
 
-      const { email, newPassword, otp } = validationResult.data;
+      const { newPassword, otp } = validationResult.data;
 
-      let result: ResetPasswordResponse;
-
-      if (email) {
-        // Code-based reset (email + otp where otp is 6-digit code)
-        result = await authService.resetPasswordWithCode(email, newPassword, otp);
-      } else {
-        // Link token-based reset (otp is 64-char hex)
-        result = await authService.resetPasswordWithLinkToken(newPassword, otp);
-      }
+      // Both magic link tokens and code-verified reset tokens use RESET_PASSWORD purpose
+      const result: ResetPasswordResponse = await authService.resetPasswordWithToken(
+        newPassword,
+        otp
+      );
 
       successResponse(res, result); // Return message with optional redirectTo
     } catch (error) {

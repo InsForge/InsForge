@@ -21,8 +21,16 @@ export const mcpConnectionStatusEventSchema = z.object({
   timestamp: z.union([z.number(), z.string()]),
 });
 
-export const showConnectOverlayEventSchema = z.object({
-  type: z.literal('SHOW_CONNECT_OVERLAY'),
+export const showOnboardingOverlayEventSchema = z.object({
+  type: z.literal('SHOW_ONBOARDING_OVERLAY'),
+});
+
+export const showSettingsOverlayEventSchema = z.object({
+  type: z.literal('SHOW_SETTINGS_OVERLAY'),
+});
+
+export const onboardingSuccessSchema = z.object({
+  type: z.literal('ONBOARDING_SUCCESS'),
 });
 
 export const cloudEventSchema = z.discriminatedUnion('type', [
@@ -30,7 +38,9 @@ export const cloudEventSchema = z.discriminatedUnion('type', [
   authSuccessEventSchema,
   authErrorEventSchema,
   mcpConnectionStatusEventSchema,
-  showConnectOverlayEventSchema,
+  showOnboardingOverlayEventSchema,
+  showSettingsOverlayEventSchema,
+  onboardingSuccessSchema,
 ]);
 
 export type AppRouteChangeEvent = z.infer<typeof appRouteChangeEventSchema>;
@@ -38,4 +48,5 @@ export type AuthSuccessEvent = z.infer<typeof authSuccessEventSchema>;
 export type AuthErrorEvent = z.infer<typeof authErrorEventSchema>;
 export type McpConnectionStatusEvent = z.infer<typeof mcpConnectionStatusEventSchema>;
 export type CloudEvent = z.infer<typeof cloudEventSchema>;
-export type ShowConnectOverlayEvent = z.infer<typeof showConnectOverlayEventSchema>;
+export type ShowOnboardingOverlayEvent = z.infer<typeof showOnboardingOverlayEventSchema>;
+export type ShowSettingsOverlayEvent = z.infer<typeof showSettingsOverlayEventSchema>;

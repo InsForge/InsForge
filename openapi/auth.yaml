@@ -5,17 +5,72 @@ info:
   description: Authentication endpoints with separated auth and profile tables
 
 paths:
-  /api/auth/email/config:
+  /api/auth/public-config:
     get:
-      summary: Get email authentication configuration
-      description: Get current email authentication settings (admin only)
+      summary: Get public authentication configuration
+      description: Get all public authentication configuration including OAuth providers and email auth settings (public endpoint)
+      tags:
+        - Client
+      responses:
+        '200':
+          description: Public authentication configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  oAuthProviders:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        provider:
+                          type: string
+                          enum: [google, github, discord, linkedin, facebook, microsoft]
+                        useSharedKey:
+                          type: boolean
+                  requireEmailVerification:
+                    type: boolean
+                  passwordMinLength:
+                    type: integer
+                    minimum: 4
+                    maximum: 128
+                  requireNumber:
+                    type: boolean
+                  requireLowercase:
+                    type: boolean
+                  requireUppercase:
+                    type: boolean
+                  requireSpecialChar:
+                    type: boolean
+                  verifyEmailRedirectTo:
+                    type: string
+                    nullable: true
+                    description: URL to redirect users after successful email verification (if not set, shows default success page)
+                  resetPasswordRedirectTo:
+                    type: string
+                    nullable: true
+                    description: URL to redirect users after successful password reset (if not set, shows default success page)
+                  verifyEmailMethod:
+                    type: string
+                    enum: [code, link]
+                    description: Method for email verification (code = 6-digit OTP, link = magic link)
+                  resetPasswordMethod:
+                    type: string
+                    enum: [code, link]
+                    description: Method for password reset (code = 6-digit OTP + exchange flow, link = magic link)
+
+  /api/auth/config:
+    get:
+      summary: Get authentication configuration
+      description: Get current authentication settings including all configuration options (admin only)
       tags:
         - Admin
       security:
         - bearerAuth: []
       responses:
         '200':
-          description: Email authentication configuration
+          description: Authentication configuration
           content:
             application/json:
               schema:
@@ -46,6 +101,18 @@ paths:
                     type: string
                     nullable: true
                     description: URL to redirect users after successful password reset (if not set, shows default success page)
+                  verifyEmailMethod:
+                    type: string
+                    enum: [code, link]
+                    description: Method for email verification (code = 6-digit OTP, link = magic link)
+                  resetPasswordMethod:
+                    type: string
+                    enum: [code, link]
+                    description: Method for password reset (code = 6-digit OTP + exchange flow, link = magic link)
+                  signInRedirectTo:
+                    type: string
+                    nullable: true
+                    description: URL to redirect users after successful sign in
                   createdAt:
                     type: string
                     format: date-time
@@ -58,8 +125,8 @@ paths:
           description: Forbidden - Admin only
 
     put:
-      summary: Update email authentication configuration
-      description: Update email authentication settings (admin only)
+      summary: Update authentication configuration
+      description: Update authentication settings (admin only)
       tags:
         - Admin
       security:
@@ -93,6 +160,18 @@ paths:
                   type: string
                   nullable: true
                   description: URL to redirect users after successful password reset (if not set, shows default success page)
+                verifyEmailMethod:
+                  type: string
+                  enum: [code, link]
+                  description: Method for email verification (code = 6-digit OTP, link = magic link)
+                resetPasswordMethod:
+                  type: string
+                  enum: [code, link]
+                  description: Method for password reset (code = 6-digit OTP + exchange flow, link = magic link)
+                signInRedirectTo:
+                  type: string
+                  nullable: true
+                  description: URL to redirect users after successful sign in
       responses:
         '200':
           description: Configuration updated successfully
@@ -126,6 +205,15 @@ paths:
                     type: string
                     nullable: true
                     description: URL to redirect users after successful password reset (if not set, shows default success page)
+                  verifyEmailMethod:
+                    type: string
+                    enum: [code, link]
+                  resetPasswordMethod:
+                    type: string
+                    enum: [code, link]
+                  signInRedirectTo:
+                    type: string
+                    nullable: true
                   createdAt:
                     type: string
                     format: date-time
@@ -180,9 +268,13 @@ paths:
                     type: string
                     nullable: true
                     description: JWT authentication token (null if email verification required)
-                  requiresEmailVerification:
+                  requireEmailVerification:
                     type: boolean
                     description: Whether email verification is required before login
+                  redirectTo:
+                    type: string
+                    format: uri
+                    description: Optional URL to redirect user after registration (only present if email verification not required)
         '400':
           description: Invalid request
         '409':
@@ -196,25 +288,23 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - name: page
+        - name: offset
           in: query
           schema:
-            type: integer
-            default: 1
+            type: string
+            default: '0'
+          description: Number of records to skip
         - name: limit
           in: query
           schema:
-            type: integer
-            default: 10
+            type: string
+            default: '10'
+          description: Maximum number of records to return
         - name: search
           in: query
           schema:
             type: string
-        - name: role
-          in: query
-          schema:
-            type: string
-            enum: [user, admin]
+          description: Search by email or name
       responses:
         '200':
           description: List of users
@@ -343,6 +433,10 @@ paths:
                     $ref: '#/components/schemas/UserResponse'
                   accessToken:
                     type: string
+                  redirectTo:
+                    type: string
+                    format: uri
+                    description: Optional URL to redirect user after login (if configured)
         '401':
           description: Invalid credentials
         '403':
@@ -461,7 +555,7 @@ paths:
       summary: Generate anonymous token
       description: Generate a non-expiring anonymous JWT token for public API access (admin only)
       tags:
-        - Client
+        - Admin
       security:
         - bearerAuth: []
       responses:
@@ -485,10 +579,10 @@ paths:
         '403':
           description: Forbidden - admin access required
 
-  /api/auth/email/send-verification-code:
+  /api/auth/email/send-verification:
     post:
-      summary: Send email verification code
-      description: Send a numeric 6-digit verification code to user's email address. Prevents user enumeration by returning success even if email doesn't exist.
+      summary: Send email verification (code or link based on config)
+      description: Send email verification using the method configured in auth settings (verifyEmailMethod). When method is 'code', sends a 6-digit numeric code. When method is 'link', sends a magic link. Prevents user enumeration by returning success even if email doesn't exist.
       tags:
         - Client
       requestBody:
@@ -506,7 +600,7 @@ paths:
                   example: user@example.com
       responses:
         '202':
-          description: Verification code sent (if email exists)
+          description: Verification email sent (if email exists). Message varies based on configured method.
           content:
             application/json:
               schema:
@@ -516,56 +610,21 @@ paths:
                     type: boolean
                   message:
                     type: string
-                    example: "If your email is registered, we have sent you a verification code. Please check your inbox."
+                    example: "If your email is registered, we have sent you a verification code/link. Please check your inbox."
         '400':
           description: Invalid request
 
-  /api/auth/email/send-verification-link:
-    post:
-      summary: Send email verification link
-      description: Send a magic link for email verification to user's email address. Prevents user enumeration by returning success even if email doesn't exist.
-      tags:
-        - Client
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - email
-              properties:
-                email:
-                  type: string
-                  format: email
-                  example: user@example.com
-      responses:
-        '202':
-          description: Verification link sent (if email exists)
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  message:
-                    type: string
-                    example: "If your email is registered, we have sent you a verification link. Please check your inbox."
-        '400':
-          description: Invalid request
-
-  /api/auth/verify-email:
+  /api/auth/email/verify:
     post:
       summary: Verify email with code or link
       description: |
-        Verify email address using either:
-        - Numeric code verification: Provide both `email` and `otp` (6-digit code)
-        - Magic link verification: Provide only `otp` (64-character token from link)
+        Verify email address using the method configured in auth settings (verifyEmailMethod):
+        - Code verification: Provide both `email` and `otp` (6-digit numeric code)
+        - Link verification: Provide only `otp` (64-character hex token from magic link)
 
         Successfully verified users will receive a session token.
 
-        The email verification link sent to users always points to the backend API endpoint (`{BASE_URL}/auth/verify-email?token=...`).
+        The email verification link sent to users always points to the backend API endpoint.
         If `verifyEmailRedirectTo` is configured, the backend will redirect to that URL after successful verification.
         Otherwise, a default success page is displayed.
       tags:
@@ -610,10 +669,10 @@ paths:
         '401':
           description: Verification code/token expired or invalid
 
-  /api/auth/email/send-reset-password-code:
+  /api/auth/email/send-reset-password:
     post:
-      summary: Send password reset code
-      description: Send a numeric 6-digit password reset code to user's email address. Prevents user enumeration by returning success even if email doesn't exist.
+      summary: Send password reset (code or link based on config)
+      description: Send password reset email using the method configured in auth settings (resetPasswordMethod). When method is 'code', sends a 6-digit numeric code for two-step flow. When method is 'link', sends a magic link. Prevents user enumeration by returning success even if email doesn't exist.
       tags:
         - Client
       requestBody:
@@ -631,7 +690,7 @@ paths:
                   example: user@example.com
       responses:
         '202':
-          description: Password reset code sent (if email exists)
+          description: Password reset email sent (if email exists). Message varies based on configured method.
           content:
             application/json:
               schema:
@@ -641,54 +700,72 @@ paths:
                     type: boolean
                   message:
                     type: string
-                    example: "If your email is registered, we have sent you a password reset code. Please check your inbox."
+                    example: "If your email is registered, we have sent you a password reset code/link. Please check your inbox."
         '400':
           description: Invalid request
 
-  /api/auth/email/send-reset-password-link:
+  /api/auth/email/exchange-reset-password-token:
     post:
-      summary: Send password reset link
-      description: Send a magic link for password reset to user's email address. Prevents user enumeration by returning success even if email doesn't exist.
-      tags:
-        - Client
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - email
-              properties:
-                email:
-                  type: string
-                  format: email
-                  example: user@example.com
-      responses:
-        '202':
-          description: Password reset link sent (if email exists)
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  message:
-                    type: string
-                    example: "If your email is registered, we have sent you a password reset link. Please check your inbox."
-        '400':
-          description: Invalid request
-
-  /api/auth/reset-password:
-    post:
-      summary: Reset password with code or link token
+      summary: Exchange reset password code for reset token
       description: |
-        Reset user password using either:
-        - Numeric code verification: Provide `email`, `newPassword`, and `otp` (6-digit code)
-        - Magic link verification: Provide `newPassword` and `otp` (64-character token from link), omit `email`
+        Step 1 of two-step password reset flow (only used when resetPasswordMethod is 'code'):
+        1. Verify the 6-digit code sent to user's email
+        2. Return a reset token that can be used to actually reset the password
 
-        The password reset link sent to users always points to the backend API endpoint (`{BASE_URL}/auth/reset-password?token=...`).
+        This endpoint is not used when resetPasswordMethod is 'link' (magic link flow is direct).
+      tags:
+        - Client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - code
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                code:
+                  type: string
+                  description: 6-digit numeric code from email
+                  example: "123456"
+      responses:
+        '200':
+          description: Code verified successfully, reset token returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: Reset token to be used in reset-password endpoint
+                  expiresAt:
+                    type: string
+                    format: date-time
+                    description: Token expiration timestamp
+        '400':
+          description: Invalid request
+        '401':
+          description: Invalid or expired code
+
+  /api/auth/email/reset-password:
+    post:
+      summary: Reset password with token
+      description: |
+        Reset user password with a token. The token can be:
+        - Magic link token (64-character hex token from send-reset-password when method is 'link')
+        - Reset token (from exchange-reset-password-token after code verification when method is 'code')
+
+        Both token types use RESET_PASSWORD purpose and are verified the same way.
+
+        Flow summary:
+        - Code method: send-reset-password → exchange-reset-password-token → reset-password (with resetToken)
+        - Link method: send-reset-password → reset-password (with link token directly)
       tags:
         - Client
       requestBody:
@@ -701,19 +778,14 @@ paths:
                 - newPassword
                 - otp
               properties:
-                email:
-                  type: string
-                  format: email
-                  description: Required for code-based reset, omit for magic link reset
-                  example: user@example.com
                 newPassword:
                   type: string
                   description: New password meeting configured requirements
                   example: newSecurePassword123
                 otp:
                   type: string
-                  description: Either a 6-digit numeric code or a 64-character hex token from magic link
-                  example: "123456"
+                  description: Reset token (either from magic link or from exchange-reset-password-token endpoint)
+                  example: "a1b2c3d4..."
       responses:
         '200':
           description: Password reset successfully
@@ -724,11 +796,7 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: "Password reset successfully. Please login with your new password."
-                  redirectTo:
-                    type: string
-                    format: uri
-                    description: Optional URL to redirect user after password reset (only present if configured)
+                    example: "Password reset successfully"
         '400':
           description: Invalid request or password requirements not met
         '401':

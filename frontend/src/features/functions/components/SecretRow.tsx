@@ -1,6 +1,6 @@
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/radix/Button';
-import { type Secret } from '@/features/secrets/services/secret.service';
+import { type Secret } from '@/features/functions/services/secret.service';
 import { cn } from '@/lib/utils/utils';
 import { formatDistance } from 'date-fns';
 

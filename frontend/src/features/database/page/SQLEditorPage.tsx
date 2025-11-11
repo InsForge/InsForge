@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useRawSQL } from '@/features/database/hooks/useRawSQL';
+import { useSQLEditorContext } from '@/features/database/contexts/SQLEditorContext';
 import { Button } from '@/components/radix/Button';
 import { CodeEditor } from '@/components/CodeEditor';
 import { DataGrid, type DataGridColumn, type DataGridRow } from '@/components/datagrid';
@@ -75,7 +76,7 @@ function ResultsViewer({ data }: ResultsViewerProps) {
   const lines = jsonString.split('\n');
 
   return (
-    <div className="bg-neutral-100 dark:bg-neutral-800 rounded-lg p-3 overflow-auto">
+    <div className="bg-neutral-100 dark:bg-neutral-900/50 rounded-lg p-3 overflow-auto">
       <pre className="font-mono text-sm text-black dark:text-white leading-5 m-0">
         {lines.map((line, index) => (
           <div key={index} className="min-h-[1.25rem]">
@@ -101,24 +102,14 @@ function ErrorViewer({ error }: ErrorViewerProps) {
   );
 }
 
-const STORAGE_KEY = 'sql-editor-query';
-
 export default function SQLEditorPage() {
-  // Load query from localStorage on mount
-  const [query, setQuery] = useState(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved || '';
-  });
+  // Use context to persist query across navigation, but clear on refresh
+  const { query, setQuery } = useSQLEditorContext();
 
   const { executeSQL, isPending, data, isSuccess, error, isError } = useRawSQL({
     showSuccessToast: true,
     showErrorToast: false, // Don't show toast, we'll display in results
   });
-
-  // Save query to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, query);
-  }, [query]);
 
   const handleExecuteQuery = () => {
     if (!query.trim() || isPending) {
@@ -129,16 +120,16 @@ export default function SQLEditorPage() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-bg-gray dark:bg-neutral-900 overflow-auto">
+    <div className="flex flex-col h-full bg-bg-gray dark:bg-neutral-800 overflow-auto">
       {/* Header */}
-      <div className="flex items-center gap-3 h-[72px] px-6 bg-bg-gray dark:bg-neutral-900 flex-shrink-0">
+      <div className="flex items-center gap-3 h-[72px] px-6 bg-bg-gray dark:bg-neutral-800 flex-shrink-0">
         <h1 className="text-xl font-semibold text-black dark:text-white">SQL Editor</h1>
       </div>
 
       {/* Main Content */}
-      <div className="flex flex-1 flex-col gap-6 px-6 bg-bg-gray dark:bg-neutral-900 items-center pb-6">
+      <div className="flex flex-1 flex-col gap-6 px-6 bg-bg-gray dark:bg-neutral-800 items-center pb-6">
         {/* Code Editor Section */}
-        <div className="h-[500px] w-full bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg overflow-hidden">
+        <div className="h-[500px] w-full bg-white dark:bg-neutral-900/50 border border-gray-200 dark:border-neutral-700 rounded-lg overflow-hidden">
           <CodeEditor
             editable
             language="sql"
@@ -174,7 +165,7 @@ export default function SQLEditorPage() {
             ) : isSuccess && data ? (
               <ResultsViewer data={data.rows || data.data || data} />
             ) : (
-              <div className="h-full bg-neutral-100 dark:bg-neutral-800 rounded-lg flex items-center justify-center text-neutral-500 dark:text-neutral-400 text-sm">
+              <div className="h-full bg-neutral-100 dark:bg-neutral-900/50 rounded-lg flex items-center justify-center text-neutral-500 dark:text-neutral-400 text-sm">
                 {isPending ? 'Executing query...' : 'Run a query to see results'}
               </div>
             )}

@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 import { useCallback, useEffect } from 'react';
-import { useMetadata } from '@/features/metadata/hooks/useMetadata';
+import { useMetadata } from '@/lib/hooks/useMetadata';
 import { useUsers } from '@/features/auth/hooks/useUsers';
 import { SchemaVisualizer, VisualizerSkeleton } from '../components';
 import { Button } from '@/components/radix/Button';
@@ -71,17 +71,25 @@ const VisualizerPage = () => {
 
   if (!metadata || error) {
     return (
-      <div className="relative min-h-screen bg-neutral-800 overflow-hidden">
-        {/* Dot Matrix Background */}
+      <div className="relative h-full bg-gray-50 dark:bg-neutral-800 overflow-hidden">
+        {/* Dot Matrix Background - Light Mode */}
         <div
-          className="absolute inset-0 opacity-50"
+          className="absolute inset-0 opacity-50 dark:hidden"
+          style={{
+            backgroundImage: `radial-gradient(circle, #D1D5DB 1px, transparent 1px)`,
+            backgroundSize: '12px 12px',
+          }}
+        />
+        {/* Dot Matrix Background - Dark Mode */}
+        <div
+          className="absolute inset-0 opacity-50 hidden dark:block"
           style={{
             backgroundImage: `radial-gradient(circle, #3B3B3B 1px, transparent 1px)`,
             backgroundSize: '12px 12px',
           }}
         />
 
-        <div className="relative z-10 flex items-center justify-center min-h-screen p-8">
+        <div className="relative z-10 flex items-center justify-center h-full p-8">
           <Alert variant="destructive" className="max-w-md">
             <AlertDescription>
               Failed to load database schema. Please ensure the backend is running and try
@@ -98,10 +106,18 @@ const VisualizerPage = () => {
   }
 
   return (
-    <div className="relative min-h-screen bg-neutral-800 overflow-hidden">
-      {/* Dot Matrix Background */}
+    <div className="relative h-full bg-gray-50 dark:bg-neutral-800 overflow-hidden">
+      {/* Dot Matrix Background - Light Mode */}
       <div
-        className="absolute inset-0 opacity-50"
+        className="absolute inset-0 opacity-50 dark:hidden"
+        style={{
+          backgroundImage: `radial-gradient(circle, #D1D5DB 1px, transparent 1px)`,
+          backgroundSize: '12px 12px',
+        }}
+      />
+      {/* Dot Matrix Background - Dark Mode */}
+      <div
+        className="absolute inset-0 opacity-50 hidden dark:block"
         style={{
           backgroundImage: `radial-gradient(circle, #3B3B3B 1px, transparent 1px)`,
           backgroundSize: '12px 12px',
@@ -109,7 +125,7 @@ const VisualizerPage = () => {
       />
 
       {/* Schema Visualizer */}
-      <div className="relative z-10 w-full h-screen">
+      <div className="relative z-10 w-full h-full">
         <SchemaVisualizer metadata={metadata} userCount={totalUsers} />
       </div>
     </div>

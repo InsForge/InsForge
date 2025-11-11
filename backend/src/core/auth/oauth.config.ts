@@ -77,6 +77,29 @@ export class OAuthConfigService {
   }
 
   /**
+   * Get public OAuth provider information (safe for public API)
+   * Only returns non-sensitive information about configured providers
+   */
+  async getConfiguredProviders(): Promise<OAuthProvidersSchema[]> {
+    const client = await this.getPool().connect();
+    try {
+      const result = await client.query(
+        `SELECT
+          provider
+         FROM _oauth_configs
+         ORDER BY provider ASC`
+      );
+
+      return result.rows.map((row) => row.provider);
+    } catch (error) {
+      logger.error('Failed to get public OAuth providers', { error });
+      throw new AppError('Failed to get OAuth providers', 500, ERROR_CODES.INTERNAL_ERROR);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
    * Get OAuth configuration by provider name
    */
   async getConfigByProvider(provider: string): Promise<OAuthConfigSchema | null> {

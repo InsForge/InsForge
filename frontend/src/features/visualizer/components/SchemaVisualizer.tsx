@@ -16,6 +16,7 @@ import { TableNode } from './TableNode';
 import { AuthNode } from './AuthNode';
 import { BucketNode } from './BucketNode';
 import { useTables } from '@/features/database/hooks/useTables';
+import { useTheme } from '@/lib/contexts/ThemeContext';
 import {
   AppMetadataSchema,
   StorageBucketSchema,
@@ -182,6 +183,8 @@ const getNodeColor = (node: Node<CustomNodeData>) => {
 };
 
 export function SchemaVisualizer({ metadata, userCount }: SchemaVisualizerProps) {
+  const { resolvedTheme } = useTheme();
+
   // Fetch all table schemas
   const { allSchemas, isLoadingSchemas } = useTables();
 
@@ -243,6 +246,7 @@ export function SchemaVisualizer({ metadata, userCount }: SchemaVisualizerProps)
 
   const initialEdges = useMemo(() => {
     const edges: BuiltInEdge[] = [];
+    const edgeColor = resolvedTheme === 'dark' ? 'white' : '#18181b'; // zinc-950 for light mode
 
     tables.forEach((table) => {
       table.columns.forEach((column) => {
@@ -256,7 +260,7 @@ export function SchemaVisualizer({ metadata, userCount }: SchemaVisualizerProps)
             targetHandle: `${column.foreignKey.referenceColumn}-target`,
             type: 'smoothstep',
             animated: true,
-            style: { stroke: 'white', strokeWidth: 2, zIndex: 1000 },
+            style: { stroke: edgeColor, strokeWidth: 2, zIndex: 1000 },
             zIndex: 1000,
             pathOptions: {
               offset: 40,
@@ -269,7 +273,7 @@ export function SchemaVisualizer({ metadata, userCount }: SchemaVisualizerProps)
     // Add authentication edges if authData exists
 
     return edges;
-  }, [tables]);
+  }, [tables, resolvedTheme]);
 
   const { nodes: layoutedNodes, edges: layoutedEdges } = useMemo(
     () => getLayoutedElements(initialNodes, initialEdges),
@@ -316,7 +320,7 @@ export function SchemaVisualizer({ metadata, userCount }: SchemaVisualizerProps)
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
         elevateEdgesOnSelect={true}
-        colorMode="dark"
+        colorMode={resolvedTheme === 'dark' ? 'dark' : 'light'}
         className="!bg-transparent"
       >
         <Controls

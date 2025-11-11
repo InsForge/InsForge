@@ -46,4 +46,4 @@ export class OAuthConfigService {
   }
 }
 
-export const oauthConfigService = new OAuthConfigService();
+export const oAuthConfigService = new OAuthConfigService();
