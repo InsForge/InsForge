@@ -233,7 +233,7 @@ BEGIN
 
   -- Insert or update the schedule record in the `_schedules` table
   INSERT INTO _schedules (
-    id, name, cron_schedule, function_url, http_method, encrypted_headers, body, cron_job_id, is_active, created_at, updated_at
+    id, name, cron_schedule, function_url, http_method, encrypted_headers, headers, body, cron_job_id, is_active, created_at, updated_at
   ) VALUES (
     p_schedule_id,
     p_name,
@@ -241,6 +241,7 @@ BEGIN
     p_function_url,
     p_http_method,
     v_encrypted_headers,
+    p_headers,
     p_body,
     v_new_cron_id,
     TRUE,
@@ -252,6 +253,7 @@ BEGIN
     function_url = EXCLUDED.function_url,
     http_method = EXCLUDED.http_method,
     encrypted_headers = EXCLUDED.encrypted_headers,
+    headers = EXCLUDED.headers,
     body = EXCLUDED.body,
     cron_job_id = EXCLUDED.cron_job_id,
     is_active = TRUE,
