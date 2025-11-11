@@ -19,6 +19,8 @@ npm install @insforge/sdk@latest
 ## Initial Setup
 
 **🚨 CRITICAL: Initialize the SDK Client**
+**Important**: Do not use SDK Client in edge function or api route. It can only be used in client-side components.
+
 
 You must create a client instance using `createClient()` with your base URL and anon key:
 
@@ -28,7 +30,7 @@ import { createClient } from '@insforge/sdk';
 const client = createClient({
   baseUrl: 'https://your-app.region.insforge.app',  // Your InsForge backend URL
   anonKey: 'your-anon-key-here'       // Get this from backend metadata
-});```
+});
 ```
 
 **API BASE URL**: Your API base URL is `https://your-app.region.insforge.app`.
