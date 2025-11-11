@@ -18,11 +18,7 @@ const featureIcons: Record<string, typeof Lock> = {
   'AI Integration': Box,
 };
 
-export function PromptDialog({
-  open,
-  onOpenChange,
-  promptTemplate,
-}: PromptDialogProps) {
+export function PromptDialog({ open, onOpenChange, promptTemplate }: PromptDialogProps) {
   if (!promptTemplate) {
     return null;
   }

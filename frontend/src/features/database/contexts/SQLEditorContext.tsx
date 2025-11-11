@@ -77,6 +77,7 @@ export function SQLEditorProvider({ children }: SQLEditorProviderProps) {
   const [tabs, setTabs] = useState<SQLTab[]>(loadTabsFromStorage);
   const [activeTabId, setActiveTabId] = useState(loadActiveTabFromStorage);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const tabsRef = useRef<SQLTab[]>(tabs);
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
 
@@ -105,11 +106,19 @@ export function SQLEditorProvider({ children }: SQLEditorProviderProps) {
 
   // Debounced save for tabs changes
   useEffect(() => {
+    // Keep ref in sync with latest tabs
+    tabsRef.current = tabs;
     debouncedSave(tabs);
-    // Cleanup timeout on unmount
+    // Cleanup timeout on unmount and flush pending save
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
+        // Flush the pending save to avoid data loss
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(tabsRef.current));
+        } catch (error) {
+          console.error('Failed to save tabs to localStorage:', error);
+        }
       }
     };
   }, [tabs]);
