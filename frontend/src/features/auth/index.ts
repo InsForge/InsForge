@@ -1,6 +1,5 @@
 // Components
 export { UserFormDialog } from './components/UserFormDialog';
-export { UsersTab } from './components/UsersTab';
 
 // Hooks
 export { useUsers } from './hooks/useUsers';

@@ -100,9 +100,9 @@ export default function AuthMethodsPage() {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Two column layout */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="h-full flex overflow-hidden">
         {/* Left Section - Auth Methods List */}
-        <div className="w-[640px] bg-slate-50 dark:bg-[#2d2d2d] flex flex-col overflow-hidden">
+        <div className="flex-1 bg-slate-50 dark:bg-[#2d2d2d] flex flex-col overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-6 gap-3 border-b border-gray-200 dark:border-neutral-700">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white tracking-tight">
@@ -235,8 +235,8 @@ export default function AuthMethodsPage() {
         </div>
 
         {/* Right Section - Preview */}
-        <div className="flex-1 bg-gray-100 dark:bg-neutral-800 p-3 flex flex-col overflow-hidden">
-          <div className="flex-1 bg-gray-200 dark:bg-neutral-700 rounded-xl overflow-hidden flex flex-col">
+        <div className="w-[688px] bg-gray-100 dark:bg-neutral-800 p-3 flex flex-col overflow-hidden">
+          <div className="h-full bg-gray-200 dark:bg-neutral-700 rounded-xl overflow-hidden flex flex-col">
             {/* Preview Header */}
             <div className="flex items-center justify-end px-6 py-3 gap-3">
               <p className="text-sm font-medium text-gray-700 dark:text-white">

@@ -5,11 +5,11 @@ import { TemplateCard } from '@/features/database/components/TemplateCard';
 
 export default function TemplatesPage() {
   const navigate = useNavigate();
-  const { setQuery } = useSQLEditorContext();
+  const { addTab } = useSQLEditorContext();
 
   const handleTemplateClick = (template: DatabaseTemplate) => {
-    // Set the query in the context so it persists to the SQL Editor page
-    setQuery(template.sql);
+    // Create a new tab with the template's SQL query prefilled
+    addTab(template.sql, template.title);
     // Navigate to the SQL Editor page
     void navigate('/dashboard/database/sql-editor');
   };
