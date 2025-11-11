@@ -1649,7 +1649,7 @@ export class AuthService {
     });
 
     if (!response.data.access_token) {
-      throw new Error('Failed to get access token from GitHub');
+      throw new Error('Failed to get access token from X');
     }
 
     return response.data.access_token;
@@ -1680,7 +1680,7 @@ export class AuthService {
   }
 
   /**
-   * Find or create LinkedIn user
+   * Find or create X user
    */
   async findOrCreateXUser(xUserInfo: XUserInfo): Promise<CreateSessionResponse> {
     const userName = xUserInfo.username || xUserInfo.name;
@@ -1855,7 +1855,7 @@ export class AuthService {
   }
 
   /**
-   * Handle GitHub OAuth callback
+   * Handle X OAuth callback
    */
   private async handleXCallback(payload: {
     code?: string;

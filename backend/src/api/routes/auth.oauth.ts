@@ -429,7 +429,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       case 'x': {
         // Handle X OAuth payload
         const xUserInfo = {
-          id: payloadData.provider_id,
+          id: payloadData.providerId,
           email: payloadData.email,
           name: payloadData.name,
           picture: payloadData.profile_image_url,
