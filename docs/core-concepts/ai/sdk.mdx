@@ -14,7 +14,7 @@ Create AI chat completions with streaming support.
 ### Parameters
 
 - `model` (string, required) - AI model (e.g., 'anthropic/claude-3.5-haiku', 'openai/gpt-4'), call `mcp__insforge__get-backend-metadata` tool to get available models
-- `messages` (array, required) - Conversation messages with role and content
+- `messages` (array, required) - Array of message objects: {role: "user"|"system"|"assistant", content: string}
 - `temperature` (number, optional) - Sampling temperature 0-2
 - `maxTokens` (number, optional) - Max tokens to generate
 - `topP` (number, optional) - Top-p sampling 0-1
@@ -30,7 +30,7 @@ Create AI chat completions with streaming support.
   model: string,
   choices: [{
     index: number,
-    message: { role: string, content: string },
+    message: { role: "system"|"user"|"assistant", content: string },
     finish_reason: string
   }],
   usage: { prompt_tokens: number, completion_tokens: number, total_tokens: number }

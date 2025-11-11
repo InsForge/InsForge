@@ -19,7 +19,7 @@ npm install @insforge/sdk@latest
 ## Initial Setup
 
 **🚨 CRITICAL: Initialize the SDK Client**
-**Important**: Do not use SDK Client in edge function or api route. It can only be used in client-side components.
+**Important**: Do not use SDK Client in nextjs api route. It can only be used in client-side components.
 
 
 You must create a client instance using `createClient()` with your base URL and anon key:
