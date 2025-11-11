@@ -57,155 +57,159 @@ export default function DashboardPage() {
 
   return (
     <main className="h-full bg-white dark:bg-neutral-800 overflow-y-auto">
-      <div className="flex flex-col gap-6 w-full max-w-[1080px] mx-auto pt-6 pb-8">
-        {/* Connection Success Banner - Only shows once on first connection */}
-        {showBanner && <ConnectionSuccessBanner />}
-
-        {/* Dashboard Header */}
-        <div className="flex items-center justify-between w-full">
+      <div className="flex flex-col gap-16 w-full max-w-[1080px] mx-auto pt-6 pb-8">
+        <div className="flex flex-col gap-6">
+          {/* Connection Success Banner - Only shows once on first connection */}
+          {showBanner && <ConnectionSuccessBanner />}
           <h1 className="text-xl font-semibold text-gray-900 dark:text-white tracking-[-0.1px]">
             Dashboard
           </h1>
-        </div>
 
-        {/* Stats Cards */}
-        <div className="flex gap-6 w-full h-[176px]">
-          <StatsCard
-            icon={Users}
-            title="AUTH"
-            value={(totalUsers || 0).toLocaleString()}
-            unit={totalUsers === 1 ? 'user' : 'users'}
-            description={`${authCount} OAuth ${authCount === 1 ? 'provider' : 'providers'} enabled`}
-            isLoading={isLoading}
-          />
+          {/* Stats Section */}
+          <section className="flex flex-col gap-6 w-full">
+            <div className="flex gap-6 w-full h-[176px]">
+              <StatsCard
+                icon={Users}
+                title="AUTH"
+                value={(totalUsers || 0).toLocaleString()}
+                unit={totalUsers === 1 ? 'user' : 'users'}
+                description={`${authCount} OAuth ${authCount === 1 ? 'provider' : 'providers'} enabled`}
+                isLoading={isLoading}
+              />
 
-          <StatsCard
-            icon={Database}
-            title="Database"
-            value={(metadata?.database?.totalSizeInGB || 0).toFixed(2)}
-            unit="GB"
-            description={`${tableCount} ${tableCount === 1 ? 'Table' : 'Tables'}`}
-            isLoading={isLoading}
-          />
+              <StatsCard
+                icon={Database}
+                title="Database"
+                value={(metadata?.database?.totalSizeInGB || 0).toFixed(2)}
+                unit="GB"
+                description={`${tableCount} ${tableCount === 1 ? 'Table' : 'Tables'}`}
+                isLoading={isLoading}
+              />
 
-          <StatsCard
-            icon={HardDrive}
-            title="Storage"
-            value={(storage?.totalSizeInGB || 0).toFixed(2)}
-            unit="GB"
-            description={`${storage?.buckets?.length || 0} ${storage?.buckets?.length === 1 ? 'Bucket' : 'Buckets'}`}
-            isLoading={isLoading}
-          />
+              <StatsCard
+                icon={HardDrive}
+                title="Storage"
+                value={(storage?.totalSizeInGB || 0).toFixed(2)}
+                unit="GB"
+                description={`${storage?.buckets?.length || 0} ${storage?.buckets?.length === 1 ? 'Bucket' : 'Buckets'}`}
+                isLoading={isLoading}
+              />
+            </div>
+          </section>
         </div>
 
         {/* Quick Start Prompt Section */}
-        <div className="flex flex-col gap-1 w-full">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white tracking-[-0.1px]">
-            Quick Start Prompt
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
-            Paste below prompts to your agent as a quick start for building real apps
-          </p>
-        </div>
+        <section className="flex flex-col gap-6 w-full">
+          <div className="flex flex-col gap-1 w-full">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white tracking-[-0.1px]">
+              Quick Start Prompt
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
+              Paste below prompts to your agent as a quick start for building real apps
+            </p>
+          </div>
 
-        {/* Prompt Cards Grid */}
-        <div className="grid grid-cols-3 gap-6 w-full">
-          {quickStartPrompts.map((prompt, index) => (
-            <PromptCard
-              key={index}
-              title={prompt.title}
-              onClick={() => {
-                setSelectedPrompt(prompt);
-                setPromptDialogOpen(true);
-              }}
-            />
-          ))}
-        </div>
+          <div className="grid grid-cols-3 gap-6 w-full">
+            {quickStartPrompts.map((prompt, index) => (
+              <PromptCard
+                key={index}
+                title={prompt.title}
+                onClick={() => {
+                  setSelectedPrompt(prompt);
+                  setPromptDialogOpen(true);
+                }}
+              />
+            ))}
+          </div>
 
-        {/* Quick Start Prompt Dialog */}
-        <QuickStartPromptDialog
-          open={promptDialogOpen}
-          onOpenChange={setPromptDialogOpen}
-          promptTemplate={selectedPrompt}
-        />
+          <QuickStartPromptDialog
+            open={promptDialogOpen}
+            onOpenChange={setPromptDialogOpen}
+            promptTemplate={selectedPrompt}
+          />
+        </section>
 
         {/* Templates & Components Section */}
-        <div className="flex flex-col gap-1 w-full">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white tracking-[-0.1px]">
-            Templates & Components
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
-            Pre-built components and schemas to accelerate development
-          </p>
-        </div>
+        <section className="flex flex-col gap-6 w-full">
+          <div className="flex flex-col gap-1 w-full">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white tracking-[-0.1px]">
+              Templates & Components
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
+              Pre-built components and schemas to accelerate development
+            </p>
+          </div>
 
-        <div className="flex gap-6 w-full">
-          {/* Sign-in Component Card */}
-          <button
-            onClick={() => void navigate('/dashboard/authentication/auth-methods')}
-            className="flex-1 bg-white dark:bg-[#363636] border border-gray-200 dark:border-[#414141] rounded-lg p-4 flex items-center gap-3 hover:bg-gray-50 hover:border-gray-300 dark:hover:bg-neutral-700 dark:hover:border-[#525252] hover:shadow-sm transition-all group"
-          >
-            <div className="flex-1 flex items-center gap-4">
-              <div className="bg-gray-100 dark:bg-neutral-800 rounded p-3.5 flex items-center justify-center shrink-0">
-                <Lock className="w-6 h-6 text-gray-600 dark:text-neutral-400" />
+          <div className="flex gap-6 w-full">
+            {/* Sign-in Component Card */}
+            <button
+              onClick={() => void navigate('/dashboard/authentication/auth-methods')}
+              className="flex-1 bg-white dark:bg-[#363636] border border-gray-200 dark:border-[#414141] rounded-lg p-4 flex items-center gap-3 hover:bg-gray-50 hover:border-gray-300 dark:hover:bg-neutral-700 dark:hover:border-[#525252] hover:shadow-sm transition-all group"
+            >
+              <div className="flex-1 flex items-center gap-4">
+                <div className="bg-gray-100 dark:bg-neutral-800 rounded p-3.5 flex items-center justify-center shrink-0">
+                  <Lock className="w-6 h-6 text-gray-600 dark:text-neutral-400" />
+                </div>
+                <div className="flex flex-col gap-1 items-start text-left">
+                  <p className="text-base text-gray-900 dark:text-white font-normal leading-6">
+                    Sign-in Component
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
+                    Authentication UI with OAuth support
+                  </p>
+                </div>
               </div>
-              <div className="flex flex-col gap-1 items-start text-left">
-                <p className="text-base text-gray-900 dark:text-white font-normal leading-6">
-                  Sign-in Component
-                </p>
-                <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
-                  Authentication UI with OAuth support
-                </p>
-              </div>
-            </div>
-            <ChevronRight className="w-5 h-5 text-gray-400 dark:text-neutral-400 shrink-0 group-hover:translate-x-0.5 transition-transform" />
-          </button>
+              <ChevronRight className="w-5 h-5 text-gray-400 dark:text-neutral-400 shrink-0 group-hover:translate-x-0.5 transition-transform" />
+            </button>
 
-          {/* Database Templates Card */}
-          <button
-            onClick={() => void navigate('/dashboard/database/templates')}
-            className="flex-1 bg-white dark:bg-[#363636] border border-gray-200 dark:border-[#414141] rounded-lg p-4 flex items-center gap-3 hover:bg-gray-50 hover:border-gray-300 dark:hover:bg-neutral-700 dark:hover:border-[#525252] hover:shadow-sm transition-all group"
-          >
-            <div className="flex-1 flex items-center gap-4">
-              <div className="bg-gray-100 dark:bg-neutral-800 rounded p-3.5 flex items-center justify-center shrink-0">
-                <Database className="w-6 h-6 text-gray-600 dark:text-neutral-400" />
+            {/* Database Templates Card */}
+            <button
+              onClick={() => void navigate('/dashboard/database/templates')}
+              className="flex-1 bg-white dark:bg-[#363636] border border-gray-200 dark:border-[#414141] rounded-lg p-4 flex items-center gap-3 hover:bg-gray-50 hover:border-gray-300 dark:hover:bg-neutral-700 dark:hover:border-[#525252] hover:shadow-sm transition-all group"
+            >
+              <div className="flex-1 flex items-center gap-4">
+                <div className="bg-gray-100 dark:bg-neutral-800 rounded p-3.5 flex items-center justify-center shrink-0">
+                  <Database className="w-6 h-6 text-gray-600 dark:text-neutral-400" />
+                </div>
+                <div className="flex flex-col gap-1 items-start text-left">
+                  <p className="text-base text-gray-900 dark:text-white font-normal leading-6">
+                    Database Templates
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
+                    Pre-built schemas for common use cases
+                  </p>
+                </div>
               </div>
-              <div className="flex flex-col gap-1 items-start text-left">
-                <p className="text-base text-gray-900 dark:text-white font-normal leading-6">
-                  Database Templates
-                </p>
-                <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
-                  Pre-built schemas for common use cases
-                </p>
-              </div>
-            </div>
-            <ChevronRight className="w-5 h-5 text-gray-400 dark:text-neutral-400 shrink-0 group-hover:translate-x-0.5 transition-transform" />
-          </button>
-        </div>
+              <ChevronRight className="w-5 h-5 text-gray-400 dark:text-neutral-400 shrink-0 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+          </div>
+        </section>
 
-        <div className="flex items-center justify-between w-full">
-          <p className="text-xl font-semibold text-gray-900 dark:text-white">MCP Call Records</p>
-          <Button
-            onClick={handleViewMoreClick}
-            className="h-10 px-4 font-medium dark:bg-emerald-300 dark:text-black"
-          >
-            View More
-          </Button>
-        </div>
+        {/* MCP Call Records Section */}
+        <section className="flex flex-col gap-6 w-full">
+          <div className="flex items-center justify-between w-full">
+            <p className="text-xl font-semibold text-gray-900 dark:text-white">MCP Call Records</p>
+            <Button
+              onClick={handleViewMoreClick}
+              className="h-8 px-4 font-medium dark:bg-emerald-300 dark:text-black"
+            >
+              View More
+            </Button>
+          </div>
 
-        {/* MCP Call Record Table */}
-        <div className={cn('w-full overflow-hidden', !records.length && 'h-60')}>
-          <LogsDataGrid
-            columnDefs={mcpColumns}
-            data={records.slice(0, 5)}
-            emptyState={
-              <div className="h-20 text-sm text-zinc-500 dark:text-zinc-400">
-                No MCP call records found
-              </div>
-            }
-            noPadding
-          />
-        </div>
+          <div className={cn('w-full overflow-hidden', !records.length && 'h-60')}>
+            <LogsDataGrid
+              columnDefs={mcpColumns}
+              data={records.slice(0, 5)}
+              emptyState={
+                <div className="h-20 text-sm text-zinc-500 dark:text-zinc-400">
+                  No MCP call records found
+                </div>
+              }
+              noPadding
+            />
+          </div>
+        </section>
       </div>
     </main>
   );
