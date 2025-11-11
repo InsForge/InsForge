@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { UserPlus } from 'lucide-react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import { Button, SearchInput, SelectionClearButton, DeleteActionButton } from '@/components';
-import { UsersTab } from '@/features/auth/components/UsersTab';
+import { UsersDataGrid } from '@/features/auth/components/UsersDataGrid';
+import { SortColumn } from 'react-data-grid';
+import { UserSchema } from '@insforge/shared-schemas';
+import { ConnectCTA } from '@/components/ConnectCTA';
 import {
   Tooltip,
   TooltipContent,
@@ -20,9 +23,83 @@ export default function UsersPage() {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
 
   const { showToast } = useToast();
-  const { refetch, deleteUsers } = useUsers();
+
+  // Default page size of 20 records per page
+  const pageSize = 20;
+  const {
+    users,
+    totalUsers,
+    isLoading,
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    refetch,
+    deleteUsers,
+  } = useUsers({ searchQuery, pageSize });
+
+  // Listen for refresh events
+  useEffect(() => {
+    const handleRefreshEvent = () => {
+      // Reset sorting columns
+      setSortColumns([]);
+      // Reset selected rows
+      setSelectedRows(new Set());
+      // Refetch data
+      void refetch();
+    };
+    window.addEventListener('refreshUsers', handleRefreshEvent);
+    return () => window.removeEventListener('refreshUsers', handleRefreshEvent);
+  }, [refetch]);
+
+  // Clear selection when page changes or search changes
+  useEffect(() => {
+    setSelectedRows(new Set());
+  }, [currentPage, searchQuery]);
+
+  // Apply sorting to users data
+  const sortedUsers = useMemo(() => {
+    if (!sortColumns.length) {
+      return users;
+    }
+
+    return [...users].sort((a, b) => {
+      for (const sort of sortColumns) {
+        const { columnKey, direction } = sort;
+        let aVal = a[columnKey as keyof UserSchema];
+        let bVal = b[columnKey as keyof UserSchema];
+
+        // Handle null/undefined values
+        if ((aVal === null || aVal === undefined) && (bVal === null || bVal === undefined)) {
+          continue;
+        }
+        if (aVal === null || aVal === undefined) {
+          return direction === 'ASC' ? -1 : 1;
+        }
+        if (bVal === null || bVal === undefined) {
+          return direction === 'ASC' ? 1 : -1;
+        }
+
+        // Convert to comparable values
+        if (typeof aVal === 'string') {
+          aVal = aVal.toLowerCase();
+        }
+        if (typeof bVal === 'string') {
+          bVal = bVal.toLowerCase();
+        }
+
+        if (aVal < bVal) {
+          return direction === 'ASC' ? -1 : 1;
+        }
+        if (aVal > bVal) {
+          return direction === 'ASC' ? 1 : -1;
+        }
+      }
+      return 0;
+    });
+  }, [users, sortColumns]);
 
   const handleBulkDelete = async () => {
     if (selectedRows.size === 0) {
@@ -53,6 +130,12 @@ export default function UsersPage() {
       setIsRefreshing(false);
     }
   };
+
+  const emptyState = (
+    <div className="text-sm text-black dark:text-white">
+      {searchQuery ? 'No users match your search criteria' : 'No users found'}. <ConnectCTA />
+    </div>
+  );
 
   return (
     <div className="h-full bg-slate-50 dark:bg-neutral-800 flex flex-col overflow-hidden">
@@ -129,11 +212,24 @@ export default function UsersPage() {
         </div>
 
         {/* Main Content */}
-        <UsersTab
-          searchQuery={searchQuery}
-          selectedRows={selectedRows}
-          onSelectedRowsChange={setSelectedRows}
-        />
+        <div className="relative flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <UsersDataGrid
+              data={sortedUsers}
+              loading={isLoading}
+              selectedRows={selectedRows}
+              onSelectedRowsChange={setSelectedRows}
+              sortColumns={sortColumns}
+              onSortColumnsChange={setSortColumns}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              totalRecords={totalUsers}
+              onPageChange={setCurrentPage}
+              emptyState={emptyState}
+            />
+          </div>
+        </div>
       </div>
 
       <UserFormDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
