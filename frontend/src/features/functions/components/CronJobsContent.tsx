@@ -110,7 +110,7 @@ export function CronJobsContent() {
       {/* Header Section */}
       <div className="flex items-center justify-between flex-shrink-0">
         <div>
-          <h1 className="text-2xl font-bold text-black dark:text-white">Cron Jobs</h1>
+          <h1 className="text-2xl font-bold text-black dark:text-white">Schedules</h1>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
             Schedule recurring jobs in PostgreSQL
           </p>
