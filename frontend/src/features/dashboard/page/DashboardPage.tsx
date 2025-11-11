@@ -7,7 +7,7 @@ import {
   ConnectionSuccessBanner,
   StatsCard,
   PromptCard,
-  QuickStartPromptDialog,
+  PromptDialog,
 } from '../components';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { LogsDataGrid, type LogsColumnDef } from '@/features/logs/components/LogsDataGrid';
@@ -122,7 +122,7 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          <QuickStartPromptDialog
+          <PromptDialog
             open={promptDialogOpen}
             onOpenChange={setPromptDialogOpen}
             promptTemplate={selectedPrompt}
@@ -133,10 +133,11 @@ export default function DashboardPage() {
         <section className="flex flex-col gap-6 w-full">
           <div className="flex flex-col gap-1 w-full">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white tracking-[-0.1px]">
-              Templates & Components
+              Explore Our Platform
             </h2>
             <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
-              Pre-built components and schemas to accelerate development
+              InsForge gives you every backend feature you need. Use the whole platform or just the
+              features you want.
             </p>
           </div>
 

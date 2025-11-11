@@ -4,7 +4,7 @@ import { CopyButton } from '@/components/CopyButton';
 import { Button } from '@/components/radix/Button';
 import type { PromptTemplate } from '../prompts';
 
-interface QuickStartPromptDialogProps {
+interface PromptDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   promptTemplate: PromptTemplate | null;
@@ -18,11 +18,11 @@ const featureIcons: Record<string, typeof Lock> = {
   'AI Integration': Box,
 };
 
-export function QuickStartPromptDialog({
+export function PromptDialog({
   open,
   onOpenChange,
   promptTemplate,
-}: QuickStartPromptDialogProps) {
+}: PromptDialogProps) {
   if (!promptTemplate) {
     return null;
   }
