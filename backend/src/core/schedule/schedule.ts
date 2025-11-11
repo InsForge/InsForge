@@ -25,6 +25,7 @@ export class ScheduleService {
   // pg_cron does not support 6-field expressions with seconds.
   private _validateCronExpression(cronSchedule: string): void {
     const fields = cronSchedule.trim().split(/\s+/);
+    // Enforce pg_cron five-field requirement first
     if (fields.length !== 5) {
       throw new AppError(
         `Cron expression must be exactly 5 fields (minute, hour, day, month, day-of-week). Got ${fields.length} fields. Example: "*/5 * * * *" for every 5 minutes.`,
@@ -32,15 +33,15 @@ export class ScheduleService {
         ERROR_CODES.INVALID_INPUT
       );
     }
-    // Basic validation: each field should not be empty
-    for (let i = 0; i < fields.length; i++) {
-      if (!fields[i]) {
-        throw new AppError(
-          `Cron expression field ${i + 1} is empty. Example: "*/5 * * * *".`,
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
+
+    // Use cron-parser to perform a thorough syntactic validation. The parser will
+    // throw on invalid expressions (invalid ranges, characters, aliases, etc.).
+    try {
+      CronExpressionParser.parse(cronSchedule, { strict: false });
+    } catch (err) {
+      // Surface the parser error message to the client for easier debugging
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new AppError(`Invalid cron expression: ${msg}`, 400, ERROR_CODES.INVALID_INPUT);
     }
   }
 
@@ -159,6 +160,7 @@ export class ScheduleService {
         http_method AS "httpMethod",
         is_active AS "isActive",
         body,
+        headers,
         cron_job_id AS "cronJobId",
         created_at AS "createdAt",
         updated_at AS "updatedAt",
@@ -198,6 +200,7 @@ export class ScheduleService {
         function_url AS "functionUrl",
         http_method AS "httpMethod",
         body,
+        headers,
         is_active AS "isActive",
         cron_job_id AS "cronJobId",
         created_at AS "createdAt",
