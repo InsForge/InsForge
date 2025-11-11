@@ -58,7 +58,7 @@ export class AuthService {
   // OAuth helpers for LinkedIn (TODO: refactor LinkedIn OAuth into separate service)
   private processedCodes: Set<string>;
   private tokenCache: Map<string, { access_token: string; id_token: string }>;
-  // Oauth helper for X(Twitter)
+  // OAuth helper for X(Twitter)
   private verifierCodes: Map<string, string>;
 
   private constructor() {
@@ -915,9 +915,6 @@ export class AuthService {
     authUrl.searchParams.set('client_id', config.clientId ?? '');
     authUrl.searchParams.set('redirect_uri', `${selfBaseUrl}/api/auth/oauth/github/callback`);
     authUrl.searchParams.set('scope', config.scopes ? config.scopes.join(' ') : 'user:email');
-    if (state) {
-      authUrl.searchParams.set('state', state);
-    }
 
     return authUrl.toString();
   }
@@ -1683,7 +1680,7 @@ export class AuthService {
    * Find or create X user
    */
   async findOrCreateXUser(xUserInfo: XUserInfo): Promise<CreateSessionResponse> {
-    const userName = xUserInfo.username || xUserInfo.name;
+    const userName = xUserInfo.username || xUserInfo.name || `user${xUserInfo.id.substring(0, 8)}`;
     const email = `${userName}@users.noreply.x.local`;
 
     return this.findOrCreateThirdPartyUser(
