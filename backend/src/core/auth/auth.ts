@@ -35,6 +35,7 @@ import {
   LinkedInUserInfo,
   DiscordUserInfo,
   UserRecord,
+  XUserInfo,
 } from '@/types/auth';
 import { ADMIN_ID } from '@/utils/constants';
 import { getApiBaseUrl } from '@/utils/environment';
@@ -57,6 +58,8 @@ export class AuthService {
   // OAuth helpers for LinkedIn (TODO: refactor LinkedIn OAuth into separate service)
   private processedCodes: Set<string>;
   private tokenCache: Map<string, { access_token: string; id_token: string }>;
+  // Oauth helper for X(Twitter)
+  private verifierCodes: Map<string, string>;
 
   private constructor() {
     // Load .env file if not already loaded
@@ -89,6 +92,9 @@ export class AuthService {
     // Initialize OAuth helpers for LinkedIn
     this.processedCodes = new Set();
     this.tokenCache = new Map();
+
+    // Initialize OAuth helpers for X(Twitter)
+    this.verifierCodes = new Map();
 
     logger.info('AuthService initialized');
   }
@@ -730,6 +736,7 @@ export class AuthService {
       | LinkedInUserInfo
       | MicrosoftUserInfo
       | FacebookUserInfo
+      | XUserInfo
       | Record<string, unknown>
   ): Promise<CreateSessionResponse> {
     // First, try to find existing user by provider ID in _account_providers table
@@ -816,6 +823,7 @@ export class AuthService {
       | LinkedInUserInfo
       | MicrosoftUserInfo
       | FacebookUserInfo
+      | XUserInfo
       | Record<string, unknown>,
     avatarUrl: string
   ): Promise<CreateSessionResponse> {
@@ -1554,6 +1562,158 @@ export class AuthService {
     );
   }
 
+  /**
+   * Generate X OAuth authorization URL
+   */
+  async generateXOAuthUrl(state?: string): Promise<string> {
+    const oauthConfigService = OAuthConfigService.getInstance();
+    const config = await oauthConfigService.getConfigByProvider('x');
+    const verifier = crypto.randomBytes(32).toString('base64url');
+    const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
+
+    if (!config) {
+      throw new Error('X OAuth not configured');
+    }
+
+    const selfBaseUrl = getApiBaseUrl();
+
+    if (!state) {
+      throw new Error('State parameter is required.');
+    }
+    this.verifierCodes.set(state, verifier);
+    setTimeout(() => {
+      this.verifierCodes.delete(state);
+    }, 600000);
+
+    if (config?.useSharedKey) {
+      if (!state) {
+        logger.warn('Shared X OAuth called without state parameter');
+        throw new Error('State parameter is required for shared X OAuth');
+      }
+
+      // Use shared keys if configured
+      const cloudBasedUrl = process.env.CLOUD_API_HOST || 'https://api.insforge.dev';
+      const redirectUri = `${selfBaseUrl}/api/auth/oauth/shared/callback/${state}`;
+      const response = await axios.get(
+        `${cloudBasedUrl}/oauth/twitter?redirect_uri=${encodeURIComponent(redirectUri)}`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      return response.data.auth_url || response.data.url || '';
+    }
+
+    logger.debug('X OAuth Config (fresh from DB):', {
+      clientId: config.clientId ? 'SET' : 'NOT SET',
+    });
+
+    const authUrl = new URL('https://twitter.com/i/oauth2/authorize');
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('client_id', config.clientId ?? '');
+    authUrl.searchParams.set('redirect_uri', `${selfBaseUrl}/api/auth/oauth/x/callback`);
+    authUrl.searchParams.set(
+      'scope',
+      config.scopes ? config.scopes.join(' ') : 'tweet.read users.read'
+    );
+    authUrl.searchParams.set('state', state ?? '');
+    authUrl.searchParams.set('code_challenge', challenge);
+    authUrl.searchParams.set('code_challenge_method', 'S256');
+
+    if (state) {
+      authUrl.searchParams.set('state', state);
+    }
+    return authUrl.toString();
+  }
+
+  /**
+   *  Exchange X code for access token
+   */
+  async exchangeXCodeForToken(code: string, state: string): Promise<string> {
+    const verifier = this.verifierCodes.get(state);
+
+    if (!verifier) {
+      throw new Error('Missing or expired PKCE verifier for this state');
+    }
+
+    // Immediately remove it to prevent replay
+    this.verifierCodes.delete(state);
+
+    const oauthConfigService = OAuthConfigService.getInstance();
+    const config = await oauthConfigService.getConfigByProvider('x');
+
+    if (!config) {
+      throw new Error('X OAuth not configured');
+    }
+
+    const clientSecret = await oauthConfigService.getClientSecretByProvider('x');
+    const selfBaseUrl = getApiBaseUrl();
+
+    const body = new URLSearchParams({
+      code,
+      grant_type: 'authorization_code',
+      client_id: config.clientId ?? '',
+      redirect_uri: `${selfBaseUrl}/api/auth/oauth/x/callback`,
+      code_verifier: verifier,
+    });
+
+    const response = await axios.post('https://api.twitter.com/2/oauth2/token', body.toString(), {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization:
+          'Basic ' + Buffer.from(`${config.clientId}:${clientSecret}`).toString('base64'),
+      },
+    });
+
+    if (!response.data.access_token) {
+      throw new Error('Failed to get access token from GitHub');
+    }
+
+    return response.data.access_token;
+  }
+
+  /**
+   * Get X user info
+   */
+  async getXUserInfo(accessToken: string) {
+    const userResponse = await axios.get('https://api.twitter.com/2/users/me', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      params: {
+        'user.fields': 'id,name,username,profile_image_url,verified',
+      },
+    });
+
+    const userData = userResponse.data.data;
+
+    return {
+      id: userData.id,
+      name: userData.name,
+      username: userData.username,
+      profile_image_url: userData.profile_image_url,
+      verified: userData.verified,
+    };
+  }
+
+  /**
+   * Find or create LinkedIn user
+   */
+  async findOrCreateXUser(xUserInfo: XUserInfo): Promise<CreateSessionResponse> {
+    const userName = xUserInfo.username || xUserInfo.name;
+    const email = `${userName}@users.noreply.x.local`;
+
+    return this.findOrCreateThirdPartyUser(
+      'x',
+      xUserInfo.id,
+      email,
+      userName,
+      xUserInfo.profile_image_url || '',
+      xUserInfo
+    );
+  }
+
   async getMetadata(): Promise<AuthMetadataSchema> {
     const oAuthConfigService = OAuthConfigService.getInstance();
     const oAuthConfigs = await oAuthConfigService.getAllConfigs();
@@ -1581,6 +1741,8 @@ export class AuthService {
         return this.generateFacebookOAuthUrl(state);
       case 'microsoft':
         return this.generateMicrosoftOAuthUrl(state);
+      case 'x':
+        return this.generateXOAuthUrl(state);
       default:
         throw new Error(`OAuth provider ${provider} is not implemented yet.`);
     }
@@ -1591,7 +1753,7 @@ export class AuthService {
    */
   async handleOAuthCallback(
     provider: OAuthProvidersSchema,
-    payload: { code?: string; token?: string }
+    payload: { code?: string; token?: string; state?: string }
   ): Promise<CreateSessionResponse> {
     switch (provider) {
       case 'google': {
@@ -1618,6 +1780,8 @@ export class AuthService {
         return this.handleFacebookCallback(payload);
       case 'microsoft':
         return this.handleMicrosoftCallback(payload);
+      case 'x':
+        return this.handleXCallback(payload);
       default:
         throw new Error(`OAuth provider ${provider} is not implemented yet.`);
     }
@@ -1706,6 +1870,23 @@ export class AuthService {
     const accessToken = await this.exchangeCodeToTokenByMicrosoft(payload.code);
     const microsoftUserInfo = await this.getMicrosoftUserInfo(accessToken.access_token);
     return this.findOrCreateMicrosoftUser(microsoftUserInfo);
+  }
+
+  /**
+   * Handle GitHub OAuth callback
+   */
+  private async handleXCallback(payload: {
+    code?: string;
+    token?: string;
+    state?: string;
+  }): Promise<CreateSessionResponse> {
+    if (!payload.code || !payload.state) {
+      throw new Error('No authorization code or state provided');
+    }
+
+    const accessToken = await this.exchangeXCodeForToken(payload.code, payload.state);
+    const xUserInfo = await this.getXUserInfo(accessToken);
+    return this.findOrCreateXUser(xUserInfo);
   }
 
   /**

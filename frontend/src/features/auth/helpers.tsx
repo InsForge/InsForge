@@ -5,6 +5,7 @@ import Microsoft from '@/assets/logos/microsoft.svg?react';
 import Discord from '@/assets/logos/discord.svg?react';
 import LinkedIn from '@/assets/logos/linkedin.svg?react';
 import Facebook from '@/assets/logos/facebook.svg?react';
+import X from '@/assets/logos/x.svg?react';
 import type { OAuthProvidersSchema } from '@insforge/shared-schemas';
 
 export enum AuthTab {
@@ -62,5 +63,12 @@ export const oauthProviders: OAuthProviderInfo[] = [
     icon: <Facebook className="w-6 h-6" />,
     description: 'Configure Facebook authentication for your users',
     setupUrl: 'https://developers.facebook.com/apps',
+  },
+  {
+    id: 'x',
+    name: 'X OAuth',
+    icon: <X className="w-6 h-6" />,
+    description: 'Configure X authentication for your users',
+    setupUrl: 'https://developer.twitter.com/en/portal/dashboard',
   },
 ];

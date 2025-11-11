@@ -75,6 +75,7 @@ export function OAuthConfigDialog({
     'discord',
     'linkedin',
     'facebook',
+    'x',
   ] satisfies readonly OAuthProvidersSchema[];
   const isSharedKeysAvailable =
     isInsForgeCloudProject() && provider?.id && sharedKeyProviders.includes(provider.id);

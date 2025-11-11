@@ -426,6 +426,16 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
         result = await authService.findOrCreateFacebookUser(facebookUserInfo);
         break;
       }
+      case 'x': {
+        // Handle X OAuth payload
+        const xUserInfo = {
+          id: payloadData.provider_id,
+          email: payloadData.email,
+          name: payloadData.name,
+          picture: payloadData.profile_image_url,
+        };
+        result = await authService.findOrCreateXUser(xUserInfo);
+      }
     }
 
     const params = new URLSearchParams();
@@ -488,6 +498,7 @@ router.get('/:provider/callback', async (req: Request, res: Response, next: Next
       const result = await authService.handleOAuthCallback(validatedProvider, {
         code: code as string | undefined,
         token: token as string | undefined,
+        state: state as string | undefined,
       });
 
       // Construct redirect URL with query parameters
