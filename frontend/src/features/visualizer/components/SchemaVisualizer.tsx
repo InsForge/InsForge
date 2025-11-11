@@ -25,7 +25,7 @@ import {
 } from '@insforge/shared-schemas';
 
 interface SchemaVisualizerProps {
-  metadata?: AppMetadataSchema;
+  metadata: AppMetadataSchema;
   userCount?: number;
   // Optional external schemas for templates
   externalSchemas?: GetTableSchemaResponse[];
@@ -237,38 +237,36 @@ export function SchemaVisualizer({
 
     const nodes: Node<CustomNodeData>[] = [...tableNodes];
 
-    // Add bucket nodes if metadata is provided
-    if (metadata) {
-      const bucketNodes: Node<BucketNodeData>[] = metadata.storage.buckets.map((bucket) => ({
-        id: `bucket-${bucket.name}`,
-        type: 'bucketNode',
-        position: { x: 0, y: 0 },
-        data: { bucket },
-      }));
-      nodes.push(...bucketNodes);
+    // Add bucket nodes
+    const bucketNodes: Node<BucketNodeData>[] = metadata.storage.buckets.map((bucket) => ({
+      id: `bucket-${bucket.name}`,
+      type: 'bucketNode',
+      position: { x: 0, y: 0 },
+      data: { bucket },
+    }));
+    nodes.push(...bucketNodes);
 
-      // Check if any tables reference users.id
-      const isUsersReferenced = tables.some((table) =>
-        table.columns.some(
-          (column) =>
-            column.foreignKey &&
-            column.foreignKey.referenceTable === 'users' &&
-            column.foreignKey.referenceColumn === 'id'
-        )
-      );
+    // Check if any tables reference users.id
+    const isUsersReferenced = tables.some((table) =>
+      table.columns.some(
+        (column) =>
+          column.foreignKey &&
+          column.foreignKey.referenceTable === 'users' &&
+          column.foreignKey.referenceColumn === 'id'
+      )
+    );
 
-      // Add authentication node
-      nodes.push({
-        id: 'authentication',
-        type: 'authNode',
-        position: { x: 0, y: 0 },
-        data: {
-          authMetadata: metadata.auth,
-          userCount,
-          isReferenced: isUsersReferenced,
-        },
-      });
-    }
+    // Add authentication node
+    nodes.push({
+      id: 'authentication',
+      type: 'authNode',
+      position: { x: 0, y: 0 },
+      data: {
+        authMetadata: metadata.auth,
+        userCount,
+        isReferenced: isUsersReferenced,
+      },
+    });
 
     return nodes;
   }, [tables, metadata, externalSchemas, userCount]);
