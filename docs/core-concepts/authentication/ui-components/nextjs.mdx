@@ -145,7 +145,7 @@ Access current user data in client side:
 import { useUser } from '@insforge/nextjs';
 
 function UserProfile() {
-  const { user, isLoaded, userId } = useUser();
+  const { user, isLoaded } = useUser();
 
   if (!isLoaded) return <div>Loading...</div>;
   if (!user) return <div>Not signed in</div>;
@@ -153,7 +153,7 @@ function UserProfile() {
 
   return (
     <div>
-      <p>Id: {userId}</p>
+      <p>Id: {user.id}</p>
       <p>Email: {user.email}</p>
       <p>Name: {user.name}</p>
       <img src={user.avatarUrl} alt="Avatar" />
@@ -165,7 +165,6 @@ function UserProfile() {
 **Returns:**
 
 - `user` - User object with id, email, name, avatarUrl
-- `userId` - User id
 - `isLoaded` - Boolean loading state
 
 ### Server side functions
