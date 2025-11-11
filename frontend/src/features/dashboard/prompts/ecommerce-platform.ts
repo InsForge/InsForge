@@ -1,6 +1,15 @@
 export const ecommercePlatformPrompt = {
-  title: 'Build an E-commerce Platform',
+  title: 'E-commerce Platform',
   description: 'Paste below prompts to your agent as a quick start for building real apps',
-  prompt: `To build an e-commerce platform, begin by defining your product categories and business model. Implement a product catalog with detailed descriptions, images, and inventory management. Create a shopping cart system with session management and checkout flow. Integrate payment gateways for secure transactions. Build an order management system to track purchases from placement to delivery. Add search and filtering capabilities to help customers find products. Implement user accounts for order history and saved preferences. Include an admin dashboard for managing products, orders, and analytics. Ensure mobile responsiveness and fast page loads for optimal user experience.`,
+  prompt: `Build an e-commerce platform with these features:
+
+• User authentication and customer accounts
+• Product catalog with categories and search
+• Shopping cart and checkout flow
+• Payment processing integration
+• Order management and tracking
+• Inventory management system
+• Product images and media storage
+• Admin dashboard for managing products and orders`,
   features: ['Authentication', 'Database', 'Storage', 'Functions'],
 };

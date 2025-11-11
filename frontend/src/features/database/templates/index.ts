@@ -1,17 +1,34 @@
-export { type DatabaseTemplate } from './types';
-export { crmSystemTemplate } from './crm-system';
-export { ecommerceTemplate } from './e-commerce';
-export { aiChatbotTemplate } from './ai-chatbot';
-export { todoListTemplate } from './todo-list';
-
+import { GetTableSchemaResponse } from '@insforge/shared-schemas';
 import { crmSystemTemplate } from './crm-system';
-import { ecommerceTemplate } from './e-commerce';
 import { aiChatbotTemplate } from './ai-chatbot';
-import { todoListTemplate } from './todo-list';
+import { ecommercePlatformTemplate } from './ecommerce-platform';
+import { twitterCloneTemplate } from './twitter-clone';
+import { instagramCloneTemplate } from './instagram-clone';
+import { bookingAppTemplate } from './booking-app';
+
+export interface DatabaseTemplate {
+  id: string;
+  title: string;
+  description: string;
+  tableCount: number;
+  sql: string;
+  visualizerSchema: GetTableSchemaResponse[];
+}
+
+export {
+  crmSystemTemplate,
+  aiChatbotTemplate,
+  ecommercePlatformTemplate,
+  twitterCloneTemplate,
+  instagramCloneTemplate,
+  bookingAppTemplate,
+};
 
 export const DATABASE_TEMPLATES = [
   crmSystemTemplate,
-  ecommerceTemplate,
   aiChatbotTemplate,
-  todoListTemplate,
+  ecommercePlatformTemplate,
+  twitterCloneTemplate,
+  instagramCloneTemplate,
+  bookingAppTemplate,
 ];

@@ -1,4 +1,4 @@
-import { DatabaseTemplate } from './types';
+import { DatabaseTemplate } from './index';
 
 export const aiChatbotTemplate: DatabaseTemplate = {
   id: 'ai-chatbot',

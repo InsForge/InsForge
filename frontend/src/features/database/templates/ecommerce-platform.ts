@@ -1,8 +1,8 @@
-import { DatabaseTemplate } from './types';
+import { DatabaseTemplate } from './index';
 
-export const ecommerceTemplate: DatabaseTemplate = {
-  id: 'e-commerce',
-  title: 'E-commerce',
+export const ecommercePlatformTemplate: DatabaseTemplate = {
+  id: 'ecommerce-platform',
+  title: 'E-commerce Platform',
   description: 'An E-commerce system with products, orders, customers, and inventory management',
   tableCount: 5,
   visualizerSchema: [

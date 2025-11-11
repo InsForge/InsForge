@@ -3,12 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useMetadata } from '@/lib/hooks/useMetadata';
 import { useUsers } from '@/features/auth';
 import { Users, Database, HardDrive, Lock, ChevronRight } from 'lucide-react';
-import {
-  ConnectionSuccessBanner,
-  StatsCard,
-  PromptCard,
-  PromptDialog,
-} from '../components';
+import { ConnectionSuccessBanner, StatsCard, PromptCard, PromptDialog } from '../components';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { LogsDataGrid, type LogsColumnDef } from '@/features/logs/components/LogsDataGrid';
 import { cn, formatTime } from '@/lib/utils/utils';
