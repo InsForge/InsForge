@@ -10,6 +10,7 @@ The `@insforge/react-router` package provides **complete authentication solution
 ### Step 1: Install Package and Set Environment Variables
 
 ```bash
+npm create vite@latest . -- --template react-ts --yes
 npm install @insforge/react-router@latest
 ```
 
@@ -119,3 +120,62 @@ export default function Home() {
 ```
 
 **That's it!** Your React + React Router app now has production-ready authentication with built-in auth pages.
+
+## Next Steps
+
+### Hooks
+
+#### `useAuth()`
+
+Access authentication state:
+
+```tsx
+import { useAuth } from '@insforge/react-router';
+
+function LoginButton() {
+  const { isSignedIn, isLoaded } = useAuth();
+  
+  if (!isLoaded) return <div>Loading...</div>;
+
+  return (
+    <div>
+      {isSignedIn ? 'Welcome!' : 'Sign In'}
+    </div>
+  );
+}
+```
+
+**Returns:**
+
+- `isSignedIn` - Boolean auth state
+- `isLoaded` - Boolean loading state
+
+#### `useUser()`
+
+Access current user data:
+
+```tsx
+import { useUser } from '@insforge/react-router';
+
+function UserProfile() {
+  const { user, isLoaded } = useUser();
+
+  if (!isLoaded) return <div>Loading...</div>;
+  if (!user) return <div>Not signed in</div>;
+
+
+  return (
+    <div>
+      <p>Id: {user.id}</p>
+      <p>Email: {user.email}</p>
+      <p>Name: {user.name}</p>
+      <img src={user.avatarUrl} alt="Avatar" />
+    </div>
+  );
+}
+```
+
+**Returns:**
+
+- `user` - User object with id, email, name, avatarUrl
+- `isLoaded` - Boolean loading state

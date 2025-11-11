@@ -10,8 +10,6 @@ Backend-as-a-service (BaaS) platform providing:
 - **AI**: Chat completions and image generation (OpenAI-compatible)
 - **Functions**: Serverless function deployment
 
-**Key Concept**: InsForge replaces your traditional backend - implement business logic by calling database operations directly instead of building API endpoints.
-
 ## Installation
 
 ```bash
@@ -21,6 +19,8 @@ npm install @insforge/sdk@latest
 ## Initial Setup
 
 **🚨 CRITICAL: Initialize the SDK Client**
+**Important**: Do not use SDK Client in nextjs api route. It can only be used in client-side components.
+
 
 You must create a client instance using `createClient()` with your base URL and anon key:
 
@@ -55,12 +55,6 @@ Available documentation types:
 - `"functions-sdk"` - Serverless functions invocation
 - `"ai-integration-sdk"` - AI chat and image generation
 
-**🎯 How to Choose Authentication Documentation:**
-
-1. **Building with Next.js?** → Use `"auth-components-nextjs"` (frontend: built-in auth pages)
-2. **Building with React (Vite+React Router)?** → Use `"auth-components-react-router"` (frontend: built-in auth pages)
-3. **Building with React (Vite)?** → Use `"auth-components-react"` (frontend: built-in auth pages)
-
 ## When to Use SDK vs MCP Tools
 
 ### Always SDK for Application Logic:
@@ -78,30 +72,6 @@ Available documentation types:
 - Storage bucket creation (`create-bucket`, `list-buckets`, `delete-bucket`)
 - Serverless function deployment (`create-function`, `update-function`, `delete-function`)
 
-### When to Use Pre-Built Components
-
-InsForge provides framework-specific UI packages with **built-in auth pages** (zero UI code):
-
-- `@insforge/react` - React (built-in auth + framework-agnostic)
-- `@insforge/nextjs` - Next.js (built-in auth + middleware + SSR)
-- `@insforge/react-router` - React + React Router (built-in auth + framework-agnostic)
-
-## Quick Start
-
-1. **First**: Call `get-backend-metadata` to check current backend state
-2. **Detect framework**: Check user's project to determine the framework (Next.js, React, etc.)
-3. **Fetch docs**: Use `fetch-docs` with the appropriate doc type based on what you're implementing:
-   - **Database**: `"db-sdk"` - For database operations
-   - **Authentication** (choose based on framework):
-     - React(Vite) → `"auth-components-react"`
-     - Next.js → `"auth-components-nextjs"`
-     - React(Vite+React Router) → `"auth-components-react-router"`
-   - **Storage**: `"storage-sdk"` - For file upload/download
-   - **AI**: `"ai-integration-sdk"` - For chat completions and image generation
-   - **Functions**: `"functions-sdk"` - For serverless functions
-4. **Initialize SDK**: Create client with your backend URL
-5. **Build**: Use framework-specific Auth Components for auth, SDK methods for database, storage, AI, and functions
-
 ## Important Notes
 
 - Use the right framework-specific component package for production-ready auth
@@ -110,3 +80,4 @@ InsForge provides framework-specific UI packages with **built-in auth pages** (z
 - Serverless functions have single endpoint (no subpaths)
 - Storage: Upload files to buckets, store URLs in database
 - AI operations are OpenAI-compatible
+- Use Tailwind CSS 3.4 (do not upgrade to v4)

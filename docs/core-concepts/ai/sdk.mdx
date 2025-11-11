@@ -14,7 +14,7 @@ Create AI chat completions with streaming support.
 ### Parameters
 
 - `model` (string, required) - AI model (e.g., 'anthropic/claude-3.5-haiku', 'openai/gpt-4'), call `mcp__insforge__get-backend-metadata` tool to get available models
-- `messages` (array, required) - Conversation messages with role and content
+- `messages` (array, required) - Array of message objects: {role: "user"|"system"|"assistant", content: string}
 - `temperature` (number, optional) - Sampling temperature 0-2
 - `maxTokens` (number, optional) - Max tokens to generate
 - `topP` (number, optional) - Top-p sampling 0-1
@@ -30,7 +30,7 @@ Create AI chat completions with streaming support.
   model: string,
   choices: [{
     index: number,
-    message: { role: string, content: string },
+    message: { role: "system"|"user"|"assistant", content: string },
     finish_reason: string
   }],
   usage: { prompt_tokens: number, completion_tokens: number, total_tokens: number }
@@ -41,13 +41,15 @@ Create AI chat completions with streaming support.
 
 ```typescript
 AsyncIterableIterator<{
-  id: string,
-  object: 'chat.completion.chunk',
-  choices: [{
-    delta: { content: string },
-    finish_reason: string | null
-  }]
-}>
+  id: string;
+  object: 'chat.completion.chunk';
+  choices: [
+    {
+      delta: { content: string };
+      finish_reason: string | null;
+    },
+  ];
+}>;
 ```
 
 ### Example (non-streaming)
@@ -63,15 +65,15 @@ const completion = await insforge.ai.chat.completions.create({
         {
           type: 'image_url',
           image_url: {
-            url: 'https://example.com/photo.jpg' // or base64: 'data:image/jpeg;base64,...'
-          }
-        }
-      ]
-    }
-  ]
-})
+            url: 'https://example.com/photo.jpg', // or base64: 'data:image/jpeg;base64,...'
+          },
+        },
+      ],
+    },
+  ],
+});
 
-console.log(completion.choices[0].message.content)
+console.log(completion.choices[0].message.content);
 ```
 
 ### Output (non-streaming)
@@ -106,12 +108,12 @@ console.log(completion.choices[0].message.content)
 const stream = await insforge.ai.chat.completions.create({
   model: 'openai/gpt-4',
   messages: [{ role: 'user', content: 'Tell me a story' }],
-  stream: true
-})
+  stream: true,
+});
 
 for await (const chunk of stream) {
   if (chunk.choices[0]?.delta?.content) {
-    process.stdout.write(chunk.choices[0].delta.content)
+    process.stdout.write(chunk.choices[0].delta.content);
   }
 }
 ```
@@ -172,25 +174,23 @@ Generate images using AI models.
 const response = await insforge.ai.images.generate({
   model: 'google/gemini-2.5-flash-image-preview',
   prompt: 'A serene mountain landscape at sunset',
-  size: '1024x1024'
-})
+  size: '1024x1024',
+});
 
 // Get base64 image and upload to storage
-const base64Image = response.data[0].b64_json
-const buffer = Buffer.from(base64Image, 'base64')
-const blob = new Blob([buffer], { type: 'image/png' })
+const base64Image = response.data[0].b64_json;
+const buffer = Buffer.from(base64Image, 'base64');
+const blob = new Blob([buffer], { type: 'image/png' });
 
-const { data: uploadData } = await insforge.storage
-  .from('ai-images')
-  .uploadAuto(blob)
+const { data: uploadData } = await insforge.storage.from('ai-images').uploadAuto(blob);
 
 // Save URL to database
-await insforge.database
-  .from('generated_images')
-  .insert([{
+await insforge.database.from('generated_images').insert([
+  {
     prompt: 'A serene mountain landscape',
-    image_url: uploadData.url
-  }])
+    image_url: uploadData.url,
+  },
+]);
 ```
 
 ### Output
@@ -211,4 +211,3 @@ await insforge.database
   }
 }
 ```
-
