@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { SignInForm, SignUpForm, ForgotPasswordForm } from '@insforge/react';
-import { OAuthProvidersSchema } from '@insforge/shared-schemas';
 import { useAuthConfig } from '../hooks/useAuthConfig';
 import { useOAuthConfig } from '../hooks/useOAuthConfig';
 
@@ -12,7 +11,6 @@ export function AuthPreview() {
   const [view, setView] = useState<AuthView>('sign-in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [oauthLoading, setOAuthLoading] = useState<OAuthProvidersSchema | null>(null);
 
   // Listen to hash changes
   useEffect(() => {
@@ -52,11 +50,8 @@ export function AuthPreview() {
     // Preview mode - do nothing
   };
 
-  const handleOAuthClick = (provider: OAuthProvidersSchema) => {
-    setOAuthLoading(provider);
-    setTimeout(() => {
-      setOAuthLoading(null);
-    }, 3000);
+  const handleOAuthClick = () => {
+    // Preview mode - do nothing
   };
 
   return (
@@ -70,7 +65,6 @@ export function AuthPreview() {
           onSubmit={handleSubmit}
           authConfig={authConfig}
           onOAuthClick={handleOAuthClick}
-          oauthLoading={oauthLoading}
           forgotPasswordUrl="#preview=forgot-password"
           signUpUrl="#preview=sign-up"
         />
@@ -85,7 +79,6 @@ export function AuthPreview() {
           onSubmit={handleSubmit}
           authConfig={authConfig}
           onOAuthClick={handleOAuthClick}
-          oauthLoading={oauthLoading}
           signInUrl="#preview=sign-in"
         />
       )}

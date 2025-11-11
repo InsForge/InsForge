@@ -74,7 +74,7 @@ export function CopyButton({
       onClick={(e) => void handleCopy(e)}
       disabled={disabled}
       className={cn(
-        'h-8 px-3 gap-2 text-sm font-medium rounded transition-colors',
+        'h-8 px-3 gap-2 text-sm font-medium rounded',
         // Icon-only mode (when showText is false)
         !showText && 'w-8 px-0 justify-center',
         // Primary variant (black/emerald)

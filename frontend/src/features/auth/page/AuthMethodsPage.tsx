@@ -251,7 +251,7 @@ export default function AuthMethodsPage() {
             </div>
 
             {/* Preview Content */}
-            <div className="flex-1 overflow-y-auto pb-14 flex flex-col items-center justify-center gap-4">
+            <div className="flex-1 overflow-y-auto py-8 flex flex-col items-center justify-center gap-4">
               <AuthPreview />
               <p className="text-xs text-gray-500 dark:text-neutral-400 text-center">
                 Preview Mode
