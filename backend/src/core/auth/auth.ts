@@ -58,8 +58,6 @@ export class AuthService {
   // OAuth helpers for LinkedIn (TODO: refactor LinkedIn OAuth into separate service)
   private processedCodes: Set<string>;
   private tokenCache: Map<string, { access_token: string; id_token: string }>;
-  // OAuth helper for X(Twitter)
-  private verifierCodes: Map<string, string>;
 
   private constructor() {
     // Load .env file if not already loaded
@@ -92,9 +90,6 @@ export class AuthService {
     // Initialize OAuth helpers for LinkedIn
     this.processedCodes = new Set();
     this.tokenCache = new Map();
-
-    // Initialize OAuth helpers for X(Twitter)
-    this.verifierCodes = new Map();
 
     logger.info('AuthService initialized');
   }
@@ -915,6 +910,9 @@ export class AuthService {
     authUrl.searchParams.set('client_id', config.clientId ?? '');
     authUrl.searchParams.set('redirect_uri', `${selfBaseUrl}/api/auth/oauth/github/callback`);
     authUrl.searchParams.set('scope', config.scopes ? config.scopes.join(' ') : 'user:email');
+    if (state) {
+      authUrl.searchParams.set('state', state);
+    }
 
     return authUrl.toString();
   }
@@ -1544,11 +1542,9 @@ export class AuthService {
   /**
    * Generate X OAuth authorization URL
    */
-  async generateXOAuthUrl(state?: string): Promise<string> {
+  async generateXOAuthUrl(state?: string, challenge?: string): Promise<string> {
     const oauthConfigService = OAuthConfigService.getInstance();
     const config = await oauthConfigService.getConfigByProvider('x');
-    const verifier = crypto.randomBytes(32).toString('base64url');
-    const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
 
     if (!config) {
       throw new Error('X OAuth not configured');
@@ -1556,25 +1552,16 @@ export class AuthService {
 
     const selfBaseUrl = getApiBaseUrl();
 
-    if (!state) {
-      throw new Error('State parameter is required.');
+    if (!state || !challenge) {
+      throw new Error('State and Challenge parameter is required.');
     }
-    this.verifierCodes.set(state, verifier);
-    setTimeout(() => {
-      this.verifierCodes.delete(state);
-    }, 600000);
 
     if (config?.useSharedKey) {
-      if (!state) {
-        logger.warn('Shared X OAuth called without state parameter');
-        throw new Error('State parameter is required for shared X OAuth');
-      }
-
       // Use shared keys if configured
       const cloudBasedUrl = process.env.CLOUD_API_HOST || 'https://api.insforge.dev';
       const redirectUri = `${selfBaseUrl}/api/auth/oauth/shared/callback/${state}`;
       const response = await axios.get(
-        `${cloudBasedUrl}/oauth/twitter?redirect_uri=${encodeURIComponent(redirectUri)}`,
+        `${cloudBasedUrl}/auth/v1/shared/x?redirect_uri=${encodeURIComponent(redirectUri)}`,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -1600,25 +1587,13 @@ export class AuthService {
     authUrl.searchParams.set('code_challenge', challenge);
     authUrl.searchParams.set('code_challenge_method', 'S256');
 
-    if (state) {
-      authUrl.searchParams.set('state', state);
-    }
     return authUrl.toString();
   }
 
   /**
    *  Exchange X code for access token
    */
-  async exchangeXCodeForToken(code: string, state: string): Promise<string> {
-    const verifier = this.verifierCodes.get(state);
-
-    if (!verifier) {
-      throw new Error('Missing or expired PKCE verifier for this state');
-    }
-
-    // Immediately remove it to prevent replay
-    this.verifierCodes.delete(state);
-
+  async exchangeXCodeForToken(code: string, verifier: string): Promise<string> {
     const oauthConfigService = OAuthConfigService.getInstance();
     const config = await oauthConfigService.getConfigByProvider('x');
 
@@ -1704,7 +1679,11 @@ export class AuthService {
   /**
    * Generate OAuth authorization URL for any supported provider
    */
-  async generateOAuthUrl(provider: OAuthProvidersSchema, state?: string): Promise<string> {
+  async generateOAuthUrl(
+    provider: OAuthProvidersSchema,
+    state?: string,
+    challenge?: string
+  ): Promise<string> {
     switch (provider) {
       case 'google': {
         const googleOAuthService = GoogleOAuthService.getInstance();
@@ -1721,7 +1700,7 @@ export class AuthService {
       case 'microsoft':
         return this.generateMicrosoftOAuthUrl(state);
       case 'x':
-        return this.generateXOAuthUrl(state);
+        return this.generateXOAuthUrl(state, challenge);
       default:
         throw new Error(`OAuth provider ${provider} is not implemented yet.`);
     }
@@ -1732,7 +1711,7 @@ export class AuthService {
    */
   async handleOAuthCallback(
     provider: OAuthProvidersSchema,
-    payload: { code?: string; token?: string; state?: string }
+    payload: { code?: string; token?: string; verifier: string }
   ): Promise<CreateSessionResponse> {
     switch (provider) {
       case 'google': {
@@ -1857,13 +1836,13 @@ export class AuthService {
   private async handleXCallback(payload: {
     code?: string;
     token?: string;
-    state?: string;
+    verifier: string;
   }): Promise<CreateSessionResponse> {
-    if (!payload.code || !payload.state) {
-      throw new Error('No authorization code or state provided');
+    if (!payload.code || !payload.verifier) {
+      throw new Error('No authorization code or verifier provided');
     }
 
-    const accessToken = await this.exchangeXCodeForToken(payload.code, payload.state);
+    const accessToken = await this.exchangeXCodeForToken(payload.code, payload.verifier);
     const xUserInfo = await this.getXUserInfo(accessToken);
     return this.findOrCreateXUser(xUserInfo);
   }

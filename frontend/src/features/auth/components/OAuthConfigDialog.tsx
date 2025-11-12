@@ -26,7 +26,13 @@ import { getBackendUrl, isInsForgeCloudProject } from '@/lib/utils/utils';
 
 const getCallbackUrl = (provider?: string) => {
   // Use backend API URL for OAuth callback
-  return `${getBackendUrl()}/api/auth/oauth/${provider}/callback`;
+  let backendUrl = getBackendUrl();
+
+  // Check if backend URL contains "localhost" and provider is "x"
+  if (provider === 'x' && backendUrl.includes('localhost')) {
+    backendUrl = backendUrl.replace('://localhost', '://www.localhost');
+  }
+  return `${backendUrl}/api/auth/oauth/${provider}/callback`;
 };
 
 interface OAuthConfigDialogProps {
