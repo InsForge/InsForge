@@ -13,7 +13,7 @@ if (rootElement) {
   createRoot(rootElement).render(
     <StrictMode>
       <BrowserRouter>
-        <InsforgeProvider baseUrl={backendUrl} hostedMode={true}>
+        <InsforgeProvider baseUrl={backendUrl}>
           <App />
         </InsforgeProvider>
       </BrowserRouter>
