@@ -6,11 +6,12 @@ interface TableNodeProps {
   data: {
     table: TableSchema;
     referencedColumns?: string[]; // List of column names that are referenced by other tables
+    showRecordCount?: boolean; // Control whether to show record count
   };
 }
 
 export function TableNode({ data }: TableNodeProps) {
-  const { table, referencedColumns = [] } = data;
+  const { table, referencedColumns = [], showRecordCount = true } = data;
 
   const getColumnIcon = (isReferenced: boolean = false) => {
     // If column is referenced by another table (has incoming connections)
@@ -43,11 +44,13 @@ export function TableNode({ data }: TableNodeProps) {
           </div>
           <div className="flex-1">
             <h3 className="text-sm font-medium text-zinc-950 dark:text-white">{table.tableName}</h3>
-            <p className="text-xs text-zinc-600 dark:text-neutral-300">
-              {table.recordCount !== undefined
-                ? `${table.recordCount.toLocaleString()} data`
-                : '0 data'}
-            </p>
+            {showRecordCount && (
+              <p className="text-xs text-zinc-600 dark:text-neutral-300">
+                {table.recordCount !== undefined
+                  ? `${table.recordCount.toLocaleString()} data`
+                  : '0 data'}
+              </p>
+            )}
           </div>
         </div>
         {/* <div className="p-1.5">

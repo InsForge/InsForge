@@ -37,6 +37,7 @@ export function FunctionRow({ function: func, onClick, className }: FunctionRowP
               {functionUrl}
             </span>
             <CopyButton
+              variant="secondary"
               showText={false}
               text={functionUrl}
               className="h-7 w-7 dark:hover:bg-neutral-500 dark:data-[copied=true]:group-hover:bg-neutral-700 dark:data-[copied=true]:hover:bg-neutral-700"

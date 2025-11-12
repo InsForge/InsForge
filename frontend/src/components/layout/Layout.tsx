@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
 import { useAuth } from '@/lib/contexts/AuthContext';
@@ -11,6 +11,11 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const { user, logout } = useAuth();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  const handleToggleCollapse = () => {
+    setSidebarCollapsed(!sidebarCollapsed);
+  };
 
   return (
     <ThemeProvider forcedTheme={isIframe() ? 'dark' : undefined}>
@@ -19,7 +24,7 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* Main layout - sidebars + content in flexbox */}
         <div className="flex-1 flex overflow-hidden">
-          <AppSidebar onLogout={logout} />
+          <AppSidebar isCollapsed={sidebarCollapsed} onToggleCollapse={handleToggleCollapse} />
           <main className="flex-1 overflow-y-auto">{children}</main>
         </div>
       </div>
