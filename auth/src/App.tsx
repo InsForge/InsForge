@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { SignInPage } from './pages/SignInPage';
 import { SignUpPage } from './pages/SignUpPage';
 import { VerifyEmailPage } from './pages/VerifyEmailPage';
@@ -24,6 +24,7 @@ export function App() {
         <Route path={AuthRouterPath.VERIFY_EMAIL} element={<VerifyEmailPage />} />
         <Route path={AuthRouterPath.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
         <Route path={AuthRouterPath.RESET_PASSWORD} element={<ResetPasswordPage />} />
+        <Route path="*" element={<Navigate to={AuthRouterPath.SIGN_IN} replace />} />
       </Routes>
     </Layout>
   );
