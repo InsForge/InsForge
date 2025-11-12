@@ -47,7 +47,6 @@ Available documentation types:
 - `"db-sdk"` - Database operations with SDK
 - **Authentication** - Choose based on implementation:
   - `"auth-components-react"` - Frontend auth for React+Vite (built-in auth pages + UI)
-  - `"auth-components-nextjs"` - Frontend auth for Next.js (built-in auth pages + UI)
   - `"auth-components-react-router"` - Frontend auth for React(Vite+React Router) (built-in auth pages + UI)
 - `"storage-sdk"` - File storage operations
 - `"functions-sdk"` - Serverless functions invocation
@@ -78,4 +77,23 @@ Available documentation types:
 - Serverless functions have single endpoint (no subpaths)
 - Storage: Upload files to buckets, store URLs in database
 - AI operations are OpenAI-compatible
-- **EXTRA IMPORTANT**: Use Tailwind CSS 3.4 (do not upgrade to v4). Lock dependencies: `vite@5.4.11`, `tailwindcss@3.4.17`, `@vitejs/plugin-react@^4.3.4`. If you see "trying to use tailwindcss directly as a PostCSS plugin" error, downgrade: `npm install -D tailwindcss@3.4.17`
+- **EXTRA IMPORTANT**: Use Tailwind CSS 3.4 (do not upgrade to v4). Lock these dependencies in `package.json`:
+  ```json
+  {
+    "devDependencies": {
+      "vite": "5.4.11",
+      "tailwindcss": "3.4.17",
+      "@vitejs/plugin-react": "^4.3.4"
+    }
+  }
+  ```
+  And use this `postcss.config.js` configuration:
+  ```javascript
+  export default {
+    plugins: {
+      tailwindcss: {},
+      autoprefixer: {},
+    },
+  }
+  ```
+  If you see "trying to use tailwindcss directly as a PostCSS plugin" error, run: `npm install -D tailwindcss@3.4.17`
