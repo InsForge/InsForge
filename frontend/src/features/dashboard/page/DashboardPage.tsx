@@ -148,10 +148,10 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex flex-col gap-1 items-start text-left">
                   <p className="text-base text-gray-900 dark:text-white font-normal leading-6">
-                    Sign-in Component
+                    Authentication
                   </p>
                   <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
-                    Authentication UI with OAuth support
+                    Sign-in & Sign-up UI with OAuth Providers
                   </p>
                 </div>
               </div>
@@ -169,7 +169,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex flex-col gap-1 items-start text-left">
                   <p className="text-base text-gray-900 dark:text-white font-normal leading-6">
-                    Database Templates
+                    Database
                   </p>
                   <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
                     Pre-built schemas for common use cases
