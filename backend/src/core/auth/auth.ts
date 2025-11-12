@@ -1711,7 +1711,7 @@ export class AuthService {
    */
   async handleOAuthCallback(
     provider: OAuthProvidersSchema,
-    payload: { code?: string; token?: string; verifier: string }
+    payload: { code?: string; token?: string; verifier?: string }
   ): Promise<CreateSessionResponse> {
     switch (provider) {
       case 'google': {
@@ -1836,7 +1836,7 @@ export class AuthService {
   private async handleXCallback(payload: {
     code?: string;
     token?: string;
-    verifier: string;
+    verifier?: string;
   }): Promise<CreateSessionResponse> {
     if (!payload.code || !payload.verifier) {
       throw new Error('No authorization code or verifier provided');

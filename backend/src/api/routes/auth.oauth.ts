@@ -447,6 +447,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
           picture: payloadData.profile_image_url,
         };
         result = await authService.findOrCreateXUser(xUserInfo);
+        break;
       }
     }
 
