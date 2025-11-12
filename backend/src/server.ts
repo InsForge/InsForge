@@ -262,8 +262,7 @@ export async function createApp() {
   // Serve main frontend if it exists
   const frontendPath = path.join(__dirname, 'frontend');
   if (fs.existsSync(frontendPath)) {
-    app.use(['/cloud', '/dashboard'], express.static(frontendPath, { index: false }));
-    app.use('/assets', express.static(path.join(frontendPath, 'assets')));
+    app.use(express.static(frontendPath, { index: false }));
     // Catch all handler for SPA routes
     app.get(['/cloud*', '/dashboard*'], (_req: Request, res: Response) => {
       res.sendFile(path.join(frontendPath, 'index.html'));
