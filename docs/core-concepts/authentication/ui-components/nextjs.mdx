@@ -172,12 +172,15 @@ Access current user data and access token in server side:
 
 ```tsx
 import { auth } from '@insforge/nextjs/server';
-import { createClient } '@insforge/sdk';
+import { createClient } from '@insforge/sdk';
 
 export async function POST(request: NextRequest) {
   try {
     // Authenticate the request and get user info
     const { user, userId, token } = await auth();
+
+    // Parse request body to get the prompt
+    const { prompt } = await request.json();
 
     // Create InsForge SDK
     const insforge = createClient({
