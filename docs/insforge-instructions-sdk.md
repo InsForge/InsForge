@@ -78,4 +78,4 @@ Available documentation types:
 - Serverless functions have single endpoint (no subpaths)
 - Storage: Upload files to buckets, store URLs in database
 - AI operations are OpenAI-compatible
-- Use Tailwind CSS 3.4 (do not upgrade to v4)
+- **EXTRA IMPORTANT**: Use Tailwind CSS 3.4 (do not upgrade to v4). Lock dependencies: `vite@5.4.11`, `tailwindcss@3.4.17`, `@vitejs/plugin-react@^4.3.4`. If you see "trying to use tailwindcss directly as a PostCSS plugin" error, downgrade: `npm install -D tailwindcss@3.4.17`
