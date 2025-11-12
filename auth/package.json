@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@insforge/react": "^0.6.8",
+    "@insforge/react": "latest",
     "@insforge/shared-schemas": "^1.1.19",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
