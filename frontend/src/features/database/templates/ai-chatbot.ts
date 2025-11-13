@@ -3,7 +3,8 @@ import { DatabaseTemplate } from './index';
 export const aiChatbotTemplate: DatabaseTemplate = {
   id: 'ai-chatbot',
   title: 'AI Chatbot',
-  description: 'A chatbot app with conversations, message history, image uploads, and user specific data',
+  description:
+    'A chatbot app with conversations, message history, image uploads, and user specific data',
   tableCount: 4,
   visualizerSchema: [
     {

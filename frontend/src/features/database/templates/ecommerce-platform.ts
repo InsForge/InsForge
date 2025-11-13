@@ -3,7 +3,8 @@ import { DatabaseTemplate } from './index';
 export const ecommercePlatformTemplate: DatabaseTemplate = {
   id: 'ecommerce-platform',
   title: 'E-commerce',
-  description: 'An online store with product listings, carts, checkout, and owner product management',
+  description:
+    'An online store with product listings, carts, checkout, and owner product management',
   tableCount: 5,
   visualizerSchema: [
     {
