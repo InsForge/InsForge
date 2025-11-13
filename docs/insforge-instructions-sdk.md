@@ -12,6 +12,12 @@ Backend-as-a-service (BaaS) platform providing:
 
 ## Installation
 
+**🚨 CRITICAL: Follow these steps in order**
+
+**Step 1: Download Template**
+Use the `download-template` MCP tool to create a new project with your backend URL and anon key pre-configured.
+
+**Step 2: Install SDK**
 ```bash
 npm install @insforge/sdk@latest
 ```
@@ -29,6 +35,7 @@ const client = createClient({
   baseUrl: 'https://your-app.region.insforge.app',  // Your InsForge backend URL
   anonKey: 'your-anon-key-here'       // Get this from backend metadata
 });
+
 ```
 
 **API BASE URL**: Your API base URL is `https://your-app.region.insforge.app`.
@@ -64,6 +71,7 @@ Available documentation types:
 
 ### Use MCP Tools for Infrastructure:
 
+- Project scaffolding (`download-template`) - Download starter templates with InsForge integration
 - Backend setup and metadata (`get-backend-metadata`)
 - Database schema management (`run-raw-sql`, `get-table-schema`)
 - Storage bucket creation (`create-bucket`, `list-buckets`, `delete-bucket`)
