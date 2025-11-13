@@ -58,7 +58,7 @@ export function StepContent({ step }: StepContentProps) {
           </div>
 
           <CodeBlock
-            code="I'm using InsForge as my backend platform, what is my current backend structure?"
+            code="I'm using InsForge as my backend platform, fetch InsForge instruction doc to learn more about InsForge"
             className="bg-slate-50 dark:bg-neutral-700 dark:text-white"
           />
         </div>
