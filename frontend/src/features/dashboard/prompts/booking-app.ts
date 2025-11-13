@@ -1,15 +1,15 @@
-export const bookingAppPrompt = {
-  title: 'Booking App',
+export const notionClonePrompt = {
+  title: 'Notion Clone',
   description: 'Paste below prompts to your agent as a quick start for building real apps',
-  prompt: `Build a booking and reservation app with these features:
+  prompt: `Make a notes app like Notion with these features:
 
-• User authentication for customers and service providers
-• Service listing with availability calendars
-• Real-time booking and scheduling system
-• Payment processing for reservations
-• Booking confirmation and reminders
-• Review and rating system
-• Admin dashboard for managing bookings
-• Email/SMS notifications for confirmations`,
-  features: ['Authentication', 'Database', 'Storage', 'Functions'],
+• User authentication for sign in and sign out
+• Pages list in a sidebar with create and delete
+• Each page has a title and rich text or simple markdown content
+• Support private pages for each user and public pages visible to all users
+• Search over page titles
+• Clean and minimal interface with white space and a neutral color palette
+• Focus on readable text with minimal distractions
+• Optional file attachments stored in InsForge storage and shown inside the page`,
+  features: ['Authentication', 'Database', 'Storage'],
 };

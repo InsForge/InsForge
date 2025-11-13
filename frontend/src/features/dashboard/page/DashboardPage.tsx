@@ -100,7 +100,7 @@ export default function DashboardPage() {
               Quick Start Prompt
             </h2>
             <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
-              Paste below prompts to your agent as a quick start for building real apps
+              Paste the prompts below into your agent to quickly start building real apps.
             </p>
           </div>
 
@@ -151,7 +151,7 @@ export default function DashboardPage() {
                     Authentication
                   </p>
                   <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
-                    Sign-in & Sign-up UI with OAuth Providers
+                    User Authentication and management
                   </p>
                 </div>
               </div>
@@ -172,7 +172,7 @@ export default function DashboardPage() {
                     Database
                   </p>
                   <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
-                    Pre-built schemas for common use cases
+                    Manage your tables and data
                   </p>
                 </div>
               </div>
