@@ -46,8 +46,8 @@ Available documentation types:
 - `"instructions"` - Essential backend setup (START HERE)
 - `"db-sdk"` - Database operations with SDK
 - **Authentication** - Choose based on implementation:
-  - `"auth-components-react"` - Frontend auth for React+Vite (built-in auth pages + UI)
-  - `"auth-components-react-router"` - Frontend auth for React(Vite+React Router) (built-in auth pages + UI)
+  - `"auth-components-react"` - Frontend auth for React+Vite (singlepage App)
+  - `"auth-components-react-router"` - Frontend auth for React(Vite+React Router) (Multipage App)
 - `"storage-sdk"` - File storage operations
 - `"functions-sdk"` - Serverless functions invocation
 - `"ai-integration-sdk"` - AI chat and image generation

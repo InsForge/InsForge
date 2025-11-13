@@ -7,17 +7,25 @@ The `@insforge/react` package provides **complete authentication solution for Re
 
 ## Quick start
 
-### Step 1: Install Package and Set Environment Variables
+### Step 1: Create New React Project (Required)
+
+**IMPORTANT**: Start by creating a new Vite + React + TypeScript project with a proper name:
 
 ```bash
+npm create vite@latest my-app -- --template react-ts
+cd my-app
 npm install @insforge/react@latest
 ```
+
+Replace `my-app` with your desired project name.
+
+### Step 2: Set Environment Variables
 
 ```bash .env
 VITE_INSFORGE_BASE_URL=https://your-app.region.insforge.app
 ```
 
-### Step 2: Setup Provider
+### Step 3: Setup Provider
 
 Wrap your app with `InsforgeProvider` in the root:
 
@@ -40,7 +48,7 @@ createRoot(document.getElementById('root')!).render(
 );
 ```
 
-### Step 3: Use Hooks & Components
+### Step 4: Use Hooks & Components
 
 ```tsx src/pages/Home.tsx
 import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton, useUser } from '@insforge/react';
