@@ -21,6 +21,5 @@ export default defineConfig({
   },
   build: {
     outDir: '../dist/auth',
-    minify: false, // Keep console.log for debugging
   },
 });
