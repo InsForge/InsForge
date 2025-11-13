@@ -1,15 +1,12 @@
 export const instagramClonePrompt = {
   title: 'Instagram Clone',
   description: 'Paste below prompts to your agent as a quick start for building real apps',
-  prompt: `Build an Instagram-style photo sharing app with these features:
+  prompt: `Build an app similar to Instagram with a global shared image stream that has these features:
 
-• User authentication and profile pages
-• Photo upload with filters and editing
-• Feed with posts from followed users
-• Like and comment on posts
-• Follow/unfollow users
-• Stories feature with 24-hour expiration
-• Direct messaging between users
-• Explore page with trending content`,
-  features: ['Authentication', 'Database', 'Storage', 'Functions'],
+• Has a drag and drop box for uploading images to InsForge storage with an optional caption
+• Has a "Feed" tab for viewing the global image stream
+• Has a "My Photos" tab for viewing and deleting your own images
+• Allows liking images in the "Feed" tab
+• Shows like count for each image`,
+  features: ['Authentication', 'Database', 'Storage'],
 };

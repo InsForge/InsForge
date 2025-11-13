@@ -1,14 +1,14 @@
 export const crmSystemPrompt = {
-  title: 'CRM System',
+  title: 'CRM',
   description: 'Paste below prompts to your agent as a quick start for building real apps',
-  prompt: `Build a CRM system with the following features:
+  prompt: `Build a lightweight CRM app with these features:
 
-• User authentication and role-based access control
-• Contact management with detailed customer profiles
-• Sales pipeline tracking with deal stages
-• Task and activity logging
-• Email integration and communication history
-• Reporting dashboard with key metrics
-• Search and filtering capabilities`,
-  features: ['Authentication', 'Database', 'Storage', 'Functions'],
+• Contacts with search and simple tags
+• Companies and linked contacts
+• Deals pipeline with stages and easy stage updates
+• Deal detail with notes, tasks, and next follow up date
+• Reminders for upcoming tasks and follow ups
+• Activity timeline that logs deal stage changes and notes
+• File attachments stored in InsForge storage and shown on the deal page`,
+  features: ['Authentication', 'Database', 'Storage'],
 };

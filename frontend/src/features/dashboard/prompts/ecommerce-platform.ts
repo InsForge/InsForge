@@ -1,15 +1,13 @@
 export const ecommercePlatformPrompt = {
-  title: 'E-commerce Platform',
+  title: 'E-commerce',
   description: 'Paste below prompts to your agent as a quick start for building real apps',
-  prompt: `Build an e-commerce platform with these features:
+  prompt: `Build an app similar to a modern online store that has these features:
 
-• User authentication and customer accounts
-• Product catalog with categories and search
-• Shopping cart and checkout flow
-• Payment processing integration
-• Order management and tracking
-• Inventory management system
-• Product images and media storage
-• Admin dashboard for managing products and orders`,
-  features: ['Authentication', 'Database', 'Storage', 'Functions'],
+• Displays a list of products with images, names, prices, and descriptions
+• Allows users to add products to a shopping cart
+• Has a "Cart" page for reviewing and removing items before checkout
+• Has a simple checkout form for entering shipping details
+• Allows business owners to add, edit, and delete products
+• Stores product images in InsForge storage`,
+  features: ['Authentication', 'Database', 'Storage'],
 };
