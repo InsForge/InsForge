@@ -21,10 +21,7 @@ Use the `download-template` MCP tool to create a new project with your backend U
 ```bash
 npm install @insforge/sdk@latest
 ```
-
-## Initial Setup
-
-**🚨 CRITICAL: Initialize the SDK Client**
+**Step 3 Create SDK Client** 
 
 You must create a client instance using `createClient()` with your base URL and anon key:
 
