@@ -1,9 +1,9 @@
 import { crmSystemPrompt } from './crm-system';
 import { aiChatbotPrompt } from './ai-chatbot';
 import { ecommercePlatformPrompt } from './ecommerce-platform';
-import { twitterClonePrompt } from './twitter-clone';
+import { redditClonePrompt } from './twitter-clone';
 import { instagramClonePrompt } from './instagram-clone';
-import { bookingAppPrompt } from './booking-app';
+import { notionClonePrompt } from './booking-app';
 
 export interface PromptTemplate {
   title: string;
@@ -16,16 +16,16 @@ export const quickStartPrompts: PromptTemplate[] = [
   crmSystemPrompt,
   aiChatbotPrompt,
   ecommercePlatformPrompt,
-  twitterClonePrompt,
+  redditClonePrompt,
   instagramClonePrompt,
-  bookingAppPrompt,
+  notionClonePrompt,
 ];
 
 export {
   crmSystemPrompt,
   aiChatbotPrompt,
   ecommercePlatformPrompt,
-  twitterClonePrompt,
+  redditClonePrompt,
   instagramClonePrompt,
-  bookingAppPrompt,
+  notionClonePrompt,
 };

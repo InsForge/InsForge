@@ -1,15 +1,13 @@
-export const twitterClonePrompt = {
-  title: 'Twitter Clone',
+export const redditClonePrompt = {
+  title: 'Reddit Clone',
   description: 'Paste below prompts to your agent as a quick start for building real apps',
-  prompt: `Build a Twitter-style social media platform with these features:
+  prompt: `Build an app similar to Reddit with community-based discussion threads that has these features:
 
-• User authentication and profile management
-• Create and post tweets with text and images
-• Follow/unfollow users
-• Timeline feed with posts from followed users
-• Like and retweet functionality
-• Reply threads and conversations
-• Real-time notifications
-• Search for users and tweets`,
-  features: ['Authentication', 'Database', 'Storage', 'Functions'],
+• Has a "Communities" list where users can browse or create communities
+• Each community has its own posts feed
+• Users can create posts with a title and body (text or image upload to InsForge storage)
+• Users can comment on posts and reply to other comments
+• Allows upvoting and downvoting for both posts and comments
+• Shows vote counts and comment counts for each post`,
+  features: ['Authentication', 'Database', 'Storage'],
 };

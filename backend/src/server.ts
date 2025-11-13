@@ -262,14 +262,11 @@ export async function createApp() {
   // Serve main frontend if it exists
   const frontendPath = path.join(__dirname, 'frontend');
   if (fs.existsSync(frontendPath)) {
+    app.use(express.static(frontendPath, { index: false }));
     // Catch all handler for SPA routes
-    app.get('/cloud*', (_req: Request, res: Response) => {
+    app.get(['/cloud*', '/dashboard*'], (_req: Request, res: Response) => {
       res.sendFile(path.join(frontendPath, 'index.html'));
     });
-    app.get('/dashboard*', (_req: Request, res: Response) => {
-      res.sendFile(path.join(frontendPath, 'index.html'));
-    });
-    app.use(express.static(frontendPath));
   } else {
     // Catch-all for 404 errors - Traditional REST format
     app.use('*', (req: Request, res: Response) => {
