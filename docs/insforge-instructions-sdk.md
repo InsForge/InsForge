@@ -12,16 +12,19 @@ Backend-as-a-service (BaaS) platform providing:
 
 ## Installation
 
-**🚨 CRITICAL: Follow these steps in order**
+### 🚨 CRITICAL: Follow these steps in order
 
-**Step 1: Download Template**
+### Step 1: Download Template
+
 Use the `download-template` MCP tool to create a new project with your backend URL and anon key pre-configured.
 
-**Step 2: Install SDK**
+### Step 2: Install SDK
+
 ```bash
 npm install @insforge/sdk@latest
 ```
-**Step 3 Create SDK Client** 
+
+### Step 3: Create SDK Client
 
 You must create a client instance using `createClient()` with your base URL and anon key:
 
@@ -39,11 +42,11 @@ const client = createClient({
 
 ## Getting Detailed Documentation
 
-**🚨 CRITICAL: Always Fetch Documentation Before Writing Code**
+### 🚨 CRITICAL: Always Fetch Documentation Before Writing Code
 
 Before writing or editing any InsForge integration code, you **MUST** call the `fetch-docs` MCP tool to get the latest SDK documentation. This ensures you have accurate, up-to-date implementation patterns.
 
-**Use the InsForge `fetch-docs` MCP tool to get specific SDK documentation:**
+### Use the InsForge `fetch-docs` MCP tool to get specific SDK documentation:
 
 Available documentation types:
 
