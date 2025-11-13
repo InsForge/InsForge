@@ -515,7 +515,8 @@ export default function TablesPage() {
                           <>
                             {/* Import CSV Button */}
                             <Button
-                              className="h-10 px-4 font-medium gap-1.5 dark:bg-emerald-300 dark:hover:bg-emerald-400 "
+                              variant="secondary"
+                              className="h-10 px-4 font-medium gap-1.5 border border-zinc-200 dark:border-neutral-600"
                               onClick={() => fileInputRef.current?.click()}
                               disabled={isImporting}
                             >
