@@ -12,15 +12,19 @@ Backend-as-a-service (BaaS) platform providing:
 
 ## Installation
 
+### 🚨 CRITICAL: Follow these steps in order
+
+### Step 1: Download Template
+
+Use the `download-template` MCP tool to create a new project with your backend URL and anon key pre-configured.
+
+### Step 2: Install SDK
+
 ```bash
 npm install @insforge/sdk@latest
 ```
 
-## Initial Setup
-
-**🚨 CRITICAL: Initialize the SDK Client**
-**Important**: Do not use SDK Client in nextjs api route. It can only be used in client-side components.
-
+### Step 3: Create SDK Client
 
 You must create a client instance using `createClient()` with your base URL and anon key:
 
@@ -31,26 +35,26 @@ const client = createClient({
   baseUrl: 'https://your-app.region.insforge.app',  // Your InsForge backend URL
   anonKey: 'your-anon-key-here'       // Get this from backend metadata
 });
+
 ```
 
 **API BASE URL**: Your API base URL is `https://your-app.region.insforge.app`.
 
 ## Getting Detailed Documentation
 
-**🚨 CRITICAL: Always Fetch Documentation Before Writing Code**
+### 🚨 CRITICAL: Always Fetch Documentation Before Writing Code
 
 Before writing or editing any InsForge integration code, you **MUST** call the `fetch-docs` MCP tool to get the latest SDK documentation. This ensures you have accurate, up-to-date implementation patterns.
 
-**Use the InsForge `fetch-docs` MCP tool to get specific SDK documentation:**
+### Use the InsForge `fetch-docs` MCP tool to get specific SDK documentation:
 
 Available documentation types:
 
 - `"instructions"` - Essential backend setup (START HERE)
 - `"db-sdk"` - Database operations with SDK
 - **Authentication** - Choose based on implementation:
-  - `"auth-components-react"` - Frontend auth for React+Vite (built-in auth pages + UI)
-  - `"auth-components-nextjs"` - Frontend auth for Next.js (built-in auth pages + UI)
-  - `"auth-components-react-router"` - Frontend auth for React(Vite+React Router) (built-in auth pages + UI)
+  - `"auth-components-react"` - Frontend auth for React+Vite (singlepage App)
+  - `"auth-components-react-router"` - Frontend auth for React(Vite+React Router) (Multipage App)
 - `"storage-sdk"` - File storage operations
 - `"functions-sdk"` - Serverless functions invocation
 - `"ai-integration-sdk"` - AI chat and image generation
@@ -67,6 +71,7 @@ Available documentation types:
 
 ### Use MCP Tools for Infrastructure:
 
+- Project scaffolding (`download-template`) - Download starter templates with InsForge integration
 - Backend setup and metadata (`get-backend-metadata`)
 - Database schema management (`run-raw-sql`, `get-table-schema`)
 - Storage bucket creation (`create-bucket`, `list-buckets`, `delete-bucket`)
@@ -80,4 +85,23 @@ Available documentation types:
 - Serverless functions have single endpoint (no subpaths)
 - Storage: Upload files to buckets, store URLs in database
 - AI operations are OpenAI-compatible
-- Use Tailwind CSS 3.4 (do not upgrade to v4)
+- **EXTRA IMPORTANT**: Use Tailwind CSS 3.4 (do not upgrade to v4). Lock these dependencies in `package.json`:
+  ```json
+  {
+    "devDependencies": {
+      "vite": "5.4.11",
+      "tailwindcss": "3.4.17",
+      "@vitejs/plugin-react": "^4.3.4"
+    }
+  }
+  ```
+  And use this `postcss.config.js` configuration:
+  ```javascript
+  export default {
+    plugins: {
+      tailwindcss: {},
+      autoprefixer: {},
+    },
+  }
+  ```
+  If you see "trying to use tailwindcss directly as a PostCSS plugin" error, run: `npm install -D tailwindcss@3.4.17`
