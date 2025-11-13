@@ -4,7 +4,7 @@ import { aiChatbotTemplate } from './ai-chatbot';
 import { ecommercePlatformTemplate } from './ecommerce-platform';
 import { redditCloneTemplate } from './twitter-clone';
 import { instagramCloneTemplate } from './instagram-clone';
-import { notionCloneTemplate } from './booking-app';
+import { notionCloneTemplate } from './notion-clone';
 
 export interface DatabaseTemplate {
   id: string;

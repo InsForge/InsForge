@@ -229,7 +229,7 @@ export const aiChatbotTemplate: DatabaseTemplate = {
 -- Conversations table
 CREATE TABLE conversations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
   title VARCHAR(255),
   model VARCHAR(100) DEFAULT 'gpt-4',
   created_at TIMESTAMP DEFAULT NOW(),
@@ -239,7 +239,7 @@ CREATE TABLE conversations (
 -- Messages table
 CREATE TABLE messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+  conversation_id UUID REFERENCES conversations(id) ON UPDATE CASCADE ON DELETE CASCADE,
   role VARCHAR(50) NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
   content TEXT NOT NULL,
   tokens_used INTEGER,
@@ -249,8 +249,8 @@ CREATE TABLE messages (
 -- Feedback table
 CREATE TABLE feedback (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  message_id UUID REFERENCES messages(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  message_id UUID REFERENCES messages(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
   rating INTEGER CHECK (rating >= 1 AND rating <= 5),
   comment TEXT,
   created_at TIMESTAMP DEFAULT NOW()
@@ -259,7 +259,7 @@ CREATE TABLE feedback (
 -- Prompts library table
 CREATE TABLE prompts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
   title VARCHAR(255) NOT NULL,
   content TEXT NOT NULL,
   category VARCHAR(100),
@@ -491,6 +491,11 @@ CREATE POLICY "Users can update messages in their conversations"
   ON messages FOR UPDATE
   TO authenticated
   USING (
+    conversation_id IN (
+      SELECT id FROM conversations WHERE user_id = auth.uid()
+    )
+  )
+  WITH CHECK (
     conversation_id IN (
       SELECT id FROM conversations WHERE user_id = auth.uid()
     )

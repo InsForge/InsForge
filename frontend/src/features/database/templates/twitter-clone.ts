@@ -336,7 +336,7 @@ CREATE TABLE communities (
   name VARCHAR(100) UNIQUE NOT NULL CHECK (name ~ '^[a-zA-Z0-9_]+$'),
   display_name VARCHAR(200) NOT NULL,
   description TEXT,
-  creator_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  creator_id UUID NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
@@ -345,8 +345,8 @@ CREATE TABLE communities (
 -- Posts table
 CREATE TABLE posts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  community_id UUID NOT NULL REFERENCES communities(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  community_id UUID NOT NULL REFERENCES communities(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
   title VARCHAR(300) NOT NULL CHECK (LENGTH(TRIM(title)) > 0),
   content TEXT,
   link_url VARCHAR(500),
@@ -364,9 +364,9 @@ CREATE TABLE posts (
 -- Comments table (with threading support)
 CREATE TABLE comments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  parent_comment_id UUID REFERENCES comments(id) ON DELETE CASCADE,
+  post_id UUID NOT NULL REFERENCES posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  parent_comment_id UUID REFERENCES comments(id) ON UPDATE CASCADE ON DELETE CASCADE,
   content TEXT NOT NULL CHECK (LENGTH(TRIM(content)) > 0),
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT NOW(),
@@ -376,9 +376,9 @@ CREATE TABLE comments (
 -- Votes table (for both posts and comments)
 CREATE TABLE votes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
-  comment_id UUID REFERENCES comments(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  post_id UUID REFERENCES posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  comment_id UUID REFERENCES comments(id) ON UPDATE CASCADE ON DELETE CASCADE,
   vote_type INTEGER NOT NULL CHECK (vote_type IN (-1, 1)),
   created_at TIMESTAMP DEFAULT NOW(),
   CHECK (
@@ -392,8 +392,8 @@ CREATE TABLE votes (
 -- Community members table (subscriptions and roles)
 CREATE TABLE community_members (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  community_id UUID NOT NULL REFERENCES communities(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  community_id UUID NOT NULL REFERENCES communities(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
   role VARCHAR(20) NOT NULL DEFAULT 'member' CHECK (role IN ('member', 'moderator', 'admin')),
   created_at TIMESTAMP DEFAULT NOW(),
   UNIQUE(community_id, user_id)

@@ -340,7 +340,7 @@ CREATE TABLE products (
 -- Customers table (extends users with customer-specific data)
 CREATE TABLE customers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
   first_name VARCHAR(100) NOT NULL,
   last_name VARCHAR(100) NOT NULL,
   phone VARCHAR(50),
@@ -354,7 +354,7 @@ CREATE TABLE customers (
 -- Orders table
 CREATE TABLE orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  customer_id UUID REFERENCES customers(id) ON DELETE CASCADE,
+  customer_id UUID REFERENCES customers(id) ON UPDATE CASCADE ON DELETE CASCADE,
   status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'shipped', 'delivered', 'cancelled')),
   total_amount DECIMAL(10, 2) NOT NULL CHECK (total_amount >= 0),
   shipping_address TEXT,
@@ -365,8 +365,8 @@ CREATE TABLE orders (
 -- Order items table
 CREATE TABLE order_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
-  product_id UUID REFERENCES products(id) ON DELETE RESTRICT,
+  order_id UUID REFERENCES orders(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  product_id UUID REFERENCES products(id) ON UPDATE CASCADE ON DELETE RESTRICT,
   quantity INTEGER NOT NULL CHECK (quantity > 0),
   unit_price DECIMAL(10, 2) NOT NULL CHECK (unit_price >= 0),
   created_at TIMESTAMP DEFAULT NOW()
@@ -375,8 +375,8 @@ CREATE TABLE order_items (
 -- Reviews table
 CREATE TABLE reviews (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  product_id UUID REFERENCES products(id) ON DELETE CASCADE,
-  customer_id UUID REFERENCES customers(id) ON DELETE CASCADE,
+  product_id UUID REFERENCES products(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  customer_id UUID REFERENCES customers(id) ON UPDATE CASCADE ON DELETE CASCADE,
   rating INTEGER CHECK (rating >= 1 AND rating <= 5),
   comment TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
@@ -435,10 +435,12 @@ BEGIN
     IF (SELECT stock_quantity FROM products WHERE id = NEW.product_id) < 0 THEN
       RAISE EXCEPTION 'Insufficient stock for product %', NEW.product_id;
     END IF;
+    RETURN NEW;
   ELSIF TG_OP = 'DELETE' THEN
     UPDATE products
     SET stock_quantity = stock_quantity + OLD.quantity
     WHERE id = OLD.product_id;
+    RETURN OLD;
   ELSIF TG_OP = 'UPDATE' THEN
     UPDATE products
     SET stock_quantity = stock_quantity + OLD.quantity - NEW.quantity
@@ -447,8 +449,9 @@ BEGIN
     IF (SELECT stock_quantity FROM products WHERE id = NEW.product_id) < 0 THEN
       RAISE EXCEPTION 'Insufficient stock for product %', NEW.product_id;
     END IF;
+    RETURN NEW;
   END IF;
-  RETURN NEW;
+  RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 

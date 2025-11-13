@@ -304,7 +304,7 @@ CREATE TABLE companies (
 -- Contacts table
 CREATE TABLE contacts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID REFERENCES companies(id) ON DELETE SET NULL,
+  company_id UUID REFERENCES companies(id) ON UPDATE CASCADE ON DELETE SET NULL,
   first_name VARCHAR(100) NOT NULL,
   last_name VARCHAR(100) NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
@@ -317,8 +317,8 @@ CREATE TABLE contacts (
 -- Deals table
 CREATE TABLE deals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
-  contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
+  company_id UUID REFERENCES companies(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  contact_id UUID REFERENCES contacts(id) ON UPDATE CASCADE ON DELETE SET NULL,
   title VARCHAR(255) NOT NULL,
   amount DECIMAL(15, 2),
   status VARCHAR(50) DEFAULT 'open' CHECK (status IN ('open', 'won', 'lost')),
@@ -330,8 +330,8 @@ CREATE TABLE deals (
 -- Activities table
 CREATE TABLE activities (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  contact_id UUID REFERENCES contacts(id) ON DELETE CASCADE,
-  deal_id UUID REFERENCES deals(id) ON DELETE CASCADE,
+  contact_id UUID REFERENCES contacts(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  deal_id UUID REFERENCES deals(id) ON UPDATE CASCADE ON DELETE CASCADE,
   type VARCHAR(50) NOT NULL CHECK (type IN ('call', 'email', 'meeting', 'note')),
   subject VARCHAR(255) NOT NULL,
   description TEXT,
