@@ -7,6 +7,9 @@ import DeleteBulkActionButton from '@/components/DeleteBulkActionButton';
 import { EmptyState } from '@/components/EmptyState';
 import { Alert, AlertDescription } from '@/components/radix/Alert';
 import { Button } from '@/components/radix/Button';
+import { TablesEmptyState } from '@/features/database/components/TablesEmptyState';
+import { TemplatePreview } from '@/features/database/components/TemplatePreview';
+import { DATABASE_TEMPLATES, DatabaseTemplate } from '@/features/database/templates';
 import {
   Tooltip,
   TooltipContent,
@@ -54,6 +57,8 @@ export default function TablesPage() {
   const [isSorting, setIsSorting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSelectingAll, setIsSelectingAll] = useState(false);
+  const [previewingTemplate, setPreviewingTemplate] = useState<DatabaseTemplate | null>(null);
+
   const { confirm, confirmDialogProps } = useConfirm();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
@@ -313,6 +318,14 @@ export default function TablesPage() {
     }
   };
 
+  const handleTemplateClick = (template: DatabaseTemplate) => {
+    setPreviewingTemplate(template);
+  };
+
+  const handleCancelPreview = () => {
+    setPreviewingTemplate(null);
+  };
+
   // Handle record update
   const handleRecordUpdate = async (rowId: string, columnKey: string, newValue: string) => {
     if (!selectedTable) {
@@ -403,6 +416,14 @@ export default function TablesPage() {
 
   // Calculate pagination
   const totalPages = Math.ceil((tableData?.totalRecords || 0) / PAGE_SIZE);
+
+  // Show empty state when there are no tables and not loading
+  const showEmptyState = !isLoadingTables && tables?.length === 0 && !showTableForm;
+
+  // Show template preview - takes full width without sidebar
+  if (previewingTemplate) {
+    return <TemplatePreview template={previewingTemplate} onCancel={handleCancelPreview} />;
+  }
 
   return (
     <div className="flex h-full bg-bg-gray dark:bg-neutral-800">
@@ -506,20 +527,22 @@ export default function TablesPage() {
                             itemType="record"
                             onClear={() => setSelectedRows(new Set())}
                           />
-                          {selectedTable !== 'users' && (
-                            <DeleteActionButton
-                              selectedCount={selectedRows.size}
-                              itemType="record"
-                              onDelete={() => void handleBulkDelete(Array.from(selectedRows))}
-                            />
-                          )}
-                          <DeleteBulkActionButton
-                            isSelectingAll={isSelectingAll}
-                            totalRecords={tableData?.totalRecords || 0}
-                            filteredRecords={selectedRows.size}
-                            searchQuery={searchQuery}
-                            onToggleSelectAll={() => void handleToggleSelectAll()}
-                          />
+                          {
+                            <>
+                              <DeleteActionButton
+                                selectedCount={selectedRows.size}
+                                itemType="record"
+                                onDelete={() => void handleBulkDelete(Array.from(selectedRows))}
+                              />
+                              <DeleteBulkActionButton
+                                isSelectingAll={isSelectingAll}
+                                totalRecords={tableData?.totalRecords || 0}
+                                filteredRecords={selectedRows.size}
+                                searchQuery={searchQuery}
+                                onToggleSelectAll={() => void handleToggleSelectAll()}
+                              />
+                            </>
+                          }
                         </div>
                       ) : (
                         <SearchInput
@@ -531,11 +554,12 @@ export default function TablesPage() {
                         />
                       )}
                       <div className="flex items-center gap-2 ml-4">
-                        {selectedRows.size === 0 && selectedTable !== 'users' && (
+                        {selectedRows.size === 0 && (
                           <>
                             {/* Import CSV Button */}
                             <Button
-                              className="h-10 px-4 font-medium gap-1.5 dark:bg-emerald-300 dark:hover:bg-emerald-400 "
+                              variant="secondary"
+                              className="h-10 px-4 font-medium gap-1.5 border border-zinc-200 dark:border-neutral-600"
                               onClick={() => fileInputRef.current?.click()}
                               disabled={isImporting}
                             >
@@ -567,7 +591,13 @@ export default function TablesPage() {
                 </Alert>
               )}
 
-              {!selectedTable ? (
+              {showEmptyState ? (
+                <TablesEmptyState
+                  templates={DATABASE_TEMPLATES}
+                  onCreateTable={handleCreateTable}
+                  onTemplateClick={handleTemplateClick}
+                />
+              ) : !selectedTable ? (
                 <div className="flex-1 flex items-center justify-center">
                   <EmptyState
                     title="No Table Selected"

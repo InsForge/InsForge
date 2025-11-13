@@ -65,3 +65,10 @@ export const oauthProviders: OAuthProviderInfo[] = [
     setupUrl: 'https://developers.facebook.com/apps',
   },
 ];
+
+/**
+ * AI prompts for implementing auth components
+ */
+export const AUTH_IMPLEMENTATION_PROMPT = `
+    Implement a sign-in form component with email/password fields, OAuth provider buttons (Google, GitHub, LinkedIn), password visibility toggle, "Forgot Password" link, "Sign Up" link, and proper form validation. The form should handle authentication errors and display appropriate feedback to users.
+`;

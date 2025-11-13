@@ -52,8 +52,6 @@ export function PromptDialog({
               {additionalAction}
               <CopyButton
                 text={prompt}
-                variant="default"
-                size="default"
                 showText={true}
                 className="h-9 pl-2 pr-3 py-2 text-sm font-medium"
                 copyText="Copy Prompt"

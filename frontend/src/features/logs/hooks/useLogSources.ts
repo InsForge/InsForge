@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { logService } from '../services/log.service';
 import type { LogSourceSchema } from '@insforge/shared-schemas';
-import type { SecondaryMenuItem } from '@/lib/utils/menuConfig';
+import type { SecondaryMenuItem } from '@/lib/utils/menuItems';
 
 export function useLogSources() {
   const [selectedSource, setSelectedSource] = useState<string | null>(() => {

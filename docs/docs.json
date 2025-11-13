@@ -30,7 +30,7 @@
         "groups": [
           {
             "group": "Getting Started",
-            "pages": ["introduction", "quickstart", "mcp-installation", "partnership"]
+            "pages": ["introduction", "mcp-installation", "partnership"]
           },
           {
             "group": "Core Concepts",
@@ -51,7 +51,9 @@
                     "group": "UI Components",
                     "pages": [
                       "core-concepts/authentication/ui-components/nextjs",
-                      "core-concepts/authentication/ui-components/react"
+                      "core-concepts/authentication/ui-components/react",
+                      "core-concepts/authentication/ui-components/react-router",
+                      "core-concepts/authentication/ui-components/customization"
                     ]
                   }
                 ]
@@ -93,12 +95,18 @@
             "pages": ["examples/overview"]
           },
           {
-            "group": "Showcase",
-            "pages": ["showcase"]
+            "group": "Framework Guides",
+            "pages": [
+              "examples/framework-guides/nextjs",
+              "examples/framework-guides/react",
+              "examples/framework-guides/vue",
+              "examples/framework-guides/nuxt",
+              "examples/framework-guides/svelte"
+            ]
           },
           {
-            "group": "Integration Guides",
-            "pages": ["examples/integration-guides/coming-soon"]
+            "group": "Community Showcase",
+            "pages": ["showcase"]
           }
         ]
       },

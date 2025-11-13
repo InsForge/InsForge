@@ -5,31 +5,22 @@ description: Framework-agnostic authentication components for any React applicat
 
 The `@insforge/react` package provides **complete authentication solution for React applications**. Use deployed auth pages (built-in auth) or custom UI components—works with Vite.
 
-## Features
+## Quick start
 
-- **Built-in Auth**: React Router integration with deployed auth pages
-- **Complete Components**: Pre-built `<SignIn>`, `<SignUp>`, `<UserButton>` with business logic
-- **OAuth Support**: Google, GitHub, Discord, Facebook, LinkedIn, Microsoft, Apple, X, Instagram, TikTok, Spotify
-- **React Hooks**: `useAuth()`, `useUser()`, `usePublicAuthConfig()`
-- **Control Components**: `<SignedIn>`, `<SignedOut>`, `<Protect>`
-- **Form Components**: Pure UI forms for custom logic
-- **TypeScript**: Full type safety
-
-## Quick Start
-
-### Step 1: Install Package and Set Environment Variables
+### Step 1: Create New React Project (Required)
 
 ```bash
 npm install @insforge/react@latest
 ```
 
-<Note>**Required Dependencies:** ```bash npm install react@^19.0.0 react-dom@^19.0.0 ```</Note>
+### Step 2: Set Environment Variables
 
 ```bash .env
 VITE_INSFORGE_BASE_URL=https://your-app.region.insforge.app
+VITE_INSFORGE_ANON_KEY=your-anon-key-here
 ```
 
-### Step 2: Setup Provider
+### Step 3: Setup Provider
 
 Wrap your app with `InsforgeProvider` in the root:
 
@@ -52,7 +43,7 @@ createRoot(document.getElementById('root')!).render(
 );
 ```
 
-### Step 3: Use Hooks & Components
+### Step 4: Use Hooks & Components
 
 ```tsx src/pages/Home.tsx
 import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton, useUser } from '@insforge/react';
@@ -78,260 +69,36 @@ export default function Home() {
 
 **That's it!** Your React app now has production-ready authentication with built-in auth pages.
 
----
+## Next Steps
 
-## How It Works
+### Hooks
 
-### Built-in Auth Flow
+#### `useAuth()`
 
-```
-1. User clicks "Sign In" → Visits /sign-in route
-   ↓
-2. getInsforgeRoutes() redirects → https://your-app.region.insforge.app/auth/sign-in?redirect=yourapp.com
-   ↓
-3. User signs in on deployed page → Backend processes authentication
-   ↓
-4. Backend redirects → yourapp.com?access_token=xxx&user_id=xxx
-   ↓
-5. InsForge SDK will:
-   - Extracts token from URL
-   - Saves to localStorage
-   - Verifies with getCurrentUser()
-   - Updates Provider state
-   ↓
-6. User sees the content wrapped by `SignedIn`
-```
-
-**Architecture:**
-
-- **InsforgeProvider**: Manages authentication state globally using React Context
-- **SDK Integration**: All auth operations go through `@insforge/sdk`, which auto-detects tokens from URL
-- **React Context**: Provides auth state to all child components
-- **Hooks**: Easy access to auth methods and user data
-
----
-
-## Complete Components (with Business Logic)
-
-These components include full authentication logic and work out of the box.
-
-### `<SignIn />`
-
-Complete sign-in component with email/password and OAuth:
-
-```tsx
-import { SignIn } from '@insforge/react';
-
-function SignInPage() {
-  return (
-    <SignIn
-      title="Welcome Back"
-      subtitle="Sign in to continue"
-      onError={(error) => {
-        console.error('Error:', error);
-      }}
-    />
-  );
-}
-```
-
-**Key Features:**
-
-- Email/password authentication
-- OAuth provider buttons (auto-detected from backend)
-- Password visibility toggle
-- Error handling
-- Loading states
-- Customizable text
-
-**Props:**
-
-- `onError` - Callback on error
-- `title` / `subtitle` - Custom heading text
-
-### `<SignUp />`
-
-Complete sign-up component with password strength validation:
-
-```tsx
-import { SignUp } from '@insforge/react';
-
-function SignUpPage() {
-  return (
-    <SignUp
-      title="Create Account"
-      subtitle="Get started with your free account"
-      onError={(error) => {
-        console.error('Error:', error);
-      }}
-    />
-  );
-}
-```
-
-**Key Features:**
-
-- Email/password registration
-- Real-time password strength indicator
-- OAuth provider buttons
-- Form validation
-- Customizable text
-
-**Props:** Same as `<SignIn>`.
-
-### `<UserButton />`
-
-User profile dropdown with sign-out:
-
-```tsx
-import { UserButton } from '@insforge/react';
-
-function Header() {
-  return (
-    <header>
-      <nav>{/* Your navigation */}</nav>
-      <UserButton afterSignOutUrl="/" mode="detailed" />
-    </header>
-  );
-}
-```
-
-**Modes:**
-
-- `detailed` (default): Shows avatar + name + email
-- `simple`: Shows avatar only
-
-**Props:**
-
-- `mode` - Display mode: `"detailed"` or `"simple"`
-- `afterSignOutUrl` - Redirect URL after sign out
-
-### `<ForgotPassword />`
-
-Complete password reset flow with automatic method detection:
-
-```tsx
-import { ForgotPassword } from '@insforge/react';
-
-function ForgotPasswordPage() {
-  return (
-    <ForgotPassword
-      onError={(error) => {
-        console.error('Error:', error);
-      }}
-    />
-  );
-}
-```
-
-**Key Features:**
-
-- Auto-detects reset method (code or link) from backend config
-- **Link method**: Sends email with reset link
-- **Code method**: Three-step flow (email → verify code → reset password)
-- 60-second countdown timer for resend
-- Built-in form validation
-- Customizable text
-
-**Props:**
-
-- `onError` - Callback on error
-
-### `<Protect />`
-
-Protected content with conditional rendering:
-
-```tsx
-import { Protect } from '@insforge/react';
-
-function Dashboard() {
-  return (
-    <div>
-      <h1>Dashboard</h1>
-      {/* Simple protection */}
-      <Protect redirectTo="/sign-in">
-        <UserContent />
-      </Protect>
-      {/* Custom logic */}
-      <Protect condition={(user) => user.subscription === 'premium'} fallback={<UpgradePrompt />}>
-        <PremiumFeature />
-      </Protect>
-    </div>
-  );
-}
-```
-
-**Props:**
-
-- `redirectTo` - URL to redirect if not authorized
-- `condition` - Custom condition function `(user) => boolean`
-- `fallback` - React node to show if not authorized
-
-### `<SignedIn>` / `<SignedOut>`
-
-Conditional rendering based on auth state:
-
-```tsx
-import { SignedIn, SignedOut } from '@insforge/react';
-
-function NavBar() {
-  return (
-    <nav>
-      <SignedOut>
-        <a href="/sign-in">Sign In</a>
-        <a href="/sign-up">Sign Up</a>
-      </SignedOut>
-
-      <SignedIn>
-        <a href="/dashboard">Dashboard</a>
-        <UserButton />
-      </SignedIn>
-    </nav>
-  );
-}
-```
-
----
-
-## Hooks
-
-### `useAuth()`
-
-Access authentication methods and state:
+Access authentication state:
 
 ```tsx
 import { useAuth } from '@insforge/react';
 
 function LoginButton() {
-  const { signIn, signUp, signOut, isSignedIn, isLoaded } = useAuth();
-
-  const handleSignIn = async () => {
-    try {
-      await signIn('user@example.com', 'password');
-    } catch (error) {
-      console.error('Sign in failed:', error);
-    }
-  };
-
+  const { isSignedIn, isLoaded } = useAuth();
+  
   if (!isLoaded) return <div>Loading...</div>;
 
   return (
-    <button onClick={isSignedIn ? signOut : handleSignIn}>
-      {isSignedIn ? 'Sign Out' : 'Sign In'}
-    </button>
+    <div>
+      {isSignedIn ? 'Welcome!' : 'Sign In'}
+    </div>
   );
 }
 ```
 
 **Returns:**
 
-- `signIn(email, password)` - Sign in with email/password
-- `signUp(email, password)` - Sign up new user
-- `signOut()` - Sign out current user
 - `isSignedIn` - Boolean auth state
 - `isLoaded` - Boolean loading state
 
-### `useUser()`
+#### `useUser()`
 
 Access current user data:
 
@@ -339,21 +106,18 @@ Access current user data:
 import { useUser } from '@insforge/react';
 
 function UserProfile() {
-  const { user, isLoaded, updateUser } = useUser();
+  const { user, isLoaded } = useUser();
 
   if (!isLoaded) return <div>Loading...</div>;
   if (!user) return <div>Not signed in</div>;
 
-  const handleUpdate = async () => {
-    await updateUser({ name: 'New Name' });
-  };
 
   return (
     <div>
+      <p>Id: {user.id}</p>
       <p>Email: {user.email}</p>
       <p>Name: {user.name}</p>
       <img src={user.avatarUrl} alt="Avatar" />
-      <button onClick={handleUpdate}>Update Name</button>
     </div>
   );
 }
@@ -363,59 +127,3 @@ function UserProfile() {
 
 - `user` - User object with id, email, name, avatarUrl
 - `isLoaded` - Boolean loading state
-- `updateUser(data)` - Update user profile
-
-### `usePublicAuthConfig()`
-
-Get your authentication config in InsForge:
-
-```tsx
-import { usePublicAuthConfig } from '@insforge/react';
-
-function SignInPage() {
-  const { authConfig, isLoaded } = usePublicAuthConfig();
-
-  if (!isLoaded) return <div>Loading...</div>;
-
-  return (
-    <div>
-      <p>Available OAuth: {authConfig.oAuthProviders.join(', ')}</p>
-      <p>Password min length: {authConfig?.passwordMinLength}</p>
-    </div>
-  );
-}
-```
-
-**Returns:**
-
-- `authConfig` - Authentication Configuration you set in InsForge dashboard.
-- `isLoaded` - Boolean loading state
-
-<Warning>
-  **Performance**: Only use this hook in SignIn/SignUp components to avoid unnecessary API calls.
-</Warning>
-
----
-
-## Advanced Features
-
-### Auth Change Callback
-
-Track authentication state changes:
-
-```tsx
-<InsforgeProvider
-  baseUrl={baseUrl}
-  onAuthChange={(user) => {
-    if (user) {
-      console.log('User signed in:', user.email);
-      analytics.identify(user.id);
-    } else {
-      console.log('User signed out');
-      analytics.reset();
-    }
-  }}
->
-  {children}
-</InsforgeProvider>
-```
