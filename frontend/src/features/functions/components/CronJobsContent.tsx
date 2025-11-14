@@ -1,16 +1,18 @@
-import type { ScheduleRow } from '../types/schedules';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import { useSchedules } from '@/features/schedules/hooks/useSchedules';
 import { Button } from '@/components/radix/Button';
 import { CronJobFormDialog } from './CronJobFormDialog';
-import { getCronJobColumns } from './CronJobsColumns';
+import ScheduleRow from './ScheduleRow';
+import ScheduleExecutionLogs from './ScheduleExecutionLogs';
+import { Skeleton } from '@/components/radix/Skeleton';
 import { Alert, AlertDescription } from '@/components/radix/Alert';
 import { SearchInput, SelectionClearButton, DeleteActionButton } from '@/components';
 import { EmptyState } from '@/components/EmptyState';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useToast } from '@/lib/hooks/useToast';
-import DataGrid from '@/components/datagrid/DataGrid';
+// DataGrid is not used in the list view; keep the import commented out in case we revert to grid view
+// import DataGrid from '@/components/datagrid/DataGrid';
 
 const PAGE_SIZE = 50;
 
@@ -21,6 +23,10 @@ export function CronJobsContent() {
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedScheduleForLogs, setSelectedScheduleForLogs] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   const { showToast } = useToast();
   const {
@@ -28,13 +34,13 @@ export function CronJobsContent() {
     filteredSchedules,
     searchQuery,
     setSearchQuery,
-    isLoading: isLoadingSchedules,
-    error: schedulesError,
-    createOrUpdate,
-    deleteSchedule: deleteScheduleFn,
+    isLoading: isLoadingSchedules, // Loading state for schedules
+    error: schedulesError, // Error state for schedules
+    createOrUpdate, // Function to create or update schedules
+    deleteSchedule: deleteScheduleFn, // Function to delete a schedule
+    isToggling: isTogglingStatus, // New toggling state
+    isDeleting: isDeletingSchedule, // New deleting state
     toggleSchedule: toggleScheduleFn,
-    isToggling: isTogglingStatus,
-    isDeleting: isDeletingSchedule,
   } = useSchedules();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmIds, setConfirmIds] = useState<string[]>([]);
@@ -63,12 +69,7 @@ export function CronJobsContent() {
 
   const totalPages = Math.ceil(filteredSchedules.length / PAGE_SIZE);
 
-  const handleToggleStatus = useCallback(
-    (scheduleId: string, isActive: boolean) => {
-      void toggleScheduleFn(scheduleId, isActive);
-    },
-    [toggleScheduleFn]
-  );
+  // toggle handler is available via the schedules hook (toggleScheduleFn) when needed.
 
   const handleDeleteSchedule = useCallback(
     (scheduleId: string) => {
@@ -97,13 +98,28 @@ export function CronJobsContent() {
     setEditOpen(true);
   }, []);
 
-  const columns = getCronJobColumns({
-    handleEditSchedule,
-    handleDeleteSchedule,
-    isTogglingStatus,
-    isDeletingSchedule,
-    handleToggleStatus,
-  });
+  const handleViewLogs = useCallback((scheduleId: string, scheduleName: string) => {
+    setSelectedScheduleForLogs({ id: scheduleId, name: scheduleName });
+  }, []);
+
+  const handleBackFromLogs = useCallback(() => {
+    setSelectedScheduleForLogs(null);
+  }, []);
+
+  // Show logs detail view if schedule is selected
+  if (selectedScheduleForLogs) {
+    return (
+      <div className="h-full flex flex-col bg-bg-gray dark:bg-neutral-800">
+        <ScheduleExecutionLogs
+          scheduleId={selectedScheduleForLogs.id}
+          scheduleName={selectedScheduleForLogs.name}
+          onBack={handleBackFromLogs}
+        />
+      </div>
+    );
+  }
+
+  // columns are not used in the list view; keep helper functions in their file for DataGrid use if needed
 
   return (
     <div className="h-full flex flex-col gap-4 p-4 bg-bg-gray dark:bg-neutral-800 overflow-hidden">
@@ -310,8 +326,8 @@ export function CronJobsContent() {
         }}
       />
 
-      {/* DataGrid */}
-      <div className="flex-1 min-h-0 overflow-hidden">
+      {/* List view matching FunctionRow pattern with header and horizontal scroll */}
+      <div className="flex-1 min-h-0 overflow-auto">
         {!isLoadingSchedules && filteredSchedules.length === 0 && !searchQuery ? (
           <div className="h-full flex items-center justify-center">
             <EmptyState
@@ -320,42 +336,83 @@ export function CronJobsContent() {
             />
           </div>
         ) : (
-          <DataGrid<ScheduleRow>
-            data={paginatedSchedules}
-            columns={columns}
-            loading={isLoadingSchedules}
-            rowKeyGetter={(row) => row.id}
-            selectedRows={selectedRows}
-            onSelectedRowsChange={setSelectedRows}
-            showSelection={true}
-            showPagination={true}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            pageSize={PAGE_SIZE}
-            totalRecords={filteredSchedules.length}
-            onPageChange={setCurrentPage}
-            emptyState={
-              <div className="text-center">
-                {searchQuery ? (
-                  <>
-                    <p className="text-zinc-600 dark:text-zinc-400">
-                      No cron jobs match your search
-                    </p>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-500 mt-1">
-                      Try adjusting your search criteria
-                    </p>
-                  </>
+          <div className="overflow-x-auto">
+            {/* Header that mirrors Function list header */}
+            <div className="min-w-[1400px]">
+              <div className="grid grid-cols-14 px-3 text-sm text-muted-foreground dark:text-neutral-400 gap-x-1">
+                <div className="col-span-2 py-1 px-3">Name</div>
+                <div className="col-span-4 py-1 px-3">Function URL</div>
+                <div className="col-span-2 py-1 px-3">Next Run</div>
+                <div className="col-span-2 py-1 px-3">Last Run</div>
+                <div className="col-span-2 py-1 px-3">Created</div>
+                <div className="col-span-1 py-1 px-3">Status</div>
+                <div className="col-span-1 py-1 px-3">Actions</div>
+              </div>
+
+              <div className="flex flex-col gap-2 mt-2">
+                {isLoadingSchedules ? (
+                  [...Array(4)].map((_, i) => (
+                    <Skeleton key={i} className="h-14 rounded-[8px] cols-span-full" />
+                  ))
+                ) : paginatedSchedules.length >= 1 ? (
+                  paginatedSchedules.map((s) => (
+                    <ScheduleRow
+                      key={s.id}
+                      schedule={s}
+                      onClick={() => void handleViewLogs(s.id, s.name)}
+                      onEdit={(id) => handleEditSchedule(id)}
+                      onDelete={(id) => handleDeleteSchedule(id)}
+                      onToggle={(id, isActive) => void toggleScheduleFn(id, isActive)}
+                      isLoading={Boolean(isTogglingStatus || isDeletingSchedule)}
+                    />
+                  ))
                 ) : (
-                  <>
-                    <p className="text-zinc-600 dark:text-zinc-400">No cron jobs found</p>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-500 mt-1">
-                      Create one to get started
-                    </p>
-                  </>
+                  <div className="cols-span-full text-center py-6">
+                    {searchQuery ? (
+                      <>
+                        <p className="text-zinc-600 dark:text-zinc-400">
+                          No cron jobs match your search
+                        </p>
+                        <p className="text-sm text-zinc-500 dark:text-zinc-500 mt-1">
+                          Try adjusting your search criteria
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-zinc-600 dark:text-zinc-400">No cron jobs found</p>
+                        <p className="text-sm text-zinc-500 dark:text-zinc-500 mt-1">
+                          Create one to get started
+                        </p>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Pagination controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-end gap-2 py-2">
+                    <Button
+                      variant="ghost"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Prev
+                    </Button>
+                    <div className="text-sm text-zinc-600 dark:text-zinc-400">
+                      Page {currentPage} of {totalPages}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
                 )}
               </div>
-            }
-          />
+            </div>
+          </div>
         )}
       </div>
     </div>

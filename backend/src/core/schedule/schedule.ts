@@ -378,15 +378,30 @@ export class ScheduleService {
       const total = parseInt((countResult.rows[0] as { total: string })?.total || '0', 10);
 
       // Convert string values to proper types
-      const formattedLogs = (logs.rows as ExecRow[]).map((log) => ({
-        id: log.id,
-        scheduleId: log.scheduleId,
-        executedAt: log.executedAt,
-        statusCode: log.statusCode,
-        success: log.success,
-        durationMs: parseInt(log.durationMs, 10),
-        message: log.message,
-      }));
+      const formattedLogs = (logs.rows as ExecRow[]).map((log) => {
+        // PostgreSQL pg driver converts timestamps to Date objects, so we need to convert back to ISO string
+        let executedAtStr: string;
+        if (typeof log.executedAt === 'string') {
+          executedAtStr = log.executedAt;
+        } else if (
+          log.executedAt &&
+          typeof (log.executedAt as unknown as { toISOString: () => string }).toISOString ===
+            'function'
+        ) {
+          executedAtStr = (log.executedAt as unknown as Date).toISOString();
+        } else {
+          executedAtStr = String(log.executedAt);
+        }
+        return {
+          id: log.id,
+          scheduleId: log.scheduleId,
+          executedAt: executedAtStr,
+          statusCode: log.statusCode,
+          success: log.success,
+          durationMs: parseInt(log.durationMs, 10),
+          message: log.message,
+        };
+      });
 
       logger.info(`Retrieved ${formattedLogs.length} execution logs for schedule`, { scheduleId });
       return {
