@@ -2,7 +2,7 @@ import { GetTableSchemaResponse } from '@insforge/shared-schemas';
 import { crmSystemTemplate } from './crm-system';
 import { aiChatbotTemplate } from './ai-chatbot';
 import { ecommercePlatformTemplate } from './ecommerce-platform';
-import { redditCloneTemplate } from './twitter-clone';
+import { redditCloneTemplate } from './reddit-clone';
 import { instagramCloneTemplate } from './instagram-clone';
 import { notionCloneTemplate } from './notion-clone';
 
