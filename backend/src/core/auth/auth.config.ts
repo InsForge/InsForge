@@ -52,7 +52,7 @@ export class AuthConfigService {
       if (!result.rows.length) {
         logger.warn('No auth config found, returning default fallback values');
         return {
-          requireEmailVerification: true,
+          requireEmailVerification: false,
           passwordMinLength: 6,
           requireNumber: false,
           requireLowercase: false,
@@ -107,7 +107,7 @@ export class AuthConfigService {
         // Return a config with fallback values and generate a temporary ID
         return {
           id: '00000000-0000-0000-0000-000000000000',
-          requireEmailVerification: true,
+          requireEmailVerification: false,
           passwordMinLength: 6,
           requireNumber: false,
           requireLowercase: false,

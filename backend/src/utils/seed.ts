@@ -6,6 +6,7 @@ import { SecretService } from '@/core/secrets/secrets';
 import { OAuthConfigService } from '@/core/auth/oauth.config.js';
 import { OAuthProvidersSchema } from '@insforge/shared-schemas';
 import { AuthService } from '@/core/auth/auth.js';
+import { AuthConfigService } from '@/core/auth/auth.config.js';
 
 /**
  * Validates admin credentials are configured
@@ -53,6 +54,47 @@ async function seedDefaultAIConfigs(): Promise<void> {
   );
 
   logger.info('✅ Default AI models configured (cloud environment)');
+}
+
+/**
+ * Seeds default auth configuration for cloud environments
+ * Enables email verification with code-based verification method
+ */
+async function seedDefaultAuthConfig(): Promise<void> {
+  const authConfigService = AuthConfigService.getInstance();
+
+  try {
+    const currentConfig = await authConfigService.getAuthConfig();
+
+    // Check if config is still at default values (not been modified by user)
+    const isDefaultConfig =
+      currentConfig.requireEmailVerification === false &&
+      currentConfig.verifyEmailMethod === 'code' &&
+      currentConfig.resetPasswordMethod === 'code';
+
+    if (!isDefaultConfig) {
+      // User has already configured, don't override
+      logger.info(
+        '✅ Email verification configured:',
+        currentConfig.requireEmailVerification ? 'enabled' : 'disabled'
+      );
+      return;
+    }
+
+    // Set cloud defaults: enable email verification with code method
+    await authConfigService.updateAuthConfig({
+      requireEmailVerification: true,
+      verifyEmailMethod: 'code',
+      resetPasswordMethod: 'code',
+    });
+
+    logger.info('✅ Email verification enabled (cloud environment)');
+  } catch (error) {
+    logger.error('Failed to seed default auth config', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    // Don't throw - this is not critical for app startup
+  }
 }
 
 /**
@@ -190,8 +232,12 @@ export async function seedBackend(): Promise<void> {
     // add default OAuth configs in Cloud hosting
     if (isCloudEnvironment()) {
       await seedDefaultOAuthConfigs();
+      // Enable email verification in cloud environment
+      await seedDefaultAuthConfig();
     } else {
       await seedLocalOAuthConfigs();
+      // Local environment keeps default (disabled) from migration
+      logger.info('📧 Email verification: disabled (local development)');
     }
 
     // Initialize reserved secrets for edge functions
