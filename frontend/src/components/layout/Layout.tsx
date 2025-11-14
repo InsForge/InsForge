@@ -17,7 +17,7 @@ export default function Layout({ children }: LayoutProps) {
   // Default to collapsed on small screens, expanded on large screens
   const [sidebarCollapsed, setSidebarCollapsed] = useState(!isLargeScreen);
 
-  // Update collapsed state when screen size changes (only if user hasn't manually toggled)
+  // Automatically sync sidebar state with screen size
   useEffect(() => {
     setSidebarCollapsed(!isLargeScreen);
   }, [isLargeScreen]);
