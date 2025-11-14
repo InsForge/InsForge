@@ -17,7 +17,7 @@ import { Switch } from '@/components/radix/Switch';
 import { Alert, AlertDescription } from '@/components/radix/Alert';
 import { ScrollArea } from '@/components/radix/ScrollArea';
 import { cn } from '@/lib/utils/utils';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Pencil } from 'lucide-react';
 
 const createCronJobSchema = z.object({
   name: z.string().min(1, 'Job name is required'),
@@ -58,6 +58,21 @@ export function CronJobFormDialog({
 }: CronJobFormDialogProps) {
   const [error, setError] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [editingField, setEditingField] = useState<'headers' | 'body' | null>(null);
+
+  const getJsonDisplay = (value: unknown): string => {
+    if (value === null || value === undefined) {
+      return 'null';
+    }
+    if (typeof value === 'string') {
+      return value;
+    }
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch {
+      return String(value);
+    }
+  };
 
   const form = useForm<CronJobForm>({
     resolver: zodResolver(createCronJobSchema),
@@ -164,7 +179,7 @@ export function CronJobFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-3xl p-0 gap-0 overflow-hidden flex flex-col">
+      <DialogContent className="w-full max-w-xl p-0 gap-0 overflow-hidden flex flex-col">
         <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col">
           <DialogHeader className="px-6 py-4 border-b border-zinc-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
             <DialogTitle className="text-xl font-semibold text-zinc-950 dark:text-white">
@@ -210,7 +225,7 @@ export function CronJobFormDialog({
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     <button
                       type="button"
-                      className="px-3 py-2 rounded bg-zinc-100 text-zinc-900 hover:bg-zinc-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 dark:bg-neutral-800 dark:text-zinc-100 dark:hover:bg-neutral-700 text-sm transition-colors text-left"
+                      className="px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 hover:bg-zinc-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 dark:bg-neutral-800 dark:text-zinc-100 dark:hover:bg-neutral-700 text-sm transition-colors text-left"
                       onClick={() => {
                         form.setValue('cronSchedule', '*/5 * * * *', {
                           shouldDirty: true,
@@ -222,7 +237,7 @@ export function CronJobFormDialog({
                     </button>
                     <button
                       type="button"
-                      className="px-3 py-2 rounded bg-zinc-100 text-zinc-900 hover:bg-zinc-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 dark:bg-neutral-800 dark:text-zinc-100 dark:hover:bg-neutral-700 text-sm transition-colors text-left"
+                      className="px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 hover:bg-zinc-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 dark:bg-neutral-800 dark:text-zinc-100 dark:hover:bg-neutral-700 text-sm transition-colors text-left"
                       onClick={() => {
                         form.setValue('cronSchedule', '0 * * * *', {
                           shouldDirty: true,
@@ -234,7 +249,7 @@ export function CronJobFormDialog({
                     </button>
                     <button
                       type="button"
-                      className="px-3 py-2 rounded bg-zinc-100 text-zinc-900 hover:bg-zinc-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 dark:bg-neutral-800 dark:text-zinc-100 dark:hover:bg-neutral-700 text-sm transition-colors text-left"
+                      className="px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 hover:bg-zinc-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 dark:bg-neutral-800 dark:text-zinc-100 dark:hover:bg-neutral-700 text-sm transition-colors text-left"
                       onClick={() => {
                         form.setValue('cronSchedule', '0 0 1 * *', {
                           shouldDirty: true,
@@ -246,7 +261,7 @@ export function CronJobFormDialog({
                     </button>
                     <button
                       type="button"
-                      className="px-3 py-2 rounded bg-zinc-100 text-zinc-900 hover:bg-zinc-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 dark:bg-neutral-800 dark:text-zinc-100 dark:hover:bg-neutral-700 text-sm transition-colors text-left"
+                      className="px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 hover:bg-zinc-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 dark:bg-neutral-800 dark:text-zinc-100 dark:hover:bg-neutral-700 text-sm transition-colors text-left"
                       onClick={() => {
                         form.setValue('cronSchedule', '0 2 * * 1', {
                           shouldDirty: true,
@@ -320,92 +335,135 @@ export function CronJobFormDialog({
                 </div>
               </div>
 
-              <div className="border-t border-zinc-200 dark:border-neutral-800 pt-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                    Advanced options
-                  </div>
+              {/* Advanced options toggle - following same grid layout */}
+              <div className="grid gap-y-5 gap-x-6 md:grid-cols-[160px_minmax(0,1fr)] items-start">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:text-right md:mt-2">
+                  Advanced options
+                </label>
+                <div>
                   <Switch checked={advancedOpen} onCheckedChange={(val) => setAdvancedOpen(val)} />
                 </div>
-
-                {advancedOpen && (
-                  <div className="grid gap-y-4 gap-x-6 md:grid-cols-[160px_minmax(0,1fr)] items-start">
-                    <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:text-right md:mt-2">
-                      Headers (JSON)
-                    </label>
-                    <Controller
-                      control={form.control}
-                      name="headers"
-                      render={({ field }) => {
-                        const inputValue =
-                          field.value === null || field.value === undefined
-                            ? 'null'
-                            : typeof field.value === 'string'
-                              ? field.value
-                              : JSON.stringify(field.value);
-
-                        return (
-                          <JsonCellEditor
-                            value={inputValue}
-                            nullable
-                            onValueChange={(v) => {
-                              if (v === 'null') {
-                                field.onChange(null);
-                                return;
-                              }
-                              try {
-                                const parsed = JSON.parse(v);
-                                field.onChange(parsed);
-                              } catch {
-                                field.onChange(v);
-                              }
-                            }}
-                            onCancel={() => undefined}
-                            className="w-full"
-                          />
-                        );
-                      }}
-                    />
-
-                    <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:text-right md:mt-2">
-                      Body (JSON)
-                    </label>
-                    <Controller
-                      control={form.control}
-                      name="body"
-                      render={({ field }) => {
-                        const inputValue =
-                          field.value === null || field.value === undefined
-                            ? 'null'
-                            : typeof field.value === 'string'
-                              ? field.value
-                              : JSON.stringify(field.value);
-
-                        return (
-                          <JsonCellEditor
-                            value={inputValue}
-                            nullable
-                            onValueChange={(v) => {
-                              if (v === 'null') {
-                                field.onChange(null);
-                                return;
-                              }
-                              try {
-                                const parsed = JSON.parse(v);
-                                field.onChange(parsed);
-                              } catch {
-                                field.onChange(v);
-                              }
-                            }}
-                            onCancel={() => undefined}
-                            className="w-full"
-                          />
-                        );
-                      }}
-                    />
-                  </div>
-                )}
               </div>
+
+              {advancedOpen && (
+                <div className="grid gap-y-5 gap-x-6 md:grid-cols-[160px_minmax(0,1fr)] items-start">
+                  {/* Headers (JSON) */}
+                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:text-right md:mt-2">
+                    Headers (JSON)
+                  </label>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 px-3 py-2 rounded-lg border bg-zinc-50 dark:bg-neutral-800/50 border-zinc-200 dark:border-neutral-700 text-sm text-zinc-600 dark:text-zinc-400 font-mono truncate">
+                        {getJsonDisplay(form.watch('headers')).slice(0, 50)}
+                        {getJsonDisplay(form.watch('headers')).length > 50 && '...'}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setEditingField(editingField === 'headers' ? null : 'headers')
+                        }
+                        className="shrink-0 dark:text-zinc-100"
+                      >
+                        <Pencil className="h-3.5 w-3.5" /> Edit
+                      </Button>
+                    </div>
+                    {editingField === 'headers' && (
+                      <Controller
+                        control={form.control}
+                        name="headers"
+                        render={({ field }) => {
+                          const inputValue =
+                            field.value === null || field.value === undefined
+                              ? 'null'
+                              : typeof field.value === 'string'
+                                ? field.value
+                                : JSON.stringify(field.value, null, 2);
+
+                          return (
+                            <JsonCellEditor
+                              value={inputValue}
+                              nullable
+                              onValueChange={(v) => {
+                                if (v === 'null') {
+                                  field.onChange(null);
+                                  return;
+                                }
+                                try {
+                                  const parsed = JSON.parse(v);
+                                  field.onChange(parsed);
+                                } catch {
+                                  field.onChange(v);
+                                }
+                              }}
+                              onCancel={() => setEditingField(null)}
+                              className="w-full"
+                            />
+                          );
+                        }}
+                      />
+                    )}
+                  </div>
+
+                  {/* Body (JSON) */}
+                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:text-right md:mt-2">
+                    Body (JSON)
+                  </label>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 px-3 py-2 rounded-lg border bg-zinc-50 dark:bg-neutral-800/50 border-zinc-200 dark:border-neutral-700 text-sm text-zinc-600 dark:text-zinc-400 font-mono truncate">
+                        {getJsonDisplay(form.watch('body')).slice(0, 50)}
+                        {getJsonDisplay(form.watch('body')).length > 50 && '...'}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditingField(editingField === 'body' ? null : 'body')}
+                        className="shrink-0 dark:text-zinc-100"
+                      >
+                        <Pencil className="h-3.5 w-3.5 dark:text-zinc-100" /> Edit
+                      </Button>
+                    </div>
+                    {editingField === 'body' && (
+                      <Controller
+                        control={form.control}
+                        name="body"
+                        render={({ field }) => {
+                          const inputValue =
+                            field.value === null || field.value === undefined
+                              ? 'null'
+                              : typeof field.value === 'string'
+                                ? field.value
+                                : JSON.stringify(field.value, null, 2);
+
+                          return (
+                            <JsonCellEditor
+                              value={inputValue}
+                              nullable
+                              onValueChange={(v) => {
+                                if (v === 'null') {
+                                  field.onChange(null);
+                                  return;
+                                }
+                                try {
+                                  const parsed = JSON.parse(v);
+                                  field.onChange(parsed);
+                                } catch {
+                                  field.onChange(v);
+                                }
+                              }}
+                              onCancel={() => setEditingField(null)}
+                              className="w-full"
+                            />
+                          );
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </ScrollArea>
 
