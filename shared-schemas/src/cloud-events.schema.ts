@@ -33,6 +33,10 @@ export const onboardingSuccessSchema = z.object({
   type: z.literal('ONBOARDING_SUCCESS'),
 });
 
+export const navigateToUsageSchema = z.object({
+  type: z.literal('NAVIGATE_TO_USAGE'),
+});
+
 export const cloudEventSchema = z.discriminatedUnion('type', [
   appRouteChangeEventSchema,
   authSuccessEventSchema,
@@ -41,6 +45,7 @@ export const cloudEventSchema = z.discriminatedUnion('type', [
   showOnboardingOverlayEventSchema,
   showSettingsOverlayEventSchema,
   onboardingSuccessSchema,
+  navigateToUsageSchema,
 ]);
 
 export type AppRouteChangeEvent = z.infer<typeof appRouteChangeEventSchema>;

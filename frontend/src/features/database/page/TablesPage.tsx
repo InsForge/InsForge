@@ -187,12 +187,20 @@ export default function TablesPage() {
     }
 
     const handleDataUpdate = (message: SocketMessage<DataUpdatePayload>) => {
-      if (
-        message.payload?.resource === DataUpdateResourceType.METADATA ||
-        message.payload?.resource === DataUpdateResourceType.DATABASE_SCHEMA
-      ) {
+      if (message.payload?.resource === DataUpdateResourceType.DATABASE) {
         // Invalidate all tables queries
         void queryClient.invalidateQueries({ queryKey: ['tables'] });
+      }
+
+      if (message.payload?.resource === DataUpdateResourceType.RECORDS) {
+        // Invalidate records queries for the updated table
+        const data = message.payload.data as { tableName?: string };
+        const updatedTableName = data?.tableName;
+
+        // Only invalidate if this is the currently selected table
+        if (updatedTableName && updatedTableName === selectedTable) {
+          void queryClient.invalidateQueries({ queryKey: ['records', selectedTable] });
+        }
       }
     };
 
@@ -201,7 +209,7 @@ export default function TablesPage() {
     return () => {
       socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
     };
-  }, [socket, isConnected, queryClient]);
+  }, [socket, isConnected, queryClient, selectedTable]);
 
   // Reset sorting flag when loading completes
   useEffect(() => {
@@ -347,7 +355,6 @@ export default function TablesPage() {
           pkValue: rowId,
           data: updates,
         });
-        await refetchTableData();
       }
     } catch (error) {
       showToast('Failed to update record', 'error');
@@ -370,10 +377,7 @@ export default function TablesPage() {
 
     if (shouldDelete) {
       await recordsHook.deleteRecords({ pkColumn: primaryKeyColumn || 'id', pkValues: ids });
-      await Promise.all([
-        refetchTableData(),
-        refetchTables(), // Also refresh tables to update sidebar record counts
-      ]);
+      // Query invalidation is handled by the mutation, no manual refetch needed
       setSelectedRows(new Set());
     }
   };
@@ -609,12 +613,6 @@ export default function TablesPage() {
           onOpenChange={setShowRecordForm}
           tableName={selectedTable}
           schema={schemaData.columns}
-          onSuccess={() => {
-            void refetchTableData();
-            void refetchTables();
-            // Also invalidate the schema cache to ensure fresh data
-            void queryClient.invalidateQueries({ queryKey: ['table-schema', selectedTable] });
-          }}
         />
       )}
 

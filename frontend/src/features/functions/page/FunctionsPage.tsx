@@ -5,10 +5,26 @@ import { CodeEditor } from '@/components/CodeEditor';
 import FunctionEmptyState from '../components/FunctionEmptyState';
 import { useFunctions } from '../hooks/useFunctions';
 import { useToast } from '@/lib/hooks/useToast';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import RefreshIcon from '@/assets/icons/refresh.svg?react';
+import { Button } from '@/components';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/radix/Tooltip';
+import {
+  DataUpdatePayload,
+  DataUpdateResourceType,
+  ServerEvents,
+  SocketMessage,
+  useSocket,
+} from '@/lib/contexts/SocketContext';
 
 export default function FunctionsPage() {
   const toastShownRef = useRef(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { showToast } = useToast();
   const {
     functions,
@@ -17,7 +33,19 @@ export default function FunctionsPage() {
     isLoading: loading,
     selectFunction,
     clearSelection,
+    refetch,
   } = useFunctions();
+
+  const { socket, isConnected } = useSocket();
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     if (!isRuntimeAvailable && !toastShownRef.current) {
@@ -25,6 +53,25 @@ export default function FunctionsPage() {
       showToast('Function container is unhealthy.', 'error');
     }
   }, [isRuntimeAvailable, showToast]);
+
+  useEffect(() => {
+    if (!socket || !isConnected) {
+      return;
+    }
+
+    const handleDataUpdate = (message: SocketMessage<DataUpdatePayload>) => {
+      if (message.payload?.resource === DataUpdateResourceType.FUNCTIONS) {
+        // Invalidate all buckets queries
+        void refetch();
+      }
+    };
+
+    socket.on(ServerEvents.DATA_UPDATE, handleDataUpdate);
+
+    return () => {
+      socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
+    };
+  }, [socket, isConnected, refetch]);
 
   // If a function is selected, show the detail view
   if (selectedFunction) {
@@ -52,8 +99,33 @@ export default function FunctionsPage() {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <div className="flex flex-col gap-6 p-4">
-        <p className="h-7 text-xl text-zinc-950 dark:text-white">Functions</p>
-        <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-normal text-zinc-950 dark:text-white">Functions</h1>
+
+          {/* Separator */}
+          <div className="h-6 w-px bg-gray-200 dark:bg-neutral-700" />
+
+          {/* Refresh button */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="p-1 h-9 w-9"
+                  onClick={() => void handleRefresh()}
+                  disabled={isRefreshing}
+                >
+                  <RefreshIcon className="h-5 w-5 text-zinc-400 dark:text-neutral-400" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" align="center">
+                <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+        <div className="flex flex-col gap-2 relative">
           {/* Table Header */}
           <div className="grid grid-cols-12 px-3 text-sm text-muted-foreground dark:text-neutral-400">
             <div className="col-span-2 py-1 px-3">Name</div>
@@ -81,6 +153,16 @@ export default function FunctionsPage() {
           ) : (
             <div className="cols-span-full">
               <FunctionEmptyState />
+            </div>
+          )}
+
+          {/* Loading mask overlay */}
+          {isRefreshing && (
+            <div className="absolute inset-0 bg-white dark:bg-neutral-800 flex items-center justify-center z-50">
+              <div className="flex items-center gap-1">
+                <div className="w-5 h-5 border-2 border-zinc-500 dark:border-neutral-700 border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm text-zinc-500 dark:text-zinc-400">Loading</span>
+              </div>
             </div>
           )}
         </div>

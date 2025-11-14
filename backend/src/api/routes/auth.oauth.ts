@@ -8,8 +8,6 @@ import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin } from '@/api/middleware/auth.js';
 import logger from '@/utils/logger.js';
 import jwt from 'jsonwebtoken';
-import { SocketService } from '@/core/socket/socket.js';
-import { DataUpdateResourceType, ServerEvents } from '@/core/socket/types.js';
 import {
   createOAuthConfigRequestSchema,
   updateOAuthConfigRequestSchema,
@@ -123,12 +121,6 @@ router.post(
         ip_address: req.ip,
       });
 
-      // Broadcast configuration change
-      const socket = SocketService.getInstance();
-      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.AUTH_SCHEMA,
-      });
-
       successResponse(res, config);
     } catch (error) {
       logger.error('Failed to create OAuth configuration', { error });
@@ -181,12 +173,6 @@ router.put(
         ip_address: req.ip,
       });
 
-      // Broadcast configuration change
-      const socket = SocketService.getInstance();
-      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.AUTH_SCHEMA,
-      });
-
       successResponse(res, config);
     } catch (error) {
       logger.error('Failed to update OAuth configuration', {
@@ -224,12 +210,6 @@ router.delete(
         module: 'AUTH',
         details: { provider },
         ip_address: req.ip,
-      });
-
-      // Broadcast configuration change
-      const socket = SocketService.getInstance();
-      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.AUTH_SCHEMA,
       });
 
       successResponse(res, {
