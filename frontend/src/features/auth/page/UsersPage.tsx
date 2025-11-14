@@ -16,6 +16,13 @@ import { UserFormDialog } from '@/features/auth/components/UserFormDialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useToast } from '@/lib/hooks/useToast';
 import { useUsers } from '@/features/auth/hooks/useUsers';
+import {
+  DataUpdatePayload,
+  DataUpdateResourceType,
+  ServerEvents,
+  SocketMessage,
+  useSocket,
+} from '@/lib/contexts/SocketContext';
 
 export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,6 +31,8 @@ export default function UsersPage() {
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
+
+  const { socket, isConnected } = useSocket();
 
   const { showToast } = useToast();
 
@@ -53,6 +62,25 @@ export default function UsersPage() {
     window.addEventListener('refreshUsers', handleRefreshEvent);
     return () => window.removeEventListener('refreshUsers', handleRefreshEvent);
   }, [refetch]);
+
+  useEffect(() => {
+    if (!socket || !isConnected) {
+      return;
+    }
+
+    const handleDataUpdate = (message: SocketMessage<DataUpdatePayload>) => {
+      if (message.payload?.resource === DataUpdateResourceType.USERS) {
+        // Refetch data
+        void refetch();
+      }
+    };
+
+    socket.on(ServerEvents.DATA_UPDATE, handleDataUpdate);
+
+    return () => {
+      socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
+    };
+  }, [socket, isConnected, refetch]);
 
   // Clear selection when page changes or search changes
   useEffect(() => {
@@ -217,6 +245,7 @@ export default function UsersPage() {
             <UsersDataGrid
               data={sortedUsers}
               loading={isLoading}
+              isRefreshing={isRefreshing}
               selectedRows={selectedRows}
               onSelectedRowsChange={setSelectedRows}
               sortColumns={sortColumns}

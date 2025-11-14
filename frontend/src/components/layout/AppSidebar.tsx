@@ -9,6 +9,7 @@ import {
   documentationMenuItem,
   reinstallMenuItem,
   settingsMenuItem,
+  usageMenuItem,
 } from '@/lib/utils/menuItems';
 import { useLocation, matchPath } from 'react-router-dom';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
@@ -34,7 +35,13 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
 
   // Build bottom menu items based on user state
   const bottomMenuItems = useMemo(() => {
-    const items = [documentationMenuItem];
+    const items = [];
+
+    if (isInsForgeCloudProject()) {
+      items.push(usageMenuItem);
+    }
+
+    items.push(documentationMenuItem);
 
     // Add reinstall button if onboarding is completed
     if (hasCompletedOnboarding && !isInsForgeCloudProject()) {

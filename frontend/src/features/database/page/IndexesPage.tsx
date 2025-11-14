@@ -1,4 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import RefreshIcon from '@/assets/icons/refresh.svg?react';
+import { Button } from '@/components';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/radix/Tooltip';
 import { useFullMetadata } from '../hooks/useFullMetadata';
 import { SearchInput } from '@/components/SearchInput';
 import { EmptyState } from '@/components/EmptyState';
@@ -6,6 +14,13 @@ import { DataGrid, type DataGridColumn, type DataGridRowType } from '@/component
 import type { ExportDatabaseResponse, ExportDatabaseJsonData } from '@insforge/shared-schemas';
 import type { ConvertedValue } from '@/components/datagrid/datagridTypes';
 import { isSystemTable } from '../constants';
+import {
+  DataUpdatePayload,
+  DataUpdateResourceType,
+  ServerEvents,
+  SocketMessage,
+  useSocket,
+} from '@/lib/contexts/SocketContext';
 
 interface IndexRow extends DataGridRowType {
   id: string;
@@ -47,9 +62,30 @@ function parseIndexesFromMetadata(metadata: ExportDatabaseResponse | undefined):
 
 export default function IndexesPage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const { data: metadata, isLoading, error } = useFullMetadata(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { data: metadata, isLoading, error, refetch } = useFullMetadata(true);
+
+  const { socket, isConnected } = useSocket();
 
   const allIndexes = useMemo(() => parseIndexesFromMetadata(metadata), [metadata]);
+
+  useEffect(() => {
+    if (!socket || !isConnected) {
+      return;
+    }
+
+    const handleDataUpdate = (message: SocketMessage<DataUpdatePayload>) => {
+      if (message.payload?.resource === DataUpdateResourceType.DATABASE) {
+        void refetch();
+      }
+    };
+
+    socket.on(ServerEvents.DATA_UPDATE, handleDataUpdate);
+
+    return () => {
+      socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
+    };
+  }, [socket, isConnected, refetch]);
 
   const filteredIndexes = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -63,6 +99,16 @@ export default function IndexesPage() {
         index.tableName.toLowerCase().includes(query)
     );
   }, [allIndexes, searchQuery]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      setSearchQuery('');
+      await refetch();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const columns: DataGridColumn<IndexRow>[] = useMemo(
     () => [
@@ -131,7 +177,32 @@ export default function IndexesPage() {
 
   return (
     <div className="flex flex-col gap-4 h-full p-4 bg-bg-gray dark:bg-neutral-800">
-      <h1 className="text-xl font-normal text-zinc-950 dark:text-white">Database Indexes</h1>
+      <div className="flex items-center gap-3">
+        <h1 className="text-xl font-normal text-zinc-950 dark:text-white">Database Indexes</h1>
+
+        {/* Separator */}
+        <div className="h-6 w-px bg-gray-200 dark:bg-neutral-700" />
+
+        {/* Refresh button */}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="p-1 h-9 w-9"
+                onClick={() => void handleRefresh()}
+                disabled={isRefreshing}
+              >
+                <RefreshIcon className="h-5 w-5 text-zinc-400 dark:text-neutral-400" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" align="center">
+              <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
 
       <SearchInput
         value={searchQuery}
@@ -153,6 +224,7 @@ export default function IndexesPage() {
             showPagination={false}
             noPadding={true}
             className="h-full"
+            isRefreshing={isRefreshing}
             emptyState={
               <div className="text-sm text-zinc-500 dark:text-zinc-400">
                 {searchQuery ? 'No indexes match your search criteria' : 'No indexes found'}

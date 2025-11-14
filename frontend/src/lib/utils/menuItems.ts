@@ -14,6 +14,7 @@ import {
   Settings,
   Users,
   Table,
+  ChartBarBig,
 } from 'lucide-react';
 import { postMessageToParent } from './cloudMessaging';
 
@@ -190,6 +191,16 @@ export const reinstallMenuItem: PrimaryMenuItem = {
   href: '/dashboard/onboard',
   icon: RotateCw,
   external: false,
+};
+
+export const usageMenuItem: PrimaryMenuItem = {
+  id: 'usage',
+  label: 'Usage',
+  href: '',
+  icon: ChartBarBig,
+  onClick: () => {
+    postMessageToParent({ type: 'NAVIGATE_TO_USAGE' }, '*');
+  },
 };
 
 export const settingsMenuItem: PrimaryMenuItem = {

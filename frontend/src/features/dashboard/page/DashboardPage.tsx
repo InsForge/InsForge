@@ -160,7 +160,7 @@ export default function DashboardPage() {
 
             {/* Database Templates Card */}
             <button
-              onClick={() => void navigate('/dashboard/database/templates')}
+              onClick={() => void navigate('/dashboard/tables')}
               className="flex-1 bg-white dark:bg-[#363636] border border-gray-200 dark:border-[#414141] rounded-lg p-4 flex items-center gap-3 hover:bg-gray-50 hover:border-gray-300 dark:hover:bg-neutral-700 dark:hover:border-[#525252] hover:shadow-sm transition-all group"
             >
               <div className="flex-1 flex items-center gap-4">
