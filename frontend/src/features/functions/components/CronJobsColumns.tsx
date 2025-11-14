@@ -1,6 +1,5 @@
-import { Pencil, Trash2 } from 'lucide-react';
+import ActionMenu from './ActionMenu';
 import { ScheduleToggleCell } from '../components/ScheduleToggleCell';
-import { Button } from '@/components/radix/Button';
 import type { DataGridColumn } from '@/components/datagrid/datagridTypes';
 import type { ScheduleRow } from '../types/schedules';
 
@@ -101,31 +100,15 @@ export function getCronJobColumns({
       sortable: false,
       resizable: false,
       renderCell: ({ row }) => (
-        <div className="flex items-center justify-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            title="Edit"
-            onClick={(e: React.MouseEvent) => {
-              e.stopPropagation();
+        <div className="flex items-center justify-center">
+          <ActionMenu
+            onEdit={() => {
               handleEditSchedule(row.id);
             }}
-          >
-            <Pencil className="h-4 w-4 text-zinc-500 dark:text-zinc-300" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            title="Delete"
-            onClick={(e: React.MouseEvent) => {
-              e.stopPropagation();
+            onDelete={() => {
               void handleDeleteSchedule(row.id);
             }}
-          >
-            <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
-          </Button>
+          />
         </div>
       ),
     },
