@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import { useSchedules } from '@/features/schedules/hooks/useSchedules';
 import { Button } from '@/components/radix/Button';
@@ -7,7 +7,7 @@ import ScheduleRow from './ScheduleRow';
 import ScheduleExecutionLogs from './ScheduleExecutionLogs';
 import { Skeleton } from '@/components/radix/Skeleton';
 import { Alert, AlertDescription } from '@/components/radix/Alert';
-import { SearchInput, SelectionClearButton, DeleteActionButton } from '@/components';
+import { SearchInput } from '@/components';
 import { EmptyState } from '@/components/EmptyState';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useToast } from '@/lib/hooks/useToast';
@@ -17,16 +17,18 @@ import { useToast } from '@/lib/hooks/useToast';
 const PAGE_SIZE = 50;
 
 export function CronJobsContent() {
-  // use search query from the schedules hook to keep a single source of truth
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
-  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedScheduleForLogs, setSelectedScheduleForLogs] = useState<{
     id: string;
     name: string;
   } | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmIds, setConfirmIds] = useState<string[]>([]);
+  const [confirmTitle, setConfirmTitle] = useState<string | undefined>(undefined);
+  const [confirmDescription, setConfirmDescription] = useState<string | undefined>(undefined);
 
   const { showToast } = useToast();
   const {
@@ -42,24 +44,6 @@ export function CronJobsContent() {
     isDeleting: isDeletingSchedule, // New deleting state
     toggleSchedule: toggleScheduleFn,
   } = useSchedules();
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [confirmIds, setConfirmIds] = useState<string[]>([]);
-  const [confirmTitle, setConfirmTitle] = useState<string | undefined>(undefined);
-  const [confirmDescription, setConfirmDescription] = useState<string | undefined>(undefined);
-
-  // schedules, statuses and functions come from the single `useSchedules` hook above
-
-  // Reset page when search query changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery]);
-
-  // Clear selected rows when data changes
-  useEffect(() => {
-    setSelectedRows(new Set());
-  }, [schedules]);
-
-  // use `filteredSchedules` from the hook (already memoized there)
 
   // Paginate filtered schedules
   const paginatedSchedules = useMemo(() => {
@@ -83,15 +67,6 @@ export function CronJobsContent() {
     },
     [schedules]
   );
-
-  const handleBulkDelete = useCallback((ids: string[]) => {
-    setConfirmIds(ids);
-    setConfirmTitle(`Delete ${ids.length} ${ids.length === 1 ? 'Cron Job' : 'Cron Jobs'}`);
-    setConfirmDescription(
-      `Are you sure you want to delete ${ids.length} ${ids.length === 1 ? 'cron job' : 'cron jobs'}? This action cannot be undone.`
-    );
-    setConfirmOpen(true);
-  }, []);
 
   const handleEditSchedule = useCallback((scheduleId: string) => {
     setEditingScheduleId(scheduleId);
@@ -150,30 +125,15 @@ export function CronJobsContent() {
         </Alert>
       )}
 
-      {/* Search and Actions Bar */}
-      <div className="flex items-center justify-between gap-3 flex-shrink-0">
-        {selectedRows.size > 0 ? (
-          <div className="flex items-center gap-3">
-            <SelectionClearButton
-              selectedCount={selectedRows.size}
-              itemType="cron job"
-              onClear={() => setSelectedRows(new Set())}
-            />
-            <DeleteActionButton
-              selectedCount={selectedRows.size}
-              itemType="cron job"
-              onDelete={() => void handleBulkDelete(Array.from(selectedRows))}
-            />
-          </div>
-        ) : (
-          <SearchInput
-            value={searchQuery}
-            onChange={setSearchQuery}
-            placeholder="Search cron jobs by name"
-            className="flex-1 max-w-96 dark:bg-neutral-700 dark:text-zinc-300 dark:border-neutral-600"
-            debounceTime={300}
-          />
-        )}
+      {/* Search Bar */}
+      <div className="flex-shrink-0">
+        <SearchInput
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder="Search cron jobs by name"
+          className="flex-1 max-w-96 dark:bg-neutral-700 dark:text-zinc-300 dark:border-neutral-600"
+          debounceTime={300}
+        />
       </div>
       {/* Create dialog */}
       <CronJobFormDialog
@@ -313,16 +273,6 @@ export function CronJobsContent() {
           confirmIds.forEach((id) => {
             void deleteScheduleFn(id);
           });
-          // clear selection if bulk delete
-          if (confirmIds.length > 1) {
-            setSelectedRows(new Set());
-          } else if (confirmIds.length === 1) {
-            setSelectedRows((prev) => {
-              const updated = new Set(prev);
-              updated.delete(confirmIds[0]);
-              return updated;
-            });
-          }
         }}
       />
 
