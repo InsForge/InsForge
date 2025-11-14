@@ -1,8 +1,7 @@
 export const notionClonePrompt = {
   title: 'Notion Clone',
   description: 'Paste below prompts to your agent as a quick start for building real apps',
-  prompt: `Make a notes app like Notion with these features:
-
+  prompt: `Make a notes app like Notion using InsForge as the backend platform with these features:
 • User authentication for sign in and sign out
 • Pages list in a sidebar with create and delete
 • Each page has a title and rich text or simple markdown content

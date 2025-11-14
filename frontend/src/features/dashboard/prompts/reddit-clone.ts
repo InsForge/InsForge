@@ -1,8 +1,7 @@
 export const redditClonePrompt = {
   title: 'Reddit Clone',
   description: 'Paste below prompts to your agent as a quick start for building real apps',
-  prompt: `Build an app similar to Reddit with community-based discussion threads that has these features:
-
+  prompt: `Build an app similar to Reddit with community-based discussion threads using InsForge as the backend platform that has these features:
 • Has a "Communities" list where users can browse or create communities
 • Each community has its own posts feed
 • Users can create posts with a title and body (text or image upload to InsForge storage)

@@ -1,9 +1,9 @@
 import { crmSystemPrompt } from './crm-system';
 import { aiChatbotPrompt } from './ai-chatbot';
 import { ecommercePlatformPrompt } from './ecommerce-platform';
-import { redditClonePrompt } from './twitter-clone';
+import { redditClonePrompt } from './reddit-clone';
 import { instagramClonePrompt } from './instagram-clone';
-import { notionClonePrompt } from './booking-app';
+import { notionClonePrompt } from './notion-clone';
 
 export interface PromptTemplate {
   title: string;

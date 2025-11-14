@@ -1,8 +1,7 @@
 export const crmSystemPrompt = {
   title: 'CRM',
   description: 'Paste below prompts to your agent as a quick start for building real apps',
-  prompt: `Build a lightweight CRM app with these features:
-
+  prompt: `Build a lightweight CRM app using InsForge as the backend platform with these features:
 • Contacts with search and simple tags
 • Companies and linked contacts
 • Deals pipeline with stages and easy stage updates
