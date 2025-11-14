@@ -51,7 +51,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <main className="h-full bg-white dark:bg-neutral-800 overflow-y-auto">
+    <main className="h-full bg-white dark:bg-neutral-800 overflow-y-auto px-6">
       <div className="flex flex-col gap-16 w-full max-w-[1080px] mx-auto pt-6 pb-8">
         <div className="flex flex-col gap-6">
           {/* Connection Success Banner - Only shows once on first connection */}
