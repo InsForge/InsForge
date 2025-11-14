@@ -58,24 +58,3 @@ DROP TRIGGER IF EXISTS update__auth_configs_updated_at ON _auth_configs;
 CREATE TRIGGER update__auth_configs_updated_at
 BEFORE UPDATE ON _auth_configs
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
--- Insert default configuration row if it doesn't exist
-INSERT INTO _auth_configs (
-  require_email_verification,
-  password_min_length,
-  require_number,
-  require_lowercase,
-  require_uppercase,
-  require_special_char,
-  verify_email_redirect_to,
-  reset_password_redirect_to
-) VALUES (
-  FALSE,  -- require_email_verification
-  6,      -- password_min_length
-  FALSE,  -- require_number
-  FALSE,  -- require_lowercase
-  FALSE,  -- require_uppercase
-  FALSE,  -- require_special_char
-  NULL,   -- verify_email_redirect_to (NULL = no redirect after verification)
-  NULL    -- reset_password_redirect_to (NULL = no redirect after reset)
-) ON CONFLICT DO NOTHING;
