@@ -91,10 +91,11 @@ async function seedDefaultAuthConfig(): Promise<void> {
           require_lowercase,
           require_uppercase,
           require_special_char
-        ) VALUES (?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT DO NOTHING`
       )
       .run(
-        true, // Enable email verification for cloud
+        isCloudEnvironment(), // Enable email verification for cloud
         6, // password_min_length
         false, // require_number
         false, // require_lowercase
@@ -243,11 +244,12 @@ export async function seedBackend(): Promise<void> {
     // seed AI configs for cloud environment
     await seedDefaultAIConfigs();
 
+    // Enable email verification in cloud environment
+    await seedDefaultAuthConfig();
+
     // add default OAuth configs in Cloud hosting
     if (isCloudEnvironment()) {
       await seedDefaultOAuthConfigs();
-      // Enable email verification in cloud environment
-      await seedDefaultAuthConfig();
     } else {
       await seedLocalOAuthConfigs();
       // Local environment keeps default (disabled) from migration
