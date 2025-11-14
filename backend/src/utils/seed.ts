@@ -59,21 +59,19 @@ async function seedDefaultAIConfigs(): Promise<void> {
 /**
  * Seeds default auth configuration for cloud environments
  * Enables email verification with code-based verification method
+ * Only inserts config if table is empty (first startup, never configured)
  */
 async function seedDefaultAuthConfig(): Promise<void> {
-  const authConfigService = AuthConfigService.getInstance();
+  const dbManager = DatabaseManager.getInstance();
+  const db = dbManager.getDb();
 
   try {
-    const currentConfig = await authConfigService.getAuthConfig();
+    const result = await db.prepare('SELECT COUNT(*) as count FROM _auth_configs').get();
+    const hasConfig = result && Number(result.count) > 0;
 
-    // Check if config is still at default values (not been modified by user)
-    const isDefaultConfig =
-      currentConfig.requireEmailVerification === false &&
-      currentConfig.verifyEmailMethod === 'code' &&
-      currentConfig.resetPasswordMethod === 'code';
-
-    if (!isDefaultConfig) {
-      // User has already configured, don't override
+    if (hasConfig) {
+      const authConfigService = AuthConfigService.getInstance();
+      const currentConfig = await authConfigService.getAuthConfig();
       logger.info(
         '✅ Email verification configured:',
         currentConfig.requireEmailVerification ? 'enabled' : 'disabled'
@@ -81,12 +79,28 @@ async function seedDefaultAuthConfig(): Promise<void> {
       return;
     }
 
-    // Set cloud defaults: enable email verification with code method
-    await authConfigService.updateAuthConfig({
-      requireEmailVerification: true,
-      verifyEmailMethod: 'code',
-      resetPasswordMethod: 'code',
-    });
+    // Table is empty - this is first startup, insert default cloud configuration
+    // Note: Migration 016 will add verify_email_method, reset_password_method, sign_in_redirect_to
+    // so we only insert fields that exist in migration 015
+    await db
+      .prepare(
+        `INSERT INTO _auth_configs (
+          require_email_verification,
+          password_min_length,
+          require_number,
+          require_lowercase,
+          require_uppercase,
+          require_special_char
+        ) VALUES (?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        true, // Enable email verification for cloud
+        6, // password_min_length
+        false, // require_number
+        false, // require_lowercase
+        false, // require_uppercase
+        false // require_special_char
+      );
 
     logger.info('✅ Email verification enabled (cloud environment)');
   } catch (error) {
