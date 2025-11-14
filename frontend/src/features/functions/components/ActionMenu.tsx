@@ -29,23 +29,29 @@ export const ActionMenu: React.FC<ActionMenuProps> = ({ onEdit, onDelete, ariaLa
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent sideOffset={6} className="w-40">
+      <DropdownMenuContent
+        sideOffset={6}
+        className="w-40"
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
         <DropdownMenuItem
-          onSelect={() => {
+          onSelect={(e) => {
+            e.preventDefault();
             onEdit();
           }}
         >
-          <Pencil className="mr-2 h-4 w-4 text-zinc-500" />
+          <Pencil className="mr-2 h-4 w-4 dark:text-zinc-300 text-zinc-700" />
           <span>Edit</span>
         </DropdownMenuItem>
 
         <DropdownMenuItem
-          onSelect={() => {
+          onSelect={(e) => {
+            e.preventDefault();
             onDelete();
           }}
-          className="text-red-600"
+          className="dark:text-red-400 text-destructive"
         >
-          <Trash2 className="mr-2 h-4 w-4 text-red-600" />
+          <Trash2 className="mr-2 h-4 w-4 dark:text-red-400 text-destructive" />
           <span>Delete</span>
         </DropdownMenuItem>
       </DropdownMenuContent>

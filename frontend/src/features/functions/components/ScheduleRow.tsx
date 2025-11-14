@@ -93,7 +93,10 @@ export function ScheduleRow({
           </div>
         </div>
 
-        <div className="col-span-1 min-w-0 px-3 py-1.5 flex items-center justify-end">
+        <div
+          className="col-span-1 min-w-0 px-3 py-1.5 flex items-center justify-end"
+          onClick={(e) => e.stopPropagation()}
+        >
           <ActionMenu
             ariaLabel={`Actions for ${schedule.name}`}
             onEdit={() => onEdit(schedule.id)}
