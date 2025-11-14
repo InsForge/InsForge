@@ -252,8 +252,6 @@ export async function seedBackend(): Promise<void> {
       await seedDefaultOAuthConfigs();
     } else {
       await seedLocalOAuthConfigs();
-      // Local environment keeps default (disabled) from migration
-      logger.info('📧 Email verification: disabled (local development)');
     }
 
     // Initialize reserved secrets for edge functions
