@@ -125,3 +125,12 @@ export interface FacebookUserInfo {
   first_name?: string;
   last_name?: string;
 }
+
+export interface XUserInfo {
+  id: string;
+  name: string;
+  username?: string;
+  profile_image_url?: string;
+  verified?: boolean;
+  created_at?: string;
+}

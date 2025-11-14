@@ -63,6 +63,12 @@ const ProviderIcon = ({ provider }: { provider: string }) => {
           color:
             'bg-green-100 text-green-700 dark:bg-neutral-800 dark:text-green-300 dark:border-green-500',
         };
+      case 'x':
+        return {
+          label: 'X',
+          color:
+            'bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-zinc-300 dark:border-gray-500',
+        };
       default:
         return {
           label: provider,
