@@ -91,7 +91,7 @@ export default function ConfigurationPage() {
           <div className="flex flex-col gap-8">
             <div>
               <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
-                Authentication Configuration
+                Configuration
               </h2>
             </div>
 
@@ -151,12 +151,14 @@ export default function ConfigurationPage() {
                         name="requireEmailVerification"
                         control={form.control}
                         render={({ field }) => (
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={(value) => {
-                              field.onChange(value);
-                            }}
-                          />
+                          <div className="w-full max-w-[320px]">
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={(value) => {
+                                field.onChange(value);
+                              }}
+                            />
+                          </div>
                         )}
                       />
                     </div>
