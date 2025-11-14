@@ -190,6 +190,7 @@ export default function TablesPage() {
       if (message.payload?.resource === DataUpdateResourceType.DATABASE) {
         // Invalidate all tables queries
         void queryClient.invalidateQueries({ queryKey: ['tables'] });
+        void queryClient.invalidateQueries({ queryKey: ['records', selectedTable] });
       }
 
       if (message.payload?.resource === DataUpdateResourceType.RECORDS) {

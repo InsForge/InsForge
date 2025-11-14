@@ -61,7 +61,6 @@ export default function FunctionsPage() {
 
     const handleDataUpdate = (message: SocketMessage<DataUpdatePayload>) => {
       if (message.payload?.resource === DataUpdateResourceType.FUNCTIONS) {
-        // Invalidate all buckets queries
         void refetch();
       }
     };

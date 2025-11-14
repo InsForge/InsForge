@@ -205,7 +205,7 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
       responseData = [];
     }
 
-    // Only send socket events for mutations (POST, PATCH, DELETE), not queries (GET, HEAD)
+    // Only send socket events for mutations (POST, DELETE)
     const mutationMethods = ['POST', 'DELETE'];
     if (mutationMethods.includes(req.method.toUpperCase())) {
       const socket = SocketService.getInstance();
