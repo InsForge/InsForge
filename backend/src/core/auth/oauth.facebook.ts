@@ -2,8 +2,7 @@ import axios from 'axios';
 import logger from '@/utils/logger.js';
 import { getApiBaseUrl } from '@/utils/environment';
 import { OAuthConfigService } from './oauth.config';
-import type { FacebookUserInfo } from '@/types/auth';
-import type { CreateSessionResponse } from '@insforge/shared-schemas';
+import type { FacebookUserInfo, OAuthUserData } from '@/types/auth';
 
 /**
  * Facebook OAuth Service
@@ -84,51 +83,84 @@ export class FacebookOAuthService {
       throw new Error('Facebook OAuth not configured');
     }
 
-    const clientSecret = await oAuthConfigService.getClientSecretByProvider('facebook');
-    const selfBaseUrl = getApiBaseUrl();
-    const response = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
-      params: {
-        client_id: config.clientId,
-        client_secret: clientSecret,
-        code,
-        redirect_uri: `${selfBaseUrl}/api/auth/oauth/facebook/callback`,
-      },
-    });
+    try {
+      logger.info('Exchanging Facebook code for token', {
+        hasCode: !!code,
+        clientId: config.clientId?.substring(0, 10) + '...',
+      });
 
-    if (!response.data.access_token) {
-      throw new Error('Failed to get access token from Facebook');
+      const clientSecret = await oAuthConfigService.getClientSecretByProvider('facebook');
+      const selfBaseUrl = getApiBaseUrl();
+      const response = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
+        params: {
+          client_id: config.clientId,
+          client_secret: clientSecret,
+          code,
+          redirect_uri: `${selfBaseUrl}/api/auth/oauth/facebook/callback`,
+        },
+      });
+
+      if (!response.data.access_token) {
+        throw new Error('Failed to get access token from Facebook');
+      }
+
+      return response.data.access_token;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        logger.error('Facebook token exchange failed', {
+          status: error.response.status,
+          error: error.response.data,
+        });
+        throw new Error(`Facebook OAuth error: ${JSON.stringify(error.response.data)}`);
+      }
+      throw error;
     }
-
-    return response.data.access_token;
   }
 
   /**
    * Get Facebook user info
    */
   async getUserInfo(accessToken: string): Promise<FacebookUserInfo> {
-    const response = await axios.get('https://graph.facebook.com/v21.0/me', {
-      params: {
-        fields: 'id,email,name,first_name,last_name,picture',
-        access_token: accessToken,
-      },
-    });
+    try {
+      const response = await axios.get('https://graph.facebook.com/v21.0/me', {
+        params: {
+          fields: 'id,email,name,first_name,last_name,picture',
+          access_token: accessToken,
+        },
+      });
 
-    return response.data;
+      return response.data;
+    } catch (error) {
+      logger.error('Facebook user info retrieval failed:', error);
+      throw new Error(`Failed to get Facebook user info: ${error}`);
+    }
   }
 
   /**
    * Handle Facebook OAuth callback
    */
-  async handleCallback(
-    payload: { code?: string; token?: string },
-    findOrCreateUser: (facebookUserInfo: FacebookUserInfo) => Promise<CreateSessionResponse>
-  ): Promise<CreateSessionResponse> {
+  async handleCallback(payload: { code?: string; token?: string }): Promise<OAuthUserData> {
     if (!payload.code) {
       throw new Error('No authorization code provided');
     }
 
     const accessToken = await this.exchangeCodeToToken(payload.code);
     const facebookUserInfo = await this.getUserInfo(accessToken);
-    return findOrCreateUser(facebookUserInfo);
+
+    // Transform Facebook user info to generic format
+    const email = facebookUserInfo.email || '';
+    const userName =
+      facebookUserInfo.name ||
+      facebookUserInfo.first_name ||
+      `User${facebookUserInfo.id.substring(0, 6)}`;
+    const avatarUrl = facebookUserInfo.picture?.data?.url || '';
+    return {
+      provider: 'facebook',
+      providerId: facebookUserInfo.id,
+      email,
+      userName,
+      avatarUrl,
+      identityData: facebookUserInfo,
+    };
   }
 }

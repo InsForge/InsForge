@@ -2,8 +2,7 @@ import axios from 'axios';
 import logger from '@/utils/logger.js';
 import { getApiBaseUrl } from '@/utils/environment';
 import { OAuthConfigService } from './oauth.config';
-import type { GitHubUserInfo, GitHubEmailInfo } from '@/types/auth';
-import type { CreateSessionResponse } from '@insforge/shared-schemas';
+import type { GitHubUserInfo, GitHubEmailInfo, OAuthUserData } from '@/types/auth';
 
 /**
  * GitHub OAuth Service
@@ -81,76 +80,105 @@ export class GitHubOAuthService {
       throw new Error('GitHub OAuth not configured');
     }
 
-    const clientSecret = await oAuthConfigService.getClientSecretByProvider('github');
-    const selfBaseUrl = getApiBaseUrl();
-    const response = await axios.post(
-      'https://github.com/login/oauth/access_token',
-      {
-        client_id: config.clientId,
-        client_secret: clientSecret,
-        code,
-        redirect_uri: `${selfBaseUrl}/api/auth/oauth/github/callback`,
-      },
-      {
-        headers: {
-          Accept: 'application/json',
+    try {
+      logger.info('Exchanging GitHub code for token', {
+        hasCode: !!code,
+        clientId: config.clientId?.substring(0, 10) + '...',
+      });
+
+      const clientSecret = await oAuthConfigService.getClientSecretByProvider('github');
+      const selfBaseUrl = getApiBaseUrl();
+      const response = await axios.post(
+        'https://github.com/login/oauth/access_token',
+        {
+          client_id: config.clientId,
+          client_secret: clientSecret,
+          code,
+          redirect_uri: `${selfBaseUrl}/api/auth/oauth/github/callback`,
         },
+        {
+          headers: {
+            Accept: 'application/json',
+          },
+        }
+      );
+
+      if (!response.data.access_token) {
+        throw new Error('Failed to get access token from GitHub');
       }
-    );
 
-    if (!response.data.access_token) {
-      throw new Error('Failed to get access token from GitHub');
+      return response.data.access_token;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        logger.error('GitHub token exchange failed', {
+          status: error.response.status,
+          error: error.response.data,
+        });
+        throw new Error(`GitHub OAuth error: ${JSON.stringify(error.response.data)}`);
+      }
+      throw error;
     }
-
-    return response.data.access_token;
   }
 
   /**
    * Get GitHub user info
    */
   async getUserInfo(accessToken: string): Promise<GitHubUserInfo> {
-    const userResponse = await axios.get('https://api.github.com/user', {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-
-    // GitHub doesn't always return email in user endpoint
-    let email = userResponse.data.email;
-
-    if (!email) {
-      const emailResponse = await axios.get('https://api.github.com/user/emails', {
+    try {
+      const userResponse = await axios.get('https://api.github.com/user', {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
       });
 
-      const primaryEmail = emailResponse.data.find((e: GitHubEmailInfo) => e.primary);
-      email = primaryEmail ? primaryEmail.email : emailResponse.data[0]?.email;
-    }
+      // GitHub doesn't always return email in user endpoint
+      let email = userResponse.data.email;
 
-    return {
-      id: userResponse.data.id,
-      login: userResponse.data.login,
-      name: userResponse.data.name,
-      email: email || `${userResponse.data.login}@users.noreply.github.com`,
-      avatar_url: userResponse.data.avatar_url,
-    };
+      if (!email) {
+        const emailResponse = await axios.get('https://api.github.com/user/emails', {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        const primaryEmail = emailResponse.data.find((e: GitHubEmailInfo) => e.primary);
+        email = primaryEmail ? primaryEmail.email : emailResponse.data[0]?.email;
+      }
+
+      return {
+        id: userResponse.data.id,
+        login: userResponse.data.login,
+        name: userResponse.data.name,
+        email: email || `${userResponse.data.login}@users.noreply.github.com`,
+        avatar_url: userResponse.data.avatar_url,
+      };
+    } catch (error) {
+      logger.error('GitHub user info retrieval failed:', error);
+      throw new Error(`Failed to get GitHub user info: ${error}`);
+    }
   }
 
   /**
    * Handle GitHub OAuth callback
    */
-  async handleCallback(
-    payload: { code?: string; token?: string },
-    findOrCreateUser: (githubUserInfo: GitHubUserInfo) => Promise<CreateSessionResponse>
-  ): Promise<CreateSessionResponse> {
+  async handleCallback(payload: { code?: string; token?: string }): Promise<OAuthUserData> {
     if (!payload.code) {
       throw new Error('No authorization code provided');
     }
 
     const accessToken = await this.exchangeCodeToToken(payload.code);
     const githubUserInfo = await this.getUserInfo(accessToken);
-    return findOrCreateUser(githubUserInfo);
+
+    // Transform GitHub user info to generic format
+    const userName = githubUserInfo.name || githubUserInfo.login;
+    const email = githubUserInfo.email || `${githubUserInfo.login}@users.noreply.github.com`;
+    return {
+      provider: 'github',
+      providerId: githubUserInfo.id.toString(),
+      email,
+      userName,
+      avatarUrl: githubUserInfo.avatar_url || '',
+      identityData: githubUserInfo,
+    };
   }
 }

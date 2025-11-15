@@ -3,8 +3,7 @@ import { OAuth2Client } from 'google-auth-library';
 import logger from '@/utils/logger.js';
 import { getApiBaseUrl } from '@/utils/environment';
 import { OAuthConfigService } from './oauth.config';
-import type { GoogleUserInfo } from '@/types/auth';
-import type { CreateSessionResponse } from '@insforge/shared-schemas';
+import type { GoogleUserInfo, OAuthUserData } from '@/types/auth';
 
 /**
  * Google OAuth Service
@@ -204,21 +203,27 @@ export class GoogleOAuthService {
   /**
    * Handle Google OAuth callback
    */
-  async handleCallback(
-    payload: { code?: string; token?: string },
-    findOrCreateUser: (googleUserInfo: GoogleUserInfo) => Promise<CreateSessionResponse>
-  ): Promise<CreateSessionResponse> {
+  async handleCallback(payload: { code?: string; token?: string }): Promise<OAuthUserData> {
+    let googleUserInfo: GoogleUserInfo;
+
     if (payload.token) {
-      const googleUserInfo = await this.verifyToken(payload.token);
-      return findOrCreateUser(googleUserInfo);
-    }
-
-    if (payload.code) {
+      googleUserInfo = await this.verifyToken(payload.token);
+    } else if (payload.code) {
       const tokens = await this.exchangeCodeToToken(payload.code);
-      const googleUserInfo = await this.verifyToken(tokens.id_token);
-      return findOrCreateUser(googleUserInfo);
+      googleUserInfo = await this.verifyToken(tokens.id_token);
+    } else {
+      throw new Error('No authorization code or token provided');
     }
 
-    throw new Error('No authorization code or token provided');
+    // Transform Google user info to generic format
+    const userName = googleUserInfo.name || googleUserInfo.email.split('@')[0];
+    return {
+      provider: 'google',
+      providerId: googleUserInfo.sub,
+      email: googleUserInfo.email,
+      userName,
+      avatarUrl: googleUserInfo.picture || '',
+      identityData: googleUserInfo,
+    };
   }
 }

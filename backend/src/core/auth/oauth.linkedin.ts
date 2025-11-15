@@ -2,8 +2,7 @@ import axios from 'axios';
 import logger from '@/utils/logger.js';
 import { getApiBaseUrl } from '@/utils/environment';
 import { OAuthConfigService } from './oauth.config';
-import type { LinkedInUserInfo } from '@/types/auth';
-import type { CreateSessionResponse } from '@insforge/shared-schemas';
+import type { LinkedInUserInfo, OAuthUserData } from '@/types/auth';
 
 /**
  * LinkedIn OAuth Service
@@ -193,21 +192,27 @@ export class LinkedInOAuthService {
   /**
    * Handle LinkedIn OAuth callback
    */
-  async handleCallback(
-    payload: { code?: string; token?: string },
-    findOrCreateUser: (linkedinUserInfo: LinkedInUserInfo) => Promise<CreateSessionResponse>
-  ): Promise<CreateSessionResponse> {
+  async handleCallback(payload: { code?: string; token?: string }): Promise<OAuthUserData> {
+    let linkedinUserInfo: LinkedInUserInfo;
+
     if (payload.token) {
-      const linkedinUserInfo = await this.verifyToken(payload.token);
-      return findOrCreateUser(linkedinUserInfo);
-    }
-
-    if (payload.code) {
+      linkedinUserInfo = await this.verifyToken(payload.token);
+    } else if (payload.code) {
       const tokens = await this.exchangeCodeToToken(payload.code);
-      const linkedinUserInfo = await this.verifyToken(tokens.id_token);
-      return findOrCreateUser(linkedinUserInfo);
+      linkedinUserInfo = await this.verifyToken(tokens.id_token);
+    } else {
+      throw new Error('No authorization code or token provided');
     }
 
-    throw new Error('No authorization code or token provided');
+    // Transform LinkedIn user info to generic format
+    const userName = linkedinUserInfo.name || linkedinUserInfo.email.split('@')[0];
+    return {
+      provider: 'linkedin',
+      providerId: linkedinUserInfo.sub,
+      email: linkedinUserInfo.email,
+      userName,
+      avatarUrl: linkedinUserInfo.picture || '',
+      identityData: linkedinUserInfo,
+    };
   }
 }

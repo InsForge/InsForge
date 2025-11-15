@@ -1,8 +1,8 @@
 import axios from 'axios';
+import logger from '@/utils/logger.js';
 import { getApiBaseUrl } from '@/utils/environment';
 import { OAuthConfigService } from './oauth.config';
-import type { MicrosoftUserInfo } from '@/types/auth';
-import type { CreateSessionResponse } from '@insforge/shared-schemas';
+import type { MicrosoftUserInfo, OAuthUserData } from '@/types/auth';
 
 /**
  * Microsoft OAuth Service
@@ -34,6 +34,10 @@ export class MicrosoftOAuthService {
 
     const selfBaseUrl = getApiBaseUrl();
 
+    logger.debug('Microsoft OAuth Config (fresh from DB):', {
+      clientId: config.clientId ? 'SET' : 'NOT SET',
+    });
+
     // Note: shared-keys path not implemented for Microsoft; configure local keys
     const authUrl = new URL('https://login.microsoftonline.com/common/oauth2/v2.0/authorize');
     authUrl.searchParams.set('client_id', config.clientId ?? '');
@@ -60,76 +64,105 @@ export class MicrosoftOAuthService {
     if (!config) {
       throw new Error('Microsoft OAuth not configured');
     }
-    const clientSecret = await oAuthConfigService.getClientSecretByProvider('microsoft');
-    const selfBaseUrl = getApiBaseUrl();
 
-    const body = new URLSearchParams({
-      client_id: config.clientId ?? '',
-      client_secret: clientSecret ?? '',
-      code,
-      redirect_uri: `${selfBaseUrl}/api/auth/oauth/microsoft/callback`,
-      grant_type: 'authorization_code',
-      scope:
-        config.scopes && config.scopes.length > 0
-          ? config.scopes.join(' ')
-          : 'openid email profile offline_access User.Read',
-    });
+    try {
+      logger.info('Exchanging Microsoft code for tokens', {
+        hasCode: !!code,
+        clientId: config.clientId?.substring(0, 10) + '...',
+      });
 
-    const response = await axios.post(
-      'https://login.microsoftonline.com/common/oauth2/v2.0/token',
-      body.toString(),
-      {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      const clientSecret = await oAuthConfigService.getClientSecretByProvider('microsoft');
+      const selfBaseUrl = getApiBaseUrl();
+
+      const body = new URLSearchParams({
+        client_id: config.clientId ?? '',
+        client_secret: clientSecret ?? '',
+        code,
+        redirect_uri: `${selfBaseUrl}/api/auth/oauth/microsoft/callback`,
+        grant_type: 'authorization_code',
+        scope:
+          config.scopes && config.scopes.length > 0
+            ? config.scopes.join(' ')
+            : 'openid email profile offline_access User.Read',
+      });
+
+      const response = await axios.post(
+        'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+        body.toString(),
+        {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        }
+      );
+
+      if (!response.data.access_token) {
+        throw new Error('Failed to get access token from Microsoft');
       }
-    );
-
-    if (!response.data.access_token) {
-      throw new Error('Failed to get access token from Microsoft');
+      return {
+        access_token: response.data.access_token,
+        id_token: response.data.id_token, // optional
+      };
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        logger.error('Microsoft token exchange failed', {
+          status: error.response.status,
+          error: error.response.data,
+        });
+        throw new Error(`Microsoft OAuth error: ${JSON.stringify(error.response.data)}`);
+      }
+      throw error;
     }
-    return {
-      access_token: response.data.access_token,
-      id_token: response.data.id_token, // optional
-    };
   }
 
   /**
    * Get Microsoft user info via Graph API
    */
   async getUserInfo(accessToken: string): Promise<MicrosoftUserInfo> {
-    const userResp = await axios.get('https://graph.microsoft.com/v1.0/me', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+    try {
+      const userResp = await axios.get('https://graph.microsoft.com/v1.0/me', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
 
-    const data = userResp.data as {
-      id: string;
-      displayName?: string;
-      userPrincipalName?: string;
-      mail?: string | null;
-    };
+      const data = userResp.data as {
+        id: string;
+        displayName?: string;
+        userPrincipalName?: string;
+        mail?: string | null;
+      };
 
-    const email = data.mail || data.userPrincipalName || `${data.id}@users.noreply.microsoft.com`;
-    const name = data.displayName || data.userPrincipalName || email;
+      const email = data.mail || data.userPrincipalName || `${data.id}@users.noreply.microsoft.com`;
+      const name = data.displayName || data.userPrincipalName || email;
 
-    return {
-      id: data.id,
-      email,
-      name,
-    };
+      return {
+        id: data.id,
+        email,
+        name,
+      };
+    } catch (error) {
+      logger.error('Microsoft user info retrieval failed:', error);
+      throw new Error(`Failed to get Microsoft user info: ${error}`);
+    }
   }
 
   /**
    * Handle Microsoft OAuth callback
    */
-  async handleCallback(
-    payload: { code?: string; token?: string },
-    findOrCreateUser: (microsoftUserInfo: MicrosoftUserInfo) => Promise<CreateSessionResponse>
-  ): Promise<CreateSessionResponse> {
+  async handleCallback(payload: { code?: string; token?: string }): Promise<OAuthUserData> {
     if (!payload.code) {
       throw new Error('No authorization code provided');
     }
 
     const tokens = await this.exchangeCodeToToken(payload.code);
     const microsoftUserInfo = await this.getUserInfo(tokens.access_token);
-    return findOrCreateUser(microsoftUserInfo);
+
+    // Transform Microsoft user info to generic format
+    const userName = microsoftUserInfo.name || microsoftUserInfo.email.split('@')[0] || 'user';
+    return {
+      provider: 'microsoft',
+      providerId: microsoftUserInfo.id,
+      email: microsoftUserInfo.email,
+      userName,
+      avatarUrl: '', // Microsoft doesn't provide avatar in basic profile
+      identityData: microsoftUserInfo,
+    };
   }
 }

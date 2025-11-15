@@ -38,6 +38,7 @@ import {
   LinkedInUserInfo,
   DiscordUserInfo,
   UserRecord,
+  OAuthUserData,
 } from '@/types/auth';
 import { ADMIN_ID } from '@/utils/constants';
 import { getApiBaseUrl } from '@/utils/environment';
@@ -57,6 +58,14 @@ export class AuthService {
   private adminEmail: string;
   private adminPassword: string;
   private db;
+
+  // OAuth service instances (cached singletons)
+  private googleOAuth: GoogleOAuthService;
+  private githubOAuth: GitHubOAuthService;
+  private discordOAuth: DiscordOAuthService;
+  private linkedinOAuth: LinkedInOAuthService;
+  private facebookOAuth: FacebookOAuthService;
+  private microsoftOAuth: MicrosoftOAuthService;
 
   private constructor() {
     // Load .env file if not already loaded
@@ -85,6 +94,14 @@ export class AuthService {
 
     const dbManager = DatabaseManager.getInstance();
     this.db = dbManager.getDb();
+
+    // Initialize OAuth services (cached singletons)
+    this.googleOAuth = GoogleOAuthService.getInstance();
+    this.githubOAuth = GitHubOAuthService.getInstance();
+    this.discordOAuth = DiscordOAuthService.getInstance();
+    this.linkedinOAuth = LinkedInOAuthService.getInstance();
+    this.facebookOAuth = FacebookOAuthService.getInstance();
+    this.microsoftOAuth = MicrosoftOAuthService.getInstance();
 
     logger.info('AuthService initialized');
   }
@@ -863,140 +880,6 @@ export class AuthService {
     }
   }
 
-  /**
-   * Generate GitHub OAuth authorization URL
-   */
-  async generateGitHubOAuthUrl(state?: string): Promise<string> {
-    const githubOAuthService = GitHubOAuthService.getInstance();
-    return githubOAuthService.generateOAuthUrl(state);
-  }
-
-  /**
-   * Generate Discord OAuth authorization URL
-   */
-  async generateDiscordOAuthUrl(state?: string): Promise<string> {
-    const discordOAuthService = DiscordOAuthService.getInstance();
-    return discordOAuthService.generateOAuthUrl(state);
-  }
-
-  /**
-   * Find or create GitHub user
-   */
-  async findOrCreateGitHubUser(githubUserInfo: GitHubUserInfo): Promise<CreateSessionResponse> {
-    const userName = githubUserInfo.name || githubUserInfo.login;
-    const email = githubUserInfo.email || `${githubUserInfo.login}@users.noreply.github.com`;
-
-    return this.findOrCreateThirdPartyUser(
-      'github',
-      githubUserInfo.id.toString(),
-      email,
-      userName,
-      githubUserInfo.avatar_url || '',
-      githubUserInfo
-    );
-  }
-  /**
-   * Generate Microsoft OAuth authorization URL
-   */
-  async generateMicrosoftOAuthUrl(state?: string): Promise<string> {
-    const microsoftOAuthService = MicrosoftOAuthService.getInstance();
-    return microsoftOAuthService.generateOAuthUrl(state);
-  }
-
-  /**
-   * Find or create Microsoft user
-   */
-  async findOrCreateMicrosoftUser(msUserInfo: {
-    id: string;
-    displayName?: string;
-    userPrincipalName?: string;
-    email: string;
-    avatar_url?: string;
-  }): Promise<CreateSessionResponse> {
-    const userName = msUserInfo.displayName || msUserInfo.email.split('@')[0] || 'user';
-    return this.findOrCreateThirdPartyUser(
-      'microsoft',
-      msUserInfo.id,
-      msUserInfo.email,
-      userName,
-      msUserInfo.avatar_url || '',
-      msUserInfo
-    );
-  }
-
-  /**
-   * Find or create Discord user
-   */
-  async findOrCreateDiscordUser(discordUserInfo: DiscordUserInfo): Promise<CreateSessionResponse> {
-    const userName = discordUserInfo.username;
-    const email = discordUserInfo.email || `${discordUserInfo.id}@users.noreply.discord.local`;
-
-    return this.findOrCreateThirdPartyUser(
-      'discord',
-      discordUserInfo.id,
-      email,
-      userName,
-      discordUserInfo.avatar || '',
-      discordUserInfo
-    );
-  }
-
-  /**
-   * Generate LinkedIn OAuth authorization URL
-   */
-  async generateLinkedInOAuthUrl(state?: string): Promise<string> {
-    const linkedinOAuthService = LinkedInOAuthService.getInstance();
-    return linkedinOAuthService.generateOAuthUrl(state);
-  }
-
-  /**
-   * Find or create LinkedIn user
-   */
-  async findOrCreateLinkedInUser(
-    linkedinUserInfo: LinkedInUserInfo
-  ): Promise<CreateSessionResponse> {
-    const userName = linkedinUserInfo.name || linkedinUserInfo.email.split('@')[0];
-    return this.findOrCreateThirdPartyUser(
-      'linkedin',
-      linkedinUserInfo.sub,
-      linkedinUserInfo.email,
-      userName,
-      linkedinUserInfo.picture || '',
-      linkedinUserInfo
-    );
-  }
-
-  /**
-   * Generate Facebook OAuth authorization URL
-   */
-  async generateFacebookOAuthUrl(state?: string): Promise<string> {
-    const facebookOAuthService = FacebookOAuthService.getInstance();
-    return facebookOAuthService.generateOAuthUrl(state);
-  }
-
-  /**
-   * Find or create Facebook user
-   */
-  async findOrCreateFacebookUser(
-    facebookUserInfo: FacebookUserInfo
-  ): Promise<CreateSessionResponse> {
-    const email = facebookUserInfo.email || '';
-    const userName =
-      facebookUserInfo.name ||
-      facebookUserInfo.first_name ||
-      `User${facebookUserInfo.id.substring(0, 6)}`;
-    const avatarUrl = facebookUserInfo.picture?.data?.url || '';
-
-    return this.findOrCreateThirdPartyUser(
-      'facebook',
-      facebookUserInfo.id,
-      email,
-      userName,
-      avatarUrl,
-      facebookUserInfo
-    );
-  }
-
   async getMetadata(): Promise<AuthMetadataSchema> {
     const oAuthConfigService = OAuthConfigService.getInstance();
     const oAuthConfigs = await oAuthConfigService.getAllConfigs();
@@ -1010,20 +893,18 @@ export class AuthService {
    */
   async generateOAuthUrl(provider: OAuthProvidersSchema, state?: string): Promise<string> {
     switch (provider) {
-      case 'google': {
-        const googleOAuthService = GoogleOAuthService.getInstance();
-        return googleOAuthService.generateOAuthUrl(state);
-      }
+      case 'google':
+        return this.googleOAuth.generateOAuthUrl(state);
       case 'github':
-        return this.generateGitHubOAuthUrl(state);
+        return this.githubOAuth.generateOAuthUrl(state);
       case 'discord':
-        return this.generateDiscordOAuthUrl(state);
+        return this.discordOAuth.generateOAuthUrl(state);
       case 'linkedin':
-        return this.generateLinkedInOAuthUrl(state);
+        return this.linkedinOAuth.generateOAuthUrl(state);
       case 'facebook':
-        return this.generateFacebookOAuthUrl(state);
+        return this.facebookOAuth.generateOAuthUrl(state);
       case 'microsoft':
-        return this.generateMicrosoftOAuthUrl(state);
+        return this.microsoftOAuth.generateOAuthUrl(state);
       default:
         throw new Error(`OAuth provider ${provider} is not implemented yet.`);
     }
@@ -1036,98 +917,38 @@ export class AuthService {
     provider: OAuthProvidersSchema,
     payload: { code?: string; token?: string }
   ): Promise<CreateSessionResponse> {
+    let userData: OAuthUserData;
+
     switch (provider) {
-      case 'google': {
-        const googleOAuthService = GoogleOAuthService.getInstance();
-        return googleOAuthService.handleCallback(payload, (googleUserInfo) => {
-          const userName = googleUserInfo.name || googleUserInfo.email.split('@')[0];
-          return this.findOrCreateThirdPartyUser(
-            'google',
-            googleUserInfo.sub,
-            googleUserInfo.email,
-            userName,
-            googleUserInfo.picture || '',
-            googleUserInfo
-          );
-        });
-      }
+      case 'google':
+        userData = await this.googleOAuth.handleCallback(payload);
+        break;
       case 'github':
-        return this.handleGitHubCallback(payload);
+        userData = await this.githubOAuth.handleCallback(payload);
+        break;
       case 'discord':
-        return this.handleDiscordCallback(payload);
+        userData = await this.discordOAuth.handleCallback(payload);
+        break;
       case 'linkedin':
-        return this.handleLinkedInCallback(payload);
+        userData = await this.linkedinOAuth.handleCallback(payload);
+        break;
       case 'facebook':
-        return this.handleFacebookCallback(payload);
+        userData = await this.facebookOAuth.handleCallback(payload);
+        break;
       case 'microsoft':
-        return this.handleMicrosoftCallback(payload);
+        userData = await this.microsoftOAuth.handleCallback(payload);
+        break;
       default:
         throw new Error(`OAuth provider ${provider} is not implemented yet.`);
     }
-  }
 
-  /**
-   * Handle GitHub OAuth callback
-   */
-  private async handleGitHubCallback(payload: {
-    code?: string;
-    token?: string;
-  }): Promise<CreateSessionResponse> {
-    const githubOAuthService = GitHubOAuthService.getInstance();
-    return githubOAuthService.handleCallback(payload, (githubUserInfo) =>
-      this.findOrCreateGitHubUser(githubUserInfo)
-    );
-  }
-
-  /**
-   * Handle Discord OAuth callback
-   */
-  private async handleDiscordCallback(payload: {
-    code?: string;
-    token?: string;
-  }): Promise<CreateSessionResponse> {
-    const discordOAuthService = DiscordOAuthService.getInstance();
-    return discordOAuthService.handleCallback(payload, (discordUserInfo) =>
-      this.findOrCreateDiscordUser(discordUserInfo)
-    );
-  }
-
-  /**
-   * Handle LinkedIn OAuth callback
-   */
-  private async handleLinkedInCallback(payload: {
-    code?: string;
-    token?: string;
-  }): Promise<CreateSessionResponse> {
-    const linkedinOAuthService = LinkedInOAuthService.getInstance();
-    return linkedinOAuthService.handleCallback(payload, (linkedinUserInfo) =>
-      this.findOrCreateLinkedInUser(linkedinUserInfo)
-    );
-  }
-
-  /**
-   * Handle Facebook OAuth callback
-   */
-  private async handleFacebookCallback(payload: {
-    code?: string;
-    token?: string;
-  }): Promise<CreateSessionResponse> {
-    const facebookOAuthService = FacebookOAuthService.getInstance();
-    return facebookOAuthService.handleCallback(payload, (facebookUserInfo) =>
-      this.findOrCreateFacebookUser(facebookUserInfo)
-    );
-  }
-
-  /**
-   * Handle Microsoft OAuth callback
-   */
-  private async handleMicrosoftCallback(payload: {
-    code?: string;
-    token?: string;
-  }): Promise<CreateSessionResponse> {
-    const microsoftOAuthService = MicrosoftOAuthService.getInstance();
-    return microsoftOAuthService.handleCallback(payload, (microsoftUserInfo) =>
-      this.findOrCreateMicrosoftUser(microsoftUserInfo)
+    return this.findOrCreateThirdPartyUser(
+      userData.provider,
+      userData.providerId,
+      userData.email,
+      userData.userName,
+      userData.avatarUrl,
+      userData.identityData
     );
   }
 
