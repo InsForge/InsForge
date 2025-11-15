@@ -55,9 +55,7 @@ export class MicrosoftOAuthService {
   /**
    * Exchange Microsoft code for tokens
    */
-  async exchangeCodeToToken(
-    code: string
-  ): Promise<{ access_token: string; id_token?: string }> {
+  async exchangeCodeToToken(code: string): Promise<{ access_token: string; id_token?: string }> {
     const oAuthConfigService = OAuthConfigService.getInstance();
     const config = await oAuthConfigService.getConfigByProvider('microsoft');
     if (!config) {
