@@ -37,7 +37,7 @@ const createCronJobSchema = z.object({
     .optional(),
 });
 
-type CronJobForm = z.infer<typeof createCronJobSchema>;
+export type CronJobForm = z.infer<typeof createCronJobSchema>;
 
 interface CronJobFormDialogProps {
   open: boolean;

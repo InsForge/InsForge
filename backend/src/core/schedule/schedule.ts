@@ -67,18 +67,19 @@ export class ScheduleService {
       client.release();
     }
   }
-  private _computeNextRunForSchedule(s: Schedule | null): string | null {
+
+  private _computeNextRunForSchedule(schedule: Schedule | null): string | null {
     try {
-      if (!s) {
+      if (!schedule) {
         return null;
       }
-      if (!s.cronSchedule) {
+      if (!schedule.cronSchedule) {
         return null;
       }
 
-      const createdAt = s.createdAt ? new Date(s.createdAt) : null;
-      const updatedAt = s.updatedAt ? new Date(s.updatedAt) : null;
-      const lastExecutedAt = s.lastExecutedAt ? new Date(s.lastExecutedAt) : null;
+      const createdAt = schedule.createdAt ? new Date(schedule.createdAt) : null;
+      const updatedAt = schedule.updatedAt ? new Date(schedule.updatedAt) : null;
+      const lastExecutedAt = schedule.lastExecutedAt ? new Date(schedule.lastExecutedAt) : null;
 
       // Determine base date using precedence
       let after: Date;
@@ -96,7 +97,7 @@ export class ScheduleService {
       }
 
       // Use the library's documented API: CronExpressionParser.parse(...)
-      const cronExpression = CronExpressionParser.parse(s.cronSchedule, {
+      const cronExpression = CronExpressionParser.parse(schedule.cronSchedule, {
         currentDate: after,
       });
       const nextDate = cronExpression.next();
@@ -104,7 +105,7 @@ export class ScheduleService {
     } catch (err) {
       // If parsing fails or values are invalid, return null. Don't throw so listing still succeeds.
       logger.warn('Failed to compute nextRun for schedule', {
-        scheduleId: s?.id,
+        scheduleId: schedule?.id,
         rawError: String(err),
         error: err instanceof Error ? { message: err.message, stack: err.stack } : err,
       });
