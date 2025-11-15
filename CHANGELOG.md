@@ -1,5 +1,7 @@
 # Changelog
 
+# [1.2.0](https://github.com/InsForge/InsForge/compare/v1.1.7-Nov13...v1.2.0) (2025-11-15)
+
 ## [1.1.2](https://github.com/InsForge/InsForge/compare/v1.1.0-posthog-9...v1.1.2) (2025-10-28)
 
 
