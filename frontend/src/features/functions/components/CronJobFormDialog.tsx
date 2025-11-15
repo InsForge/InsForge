@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSchedules } from '@/features/schedules/hooks/useSchedules';
+import { useSchedules } from '@/features/functions/hooks/useSchedules';
 import type { ScheduleRow } from '../types/schedules';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
