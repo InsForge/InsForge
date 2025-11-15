@@ -80,9 +80,7 @@ export class LinkedInOAuthService {
   /**
    * Exchange LinkedIn code for tokens
    */
-  async exchangeCodeToToken(
-    code: string
-  ): Promise<{ access_token: string; id_token: string }> {
+  async exchangeCodeToToken(code: string): Promise<{ access_token: string; id_token: string }> {
     if (this.processedCodes.has(code)) {
       const cachedTokens = this.tokenCache.get(code);
       if (cachedTokens) {
