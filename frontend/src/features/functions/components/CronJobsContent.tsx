@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import { useSchedules } from '@/features/schedules/hooks/useSchedules';
 import { Button } from '@/components/radix/Button';
-import { CronJobFormDialog } from './CronJobFormDialog';
+import { CronJobFormDialog, CronJobForm } from './CronJobFormDialog';
 import ScheduleRow from './ScheduleRow';
 import ScheduleExecutionLogs from './ScheduleExecutionLogs';
 import { Skeleton } from '@/components/radix/Skeleton';
@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/radix/Alert';
 import { SearchInput } from '@/components';
 import { EmptyState } from '@/components/EmptyState';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
 // DataGrid is not used in the list view; keep the import commented out in case we revert to grid view
 // import DataGrid from '@/components/datagrid/DataGrid';
@@ -25,10 +26,7 @@ export function CronJobsContent() {
     id: string;
     name: string;
   } | null>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [confirmIds, setConfirmIds] = useState<string[]>([]);
-  const [confirmTitle, setConfirmTitle] = useState<string | undefined>(undefined);
-  const [confirmDescription, setConfirmDescription] = useState<string | undefined>(undefined);
+  const { confirm, confirmDialogProps } = useConfirm();
 
   const { showToast } = useToast();
   const {
@@ -56,16 +54,27 @@ export function CronJobsContent() {
   // toggle handler is available via the schedules hook (toggleScheduleFn) when needed.
 
   const handleDeleteSchedule = useCallback(
-    (scheduleId: string) => {
+    async (scheduleId: string) => {
       const schedule = schedules.find((s) => s.id === scheduleId);
-      setConfirmIds([scheduleId]);
-      setConfirmTitle('Delete Cron Job');
-      setConfirmDescription(
-        `Are you sure you want to delete the cron job "${schedule?.name}"? This action cannot be undone.`
-      );
-      setConfirmOpen(true);
+      try {
+        const confirmed = await confirm({
+          title: 'Delete Cron Job',
+          description: `Are you sure you want to delete the cron job "${schedule?.name}"? This action cannot be undone.`,
+          confirmText: 'Delete',
+          cancelText: 'Cancel',
+          destructive: true,
+        });
+
+        if (!confirmed) {
+          return;
+        }
+
+        await deleteScheduleFn(scheduleId);
+      } catch (err) {
+        console.error('delete cron job error', err);
+      }
     },
-    [schedules]
+    [schedules, confirm, deleteScheduleFn]
   );
 
   const handleEditSchedule = useCallback((scheduleId: string) => {
@@ -80,6 +89,96 @@ export function CronJobsContent() {
   const handleBackFromLogs = useCallback(() => {
     setSelectedScheduleForLogs(null);
   }, []);
+
+  const handleCreateOnSubmit = async (values: CronJobForm) => {
+    try {
+      const normalizeHeaders = (h: unknown): Record<string, string> | undefined => {
+        if (h === null) {
+          return undefined;
+        }
+        if (typeof h === 'string') {
+          try {
+            const parsed = JSON.parse(h);
+            if (parsed && typeof parsed === 'object') {
+              return Object.fromEntries(Object.entries(parsed).map(([k, v]) => [k, String(v)]));
+            }
+            return undefined;
+          } catch {
+            return undefined;
+          }
+        }
+        if (typeof h === 'object') {
+          return Object.fromEntries(
+            Object.entries(h as Record<string, unknown>).map(([k, v]) => [k, String(v)])
+          );
+        }
+        return undefined;
+      };
+
+      const ok = await createOrUpdate({
+        name: values.name,
+        cronSchedule: values.cronSchedule,
+        functionUrl: values.functionUrl,
+        httpMethod: values.httpMethod || 'POST',
+        headers: normalizeHeaders(values.headers),
+        body: values.body ?? undefined,
+      });
+      if (!ok) {
+        showToast('Failed to create cron job', 'error');
+        throw new Error('create failed');
+      }
+    } catch (err) {
+      console.error('create cron job error', err);
+      throw err;
+    }
+  };
+
+  const handleEditOnSubmit = async (values: CronJobForm) => {
+    try {
+      if (!editingScheduleId) {
+        return;
+      }
+      const normalizeHeaders = (h: unknown): Record<string, string> | undefined => {
+        if (h === null) {
+          return undefined;
+        }
+        if (typeof h === 'string') {
+          try {
+            const parsed = JSON.parse(h);
+            if (parsed && typeof parsed === 'object') {
+              return Object.fromEntries(Object.entries(parsed).map(([k, v]) => [k, String(v)]));
+            }
+            return undefined;
+          } catch {
+            return undefined;
+          }
+        }
+        if (typeof h === 'object') {
+          return Object.fromEntries(
+            Object.entries(h as Record<string, unknown>).map(([k, v]) => [k, String(v)])
+          );
+        }
+        return undefined;
+      };
+
+      const ok = await createOrUpdate({
+        id: editingScheduleId,
+        name: values.name,
+        cronSchedule: values.cronSchedule,
+        functionUrl: values.functionUrl,
+        httpMethod: values.httpMethod || 'POST',
+        headers: normalizeHeaders(values.headers),
+        body: values.body ?? undefined,
+      });
+      if (!ok) {
+        showToast('Failed to update cron job', 'error');
+        throw new Error('update failed');
+      }
+    } catch (err) {
+      console.error('update cron job error', err);
+      throw err;
+    }
+  };
 
   // Show logs detail view if schedule is selected
   if (selectedScheduleForLogs) {
@@ -140,50 +239,7 @@ export function CronJobsContent() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         mode="create"
-        onSubmit={async (values) => {
-          try {
-            const normalizeHeaders = (h: unknown): Record<string, string> | undefined => {
-              if (h === null) {
-                return undefined;
-              }
-              if (typeof h === 'string') {
-                try {
-                  const parsed = JSON.parse(h);
-                  if (parsed && typeof parsed === 'object') {
-                    return Object.fromEntries(
-                      Object.entries(parsed).map(([k, v]) => [k, String(v)])
-                    );
-                  }
-                  return undefined;
-                } catch {
-                  return undefined;
-                }
-              }
-              if (typeof h === 'object') {
-                return Object.fromEntries(
-                  Object.entries(h as Record<string, unknown>).map(([k, v]) => [k, String(v)])
-                );
-              }
-              return undefined;
-            };
-
-            const ok = await createOrUpdate({
-              name: values.name,
-              cronSchedule: values.cronSchedule,
-              functionUrl: values.functionUrl,
-              httpMethod: values.httpMethod || 'POST',
-              headers: normalizeHeaders(values.headers),
-              body: values.body ?? undefined,
-            });
-            if (!ok) {
-              showToast('Failed to create cron job', 'error');
-              throw new Error('create failed');
-            }
-          } catch (err) {
-            console.error('create cron job error', err);
-            throw err;
-          }
-        }}
+        onSubmit={handleCreateOnSubmit}
       />
 
       {/* Edit dialog */}
@@ -198,83 +254,12 @@ export function CronJobsContent() {
           }}
           mode="edit"
           scheduleId={editingScheduleId}
-          onSubmit={async (values) => {
-            try {
-              if (!editingScheduleId) {
-                return;
-              }
-              const normalizeHeaders = (h: unknown): Record<string, string> | undefined => {
-                if (h === null) {
-                  return undefined;
-                }
-                if (typeof h === 'string') {
-                  try {
-                    const parsed = JSON.parse(h);
-                    if (parsed && typeof parsed === 'object') {
-                      return Object.fromEntries(
-                        Object.entries(parsed).map(([k, v]) => [k, String(v)])
-                      );
-                    }
-                    return undefined;
-                  } catch {
-                    return undefined;
-                  }
-                }
-                if (typeof h === 'object') {
-                  return Object.fromEntries(
-                    Object.entries(h as Record<string, unknown>).map(([k, v]) => [k, String(v)])
-                  );
-                }
-                return undefined;
-              };
-
-              const ok = await createOrUpdate({
-                id: editingScheduleId,
-                name: values.name,
-                cronSchedule: values.cronSchedule,
-                functionUrl: values.functionUrl,
-                httpMethod: values.httpMethod || 'POST',
-                headers: normalizeHeaders(values.headers),
-                body: values.body ?? undefined,
-              });
-              if (!ok) {
-                showToast('Failed to update cron job', 'error');
-                throw new Error('update failed');
-              }
-            } catch (err) {
-              console.error('update cron job error', err);
-              throw err;
-            }
-          }}
+          onSubmit={handleEditOnSubmit}
         />
       )}
 
-      {/* Confirm delete dialog (single or bulk) — reuse shared ConfirmDialog component */}
-      <ConfirmDialog
-        open={confirmOpen}
-        onOpenChange={(open) => {
-          setConfirmOpen(open);
-          if (!open) {
-            setConfirmIds([]);
-            setConfirmTitle(undefined);
-            setConfirmDescription(undefined);
-          }
-        }}
-        title={confirmTitle ?? 'Delete'}
-        description={
-          confirmDescription ??
-          'Are you sure you want to delete the selected item(s)? This action cannot be undone.'
-        }
-        confirmText="Delete"
-        cancelText="Cancel"
-        destructive={true}
-        onConfirm={() => {
-          // perform deletions
-          confirmIds.forEach((id) => {
-            void deleteScheduleFn(id);
-          });
-        }}
-      />
+      {/* Confirm delete dialog managed by useConfirm hook */}
+      <ConfirmDialog {...confirmDialogProps} />
 
       {/* List view matching FunctionRow pattern with header and horizontal scroll */}
       <div className="flex-1 min-h-0 overflow-auto">
@@ -311,7 +296,7 @@ export function CronJobsContent() {
                       schedule={s}
                       onClick={() => void handleViewLogs(s.id, s.name)}
                       onEdit={(id) => handleEditSchedule(id)}
-                      onDelete={(id) => handleDeleteSchedule(id)}
+                      onDelete={(id) => void handleDeleteSchedule(id)}
                       onToggle={(id, isActive) => void toggleScheduleFn(id, isActive)}
                       isLoading={Boolean(isTogglingStatus || isDeletingSchedule)}
                     />

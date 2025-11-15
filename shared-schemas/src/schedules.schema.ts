@@ -10,7 +10,7 @@ export const scheduleSchema = z.object({
   name: z.string(),
   cronSchedule: z.string(),
   functionUrl: z.string().url(),
-  httpMethod: z.string(),
+  httpMethod: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']),
   // Optional HTTP headers to include when invoking the scheduled function
   headers: z.record(z.string()).nullable().optional(),
   // Body payload for the scheduled invocation. Can be a JSON object or a raw string.
