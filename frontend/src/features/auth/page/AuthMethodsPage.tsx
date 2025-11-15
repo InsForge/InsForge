@@ -18,8 +18,9 @@ import type { OAuthProvidersSchema } from '@insforge/shared-schemas';
 import {
   oauthProviders,
   type OAuthProviderInfo,
-  AUTH_IMPLEMENTATION_PROMPT,
+  getAuthImplementationPrompt,
 } from '@/features/auth/helpers';
+import { getBackendUrl } from '@/lib/utils/utils';
 
 export default function AuthMethodsPage() {
   const [selectedProvider, setSelectedProvider] = useState<OAuthProviderInfo>();
@@ -243,7 +244,7 @@ export default function AuthMethodsPage() {
                 Integrate Authentication to Your Application
               </p>
               <CopyButton
-                text={AUTH_IMPLEMENTATION_PROMPT}
+                text={getAuthImplementationPrompt(getBackendUrl())}
                 copyText="Copy Prompt"
                 variant="primary"
                 className="w-34"
