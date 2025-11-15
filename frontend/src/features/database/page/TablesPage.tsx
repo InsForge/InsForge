@@ -1,17 +1,12 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { Plus, Upload } from 'lucide-react';
 import PencilIcon from '@/assets/icons/pencil.svg?react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
-import { useTables } from '@/features/database/hooks/useTables';
-import { useRecords } from '@/features/database/hooks/useRecords';
-import { Button } from '@/components/radix/Button';
-import { Alert, AlertDescription } from '@/components/radix/Alert';
-import { TableSidebar } from '@/features/database/components/TableSidebar';
-import { RecordFormDialog } from '@/features/database/components/RecordFormDialog';
-import { TableForm } from '@/features/database/components/TableForm';
+import { DeleteActionButton, SearchInput, SelectionClearButton } from '@/components';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { ConnectCTA } from '@/components/ConnectCTA';
+import DeleteBulkActionButton from '@/components/DeleteBulkActionButton';
 import { EmptyState } from '@/components/EmptyState';
+import { Alert, AlertDescription } from '@/components/radix/Alert';
+import { Button } from '@/components/radix/Button';
 import { TablesEmptyState } from '@/features/database/components/TablesEmptyState';
 import { TemplatePreview } from '@/features/database/components/TemplatePreview';
 import { DATABASE_TEMPLATES, DatabaseTemplate } from '@/features/database/templates';
@@ -21,13 +16,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/radix/Tooltip';
-import { useConfirm } from '@/lib/hooks/useConfirm';
-import { useToast } from '@/lib/hooks/useToast';
 import { DatabaseDataGrid } from '@/features/database/components/DatabaseDataGrid';
-import { SearchInput, SelectionClearButton, DeleteActionButton } from '@/components';
-import { ConnectCTA } from '@/components/ConnectCTA';
-import { SortColumn } from 'react-data-grid';
-import { convertValueForColumn } from '@/lib/utils/utils';
+import { RecordFormDialog } from '@/features/database/components/RecordFormDialog';
+import { TableForm } from '@/features/database/components/TableForm';
+import { TableSidebar } from '@/features/database/components/TableSidebar';
+import { useCSVImport } from '@/features/database/hooks/useCSVImport';
+import { useRecords } from '@/features/database/hooks/useRecords';
+import { useTables } from '@/features/database/hooks/useTables';
 import {
   DataUpdatePayload,
   DataUpdateResourceType,
@@ -35,7 +30,13 @@ import {
   SocketMessage,
   useSocket,
 } from '@/lib/contexts/SocketContext';
-import { useCSVImport } from '@/features/database/hooks/useCSVImport';
+import { useConfirm } from '@/lib/hooks/useConfirm';
+import { useToast } from '@/lib/hooks/useToast';
+import { convertValueForColumn } from '@/lib/utils/utils';
+import { useQueryClient } from '@tanstack/react-query';
+import { Plus, Upload } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { SortColumn } from 'react-data-grid';
 
 const PAGE_SIZE = 50;
 
@@ -55,6 +56,7 @@ export default function TablesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isSorting, setIsSorting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSelectingAll, setIsSelectingAll] = useState(false);
   const [previewingTemplate, setPreviewingTemplate] = useState<DatabaseTemplate | null>(null);
 
   const { confirm, confirmDialogProps } = useConfirm();
@@ -363,6 +365,38 @@ export default function TablesPage() {
     }
   };
 
+  const isAllSelected = useMemo(() => {
+    if (!tableData?.totalRecords || selectedRows.size === 0) {
+      return false;
+    }
+    return selectedRows.size === tableData.totalRecords;
+  }, [selectedRows.size, tableData?.totalRecords]);
+
+  const handleToggleSelectAll = async () => {
+    if (!selectedTable || !primaryKeyColumn) {
+      return;
+    }
+
+    if (isAllSelected) {
+      setSelectedRows(new Set());
+      return;
+    }
+
+    setIsSelectingAll(true);
+    try {
+      const allIds = await recordsHook.getAllPrimaryKeys({
+        pkColumn: primaryKeyColumn,
+        searchQuery: searchQuery,
+      });
+      setSelectedRows(new Set(allIds));
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : 'Failed to select all records';
+      showToast(errorMessage, 'error');
+    } finally {
+      setIsSelectingAll(false);
+    }
+  };
+
   // Handle bulk delete
   const handleBulkDelete = async (ids: string[]) => {
     if (!selectedTable || !ids.length) {
@@ -499,11 +533,20 @@ export default function TablesPage() {
                             onClear={() => setSelectedRows(new Set())}
                           />
                           {
-                            <DeleteActionButton
-                              selectedCount={selectedRows.size}
-                              itemType="record"
-                              onDelete={() => void handleBulkDelete(Array.from(selectedRows))}
-                            />
+                            <>
+                              <DeleteActionButton
+                                selectedCount={selectedRows.size}
+                                itemType="record"
+                                onDelete={() => void handleBulkDelete(Array.from(selectedRows))}
+                              />
+                              <DeleteBulkActionButton
+                                isSelectingAll={isSelectingAll}
+                                totalRecords={tableData?.totalRecords || 0}
+                                filteredRecords={selectedRows.size}
+                                searchQuery={searchQuery}
+                                onToggleSelectAll={() => void handleToggleSelectAll()}
+                              />
+                            </>
                           }
                         </div>
                       ) : (
