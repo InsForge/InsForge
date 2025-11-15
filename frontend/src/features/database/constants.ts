@@ -35,6 +35,15 @@ export const SYSTEM_FUNCTIONS = [
   'role',
   'uid',
   'update_updated_at_column',
+  'build_http_headers',
+  'decrypt_headers',
+  'delete_cron_schedule',
+  'disable_cron_schedule',
+  'enable_cron_schedule',
+  'encrypt_headers',
+  'execute_scheduled_request',
+  'log_schedule_execution',
+  'upsert_cron_schedule',
 ];
 
 /**

@@ -140,6 +140,11 @@ export const staticMenuItems: PrimaryMenuItem[] = [
         label: 'Secrets',
         href: '/dashboard/functions/secrets',
       },
+      {
+        id: 'schedules',
+        label: 'Schedules',
+        href: '/dashboard/functions/schedules',
+      },
     ],
   },
   {
