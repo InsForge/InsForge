@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Plus } from 'lucide-react';
-import { useSchedules } from '@/features/schedules/hooks/useSchedules';
+import { useSchedules } from '@/features/functions/hooks/useSchedules';
 import { Button } from '@/components/radix/Button';
 import { CronJobFormDialog, CronJobForm } from './CronJobFormDialog';
 import ScheduleRow from './ScheduleRow';
