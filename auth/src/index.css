@@ -1,0 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import 'tailwindcss';
+
+@layer base {
+  :root {
+    /* Font system */
+    --fontFamilyBase:
+      'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --fontFamilyManrope: 'Manrope', sans-serif;
+  }
+
+  body {
+    font-family: var(--fontFamilyBase);
+  }
+
+  button {
+    cursor: pointer;
+  }
+}

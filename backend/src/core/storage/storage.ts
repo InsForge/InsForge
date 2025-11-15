@@ -358,7 +358,13 @@ class S3StorageBackend implements StorageBackend {
         } else {
           try {
             // Generate CloudFront signed URL
-            const cloudFrontObjectUrl = `${cloudFrontUrl.replace(/\/$/, '')}/${s3Key}`;
+            // IMPORTANT: URL-encode the S3 key to match what CloudFront receives
+            // This ensures the signature matches for files with spaces, parentheses, etc.
+            const encodedS3Key = s3Key
+              .split('/')
+              .map((segment) => encodeURIComponent(segment))
+              .join('/');
+            const cloudFrontObjectUrl = `${cloudFrontUrl.replace(/\/$/, '')}/${encodedS3Key}`;
 
             // Convert escaped newlines to actual newlines in the private key
             const formattedPrivateKey = cloudFrontPrivateKey.replace(/\\n/g, '\n');

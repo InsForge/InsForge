@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Insforge Documentation",
+  "name": "InsForge Docs",
   "colors": {
     "primary": "#16A34A",
     "light": "#07C983",
@@ -15,22 +15,22 @@
   },
   "seo": {
     "metatags": {
-      "og:site_name": "Insforge Documentation"
+      "og:site_name": "InsForge Docs"
     },
     "indexing": "navigable"
   },
   "search": {
-    "prompt": "Search Insforge docs..."
+    "prompt": "Search InsForge docs..."
   },
   "favicon": "/favicon.svg",
   "navigation": {
     "tabs": [
       {
-        "tab": "Documentation",
+        "tab": "Docs",
         "groups": [
           {
             "group": "Getting Started",
-            "pages": ["introduction", "quickstart", "mcp-installation", "partnership"]
+            "pages": ["introduction", "mcp-installation", "partnership"]
           },
           {
             "group": "Core Concepts",
@@ -46,7 +46,16 @@
                 "group": "Authentication",
                 "pages": [
                   "core-concepts/authentication/architecture",
-                  "core-concepts/authentication/sdk"
+                  "core-concepts/authentication/sdk",
+                  {
+                    "group": "UI Components",
+                    "pages": [
+                      "core-concepts/authentication/ui-components/nextjs",
+                      "core-concepts/authentication/ui-components/react",
+                      "core-concepts/authentication/ui-components/react-router",
+                      "core-concepts/authentication/ui-components/customization"
+                    ]
+                  }
                 ]
               },
               {
@@ -73,7 +82,30 @@
             ]
           },
           {
-            "group": "Showcase",
+            "group": "Changelog",
+            "pages": ["changelog"]
+          }
+        ]
+      },
+      {
+        "tab": "Examples",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": ["examples/overview"]
+          },
+          {
+            "group": "Framework Guides",
+            "pages": [
+              "examples/framework-guides/nextjs",
+              "examples/framework-guides/react",
+              "examples/framework-guides/vue",
+              "examples/framework-guides/nuxt",
+              "examples/framework-guides/svelte"
+            ]
+          },
+          {
+            "group": "Community Showcase",
             "pages": ["showcase"]
           }
         ]
@@ -135,6 +167,11 @@
           "anchor": "Blog",
           "href": "https://insforge.dev/blog",
           "icon": "newspaper"
+        },
+        {
+          "anchor": "Roadmap",
+          "href": "https://feedback.insforge.dev/roadmap",
+          "icon": "route"
         }
       ]
     }
@@ -145,16 +182,10 @@
     "href": "https://insforge.dev"
   },
   "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:info@insforge.dev"
-      }
-    ],
     "primary": {
       "type": "button",
-      "label": "Dashboard",
-      "href": "https://insforge.dev/dashboard"
+      "label": "Get Started",
+      "href": "https://insforge.dev/auth/sign-up"
     }
   },
   "contextual": {

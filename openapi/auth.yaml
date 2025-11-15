@@ -5,6 +5,228 @@ info:
   description: Authentication endpoints with separated auth and profile tables
 
 paths:
+  /api/auth/public-config:
+    get:
+      summary: Get public authentication configuration
+      description: Get all public authentication configuration including OAuth providers and email auth settings (public endpoint)
+      tags:
+        - Client
+      responses:
+        '200':
+          description: Public authentication configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  oAuthProviders:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        provider:
+                          type: string
+                          enum: [google, github, discord, linkedin, facebook, microsoft]
+                        useSharedKey:
+                          type: boolean
+                  requireEmailVerification:
+                    type: boolean
+                  passwordMinLength:
+                    type: integer
+                    minimum: 4
+                    maximum: 128
+                  requireNumber:
+                    type: boolean
+                  requireLowercase:
+                    type: boolean
+                  requireUppercase:
+                    type: boolean
+                  requireSpecialChar:
+                    type: boolean
+                  verifyEmailRedirectTo:
+                    type: string
+                    nullable: true
+                    description: URL to redirect users after successful email verification (if not set, shows default success page)
+                  resetPasswordRedirectTo:
+                    type: string
+                    nullable: true
+                    description: URL to redirect users after successful password reset (if not set, shows default success page)
+                  verifyEmailMethod:
+                    type: string
+                    enum: [code, link]
+                    description: Method for email verification (code = 6-digit OTP, link = magic link)
+                  resetPasswordMethod:
+                    type: string
+                    enum: [code, link]
+                    description: Method for password reset (code = 6-digit OTP + exchange flow, link = magic link)
+
+  /api/auth/config:
+    get:
+      summary: Get authentication configuration
+      description: Get current authentication settings including all configuration options (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Authentication configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  requireEmailVerification:
+                    type: boolean
+                  passwordMinLength:
+                    type: integer
+                    minimum: 4
+                    maximum: 128
+                  requireNumber:
+                    type: boolean
+                  requireLowercase:
+                    type: boolean
+                  requireUppercase:
+                    type: boolean
+                  requireSpecialChar:
+                    type: boolean
+                  verifyEmailRedirectTo:
+                    type: string
+                    nullable: true
+                    description: URL to redirect users after successful email verification (if not set, shows default success page)
+                  resetPasswordRedirectTo:
+                    type: string
+                    nullable: true
+                    description: URL to redirect users after successful password reset (if not set, shows default success page)
+                  verifyEmailMethod:
+                    type: string
+                    enum: [code, link]
+                    description: Method for email verification (code = 6-digit OTP, link = magic link)
+                  resetPasswordMethod:
+                    type: string
+                    enum: [code, link]
+                    description: Method for password reset (code = 6-digit OTP + exchange flow, link = magic link)
+                  signInRedirectTo:
+                    type: string
+                    nullable: true
+                    description: URL to redirect users after successful sign in
+                  createdAt:
+                    type: string
+                    format: date-time
+                  updatedAt:
+                    type: string
+                    format: date-time
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+
+    put:
+      summary: Update authentication configuration
+      description: Update authentication settings (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                requireEmailVerification:
+                  type: boolean
+                passwordMinLength:
+                  type: integer
+                  minimum: 4
+                  maximum: 128
+                requireNumber:
+                  type: boolean
+                requireLowercase:
+                  type: boolean
+                requireUppercase:
+                  type: boolean
+                requireSpecialChar:
+                  type: boolean
+                verifyEmailRedirectTo:
+                  type: string
+                  nullable: true
+                  description: URL to redirect users after successful email verification (if not set, shows default success page)
+                resetPasswordRedirectTo:
+                  type: string
+                  nullable: true
+                  description: URL to redirect users after successful password reset (if not set, shows default success page)
+                verifyEmailMethod:
+                  type: string
+                  enum: [code, link]
+                  description: Method for email verification (code = 6-digit OTP, link = magic link)
+                resetPasswordMethod:
+                  type: string
+                  enum: [code, link]
+                  description: Method for password reset (code = 6-digit OTP + exchange flow, link = magic link)
+                signInRedirectTo:
+                  type: string
+                  nullable: true
+                  description: URL to redirect users after successful sign in
+      responses:
+        '200':
+          description: Configuration updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  requireEmailVerification:
+                    type: boolean
+                  passwordMinLength:
+                    type: integer
+                    minimum: 4
+                    maximum: 128
+                  requireNumber:
+                    type: boolean
+                  requireLowercase:
+                    type: boolean
+                  requireUppercase:
+                    type: boolean
+                  requireSpecialChar:
+                    type: boolean
+                  verifyEmailRedirectTo:
+                    type: string
+                    nullable: true
+                    description: URL to redirect users after successful email verification (if not set, shows default success page)
+                  resetPasswordRedirectTo:
+                    type: string
+                    nullable: true
+                    description: URL to redirect users after successful password reset (if not set, shows default success page)
+                  verifyEmailMethod:
+                    type: string
+                    enum: [code, link]
+                  resetPasswordMethod:
+                    type: string
+                    enum: [code, link]
+                  signInRedirectTo:
+                    type: string
+                    nullable: true
+                  createdAt:
+                    type: string
+                    format: date-time
+                  updatedAt:
+                    type: string
+                    format: date-time
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+
   /api/auth/users:
     post:
       summary: Register new user
@@ -27,13 +249,13 @@ paths:
                   example: user@example.com
                 password:
                   type: string
-                  minLength: 8
+                  description: Password meeting configured requirements (check /api/auth/email/config for current requirements)
                   example: securepassword123
                 name:
                   type: string
                   example: John Doe
       responses:
-        '201':
+        '200':
           description: User created successfully
           content:
             application/json:
@@ -41,26 +263,18 @@ paths:
                 type: object
                 properties:
                   user:
-                    type: object
-                    properties:
-                      id:
-                        type: string
-                        format: uuid
-                      email:
-                        type: string
-                      name:
-                        type: string
-                      emailVerified:
-                        type: boolean
-                      createdAt:
-                        type: string
-                        format: date-time
-                      updatedAt:
-                        type: string
-                        format: date-time
+                    $ref: '#/components/schemas/UserResponse'
                   accessToken:
                     type: string
-                    description: JWT authentication token
+                    nullable: true
+                    description: JWT authentication token (null if email verification required)
+                  requireEmailVerification:
+                    type: boolean
+                    description: Whether email verification is required before login
+                  redirectTo:
+                    type: string
+                    format: uri
+                    description: Optional URL to redirect user after registration (only present if email verification not required)
         '400':
           description: Invalid request
         '409':
@@ -74,25 +288,23 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - name: page
+        - name: offset
           in: query
           schema:
-            type: integer
-            default: 1
+            type: string
+            default: '0'
+          description: Number of records to skip
         - name: limit
           in: query
           schema:
-            type: integer
-            default: 10
+            type: string
+            default: '10'
+          description: Maximum number of records to return
         - name: search
           in: query
           schema:
             type: string
-        - name: role
-          in: query
-          schema:
-            type: string
-            enum: [user, admin]
+          description: Search by email or name
       responses:
         '200':
           description: List of users
@@ -104,19 +316,7 @@ paths:
                   data:
                     type: array
                     items:
-                      type: object
-                      properties:
-                        id:
-                          type: string
-                        email:
-                          type: string
-                        name:
-                          type: string
-                        role:
-                          type: string
-                        created_at:
-                          type: string
-                          format: date-time
+                      $ref: '#/components/schemas/UserResponse'
                   pagination:
                     type: object
                     properties:
@@ -168,6 +368,38 @@ paths:
         '403':
           description: Forbidden - Admin only
 
+  /api/auth/users/{userId}:
+    get:
+      summary: Get specific user
+      description: Get user details by ID (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: User ID
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: Invalid user ID format
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+        '404':
+          description: User not found
+
   /api/auth/sessions:
     post:
       summary: User login
@@ -198,32 +430,22 @@ paths:
                 type: object
                 properties:
                   user:
-                    type: object
-                    properties:
-                      id:
-                        type: string
-                        format: uuid
-                      email:
-                        type: string
-                      name:
-                        type: string
-                      emailVerified:
-                        type: boolean
-                      createdAt:
-                        type: string
-                        format: date-time
-                      updatedAt:
-                        type: string
-                        format: date-time
+                    $ref: '#/components/schemas/UserResponse'
                   accessToken:
                     type: string
+                  redirectTo:
+                    type: string
+                    format: uri
+                    description: Optional URL to redirect user after login (if configured)
         '401':
           description: Invalid credentials
+        '403':
+          description: Email verification required
 
   /api/auth/sessions/current:
     get:
       summary: Get current user
-      description: Returns the currently authenticated user
+      description: Returns the currently authenticated user's basic info from JWT token
       tags:
         - Client
       security:
@@ -241,12 +463,13 @@ paths:
                     properties:
                       id:
                         type: string
+                        format: uuid
                       email:
                         type: string
-                      name:
-                        type: string
+                        format: email
                       role:
                         type: string
+                        enum: [authenticated, project_admin]
         '401':
           description: Unauthorized
 
@@ -279,20 +502,10 @@ paths:
               schema:
                 type: object
                 properties:
+                  user:
+                    $ref: '#/components/schemas/UserResponse'
                   accessToken:
                     type: string
-                  user:
-                    type: object
-                    properties:
-                      id:
-                        type: string
-                      email:
-                        type: string
-                      name:
-                        type: string
-                      role:
-                        type: string
-                        enum: [admin]
         '401':
           description: Invalid credentials
         '403':
@@ -325,28 +538,11 @@ paths:
               schema:
                 type: object
                 properties:
+                  user:
+                    $ref: '#/components/schemas/UserResponse'
                   accessToken:
                     type: string
                     description: Internal JWT for admin authentication
-                  user:
-                    type: object
-                    properties:
-                      id:
-                        type: string
-                        format: uuid
-                      email:
-                        type: string
-                      name:
-                        type: string
-                        example: Administrator
-                      emailVerified:
-                        type: boolean
-                      createdAt:
-                        type: string
-                        format: date-time
-                      updatedAt:
-                        type: string
-                        format: date-time
         '400':
           description: Invalid authorization code or JWT verification failed
           content:
@@ -359,7 +555,7 @@ paths:
       summary: Generate anonymous token
       description: Generate a non-expiring anonymous JWT token for public API access (admin only)
       tags:
-        - Client
+        - Admin
       security:
         - bearerAuth: []
       responses:
@@ -383,85 +579,484 @@ paths:
         '403':
           description: Forbidden - admin access required
 
-  /api/auth/oauth/google:
+  /api/auth/email/send-verification:
+    post:
+      summary: Send email verification (code or link based on config)
+      description: Send email verification using the method configured in auth settings (verifyEmailMethod). When method is 'code', sends a 6-digit numeric code. When method is 'link', sends a magic link. Prevents user enumeration by returning success even if email doesn't exist.
+      tags:
+        - Client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+      responses:
+        '202':
+          description: Verification email sent (if email exists). Message varies based on configured method.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                    example: "If your email is registered, we have sent you a verification code/link. Please check your inbox."
+        '400':
+          description: Invalid request
+
+  /api/auth/email/verify:
+    post:
+      summary: Verify email with code or link
+      description: |
+        Verify email address using the method configured in auth settings (verifyEmailMethod):
+        - Code verification: Provide both `email` and `otp` (6-digit numeric code)
+        - Link verification: Provide only `otp` (64-character hex token from magic link)
+
+        Successfully verified users will receive a session token.
+
+        The email verification link sent to users always points to the backend API endpoint.
+        If `verifyEmailRedirectTo` is configured, the backend will redirect to that URL after successful verification.
+        Otherwise, a default success page is displayed.
+      tags:
+        - Client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - otp
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: Required for numeric code verification, omit for magic link verification
+                  example: user@example.com
+                otp:
+                  type: string
+                  description: Either a 6-digit numeric code or a 64-character hex token from magic link
+                  example: "123456"
+      responses:
+        '200':
+          description: Email verified successfully, session created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/UserResponse'
+                  accessToken:
+                    type: string
+                    description: JWT authentication token
+                  redirectTo:
+                    type: string
+                    format: uri
+                    description: Optional URL to redirect user after verification (only present if configured)
+        '400':
+          description: Invalid verification code or token
+        '401':
+          description: Verification code/token expired or invalid
+
+  /api/auth/email/send-reset-password:
+    post:
+      summary: Send password reset (code or link based on config)
+      description: Send password reset email using the method configured in auth settings (resetPasswordMethod). When method is 'code', sends a 6-digit numeric code for two-step flow. When method is 'link', sends a magic link. Prevents user enumeration by returning success even if email doesn't exist.
+      tags:
+        - Client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+      responses:
+        '202':
+          description: Password reset email sent (if email exists). Message varies based on configured method.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                    example: "If your email is registered, we have sent you a password reset code/link. Please check your inbox."
+        '400':
+          description: Invalid request
+
+  /api/auth/email/exchange-reset-password-token:
+    post:
+      summary: Exchange reset password code for reset token
+      description: |
+        Step 1 of two-step password reset flow (only used when resetPasswordMethod is 'code'):
+        1. Verify the 6-digit code sent to user's email
+        2. Return a reset token that can be used to actually reset the password
+
+        This endpoint is not used when resetPasswordMethod is 'link' (magic link flow is direct).
+      tags:
+        - Client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - code
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                code:
+                  type: string
+                  description: 6-digit numeric code from email
+                  example: "123456"
+      responses:
+        '200':
+          description: Code verified successfully, reset token returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: Reset token to be used in reset-password endpoint
+                  expiresAt:
+                    type: string
+                    format: date-time
+                    description: Token expiration timestamp
+        '400':
+          description: Invalid request
+        '401':
+          description: Invalid or expired code
+
+  /api/auth/email/reset-password:
+    post:
+      summary: Reset password with token
+      description: |
+        Reset user password with a token. The token can be:
+        - Magic link token (64-character hex token from send-reset-password when method is 'link')
+        - Reset token (from exchange-reset-password-token after code verification when method is 'code')
+
+        Both token types use RESET_PASSWORD purpose and are verified the same way.
+
+        Flow summary:
+        - Code method: send-reset-password → exchange-reset-password-token → reset-password (with resetToken)
+        - Link method: send-reset-password → reset-password (with link token directly)
+      tags:
+        - Client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - newPassword
+                - otp
+              properties:
+                newPassword:
+                  type: string
+                  description: New password meeting configured requirements
+                  example: newSecurePassword123
+                otp:
+                  type: string
+                  description: Reset token (either from magic link or from exchange-reset-password-token endpoint)
+                  example: "a1b2c3d4..."
+      responses:
+        '200':
+          description: Password reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Password reset successfully"
+        '400':
+          description: Invalid request or password requirements not met
+        '401':
+          description: Verification code/token expired or invalid
+
+  /api/auth/oauth/configs:
     get:
-      summary: Initiate Google OAuth flow
+      summary: List all OAuth configurations
+      description: Get all configured OAuth providers (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of OAuth configurations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OAuthConfig'
+                  count:
+                    type: integer
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+
+    post:
+      summary: Create OAuth configuration
+      description: Create a new OAuth provider configuration (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - provider
+              properties:
+                provider:
+                  type: string
+                  enum: [google, github, discord, linkedin, facebook, microsoft]
+                clientId:
+                  type: string
+                clientSecret:
+                  type: string
+                redirectUri:
+                  type: string
+                scopes:
+                  type: array
+                  items:
+                    type: string
+                useSharedKey:
+                  type: boolean
+      responses:
+        '200':
+          description: OAuth configuration created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthConfig'
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+
+  /api/auth/oauth/{provider}/config:
+    get:
+      summary: Get OAuth configuration for specific provider
+      description: Get OAuth configuration including client secret (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [google, github, discord, linkedin, facebook, microsoft]
+      responses:
+        '200':
+          description: OAuth configuration
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/OAuthConfig'
+                  - type: object
+                    properties:
+                      clientSecret:
+                        type: string
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+        '404':
+          description: Configuration not found
+
+    put:
+      summary: Update OAuth configuration
+      description: Update OAuth provider configuration (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [google, github, discord, linkedin, facebook, microsoft]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                clientId:
+                  type: string
+                clientSecret:
+                  type: string
+                redirectUri:
+                  type: string
+                scopes:
+                  type: array
+                  items:
+                    type: string
+                useSharedKey:
+                  type: boolean
+      responses:
+        '200':
+          description: Configuration updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthConfig'
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+        '404':
+          description: Configuration not found
+
+    delete:
+      summary: Delete OAuth configuration
+      description: Delete OAuth provider configuration (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [google, github, discord, linkedin, facebook, microsoft]
+      responses:
+        '200':
+          description: Configuration deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+        '404':
+          description: Configuration not found
+
+  /api/auth/oauth/{provider}:
+    get:
+      summary: Initiate OAuth flow
+      description: Generate OAuth authorization URL for any supported provider
       tags:
         - Client
       parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [google, github, discord, linkedin, facebook, microsoft]
         - name: redirect_uri
           in: query
+          required: true
           schema:
             type: string
             format: uri
           description: URL to redirect after authentication
       responses:
-        '302':
-          description: Redirect to Google OAuth
+        '200':
+          description: OAuth authorization URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authUrl:
+                    type: string
+                    format: uri
+        '400':
+          description: Invalid request or provider not supported
         '500':
           description: OAuth not configured
 
-  /api/auth/oauth/github:
-    get:
-      summary: Initiate GitHub OAuth flow
-      tags:
-        - Client
-      parameters:
-        - name: redirect_uri
-          in: query
-          schema:
-            type: string
-            format: uri
-          description: URL to redirect after authentication
-      responses:
-        '302':
-          description: Redirect to GitHub OAuth
-        '500':
-          description: OAuth not configured
-
-  /api/auth/oauth/discord:
-    get:
-      summary: Initiate Discord OAuth flow
-      tags:
-        - Client
-      parameters:
-        - name: redirect_uri
-          in: query
-          schema:
-            type: string
-            format: uri
-          description: URL to redirect after authentication
-      responses:
-        '302':
-          description: Redirect to Discord OAuth
-        '500':
-          description: OAuth not configured
-
-  /api/auth/oauth/shared/callback:
+  /api/auth/oauth/shared/callback/{state}:
     get:
       summary: Shared OAuth callback handler
-      description: Handles OAuth callbacks from all providers
+      description: Handles OAuth callbacks from InsForge Cloud shared OAuth
       tags:
         - Client
       parameters:
-        - name: code
-          in: query
-          schema:
-            type: string
-          description: Authorization code from OAuth provider
         - name: state
+          in: path
+          required: true
+          schema:
+            type: string
+          description: JWT state parameter
+        - name: success
           in: query
           schema:
             type: string
-          description: JWT encoded state with provider and redirect URL
-        - name: token
+          description: Success flag
+        - name: error
           in: query
           schema:
             type: string
-          description: Direct ID token (for Google)
+          description: Error message
+        - name: payload
+          in: query
+          schema:
+            type: string
+          description: Base64 encoded user payload
       responses:
         '302':
-          description: Redirect with access token and user info in query params
+          description: Redirect to application with access token or error
           headers:
             Location:
               schema:
@@ -471,7 +1066,7 @@ paths:
   /api/auth/oauth/{provider}/callback:
     get:
       summary: Provider-specific OAuth callback
-      description: Alternative callback endpoint for specific providers
+      description: OAuth callback endpoint for provider-specific flows
       tags:
         - Client
       parameters:
@@ -480,22 +1075,32 @@ paths:
           required: true
           schema:
             type: string
-            enum: [google, github, discord]
+            enum: [google, github, discord, linkedin, facebook, microsoft]
         - name: code
           in: query
           schema:
             type: string
+          description: Authorization code from OAuth provider
         - name: state
           in: query
+          required: true
           schema:
             type: string
+          description: JWT state with redirect URI
         - name: token
           in: query
           schema:
             type: string
+          description: Direct ID token (for some providers)
       responses:
         '302':
-          description: Redirect with access token
+          description: Redirect to application with access token
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+                description: Redirect URL with access_token, user_id, email, and name query params
 
 components:
   securitySchemes:
@@ -507,8 +1112,66 @@ components:
       type: apiKey
       in: header
       name: x-api-key
-  
+
   schemas:
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        emailVerified:
+          type: boolean
+        identities:
+          type: array
+          items:
+            type: object
+            properties:
+              provider:
+                type: string
+        providerType:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    OAuthConfig:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider:
+          type: string
+          enum: [google, github, discord, linkedin, facebook, microsoft]
+        clientId:
+          type: string
+          nullable: true
+        redirectUri:
+          type: string
+          nullable: true
+        scopes:
+          type: array
+          items:
+            type: string
+          nullable: true
+        useSharedKey:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
     AuthRecord:
       type: object
       properties:
@@ -527,7 +1190,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-    
+
     ProfileRecord:
       type: object
       properties:
@@ -555,7 +1218,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-    
+
     ErrorResponse:
       type: object
       required:

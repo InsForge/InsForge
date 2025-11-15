@@ -58,6 +58,7 @@ services:
     ports:
       - "7130:7130"
       - "7131:7131"
+      - "7132:7132"
     environment:
       - PORT=7130
       - PROJECT_ROOT=/app
@@ -91,6 +92,7 @@ services:
       - PROJECT_ID=${PROJECT_ID:-}
       - APP_KEY=${APP_KEY:-}
       - ACCESS_API_KEY=${ACCESS_API_KEY:-}
+      - CLOUD_API_HOST=${CLOUD_API_HOST:-}
       # LLM Model API keys
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       # OAuth Configuration
@@ -108,15 +110,19 @@ services:
       - LOGS_DIR=/insforge-logs
       # Storage directory (for local file storage when S3 is not configured)
       - STORAGE_DIR=/insforge-storage
+      # Auth app URL for development proxy
+      - AUTH_APP_URL=${AUTH_APP_URL:-http://localhost:7132}
     volumes:
       - ./package.json:/app/package.json
       - ./backend:/app/backend
       - ./frontend:/app/frontend
+      - ./auth:/app/auth
       - ./shared-schemas:/app/shared-schemas
       - ./docs:/app/docs
       - node_modules:/app/node_modules
       - backend_node_modules:/app/backend/node_modules
       - frontend_node_modules:/app/frontend/node_modules
+      - auth_node_modules:/app/auth/node_modules
       - shared_schemas_node_modules:/app/shared-schemas/node_modules
       - shared-logs:/insforge-logs
       - storage-data:/insforge-storage
@@ -206,6 +212,8 @@ volumes:
   backend_node_modules:
     driver: local
   frontend_node_modules:
+    driver: local
+  auth_node_modules:
     driver: local
   shared_schemas_node_modules:
     driver: local

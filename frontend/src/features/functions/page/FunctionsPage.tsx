@@ -1,38 +1,170 @@
-import { useState, useEffect } from 'react';
-import { FunctionsSidebar } from '@/features/functions/components/FunctionsSidebar';
-import { FunctionsContent } from '@/features/functions/components/FunctionsContent';
-import { SecretsContent } from '@/features/functions/components/SecretsContent';
-import { CronJobsContent } from '@/features/functions/components/CronJobsContent';
+import { ChevronRight } from 'lucide-react';
+import { Skeleton } from '@/components/radix/Skeleton';
+import { FunctionRow } from '../components/FunctionRow';
+import { CodeEditor } from '@/components/CodeEditor';
+import FunctionEmptyState from '../components/FunctionEmptyState';
+import { useFunctions } from '../hooks/useFunctions';
+import { useToast } from '@/lib/hooks/useToast';
+import { useEffect, useRef, useState } from 'react';
+import RefreshIcon from '@/assets/icons/refresh.svg?react';
+import { Button } from '@/components';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/radix/Tooltip';
+import {
+  DataUpdatePayload,
+  DataUpdateResourceType,
+  ServerEvents,
+  SocketMessage,
+  useSocket,
+} from '@/lib/contexts/SocketContext';
+
 export default function FunctionsPage() {
-  // Load selected section from localStorage on mount
-  const [selectedSection, setSelectedSection] = useState<'functions' | 'secrets' | 'schedules'>(
-    () => {
-      return (
-        (localStorage.getItem('selectedFunctionSection') as
-          | 'functions'
-          | 'secrets'
-          | 'schedules') || 'functions'
-      );
+  const toastShownRef = useRef(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { showToast } = useToast();
+  const {
+    functions,
+    isRuntimeAvailable,
+    selectedFunction,
+    isLoading: loading,
+    selectFunction,
+    clearSelection,
+    refetch,
+  } = useFunctions();
+
+  const { socket, isConnected } = useSocket();
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setIsRefreshing(false);
     }
-  );
+  };
 
-  // Save selected section to localStorage when it changes
   useEffect(() => {
-    localStorage.setItem('selectedFunctionSection', selectedSection);
-  }, [selectedSection]);
+    if (!isRuntimeAvailable && !toastShownRef.current) {
+      toastShownRef.current = true;
+      showToast('Function container is unhealthy.', 'error');
+    }
+  }, [isRuntimeAvailable, showToast]);
 
+  useEffect(() => {
+    if (!socket || !isConnected) {
+      return;
+    }
+
+    const handleDataUpdate = (message: SocketMessage<DataUpdatePayload>) => {
+      if (message.payload?.resource === DataUpdateResourceType.FUNCTIONS) {
+        void refetch();
+      }
+    };
+
+    socket.on(ServerEvents.DATA_UPDATE, handleDataUpdate);
+
+    return () => {
+      socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
+    };
+  }, [socket, isConnected, refetch]);
+
+  // If a function is selected, show the detail view
+  if (selectedFunction) {
+    return (
+      <div className="h-full flex flex-col overflow-hidden">
+        <div className="flex items-center gap-2.5 p-4 border-b border-border-gray dark:border-neutral-600">
+          <button
+            onClick={clearSelection}
+            className="text-xl text-zinc-500 dark:text-neutral-400 hover:text-zinc-950 dark:hover:text-white transition-colors"
+          >
+            Functions
+          </button>
+          <ChevronRight className="w-5 h-5 text-muted-foreground dark:text-neutral-400" />
+          <p className="text-xl text-zinc-950 dark:text-white">{selectedFunction.name}</p>
+        </div>
+
+        <div className="flex-1 min-h-0">
+          <CodeEditor code={selectedFunction.code || '// No code available'} />
+        </div>
+      </div>
+    );
+  }
+
+  // Default list view
   return (
-    <div className="h-full flex">
-      <FunctionsSidebar selectedSection={selectedSection} onSectionSelect={setSelectedSection} />
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex flex-col gap-6 p-4">
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-normal text-zinc-950 dark:text-white">Functions</h1>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {selectedSection === 'functions' ? (
-          <FunctionsContent />
-        ) : selectedSection === 'secrets' ? (
-          <SecretsContent />
-        ) : (
-          <CronJobsContent />
-        )}
+          {/* Separator */}
+          <div className="h-6 w-px bg-gray-200 dark:bg-neutral-700" />
+
+          {/* Refresh button */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="p-1 h-9 w-9"
+                  onClick={() => void handleRefresh()}
+                  disabled={isRefreshing}
+                >
+                  <RefreshIcon className="h-5 w-5 text-zinc-400 dark:text-neutral-400" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" align="center">
+                <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+        <div className="flex flex-col gap-2 relative">
+          {/* Table Header */}
+          <div className="grid grid-cols-12 px-3 text-sm text-muted-foreground dark:text-neutral-400">
+            <div className="col-span-2 py-1 px-3">Name</div>
+            <div className="col-span-6 py-1 px-3">URL</div>
+            <div className="col-span-2 py-1 px-3">Created</div>
+            <div className="col-span-2 py-1 px-3">Last Update</div>
+          </div>
+          {loading ? (
+            <>
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-14 rounded-[8px] cols-span-full" />
+              ))}
+            </>
+          ) : functions.length >= 1 ? (
+            <>
+              {functions.map((func) => (
+                <FunctionRow
+                  key={func.id}
+                  function={func}
+                  onClick={() => void selectFunction(func)}
+                  className="cols-span-full"
+                />
+              ))}
+            </>
+          ) : (
+            <div className="cols-span-full">
+              <FunctionEmptyState />
+            </div>
+          )}
+
+          {/* Loading mask overlay */}
+          {isRefreshing && (
+            <div className="absolute inset-0 bg-white dark:bg-neutral-800 flex items-center justify-center z-50">
+              <div className="flex items-center gap-1">
+                <div className="w-5 h-5 border-2 border-zinc-500 dark:border-neutral-700 border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm text-zinc-500 dark:text-zinc-400">Loading</span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

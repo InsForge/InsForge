@@ -17,8 +17,8 @@
 
 # InsForge
 
-**InsForge is the Agent-Native Supabase Alternative.** We are building the features of Supabase in an AI-native way, enabling AI agents to build and manage full-stack applications autonomously. 
-
+**InsForge is the backend built for AI-assisted development.**
+Connect InsForge with any agent. Add authentication, database, storage, functions, and AI integrations to your app in seconds.
 ## Key Features & Use Cases
 
 ### Core Features:

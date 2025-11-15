@@ -67,10 +67,7 @@ export function JsonHighlight({ json, textColor, className }: JsonHighlightProps
       >
         {highlightJson(json, textColor)}
       </pre>
-      <CopyButton
-        text={json}
-        className="absolute top-3.5 right-3.5 dark:bg-neutral-800 dark:hover:bg-neutral-800 dark:data-[copied=true]:bg-transparent dark:data-[copied=true]:hover:bg-transparent pl-2"
-      />
+      <CopyButton variant="primary" text={json} className="absolute top-3.5 right-3.5 pl-2" />
     </div>
   );
 }

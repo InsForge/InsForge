@@ -63,3 +63,4 @@ jobs:
             VERSION=${{ github.ref_name }}
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
             COMMIT_SHA=${{ github.sha }}
+            VITE_PUBLIC_POSTHOG_KEY=${{ secrets.POSTHOG_KEY }}

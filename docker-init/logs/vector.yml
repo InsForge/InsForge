@@ -81,7 +81,7 @@ transforms:
           }
 
           # Set log level
-          .level = req.level
+          .metadata.level = req.level
 
           # Check if this is a request log (has duration field)
           if req.duration != null {
@@ -124,10 +124,11 @@ transforms:
     inputs:
       - router.deno
     source: |-
-      parsed, err = parse_regex(.event_message, r'^(?P<time>.*): (?P<msg>.*)$')
+      parsed, err = parse_regex(.event_message, r'^(?P<time>\d+:\d+:\d+\.\d+) \[(?P<level>\w+)\] (?P<msg>.*)$')
       if err == null {
           .event_message = parsed.msg
           .timestamp = to_timestamp!(parsed.time)
+          .metadata.level = upcase!(parsed.level)
           # .metadata.host = .project
       }
   # Postgres logs with proper parsing
@@ -142,19 +143,19 @@ transforms:
 
       if err == null && parsed != null {
           .metadata.parsed.pid = parsed.pid
-          .metadata.parsed.error_severity = upcase!(parsed.level)
+          .metadata.level = upcase!(parsed.level)
           .event_message = parsed.msg
 
           # Normalize STATEMENT and DETAIL to appropriate log levels
-          if .metadata.parsed.error_severity == "STATEMENT" {
-              .metadata.parsed.error_severity = "INFO"
+          if .metadata.level == "STATEMENT" {
+              .metadata.level = "INFO"
           }
-          if .metadata.parsed.error_severity == "DETAIL" {
-              .metadata.parsed.error_severity = "INFO"
+          if .metadata.level == "DETAIL" {
+              .metadata.level = "INFO"
           }
       } else {
           # If parsing fails, keep original message and set default severity
-          .metadata.parsed.error_severity = "LOG"
+          .metadata.level = "LOG"
       }
 
 sinks:

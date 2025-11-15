@@ -44,7 +44,7 @@ export function Checkbox({
         <div
           className={cn(
             'mx-auto w-4 h-4 rounded row-start-1 col-start-1 pointer-events-none',
-            resolvedTheme === 'light' ? 'bg-black text-white' : 'bg-white text-black'
+            resolvedTheme === 'light' ? 'bg-black text-white' : 'bg-emerald-300 text-black'
           )}
         >
           {indeterminate ? (

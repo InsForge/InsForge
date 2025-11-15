@@ -1,0 +1,184 @@
+---
+title: React + React Router
+description: Framework-agnostic authentication components for React + React Router application
+---
+
+The `@insforge/react-router` package provides **complete authentication solution for React applications**. Use deployed auth pages (built-in auth) or custom UI components—works with Vite + React Router.
+
+## Quick Start
+
+### Step 1: Create New React Project (Required)
+
+
+```bash
+npm install react-router-dom @insforge/react-router@latest
+```
+
+### Step 2: Set Environment Variables
+
+```bash .env
+VITE_INSFORGE_BASE_URL=https://your-app.region.insforge.app
+VITE_INSFORGE_ANON_KEY=your-anon-key-here
+```
+
+### Step 3: Setup Provider
+
+Wrap your app with `InsforgeProvider` in the root:
+
+```tsx src/main.tsx
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { InsforgeProvider } from '@insforge/react-router';
+import App from './App';
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <InsforgeProvider
+      baseUrl={
+        import.meta.env.VITE_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app' // Replace with your InsForge backend URL
+      }
+    >
+      <App />
+    </InsforgeProvider>
+  </StrictMode>
+);
+```
+
+### Step 4: Configure Router (Built-in Auth)
+
+**The fastest way** - Use deployed auth pages with Layout pattern:
+
+```tsx src/App.tsx
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { getInsforgeRoutes } from '@insforge/react-router/router';
+import Layout from './components/Layout';
+import Home from './pages/Home';
+import Dashboard from './pages/Dashboard';
+
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <Layout />,
+    children: [
+      { index: true, element: <Home /> },
+      { path: 'dashboard', element: <Dashboard /> },
+    ],
+  },
+  ...getInsforgeRoutes({
+    baseUrl: import.meta.env.VITE_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app', // Replace with your InsForge backend URL
+    afterSignInUrl: '/dashboard',
+  }),
+]);
+
+export default function App() {
+  return <RouterProvider router={router} />;
+}
+```
+
+```tsx src/components/Layout.tsx
+import { Outlet } from 'react-router-dom';
+
+export default function Layout() {
+  return (
+    <div>
+      <nav>{/* Your navigation */}</nav>
+      <main>
+        <Outlet />
+      </main>
+    </div>
+  );
+}
+```
+
+**What this does:**
+
+- Visiting `/sign-in` → Redirects to `your-project.insforge.app/auth/sign-in`
+- Visiting `/sign-up` → Redirects to `your-project.insforge.app/auth/sign-up`
+- Visiting `/forgot-password` → Redirects to `your-project.insforge.app/auth/forgot-password`
+- After auth → Backend redirects with token in URL → SDK auto-detects and stores token → Goes to dashboard
+
+<Info>
+  **Built-in auth** means using authentication pages hosted in your InsForge App. No UI code needed!
+</Info>
+
+### Step 5: Use Hooks & Components
+
+```tsx src/pages/Home.tsx
+import { SignInButton, SignedIn, SignedOut, UserButton } from '@insforge/react-router';
+
+export default function Home() {
+  return (
+    <div>
+      <SignedOut>
+        <SignInButton />
+      </SignedOut>
+
+      <SignedIn>
+        <UserButton />
+        <h1>Welcome!</h1>
+      </SignedIn>
+    </div>
+  );
+}
+```
+
+**That's it!** Your React + React Router app now has production-ready authentication with built-in auth pages.
+
+## Next Steps
+
+### Hooks
+
+#### `useAuth()`
+
+Access authentication state:
+
+```tsx
+import { useAuth } from '@insforge/react-router';
+
+function LoginButton() {
+  const { isSignedIn, isLoaded } = useAuth();
+  
+  if (!isLoaded) return <div>Loading...</div>;
+
+  return (
+    <div>
+      {isSignedIn ? 'Welcome!' : 'Sign In'}
+    </div>
+  );
+}
+```
+
+**Returns:**
+
+- `isSignedIn` - Boolean auth state
+- `isLoaded` - Boolean loading state
+
+#### `useUser()`
+
+Access current user data:
+
+```tsx
+import { useUser } from '@insforge/react-router';
+
+function UserProfile() {
+  const { user, isLoaded } = useUser();
+
+  if (!isLoaded) return <div>Loading...</div>;
+  if (!user) return <div>Not signed in</div>;
+
+
+  return (
+    <div>
+      <p>Id: {user.id}</p>
+      <p>Email: {user.email}</p>
+      <p>Name: {user.name}</p>
+      <img src={user.avatarUrl} alt="Avatar" />
+    </div>
+  );
+}
+```
+
+**Returns:**
+
+- `user` - User object with id, email, name, avatarUrl
+- `isLoaded` - Boolean loading state

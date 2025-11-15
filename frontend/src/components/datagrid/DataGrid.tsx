@@ -39,6 +39,7 @@ export interface DataGridProps<TRow extends DataGridRowType = DataGridRow> {
   showSelection?: boolean;
   showPagination?: boolean;
   showTypeBadge?: boolean;
+  noPadding?: boolean;
 }
 
 // Main DataGrid component
@@ -64,6 +65,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
   showSelection = false,
   showPagination = true,
   showTypeBadge = true,
+  noPadding = false,
 }: DataGridProps<TRow>) {
   const { resolvedTheme } = useTheme();
 
@@ -185,7 +187,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
   // Loading state - only show full loading screen if not sorting
   if (loading && !isSorting) {
     return (
-      <div className="h-full flex items-center justify-center bg-white dark:bg-neutral-800">
+      <div className="h-full flex items-center justify-center bg-bg-gray dark:bg-neutral-800">
         <div className="text-gray-500 dark:text-zinc-400">Loading...</div>
       </div>
     );
@@ -194,11 +196,16 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
   return (
     <div
       className={cn(
-        'h-full flex flex-col bg-bg-gray dark:bg-neutral-800 overflow-hidden',
+        'h-full flex flex-col overflow-hidden bg-bg-gray dark:bg-neutral-800',
         className
       )}
     >
-      <div className="flex-1 overflow-hidden relative mx-3 border border-border-gray dark:border-0">
+      <div
+        className={cn(
+          'flex-1 overflow-hidden relative border border-border-gray dark:border-neutral-700 rounded-sm',
+          !noPadding && 'mx-3'
+        )}
+      >
         <ReactDataGrid
           columns={gridColumns}
           rows={isRefreshing ? [] : data}

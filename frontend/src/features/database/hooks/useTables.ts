@@ -6,6 +6,7 @@ import {
   GetTableSchemaResponse,
   UpdateTableSchemaRequest,
 } from '@insforge/shared-schemas';
+import { useMemo } from 'react';
 
 export function useTables() {
   const queryClient = useQueryClient();
@@ -97,7 +98,10 @@ export function useTables() {
   return {
     // Data
     tables: tables || [],
-    allSchemas: allSchemas || [],
+    allSchemas: useMemo(
+      () => allSchemas?.filter((schema) => schema.tableName !== 'users') || [],
+      [allSchemas]
+    ),
     tablesCount: tables?.length || 0,
 
     // Loading states

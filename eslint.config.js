@@ -17,13 +17,20 @@ export default defineConfig(
   prettierConfig,
   // Frontend configuration
   {
-    files: ['frontend/**/*.ts', 'frontend/**/*.tsx'],
-    ignores: ['frontend/tests/**/*', 'frontend/**/*.test.*', 'frontend/**/*.spec.*'],
+    files: ['frontend/**/*.ts', 'frontend/**/*.tsx', 'auth/**/*.ts', 'auth/**/*.tsx'],
+    ignores: [
+      'frontend/tests/**/*',
+      'frontend/**/*.test.*',
+      'frontend/**/*.spec.*',
+      'auth/tests/**/*',
+      'auth/**/*.test.*',
+      'auth/**/*.spec.*',
+    ],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
       parserOptions: {
-        project: './frontend/tsconfig.json',
+        project: ['./frontend/tsconfig.json', './auth/tsconfig.json'],
         tsconfigRootDir: __dirname,
         ecmaFeatures: {
           jsx: true,

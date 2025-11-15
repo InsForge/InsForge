@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { AuthService } from '@/core/auth/auth.js';
-import { OAuthConfigService } from '@/core/auth/oauth.js';
+import { OAuthConfigService } from '@/core/auth/oauth.config.js';
 import { AuditService } from '@/core/logs/audit.js';
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -8,8 +8,6 @@ import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin } from '@/api/middleware/auth.js';
 import logger from '@/utils/logger.js';
 import jwt from 'jsonwebtoken';
-import { SocketService } from '@/core/socket/socket.js';
-import { DataUpdateResourceType, ServerEvents } from '@/core/socket/types.js';
 import {
   createOAuthConfigRequestSchema,
   updateOAuthConfigRequestSchema,
@@ -20,7 +18,7 @@ import { isOAuthSharedKeysAvailable } from '@/utils/environment.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
-const oauthConfigService = OAuthConfigService.getInstance();
+const oAuthConfigService = OAuthConfigService.getInstance();
 const auditService = AuditService.getInstance();
 
 // Helper function to validate JWT_SECRET
@@ -40,7 +38,7 @@ const validateJwtSecret = (): string => {
 // GET /api/auth/oauth/configs - List all OAuth configurations (admin only)
 router.get('/configs', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const configs = await oauthConfigService.getAllConfigs();
+    const configs = await oAuthConfigService.getAllConfigs();
     const response: ListOAuthConfigsResponse = {
       data: configs,
       count: configs.length,
@@ -52,15 +50,15 @@ router.get('/configs', verifyAdmin, async (req: AuthRequest, res: Response, next
   }
 });
 
-// GET /api/auth/oauth/configs/:provider - Get specific OAuth configuration (admin only)
+// GET /api/auth/oauth/:provider/config - Get specific OAuth configuration (admin only)
 router.get(
-  '/configs/:provider',
+  '/:provider/config',
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { provider } = req.params;
-      const config = await oauthConfigService.getConfigByProvider(provider);
-      const clientSecret = await oauthConfigService.getClientSecretByProvider(provider);
+      const config = await oAuthConfigService.getConfigByProvider(provider);
+      const clientSecret = await oAuthConfigService.getClientSecretByProvider(provider);
 
       if (!config) {
         throw new AppError(
@@ -110,7 +108,7 @@ router.post(
         );
       }
 
-      const config = await oauthConfigService.createConfig(input);
+      const config = await oAuthConfigService.createConfig(input);
 
       await auditService.log({
         actor: req.user?.email || 'api-key',
@@ -123,12 +121,6 @@ router.post(
         ip_address: req.ip,
       });
 
-      // Broadcast configuration change
-      const socket = SocketService.getInstance();
-      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.AUTH_SCHEMA,
-      });
-
       successResponse(res, config);
     } catch (error) {
       logger.error('Failed to create OAuth configuration', { error });
@@ -137,9 +129,9 @@ router.post(
   }
 );
 
-// PUT /api/auth/oauth/configs/:provider - Update OAuth configuration (admin only)
+// PUT /api/auth/oauth/:provider/config - Update OAuth configuration (admin only)
 router.put(
-  '/configs/:provider',
+  '/:provider/config',
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -168,7 +160,7 @@ router.put(
         );
       }
 
-      const config = await oauthConfigService.updateConfig(provider, input);
+      const config = await oAuthConfigService.updateConfig(provider, input);
 
       await auditService.log({
         actor: req.user?.email || 'api-key',
@@ -179,12 +171,6 @@ router.put(
           updatedFields: Object.keys(input),
         },
         ip_address: req.ip,
-      });
-
-      // Broadcast configuration change
-      const socket = SocketService.getInstance();
-      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.AUTH_SCHEMA,
       });
 
       successResponse(res, config);
@@ -198,9 +184,9 @@ router.put(
   }
 );
 
-// DELETE /api/auth/oauth/configs/:provider - Delete OAuth configuration (admin only)
+// DELETE /api/auth/oauth/:provider/config - Delete OAuth configuration (admin only)
 router.delete(
-  '/configs/:provider',
+  '/:provider/config',
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -208,7 +194,7 @@ router.delete(
       if (!provider || provider.length === 0 || provider.length > 50) {
         throw new AppError('Invalid provider name', 400, ERROR_CODES.INVALID_INPUT);
       }
-      const deleted = await oauthConfigService.deleteConfig(provider);
+      const deleted = await oAuthConfigService.deleteConfig(provider);
 
       if (!deleted) {
         throw new AppError(
@@ -224,12 +210,6 @@ router.delete(
         module: 'AUTH',
         details: { provider },
         ip_address: req.ip,
-      });
-
-      // Broadcast configuration change
-      const socket = SocketService.getInstance();
-      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.AUTH_SCHEMA,
       });
 
       successResponse(res, {
@@ -360,14 +340,14 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     switch (validatedProvider) {
       case 'google': {
         // Handle Google OAuth payload
-        const googleUserInfo = {
-          sub: payloadData.providerId,
-          email: payloadData.email,
-          name: payloadData.name || '',
-          userName: payloadData.userName || '',
-          picture: payloadData.avatar || '',
-        };
-        result = await authService.findOrCreateGoogleUser(googleUserInfo);
+        result = await authService.findOrCreateThirdPartyUser(
+          'google',
+          payloadData.providerId,
+          payloadData.email,
+          payloadData.name || payloadData.email.split('@')[0],
+          payloadData.avatar,
+          payloadData
+        );
         break;
       }
       case 'github': {
@@ -430,9 +410,9 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
 
     const params = new URLSearchParams();
     params.set('access_token', result?.accessToken ?? '');
-    params.set('user_id', result?.user.id ?? '');
-    params.set('email', result?.user.email ?? '');
-    params.set('name', result?.user.name ?? '');
+    params.set('user_id', result?.user?.id ?? '');
+    params.set('email', result?.user?.email ?? '');
+    params.set('name', result?.user?.name ?? '');
 
     res.redirect(`${redirectUri}?${params.toString()}`);
   } catch (error) {
@@ -493,9 +473,9 @@ router.get('/:provider/callback', async (req: Request, res: Response, next: Next
       // Construct redirect URL with query parameters
       const params = new URLSearchParams();
       params.set('access_token', result?.accessToken ?? '');
-      params.set('user_id', result?.user.id ?? '');
-      params.set('email', result?.user.email ?? '');
-      params.set('name', result?.user.name ?? '');
+      params.set('user_id', result?.user?.id ?? '');
+      params.set('email', result?.user?.email ?? '');
+      params.set('name', result?.user?.name ?? '');
 
       const finalRedirectUri = `${redirectUri}?${params.toString()}`;
 

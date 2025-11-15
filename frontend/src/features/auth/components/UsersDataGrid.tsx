@@ -162,6 +162,14 @@ export function createUsersColumns(): DataGridColumn<UserDataGridRow>[] {
       renderCell: cellRenderers.text,
     },
     {
+      key: 'emailVerified',
+      name: 'Email Verified',
+      width: '1fr',
+      resizable: true,
+      sortable: true,
+      renderCell: cellRenderers.boolean,
+    },
+    {
       key: 'createdAt',
       name: 'Created',
       width: '1fr',

@@ -1,8 +1,44 @@
 import { AppError } from '@/api/middleware/error';
 import { ERROR_CODES } from '@/types/error-constants';
+import type { AuthConfigSchema } from '@insforge/shared-schemas';
 
 export function validateEmail(email: string) {
   return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
+}
+
+/**
+ * Validates password against authentication configuration requirements
+ * @param password - The password to validate
+ * @param config - Authentication configuration with password requirements
+ * @returns true if password meets all requirements, false otherwise
+ */
+export function validatePassword(password: string, config: AuthConfigSchema): boolean {
+  // Check minimum length
+  if (password.length < config.passwordMinLength) {
+    return false;
+  }
+
+  // Check for number requirement
+  if (config.requireNumber && !/\d/.test(password)) {
+    return false;
+  }
+
+  // Check for lowercase requirement
+  if (config.requireLowercase && !/[a-z]/.test(password)) {
+    return false;
+  }
+
+  // Check for uppercase requirement
+  if (config.requireUppercase && !/[A-Z]/.test(password)) {
+    return false;
+  }
+
+  // Check for special character requirement
+  if (config.requireSpecialChar && !/[!@#$%^&*()_+\-=[\]{};\\|,.<>/?]/.test(password)) {
+    return false;
+  }
+
+  return true;
 }
 
 /**

@@ -54,6 +54,7 @@ export enum ERROR_CODES {
   INTERNAL_ERROR = 'INTERNAL_ERROR',
   TOO_MANY_REQUESTS = 'TOO_MANY_REQUESTS',
   FORBIDDEN = 'FORBIDDEN',
+  RATE_LIMITED = 'RATE_LIMITED',
 }
 
 // Next actions - what the user should do

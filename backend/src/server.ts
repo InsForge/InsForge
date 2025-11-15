@@ -248,19 +248,26 @@ export async function createApp() {
     }
   });
 
-  // Always try to serve frontend if it exists
-  const frontendPath = path.join(__dirname, 'frontend');
+  // Serve auth app
+  const authAppPath = path.join(__dirname, 'auth');
+  if (fs.existsSync(authAppPath)) {
+    app.use('/auth', express.static(authAppPath));
+    app.get('/auth*', (_req: Request, res: Response) => {
+      res.sendFile(path.join(authAppPath, 'index.html'));
+    });
+  } else if (!isProduction()) {
+    const authAppUrl = process.env.AUTH_APP_URL || 'http://localhost:7132';
+    logger.info('Auth app not built, proxying to development server', { authAppUrl });
+  }
 
-  // Check if frontend build exists
+  // Serve main frontend if it exists
+  const frontendPath = path.join(__dirname, 'frontend');
   if (fs.existsSync(frontendPath)) {
+    app.use(express.static(frontendPath, { index: false }));
     // Catch all handler for SPA routes
-    app.get('/cloud*', (_req: Request, res: Response) => {
+    app.get(['/cloud*', '/dashboard*'], (_req: Request, res: Response) => {
       res.sendFile(path.join(frontendPath, 'index.html'));
     });
-    app.get('/dashboard*', (_req: Request, res: Response) => {
-      res.sendFile(path.join(frontendPath, 'index.html'));
-    });
-    app.use(express.static(frontendPath));
   } else {
     // Catch-all for 404 errors - Traditional REST format
     app.use('*', (req: Request, res: Response) => {

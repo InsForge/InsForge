@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 frontend/node_modules/
+auth/node_modules/
+shared-schemas/node_modules/
+backend/node_modules/
 
 # Build outputs
 dist/

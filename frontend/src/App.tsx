@@ -3,6 +3,8 @@ import { AuthProvider } from '@/lib/contexts/AuthContext';
 import { AppRoutes } from '@/lib/routing/AppRoutes';
 import { ToastProvider } from '@/lib/hooks/useToast';
 import { SocketProvider } from '@/lib/contexts/SocketContext';
+import { PostHogAnalyticsProvider } from './lib/analytics/posthog';
+import { SQLEditorProvider } from '@/features/database/contexts/SQLEditorContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,7 +22,11 @@ function App() {
       <AuthProvider>
         <SocketProvider>
           <ToastProvider>
-            <AppRoutes />
+            <PostHogAnalyticsProvider>
+              <SQLEditorProvider>
+                <AppRoutes />
+              </SQLEditorProvider>
+            </PostHogAnalyticsProvider>
           </ToastProvider>
         </SocketProvider>
       </AuthProvider>

@@ -2,7 +2,6 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import axios from 'axios';
-import { OAuth2Client } from 'google-auth-library';
 import dotenv from 'dotenv';
 import { verifyCloudToken } from '@/utils/cloud-token.js';
 import path from 'path';
@@ -14,12 +13,19 @@ import type {
   UserSchema,
   CreateUserResponse,
   CreateSessionResponse,
+  VerifyEmailResponse,
+  ResetPasswordResponse,
   CreateAdminSessionResponse,
   TokenPayloadSchema,
   AuthMetadataSchema,
   OAuthProvidersSchema,
 } from '@insforge/shared-schemas';
-import { OAuthConfigService } from './oauth';
+import { OAuthConfigService } from './oauth.config';
+import { AuthConfigService } from './auth.config';
+import { AuthOTPService, OTPPurpose, OTPType } from './auth.otp';
+import { GoogleOAuthService } from './oauth.google';
+import { validatePassword } from '@/utils/validations';
+import { getPasswordRequirementsMessage } from '@/utils/utils';
 import {
   FacebookUserInfo,
   GitHubEmailInfo,
@@ -34,6 +40,7 @@ import { ADMIN_ID } from '@/utils/constants';
 import { getApiBaseUrl } from '@/utils/environment';
 import { AppError } from '@/api/middleware/error';
 import { ERROR_CODES } from '@/types/error-constants';
+import { EmailService } from '../email';
 
 const JWT_SECRET = () => process.env.JWT_SECRET ?? '';
 const JWT_EXPIRES_IN = '7d';
@@ -47,6 +54,7 @@ export class AuthService {
   private adminEmail: string;
   private adminPassword: string;
   private db;
+  // OAuth helpers for LinkedIn (TODO: refactor LinkedIn OAuth into separate service)
   private processedCodes: Set<string>;
   private tokenCache: Map<string, { access_token: string; id_token: string }>;
 
@@ -78,7 +86,7 @@ export class AuthService {
     const dbManager = DatabaseManager.getInstance();
     this.db = dbManager.getDb();
 
-    // Initialize OAuth helpers
+    // Initialize OAuth helpers for LinkedIn
     this.processedCodes = new Set();
     this.tokenCache = new Map();
 
@@ -121,7 +129,7 @@ export class AuthService {
    */
   generateAnonToken(): string {
     const payload = {
-      sub: 'anonymous',
+      sub: '12345678-1234-5678-90ab-cdef12345678',
       email: 'anon@insforge.com',
       role: 'anon',
     };
@@ -143,42 +151,53 @@ export class AuthService {
         role: decoded.role || 'authenticated',
       };
     } catch {
-      throw new Error('Invalid token');
+      throw new AppError('Invalid token', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
   }
 
   /**
    * User registration
+   * Otherwise, returns user with access token for immediate login
    */
   async register(email: string, password: string, name?: string): Promise<CreateUserResponse> {
-    const existingUser = await this.db
-      .prepare('SELECT id FROM _accounts WHERE email = ?')
-      .get(email);
+    // Get email auth configuration and validate password
+    const authConfigService = AuthConfigService.getInstance();
+    const emailAuthConfig = await authConfigService.getAuthConfig();
 
-    if (existingUser) {
-      throw new Error('User already exists');
+    if (!validatePassword(password, emailAuthConfig)) {
+      throw new AppError(
+        getPasswordRequirementsMessage(emailAuthConfig),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const userId = crypto.randomUUID();
+    await this.db.exec('BEGIN');
+    try {
+      await this.db
+        .prepare(
+          `INSERT INTO _accounts (id, email, password, name, email_verified, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, NOW(), NOW())`
+        )
+        .run(userId, email, hashedPassword, name || null, false);
 
-    await this.db
-      .prepare(
-        `
-      INSERT INTO _accounts (id, email, password, name, email_verified, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, NOW(), NOW())
-    `
-      )
-      .run(userId, email, hashedPassword, name || null, false);
-
-    await this.db
-      .prepare(
-        `
-      INSERT INTO users (id, nickname, created_at, updated_at)
-      VALUES (?, ?, NOW(), NOW())
-    `
-      )
-      .run(userId, name || null);
+      await this.db
+        .prepare(
+          `INSERT INTO users (id, nickname, created_at, updated_at)
+           VALUES (?, ?, NOW(), NOW())`
+        )
+        .run(userId, name || null);
+      await this.db.exec('COMMIT');
+    } catch (e) {
+      await this.db.exec('ROLLBACK');
+      // Postgres unique_violation
+      if (e && typeof e === 'object' && 'code' in e && e.code === '23505') {
+        throw new AppError('User already exists', 409, ERROR_CODES.ALREADY_EXISTS);
+      }
+      throw e;
+    }
 
     const dbUser = await this.db
       .prepare(
@@ -186,9 +205,32 @@ export class AuthService {
       )
       .get(userId);
     const user = this.dbUserToApiUser(dbUser);
+
+    if (emailAuthConfig.requireEmailVerification) {
+      try {
+        if (emailAuthConfig.verifyEmailMethod === 'link') {
+          await this.sendVerificationEmailWithLink(email);
+        } else {
+          await this.sendVerificationEmailWithCode(email);
+        }
+      } catch (error) {
+        logger.warn('Verification email send failed during register', { error });
+      }
+      return {
+        accessToken: null,
+        requireEmailVerification: true,
+      };
+    }
+
+    // Email verification not required, provide access token for immediate login
     const accessToken = this.generateToken({ sub: userId, email, role: 'authenticated' });
 
-    return { user, accessToken };
+    return {
+      user,
+      accessToken,
+      requireEmailVerification: false,
+      redirectTo: emailAuthConfig.signInRedirectTo || undefined,
+    };
   }
 
   /**
@@ -198,12 +240,25 @@ export class AuthService {
     const dbUser = await this.db.prepare('SELECT * FROM _accounts WHERE email = ?').get(email);
 
     if (!dbUser || !dbUser.password) {
-      throw new Error('Invalid credentials');
+      throw new AppError('Invalid credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
     const validPassword = await bcrypt.compare(password, dbUser.password);
     if (!validPassword) {
-      throw new Error('Invalid credentials');
+      throw new AppError('Invalid credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+
+    // Check if email verification is required
+    const authConfigService = AuthConfigService.getInstance();
+    const emailAuthConfig = await authConfigService.getAuthConfig();
+
+    if (emailAuthConfig.requireEmailVerification && !dbUser.email_verified) {
+      throw new AppError(
+        'Email verification required',
+        403,
+        ERROR_CODES.FORBIDDEN,
+        'Please verify your email address before logging in'
+      );
     }
 
     const user = this.dbUserToApiUser(dbUser);
@@ -213,7 +268,350 @@ export class AuthService {
       role: 'authenticated',
     });
 
-    return { user, accessToken };
+    // Include redirect URL if configured
+    const response: CreateSessionResponse = {
+      user,
+      accessToken,
+      redirectTo: emailAuthConfig.signInRedirectTo || undefined,
+    };
+
+    return response;
+  }
+
+  /**
+   * Send verification email with numeric OTP code
+   * Creates a 6-digit OTP and sends it via email for manual entry
+   */
+  async sendVerificationEmailWithCode(email: string): Promise<void> {
+    // Check if user exists
+    const dbUser = await this.db.prepare('SELECT * FROM _accounts WHERE email = ?').get(email);
+    if (!dbUser) {
+      // Silently succeed to prevent user enumeration
+      logger.info('Verification email requested for non-existent user', { email });
+      return;
+    }
+
+    // Create numeric OTP code using the OTP service
+    const otpService = AuthOTPService.getInstance();
+    const { otp: code } = await otpService.createEmailOTP(
+      email,
+      OTPPurpose.VERIFY_EMAIL,
+      OTPType.NUMERIC_CODE
+    );
+
+    // Send email with verification code
+    const emailService = EmailService.getInstance();
+    await emailService.sendWithTemplate(email, dbUser.name || 'User', 'email-verification-code', {
+      token: code,
+    });
+  }
+
+  /**
+   * Send verification email with clickable link
+   * Creates a long cryptographic token and sends it via email as a clickable link
+   * The link contains only the token (no email) for better privacy and security
+   */
+  async sendVerificationEmailWithLink(email: string): Promise<void> {
+    // Check if user exists
+    const dbUser = await this.db.prepare('SELECT * FROM _accounts WHERE email = ?').get(email);
+    if (!dbUser) {
+      // Silently succeed to prevent user enumeration
+      logger.info('Verification email requested for non-existent user', { email });
+      return;
+    }
+
+    // Create long cryptographic token for clickable verification link
+    const otpService = AuthOTPService.getInstance();
+    const { otp: token } = await otpService.createEmailOTP(
+      email,
+      OTPPurpose.VERIFY_EMAIL,
+      OTPType.HASH_TOKEN
+    );
+
+    // Build verification link URL using backend API endpoint
+    const linkUrl = `${getApiBaseUrl()}/auth/verify-email?token=${token}`;
+
+    // Send email with verification link
+    const emailService = EmailService.getInstance();
+    await emailService.sendWithTemplate(email, dbUser.name || 'User', 'email-verification-link', {
+      link: linkUrl,
+    });
+  }
+
+  /**
+   * Verify email with numeric code
+   * Verifies the email OTP code and updates the account in a single transaction
+   */
+  async verifyEmailWithCode(email: string, verificationCode: string): Promise<VerifyEmailResponse> {
+    const dbManager = DatabaseManager.getInstance();
+    const pool = dbManager.getPool();
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Verify OTP using the OTP service (within the same transaction)
+      const otpService = AuthOTPService.getInstance();
+      await otpService.verifyEmailOTPWithCode(
+        email,
+        OTPPurpose.VERIFY_EMAIL,
+        verificationCode,
+        client
+      );
+
+      // Update account email verification status
+      const result = await client.query(
+        `UPDATE _accounts
+         SET email_verified = true, updated_at = NOW()
+         WHERE email = $1
+         RETURNING id, email, name, email_verified, created_at, updated_at`,
+        [email]
+      );
+
+      if (result.rows.length === 0) {
+        throw new Error('User not found');
+      }
+
+      await client.query('COMMIT');
+
+      const dbUser = result.rows[0];
+      const user = this.dbUserToApiUser(dbUser);
+      const accessToken = this.generateToken({
+        sub: dbUser.id,
+        email: dbUser.email,
+        role: 'authenticated',
+      });
+
+      // Get redirect URL from auth config if configured
+      const authConfigService = AuthConfigService.getInstance();
+      const emailAuthConfig = await authConfigService.getAuthConfig();
+
+      return {
+        user,
+        accessToken,
+        redirectTo: emailAuthConfig.signInRedirectTo || undefined,
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Verify email with hash token from clickable link
+   * Verifies the token (without needing email), looks up the email, and updates the account
+   * This is more secure as the email is not exposed in the URL
+   */
+  async verifyEmailWithToken(token: string): Promise<VerifyEmailResponse> {
+    const dbManager = DatabaseManager.getInstance();
+    const pool = dbManager.getPool();
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Verify token and get the associated email
+      const otpService = AuthOTPService.getInstance();
+      const { email } = await otpService.verifyEmailOTPWithToken(
+        OTPPurpose.VERIFY_EMAIL,
+        token,
+        client
+      );
+
+      // Update account email verification status
+      const result = await client.query(
+        `UPDATE _accounts
+         SET email_verified = true, updated_at = NOW()
+         WHERE email = $1
+         RETURNING id, email, name, email_verified, created_at, updated_at`,
+        [email]
+      );
+
+      if (result.rows.length === 0) {
+        throw new Error('User not found');
+      }
+
+      await client.query('COMMIT');
+
+      const dbUser = result.rows[0];
+      const user = this.dbUserToApiUser(dbUser);
+      const accessToken = this.generateToken({
+        sub: dbUser.id,
+        email: dbUser.email,
+        role: 'authenticated',
+      });
+
+      // Get redirect URL from auth config if configured
+      const authConfigService = AuthConfigService.getInstance();
+      const emailAuthConfig = await authConfigService.getAuthConfig();
+
+      return {
+        user,
+        accessToken,
+        redirectTo: emailAuthConfig.signInRedirectTo || undefined,
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Send reset password email with numeric OTP code
+   * Creates a 6-digit OTP and sends it via email for manual entry
+   */
+  async sendResetPasswordEmailWithCode(email: string): Promise<void> {
+    // Check if user exists
+    const dbUser = await this.db.prepare('SELECT * FROM _accounts WHERE email = ?').get(email);
+    if (!dbUser) {
+      // Silently succeed to prevent user enumeration
+      logger.info('Password reset requested for non-existent user', { email });
+      return;
+    }
+
+    // Create numeric OTP code using the OTP service
+    const otpService = AuthOTPService.getInstance();
+    const { otp: code } = await otpService.createEmailOTP(
+      email,
+      OTPPurpose.RESET_PASSWORD,
+      OTPType.NUMERIC_CODE
+    );
+
+    // Send email with reset password code
+    const emailService = EmailService.getInstance();
+    await emailService.sendWithTemplate(email, dbUser.name || 'User', 'reset-password-code', {
+      token: code,
+    });
+  }
+
+  /**
+   * Send reset password email with clickable link
+   * Creates a long cryptographic token and sends it via email as a clickable link
+   * The link contains only the token (no email) for better privacy and security
+   */
+  async sendResetPasswordEmailWithLink(email: string): Promise<void> {
+    // Check if user exists
+    const dbUser = await this.db.prepare('SELECT * FROM _accounts WHERE email = ?').get(email);
+    if (!dbUser) {
+      // Silently succeed to prevent user enumeration
+      logger.info('Password reset requested for non-existent user', { email });
+      return;
+    }
+
+    // Create long cryptographic token for clickable reset link
+    const otpService = AuthOTPService.getInstance();
+    const { otp: token } = await otpService.createEmailOTP(
+      email,
+      OTPPurpose.RESET_PASSWORD,
+      OTPType.HASH_TOKEN
+    );
+
+    // Build password reset link URL using backend API endpoint
+    const linkUrl = `${getApiBaseUrl()}/auth/reset-password?token=${token}`;
+
+    // Send email with password reset link
+    const emailService = EmailService.getInstance();
+    await emailService.sendWithTemplate(email, dbUser.name || 'User', 'reset-password-link', {
+      link: linkUrl,
+    });
+  }
+
+  /**
+   * Exchange reset password code for a temporary reset token
+   * This separates code verification from password reset for better security
+   * The reset token can be used later to reset the password without needing email
+   */
+  async exchangeResetPasswordToken(
+    email: string,
+    verificationCode: string
+  ): Promise<{ token: string; expiresAt: Date }> {
+    const otpService = AuthOTPService.getInstance();
+
+    // Exchange the numeric verification code for a long-lived reset token
+    // All OTP logic (verification, consumption, token generation) is handled by AuthOTPService
+    const result = await otpService.exchangeCodeForToken(
+      email,
+      OTPPurpose.RESET_PASSWORD,
+      verificationCode
+    );
+
+    return {
+      token: result.token,
+      expiresAt: result.expiresAt,
+    };
+  }
+
+  /**
+   * Reset password with token
+   * Verifies the token (without needing email), looks up the email, and updates the password
+   * Both clickable link tokens and code-verified reset tokens use RESET_PASSWORD purpose
+   * Note: Does not return access token - user must login again with new password
+   */
+  async resetPasswordWithToken(newPassword: string, token: string): Promise<ResetPasswordResponse> {
+    // Validate password first before verifying token
+    // This allows the user to retry with the same token if password is invalid
+    const authConfigService = AuthConfigService.getInstance();
+    const emailAuthConfig = await authConfigService.getAuthConfig();
+
+    if (!validatePassword(newPassword, emailAuthConfig)) {
+      throw new AppError(
+        getPasswordRequirementsMessage(emailAuthConfig),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const dbManager = DatabaseManager.getInstance();
+    const pool = dbManager.getPool();
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Verify token and get the associated email
+      // Both clickable link tokens and code-verified reset tokens use RESET_PASSWORD purpose
+      const otpService = AuthOTPService.getInstance();
+      const { email } = await otpService.verifyEmailOTPWithToken(
+        OTPPurpose.RESET_PASSWORD,
+        token,
+        client
+      );
+
+      // Hash the new password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      // Update password in the database
+      const result = await client.query(
+        `UPDATE _accounts
+         SET password = $1, updated_at = NOW()
+         WHERE email = $2
+         RETURNING id`,
+        [hashedPassword, email]
+      );
+
+      if (result.rows.length === 0) {
+        throw new Error('User not found');
+      }
+
+      const userId = result.rows[0].id;
+
+      await client.query('COMMIT');
+
+      logger.info('Password reset successfully with token', { userId });
+
+      return {
+        message: 'Password reset successfully. Please login with your new password.',
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   /**
@@ -222,7 +620,7 @@ export class AuthService {
   adminLogin(email: string, password: string): CreateAdminSessionResponse {
     // Simply validate against environment variables
     if (email !== this.adminEmail || password !== this.adminPassword) {
-      throw new Error('Invalid admin credentials');
+      throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
     // Use a fixed admin ID for the system administrator
@@ -274,7 +672,7 @@ export class AuthService {
       };
     } catch (error) {
       logger.error('Admin token verification failed:', error);
-      throw new Error('Invalid admin credentials');
+      throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
   }
 
@@ -309,6 +707,13 @@ export class AuthService {
           'UPDATE _account_providers SET updated_at = CURRENT_TIMESTAMP WHERE provider = ? AND provider_account_id = ?'
         )
         .run(provider, providerId);
+
+      // Update email_verified to true if not already verified (OAuth login means email is trusted)
+      await this.db
+        .prepare(
+          'UPDATE _accounts SET email_verified = true WHERE id = ? AND email_verified = false'
+        )
+        .run(account.user_id);
 
       const dbUser = await this.db
         .prepare(
@@ -345,7 +750,19 @@ export class AuthService {
         )
         .run(existingUser.id, provider, providerId, JSON.stringify(identityData));
 
-      const user = this.dbUserToApiUser(existingUser);
+      // Update email_verified to true (OAuth login means email is trusted)
+      await this.db
+        .prepare(
+          'UPDATE _accounts SET email_verified = true WHERE id = ? AND email_verified = false'
+        )
+        .run(existingUser.id);
+
+      // Fetch updated user data
+      const updatedUser = await this.db
+        .prepare('SELECT * FROM _accounts WHERE id = ?')
+        .get(existingUser.id);
+
+      const user = this.dbUserToApiUser(updatedUser);
       const accessToken = this.generateToken({
         sub: existingUser.id,
         email: existingUser.email,
@@ -451,63 +868,11 @@ export class AuthService {
   }
 
   /**
-   * Generate Google OAuth authorization URL
-   */
-  async generateGoogleOAuthUrl(state?: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('google');
-
-    if (!config) {
-      throw new Error('Google OAuth not configured');
-    }
-
-    const selfBaseUrl = getApiBaseUrl();
-
-    if (config?.useSharedKey) {
-      if (!state) {
-        logger.warn('Shared Google OAuth called without state parameter');
-        throw new Error('State parameter is required for shared Google OAuth');
-      }
-      // Use shared keys if configured
-      const cloudBaseUrl = process.env.CLOUD_API_HOST || 'https://api.insforge.dev';
-      const redirectUri = `${selfBaseUrl}/api/auth/oauth/shared/callback/${state}`;
-      const response = await axios.get(
-        `${cloudBaseUrl}/auth/v1/shared/google?redirect_uri=${encodeURIComponent(redirectUri)}`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      return response.data.auth_url || response.data.url || '';
-    }
-
-    logger.debug('Google OAuth Config (fresh from DB):', {
-      clientId: config.clientId ? 'SET' : 'NOT SET',
-    });
-
-    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    authUrl.searchParams.set('client_id', config.clientId ?? '');
-    authUrl.searchParams.set('redirect_uri', `${selfBaseUrl}/api/auth/oauth/google/callback`);
-    authUrl.searchParams.set('response_type', 'code');
-    authUrl.searchParams.set(
-      'scope',
-      config.scopes ? config.scopes.join(' ') : 'openid email profile'
-    );
-    authUrl.searchParams.set('access_type', 'offline');
-    if (state) {
-      authUrl.searchParams.set('state', state);
-    }
-
-    return authUrl.toString();
-  }
-
-  /**
    * Generate GitHub OAuth authorization URL - ALWAYS reads fresh from DB
    */
   async generateGitHubOAuthUrl(state?: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('github');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('github');
 
     if (!config) {
       throw new Error('GitHub OAuth not configured');
@@ -553,8 +918,8 @@ export class AuthService {
    * Generate Discord OAuth authorization URL
    */
   async generateDiscordOAuthUrl(state?: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('discord');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('discord');
 
     if (!config) {
       throw new Error('Discord OAuth not configured');
@@ -607,155 +972,17 @@ export class AuthService {
   }
 
   /**
-   * Exchange Google code for tokens
-   */
-  async exchangeCodeToTokenByGoogle(
-    code: string
-  ): Promise<{ access_token: string; id_token: string }> {
-    // Check cache first
-    if (this.processedCodes.has(code)) {
-      const cachedTokens = this.tokenCache.get(code);
-      if (cachedTokens) {
-        logger.debug('Returning cached tokens for already processed code.');
-        return cachedTokens;
-      }
-      throw new Error('Authorization code is currently being processed.');
-    }
-
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('google');
-
-    if (!config) {
-      throw new Error('Google OAuth not configured');
-    }
-
-    try {
-      this.processedCodes.add(code);
-
-      logger.info('Exchanging Google code for tokens', {
-        hasCode: !!code,
-        clientId: config.clientId?.substring(0, 10) + '...',
-      });
-
-      const clientSecret = await oauthConfigService.getClientSecretByProvider('google');
-      const selfBaseUrl = getApiBaseUrl();
-      const response = await axios.post('https://oauth2.googleapis.com/token', {
-        code,
-        client_id: config.clientId,
-        client_secret: clientSecret,
-        redirect_uri: `${selfBaseUrl}/api/auth/oauth/google/callback`,
-        grant_type: 'authorization_code',
-      });
-
-      if (!response.data.access_token || !response.data.id_token) {
-        throw new Error('Failed to get tokens from Google');
-      }
-
-      const result = {
-        access_token: response.data.access_token,
-        id_token: response.data.id_token,
-      };
-
-      // Cache the successful token exchange
-      this.tokenCache.set(code, result);
-
-      // Set a timeout to clear the code and cache to prevent memory leaks
-      setTimeout(() => {
-        this.processedCodes.delete(code);
-        this.tokenCache.delete(code);
-      }, 60000); // 1 minute timeout
-
-      return result;
-    } catch (error) {
-      // If the request fails, remove the code immediately to allow for a retry
-      this.processedCodes.delete(code);
-
-      if (axios.isAxiosError(error) && error.response) {
-        logger.error('Google token exchange failed', {
-          status: error.response.status,
-          error: error.response.data,
-        });
-        throw new Error(`Google OAuth error: ${JSON.stringify(error.response.data)}`);
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * Verify Google ID token and get user info
-   */
-  async verifyGoogleToken(idToken: string) {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('google');
-
-    if (!config) {
-      throw new Error('Google OAuth not configured');
-    }
-
-    const clientSecret = await oauthConfigService.getClientSecretByProvider('google');
-
-    if (!clientSecret) {
-      throw new Error('Google Client Secret not conifgured.');
-    }
-
-    // Create OAuth2Client with fresh config
-    const googleClient = new OAuth2Client(config.clientId, clientSecret, config.redirectUri);
-
-    try {
-      // Properly verify the ID token with Google's servers
-      const ticket = await googleClient.verifyIdToken({
-        idToken,
-        audience: config.clientId,
-      });
-
-      const payload = ticket.getPayload();
-      if (!payload) {
-        throw new Error('Invalid Google token payload');
-      }
-
-      return {
-        sub: payload.sub,
-        email: payload.email || '',
-        email_verified: payload.email_verified || false,
-        name: payload.name || '',
-        picture: payload.picture || '',
-        given_name: payload.given_name || '',
-        family_name: payload.family_name || '',
-        locale: payload.locale || '',
-      };
-    } catch (error) {
-      logger.error('Google token verification failed:', error);
-      throw new Error(`Google token verification failed: ${error}`);
-    }
-  }
-
-  /**
-   * Find or create Google user
-   */
-  async findOrCreateGoogleUser(googleUserInfo: GoogleUserInfo): Promise<CreateSessionResponse> {
-    const userName = googleUserInfo.name || googleUserInfo.email.split('@')[0];
-    return this.findOrCreateThirdPartyUser(
-      'google',
-      googleUserInfo.sub,
-      googleUserInfo.email,
-      userName,
-      googleUserInfo.picture || '',
-      googleUserInfo
-    );
-  }
-
-  /**
    * Exchange GitHub code for access token
    */
   async exchangeGitHubCodeForToken(code: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('github');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('github');
 
     if (!config) {
       throw new Error('GitHub OAuth not configured');
     }
 
-    const clientSecret = await oauthConfigService.getClientSecretByProvider('github');
+    const clientSecret = await oAuthConfigService.getClientSecretByProvider('github');
     const selfBaseUrl = getApiBaseUrl();
     const response = await axios.post(
       'https://github.com/login/oauth/access_token',
@@ -830,8 +1057,8 @@ export class AuthService {
   }
   // NEW: Generate Microsoft OAuth authorization URL
   async generateMicrosoftOAuthUrl(state?: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('microsoft');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('microsoft');
     if (!config) {
       throw new Error('Microsoft OAuth not configured');
     }
@@ -859,12 +1086,12 @@ export class AuthService {
   async exchangeCodeToTokenByMicrosoft(
     code: string
   ): Promise<{ access_token: string; id_token?: string }> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('microsoft');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('microsoft');
     if (!config) {
       throw new Error('Microsoft OAuth not configured');
     }
-    const clientSecret = await oauthConfigService.getClientSecretByProvider('microsoft');
+    const clientSecret = await oAuthConfigService.getClientSecretByProvider('microsoft');
     const selfBaseUrl = getApiBaseUrl();
 
     const body = new URLSearchParams({
@@ -942,14 +1169,14 @@ export class AuthService {
    * Exchange Discord code for access token
    */
   async exchangeDiscordCodeForToken(code: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('discord');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('discord');
 
     if (!config) {
       throw new Error('Discord OAuth not configured');
     }
 
-    const clientSecret = await oauthConfigService.getClientSecretByProvider('discord');
+    const clientSecret = await oAuthConfigService.getClientSecretByProvider('discord');
     const selfBaseUrl = getApiBaseUrl();
     const response = await axios.post(
       'https://discord.com/api/oauth2/token',
@@ -1015,8 +1242,8 @@ export class AuthService {
    * Generate LinkedIn OAuth authorization URL
    */
   async generateLinkedInOAuthUrl(state?: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('linkedin');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('linkedin');
 
     if (!config) {
       throw new Error('LinkedIn OAuth not configured');
@@ -1076,8 +1303,8 @@ export class AuthService {
       throw new Error('Authorization code is currently being processed.');
     }
 
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('linkedin');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('linkedin');
 
     if (!config) {
       throw new Error('LinkedIn OAuth not configured');
@@ -1091,7 +1318,7 @@ export class AuthService {
         clientId: config.clientId?.substring(0, 10) + '...',
       });
 
-      const clientSecret = await oauthConfigService.getClientSecretByProvider('linkedin');
+      const clientSecret = await oAuthConfigService.getClientSecretByProvider('linkedin');
       const selfBaseUrl = getApiBaseUrl();
       const response = await axios.post(
         'https://www.linkedin.com/oauth/v2/accessToken',
@@ -1144,8 +1371,8 @@ export class AuthService {
    * Verify LinkedIn ID token and get user info
    */
   async verifyLinkedInToken(idToken: string) {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('linkedin');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('linkedin');
 
     if (!config) {
       throw new Error('LinkedIn OAuth not configured');
@@ -1197,8 +1424,8 @@ export class AuthService {
    * Generate Facebook OAuth authorization URL
    */
   async generateFacebookOAuthUrl(state?: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('facebook');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('facebook');
 
     if (!config) {
       throw new Error('Facebook OAuth not configured');
@@ -1247,14 +1474,14 @@ export class AuthService {
    * Exchange Facebook code for access token
    */
   async exchangeFacebookCodeForToken(code: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('facebook');
+    const oAuthConfigService = OAuthConfigService.getInstance();
+    const config = await oAuthConfigService.getConfigByProvider('facebook');
 
     if (!config) {
       throw new Error('Facebook OAuth not configured');
     }
 
-    const clientSecret = await oauthConfigService.getClientSecretByProvider('facebook');
+    const clientSecret = await oAuthConfigService.getClientSecretByProvider('facebook');
     const selfBaseUrl = getApiBaseUrl();
     const response = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
       params: {
@@ -1322,8 +1549,10 @@ export class AuthService {
    */
   async generateOAuthUrl(provider: OAuthProvidersSchema, state?: string): Promise<string> {
     switch (provider) {
-      case 'google':
-        return this.generateGoogleOAuthUrl(state);
+      case 'google': {
+        const googleOAuthService = GoogleOAuthService.getInstance();
+        return googleOAuthService.generateOAuthUrl(state);
+      }
       case 'github':
         return this.generateGitHubOAuthUrl(state);
       case 'discord':
@@ -1347,8 +1576,20 @@ export class AuthService {
     payload: { code?: string; token?: string }
   ): Promise<CreateSessionResponse> {
     switch (provider) {
-      case 'google':
-        return this.handleGoogleCallback(payload);
+      case 'google': {
+        const googleOAuthService = GoogleOAuthService.getInstance();
+        return googleOAuthService.handleCallback(payload, (googleUserInfo) => {
+          const userName = googleUserInfo.name || googleUserInfo.email.split('@')[0];
+          return this.findOrCreateThirdPartyUser(
+            'google',
+            googleUserInfo.sub,
+            googleUserInfo.email,
+            userName,
+            googleUserInfo.picture || '',
+            googleUserInfo
+          );
+        });
+      }
       case 'github':
         return this.handleGitHubCallback(payload);
       case 'discord':
@@ -1362,27 +1603,6 @@ export class AuthService {
       default:
         throw new Error(`OAuth provider ${provider} is not implemented yet.`);
     }
-  }
-
-  /**
-   * Handle Google OAuth callback
-   */
-  private async handleGoogleCallback(payload: {
-    code?: string;
-    token?: string;
-  }): Promise<CreateSessionResponse> {
-    if (payload.token) {
-      const googleUserInfo = await this.verifyGoogleToken(payload.token);
-      return this.findOrCreateGoogleUser(googleUserInfo);
-    }
-
-    if (payload.code) {
-      const tokens = await this.exchangeCodeToTokenByGoogle(payload.code);
-      const googleUserInfo = await this.verifyGoogleToken(tokens.id_token);
-      return this.findOrCreateGoogleUser(googleUserInfo);
-    }
-
-    throw new Error('No authorization code or token provided');
   }
 
   /**
