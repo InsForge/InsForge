@@ -5,7 +5,7 @@ import {
   scheduleService,
   type UpsertScheduleInput,
   type UpsertScheduleResponse,
-} from '@/features/schedules/services/schedule.service';
+} from '@/features/functions/services/schedule.service';
 import { useToast } from '@/lib/hooks/useToast';
 
 const SCHEDULES_QUERY_KEY = ['schedules'];
