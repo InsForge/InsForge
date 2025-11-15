@@ -64,7 +64,7 @@ export function ScheduleExecutionLogs({
         ),
       },
       {
-        key: 'durationMs',
+        key: 'endTime',
         name: 'End Time',
         width: '200px',
         renderCell: ({ row }) => {
