@@ -1,5 +1,4 @@
 import axios from 'axios';
-import logger from '@/utils/logger.js';
 import { getApiBaseUrl } from '@/utils/environment';
 import { OAuthConfigService } from './oauth.config';
 import type { MicrosoftUserInfo } from '@/types/auth';
