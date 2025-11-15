@@ -108,13 +108,13 @@ export class MicrosoftOAuthService {
       mail?: string | null;
     };
 
-    const email = data.mail || `${data.id}@users.noreply.microsoft.com`;
+    const email = data.mail || data.userPrincipalName || `${data.id}@users.noreply.microsoft.com`;
+    const name = data.displayName || data.userPrincipalName || email;
 
     return {
       id: data.id,
-      displayName: data.displayName || '',
-      userPrincipalName: data.userPrincipalName || '',
       email,
+      name,
     };
   }
 
