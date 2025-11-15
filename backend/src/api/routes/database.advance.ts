@@ -12,6 +12,8 @@ import {
   bulkUpsertRequestSchema,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger';
+import { SocketService } from '@/core/socket/socket';
+import { DataUpdateResourceType, ServerEvents } from '@/core/socket/types';
 
 const router = Router();
 const dbAdvanceService = new DatabaseAdvanceService();
@@ -56,6 +58,11 @@ router.post('/rawsql/unrestricted', verifyAdmin, async (req: AuthRequest, res: R
         mode: 'relaxed',
       },
       ip_address: req.ip,
+    });
+
+    const socket = SocketService.getInstance();
+    socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
+      resource: DataUpdateResourceType.DATABASE,
     });
 
     res.json(response);
@@ -114,6 +121,11 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response) => {
         mode: 'strict',
       },
       ip_address: req.ip,
+    });
+
+    const socket = SocketService.getInstance();
+    socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
+      resource: DataUpdateResourceType.DATABASE,
     });
 
     res.json(response);
@@ -247,6 +259,14 @@ router.post(
         ip_address: req.ip,
       });
 
+      const socket = SocketService.getInstance();
+      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
+        resource: DataUpdateResourceType.RECORDS,
+        data: {
+          tableName: table,
+        },
+      });
+
       res.json(response);
     } catch (error: unknown) {
       logger.warn('Bulk upsert error:', error);
@@ -316,6 +336,11 @@ router.post(
           rowsImported: response.rowsImported,
         },
         ip_address: req.ip,
+      });
+
+      const socket = SocketService.getInstance();
+      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
+        resource: DataUpdateResourceType.DATABASE,
       });
 
       res.json(response);

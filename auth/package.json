@@ -1,0 +1,28 @@
+{
+  "name": "insforge-auth",
+  "version": "1.0.0",
+  "author": "Insforge",
+  "description": "Built-in authentication UI for Insforge users",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@insforge/react": "0.7.9",
+    "@insforge/shared-schemas": "^1.1.23",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.7.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.11",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^4.7.0",
+    "tailwindcss": "^4.1.11",
+    "tailwindcss-animate": "^1.0.7",
+    "vite": "^7.0.5"
+  }
+}

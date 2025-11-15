@@ -28,6 +28,7 @@ export function CodeBlock({
       </div>
       {showCopy && (
         <CopyButton
+          variant="primary"
           text={code}
           onCopy={onCopy}
           className={`${buttonClassName} absolute right-3.5 top-3.5 h-9 pl-2`}

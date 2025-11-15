@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { logService } from '../services/log.service';
 import type { LogSourceSchema } from '@insforge/shared-schemas';
+import type { SecondaryMenuItem } from '@/lib/utils/menuItems';
 
 export function useLogSources() {
   const [selectedSource, setSelectedSource] = useState<string | null>(() => {
@@ -34,6 +35,23 @@ export function useLogSources() {
 
   // Extract source names
   const sourceNames = useMemo(() => sources?.map((s) => s.name) || [], [sources]);
+
+  // Menu items for sidebar navigation
+  const menuItems: SecondaryMenuItem[] = useMemo(
+    () => [
+      {
+        id: 'mcp-logs',
+        label: 'MCP logs',
+        href: '/dashboard/logs/MCP',
+      },
+      ...sourceNames.map((source) => ({
+        id: `log-${source}`,
+        label: source,
+        href: `/dashboard/logs/${source}`,
+      })),
+    ],
+    [sourceNames]
+  );
 
   // Persist selected source to localStorage
   useEffect(() => {
@@ -95,6 +113,7 @@ export function useLogSources() {
     sourcesCount: sources?.length || 0,
     selectedSource,
     stats: stats || [],
+    menuItems,
 
     // Loading states
     isLoading,

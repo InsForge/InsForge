@@ -54,12 +54,11 @@ export interface NotificationPayload {
 }
 
 export enum DataUpdateResourceType {
-  METADATA = 'metadata',
-  DATABASE_SCHEMA = 'database_schema',
-  TABLE_SCHEMA = 'table_schema',
-  STORAGE_SCHEMA = 'storage_schema',
-  BUCKET_SCHEMA = 'bucket_schema',
-  OAUTH_SCHEMA = 'oauth_schmea',
+  DATABASE = 'database',
+  USERS = 'users',
+  RECORDS = 'records',
+  BUCKETS = 'buckets',
+  FUNCTIONS = 'functions',
 }
 
 export interface DataUpdatePayload {

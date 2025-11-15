@@ -16,31 +16,8 @@ GRANT USAGE ON SCHEMA public TO project_admin;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO project_admin;
 
 -- Grant permissions to roles
--- NOTICE: The anon role is intended for unauthenticated users, so it should only have read access.
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT SELECT ON TABLES TO anon;
-
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO authenticated;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT SELECT ON TABLES TO authenticated;
-
-GRANT INSERT ON ALL TABLES IN SCHEMA public TO authenticated;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT INSERT ON TABLES TO authenticated;
-
-GRANT UPDATE ON ALL TABLES IN SCHEMA public TO authenticated;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT UPDATE ON TABLES TO authenticated;
-
-GRANT DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT DELETE ON TABLES TO authenticated;
-
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO project_admin;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO project_admin;
-
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon, authenticated, project_admin;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated, project_admin;
 -- Create function to automatically create RLS policies for new tables
 CREATE OR REPLACE FUNCTION public.create_default_policies()
 RETURNS event_trigger AS $$
@@ -65,12 +42,8 @@ BEGIN
       AND tablename = table_name;
     -- Only create policies if RLS is enabled
     IF has_rls THEN
-      -- Create policies for each role
-      -- anon: read-only access
-      EXECUTE format('CREATE POLICY "anon_policy" ON %s FOR SELECT TO anon USING (true)', obj.object_identity);
-      -- authenticated: full access
-      EXECUTE format('CREATE POLICY "authenticated_policy" ON %s FOR ALL TO authenticated USING (true) WITH CHECK (true)', obj.object_identity);
-      -- project_admin: full access
+      -- Create policy for project_admin role only
+      -- Users must define their own policies for anon and authenticated roles
       EXECUTE format('CREATE POLICY "project_admin_policy" ON %s FOR ALL TO project_admin USING (true) WITH CHECK (true)', obj.object_identity);
     END IF;
   END LOOP;
@@ -109,9 +82,8 @@ BEGIN
       WHERE schemaname = table_schema
         AND tablename = table_name
     ) THEN
-      -- Create default policies
-      EXECUTE format('CREATE POLICY "anon_policy" ON %s FOR SELECT TO anon USING (true)', obj.object_identity);
-      EXECUTE format('CREATE POLICY "authenticated_policy" ON %s FOR ALL TO authenticated USING (true) WITH CHECK (true)', obj.object_identity);
+      -- Create policy for project_admin role only
+      -- Users must define their own policies for anon and authenticated roles
       EXECUTE format('CREATE POLICY "project_admin_policy" ON %s FOR ALL TO project_admin USING (true) WITH CHECK (true)', obj.object_identity);
     END IF;
   END LOOP;

@@ -2,8 +2,8 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { logService } from '../services/log.service';
 import type { LogSchema } from '@insforge/shared-schemas';
+import { LOGS_PAGE_SIZE, SeverityType } from '../helpers';
 
-const PAGE_SIZE = 50;
 const FETCH_SIZE = 200;
 
 export function useLogs(source: string) {
@@ -81,14 +81,23 @@ export function useLogs(source: string) {
   }, [source, loadedLogs, hasMore, isLoadingMore]);
 
   // Get severity from log
-  const getSeverity = useCallback((log: LogSchema): string => {
-    const message = log.eventMessage.toLowerCase();
-    if (message.includes('error') || log.body?.error) {
+  const getSeverity = useCallback((log: LogSchema): SeverityType => {
+    // Parse from log.body.metadata.level set by Vector
+    const metadata = log.body?.metadata as { level?: string } | undefined;
+    const level = metadata?.level;
+    if (!level) {
+      return 'informational';
+    }
+
+    const levelLower = level.toLowerCase();
+
+    if (levelLower === 'error') {
       return 'error';
     }
-    if (message.includes('warning') || message.includes('warn')) {
+    if (levelLower === 'warning' || levelLower === 'warn') {
       return 'warning';
     }
+    // 'info', 'log', and anything else defaults to informational
     return 'informational';
   }, []);
 
@@ -108,11 +117,11 @@ export function useLogs(source: string) {
 
   // Calculate pagination
   const totalPages = useMemo(
-    () => Math.ceil(filteredLogs.length / PAGE_SIZE),
+    () => Math.ceil(filteredLogs.length / LOGS_PAGE_SIZE),
     [filteredLogs.length]
   );
-  const startIndex = useMemo(() => (currentPage - 1) * PAGE_SIZE, [currentPage]);
-  const endIndex = useMemo(() => startIndex + PAGE_SIZE, [startIndex]);
+  const startIndex = useMemo(() => (currentPage - 1) * LOGS_PAGE_SIZE, [currentPage]);
+  const endIndex = useMemo(() => startIndex + LOGS_PAGE_SIZE, [startIndex]);
   const paginatedLogs = useMemo(
     () => filteredLogs.slice(startIndex, endIndex),
     [filteredLogs, startIndex, endIndex]

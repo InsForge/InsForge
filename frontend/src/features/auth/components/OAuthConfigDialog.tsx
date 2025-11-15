@@ -20,7 +20,7 @@ import {
   OAuthConfigSchema,
   OAuthProvidersSchema,
 } from '@insforge/shared-schemas';
-import { OAuthProviderInfo } from './AuthMethodTab';
+import { type OAuthProviderInfo } from '../helpers';
 import { useOAuthConfig } from '@/features/auth/hooks/useOAuthConfig';
 import { getBackendUrl, isInsForgeCloudProject } from '@/lib/utils/utils';
 
@@ -310,7 +310,7 @@ export function OAuthConfigDialog({
                     : 'Adding...'
                   : providerConfig
                     ? 'Update'
-                    : 'Add OAuth'}
+                    : 'Add Provider'}
               </Button>
             </DialogFooter>
           </>

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { useTimeout } from './useTimeout';
-import { generateUUID } from '@/lib/utils/utils';
+import { cn, generateUUID } from '@/lib/utils/utils';
 
 interface Toast {
   id: string;
@@ -191,7 +191,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={{ showToast, updateToast, removeToast }}>
       {children}
       {/* Regular toasts - top center */}
-      <div className="fixed top-7.5 dark:top-20 left-1/2 transform -translate-x-1/2 z-[9999] flex flex-col gap-3 w-full max-w-[480px]">
+      <div
+        className={cn(
+          'fixed top-2 left-1/2 transform -translate-x-1/2 z-[9999] flex flex-col gap-3 w-full max-w-[480px]'
+        )}
+      >
         {toasts
           .filter((t) => t.type !== 'upload')
           .map((toast) => (

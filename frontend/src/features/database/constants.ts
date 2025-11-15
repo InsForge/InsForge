@@ -1,7 +1,6 @@
 import { Type, Clock, Calendar, Hash, Percent, ToggleLeft, Fingerprint, Code } from 'lucide-react';
 import { ColumnType } from '@insforge/shared-schemas';
 
-// Icon mapping for field types
 export const columnTypeIcons: Record<ColumnType, React.ComponentType<{ className?: string }>> = {
   [ColumnType.STRING]: Type,
   [ColumnType.DATE]: Calendar,
@@ -13,7 +12,6 @@ export const columnTypeIcons: Record<ColumnType, React.ComponentType<{ className
   [ColumnType.JSON]: Code,
 };
 
-// Field type descriptions
 export const columnTypeDescriptions: Record<ColumnType, string> = {
   [ColumnType.STRING]: 'Text values of any length',
   [ColumnType.INTEGER]: 'Whole numbers without decimals',
@@ -24,3 +22,31 @@ export const columnTypeDescriptions: Record<ColumnType, string> = {
   [ColumnType.UUID]: 'Unique identifiers (auto-generated)',
   [ColumnType.JSON]: 'Complex structured data',
 };
+
+/**
+ * System tables that should be filtered out from user-facing database views
+ */
+export const SYSTEM_TABLES = ['users'];
+export const SYSTEM_FUNCTIONS = [
+  'create_default_policies',
+  'create_policies_after_rls',
+  'email',
+  'reload_postgrest_schema',
+  'role',
+  'uid',
+  'update_updated_at_column',
+];
+
+/**
+ * Check if a table name is a system table
+ */
+export function isSystemTable(tableName: string): boolean {
+  return tableName.startsWith('_') || SYSTEM_TABLES.includes(tableName);
+}
+
+/**
+ * Check if a function name is a system function
+ */
+export function isSystemFunction(functionName: string): boolean {
+  return SYSTEM_FUNCTIONS.includes(functionName);
+}

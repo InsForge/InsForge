@@ -3,6 +3,7 @@ import { CloudWatchProvider } from './providers/cloudwatch.provider.js';
 import { LocalFileProvider } from './providers/file.provider.js';
 import { LogProvider } from './providers/base.provider.js';
 import { LogSchema, LogSourceSchema, LogStatsSchema } from '@insforge/shared-schemas';
+import { isCloudEnvironment } from '@/utils/environment.js';
 
 export class LogService {
   private static instance: LogService;
@@ -18,8 +19,10 @@ export class LogService {
   }
 
   async initialize(): Promise<void> {
-    // Use CloudWatch if AWS credentials are available, otherwise use file-based logging
-    const hasAwsCredentials = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY;
+    // Use CloudWatch if AWS credentials are available or if it's cloud environment since we provided the permissions in instance profile
+    // otherwise use file-based logging
+    const hasAwsCredentials =
+      (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) || isCloudEnvironment();
 
     if (hasAwsCredentials) {
       logger.info('Using log provider: CloudWatch');

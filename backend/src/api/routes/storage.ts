@@ -91,7 +91,7 @@ router.post(
 
       const socket = SocketService.getInstance();
       socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.STORAGE_SCHEMA,
+        resource: DataUpdateResourceType.BUCKETS,
       });
 
       const accessInfo = isPublic
@@ -162,9 +162,9 @@ router.patch(
 
       const socket = SocketService.getInstance();
       socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.BUCKET_SCHEMA,
+        resource: DataUpdateResourceType.BUCKETS,
         data: {
-          name: bucketName,
+          bucketName,
         },
       });
 
@@ -399,7 +399,7 @@ router.delete(
 
       const socket = SocketService.getInstance();
       socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.STORAGE_SCHEMA,
+        resource: DataUpdateResourceType.BUCKETS,
       });
 
       successResponse(

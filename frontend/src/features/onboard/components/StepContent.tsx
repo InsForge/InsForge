@@ -38,16 +38,8 @@ export function StepContent({ step }: StepContentProps) {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <CodeBlock
-              code="node --version"
-              className="dark:bg-neutral-700 dark:text-white"
-              buttonClassName="dark:bg-neutral-800 dark:hover:bg-neutral-800 dark:data-[copied=true]:bg-transparent dark:data-[copied=true]:hover:bg-transparent"
-            />
-            <CodeBlock
-              code="npm --version"
-              className="dark:bg-neutral-700 dark:text-white"
-              buttonClassName="dark:bg-neutral-800 dark:hover:bg-neutral-800 dark:data-[copied=true]:bg-transparent dark:data-[copied=true]:hover:bg-transparent"
-            />
+            <CodeBlock code="node --version" className="dark:bg-neutral-700 dark:text-white" />
+            <CodeBlock code="npm --version" className="dark:bg-neutral-700 dark:text-white" />
           </div>
         </div>
       );
@@ -66,9 +58,8 @@ export function StepContent({ step }: StepContentProps) {
           </div>
 
           <CodeBlock
-            code="I'm using InsForge as my backend platform, what is my current backend structure?"
+            code="I'm using InsForge as my backend platform, fetch InsForge instruction doc to learn more about InsForge"
             className="bg-slate-50 dark:bg-neutral-700 dark:text-white"
-            buttonClassName="dark:bg-neutral-800 dark:hover:bg-neutral-800 dark:data-[copied=true]:bg-transparent dark:data-[copied=true]:hover:bg-transparent"
           />
         </div>
       );

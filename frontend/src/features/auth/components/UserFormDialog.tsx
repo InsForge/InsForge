@@ -11,7 +11,7 @@ import {
 import ErrorIcon from '@/assets/icons/error.svg';
 import { useToast } from '@/lib/hooks/useToast';
 import { useUsers } from '@/features/auth/hooks/useUsers';
-import { emailSchema } from '@/lib/utils/validation-schemas';
+import { emailSchema } from '@insforge/shared-schemas';
 import { z } from 'zod';
 
 interface User {

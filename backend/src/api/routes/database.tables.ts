@@ -5,8 +5,6 @@ import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { createTableRequestSchema, updateTableSchemaRequestSchema } from '@insforge/shared-schemas';
-import { SocketService } from '@/core/socket/socket';
-import { DataUpdateResourceType, ServerEvents } from '@/core/socket/types';
 import { AuditService } from '@/core/logs/audit';
 
 const router = Router();
@@ -55,10 +53,6 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
       ip_address: req.ip,
     });
 
-    const socket = SocketService.getInstance();
-    socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-      resource: DataUpdateResourceType.DATABASE_SCHEMA,
-    });
     successResponse(res, result, 201);
   } catch (error) {
     next(error);
@@ -127,13 +121,6 @@ router.patch(
         ip_address: req.ip,
       });
 
-      const socket = SocketService.getInstance();
-      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.TABLE_SCHEMA,
-        data: {
-          name: tableName,
-        },
-      });
       successResponse(res, result);
     } catch (error) {
       next(error);
@@ -161,10 +148,6 @@ router.delete(
         ip_address: req.ip,
       });
 
-      const socket = SocketService.getInstance();
-      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.DATABASE_SCHEMA,
-      });
       successResponse(res, result);
     } catch (error) {
       next(error);
