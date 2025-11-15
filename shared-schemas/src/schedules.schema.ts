@@ -12,19 +12,16 @@ export const scheduleSchema = z.object({
   functionUrl: z.string().url(),
   httpMethod: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']),
   // Optional HTTP headers to include when invoking the scheduled function
-  headers: z.record(z.string()).nullable().optional(),
+  headers: z.record(z.string()).nullable(),
   // Body payload for the scheduled invocation. Can be a JSON object or a raw string.
-  body: z
-    .union([z.string(), z.record(z.unknown())])
-    .nullable()
-    .optional(),
+  body: z.union([z.string(), z.record(z.unknown())]).nullable(),
   // cron_job_id is a BIGINT in postgres, which node-pg returns as a string.
   cronJobId: z.string().nullable(),
   lastExecutedAt: z.string().datetime().nullable(),
   // Whether the cron job is currently active (has a scheduled cron job)
   isActive: z.boolean().default(true),
   // Next scheduled run time in ISO format (nullable if cron expression invalid)
-  nextRun: z.string().datetime().nullable().optional(),
+  nextRun: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });

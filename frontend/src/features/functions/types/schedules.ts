@@ -12,7 +12,6 @@ export interface ScheduleRow extends Schedule {
     | number
     | boolean
     | null
-    | undefined
     | Record<string, unknown>
     | Array<{ [key: string]: string }>;
 }
