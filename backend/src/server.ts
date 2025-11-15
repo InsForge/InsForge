@@ -19,6 +19,7 @@ import { usageRouter } from '@/api/routes/usage.js';
 import { openAPIRouter } from '@/api/routes/openapi.js';
 import { agentDocsRouter } from '@/api/routes/agent.js';
 import { aiRouter } from '@/api/routes/ai.js';
+import { deploymentsRouter } from '@/api/routes/deployments.js';
 import { errorMiddleware } from '@/api/middleware/error.js';
 import fetch, { HeadersInit } from 'node-fetch';
 import { DatabaseManager } from '@/core/database/manager.js';
@@ -180,6 +181,7 @@ export async function createApp() {
   apiRouter.use('/openapi', openAPIRouter);
   apiRouter.use('/agent-docs', agentDocsRouter);
   apiRouter.use('/ai', aiRouter);
+  apiRouter.use('/deployments', deploymentsRouter);
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);
