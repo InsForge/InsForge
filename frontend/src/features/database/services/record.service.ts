@@ -134,38 +134,6 @@ export class RecordService {
     };
   }
 
-  /**
-   * Get all primary key values for a table (for bulk selection)
-   * @param tableName - Name of the table
-   * @param pkColumn - Name of the primary key column
-   * @param searchQuery - Optional search filter
-   * @returns Array of primary key values
-   */
-  async getAllPrimaryKeys(tableName: string, pkColumn: string, searchQuery?: string) {
-    const params = new URLSearchParams();
-    params.set('select', pkColumn);
-
-    // Apply search filter if provided
-    const orFilter = await this.buildSearchFilter(tableName, searchQuery);
-    if (orFilter) {
-      params.set('or', `(${orFilter})`);
-    }
-
-    const url = `/database/records/${tableName}?${params.toString()}`;
-    const response = await apiClient.request(url, {
-      headers: {
-        Prefer: 'count=exact',
-      },
-    });
-
-    if (Array.isArray(response)) {
-      return response.map((row: { [key: string]: unknown }) => String(row[pkColumn]));
-    } else if (response.data && Array.isArray(response.data)) {
-      return response.data.map((row: { [key: string]: unknown }) => String(row[pkColumn]));
-    }
-    return [];
-  }
-
   createRecords(table: string, records: { [key: string]: ConvertedValue }[]) {
     // if data is json and data[id] == "" then remove id from data, because can't assign '' to uuid
     records = records.map((record) => {
