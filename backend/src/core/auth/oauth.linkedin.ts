@@ -215,4 +215,25 @@ export class LinkedInOAuthService {
       identityData: linkedinUserInfo,
     };
   }
+
+  /**
+   * Handle shared callback payload transformation
+   */
+  handleSharedCallback(payloadData: Record<string, unknown>): OAuthUserData {
+    const providerId = String(payloadData.providerId ?? '');
+    const email = String(payloadData.email ?? '');
+    const name = String(payloadData.name ?? '');
+    const avatar = String(payloadData.avatar ?? '');
+
+    const userName = name || email.split('@')[0];
+
+    return {
+      provider: 'linkedin',
+      providerId,
+      email,
+      userName,
+      avatarUrl: avatar,
+      identityData: payloadData,
+    };
+  }
 }

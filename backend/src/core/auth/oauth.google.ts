@@ -226,4 +226,23 @@ export class GoogleOAuthService {
       identityData: googleUserInfo,
     };
   }
+
+  /**
+   * Handle shared callback payload transformation
+   */
+  handleSharedCallback(payloadData: Record<string, unknown>): OAuthUserData {
+    const providerId = String(payloadData.providerId ?? '');
+    const email = String(payloadData.email ?? '');
+    const name = String(payloadData.name ?? '');
+    const avatar = String(payloadData.avatar ?? '');
+
+    return {
+      provider: 'google',
+      providerId,
+      email,
+      userName: name || email.split('@')[0],
+      avatarUrl: avatar,
+      identityData: payloadData,
+    };
+  }
 }

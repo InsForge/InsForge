@@ -170,4 +170,25 @@ export class DiscordOAuthService {
       identityData: discordUserInfo,
     };
   }
+
+  /**
+   * Handle shared callback payload transformation
+   */
+  handleSharedCallback(payloadData: Record<string, unknown>): OAuthUserData {
+    const providerId = String(payloadData.providerId ?? '');
+    const username = String(payloadData.username ?? '');
+    const emailField = String(payloadData.email ?? '');
+    const avatar = String(payloadData.avatar ?? '');
+
+    const email = emailField || `${providerId}@users.noreply.discord.local`;
+
+    return {
+      provider: 'discord',
+      providerId,
+      email,
+      userName: username,
+      avatarUrl: avatar,
+      identityData: payloadData,
+    };
+  }
 }

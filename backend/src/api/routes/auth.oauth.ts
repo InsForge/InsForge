@@ -334,111 +334,12 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       throw new AppError('No payload provided in callback', 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    const payloadData = JSON.parse(Buffer.from(payload as string, 'base64').toString('utf8'));
-    let result;
+    const payloadData = JSON.parse(
+      Buffer.from(payload as string, 'base64').toString('utf8')
+    ) as Record<string, unknown>;
 
-    switch (validatedProvider) {
-      case 'google': {
-        // Handle Google OAuth payload
-        result = await authService.findOrCreateThirdPartyUser(
-          'google',
-          payloadData.providerId,
-          payloadData.email,
-          payloadData.name || payloadData.email.split('@')[0],
-          payloadData.avatar,
-          payloadData
-        );
-        break;
-      }
-      case 'github': {
-        // Handle GitHub OAuth payload
-        const userName = payloadData.name || payloadData.login || '';
-        const email = payloadData.email || `${payloadData.login}@users.noreply.github.com`;
-        result = await authService.findOrCreateThirdPartyUser(
-          'github',
-          payloadData.providerId,
-          email,
-          userName,
-          payloadData.avatar || '',
-          payloadData
-        );
-        break;
-      }
-      case 'microsoft': {
-        // Handle Microsoft OAuth payload
-        const userName = payloadData.name || payloadData.email.split('@')[0] || 'user';
-        result = await authService.findOrCreateThirdPartyUser(
-          'microsoft',
-          payloadData.providerId,
-          payloadData.email,
-          userName,
-          payloadData.avatar || '',
-          payloadData
-        );
-        break;
-      }
-      case 'discord': {
-        // Handle Discord OAuth payload
-        const userName = payloadData.username || '';
-        const email = payloadData.email || `${payloadData.providerId}@users.noreply.discord.local`;
-        result = await authService.findOrCreateThirdPartyUser(
-          'discord',
-          payloadData.providerId,
-          email,
-          userName,
-          payloadData.avatar || '',
-          payloadData
-        );
-        break;
-      }
-      case 'linkedin': {
-        // Handle LinkedIn OAuth payload
-        const userName = payloadData.name || payloadData.email.split('@')[0];
-        result = await authService.findOrCreateThirdPartyUser(
-          'linkedin',
-          payloadData.providerId,
-          payloadData.email,
-          userName,
-          payloadData.avatar || '',
-          payloadData
-        );
-        break;
-      }
-      case 'facebook': {
-        // Handle Facebook OAuth payload
-        const userName =
-          payloadData.name ||
-          payloadData.first_name ||
-          `User${payloadData.providerId.substring(0, 6)}`;
-        const avatarUrl = payloadData.picture?.data?.url || payloadData.avatar || '';
-        result = await authService.findOrCreateThirdPartyUser(
-          'facebook',
-          payloadData.providerId,
-          payloadData.email || '',
-          userName,
-          avatarUrl,
-          payloadData
-        );
-        break;
-      }
-      case 'x': {
-        // Handle X OAuth payload
-        const userName =
-          payloadData.username ||
-          payloadData.name ||
-          `user${payloadData.providerId.substring(0, 8)}`;
-        const email = `${userName}@users.noreply.x.local`;
-        result = await authService.findOrCreateThirdPartyUser(
-          'x',
-          payloadData.providerId,
-          email,
-          userName,
-          payloadData.profile_image_url || '',
-          payloadData
-        );
-        break;
-      }
-    }
+    // Handle shared callback - transforms payload and creates/finds user
+    const result = await authService.handleSharedCallback(validatedProvider, payloadData);
 
     const params = new URLSearchParams();
     params.set('access_token', result?.accessToken ?? '');

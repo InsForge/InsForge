@@ -964,6 +964,50 @@ export class AuthService {
   }
 
   /**
+   * Handle shared callback for any supported provider
+   * Transforms payload and creates/finds user
+   */
+  async handleSharedCallback(
+    provider: OAuthProvidersSchema,
+    payloadData: Record<string, unknown>
+  ): Promise<CreateSessionResponse> {
+    let userData: OAuthUserData;
+
+    switch (provider) {
+      case 'google':
+        userData = this.googleOAuthService.handleSharedCallback(payloadData);
+        break;
+      case 'github':
+        userData = this.githubOAuthService.handleSharedCallback(payloadData);
+        break;
+      case 'discord':
+        userData = this.discordOAuthService.handleSharedCallback(payloadData);
+        break;
+      case 'linkedin':
+        userData = this.linkedinOAuthService.handleSharedCallback(payloadData);
+        break;
+      case 'facebook':
+        userData = this.facebookOAuthService.handleSharedCallback(payloadData);
+        break;
+      case 'x':
+        userData = this.xOAuthService.handleSharedCallback(payloadData);
+        break;
+      case 'microsoft':
+      default:
+        throw new Error(`OAuth provider ${provider} is not supported for shared callback.`);
+    }
+
+    return this.findOrCreateThirdPartyUser(
+      userData.provider,
+      userData.providerId,
+      userData.email,
+      userData.userName,
+      userData.avatarUrl,
+      userData.identityData
+    );
+  }
+
+  /**
    * Get database instance for direct queries
    */
   getDb() {

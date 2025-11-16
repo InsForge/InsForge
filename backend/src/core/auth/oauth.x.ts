@@ -176,4 +176,26 @@ export class XOAuthService {
       identityData: xUserInfo,
     };
   }
+
+  /**
+   * Handle shared callback payload transformation
+   */
+  handleSharedCallback(payloadData: Record<string, unknown>): OAuthUserData {
+    const providerId = String(payloadData.providerId ?? '');
+    const username = String(payloadData.username ?? '');
+    const name = String(payloadData.name ?? '');
+    const profileImageUrl = String(payloadData.profile_image_url ?? '');
+
+    const userName = username || name || `user${providerId.substring(0, 8)}`;
+    const email = `${userName}@users.noreply.x.local`;
+
+    return {
+      provider: 'x',
+      providerId,
+      email,
+      userName,
+      avatarUrl: profileImageUrl,
+      identityData: payloadData,
+    };
+  }
 }

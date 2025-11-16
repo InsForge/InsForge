@@ -163,4 +163,31 @@ export class FacebookOAuthService {
       identityData: facebookUserInfo,
     };
   }
+
+  /**
+   * Handle shared callback payload transformation
+   */
+  handleSharedCallback(payloadData: Record<string, unknown>): OAuthUserData {
+    const providerId = String(payloadData.providerId ?? '');
+    const email = String(payloadData.email ?? '');
+    const name = String(payloadData.name ?? '');
+    const firstName = String(payloadData.first_name ?? '');
+    const avatar = String(payloadData.avatar ?? '');
+
+    // Handle nested picture.data.url structure
+    const picture = payloadData.picture as { data?: { url?: string } } | undefined;
+    const pictureUrl = picture?.data?.url ?? '';
+
+    const userName = name || firstName || `User${providerId.substring(0, 6)}`;
+    const avatarUrl = pictureUrl || avatar;
+
+    return {
+      provider: 'facebook',
+      providerId,
+      email,
+      userName,
+      avatarUrl,
+      identityData: payloadData,
+    };
+  }
 }

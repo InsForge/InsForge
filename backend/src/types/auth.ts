@@ -149,5 +149,6 @@ export interface OAuthUserData {
     | LinkedInUserInfo
     | FacebookUserInfo
     | MicrosoftUserInfo
-    | XUserInfo;
+    | XUserInfo
+    | Record<string, unknown>;
 }

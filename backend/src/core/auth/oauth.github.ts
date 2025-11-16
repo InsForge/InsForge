@@ -181,4 +181,27 @@ export class GitHubOAuthService {
       identityData: githubUserInfo,
     };
   }
+
+  /**
+   * Handle shared callback payload transformation
+   */
+  handleSharedCallback(payloadData: Record<string, unknown>): OAuthUserData {
+    const providerId = String(payloadData.providerId ?? '');
+    const name = String(payloadData.name ?? '');
+    const login = String(payloadData.login ?? '');
+    const emailField = String(payloadData.email ?? '');
+    const avatar = String(payloadData.avatar ?? '');
+
+    const userName = name || login;
+    const email = emailField || `${login}@users.noreply.github.com`;
+
+    return {
+      provider: 'github',
+      providerId,
+      email,
+      userName,
+      avatarUrl: avatar,
+      identityData: payloadData,
+    };
+  }
 }
