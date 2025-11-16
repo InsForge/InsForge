@@ -21,6 +21,7 @@ import IndexesPage from '@/features/database/page/IndexesPage';
 import DatabaseFunctionsPage from '@/features/database/page/FunctionsPage';
 import TriggersPage from '@/features/database/page/TriggersPage';
 import PoliciesPage from '@/features/database/page/PoliciesPage';
+import TemplatesPage from '@/features/database/page/TemplatesPage';
 
 export function AppRoutes() {
   return (
@@ -35,9 +36,11 @@ export function AppRoutes() {
               <Routes>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/dashboard/users" element={<UsersPage />} />
+                <Route path="/dashboard/tables" element={<TablesPage />} />
                 <Route
                   path="/dashboard/authentication"
-                  element={<Navigate to="/dashboard/authentication/users" replace />}
+                  element={<Navigate to="/dashboard/authentication/auth-methods" replace />}
                 />
                 <Route path="/dashboard/authentication/users" element={<UsersPage />} />
                 <Route
@@ -47,7 +50,7 @@ export function AppRoutes() {
                 <Route path="/dashboard/authentication/config" element={<ConfigurationPage />} />
                 <Route
                   path="/dashboard/database"
-                  element={<Navigate to="/dashboard/database/tables" replace />}
+                  element={<Navigate to="/dashboard/database/indexes" replace />}
                 />
                 <Route path="/dashboard/database/tables" element={<TablesPage />} />
                 <Route path="/dashboard/database/indexes" element={<IndexesPage />} />
@@ -55,6 +58,7 @@ export function AppRoutes() {
                 <Route path="/dashboard/database/triggers" element={<TriggersPage />} />
                 <Route path="/dashboard/database/policies" element={<PoliciesPage />} />
                 <Route path="/dashboard/database/sql-editor" element={<SQLEditorPage />} />
+                <Route path="/dashboard/database/templates" element={<TemplatesPage />} />
                 <Route path="/dashboard/storage" element={<StoragePage />} />
                 <Route
                   path="/dashboard/logs"

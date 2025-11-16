@@ -27,7 +27,6 @@ import { InsforgeMiddleware } from '@insforge/nextjs/middleware';
 export default InsforgeMiddleware({
   baseUrl: process.env.NEXT_PUBLIC_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app', // Replace with your InsForge backend URL
   publicRoutes: ['/'],
-  cookieName: 'insforge_token',
 });
 
 export const config = {
@@ -46,7 +45,6 @@ import { createAuthRouteHandlers } from '@insforge/nextjs/api';
 
 const handlers = createAuthRouteHandlers({
   baseUrl: process.env.NEXT_PUBLIC_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app', // Replace with your InsForge backend URL
-  cookieName: 'insforge_token',
 });
 
 export const POST = handlers.POST;
@@ -61,7 +59,14 @@ export const DELETE = handlers.DELETE;
 Wrap your application with the `InsforgeProvider` in your root layout:
 
 ```tsx app/layout.tsx
-import { InsforgeProvider, SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@insforge/nextjs';
+import {
+  InsforgeProvider,
+  SignedIn,
+  SignedOut,
+  SignInButton,
+  SignUpButton,
+  UserButton,
+} from '@insforge/nextjs';
 
 export const metadata: Metadata = {
   title: 'InsForge Next.js Quickstart',
@@ -95,4 +100,122 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
+<Info>
+  **Preventing FOUC**: The CSS import in your root layout ensures styles are loaded during
+  server-side rendering, preventing flash of unstyled content (FOUC). Without this import,
+  components may briefly appear unstyled when the page first loads.
+</Info>
+
 **That's it!** When users click "Sign In", they'll be redirected to your backend's auth page automatically.
+
+## Next Steps
+
+### Client-side Hooks
+
+#### `useAuth()`
+
+Access authentication state in client side:
+
+```tsx
+'use client';
+import { useAuth } from '@insforge/nextjs';
+
+function LoginButton() {
+  const { isSignedIn, isLoaded } = useAuth();
+
+  if (!isLoaded) return <div>Loading...</div>;
+
+  return <div>{isSignedIn ? 'Welcome!' : 'Sign In'}</div>;
+}
+```
+
+**Returns:**
+
+- `isSignedIn` - Boolean auth state
+- `isLoaded` - Boolean loading state
+
+#### `useUser()`
+
+Access current user data in client side:
+
+```tsx
+'use client';
+import { useUser } from '@insforge/nextjs';
+
+function UserProfile() {
+  const { user, isLoaded } = useUser();
+
+  if (!isLoaded) return <div>Loading...</div>;
+  if (!user) return <div>Not signed in</div>;
+
+  return (
+    <div>
+      <p>Id: {user.id}</p>
+      <p>Email: {user.email}</p>
+      <p>Name: {user.name}</p>
+      <img src={user.avatarUrl} alt="Avatar" />
+    </div>
+  );
+}
+```
+
+**Returns:**
+
+- `user` - User object with id, email, name, avatarUrl
+- `isLoaded` - Boolean loading state
+
+### Server side functions
+
+#### `auth`
+
+Access current user data and access token in server side:
+
+```tsx
+import { auth } from '@insforge/nextjs/server';
+import { createClient } from '@insforge/sdk';
+
+export async function POST(request: NextRequest) {
+  try {
+    // Authenticate the request and get user info
+    const { user, userId, token } = await auth();
+
+    // Parse request body to get the prompt
+    const { prompt } = await request.json();
+
+    // Create InsForge SDK
+    const insforge = createClient({
+      baseUrl: process.env.NEXT_PUBLIC_INSFORGE_BASE_URL || "https://your-app.region.insforge.app",
+      anonKey: token
+    });
+
+    // Request for AI response
+    const completion = await insforge.ai.chat.completions.create({
+      model: 'anthropic/claude-3.5-haiku',
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+    });
+
+    const generatedResponse = completion.choices[0].message.content.trim();
+
+    // Return success response
+    return NextResponse.json(
+      {
+        success: true,
+        data: generatedResponse,
+      },
+      { status: 201 }
+    );
+
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+```

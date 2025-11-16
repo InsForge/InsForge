@@ -91,7 +91,6 @@ export function McpInstallation({
                 <CodeBlock
                   code={GenerateInstallCommand(agent, apiKey || '')}
                   className="bg-slate-50 dark:bg-neutral-700 w-full font-normal text-blue-800 dark:text-white"
-                  buttonClassName="dark:bg-neutral-800 dark:hover:bg-neutral-800 dark:data-[copied=true]:bg-transparent dark:data-[copied=true]:hover:bg-transparent pl-2"
                 />
               </div>
             ) : (

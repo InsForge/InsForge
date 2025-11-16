@@ -36,6 +36,8 @@ import {
   updateAuthConfigRequestSchema,
 } from '@insforge/shared-schemas';
 import { UserRecord } from '@/types/auth.js';
+import { SocketService } from '@/core/socket/socket.js';
+import { DataUpdateResourceType, ServerEvents } from '@/core/socket/types.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -122,6 +124,11 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
 
     const { email, password, name } = validationResult.data;
     const result: CreateUserResponse = await authService.register(email, password, name);
+
+    const socket = SocketService.getInstance();
+    socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
+      resource: DataUpdateResourceType.USERS,
+    });
 
     successResponse(res, result);
   } catch (error) {

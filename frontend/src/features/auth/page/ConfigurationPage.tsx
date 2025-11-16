@@ -91,36 +91,40 @@ export default function ConfigurationPage() {
           <div className="flex flex-col gap-8">
             <div>
               <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
-                Authentication Configuration
+                Configuration
               </h2>
             </div>
 
             <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-8">
               {/* Sign In Redirect URL */}
-
               <div className="space-y-6">
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium text-gray-900 dark:text-white">
-                    Redirect URL After Sign In
-                  </label>
-                  <span className="text-xs text-zinc-500 dark:text-neutral-400">
-                    Your app url after successful authentication
-                  </span>
-                  <Input
-                    type="url"
-                    placeholder="https://yourapp.com/dashboard"
-                    {...form.register('signInRedirectTo')}
-                    className={`bg-white dark:bg-neutral-900 dark:placeholder:text-neutral-400 dark:border-neutral-700 dark:text-white ${
-                      form.formState.errors.signInRedirectTo
-                        ? 'border-red-500 dark:border-red-500'
-                        : ''
-                    }`}
-                  />
-                  {form.formState.errors.signInRedirectTo && (
-                    <span className="text-xs text-red-500">
-                      {form.formState.errors.signInRedirectTo.message || 'Please enter a valid URL'}
+                <div className="bg-white dark:bg-[#333333] rounded-lg p-6 flex items-center gap-10">
+                  <div className="w-100 flex flex-col gap-1">
+                    <label className="text-sm font-medium text-gray-900 dark:text-white">
+                      Redirect URL After Sign In
+                    </label>
+                    <span className="text-xs text-zinc-500 dark:text-neutral-400">
+                      Your app url after successful authentication
                     </span>
-                  )}
+                  </div>
+                  <div className="w-full max-w-[320px]">
+                    <Input
+                      type="url"
+                      placeholder="https://yourapp.com/dashboard"
+                      {...form.register('signInRedirectTo')}
+                      className={`bg-white dark:bg-neutral-900 dark:placeholder:text-neutral-400 dark:border-neutral-700 dark:text-white ${
+                        form.formState.errors.signInRedirectTo
+                          ? 'border-red-500 dark:border-red-500'
+                          : ''
+                      }`}
+                    />
+                    {form.formState.errors.signInRedirectTo && (
+                      <span className="text-xs text-red-500">
+                        {form.formState.errors.signInRedirectTo.message ||
+                          'Please enter a valid URL'}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -130,46 +134,203 @@ export default function ConfigurationPage() {
                     <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">
                       Email Verification
                     </h3>
-                    <div className="h-px bg-gray-200 dark:bg-neutral-700" />
                   </div>
 
-                  {/* Email Verification Toggle */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
-                        Require Email Verification
-                      </span>
-                      <span className="text-xs text-zinc-500 dark:text-neutral-400">
-                        Users must verify their email address before they can sign in
-                      </span>
-                    </div>
-                    <Controller
-                      name="requireEmailVerification"
-                      control={form.control}
-                      render={({ field }) => (
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={(value) => {
-                            field.onChange(value);
-                          }}
-                        />
-                      )}
-                    />
-                  </div>
-
-                  {/* Verify Email Method - Only shown when email verification is enabled */}
-                  {form.watch('requireEmailVerification') && (
-                    <div className="flex items-center justify-between">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-sm font-medium text-gray-900 dark:text-white">
-                          Email Verification Method
-                        </label>
+                  <div className="bg-white dark:bg-[#333333] rounded-lg p-6 space-y-6">
+                    {/* Email Verification Toggle */}
+                    <div className="flex items-center gap-10">
+                      <div className="w-100 flex flex-col gap-1">
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">
+                          Require Email Verification
+                        </span>
                         <span className="text-xs text-zinc-500 dark:text-neutral-400">
-                          Choose between 6-digit verification code or verification link
+                          Users must verify their email address before they can sign in
                         </span>
                       </div>
                       <Controller
-                        name="verifyEmailMethod"
+                        name="requireEmailVerification"
+                        control={form.control}
+                        render={({ field }) => (
+                          <div className="w-full max-w-[320px]">
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={(value) => {
+                                field.onChange(value);
+                              }}
+                            />
+                          </div>
+                        )}
+                      />
+                    </div>
+
+                    {/* Verify Email Method - Only shown when email verification is enabled */}
+                    {form.watch('requireEmailVerification') && (
+                      <div className="flex items-center gap-10">
+                        <div className="w-100 flex flex-col gap-1">
+                          <label className="text-sm font-medium text-gray-900 dark:text-white">
+                            Email Verification Method
+                          </label>
+                          <span className="text-xs text-zinc-500 dark:text-neutral-400">
+                            Choose between 6-digit verification code or verification link
+                          </span>
+                        </div>
+                        <Controller
+                          name="verifyEmailMethod"
+                          control={form.control}
+                          render={({ field }) => (
+                            <Select
+                              value={field.value}
+                              onValueChange={(value) => {
+                                if (value) {
+                                  field.onChange(value);
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="w-full max-w-[320px] dark:bg-neutral-700 dark:border-neutral-700">
+                                <span className="text-black dark:text-white">
+                                  {field.value === 'code' ? 'Code' : 'Link'}
+                                </span>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="code">Code</SelectItem>
+                                <SelectItem value="link">Link</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Password Requirements Section */}
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">
+                    Password Requirements
+                  </h3>
+                </div>
+
+                <div className="bg-white dark:bg-[#333333] rounded-lg p-6 space-y-6">
+                  {/* Password Length */}
+                  <div className="flex items-center gap-10">
+                    <div className="w-100 flex flex-col gap-1">
+                      <label className="text-sm font-medium text-gray-900 dark:text-white">
+                        Minimum Password Length
+                      </label>
+                      <span className="text-xs text-zinc-500 dark:text-neutral-400">
+                        Must be between 4 and 128 characters
+                      </span>
+                    </div>
+                    <div className="w-full max-w-[320px]">
+                      <Input
+                        type="number"
+                        min="4"
+                        max="128"
+                        {...form.register('passwordMinLength', { valueAsNumber: true })}
+                        className={`bg-white dark:bg-neutral-900 dark:placeholder:text-neutral-400 dark:border-neutral-700 dark:text-white ${
+                          form.formState.errors.passwordMinLength
+                            ? 'border-red-500 dark:border-red-500'
+                            : ''
+                        }`}
+                      />
+                      {form.formState.errors.passwordMinLength && (
+                        <span className="text-xs text-red-500">
+                          {form.formState.errors.passwordMinLength.message ||
+                            'Must be between 4 and 128 characters'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Password Strength Checkboxes */}
+                  <div className="flex items-start gap-10">
+                    <div className="w-100 flex flex-col gap-1 justify-center">
+                      <label className="text-sm font-medium text-gray-900 dark:text-white">
+                        Password Strength Requirements
+                      </label>
+                    </div>
+                    <div className="w-full max-w-[320px] flex flex-col gap-3 justify-center">
+                      <Controller
+                        name="requireNumber"
+                        control={form.control}
+                        render={({ field }) => (
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <Checkbox
+                              checked={field.value ?? false}
+                              onChange={(checked) => field.onChange(checked)}
+                            />
+                            <span className="text-sm text-gray-700 dark:text-white">
+                              At least 1 number
+                            </span>
+                          </label>
+                        )}
+                      />
+
+                      <Controller
+                        name="requireSpecialChar"
+                        control={form.control}
+                        render={({ field }) => (
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <Checkbox
+                              checked={field.value ?? false}
+                              onChange={(checked) => field.onChange(checked)}
+                            />
+                            <span className="text-sm text-gray-700 dark:text-white">
+                              At least 1 special character
+                            </span>
+                          </label>
+                        )}
+                      />
+
+                      <Controller
+                        name="requireLowercase"
+                        control={form.control}
+                        render={({ field }) => (
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <Checkbox
+                              checked={field.value ?? false}
+                              onChange={(checked) => field.onChange(checked)}
+                            />
+                            <span className="text-sm text-gray-700 dark:text-white">
+                              At least 1 lowercase character
+                            </span>
+                          </label>
+                        )}
+                      />
+
+                      <Controller
+                        name="requireUppercase"
+                        control={form.control}
+                        render={({ field }) => (
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <Checkbox
+                              checked={field.value ?? false}
+                              onChange={(checked) => field.onChange(checked)}
+                            />
+                            <span className="text-sm text-gray-700 dark:text-white">
+                              At least 1 uppercase character
+                            </span>
+                          </label>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Reset Password Method */}
+                  {isInsForgeCloudProject() && (
+                    <div className="flex items-center gap-10">
+                      <div className="w-100 flex flex-col gap-1">
+                        <label className="text-sm font-medium text-gray-900 dark:text-white">
+                          Password Reset Method
+                        </label>
+                        <span className="text-xs text-zinc-500 dark:text-neutral-400">
+                          Choose between 6-digit reset code or reset link
+                        </span>
+                      </div>
+                      <Controller
+                        name="resetPasswordMethod"
                         control={form.control}
                         render={({ field }) => (
                           <Select
@@ -180,7 +341,7 @@ export default function ConfigurationPage() {
                               }
                             }}
                           >
-                            <SelectTrigger className="w-[240px]">
+                            <SelectTrigger className="w-full max-w-[320px] dark:bg-neutral-700 dark:border-neutral-700">
                               <span className="text-black dark:text-white">
                                 {field.value === 'code' ? 'Code' : 'Link'}
                               </span>
@@ -195,153 +356,6 @@ export default function ConfigurationPage() {
                     </div>
                   )}
                 </div>
-              )}
-
-              {/* Password Requirements Section */}
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">
-                    Password Requirements
-                  </h3>
-                  <div className="h-px bg-gray-200 dark:bg-neutral-700" />
-                </div>
-
-                {/* Password Length */}
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium text-gray-900 dark:text-white">
-                    Minimum Password Length
-                  </label>
-                  <span className="text-xs text-zinc-500 dark:text-neutral-400">
-                    Must be between 4 and 128 characters
-                  </span>
-                  <Input
-                    type="number"
-                    min="4"
-                    max="128"
-                    {...form.register('passwordMinLength', { valueAsNumber: true })}
-                    className={`max-w-xs bg-white dark:bg-neutral-900 dark:placeholder:text-neutral-400 dark:border-neutral-700 dark:text-white ${
-                      form.formState.errors.passwordMinLength
-                        ? 'border-red-500 dark:border-red-500'
-                        : ''
-                    }`}
-                  />
-                  {form.formState.errors.passwordMinLength && (
-                    <span className="text-xs text-red-500">
-                      {form.formState.errors.passwordMinLength.message ||
-                        'Must be between 4 and 128 characters'}
-                    </span>
-                  )}
-                </div>
-
-                {/* Password Strength Checkboxes */}
-                <div className="flex flex-col gap-3">
-                  <label className="text-sm font-medium text-gray-900 dark:text-white">
-                    Password Strength Requirements
-                  </label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <Controller
-                      name="requireNumber"
-                      control={form.control}
-                      render={({ field }) => (
-                        <label className="flex items-center gap-3 cursor-pointer">
-                          <Checkbox
-                            checked={field.value ?? false}
-                            onChange={(checked) => field.onChange(checked)}
-                          />
-                          <span className="text-sm text-gray-700 dark:text-gray-300">
-                            At least 1 number
-                          </span>
-                        </label>
-                      )}
-                    />
-
-                    <Controller
-                      name="requireSpecialChar"
-                      control={form.control}
-                      render={({ field }) => (
-                        <label className="flex items-center gap-3 cursor-pointer">
-                          <Checkbox
-                            checked={field.value ?? false}
-                            onChange={(checked) => field.onChange(checked)}
-                          />
-                          <span className="text-sm text-gray-700 dark:text-gray-300">
-                            At least 1 special character
-                          </span>
-                        </label>
-                      )}
-                    />
-
-                    <Controller
-                      name="requireLowercase"
-                      control={form.control}
-                      render={({ field }) => (
-                        <label className="flex items-center gap-3 cursor-pointer">
-                          <Checkbox
-                            checked={field.value ?? false}
-                            onChange={(checked) => field.onChange(checked)}
-                          />
-                          <span className="text-sm text-gray-700 dark:text-gray-300">
-                            At least 1 lowercase character
-                          </span>
-                        </label>
-                      )}
-                    />
-
-                    <Controller
-                      name="requireUppercase"
-                      control={form.control}
-                      render={({ field }) => (
-                        <label className="flex items-center gap-3 cursor-pointer">
-                          <Checkbox
-                            checked={field.value ?? false}
-                            onChange={(checked) => field.onChange(checked)}
-                          />
-                          <span className="text-sm text-gray-700 dark:text-gray-300">
-                            At least 1 uppercase character
-                          </span>
-                        </label>
-                      )}
-                    />
-                  </div>
-                </div>
-
-                {/* Reset Password Method */}
-                {isInsForgeCloudProject() && (
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-sm font-medium text-gray-900 dark:text-white">
-                        Password Reset Method
-                      </label>
-                      <span className="text-xs text-zinc-500 dark:text-neutral-400">
-                        Choose between 6-digit reset code or reset link
-                      </span>
-                    </div>
-                    <Controller
-                      name="resetPasswordMethod"
-                      control={form.control}
-                      render={({ field }) => (
-                        <Select
-                          value={field.value}
-                          onValueChange={(value) => {
-                            if (value) {
-                              field.onChange(value);
-                            }
-                          }}
-                        >
-                          <SelectTrigger className="w-[240px]">
-                            <span className="text-black dark:text-white">
-                              {field.value === 'code' ? 'Code' : 'Link'}
-                            </span>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="code">Code</SelectItem>
-                            <SelectItem value="link">Link</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                  </div>
-                )}
               </div>
 
               {/* Action Buttons - Reserve space even when hidden */}

@@ -5,19 +5,22 @@ description: Framework-agnostic authentication components for any React applicat
 
 The `@insforge/react` package provides **complete authentication solution for React applications**. Use deployed auth pages (built-in auth) or custom UI components—works with Vite.
 
-## Quick Start
+## Quick start
 
-### Step 1: Install Package and Set Environment Variables
+### Step 1: Create New React Project (Required)
 
 ```bash
 npm install @insforge/react@latest
 ```
 
+### Step 2: Set Environment Variables
+
 ```bash .env
 VITE_INSFORGE_BASE_URL=https://your-app.region.insforge.app
+VITE_INSFORGE_ANON_KEY=your-anon-key-here
 ```
 
-### Step 2: Setup Provider
+### Step 3: Setup Provider
 
 Wrap your app with `InsforgeProvider` in the root:
 
@@ -40,7 +43,7 @@ createRoot(document.getElementById('root')!).render(
 );
 ```
 
-### Step 3: Use Hooks & Components
+### Step 4: Use Hooks & Components
 
 ```tsx src/pages/Home.tsx
 import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton, useUser } from '@insforge/react';
@@ -65,3 +68,62 @@ export default function Home() {
 ```
 
 **That's it!** Your React app now has production-ready authentication with built-in auth pages.
+
+## Next Steps
+
+### Hooks
+
+#### `useAuth()`
+
+Access authentication state:
+
+```tsx
+import { useAuth } from '@insforge/react';
+
+function LoginButton() {
+  const { isSignedIn, isLoaded } = useAuth();
+  
+  if (!isLoaded) return <div>Loading...</div>;
+
+  return (
+    <div>
+      {isSignedIn ? 'Welcome!' : 'Sign In'}
+    </div>
+  );
+}
+```
+
+**Returns:**
+
+- `isSignedIn` - Boolean auth state
+- `isLoaded` - Boolean loading state
+
+#### `useUser()`
+
+Access current user data:
+
+```tsx
+import { useUser } from '@insforge/react';
+
+function UserProfile() {
+  const { user, isLoaded } = useUser();
+
+  if (!isLoaded) return <div>Loading...</div>;
+  if (!user) return <div>Not signed in</div>;
+
+
+  return (
+    <div>
+      <p>Id: {user.id}</p>
+      <p>Email: {user.email}</p>
+      <p>Name: {user.name}</p>
+      <img src={user.avatarUrl} alt="Avatar" />
+    </div>
+  );
+}
+```
+
+**Returns:**
+
+- `user` - User object with id, email, name, avatarUrl
+- `isLoaded` - Boolean loading state

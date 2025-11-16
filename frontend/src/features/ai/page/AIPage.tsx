@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/radix/Button';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -9,7 +9,6 @@ import {
   UpdateAIConfigurationRequest,
 } from '@insforge/shared-schemas';
 import { useConfirm } from '@/lib/hooks/useConfirm';
-import { useToast } from '@/lib/hooks/useToast';
 import { ModelSelectionDialog } from '@/features/ai/components/ModelSelectionDialog';
 import { SystemPromptDialog } from '@/features/ai/components/SystemPromptDialog';
 import { AIModelCard } from '@/features/ai/components/AIConfigCard';
@@ -29,16 +28,6 @@ export default function AIPage() {
     useAIRemainingCredits(!isInsForgeCloudProject());
 
   const { confirm, confirmDialogProps } = useConfirm();
-  const { showToast } = useToast();
-
-  // Handle AI credits error
-  useEffect(() => {
-    if (getAICreditsError) {
-      console.error('Failed to fetch AI credits:', getAICreditsError);
-      const errorMessage = getAICreditsError.message || 'Failed to load AI credits';
-      showToast(errorMessage, 'error');
-    }
-  }, [getAICreditsError, showToast]);
 
   // Format credits display
   const formatCredits = (remaining: number) => {
@@ -127,7 +116,9 @@ export default function AIPage() {
 
         {/* Content Section */}
         <div className="flex-1 overflow-auto">
-          {isLoadingConfigurations ? (
+          {getAICreditsError ? (
+            <AIEmptyState title="Configuration Error" description={getAICreditsError.message} />
+          ) : isLoadingConfigurations ? (
             <div className="flex-1 flex items-center justify-center h-full">
               <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
             </div>
@@ -144,7 +135,10 @@ export default function AIPage() {
               ))}
             </div>
           ) : (
-            <AIEmptyState />
+            <AIEmptyState
+              title="No AI Integration Yet"
+              description="Add your first integration to get started"
+            />
           )}
         </div>
       </div>

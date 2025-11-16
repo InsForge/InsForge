@@ -134,3 +134,19 @@ export interface XUserInfo {
   verified?: boolean;
   created_at?: string;
 }
+
+// Generic OAuth user data returned by provider services
+export interface OAuthUserData {
+  provider: string;
+  providerId: string;
+  email: string;
+  userName: string;
+  avatarUrl: string;
+  identityData:
+    | GoogleUserInfo
+    | GitHubUserInfo
+    | DiscordUserInfo
+    | LinkedInUserInfo
+    | FacebookUserInfo
+    | MicrosoftUserInfo;
+}

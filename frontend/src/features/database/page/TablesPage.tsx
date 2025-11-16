@@ -12,6 +12,9 @@ import { RecordFormDialog } from '@/features/database/components/RecordFormDialo
 import { TableForm } from '@/features/database/components/TableForm';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EmptyState } from '@/components/EmptyState';
+import { TablesEmptyState } from '@/features/database/components/TablesEmptyState';
+import { TemplatePreview } from '@/features/database/components/TemplatePreview';
+import { DATABASE_TEMPLATES, DatabaseTemplate } from '@/features/database/templates';
 import {
   Tooltip,
   TooltipContent,
@@ -52,6 +55,7 @@ export default function TablesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isSorting, setIsSorting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [previewingTemplate, setPreviewingTemplate] = useState<DatabaseTemplate | null>(null);
 
   const { confirm, confirmDialogProps } = useConfirm();
   const { showToast } = useToast();
@@ -183,12 +187,21 @@ export default function TablesPage() {
     }
 
     const handleDataUpdate = (message: SocketMessage<DataUpdatePayload>) => {
-      if (
-        message.payload?.resource === DataUpdateResourceType.METADATA ||
-        message.payload?.resource === DataUpdateResourceType.DATABASE_SCHEMA
-      ) {
+      if (message.payload?.resource === DataUpdateResourceType.DATABASE) {
         // Invalidate all tables queries
         void queryClient.invalidateQueries({ queryKey: ['tables'] });
+        void queryClient.invalidateQueries({ queryKey: ['records', selectedTable] });
+      }
+
+      if (message.payload?.resource === DataUpdateResourceType.RECORDS) {
+        // Invalidate records queries for the updated table
+        const data = message.payload.data as { tableName?: string };
+        const updatedTableName = data?.tableName;
+
+        // Only invalidate if this is the currently selected table
+        if (updatedTableName && updatedTableName === selectedTable) {
+          void queryClient.invalidateQueries({ queryKey: ['records', selectedTable] });
+        }
       }
     };
 
@@ -197,7 +210,7 @@ export default function TablesPage() {
     return () => {
       socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
     };
-  }, [socket, isConnected, queryClient]);
+  }, [socket, isConnected, queryClient, selectedTable]);
 
   // Reset sorting flag when loading completes
   useEffect(() => {
@@ -312,6 +325,14 @@ export default function TablesPage() {
     }
   };
 
+  const handleTemplateClick = (template: DatabaseTemplate) => {
+    setPreviewingTemplate(template);
+  };
+
+  const handleCancelPreview = () => {
+    setPreviewingTemplate(null);
+  };
+
   // Handle record update
   const handleRecordUpdate = async (rowId: string, columnKey: string, newValue: string) => {
     if (!selectedTable) {
@@ -335,7 +356,6 @@ export default function TablesPage() {
           pkValue: rowId,
           data: updates,
         });
-        await refetchTableData();
       }
     } catch (error) {
       showToast('Failed to update record', 'error');
@@ -358,10 +378,7 @@ export default function TablesPage() {
 
     if (shouldDelete) {
       await recordsHook.deleteRecords({ pkColumn: primaryKeyColumn || 'id', pkValues: ids });
-      await Promise.all([
-        refetchTableData(),
-        refetchTables(), // Also refresh tables to update sidebar record counts
-      ]);
+      // Query invalidation is handled by the mutation, no manual refetch needed
       setSelectedRows(new Set());
     }
   };
@@ -370,6 +387,14 @@ export default function TablesPage() {
 
   // Calculate pagination
   const totalPages = Math.ceil((tableData?.totalRecords || 0) / PAGE_SIZE);
+
+  // Show empty state when there are no tables and not loading
+  const showEmptyState = !isLoadingTables && tables?.length === 0 && !showTableForm;
+
+  // Show template preview - takes full width without sidebar
+  if (previewingTemplate) {
+    return <TemplatePreview template={previewingTemplate} onCancel={handleCancelPreview} />;
+  }
 
   return (
     <div className="flex h-full bg-bg-gray dark:bg-neutral-800">
@@ -473,13 +498,13 @@ export default function TablesPage() {
                             itemType="record"
                             onClear={() => setSelectedRows(new Set())}
                           />
-                          {selectedTable !== 'users' && (
+                          {
                             <DeleteActionButton
                               selectedCount={selectedRows.size}
                               itemType="record"
                               onDelete={() => void handleBulkDelete(Array.from(selectedRows))}
                             />
-                          )}
+                          }
                         </div>
                       ) : (
                         <SearchInput
@@ -491,11 +516,12 @@ export default function TablesPage() {
                         />
                       )}
                       <div className="flex items-center gap-2 ml-4">
-                        {selectedRows.size === 0 && selectedTable !== 'users' && (
+                        {selectedRows.size === 0 && (
                           <>
                             {/* Import CSV Button */}
                             <Button
-                              className="h-10 px-4 font-medium gap-1.5 dark:bg-emerald-300 dark:hover:bg-emerald-400 "
+                              variant="secondary"
+                              className="h-10 px-4 font-medium gap-1.5 border border-zinc-200 dark:border-neutral-600"
                               onClick={() => fileInputRef.current?.click()}
                               disabled={isImporting}
                             >
@@ -527,7 +553,13 @@ export default function TablesPage() {
                 </Alert>
               )}
 
-              {!selectedTable ? (
+              {showEmptyState ? (
+                <TablesEmptyState
+                  templates={DATABASE_TEMPLATES}
+                  onCreateTable={handleCreateTable}
+                  onTemplateClick={handleTemplateClick}
+                />
+              ) : !selectedTable ? (
                 <div className="flex-1 flex items-center justify-center">
                   <EmptyState
                     title="No Table Selected"
@@ -582,12 +614,6 @@ export default function TablesPage() {
           onOpenChange={setShowRecordForm}
           tableName={selectedTable}
           schema={schemaData.columns}
-          onSuccess={() => {
-            void refetchTableData();
-            void refetchTables();
-            // Also invalidate the schema cache to ensure fresh data
-            void queryClient.invalidateQueries({ queryKey: ['table-schema', selectedTable] });
-          }}
         />
       )}
 

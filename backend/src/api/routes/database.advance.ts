@@ -62,7 +62,7 @@ router.post('/rawsql/unrestricted', verifyAdmin, async (req: AuthRequest, res: R
 
     const socket = SocketService.getInstance();
     socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-      resource: DataUpdateResourceType.DATABASE_SCHEMA,
+      resource: DataUpdateResourceType.DATABASE,
     });
 
     res.json(response);
@@ -125,7 +125,7 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response) => {
 
     const socket = SocketService.getInstance();
     socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-      resource: DataUpdateResourceType.DATABASE_SCHEMA,
+      resource: DataUpdateResourceType.DATABASE,
     });
 
     res.json(response);
@@ -259,6 +259,14 @@ router.post(
         ip_address: req.ip,
       });
 
+      const socket = SocketService.getInstance();
+      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
+        resource: DataUpdateResourceType.RECORDS,
+        data: {
+          tableName: table,
+        },
+      });
+
       res.json(response);
     } catch (error: unknown) {
       logger.warn('Bulk upsert error:', error);
@@ -332,7 +340,7 @@ router.post(
 
       const socket = SocketService.getInstance();
       socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.DATABASE_SCHEMA,
+        resource: DataUpdateResourceType.DATABASE,
       });
 
       res.json(response);

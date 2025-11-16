@@ -8,8 +8,6 @@ import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin } from '@/api/middleware/auth.js';
 import logger from '@/utils/logger.js';
 import jwt from 'jsonwebtoken';
-import { SocketService } from '@/core/socket/socket.js';
-import { DataUpdateResourceType, ServerEvents } from '@/core/socket/types.js';
 import {
   createOAuthConfigRequestSchema,
   updateOAuthConfigRequestSchema,
@@ -124,12 +122,6 @@ router.post(
         ip_address: req.ip,
       });
 
-      // Broadcast configuration change
-      const socket = SocketService.getInstance();
-      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.AUTH_SCHEMA,
-      });
-
       successResponse(res, config);
     } catch (error) {
       logger.error('Failed to create OAuth configuration', { error });
@@ -182,12 +174,6 @@ router.put(
         ip_address: req.ip,
       });
 
-      // Broadcast configuration change
-      const socket = SocketService.getInstance();
-      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.AUTH_SCHEMA,
-      });
-
       successResponse(res, config);
     } catch (error) {
       logger.error('Failed to update OAuth configuration', {
@@ -225,12 +211,6 @@ router.delete(
         module: 'AUTH',
         details: { provider },
         ip_address: req.ip,
-      });
-
-      // Broadcast configuration change
-      const socket = SocketService.getInstance();
-      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.AUTH_SCHEMA,
       });
 
       successResponse(res, {
@@ -373,58 +353,73 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       }
       case 'github': {
         // Handle GitHub OAuth payload
-        const githubUserInfo = {
-          id: payloadData.providerId,
-          login: payloadData.login || '',
-          email: payloadData.email,
-          name: payloadData.name || '',
-          avatar_url: payloadData.avatar || '',
-        };
-        result = await authService.findOrCreateGitHubUser(githubUserInfo);
+        const userName = payloadData.name || payloadData.login || '';
+        const email = payloadData.email || `${payloadData.login}@users.noreply.github.com`;
+        result = await authService.findOrCreateThirdPartyUser(
+          'github',
+          payloadData.providerId,
+          email,
+          userName,
+          payloadData.avatar || '',
+          payloadData
+        );
         break;
       }
       case 'microsoft': {
         // Handle Microsoft OAuth payload
-        const microsoftUserInfo = {
-          id: payloadData.providerId,
-          email: payloadData.email,
-          name: payloadData.name || '',
-          avatar_url: payloadData.avatar || '',
-        };
-        result = await authService.findOrCreateMicrosoftUser(microsoftUserInfo);
+        const userName = payloadData.name || payloadData.email.split('@')[0] || 'user';
+        result = await authService.findOrCreateThirdPartyUser(
+          'microsoft',
+          payloadData.providerId,
+          payloadData.email,
+          userName,
+          payloadData.avatar || '',
+          payloadData
+        );
         break;
       }
       case 'discord': {
         // Handle Discord OAuth payload
-        const discordUserInfo = {
-          id: payloadData.providerId,
-          username: payloadData.username || '',
-          email: payloadData.email,
-          avatar: payloadData.avatar || '',
-        };
-        result = await authService.findOrCreateDiscordUser(discordUserInfo);
+        const userName = payloadData.username || '';
+        const email = payloadData.email || `${payloadData.providerId}@users.noreply.discord.local`;
+        result = await authService.findOrCreateThirdPartyUser(
+          'discord',
+          payloadData.providerId,
+          email,
+          userName,
+          payloadData.avatar || '',
+          payloadData
+        );
         break;
       }
       case 'linkedin': {
         // Handle LinkedIn OAuth payload
-        const linkedinUserInfo = {
-          sub: payloadData.providerId,
-          email: payloadData.email,
-          name: payloadData.name || '',
-          picture: payloadData.avatar || '',
-        };
-        result = await authService.findOrCreateLinkedInUser(linkedinUserInfo);
+        const userName = payloadData.name || payloadData.email.split('@')[0];
+        result = await authService.findOrCreateThirdPartyUser(
+          'linkedin',
+          payloadData.providerId,
+          payloadData.email,
+          userName,
+          payloadData.avatar || '',
+          payloadData
+        );
         break;
       }
       case 'facebook': {
         // Handle Facebook OAuth payload
-        const facebookUserInfo = {
-          id: payloadData.providerId,
-          email: payloadData.email,
-          name: payloadData.name || '',
-          picture: payloadData.picture || { data: { url: payloadData.avatar || '' } },
-        };
-        result = await authService.findOrCreateFacebookUser(facebookUserInfo);
+        const userName =
+          payloadData.name ||
+          payloadData.first_name ||
+          `User${payloadData.providerId.substring(0, 6)}`;
+        const avatarUrl = payloadData.picture?.data?.url || payloadData.avatar || '';
+        result = await authService.findOrCreateThirdPartyUser(
+          'facebook',
+          payloadData.providerId,
+          payloadData.email || '',
+          userName,
+          avatarUrl,
+          payloadData
+        );
         break;
       }
       case 'x': {

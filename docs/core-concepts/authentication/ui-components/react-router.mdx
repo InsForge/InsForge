@@ -7,17 +7,21 @@ The `@insforge/react-router` package provides **complete authentication solution
 
 ## Quick Start
 
-### Step 1: Install Package and Set Environment Variables
+### Step 1: Create New React Project (Required)
+
 
 ```bash
-npm install @insforge/react-router@latest
+npm install react-router-dom @insforge/react-router@latest
 ```
+
+### Step 2: Set Environment Variables
 
 ```bash .env
 VITE_INSFORGE_BASE_URL=https://your-app.region.insforge.app
+VITE_INSFORGE_ANON_KEY=your-anon-key-here
 ```
 
-### Step 2: Setup Provider
+### Step 3: Setup Provider
 
 Wrap your app with `InsforgeProvider` in the root:
 
@@ -40,7 +44,7 @@ createRoot(document.getElementById('root')!).render(
 );
 ```
 
-### Step 3: Configure Router (Built-in Auth)
+### Step 4: Configure Router (Built-in Auth)
 
 **The fastest way** - Use deployed auth pages with Layout pattern:
 
@@ -97,7 +101,7 @@ export default function Layout() {
   **Built-in auth** means using authentication pages hosted in your InsForge App. No UI code needed!
 </Info>
 
-### Step 4: Use Hooks & Components
+### Step 5: Use Hooks & Components
 
 ```tsx src/pages/Home.tsx
 import { SignInButton, SignedIn, SignedOut, UserButton } from '@insforge/react-router';
@@ -119,3 +123,62 @@ export default function Home() {
 ```
 
 **That's it!** Your React + React Router app now has production-ready authentication with built-in auth pages.
+
+## Next Steps
+
+### Hooks
+
+#### `useAuth()`
+
+Access authentication state:
+
+```tsx
+import { useAuth } from '@insforge/react-router';
+
+function LoginButton() {
+  const { isSignedIn, isLoaded } = useAuth();
+  
+  if (!isLoaded) return <div>Loading...</div>;
+
+  return (
+    <div>
+      {isSignedIn ? 'Welcome!' : 'Sign In'}
+    </div>
+  );
+}
+```
+
+**Returns:**
+
+- `isSignedIn` - Boolean auth state
+- `isLoaded` - Boolean loading state
+
+#### `useUser()`
+
+Access current user data:
+
+```tsx
+import { useUser } from '@insforge/react-router';
+
+function UserProfile() {
+  const { user, isLoaded } = useUser();
+
+  if (!isLoaded) return <div>Loading...</div>;
+  if (!user) return <div>Not signed in</div>;
+
+
+  return (
+    <div>
+      <p>Id: {user.id}</p>
+      <p>Email: {user.email}</p>
+      <p>Name: {user.name}</p>
+      <img src={user.avatarUrl} alt="Avatar" />
+    </div>
+  );
+}
+```
+
+**Returns:**
+
+- `user` - User object with id, email, name, avatarUrl
+- `isLoaded` - Boolean loading state

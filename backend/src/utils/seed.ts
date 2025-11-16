@@ -6,6 +6,7 @@ import { SecretService } from '@/core/secrets/secrets';
 import { OAuthConfigService } from '@/core/auth/oauth.config.js';
 import { OAuthProvidersSchema } from '@insforge/shared-schemas';
 import { AuthService } from '@/core/auth/auth.js';
+import { AuthConfigService } from '@/core/auth/auth.config.js';
 
 /**
  * Validates admin credentials are configured
@@ -53,6 +54,62 @@ async function seedDefaultAIConfigs(): Promise<void> {
   );
 
   logger.info('✅ Default AI models configured (cloud environment)');
+}
+
+/**
+ * Seeds default auth configuration for cloud environments
+ * Enables email verification with code-based verification method
+ * Only inserts config if table is empty (first startup, never configured)
+ */
+async function seedDefaultAuthConfig(): Promise<void> {
+  const dbManager = DatabaseManager.getInstance();
+  const db = dbManager.getDb();
+
+  try {
+    const result = await db.prepare('SELECT COUNT(*) as count FROM _auth_configs').get();
+    const hasConfig = result && Number(result.count) > 0;
+
+    if (hasConfig) {
+      const authConfigService = AuthConfigService.getInstance();
+      const currentConfig = await authConfigService.getAuthConfig();
+      logger.info(
+        '✅ Email verification configured:',
+        currentConfig.requireEmailVerification ? 'enabled' : 'disabled'
+      );
+      return;
+    }
+
+    // Table is empty - this is first startup, insert default cloud configuration
+    // Note: Migration 016 will add verify_email_method, reset_password_method, sign_in_redirect_to
+    // so we only insert fields that exist in migration 015
+    await db
+      .prepare(
+        `INSERT INTO _auth_configs (
+          require_email_verification,
+          password_min_length,
+          require_number,
+          require_lowercase,
+          require_uppercase,
+          require_special_char
+        ) VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT DO NOTHING`
+      )
+      .run(
+        isCloudEnvironment(), // Enable email verification for cloud
+        6, // password_min_length
+        false, // require_number
+        false, // require_lowercase
+        false, // require_uppercase
+        false // require_special_char
+      );
+
+    logger.info('✅ Email verification enabled (cloud environment)');
+  } catch (error) {
+    logger.error('Failed to seed default auth config', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    // Don't throw - this is not critical for app startup
+  }
 }
 
 /**
@@ -186,6 +243,9 @@ export async function seedBackend(): Promise<void> {
 
     // seed AI configs for cloud environment
     await seedDefaultAIConfigs();
+
+    // Enable email verification in cloud environment
+    await seedDefaultAuthConfig();
 
     // add default OAuth configs in Cloud hosting
     if (isCloudEnvironment()) {

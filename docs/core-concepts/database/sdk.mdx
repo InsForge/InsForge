@@ -335,3 +335,48 @@ const { data } = await insforge.database
   "error": null
 }
 ```
+
+### Using with Authentication Hooks
+
+Combine database queries with `useUser()` or `useAuth()` hooks to fetch user-specific data:
+
+```tsx
+import { useUser } from '@insforge/react'; // or '@insforge/react-router'
+import { insforge } from './lib/insforge';
+import { useEffect, useState } from 'react';
+
+function MyProfile() {
+  const { user, isLoaded } = useUser();
+  const [posts, setPosts] = useState([]);
+
+  useEffect(() => {
+    if (user) {
+      // Fetch user's posts from database
+      insforge.database
+        .from('posts')
+        .select('*')
+        .eq('user_id', user.id)
+        .then(({ data }) => setPosts(data));
+    }
+  }, [user]);
+
+  if (!isLoaded) return <div>Loading...</div>;
+  if (!user) return <div>Not signed in</div>;
+
+  return (
+    <div>
+      <h1>{user.name}</h1>
+      <p>{user.email}</p>
+      <h2>My Posts: {posts.length}</h2>
+      {posts.map(post => (
+        <div key={post.id}>{post.title}</div>
+      ))}
+    </div>
+  );
+}
+```
+
+**Key points:**
+- Use `user.id` to filter data for the authenticated user
+- Check `isLoaded` before accessing `user` to avoid race conditions
+- Check `!user` to handle unauthenticated state
