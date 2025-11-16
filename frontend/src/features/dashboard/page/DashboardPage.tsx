@@ -29,9 +29,7 @@ export default function DashboardPage() {
       name: 'MCP Call',
       width: '12fr',
       renderCell: ({ row }) => (
-        <p className="text-sm text-gray-900 dark:text-white font-normal leading-6">
-          {String(row.tool_name ?? '')}
-        </p>
+        <p className="text-sm font-normal leading-6">{String(row.tool_name ?? '')}</p>
       ),
     },
     {
@@ -39,9 +37,7 @@ export default function DashboardPage() {
       name: 'Time',
       width: 'minmax(200px, 1fr)',
       renderCell: ({ row }) => (
-        <p className="text-sm text-gray-900 dark:text-white font-normal leading-6">
-          {formatTime(String(row.created_at ?? ''))}
-        </p>
+        <p className="text-sm font-normal leading-6">{formatTime(String(row.created_at ?? ''))}</p>
       ),
     },
   ];
@@ -51,14 +47,12 @@ export default function DashboardPage() {
   };
 
   return (
-    <main className="h-full bg-white dark:bg-neutral-800 overflow-y-auto">
+    <main className="h-full overflow-y-auto">
       <div className="flex flex-col gap-16 w-full max-w-[1080px] mx-auto pt-6 pb-8">
         <div className="flex flex-col gap-6">
           {/* Connection Success Banner - Only shows once on first connection */}
           {showBanner && <ConnectionSuccessBanner />}
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white tracking-[-0.1px]">
-            Dashboard
-          </h1>
+          <h1 className="text-xl font-semibold tracking-[-0.1px]">Dashboard</h1>
 
           {/* Stats Section */}
           <section className="flex flex-col gap-6 w-full">
@@ -96,10 +90,8 @@ export default function DashboardPage() {
         {/* Quick Start Prompt Section */}
         <section className="flex flex-col gap-6 w-full">
           <div className="flex flex-col gap-1 w-full">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white tracking-[-0.1px]">
-              Quick Start Prompt
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
+            <h2 className="text-xl font-semibold tracking-[-0.1px]">Quick Start Prompt</h2>
+            <p className="text-sm text-light-mode-text dark:text-dark-mode-text leading-6">
               Paste the prompts below into your agent to quickly start building real apps.
             </p>
           </div>
@@ -127,9 +119,7 @@ export default function DashboardPage() {
         {/* Templates & Components Section */}
         <section className="flex flex-col gap-6 w-full">
           <div className="flex flex-col gap-1 w-full">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white tracking-[-0.1px]">
-              Explore Our Platform
-            </h2>
+            <h2 className="text-xl font-semibold tracking-[-0.1px]">Explore Our Platform</h2>
             <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
               InsForge gives you every backend feature you need. Use the whole platform or just the
               features you want.
@@ -143,13 +133,11 @@ export default function DashboardPage() {
               className="flex-1 bg-white dark:bg-[#363636] border border-gray-200 dark:border-[#414141] rounded-lg p-4 flex items-center gap-3 hover:bg-gray-50 hover:border-gray-300 dark:hover:bg-neutral-700 dark:hover:border-[#525252] hover:shadow-sm transition-all group"
             >
               <div className="flex-1 flex items-center gap-4">
-                <div className="bg-gray-100 dark:bg-neutral-800 rounded p-3.5 flex items-center justify-center shrink-0">
+                <div className="bg-gray-100 dark:bg-dark-mode-background rounded p-3.5 flex items-center justify-center shrink-0">
                   <Lock className="w-6 h-6 text-gray-600 dark:text-neutral-400" />
                 </div>
                 <div className="flex flex-col gap-1 items-start text-left">
-                  <p className="text-base text-gray-900 dark:text-white font-normal leading-6">
-                    Authentication
-                  </p>
+                  <p className="text-base   font-normal leading-6">Authentication</p>
                   <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
                     User Authentication and management
                   </p>
@@ -164,13 +152,11 @@ export default function DashboardPage() {
               className="flex-1 bg-white dark:bg-[#363636] border border-gray-200 dark:border-[#414141] rounded-lg p-4 flex items-center gap-3 hover:bg-gray-50 hover:border-gray-300 dark:hover:bg-neutral-700 dark:hover:border-[#525252] hover:shadow-sm transition-all group"
             >
               <div className="flex-1 flex items-center gap-4">
-                <div className="bg-gray-100 dark:bg-neutral-800 rounded p-3.5 flex items-center justify-center shrink-0">
+                <div className="bg-gray-100 dark:bg-dark-mode-background rounded p-3.5 flex items-center justify-center shrink-0">
                   <Database className="w-6 h-6 text-gray-600 dark:text-neutral-400" />
                 </div>
                 <div className="flex flex-col gap-1 items-start text-left">
-                  <p className="text-base text-gray-900 dark:text-white font-normal leading-6">
-                    Database
-                  </p>
+                  <p className="text-base   font-normal leading-6">Database</p>
                   <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
                     Manage your tables and data
                   </p>
@@ -184,7 +170,7 @@ export default function DashboardPage() {
         {/* MCP Call Records Section */}
         <section className="flex flex-col gap-6 w-full">
           <div className="flex items-center justify-between w-full">
-            <p className="text-xl font-semibold text-gray-900 dark:text-white">MCP Call Records</p>
+            <p className="text-xl font-semibold ">MCP Call Records</p>
             <Button
               onClick={handleViewMoreClick}
               className="h-8 px-4 font-medium dark:bg-emerald-300 dark:text-black"

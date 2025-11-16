@@ -68,6 +68,8 @@
   body {
     overflow: hidden;
     height: 100%;
+    background: rgb(var(--background));
+    color: rgb(var(--foreground));
   }
 
   /* Apply base font settings */
@@ -149,9 +151,9 @@
   :root {
     /* Light mode colors */
     --background: 255 255 255; /* white */
-    --foreground: 10 10 10; /* near-black */
+    --foreground: 17 24 39; /* near-black */
     --card: 255 255 255; /* white */
-    --card-foreground: 10 10 10; /* near-black */
+    --card-foreground: 17 24 39; /* near-black */
     --popover: 255 255 255; /* white */
     --popover-foreground: 10 10 10; /* near-black */
     --primary: 23 23 23; /* zinc-900 */
@@ -176,9 +178,9 @@
   .dark {
     /* Dark mode colors - matching your neutral theme */
     --background: 38 38 38; /* neutral-800 */
-    --foreground: 250 250 250; /* zinc-50 */
-    --card: 64 64 64; /* neutral-700 */
-    --card-foreground: 250 250 250; /* zinc-50 */
+    --foreground: 255 255 255; /* white*/
+    --card: 51 51 51; /* #333333 */
+    --card-foreground: 255 255 255; /* white*/
     --popover: 64 64 64; /* neutral-700 */
     --popover-foreground: 250 250 250; /* zinc-50 */
     --primary: 250 250 250; /* zinc-50 */
@@ -215,6 +217,30 @@
 }
 
 @theme {
+  /* Dark mode theme */
+  --color-dark-mode-background: theme(--color-neutral-800);
+  --color-dark-mode-card: #333333;
+  --color-dark-mode-input: theme(--color-neutral-900);
+  --color-dark-mode-border: theme(--color-neutral-700);
+  --color-dark-mode-border-hover: theme(--color-neutral-600);
+  --color-dark-mode-secondary: theme(--color-neutral-700);
+  --color-dark-mode-text: theme(--color-neutral-400);
+  /* Light mode theme*/
+  --color-light-mode-background: theme(--color-gray-50);
+  --color-light-mode-card: theme(--color-white);
+  --color-light-mode-secondary: theme(--color-gray-200);
+  --color-light-mode-border: theme(--color-gray-200);
+  --color-light-mode-border-hover: theme(--color-gray-300);
+  --color-light-mode-text: theme(--color-gray-500);
+
+  /* Icon themes */
+  --color-light-mode-icon: theme(--color-zinc-700);
+  --color-dark-mode-icon: theme(--color-neutral-400);
+
+  /* emerald themes */
+  --color-primary-emerald: theme(--color-emerald-300);
+  --color-secondary-emerald: theme(--color-emerald-400);
+  /*  */
   --color-border-gray: #e4e4e7;
   --color-chart-blue-dark: #2c7fff;
   --color-text-gray: #a1a1a1;
