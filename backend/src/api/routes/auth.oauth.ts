@@ -8,7 +8,6 @@ import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin } from '@/api/middleware/auth.js';
 import logger from '@/utils/logger.js';
 import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
 import { SocketService } from '@/core/socket/socket.js';
 import { DataUpdateResourceType, ServerEvents } from '@/core/socket/types.js';
 import {
@@ -18,6 +17,7 @@ import {
   oAuthProvidersSchema,
 } from '@insforge/shared-schemas';
 import { isOAuthSharedKeysAvailable } from '@/utils/environment.js';
+import { XOAuthService } from '@/core/auth/oauth.x';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -270,29 +270,18 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
       throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    let jwtPayload: Record<string, unknown> = {
+    const jwtPayload = {
       provider: validatedProvider,
       redirectUri: redirect_uri ? (redirect_uri as string) : undefined,
       createdAt: Date.now(),
     };
-    let challenge: string | undefined;
-
-    // For X (Twitter) only — generate PKCE verifier/challenge and embed verifier in state
-    if (validatedProvider === 'x') {
-      const verifier = crypto.randomBytes(32).toString('base64url');
-      challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
-      jwtPayload = {
-        ...jwtPayload,
-        codeVerifier: verifier, // add PKCE verifier
-      };
-    }
     const jwtSecret = validateJwtSecret();
     const state = jwt.sign(jwtPayload, jwtSecret, {
       algorithm: 'HS256',
       expiresIn: '1h', // Set expiration time for the state token
     });
 
-    const authUrl = await authService.generateOAuthUrl(validatedProvider, state, challenge);
+    const authUrl = await authService.generateOAuthUrl(validatedProvider, state);
 
     res.json({ authUrl });
   } catch (error) {
@@ -446,7 +435,8 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
           name: payloadData.name,
           picture: payloadData.profile_image_url,
         };
-        result = await authService.findOrCreateXUser(xUserInfo);
+        const xOAuthService = XOAuthService.getInstance();
+        result = await xOAuthService.findOrCreateXUser(xUserInfo);
         break;
       }
     }
@@ -478,16 +468,12 @@ router.get('/:provider/callback', async (req: Request, res: Response, next: Next
     // Decode redirectUri from state (needed for both success and error paths)
     let redirectUri: string;
 
-    let verifier: string;
-
     try {
       const jwtSecret = validateJwtSecret();
       const stateData = jwt.verify(state as string, jwtSecret) as {
         provider: string;
         redirectUri: string;
-        codeVerifier?: string;
       };
-      verifier = stateData.codeVerifier || '';
       redirectUri = stateData.redirectUri || '';
     } catch {
       // Invalid state
@@ -515,7 +501,7 @@ router.get('/:provider/callback', async (req: Request, res: Response, next: Next
       const result = await authService.handleOAuthCallback(validatedProvider, {
         code: code as string | undefined,
         token: token as string | undefined,
-        verifier,
+        state: state as string | undefined,
       });
 
       // Construct redirect URL with query parameters

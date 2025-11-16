@@ -42,6 +42,7 @@ import { getApiBaseUrl } from '@/utils/environment';
 import { AppError } from '@/api/middleware/error';
 import { ERROR_CODES } from '@/types/error-constants';
 import { EmailService } from '../email';
+import { XOAuthService } from './oauth.x';
 
 const JWT_SECRET = () => process.env.JWT_SECRET ?? '';
 const JWT_EXPIRES_IN = '7d';
@@ -1539,135 +1540,6 @@ export class AuthService {
     );
   }
 
-  /**
-   * Generate X OAuth authorization URL
-   */
-  async generateXOAuthUrl(state?: string, challenge?: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('x');
-
-    if (!config) {
-      throw new Error('X OAuth not configured');
-    }
-
-    const selfBaseUrl = getApiBaseUrl();
-
-    if (!state || !challenge) {
-      throw new Error('State and Challenge parameter is required.');
-    }
-
-    if (config?.useSharedKey) {
-      // Use shared keys if configured
-      const cloudBasedUrl = process.env.CLOUD_API_HOST || 'https://api.insforge.dev';
-      const redirectUri = `${selfBaseUrl}/api/auth/oauth/shared/callback/${state}`;
-      const response = await axios.get(
-        `${cloudBasedUrl}/auth/v1/shared/x?redirect_uri=${encodeURIComponent(redirectUri)}`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      return response.data.auth_url || response.data.url || '';
-    }
-
-    logger.debug('X OAuth Config (fresh from DB):', {
-      clientId: config.clientId ? 'SET' : 'NOT SET',
-    });
-
-    const authUrl = new URL('https://twitter.com/i/oauth2/authorize');
-    authUrl.searchParams.set('response_type', 'code');
-    authUrl.searchParams.set('client_id', config.clientId ?? '');
-    authUrl.searchParams.set('redirect_uri', `${selfBaseUrl}/api/auth/oauth/x/callback`);
-    authUrl.searchParams.set(
-      'scope',
-      config.scopes ? config.scopes.join(' ') : 'tweet.read users.read'
-    );
-    authUrl.searchParams.set('state', state ?? '');
-    authUrl.searchParams.set('code_challenge', challenge);
-    authUrl.searchParams.set('code_challenge_method', 'S256');
-
-    return authUrl.toString();
-  }
-
-  /**
-   *  Exchange X code for access token
-   */
-  async exchangeXCodeForToken(code: string, verifier: string): Promise<string> {
-    const oauthConfigService = OAuthConfigService.getInstance();
-    const config = await oauthConfigService.getConfigByProvider('x');
-
-    if (!config) {
-      throw new Error('X OAuth not configured');
-    }
-
-    const clientSecret = await oauthConfigService.getClientSecretByProvider('x');
-    const selfBaseUrl = getApiBaseUrl();
-
-    const body = new URLSearchParams({
-      code,
-      grant_type: 'authorization_code',
-      client_id: config.clientId ?? '',
-      redirect_uri: `${selfBaseUrl}/api/auth/oauth/x/callback`,
-      code_verifier: verifier,
-    });
-
-    const response = await axios.post('https://api.twitter.com/2/oauth2/token', body.toString(), {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Authorization:
-          'Basic ' + Buffer.from(`${config.clientId}:${clientSecret}`).toString('base64'),
-      },
-    });
-
-    if (!response.data.access_token) {
-      throw new Error('Failed to get access token from X');
-    }
-
-    return response.data.access_token;
-  }
-
-  /**
-   * Get X user info
-   */
-  async getXUserInfo(accessToken: string) {
-    const userResponse = await axios.get('https://api.twitter.com/2/users/me', {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-      params: {
-        'user.fields': 'id,name,username,profile_image_url,verified',
-      },
-    });
-
-    const userData = userResponse.data.data;
-
-    return {
-      id: userData.id,
-      name: userData.name,
-      username: userData.username,
-      profile_image_url: userData.profile_image_url,
-      verified: userData.verified,
-    };
-  }
-
-  /**
-   * Find or create X user
-   */
-  async findOrCreateXUser(xUserInfo: XUserInfo): Promise<CreateSessionResponse> {
-    const userName = xUserInfo.username || xUserInfo.name || `user${xUserInfo.id.substring(0, 8)}`;
-    const email = `${userName}@users.noreply.x.local`;
-
-    return this.findOrCreateThirdPartyUser(
-      'x',
-      xUserInfo.id,
-      email,
-      userName,
-      xUserInfo.profile_image_url || '',
-      xUserInfo
-    );
-  }
-
   async getMetadata(): Promise<AuthMetadataSchema> {
     const oAuthConfigService = OAuthConfigService.getInstance();
     const oAuthConfigs = await oAuthConfigService.getAllConfigs();
@@ -1679,11 +1551,7 @@ export class AuthService {
   /**
    * Generate OAuth authorization URL for any supported provider
    */
-  async generateOAuthUrl(
-    provider: OAuthProvidersSchema,
-    state?: string,
-    challenge?: string
-  ): Promise<string> {
+  async generateOAuthUrl(provider: OAuthProvidersSchema, state?: string): Promise<string> {
     switch (provider) {
       case 'google': {
         const googleOAuthService = GoogleOAuthService.getInstance();
@@ -1699,8 +1567,10 @@ export class AuthService {
         return this.generateFacebookOAuthUrl(state);
       case 'microsoft':
         return this.generateMicrosoftOAuthUrl(state);
-      case 'x':
-        return this.generateXOAuthUrl(state, challenge);
+      case 'x': {
+        const xOAuthService = XOAuthService.getInstance();
+        return xOAuthService.generateXOAuthUrl(state);
+      }
       default:
         throw new Error(`OAuth provider ${provider} is not implemented yet.`);
     }
@@ -1711,7 +1581,7 @@ export class AuthService {
    */
   async handleOAuthCallback(
     provider: OAuthProvidersSchema,
-    payload: { code?: string; token?: string; verifier?: string }
+    payload: { code?: string; token?: string; state?: string }
   ): Promise<CreateSessionResponse> {
     switch (provider) {
       case 'google': {
@@ -1738,8 +1608,10 @@ export class AuthService {
         return this.handleFacebookCallback(payload);
       case 'microsoft':
         return this.handleMicrosoftCallback(payload);
-      case 'x':
-        return this.handleXCallback(payload);
+      case 'x': {
+        const xOAuthService = XOAuthService.getInstance();
+        return xOAuthService.handleXCallback(payload);
+      }
       default:
         throw new Error(`OAuth provider ${provider} is not implemented yet.`);
     }
@@ -1828,23 +1700,6 @@ export class AuthService {
     const accessToken = await this.exchangeCodeToTokenByMicrosoft(payload.code);
     const microsoftUserInfo = await this.getMicrosoftUserInfo(accessToken.access_token);
     return this.findOrCreateMicrosoftUser(microsoftUserInfo);
-  }
-
-  /**
-   * Handle X OAuth callback
-   */
-  private async handleXCallback(payload: {
-    code?: string;
-    token?: string;
-    verifier?: string;
-  }): Promise<CreateSessionResponse> {
-    if (!payload.code || !payload.verifier) {
-      throw new Error('No authorization code or verifier provided');
-    }
-
-    const accessToken = await this.exchangeXCodeForToken(payload.code, payload.verifier);
-    const xUserInfo = await this.getXUserInfo(accessToken);
-    return this.findOrCreateXUser(xUserInfo);
   }
 
   /**
