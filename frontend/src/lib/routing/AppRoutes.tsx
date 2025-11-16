@@ -15,6 +15,7 @@ import OnBoardPage from '@/features/onboard/page/OnBoardPage';
 import VisualizerPage from '@/features/visualizer/page/VisualizerPage';
 import FunctionsPage from '@/features/functions/page/FunctionsPage';
 import SecretsPage from '@/features/functions/page/SecretsPage';
+import SchedulesPage from '@/features/functions/page/SchedulesPage';
 import AIPage from '@/features/ai/page/AIPage';
 import SQLEditorPage from '@/features/database/page/SQLEditorPage';
 import IndexesPage from '@/features/database/page/IndexesPage';
@@ -72,6 +73,7 @@ export function AppRoutes() {
                 />
                 <Route path="/dashboard/functions/list" element={<FunctionsPage />} />
                 <Route path="/dashboard/functions/secrets" element={<SecretsPage />} />
+                <Route path="/dashboard/functions/schedules" element={<SchedulesPage />} />
                 <Route path="/dashboard/visualizer" element={<VisualizerPage />} />
                 <Route path="/dashboard/onboard" element={<OnBoardPage />} />
                 <Route path="/dashboard/ai" element={<AIPage />} />
