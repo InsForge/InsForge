@@ -148,5 +148,6 @@ export interface OAuthUserData {
     | DiscordUserInfo
     | LinkedInUserInfo
     | FacebookUserInfo
-    | MicrosoftUserInfo;
+    | MicrosoftUserInfo
+    | XUserInfo;
 }

@@ -1,11 +1,9 @@
 import crypto from 'crypto';
-import { XUserInfo } from '@/types/auth';
+import { XUserInfo, OAuthUserData } from '@/types/auth';
 import { getApiBaseUrl } from '@/utils/environment';
 import logger from '@/utils/logger';
-import { CreateSessionResponse } from '@insforge/shared-schemas';
 import axios from 'axios';
 import { OAuthConfigService } from './oauth.config';
-import { AuthService } from './auth';
 
 export class XOAuthService {
   private static instance: XOAuthService;
@@ -129,7 +127,7 @@ export class XOAuthService {
   /**
    * Get X user info
    */
-  async getXUserInfo(accessToken: string) {
+  async getXUserInfo(accessToken: string): Promise<XUserInfo> {
     const userResponse = await axios.get('https://api.twitter.com/2/users/me', {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -151,37 +149,31 @@ export class XOAuthService {
   }
 
   /**
-   * Find or create X user
-   */
-  async findOrCreateXUser(xUserInfo: XUserInfo): Promise<CreateSessionResponse> {
-    const userName = xUserInfo.username || xUserInfo.name || `user${xUserInfo.id.substring(0, 8)}`;
-    const email = `${userName}@users.noreply.x.local`;
-
-    const authService = AuthService.getInstance();
-    return authService.findOrCreateThirdPartyUser(
-      'x',
-      xUserInfo.id,
-      email,
-      userName,
-      xUserInfo.profile_image_url || '',
-      xUserInfo
-    );
-  }
-
-  /**
    * Handle X OAuth callback
    */
-  async handleXCallback(payload: {
+  async handleCallback(payload: {
     code?: string;
     token?: string;
     state?: string;
-  }): Promise<CreateSessionResponse> {
+  }): Promise<OAuthUserData> {
     if (!payload.code || !payload.state) {
       throw new Error('No authorization code or state provided');
     }
 
     const accessToken = await this.exchangeXCodeForToken(payload.code, payload.state);
     const xUserInfo = await this.getXUserInfo(accessToken);
-    return this.findOrCreateXUser(xUserInfo);
+
+    // Transform X user info to generic format
+    const userName = xUserInfo.username || xUserInfo.name || `user${xUserInfo.id.substring(0, 8)}`;
+    const email = `${userName}@users.noreply.x.local`;
+
+    return {
+      provider: 'x',
+      providerId: xUserInfo.id,
+      email,
+      userName,
+      avatarUrl: xUserInfo.profile_image_url || '',
+      identityData: xUserInfo,
+    };
   }
 }
