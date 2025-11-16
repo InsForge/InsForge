@@ -15,7 +15,6 @@ import {
   oAuthProvidersSchema,
 } from '@insforge/shared-schemas';
 import { isOAuthSharedKeysAvailable } from '@/utils/environment.js';
-import { XOAuthService } from '@/core/auth/oauth.x';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -424,14 +423,19 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       }
       case 'x': {
         // Handle X OAuth payload
-        const xUserInfo = {
-          id: payloadData.providerId,
-          email: payloadData.email,
-          name: payloadData.name,
-          picture: payloadData.profile_image_url,
-        };
-        const xOAuthService = XOAuthService.getInstance();
-        result = await xOAuthService.findOrCreateXUser(xUserInfo);
+        const userName =
+          payloadData.username ||
+          payloadData.name ||
+          `user${payloadData.providerId.substring(0, 8)}`;
+        const email = `${userName}@users.noreply.x.local`;
+        result = await authService.findOrCreateThirdPartyUser(
+          'x',
+          payloadData.providerId,
+          email,
+          userName,
+          payloadData.profile_image_url || '',
+          payloadData
+        );
         break;
       }
     }
