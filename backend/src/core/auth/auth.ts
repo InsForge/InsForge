@@ -37,6 +37,7 @@ import {
   MicrosoftUserInfo,
   LinkedInUserInfo,
   DiscordUserInfo,
+  XUserInfo,
   UserRecord,
   OAuthUserData,
 } from '@/types/auth';
@@ -45,6 +46,7 @@ import { getApiBaseUrl } from '@/utils/environment';
 import { AppError } from '@/api/middleware/error';
 import { ERROR_CODES } from '@/types/error-constants';
 import { EmailService } from '../email';
+import { XOAuthService } from './oauth.x';
 
 const JWT_SECRET = () => process.env.JWT_SECRET ?? '';
 const JWT_EXPIRES_IN = '7d';
@@ -60,12 +62,13 @@ export class AuthService {
   private db;
 
   // OAuth service instances (cached singletons)
-  private googleOAuth: GoogleOAuthService;
-  private githubOAuth: GitHubOAuthService;
-  private discordOAuth: DiscordOAuthService;
-  private linkedinOAuth: LinkedInOAuthService;
-  private facebookOAuth: FacebookOAuthService;
-  private microsoftOAuth: MicrosoftOAuthService;
+  private googleOAuthService: GoogleOAuthService;
+  private githubOAuthService: GitHubOAuthService;
+  private discordOAuthService: DiscordOAuthService;
+  private linkedinOAuthService: LinkedInOAuthService;
+  private facebookOAuthService: FacebookOAuthService;
+  private microsoftOAuthService: MicrosoftOAuthService;
+  private xOAuthService: XOAuthService;
 
   private constructor() {
     // Load .env file if not already loaded
@@ -96,12 +99,13 @@ export class AuthService {
     this.db = dbManager.getDb();
 
     // Initialize OAuth services (cached singletons)
-    this.googleOAuth = GoogleOAuthService.getInstance();
-    this.githubOAuth = GitHubOAuthService.getInstance();
-    this.discordOAuth = DiscordOAuthService.getInstance();
-    this.linkedinOAuth = LinkedInOAuthService.getInstance();
-    this.facebookOAuth = FacebookOAuthService.getInstance();
-    this.microsoftOAuth = MicrosoftOAuthService.getInstance();
+    this.googleOAuthService = GoogleOAuthService.getInstance();
+    this.githubOAuthService = GitHubOAuthService.getInstance();
+    this.discordOAuthService = DiscordOAuthService.getInstance();
+    this.linkedinOAuthService = LinkedInOAuthService.getInstance();
+    this.facebookOAuthService = FacebookOAuthService.getInstance();
+    this.microsoftOAuthService = MicrosoftOAuthService.getInstance();
+    this.xOAuthService = XOAuthService.getInstance();
 
     logger.info('AuthService initialized');
   }
@@ -706,6 +710,7 @@ export class AuthService {
       | LinkedInUserInfo
       | MicrosoftUserInfo
       | FacebookUserInfo
+      | XUserInfo
       | Record<string, unknown>
   ): Promise<CreateSessionResponse> {
     // First, try to find existing user by provider ID in _account_providers table
@@ -811,6 +816,7 @@ export class AuthService {
       | LinkedInUserInfo
       | MicrosoftUserInfo
       | FacebookUserInfo
+      | XUserInfo
       | Record<string, unknown>,
     avatarUrl: string
   ): Promise<CreateSessionResponse> {
@@ -894,17 +900,19 @@ export class AuthService {
   async generateOAuthUrl(provider: OAuthProvidersSchema, state?: string): Promise<string> {
     switch (provider) {
       case 'google':
-        return this.googleOAuth.generateOAuthUrl(state);
+        return this.googleOAuthService.generateOAuthUrl(state);
       case 'github':
-        return this.githubOAuth.generateOAuthUrl(state);
+        return this.githubOAuthService.generateOAuthUrl(state);
       case 'discord':
-        return this.discordOAuth.generateOAuthUrl(state);
+        return this.discordOAuthService.generateOAuthUrl(state);
       case 'linkedin':
-        return this.linkedinOAuth.generateOAuthUrl(state);
+        return this.linkedinOAuthService.generateOAuthUrl(state);
       case 'facebook':
-        return this.facebookOAuth.generateOAuthUrl(state);
+        return this.facebookOAuthService.generateOAuthUrl(state);
       case 'microsoft':
-        return this.microsoftOAuth.generateOAuthUrl(state);
+        return this.microsoftOAuthService.generateOAuthUrl(state);
+      case 'x':
+        return this.xOAuthService.generateXOAuthUrl(state);
       default:
         throw new Error(`OAuth provider ${provider} is not implemented yet.`);
     }
@@ -915,28 +923,31 @@ export class AuthService {
    */
   async handleOAuthCallback(
     provider: OAuthProvidersSchema,
-    payload: { code?: string; token?: string }
+    payload: { code?: string; token?: string; state?: string }
   ): Promise<CreateSessionResponse> {
     let userData: OAuthUserData;
 
     switch (provider) {
       case 'google':
-        userData = await this.googleOAuth.handleCallback(payload);
+        userData = await this.googleOAuthService.handleCallback(payload);
         break;
       case 'github':
-        userData = await this.githubOAuth.handleCallback(payload);
+        userData = await this.githubOAuthService.handleCallback(payload);
         break;
       case 'discord':
-        userData = await this.discordOAuth.handleCallback(payload);
+        userData = await this.discordOAuthService.handleCallback(payload);
         break;
       case 'linkedin':
-        userData = await this.linkedinOAuth.handleCallback(payload);
+        userData = await this.linkedinOAuthService.handleCallback(payload);
         break;
       case 'facebook':
-        userData = await this.facebookOAuth.handleCallback(payload);
+        userData = await this.facebookOAuthService.handleCallback(payload);
         break;
       case 'microsoft':
-        userData = await this.microsoftOAuth.handleCallback(payload);
+        userData = await this.microsoftOAuthService.handleCallback(payload);
+        break;
+      case 'x':
+        userData = await this.xOAuthService.handleCallback(payload);
         break;
       default:
         throw new Error(`OAuth provider ${provider} is not implemented yet.`);

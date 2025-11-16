@@ -421,6 +421,23 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
         );
         break;
       }
+      case 'x': {
+        // Handle X OAuth payload
+        const userName =
+          payloadData.username ||
+          payloadData.name ||
+          `user${payloadData.providerId.substring(0, 8)}`;
+        const email = `${userName}@users.noreply.x.local`;
+        result = await authService.findOrCreateThirdPartyUser(
+          'x',
+          payloadData.providerId,
+          email,
+          userName,
+          payloadData.profile_image_url || '',
+          payloadData
+        );
+        break;
+      }
     }
 
     const params = new URLSearchParams();
@@ -483,6 +500,7 @@ router.get('/:provider/callback', async (req: Request, res: Response, next: Next
       const result = await authService.handleOAuthCallback(validatedProvider, {
         code: code as string | undefined,
         token: token as string | undefined,
+        state: state as string | undefined,
       });
 
       // Construct redirect URL with query parameters

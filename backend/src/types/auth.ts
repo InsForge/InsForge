@@ -126,6 +126,15 @@ export interface FacebookUserInfo {
   last_name?: string;
 }
 
+export interface XUserInfo {
+  id: string;
+  name: string;
+  username?: string;
+  profile_image_url?: string;
+  verified?: boolean;
+  created_at?: string;
+}
+
 // Generic OAuth user data returned by provider services
 export interface OAuthUserData {
   provider: string;
@@ -139,5 +148,6 @@ export interface OAuthUserData {
     | DiscordUserInfo
     | LinkedInUserInfo
     | FacebookUserInfo
-    | MicrosoftUserInfo;
+    | MicrosoftUserInfo
+    | XUserInfo;
 }
