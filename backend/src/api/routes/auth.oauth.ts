@@ -334,79 +334,12 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       throw new AppError('No payload provided in callback', 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    const payloadData = JSON.parse(Buffer.from(payload as string, 'base64').toString('utf8'));
-    let result;
+    const payloadData = JSON.parse(
+      Buffer.from(payload as string, 'base64').toString('utf8')
+    ) as Record<string, unknown>;
 
-    switch (validatedProvider) {
-      case 'google': {
-        // Handle Google OAuth payload
-        result = await authService.findOrCreateThirdPartyUser(
-          'google',
-          payloadData.providerId,
-          payloadData.email,
-          payloadData.name || payloadData.email.split('@')[0],
-          payloadData.avatar,
-          payloadData
-        );
-        break;
-      }
-      case 'github': {
-        // Handle GitHub OAuth payload
-        const githubUserInfo = {
-          id: payloadData.providerId,
-          login: payloadData.login || '',
-          email: payloadData.email,
-          name: payloadData.name || '',
-          avatar_url: payloadData.avatar || '',
-        };
-        result = await authService.findOrCreateGitHubUser(githubUserInfo);
-        break;
-      }
-      case 'microsoft': {
-        // Handle Microsoft OAuth payload
-        const microsoftUserInfo = {
-          id: payloadData.providerId,
-          email: payloadData.email,
-          name: payloadData.name || '',
-          avatar_url: payloadData.avatar || '',
-        };
-        result = await authService.findOrCreateMicrosoftUser(microsoftUserInfo);
-        break;
-      }
-      case 'discord': {
-        // Handle Discord OAuth payload
-        const discordUserInfo = {
-          id: payloadData.providerId,
-          username: payloadData.username || '',
-          email: payloadData.email,
-          avatar: payloadData.avatar || '',
-        };
-        result = await authService.findOrCreateDiscordUser(discordUserInfo);
-        break;
-      }
-      case 'linkedin': {
-        // Handle LinkedIn OAuth payload
-        const linkedinUserInfo = {
-          sub: payloadData.providerId,
-          email: payloadData.email,
-          name: payloadData.name || '',
-          picture: payloadData.avatar || '',
-        };
-        result = await authService.findOrCreateLinkedInUser(linkedinUserInfo);
-        break;
-      }
-      case 'facebook': {
-        // Handle Facebook OAuth payload
-        const facebookUserInfo = {
-          id: payloadData.providerId,
-          email: payloadData.email,
-          name: payloadData.name || '',
-          picture: payloadData.picture || { data: { url: payloadData.avatar || '' } },
-        };
-        result = await authService.findOrCreateFacebookUser(facebookUserInfo);
-        break;
-      }
-    }
+    // Handle shared callback - transforms payload and creates/finds user
+    const result = await authService.handleSharedCallback(validatedProvider, payloadData);
 
     const params = new URLSearchParams();
     params.set('access_token', result?.accessToken ?? '');
@@ -468,6 +401,7 @@ router.get('/:provider/callback', async (req: Request, res: Response, next: Next
       const result = await authService.handleOAuthCallback(validatedProvider, {
         code: code as string | undefined,
         token: token as string | undefined,
+        state: state as string | undefined,
       });
 
       // Construct redirect URL with query parameters
