@@ -61,7 +61,7 @@ export const getProviderDisplayName = (providerId: string): string => {
     openrouter: 'OpenRouter',
     azure: 'Azure',
     amazon: 'Amazon',
-    xai: 'xAI',
+    'x-ai': 'xAI',
     huggingface: 'HuggingFace',
   };
 
