@@ -68,9 +68,9 @@ export const oauthProviders: OAuthProviderInfo[] = [
   {
     id: 'x',
     name: 'X OAuth',
-    icon: <X className="w-6 h-6" />,
+    icon: <X className="w-6 h-6 text-black dark:text-white" />,
     description: 'Configure X authentication for your users',
-    setupUrl: 'https://developer.twitter.com/en/portal/dashboard',
+    setupUrl: 'https://developer.x.com/en/portal/dashboard',
   },
 ];
 

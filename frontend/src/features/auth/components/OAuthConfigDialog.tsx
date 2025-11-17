@@ -74,14 +74,12 @@ export function OAuthConfigDialog({
   const clientSecret = form.watch('clientSecret');
 
   // Our Cloud only support shared keys of these OAuth Providers for now
-  // These are a subset of oAuthProvidersSchema.options
   const sharedKeyProviders: readonly OAuthProvidersSchema[] = [
     'google',
     'github',
     'discord',
     'linkedin',
     'facebook',
-    'x',
   ] satisfies readonly OAuthProvidersSchema[];
   const isSharedKeysAvailable =
     isInsForgeCloudProject() && provider?.id && sharedKeyProviders.includes(provider.id);
