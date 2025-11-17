@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { ThemeProvider } from '@/lib/contexts/ThemeContext';
 import { isIframe } from '@/lib/utils/utils';
-import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -12,15 +11,9 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const { user, logout } = useAuth();
-  const isLargeScreen = useMediaQuery('(min-width: 1536px)'); // 2xl breakpoint
 
   // Default to collapsed on small screens, expanded on large screens
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(!isLargeScreen);
-
-  // Automatically sync sidebar state with screen size
-  useEffect(() => {
-    setSidebarCollapsed(!isLargeScreen);
-  }, [isLargeScreen]);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const handleToggleCollapse = () => {
     setSidebarCollapsed(!sidebarCollapsed);
