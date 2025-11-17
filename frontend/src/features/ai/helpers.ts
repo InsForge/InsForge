@@ -78,7 +78,7 @@ export const getProviderLogo = (
     anthropic: ClaudeIcon,
     openai: OpenAIIcon,
     google: GeminiIcon,
-    xai: GrokIcon,
+    'x-ai': GrokIcon,
     amazon: AmazonIcon,
   };
   return logoMap[providerId];
