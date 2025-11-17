@@ -226,12 +226,12 @@
   --color-dark-mode-secondary: theme(--color-neutral-700);
   --color-dark-mode-text: theme(--color-neutral-400);
   /* Light mode theme*/
-  --color-light-mode-background: theme(--color-gray-50);
+  --color-light-mode-background: theme(--color-zinc-50);
   --color-light-mode-card: theme(--color-white);
-  --color-light-mode-secondary: theme(--color-gray-200);
-  --color-light-mode-border: theme(--color-gray-200);
-  --color-light-mode-border-hover: theme(--color-gray-300);
-  --color-light-mode-text: theme(--color-gray-500);
+  --color-light-mode-secondary: theme(--color-zinc-200);
+  --color-light-mode-border: theme(--color-zinc-200);
+  --color-light-mode-border-hover: theme(--color-zinc-300);
+  --color-light-mode-text: theme(--color-zinc-500);
 
   /* Icon themes */
   --color-light-mode-icon: theme(--color-zinc-700);

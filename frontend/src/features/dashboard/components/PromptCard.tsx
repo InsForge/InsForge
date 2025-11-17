@@ -13,7 +13,7 @@ export function PromptCard({ title, onClick }: PromptCardProps) {
     >
       <LayoutGrid className="w-6 h-6 text-light-mode-icon dark:text-secondary-emerald shrink-0" />
       <p className="flex-1 text-base  font-normal leading-6 text-left truncate">{title}</p>
-      <ChevronRight className="w-5 h-5 text-dark-mode-icon shrink-0 group-hover:translate-x-0.5 transition-transform" />
+      <ChevronRight className="w-5 h-5 text-light-mode-icon dark:text-dark-mode-icon shrink-0 group-hover:translate-x-0.5 transition-transform" />
     </button>
   );
 }
