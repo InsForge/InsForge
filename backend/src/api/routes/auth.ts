@@ -1,8 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { AuthService } from '@/core/auth/auth.js';
-import { AuthConfigService } from '@/core/auth/auth.config.js';
-import { OAuthConfigService } from '@/core/auth/oauth.config.js';
-import { AuditService } from '@/core/logs/audit.js';
+import { AuthService } from '@/services/auth/auth.service.js';
+import { AuthConfigService } from '@/services/auth/auth-config.service.js';
+import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
+import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
@@ -36,8 +36,8 @@ import {
   updateAuthConfigRequestSchema,
 } from '@insforge/shared-schemas';
 import { UserRecord } from '@/types/auth.js';
-import { SocketService } from '@/core/socket/socket.js';
-import { DataUpdateResourceType, ServerEvents } from '@/core/socket/types.js';
+import { SocketService } from '@/infra/socket/socket.js';
+import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 
 const router = Router();
 const authService = AuthService.getInstance();

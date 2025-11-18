@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
-import { DatabaseAdvanceService } from '@/core/database/advance.js';
-import { AuditService } from '@/core/logs/audit.js';
+import { DatabaseAdvanceService } from '@/services/database/advance.service.js';
+import { AuditService } from '@/services/logs/audit.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middleware/auth.js';
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -12,8 +12,8 @@ import {
   bulkUpsertRequestSchema,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger';
-import { SocketService } from '@/core/socket/socket';
-import { DataUpdateResourceType, ServerEvents } from '@/core/socket/types';
+import { SocketService } from '@/infra/socket/socket';
+import { DataUpdateResourceType, ServerEvents } from '@/types/socket';
 
 const router = Router();
 const dbAdvanceService = new DatabaseAdvanceService();

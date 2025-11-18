@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { AuthService } from '@/core/auth/auth.js';
-import { OAuthConfigService } from '@/core/auth/oauth.config.js';
-import { AuditService } from '@/core/logs/audit.js';
+import { AuthService } from '@/services/auth/auth.service.js';
+import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
+import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';

@@ -1,16 +1,16 @@
 import { Router, Response, NextFunction } from 'express';
-import { DatabaseAdvanceService } from '@/core/database/advance.js';
-import { AuthService } from '@/core/auth/auth.js';
-import { StorageService } from '@/core/storage/storage.js';
-import { AIConfigService } from '@/core/ai/config.js';
-import { FunctionService } from '@/core/functions/functions.js';
+import { DatabaseAdvanceService } from '@/services/database/advance.service.js';
+import { AuthService } from '@/services/auth/auth.service.js';
+import { StorageService } from '@/providers/storage/storage.provider.js';
+import { AIConfigService } from '@/services/ai/config.service.js';
+import { FunctionService } from '@/services/functions/functions.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middleware/auth.js';
 import { successResponse } from '@/utils/response.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { AppError } from '@/api/middleware/error.js';
 import type { AppMetadataSchema } from '@insforge/shared-schemas';
-import { SecretService } from '@/core/secrets/secrets';
-import { DatabaseManager } from '@/core/database/manager';
+import { SecretService } from '@/services/secrets/secrets.service';
+import { DatabaseManager } from '@/infra/database/manager';
 
 const router = Router();
 const authService = AuthService.getInstance();

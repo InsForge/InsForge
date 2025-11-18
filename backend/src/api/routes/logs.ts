@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
-import { LogService } from '@/core/logs/logs.js';
-import { AuditService } from '@/core/logs/audit.js';
+import { LogService } from '@/services/logs/logs.service.js';
+import { AuditService } from '@/services/logs/audit.service.js';
 import { AuthRequest, verifyAdmin } from '@/api/middleware/auth.js';
 import { successResponse, paginatedResponse } from '@/utils/response.js';
 import { GetLogsResponse } from '@insforge/shared-schemas';

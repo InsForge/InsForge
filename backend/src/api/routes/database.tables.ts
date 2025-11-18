@@ -1,11 +1,11 @@
 import { Router, Response, NextFunction } from 'express';
 import { verifyAdmin, AuthRequest } from '@/api/middleware/auth.js';
-import { DatabaseTableService } from '@/core/database/table.js';
+import { DatabaseTableService } from '@/services/database/table.service.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { createTableRequestSchema, updateTableSchemaRequestSchema } from '@insforge/shared-schemas';
-import { AuditService } from '@/core/logs/audit';
+import { AuditService } from '@/services/logs/audit.service';
 
 const router = Router();
 const tableService = new DatabaseTableService();

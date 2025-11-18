@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { DatabaseManager } from '@/core/database/manager.js';
+import { DatabaseManager } from '@/infra/database/manager.js';
 import { verifyCloudBackend, verifyApiKey, verifyAdmin } from '@/api/middleware/auth.js';
-import { SocketService } from '@/core/socket/socket.js';
-import { ServerEvents } from '@/core/socket/types.js';
+import { SocketService } from '@/infra/socket/socket.js';
+import { ServerEvents } from '@/types/socket.js';
 
 export const usageRouter = Router();
 

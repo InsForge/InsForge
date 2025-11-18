@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { AgentAPIDocService } from '@/core/documentation/agent.js';
+import { AgentAPIDocService } from '@/services/documentation/agent.service.js';
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
