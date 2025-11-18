@@ -150,7 +150,7 @@
   /* CSS Variables for Radix UI components - using RGB values for clarity */
   :root {
     /* Light mode colors */
-    --background: 250 250 250; /* white */
+    --background: 250 250 250; /* zinc-50 */
     --foreground: 17 24 39; /* near-black */
     --card: 255 255 255; /* white */
     --card-foreground: 17 24 39; /* near-black */
