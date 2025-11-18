@@ -1,7 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { DatabaseAdvanceService } from '@/services/database/advance.service.js';
 import { AuthService } from '@/services/auth/auth.service.js';
-import { StorageService } from '@/providers/storage/storage.provider.js';
+import { StorageService } from '@/services/storage/storage.service.js';
 import { AIConfigService } from '@/services/ai/config.service.js';
 import { FunctionService } from '@/services/functions/functions.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middleware/auth.js';

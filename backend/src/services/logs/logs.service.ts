@@ -1,6 +1,6 @@
 import logger from '@/utils/logger.js';
 import { CloudWatchProvider } from '@/providers/logging/cloudwatch.provider.js';
-import { LocalFileProvider } from '@/providers/logging/file.provider.js';
+import { LocalFileProvider } from '@/providers/logging/local.provider.js';
 import { LogProvider } from '@/providers/logging/base.provider.js';
 import { LogSchema, LogSourceSchema, LogStatsSchema } from '@insforge/shared-schemas';
 import { isCloudEnvironment } from '@/utils/environment.js';
