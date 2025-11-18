@@ -2,7 +2,7 @@ import { DatabaseManager } from '@/infra/database/manager.js';
 import { AIConfigService } from '@/services/ai/config.service.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
-import { SecretService } from '@/services/secrets/secrets.service';
+import { SecretService } from '@/services/secrets/secret.service';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { OAuthProvidersSchema } from '@insforge/shared-schemas';
 import { AuthService } from '@/services/auth/auth.service.js';

@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/manager.js';
-import { SecretService } from '@/services/secrets/secrets.service.js';
+import { SecretService } from '@/services/secrets/secret.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';

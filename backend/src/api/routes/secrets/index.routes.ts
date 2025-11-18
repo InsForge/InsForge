@@ -1,5 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
-import { SecretService } from '@/services/secrets/secrets.service.js';
+import { SecretService } from '@/services/secrets/secret.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';

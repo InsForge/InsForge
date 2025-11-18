@@ -10,7 +10,7 @@ import { validateTableName } from '@/utils/validations.js';
 import { DatabaseRecord } from '@/types/database.js';
 import { successResponse } from '@/utils/response.js';
 import logger from '@/utils/logger.js';
-import { SecretService } from '@/services/secrets/secrets.service.js';
+import { SecretService } from '@/services/secrets/secret.service.js';
 import { AuthService } from '@/services/auth/auth.service.js';
 import { SocketService } from '@/infra/socket/socket';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket';

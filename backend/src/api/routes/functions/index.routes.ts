@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
-import { FunctionService } from '@/services/functions/functions.service.js';
+import { FunctionService } from '@/services/functions/function.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import logger from '@/utils/logger.js';

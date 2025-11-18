@@ -3,13 +3,13 @@ import { DatabaseAdvanceService } from '@/services/database/advance.service.js';
 import { AuthService } from '@/services/auth/auth.service.js';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { AIConfigService } from '@/services/ai/config.service.js';
-import { FunctionService } from '@/services/functions/functions.service.js';
+import { FunctionService } from '@/services/functions/function.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { successResponse } from '@/utils/response.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { AppError } from '@/api/middlewares/error.js';
 import type { AppMetadataSchema } from '@insforge/shared-schemas';
-import { SecretService } from '@/services/secrets/secrets.service';
+import { SecretService } from '@/services/secrets/secret.service';
 import { DatabaseManager } from '@/infra/database/manager';
 
 const router = Router();

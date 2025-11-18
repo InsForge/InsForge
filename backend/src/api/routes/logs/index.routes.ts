@@ -1,5 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
-import { LogService } from '@/services/logs/logs.service.js';
+import { LogService } from '@/services/logs/log.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
 import { successResponse, paginatedResponse } from '@/utils/response.js';

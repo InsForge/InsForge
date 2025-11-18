@@ -3,7 +3,7 @@ import { AuthService } from '@/services/auth/auth.service.js';
 import { AppError } from './error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 import { verifyCloudToken } from '@/utils/cloud-token.js';
-import { SecretService } from '@/services/secrets/secrets.service.js';
+import { SecretService } from '@/services/secrets/secret.service.js';
 
 export interface AuthRequest extends Request {
   user?: {
