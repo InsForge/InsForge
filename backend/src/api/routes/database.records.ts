@@ -12,6 +12,8 @@ import { successResponse } from '@/utils/response.js';
 import logger from '@/utils/logger.js';
 import { SecretService } from '@/core/secrets/secrets.js';
 import { AuthService } from '@/core/auth/auth.js';
+import { SocketService } from '@/core/socket/socket';
+import { DataUpdateResourceType, ServerEvents } from '@/core/socket/types';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -201,6 +203,18 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
       (typeof response.data === 'string' && response.data.trim() === '')
     ) {
       responseData = [];
+    }
+
+    // Only send socket events for mutations (POST, DELETE)
+    const mutationMethods = ['POST', 'DELETE'];
+    if (mutationMethods.includes(req.method.toUpperCase())) {
+      const socket = SocketService.getInstance();
+      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
+        resource: DataUpdateResourceType.RECORDS,
+        data: {
+          tableName: tableName,
+        },
+      });
     }
 
     successResponse(res, responseData, response.status);

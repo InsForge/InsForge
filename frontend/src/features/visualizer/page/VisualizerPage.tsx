@@ -47,11 +47,8 @@ const VisualizerPage = () => {
 
     const handleDataUpdate = (message: SocketMessage<DataUpdatePayload>) => {
       if (
-        message.payload?.resource === DataUpdateResourceType.METADATA ||
-        message.payload?.resource === DataUpdateResourceType.DATABASE_SCHEMA ||
-        message.payload?.resource === DataUpdateResourceType.TABLE_SCHEMA ||
-        message.payload?.resource === DataUpdateResourceType.OAUTH_SCHEMA ||
-        message.payload?.resource === DataUpdateResourceType.STORAGE_SCHEMA
+        message.payload?.resource === DataUpdateResourceType.DATABASE ||
+        message.payload?.resource === DataUpdateResourceType.BUCKETS
       ) {
         // Invalidate all metadata-related queries
         void queryClient.invalidateQueries({ queryKey: ['metadata'] });

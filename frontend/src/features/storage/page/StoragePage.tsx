@@ -82,10 +82,7 @@ export default function StoragePage() {
     }
 
     const handleDataUpdate = (message: SocketMessage<DataUpdatePayload>) => {
-      if (
-        message.payload?.resource === DataUpdateResourceType.METADATA ||
-        message.payload?.resource === DataUpdateResourceType.STORAGE_SCHEMA
-      ) {
+      if (message.payload?.resource === DataUpdateResourceType.BUCKETS) {
         // Invalidate all buckets queries
         void queryClient.invalidateQueries({ queryKey: ['storage'] });
       }

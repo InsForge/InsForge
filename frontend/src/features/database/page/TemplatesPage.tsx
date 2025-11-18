@@ -23,8 +23,7 @@ export default function TemplatesPage() {
           <h1 className="text-xl font-semibold text-zinc-950 dark:text-white">Database Template</h1>
         </div>
         <div className="w-full max-w-[1024px]">
-          {/* Grid Layout with 3 columns */}
-          <div className="grid grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 xl:grid-cols-3 gap-6">
             {DATABASE_TEMPLATES.map((template) => (
               <TemplateCard
                 key={template.id}

@@ -11,6 +11,8 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const { user, logout } = useAuth();
+
+  // Sidebar is expanded by default; user can toggle via UI
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const handleToggleCollapse = () => {

@@ -61,7 +61,7 @@ export const getProviderDisplayName = (providerId: string): string => {
     openrouter: 'OpenRouter',
     azure: 'Azure',
     amazon: 'Amazon',
-    xai: 'xAI',
+    'x-ai': 'xAI',
     huggingface: 'HuggingFace',
   };
 
@@ -78,7 +78,7 @@ export const getProviderLogo = (
     anthropic: ClaudeIcon,
     openai: OpenAIIcon,
     google: GeminiIcon,
-    xai: GrokIcon,
+    'x-ai': GrokIcon,
     amazon: AmazonIcon,
   };
   return logoMap[providerId];

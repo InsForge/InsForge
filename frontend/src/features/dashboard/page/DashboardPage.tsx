@@ -47,7 +47,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <main className="h-full overflow-y-auto">
+    <main className="h-full overflow-y-auto px-6">
       <div className="flex flex-col gap-16 w-full max-w-[1080px] mx-auto pt-6 pb-8">
         <div className="flex flex-col gap-6">
           {/* Connection Success Banner - Only shows once on first connection */}
@@ -146,7 +146,7 @@ export default function DashboardPage() {
 
             {/* Database Templates Card */}
             <button
-              onClick={() => void navigate('/dashboard/database/templates')}
+              onClick={() => void navigate('/dashboard/tables')}
               className="flex-1 bg-card border border-border rounded-lg p-4 flex items-center gap-3 hover:bg-bg-secondary hover:border-border-hover hover:shadow-sm transition-all group"
             >
               <div className="flex-1 flex items-center gap-4">

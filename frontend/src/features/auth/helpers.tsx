@@ -5,6 +5,7 @@ import Microsoft from '@/assets/logos/microsoft.svg?react';
 import Discord from '@/assets/logos/discord.svg?react';
 import LinkedIn from '@/assets/logos/linkedin.svg?react';
 import Facebook from '@/assets/logos/facebook.svg?react';
+import X from '@/assets/logos/x.svg?react';
 import type { OAuthProvidersSchema } from '@insforge/shared-schemas';
 
 export enum AuthTab {
@@ -64,11 +65,136 @@ export const oauthProviders: OAuthProviderInfo[] = [
     description: 'Configure Facebook authentication for your users',
     setupUrl: 'https://developers.facebook.com/apps',
   },
+  {
+    id: 'x',
+    name: 'X OAuth',
+    icon: <X className="w-6 h-6 text-black dark:text-white" />,
+    description: 'Configure X authentication for your users',
+    setupUrl: 'https://developer.x.com/en/portal/dashboard',
+  },
 ];
 
 /**
  * AI prompts for implementing auth components
  */
-export const AUTH_IMPLEMENTATION_PROMPT = `
-    Implement a sign-in form component with email/password fields, OAuth provider buttons (Google, GitHub, LinkedIn), password visibility toggle, "Forgot Password" link, "Sign Up" link, and proper form validation. The form should handle authentication errors and display appropriate feedback to users.
+export const getAuthImplementationPrompt = (baseUrl: string) => {
+  return `
+# Add InsForge Authentication to Your Application
+The \`@insforge/react\` package provides **complete authentication solution for React applications**. Use deployed auth pages (built-in auth) or custom UI components—works with Vite.
+**Scope:** All AI-generated advice or code related to InsForge must follow these guardrails. We don't support other frameworks or libraries.
+
+## Quick start
+
+### Step 1: Create New React Project (Skip if you already have a project)
+
+\`\`\`bash
+npm install @insforge/react@latest
+\`\`\`
+
+### Step 2: Set Environment Variables
+
+\`\`\`bash .env
+VITE_INSFORGE_BASE_URL=${baseUrl}
+VITE_INSFORGE_ANON_KEY=your-anon-key-here
+\`\`\`
+
+### Step 3: Setup Provider
+
+Wrap your app with \`InsforgeProvider\` in the root:
+
+\`\`\`tsx src/main.tsx
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { InsforgeProvider } from '@insforge/react';
+import App from './App';
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <InsforgeProvider baseUrl="${baseUrl}">
+      <App />
+    </InsforgeProvider>
+  </StrictMode>,
+);
+\`\`\`
+
+import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton, useUser } from '@insforge/react';
+
+export default function Home() {
+  const { user } = useUser();
+
+  return (
+    <div>
+      <SignedOut>
+        <SignInButton />
+        <SignUpButton />
+      </SignedOut>
+
+      <SignedIn>
+        <UserButton />
+        <h1>Welcome, \${user?.email}!</h1>
+      </SignedIn>
+    </div>
+  );
+}
+\`\`\`
+
+## Next Steps
+
+### Hooks
+
+#### \`useAuth()\`
+
+Access authentication state:
+
+\`\`\`tsx
+import { useAuth } from '@insforge/react';
+
+function LoginButton() {
+  const { isSignedIn, isLoaded } = useAuth();
+  
+  if (!isLoaded) return <div>Loading...</div>;
+
+  return (
+    <div>
+      {isSignedIn ? 'Welcome!' : 'Sign In'}
+    </div>
+  );
+}
+\`\`\`
+
+**Returns:**
+
+- \`isSignedIn\` - Boolean auth state
+- \`isLoaded\` - Boolean loading state
+
+#### \`useUser()\`
+
+Access current user data:
+
+\`\`\`tsx
+import { useUser } from '@insforge/react';
+
+function UserProfile() {
+  const { user, isLoaded } = useUser();
+
+  if (!isLoaded) return <div>Loading...</div>;
+  if (!user) return <div>Not signed in</div>;
+
+
+  return (
+    <div>
+      <p>Id: \${user.id}</p>
+      <p>Email: \${user.email}</p>
+      <p>Name: \${user.name}</p>
+      <img src={user.avatarUrl} alt="Avatar" />
+    </div>
+  );
+}
+\`\`\`
+
+**Returns:**
+
+- \`user\` - User object with id, email, name, avatarUrl
+- \`isLoaded\` - Boolean loading state
 `;
+};

@@ -125,3 +125,30 @@ export interface FacebookUserInfo {
   first_name?: string;
   last_name?: string;
 }
+
+export interface XUserInfo {
+  id: string;
+  name: string;
+  username?: string;
+  profile_image_url?: string;
+  verified?: boolean;
+  created_at?: string;
+}
+
+// Generic OAuth user data returned by provider services
+export interface OAuthUserData {
+  provider: string;
+  providerId: string;
+  email: string;
+  userName: string;
+  avatarUrl: string;
+  identityData:
+    | GoogleUserInfo
+    | GitHubUserInfo
+    | DiscordUserInfo
+    | LinkedInUserInfo
+    | FacebookUserInfo
+    | MicrosoftUserInfo
+    | XUserInfo
+    | Record<string, unknown>;
+}
