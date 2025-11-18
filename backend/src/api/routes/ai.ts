@@ -29,6 +29,7 @@ const auditService = AuditService.getInstance();
  * GET /api/ai/models
  * Get all available AI models in ListModelsResponse format
  */
+
 router.get('/models', verifyAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const models = await AIModelService.getModels();

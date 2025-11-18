@@ -10,7 +10,7 @@ echo "🧪 Testing AI configuration..."
 API_BASE="$TEST_API_BASE"
 ADMIN_TOKEN=""
 CONFIG_ID=""
-TEST_MODEL_ID="test-gpt-3.5-turbo"  # Use consistent test model ID - cleanup will remove it
+TEST_MODEL_ID="openai/gpt-4o-mini"  # Use consistent test model ID - cleanup will remove it
 
 # Get admin token
 echo "🔑 Getting admin token..."

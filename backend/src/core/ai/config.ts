@@ -2,7 +2,9 @@ import { Pool } from 'pg';
 import { DatabaseManager } from '@/core/database/manager.js';
 import logger from '@/utils/logger.js';
 import { AIConfigurationSchema, AIConfigurationWithUsageSchema } from '@insforge/shared-schemas';
-
+import { validateModelId } from '@/utils/validateModelId';
+import { AppError } from '@/api/middleware/error';
+import { ERROR_CODES } from '@/types/error-constants';
 export class AIConfigService {
   private pool: Pool | null = null;
 
@@ -20,7 +22,30 @@ export class AIConfigService {
     modelId: string,
     systemPrompt?: string
   ): Promise<{ id: string }> {
+    const result = await validateModelId(modelId);
+    if (!result.valid) {
+      if (result.reason === 'not_found') {
+        logger.error(`Invalid modelId '${modelId}' - not found on OpenRouter`);
+        throw new AppError(
+          `Invalid modelId '${modelId}' - not found on OpenRouter`,
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      } else {
+        logger.error('Failed to validate modelId due to infrastructure issue', {
+          modelId,
+          reason: result.reason,
+        });
+        throw new AppError(
+          'Unable to validate modelId - service temporarily unavailable',
+          500,
+          ERROR_CODES.INTERNAL_ERROR
+        );
+      }
+    }
+
     const client = await this.getPool().connect();
+
     try {
       const result = await client.query(
         `INSERT INTO _ai_configs (input_modality, output_modality, provider, model_id, system_prompt)
