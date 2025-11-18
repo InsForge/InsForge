@@ -85,7 +85,7 @@ export function CopyButton({
         // Secondary variant (light gray/neutral)
         !isPrimary &&
           !copied &&
-          'secondary-bg text-secondary-foreground hover:secondary-bg/90 dark:text-white',
+          'bg-secondary text-secondary-foreground hover:bg-secondary/90 dark:text-white',
         // Copied state (same for both variants) - stone-600
         copied && 'bg-stone-600 text-white cursor-default hover:bg-stone-600',
         copied && 'dark:bg-stone-600 dark:text-white dark:hover:bg-stone-600',
