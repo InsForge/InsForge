@@ -150,10 +150,12 @@
   /* CSS Variables for Radix UI components - using RGB values for clarity */
   :root {
     /* Light mode colors */
-    --background: 255 255 255; /* white */
+    --background: 250 250 250; /* white */
     --foreground: 17 24 39; /* near-black */
     --card: 255 255 255; /* white */
     --card-foreground: 17 24 39; /* near-black */
+    --bg-secondary: 250 250 250; /* zinc-100 */
+    --text: 113 113 122; /* zinc-500 */
     --popover: 255 255 255; /* white */
     --popover-foreground: 10 10 10; /* near-black */
     --primary: 23 23 23; /* zinc-900 */
@@ -167,6 +169,7 @@
     --destructive: 239 68 68; /* red-500 */
     --destructive-foreground: 250 250 250; /* zinc-50 */
     --border: 228 228 231; /* zinc-200 */
+    --border-hover: 212 212 216; /* zinc-300 */
     --input: 228 228 231; /* zinc-200 */
     --ring: 10 10 10; /* near-black */
     --radius: 0.5rem;
@@ -181,6 +184,8 @@
     --foreground: 255 255 255; /* white*/
     --card: 51 51 51; /* #333333 */
     --card-foreground: 255 255 255; /* white*/
+    --bg-secondary: 64 64 64; /* neutral-700 */
+    --text: 163 163 163; /* neutral-400 */
     --popover: 64 64 64; /* neutral-700 */
     --popover-foreground: 250 250 250; /* zinc-50 */
     --primary: 250 250 250; /* zinc-50 */
@@ -194,6 +199,7 @@
     --destructive: 127 29 29; /* red-900 */
     --destructive-foreground: 250 250 250; /* zinc-50 */
     --border: 64 64 64; /* neutral-700 */
+    --border-hover: 82 82 82; /* neutral-600 */
     --input: 64 64 64; /* neutral-700 */
     --ring: 212 212 212; /* zinc-300 */
     --background-color: #262626;
@@ -217,30 +223,10 @@
 }
 
 @theme {
-  /* Dark mode theme */
-  --color-dark-mode-background: theme(--color-neutral-800);
-  --color-dark-mode-card: #333333;
-  --color-dark-mode-input: theme(--color-neutral-900);
-  --color-dark-mode-border: theme(--color-neutral-700);
-  --color-dark-mode-border-hover: theme(--color-neutral-600);
-  --color-dark-mode-secondary: theme(--color-neutral-700);
-  --color-dark-mode-text: theme(--color-neutral-400);
-  /* Light mode theme*/
-  --color-light-mode-background: theme(--color-zinc-50);
-  --color-light-mode-card: theme(--color-white);
-  --color-light-mode-secondary: theme(--color-zinc-200);
-  --color-light-mode-border: theme(--color-zinc-200);
-  --color-light-mode-border-hover: theme(--color-zinc-300);
-  --color-light-mode-text: theme(--color-zinc-500);
-
-  /* Icon themes */
-  --color-light-mode-icon: theme(--color-zinc-700);
-  --color-dark-mode-icon: theme(--color-neutral-400);
-
   /* emerald themes */
   --color-primary-emerald: theme(--color-emerald-300);
   --color-secondary-emerald: theme(--color-emerald-400);
-  /*  */
+
   --color-border-gray: #e4e4e7;
   --color-chart-blue-dark: #2c7fff;
   --color-text-gray: #a1a1a1;

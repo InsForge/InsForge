@@ -91,7 +91,7 @@ export default function DashboardPage() {
         <section className="flex flex-col gap-6 w-full">
           <div className="flex flex-col gap-1 w-full">
             <h2 className="text-xl font-semibold tracking-[-0.1px]">Quick Start Prompt</h2>
-            <p className="text-sm text-light-mode-text dark:text-dark-mode-text leading-6">
+            <p className="text-sm text-text leading-6">
               Paste the prompts below into your agent to quickly start building real apps.
             </p>
           </div>
@@ -120,7 +120,7 @@ export default function DashboardPage() {
         <section className="flex flex-col gap-6 w-full">
           <div className="flex flex-col gap-1 w-full">
             <h2 className="text-xl font-semibold tracking-[-0.1px]">Explore Our Platform</h2>
-            <p className="text-sm text-light-mode-text dark:text-dark-mode-text leading-6">
+            <p className="text-sm text-text leading-6">
               InsForge gives you every backend feature you need. Use the whole platform or just the
               features you want.
             </p>
@@ -130,39 +130,35 @@ export default function DashboardPage() {
             {/* Sign-in Component Card */}
             <button
               onClick={() => void navigate('/dashboard/authentication/auth-methods')}
-              className="flex-1 bg-light-mode-card dark:bg-dark-mode-card border border-light-mode-border dark:border-dark-mode-border rounded-lg p-4 flex items-center gap-3 hover:bg-light-mode-background hover:border-light-mode-border-hover dark:hover:bg-dark-mode-secondary dark:hover:border-dark-mode-border-hover hover:shadow-sm transition-all group"
+              className="flex-1 bg-card border border-border rounded-lg p-4 flex items-center gap-3 hover:bg-bg-secondary hover:border-border-hover hover:shadow-sm transition-all group"
             >
               <div className="flex-1 flex items-center gap-4">
-                <div className="bg-light-mode-secondary dark:bg-dark-mode-background rounded p-3.5 flex items-center justify-center shrink-0">
-                  <Lock className="w-6 h-6 text-light-mode-icon dark:text-dark-mode-icon" />
+                <div className="bg-background rounded p-3.5 flex items-center justify-center shrink-0">
+                  <Lock className="w-6 h-6 text-text" />
                 </div>
                 <div className="flex flex-col gap-1 items-start text-left">
                   <p className="text-base font-normal leading-6">Authentication</p>
-                  <p className="text-sm text-light-mode-text dark:text-dark-mode-text leading-6">
-                    User Authentication and management
-                  </p>
+                  <p className="text-sm text-text leading-6">User Authentication and management</p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-light-mode-icon dark:text-dark-mode-text shrink-0 group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="w-5 h-5 text-text shrink-0 group-hover:translate-x-0.5 transition-transform" />
             </button>
 
             {/* Database Templates Card */}
             <button
               onClick={() => void navigate('/dashboard/database/templates')}
-              className="flex-1 bg-light-mode-card dark:bg-dark-mode-card border border-light-mode-border dark:border-dark-mode-border rounded-lg p-4 flex items-center gap-3 hover:bg-light-mode-background hover:border-light-mode-border-hover dark:hover:bg-dark-mode-secondary dark:hover:border-dark-mode-border-hover hover:shadow-sm transition-all group"
+              className="flex-1 bg-card border border-border rounded-lg p-4 flex items-center gap-3 hover:bg-bg-secondary hover:border-border-hover hover:shadow-sm transition-all group"
             >
               <div className="flex-1 flex items-center gap-4">
-                <div className="bg-light-mode-secondary dark:bg-dark-mode-background rounded p-3.5 flex items-center justify-center shrink-0">
-                  <Database className="w-6 h-6 text-light-mode-icon dark:text-dark-mode-icon" />
+                <div className="bg-background rounded p-3.5 flex items-center justify-center shrink-0">
+                  <Database className="w-6 h-6 text-text" />
                 </div>
                 <div className="flex flex-col gap-1 items-start text-left">
                   <p className="text-base   font-normal leading-6">Database</p>
-                  <p className="text-sm text-light-mode-text dark:text-dark-mode-text leading-6">
-                    Manage your tables and data
-                  </p>
+                  <p className="text-sm text-text leading-6">Manage your tables and data</p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-light-mode-icon dark:text-dark-mode-text shrink-0 group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="w-5 h-5 text-text shrink-0 group-hover:translate-x-0.5 transition-transform" />
             </button>
           </div>
         </section>
@@ -183,11 +179,7 @@ export default function DashboardPage() {
             <LogsDataGrid
               columnDefs={mcpColumns}
               data={records.slice(0, 5)}
-              emptyState={
-                <div className="h-20 text-sm text-light-mode-text dark:text-dark-mode-text">
-                  No MCP call records found
-                </div>
-              }
+              emptyState={<div className="h-20 text-sm text-text">No MCP call records found</div>}
               noPadding
             />
           </div>

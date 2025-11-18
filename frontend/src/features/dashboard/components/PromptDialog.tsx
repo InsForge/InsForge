@@ -25,9 +25,9 @@ export function PromptDialog({ open, onOpenChange, promptTemplate }: PromptDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl p-0 border border-light-mode-border dark:border-dark-mode-border overflow-hidden">
+      <DialogContent className="max-w-2xl p-0 border border-border overflow-hidden">
         {/* Content area with border bottom */}
-        <div className="flex flex-col gap-10 p-6 border-b border-light-mode-border dark:border-dark-mode-border">
+        <div className="flex flex-col gap-10 p-6 border-b border-border">
           {/* Header and Prompt Section */}
           <div className="flex flex-col gap-6">
             {/* Title */}
@@ -39,13 +39,11 @@ export function PromptDialog({ open, onOpenChange, promptTemplate }: PromptDialo
 
             {/* Prompt Box */}
             <div className="flex flex-col gap-3">
-              <p className="text-sm text-light-mode-text dark:text-dark-mode-text leading-6">
-                {promptTemplate.description}
-              </p>
-              <div className="bg-light-mode-background dark:bg-dark-mode-input rounded p-3 h-60 overflow-y-auto relative">
+              <p className="text-sm text-text leading-6">{promptTemplate.description}</p>
+              <div className="bg-card dark:bg-neutral-900 rounded p-3 h-60 overflow-y-auto relative">
                 {/* Badge only */}
                 <div className="flex items-center justify-between mb-2">
-                  <div className="bg-light-mode-secondary dark:bg-dark-mode-secondary rounded px-2 py-0 inline-flex items-center justify-center">
+                  <div className="bg-bg-secondary rounded px-2 py-0 inline-flex items-center justify-center">
                     <span className="text-xs leading-5">Prompt</span>
                   </div>
                 </div>
@@ -57,16 +55,14 @@ export function PromptDialog({ open, onOpenChange, promptTemplate }: PromptDialo
 
           {/* Features Section */}
           <div className="flex flex-col gap-3">
-            <p className="text-sm text-light-mode-text dark:text-dark-mode-text leading-6">
-              Features included:
-            </p>
+            <p className="text-sm text-text leading-6">Features included:</p>
             <div className="flex flex-col gap-1">
               {promptTemplate.features.map((feature, index) => {
                 const Icon = featureIcons[feature] || Box;
                 return (
                   <div key={index} className="flex items-center gap-3 h-9 px-2 py-0">
                     <CheckCircle className="w-5 h-5 text-secondary-emerald shrink-0" />
-                    <Icon className="w-5 h-5 text-light-mode-text dark:text-dark-mode-text shrink-0" />
+                    <Icon className="w-5 h-5 text-text shrink-0" />
                     <p className="text-sm font-medium leading-6">{feature}</p>
                   </div>
                 );
@@ -80,7 +76,7 @@ export function PromptDialog({ open, onOpenChange, promptTemplate }: PromptDialo
           <Button
             onClick={() => onOpenChange(false)}
             variant="secondary"
-            className="h-8 px-3 text-sm font-medium bg-light-mode-secondary hover:bg-light-mode-border-hover dark:bg-dark-mode-secondary dark:hover:bg-dark-mode-border-hover"
+            className="h-8 px-3 text-sm font-medium bg-bg-secondary hover:bg-border-hover"
           >
             Cancel
           </Button>

@@ -13,6 +13,9 @@ export default {
     },
     extend: {
       colors: {
+        'border-hover': 'rgb(var(--border-hover))',
+        'bg-secondary': 'rgb(var(--bg-secondary))',
+        text: 'rgb(var(--text))',
         border: 'rgb(var(--border))',
         input: 'rgb(var(--input))',
         ring: 'rgb(var(--ring))',

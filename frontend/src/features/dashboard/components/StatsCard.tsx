@@ -20,31 +20,26 @@ export function StatsCard({
   isLoading,
 }: StatsCardProps) {
   return (
-    <Card className="flex-1 rounded-lg border border-light-mode-border dark:border-dark-mode-border shadow-[0px_1px_3px_0px_rgba(0,0,0,0.1)] h-full">
+    <Card className="flex-1 rounded-lg border border-border shadow-[0px_1px_3px_0px_rgba(0,0,0,0.1)] h-full">
       <CardContent className="px-8 py-6 h-full flex flex-col gap-6">
         <div className="flex items-center gap-2 h-7">
-          <Icon className="w-5 h-5 text-light-mode-icon dark:text-dark-mode-icon" />
+          <Icon className="w-5 h-5 text-text" />
           <span className="text-base font-normal">{title}</span>
         </div>
 
         <div className="flex flex-col gap-2">
           {isLoading ? (
-            <Skeleton className="h-8 w-24 bg-light-mode-secondary dark:bg-dark-mode-secondary" />
+            <Skeleton className="h-8 w-24 bg-bg-secondary" />
           ) : (
             <p className="text-2xl font-normal tracking-[-0.144px] leading-8">
-              {value}{' '}
-              <span className="text-sm font-normal text-light-mode-text dark:text-dark-mode-text leading-6">
-                {unit}
-              </span>
+              {value} <span className="text-sm font-normal text-text leading-6">{unit}</span>
             </p>
           )}
 
           {isLoading ? (
-            <Skeleton className="h-6 w-32 bg-light-mode-secondary dark:bg-dark-mode-secondary" />
+            <Skeleton className="h-6 w-32 bg-bg-secondary" />
           ) : (
-            <p className="text-base text-light-mode-text dark:text-dark-mode-text leading-6">
-              {description}
-            </p>
+            <p className="text-base text-text leading-6">{description}</p>
           )}
         </div>
       </CardContent>
