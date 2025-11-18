@@ -1,6 +1,6 @@
 import { StorageBucketSchema, TableSchema } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import { StorageService } from '@/providers/storage/storage.provider';
+import { StorageService } from '@/services/storage/storage.service';
 import { DatabaseTableService } from '@/services/database/table.service';
 import { DatabaseManager } from '@/infra/database/manager';
 import { getApiBaseUrl } from '@/utils/environment';

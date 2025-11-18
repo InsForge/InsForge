@@ -23,7 +23,7 @@ import { errorMiddleware } from '@/api/middleware/error.js';
 import fetch, { HeadersInit } from 'node-fetch';
 import { DatabaseManager } from '@/infra/database/manager.js';
 import { LogService } from '@/services/logs/logs.service.js';
-import { StorageService } from '@/providers/storage/storage.provider.js';
+import { StorageService } from '@/services/storage/storage.service.js';
 import { SocketService } from '@/infra/socket/socket.js';
 import { seedBackend } from '@/utils/seed.js';
 import logger from '@/utils/logger.js';

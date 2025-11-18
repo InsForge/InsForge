@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import path from 'path';
 import { verifyAdmin, AuthRequest, verifyUser } from '@/api/middleware/auth.js';
 import { AppError } from '@/api/middleware/error.js';
-import { StorageService } from '@/providers/storage/storage.provider.js';
+import { StorageService } from '@/services/storage/storage.service.js';
 import { DatabaseManager } from '@/infra/database/manager.js';
 import { successResponse } from '@/utils/response.js';
 import { upload, handleUploadError } from '@/api/middleware/upload.js';
