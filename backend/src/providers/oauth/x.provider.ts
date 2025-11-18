@@ -2,11 +2,12 @@ import crypto from 'crypto';
 import { XUserInfo, OAuthUserData } from '@/types/auth';
 import { getApiBaseUrl } from '@/utils/environment';
 import logger from '@/utils/logger';
+import { OAuthProvider } from './base.provider.js';
 import axios from 'axios';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service';
 
-export class XOAuthService {
-  private static instance: XOAuthService;
+export class XOAuthProvider implements OAuthProvider {
+  private static instance: XOAuthProvider;
   // OAuth helper for X(Twitter)
   private verifierCodes: Map<string, string>;
 
@@ -14,17 +15,17 @@ export class XOAuthService {
     this.verifierCodes = new Map();
   }
 
-  public static getInstance(): XOAuthService {
-    if (!XOAuthService.instance) {
-      XOAuthService.instance = new XOAuthService();
+  public static getInstance(): XOAuthProvider {
+    if (!XOAuthProvider.instance) {
+      XOAuthProvider.instance = new XOAuthProvider();
     }
-    return XOAuthService.instance;
+    return XOAuthProvider.instance;
   }
 
   /**
    * Generate X OAuth authorization URL
    */
-  async generateXOAuthUrl(state?: string): Promise<string> {
+  async generateOAuthUrl(state?: string): Promise<string> {
     const oauthConfigService = OAuthConfigService.getInstance();
     const config = await oauthConfigService.getConfigByProvider('x');
     const verifier = crypto.randomBytes(32).toString('base64url');

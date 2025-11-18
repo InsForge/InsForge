@@ -1,4 +1,4 @@
-import { AppError } from '@/api/middleware/error';
+import { AppError } from '@/api/middlewares/error';
 import { ERROR_CODES } from '@/types/error-constants';
 import type { AuthConfigSchema } from '@insforge/shared-schemas';
 

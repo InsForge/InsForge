@@ -2,24 +2,25 @@ import axios from 'axios';
 import logger from '@/utils/logger.js';
 import { getApiBaseUrl } from '@/utils/environment';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service';
+import { OAuthProvider } from './base.provider.js';
 import type { FacebookUserInfo, OAuthUserData } from '@/types/auth';
 
 /**
  * Facebook OAuth Service
  * Handles all Facebook OAuth operations including URL generation, token exchange, and user info retrieval
  */
-export class FacebookOAuthService {
-  private static instance: FacebookOAuthService;
+export class FacebookOAuthProvider implements OAuthProvider {
+  private static instance: FacebookOAuthProvider;
 
   private constructor() {
     // Initialize OAuth helpers if needed
   }
 
-  public static getInstance(): FacebookOAuthService {
-    if (!FacebookOAuthService.instance) {
-      FacebookOAuthService.instance = new FacebookOAuthService();
+  public static getInstance(): FacebookOAuthProvider {
+    if (!FacebookOAuthProvider.instance) {
+      FacebookOAuthProvider.instance = new FacebookOAuthProvider();
     }
-    return FacebookOAuthService.instance;
+    return FacebookOAuthProvider.instance;
   }
 
   /**

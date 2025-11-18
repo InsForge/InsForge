@@ -1,5 +1,5 @@
 import { DatabaseManager } from '@/infra/database/manager.js';
-import { AppError } from '@/api/middleware/error.js';
+import { AppError } from '@/api/middlewares/error.js';
 import {
   type RawSQLResponse,
   type ExportDatabaseResponse,

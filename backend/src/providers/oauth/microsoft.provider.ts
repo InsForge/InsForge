@@ -2,24 +2,25 @@ import axios from 'axios';
 import logger from '@/utils/logger.js';
 import { getApiBaseUrl } from '@/utils/environment';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service';
+import { OAuthProvider } from './base.provider.js';
 import type { MicrosoftUserInfo, OAuthUserData } from '@/types/auth';
 
 /**
  * Microsoft OAuth Service
  * Handles all Microsoft OAuth operations including URL generation, token exchange, and user info retrieval
  */
-export class MicrosoftOAuthService {
-  private static instance: MicrosoftOAuthService;
+export class MicrosoftOAuthProvider implements OAuthProvider {
+  private static instance: MicrosoftOAuthProvider;
 
   private constructor() {
     // Initialize OAuth helpers if needed
   }
 
-  public static getInstance(): MicrosoftOAuthService {
-    if (!MicrosoftOAuthService.instance) {
-      MicrosoftOAuthService.instance = new MicrosoftOAuthService();
+  public static getInstance(): MicrosoftOAuthProvider {
+    if (!MicrosoftOAuthProvider.instance) {
+      MicrosoftOAuthProvider.instance = new MicrosoftOAuthProvider();
     }
-    return MicrosoftOAuthService.instance;
+    return MicrosoftOAuthProvider.instance;
   }
 
   /**

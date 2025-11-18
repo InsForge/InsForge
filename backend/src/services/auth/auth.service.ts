@@ -22,12 +22,12 @@ import type {
 import { OAuthConfigService } from '@/services/auth/oauth-config.service';
 import { AuthConfigService } from './auth-config.service';
 import { AuthOTPService, OTPPurpose, OTPType } from './auth-otp.service';
-import { GoogleOAuthService } from '@/providers/oauth/google.provider';
-import { GitHubOAuthService } from '@/providers/oauth/github.provider';
-import { DiscordOAuthService } from '@/providers/oauth/discord.provider';
-import { LinkedInOAuthService } from '@/providers/oauth/linkedin.provider';
-import { FacebookOAuthService } from '@/providers/oauth/facebook.provider';
-import { MicrosoftOAuthService } from '@/providers/oauth/microsoft.provider';
+import { GoogleOAuthProvider } from '@/providers/oauth/google.provider';
+import { GitHubOAuthProvider } from '@/providers/oauth/github.provider';
+import { DiscordOAuthProvider } from '@/providers/oauth/discord.provider';
+import { LinkedInOAuthProvider } from '@/providers/oauth/linkedin.provider';
+import { FacebookOAuthProvider } from '@/providers/oauth/facebook.provider';
+import { MicrosoftOAuthProvider } from '@/providers/oauth/microsoft.provider';
 import { validatePassword } from '@/utils/validations';
 import { getPasswordRequirementsMessage } from '@/utils/utils';
 import {
@@ -43,10 +43,10 @@ import {
 } from '@/types/auth';
 import { ADMIN_ID } from '@/utils/constants';
 import { getApiBaseUrl } from '@/utils/environment';
-import { AppError } from '@/api/middleware/error';
+import { AppError } from '@/api/middlewares/error';
 import { ERROR_CODES } from '@/types/error-constants';
-import { EmailService } from '@/providers/email/email';
-import { XOAuthService } from '@/providers/oauth/x.provider';
+import { EmailService } from '@/services/email/email.service';
+import { XOAuthProvider } from '@/providers/oauth/x.provider';
 
 const JWT_SECRET = () => process.env.JWT_SECRET ?? '';
 const JWT_EXPIRES_IN = '7d';
@@ -62,13 +62,13 @@ export class AuthService {
   private db;
 
   // OAuth service instances (cached singletons)
-  private googleOAuthService: GoogleOAuthService;
-  private githubOAuthService: GitHubOAuthService;
-  private discordOAuthService: DiscordOAuthService;
-  private linkedinOAuthService: LinkedInOAuthService;
-  private facebookOAuthService: FacebookOAuthService;
-  private microsoftOAuthService: MicrosoftOAuthService;
-  private xOAuthService: XOAuthService;
+  private googleOAuthService: GoogleOAuthProvider;
+  private githubOAuthService: GitHubOAuthProvider;
+  private discordOAuthService: DiscordOAuthProvider;
+  private linkedinOAuthService: LinkedInOAuthProvider;
+  private facebookOAuthService: FacebookOAuthProvider;
+  private microsoftOAuthService: MicrosoftOAuthProvider;
+  private xOAuthService: XOAuthProvider;
 
   private constructor() {
     // Load .env file if not already loaded
@@ -99,13 +99,13 @@ export class AuthService {
     this.db = dbManager.getDb();
 
     // Initialize OAuth services (cached singletons)
-    this.googleOAuthService = GoogleOAuthService.getInstance();
-    this.githubOAuthService = GitHubOAuthService.getInstance();
-    this.discordOAuthService = DiscordOAuthService.getInstance();
-    this.linkedinOAuthService = LinkedInOAuthService.getInstance();
-    this.facebookOAuthService = FacebookOAuthService.getInstance();
-    this.microsoftOAuthService = MicrosoftOAuthService.getInstance();
-    this.xOAuthService = XOAuthService.getInstance();
+    this.googleOAuthService = GoogleOAuthProvider.getInstance();
+    this.githubOAuthService = GitHubOAuthProvider.getInstance();
+    this.discordOAuthService = DiscordOAuthProvider.getInstance();
+    this.linkedinOAuthService = LinkedInOAuthProvider.getInstance();
+    this.facebookOAuthService = FacebookOAuthProvider.getInstance();
+    this.microsoftOAuthService = MicrosoftOAuthProvider.getInstance();
+    this.xOAuthService = XOAuthProvider.getInstance();
 
     logger.info('AuthService initialized');
   }
@@ -912,7 +912,7 @@ export class AuthService {
       case 'microsoft':
         return this.microsoftOAuthService.generateOAuthUrl(state);
       case 'x':
-        return this.xOAuthService.generateXOAuthUrl(state);
+        return this.xOAuthService.generateOAuthUrl(state);
       default:
         throw new Error(`OAuth provider ${provider} is not implemented yet.`);
     }

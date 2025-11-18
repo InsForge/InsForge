@@ -3,12 +3,12 @@ import { AuthService } from '@/services/auth/auth.service.js';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { AppError } from '@/api/middleware/error.js';
+import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
-import { AuthRequest, verifyAdmin } from '@/api/middleware/auth.js';
-import oauthRouter from './auth.oauth.js';
-import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middleware/rate-limiters.js';
+import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
+import oauthRouter from './oauth.routes.js';
+import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-limiters.js';
 import {
   userIdSchema,
   createUserRequestSchema,

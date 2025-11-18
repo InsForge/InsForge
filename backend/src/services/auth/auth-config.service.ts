@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/manager.js';
-import { AppError } from '@/api/middleware/error.js';
+import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
 import type { AuthConfigSchema, UpdateAuthConfigRequest } from '@insforge/shared-schemas';

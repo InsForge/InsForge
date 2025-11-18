@@ -1,9 +1,9 @@
 import { Router, Response, NextFunction } from 'express';
 import { ChatService } from '@/services/ai/chat.service';
-import { AuthRequest, verifyAdmin, verifyUser } from '../middleware/auth';
+import { AuthRequest, verifyAdmin, verifyUser } from '../../middlewares/auth';
 import { ImageService } from '@/services/ai/image.service';
 import { AIModelService } from '@/services/ai/model.service';
-import { AppError } from '@/api/middleware/error';
+import { AppError } from '@/api/middlewares/error';
 import { ERROR_CODES } from '@/types/error-constants';
 import { successResponse } from '@/utils/response';
 import { AIConfigService } from '@/services/ai/config.service';

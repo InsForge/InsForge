@@ -7,7 +7,7 @@ import { LocalStorageProvider } from '@/providers/storage/local.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
 import logger from '@/utils/logger.js';
 import { ADMIN_ID } from '@/utils/constants';
-import { AppError } from '@/api/middleware/error';
+import { AppError } from '@/api/middlewares/error';
 import { ERROR_CODES } from '@/types/error-constants';
 import { escapeSqlLikePattern, escapeRegexPattern } from '@/utils/validations.js';
 import { getApiBaseUrl } from '@/utils/environment';

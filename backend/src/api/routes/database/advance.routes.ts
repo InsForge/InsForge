@@ -1,10 +1,10 @@
 import { Router, Response } from 'express';
 import { DatabaseAdvanceService } from '@/services/database/advance.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { verifyAdmin, AuthRequest } from '@/api/middleware/auth.js';
-import { AppError } from '@/api/middleware/error.js';
+import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
+import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
-import { upload, handleUploadError } from '@/api/middleware/upload.js';
+import { upload, handleUploadError } from '@/api/middlewares/upload.js';
 import {
   rawSQLRequestSchema,
   exportRequestSchema,

@@ -3,23 +3,24 @@ import logger from '@/utils/logger.js';
 import { getApiBaseUrl } from '@/utils/environment';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service';
 import type { GitHubUserInfo, GitHubEmailInfo, OAuthUserData } from '@/types/auth';
+import { OAuthProvider } from './base.provider.js';
 
 /**
  * GitHub OAuth Service
  * Handles all GitHub OAuth operations including URL generation, token exchange, and user info retrieval
  */
-export class GitHubOAuthService {
-  private static instance: GitHubOAuthService;
+export class GitHubOAuthProvider implements OAuthProvider {
+  private static instance: GitHubOAuthProvider;
 
   private constructor() {
     // Initialize OAuth helpers if needed
   }
 
-  public static getInstance(): GitHubOAuthService {
-    if (!GitHubOAuthService.instance) {
-      GitHubOAuthService.instance = new GitHubOAuthService();
+  public static getInstance(): GitHubOAuthProvider {
+    if (!GitHubOAuthProvider.instance) {
+      GitHubOAuthProvider.instance = new GitHubOAuthProvider();
     }
-    return GitHubOAuthService.instance;
+    return GitHubOAuthProvider.instance;
   }
 
   /**

@@ -4,13 +4,14 @@ import logger from '@/utils/logger.js';
 import { getApiBaseUrl } from '@/utils/environment';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service';
 import type { GoogleUserInfo, OAuthUserData } from '@/types/auth';
+import { OAuthProvider } from './base.provider.js';
 
 /**
  * Google OAuth Service
  * Handles all Google OAuth operations including URL generation, token exchange, and user info verification
  */
-export class GoogleOAuthService {
-  private static instance: GoogleOAuthService;
+export class GoogleOAuthProvider implements OAuthProvider {
+  private static instance: GoogleOAuthProvider;
   private processedCodes: Set<string>;
   private tokenCache: Map<string, { access_token: string; id_token: string }>;
 
@@ -20,11 +21,11 @@ export class GoogleOAuthService {
     this.tokenCache = new Map();
   }
 
-  public static getInstance(): GoogleOAuthService {
-    if (!GoogleOAuthService.instance) {
-      GoogleOAuthService.instance = new GoogleOAuthService();
+  public static getInstance(): GoogleOAuthProvider {
+    if (!GoogleOAuthProvider.instance) {
+      GoogleOAuthProvider.instance = new GoogleOAuthProvider();
     }
-    return GoogleOAuthService.instance;
+    return GoogleOAuthProvider.instance;
   }
 
   /**

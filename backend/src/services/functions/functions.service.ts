@@ -7,7 +7,7 @@ import {
 import logger from '@/utils/logger.js';
 import { DatabaseError } from 'pg';
 import fetch from 'node-fetch';
-import { AppError } from '@/api/middleware/error.js';
+import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 
 export interface FunctionWithRuntime {

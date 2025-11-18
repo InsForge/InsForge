@@ -1,5 +1,5 @@
 import { createRemoteJWKSet, JWTPayload, jwtVerify } from 'jose';
-import { AppError } from '@/api/middleware/error';
+import { AppError } from '@/api/middlewares/error';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants';
 
 /**

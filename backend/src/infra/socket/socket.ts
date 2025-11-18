@@ -11,7 +11,7 @@ import {
   SubscribePayload,
   UnsubscribePayload,
 } from '@/types/socket.js';
-import { AppError } from '@/api/middleware/error.js';
+import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 
 const authService = AuthService.getInstance();

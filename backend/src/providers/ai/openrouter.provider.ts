@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import jwt from 'jsonwebtoken';
 import { isCloudEnvironment } from '@/utils/environment';
-import { AppError } from '@/api/middleware/error';
+import { AppError } from '@/api/middlewares/error';
 import { ERROR_CODES } from '@/types/error-constants';
 import logger from '@/utils/logger.js';
 

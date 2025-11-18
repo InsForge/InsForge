@@ -2,36 +2,15 @@ import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import { config } from '@/infra/config/app.config';
 import logger from '@/utils/logger';
-import { AppError } from '@/api/middleware/error';
+import { AppError } from '@/api/middlewares/error';
 import { ERROR_CODES } from '@/types/error-constants';
+import { EmailTemplate } from '@/types/email.js';
+import { EmailProvider } from './base.provider.js';
 
 /**
- * Email template types supported by the cloud backend
+ * Cloud email provider for sending emails via Insforge cloud backend
  */
-export type EmailTemplate =
-  | 'email-verification-code' // Numeric OTP for email verification
-  | 'email-verification-link' // Magic link for email verification
-  | 'reset-password-code' // Numeric OTP for password reset
-  | 'reset-password-link'; // Magic link for password reset
-
-/**
- * Email service for sending emails via cloud backend
- */
-export class EmailService {
-  private static instance: EmailService;
-
-  private constructor() {}
-
-  /**
-   * Get singleton instance of EmailService
-   */
-  public static getInstance(): EmailService {
-    if (!EmailService.instance) {
-      EmailService.instance = new EmailService();
-    }
-    return EmailService.instance;
-  }
-
+export class CloudEmailProvider implements EmailProvider {
   /**
    * Generate JWT sign token for cloud API authentication
    * @returns JWT token signed with project secret
@@ -66,6 +45,13 @@ export class EmailService {
   }
 
   /**
+   * Check if provider supports templates
+   */
+  supportsTemplates(): boolean {
+    return true;
+  }
+
+  /**
    * Send email using predefined template
    * @param email - Recipient email address
    * @param name - Recipient name
@@ -73,7 +59,7 @@ export class EmailService {
    * @param variables - Variables to use in the email template
    * @returns Promise that resolves when email is sent successfully
    */
-  public async sendWithTemplate(
+  async sendWithTemplate(
     email: string,
     name: string,
     template: EmailTemplate,

@@ -2,14 +2,15 @@ import axios from 'axios';
 import logger from '@/utils/logger.js';
 import { getApiBaseUrl } from '@/utils/environment';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service';
+import { OAuthProvider } from './base.provider.js';
 import type { LinkedInUserInfo, OAuthUserData } from '@/types/auth';
 
 /**
  * LinkedIn OAuth Service
  * Handles all LinkedIn OAuth operations including URL generation, token exchange, and user info verification
  */
-export class LinkedInOAuthService {
-  private static instance: LinkedInOAuthService;
+export class LinkedInOAuthProvider implements OAuthProvider {
+  private static instance: LinkedInOAuthProvider;
   private processedCodes: Set<string>;
   private tokenCache: Map<string, { access_token: string; id_token: string }>;
 
@@ -19,11 +20,11 @@ export class LinkedInOAuthService {
     this.tokenCache = new Map();
   }
 
-  public static getInstance(): LinkedInOAuthService {
-    if (!LinkedInOAuthService.instance) {
-      LinkedInOAuthService.instance = new LinkedInOAuthService();
+  public static getInstance(): LinkedInOAuthProvider {
+    if (!LinkedInOAuthProvider.instance) {
+      LinkedInOAuthProvider.instance = new LinkedInOAuthProvider();
     }
-    return LinkedInOAuthService.instance;
+    return LinkedInOAuthProvider.instance;
   }
 
   /**

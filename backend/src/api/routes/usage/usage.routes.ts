@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { DatabaseManager } from '@/infra/database/manager.js';
-import { verifyCloudBackend, verifyApiKey, verifyAdmin } from '@/api/middleware/auth.js';
+import { verifyCloudBackend, verifyApiKey, verifyAdmin } from '@/api/middlewares/auth.js';
 import { SocketService } from '@/infra/socket/socket.js';
 import { ServerEvents } from '@/types/socket.js';
 

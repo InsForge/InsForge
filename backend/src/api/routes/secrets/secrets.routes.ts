@@ -1,8 +1,8 @@
 import { Router, Response, NextFunction } from 'express';
 import { SecretService } from '@/services/secrets/secrets.service.js';
-import { verifyAdmin, AuthRequest } from '@/api/middleware/auth.js';
+import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { AppError } from '@/api/middleware/error.js';
+import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 
 const router = Router();

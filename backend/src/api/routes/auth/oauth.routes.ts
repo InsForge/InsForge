@@ -2,10 +2,10 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { AuthService } from '@/services/auth/auth.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { AppError } from '@/api/middleware/error.js';
+import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
-import { AuthRequest, verifyAdmin } from '@/api/middleware/auth.js';
+import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
 import logger from '@/utils/logger.js';
 import jwt from 'jsonwebtoken';
 import {

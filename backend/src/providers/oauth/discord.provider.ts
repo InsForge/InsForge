@@ -2,24 +2,25 @@ import axios from 'axios';
 import logger from '@/utils/logger.js';
 import { getApiBaseUrl } from '@/utils/environment';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service';
+import { OAuthProvider } from './base.provider.js';
 import type { DiscordUserInfo, OAuthUserData } from '@/types/auth';
 
 /**
  * Discord OAuth Service
  * Handles all Discord OAuth operations including URL generation, token exchange, and user info retrieval
  */
-export class DiscordOAuthService {
-  private static instance: DiscordOAuthService;
+export class DiscordOAuthProvider implements OAuthProvider {
+  private static instance: DiscordOAuthProvider;
 
   private constructor() {
     // Initialize OAuth helpers if needed
   }
 
-  public static getInstance(): DiscordOAuthService {
-    if (!DiscordOAuthService.instance) {
-      DiscordOAuthService.instance = new DiscordOAuthService();
+  public static getInstance(): DiscordOAuthProvider {
+    if (!DiscordOAuthProvider.instance) {
+      DiscordOAuthProvider.instance = new DiscordOAuthProvider();
     }
-    return DiscordOAuthService.instance;
+    return DiscordOAuthProvider.instance;
   }
 
   /**
