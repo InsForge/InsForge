@@ -21,10 +21,10 @@ import { agentDocsRouter } from '@/api/routes/agent.js';
 import { aiRouter } from '@/api/routes/ai.js';
 import { errorMiddleware } from '@/api/middleware/error.js';
 import fetch, { HeadersInit } from 'node-fetch';
-import { DatabaseManager } from '@/core/database/manager.js';
-import { LogService } from '@/core/logs/logs.js';
-import { StorageService } from '@/core/storage/storage.js';
-import { SocketService } from '@/core/socket/socket.js';
+import { DatabaseManager } from '@/infra/database/manager.js';
+import { LogService } from '@/services/logs/logs.service.js';
+import { StorageService } from '@/providers/storage/storage.provider.js';
+import { SocketService } from '@/infra/socket/socket.js';
 import { seedBackend } from '@/utils/seed.js';
 import logger from '@/utils/logger.js';
 import { isProduction } from './utils/environment';
@@ -187,7 +187,7 @@ export async function createApp() {
   // Add direct OpenAPI route at /openapi
   app.get('/openapi', async (_req: Request, res: Response) => {
     try {
-      const { OpenAPIService } = await import('@/core/documentation/openapi.js');
+      const { OpenAPIService } = await import('@/services/documentation/openapi.service.js');
       const openAPIService = OpenAPIService.getInstance();
       const openAPIDocument = await openAPIService.generateOpenAPIDocument();
       res.json(openAPIDocument);
@@ -199,7 +199,7 @@ export async function createApp() {
   // Add direct AI agent documentation route at /agent-docs
   app.get('/agent-docs', async (_req: Request, res: Response) => {
     try {
-      const { AgentAPIDocService } = await import('@/core/documentation/agent.js');
+      const { AgentAPIDocService } = await import('@/services/documentation/agent.service.js');
       const agentAPIDocService = AgentAPIDocService.getInstance();
       const agentDocs = await agentAPIDocService.generateAgentDocumentation();
       res.json(agentDocs);

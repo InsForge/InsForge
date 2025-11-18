@@ -2,8 +2,8 @@ import { Router, Request, Response, NextFunction } from 'express';
 import path from 'path';
 import { verifyAdmin, AuthRequest, verifyUser } from '@/api/middleware/auth.js';
 import { AppError } from '@/api/middleware/error.js';
-import { StorageService } from '@/core/storage/storage.js';
-import { DatabaseManager } from '@/core/database/manager.js';
+import { StorageService } from '@/providers/storage/storage.provider.js';
+import { DatabaseManager } from '@/infra/database/manager.js';
 import { successResponse } from '@/utils/response.js';
 import { upload, handleUploadError } from '@/api/middleware/upload.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -12,9 +12,9 @@ import {
   createBucketRequestSchema,
   updateBucketRequestSchema,
 } from '@insforge/shared-schemas';
-import { SocketService } from '@/core/socket/socket';
-import { DataUpdateResourceType, ServerEvents } from '@/core/socket/types';
-import { AuditService } from '@/core/logs/audit.js';
+import { SocketService } from '@/infra/socket/socket';
+import { DataUpdateResourceType, ServerEvents } from '@/types/socket';
+import { AuditService } from '@/services/logs/audit.service.js';
 
 const router = Router();
 const auditService = AuditService.getInstance();

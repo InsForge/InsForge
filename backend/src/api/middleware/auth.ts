@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
-import { AuthService } from '@/core/auth/auth.js';
+import { AuthService } from '@/services/auth/auth.service.js';
 import { AppError } from './error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 import { verifyCloudToken } from '@/utils/cloud-token.js';
-import { SecretService } from '@/core/secrets/secrets.js';
+import { SecretService } from '@/services/secrets/secrets.service.js';
 
 export interface AuthRequest extends Request {
   user?: {

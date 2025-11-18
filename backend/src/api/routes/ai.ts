@@ -1,15 +1,15 @@
 import { Router, Response, NextFunction } from 'express';
-import { ChatService } from '@/core/ai/chat';
+import { ChatService } from '@/services/ai/chat.service';
 import { AuthRequest, verifyAdmin, verifyUser } from '../middleware/auth';
-import { ImageService } from '@/core/ai/image';
-import { AIModelService } from '@/core/ai/model';
+import { ImageService } from '@/services/ai/image.service';
+import { AIModelService } from '@/services/ai/model.service';
 import { AppError } from '@/api/middleware/error';
 import { ERROR_CODES } from '@/types/error-constants';
 import { successResponse } from '@/utils/response';
-import { AIConfigService } from '@/core/ai/config';
-import { AIUsageService } from '@/core/ai/usage';
-import { AIClientService } from '@/core/ai/client';
-import { AuditService } from '@/core/logs/audit';
+import { AIConfigService } from '@/services/ai/config.service';
+import { AIUsageService } from '@/services/ai/usage.service';
+import { AIClientService } from '@/providers/ai/openrouter.provider';
+import { AuditService } from '@/services/logs/audit.service';
 import {
   createAIConfigurationRequestSchema,
   updateAIConfigurationRequestSchema,

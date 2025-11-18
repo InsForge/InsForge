@@ -1,7 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
-import { SecretService } from '@/core/secrets/secrets.js';
+import { SecretService } from '@/services/secrets/secrets.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middleware/auth.js';
-import { AuditService } from '@/core/logs/audit.js';
+import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middleware/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 

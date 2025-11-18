@@ -1,12 +1,12 @@
 import { Router, Response } from 'express';
 import { AuthRequest, verifyAdmin } from '@/api/middleware/auth.js';
-import { FunctionService } from '@/core/functions/functions.js';
-import { AuditService } from '@/core/logs/audit.js';
+import { FunctionService } from '@/services/functions/functions.service.js';
+import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middleware/error.js';
 import logger from '@/utils/logger.js';
 import { functionUploadRequestSchema, functionUpdateRequestSchema } from '@insforge/shared-schemas';
-import { SocketService } from '@/core/socket/socket';
-import { DataUpdateResourceType, ServerEvents } from '@/core/socket/types';
+import { SocketService } from '@/infra/socket/socket';
+import { DataUpdateResourceType, ServerEvents } from '@/types/socket';
 
 const router = Router();
 const functionService = FunctionService.getInstance();
