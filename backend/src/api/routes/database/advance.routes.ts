@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { DatabaseAdvanceService } from '@/services/database/advance.service.js';
+import { DatabaseAdvanceService } from '@/services/database/database-advance.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { AppError } from '@/api/middlewares/error.js';

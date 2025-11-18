@@ -1,13 +1,13 @@
 import { Router, Response, NextFunction } from 'express';
-import { ChatService } from '@/services/ai/chat.service';
+import { ChatCompletionService } from '@/services/ai/chat-completion.service';
 import { AuthRequest, verifyAdmin, verifyUser } from '../../middlewares/auth';
-import { ImageService } from '@/services/ai/image.service';
-import { AIModelService } from '@/services/ai/model.service';
+import { ImageGenerationService } from '@/services/ai/image-generation.service';
+import { AIModelService } from '@/services/ai/ai-model.service';
 import { AppError } from '@/api/middlewares/error';
 import { ERROR_CODES } from '@/types/error-constants';
 import { successResponse } from '@/utils/response';
-import { AIConfigService } from '@/services/ai/config.service';
-import { AIUsageService } from '@/services/ai/usage.service';
+import { AIConfigService } from '@/services/ai/ai-config.service';
+import { AIUsageService } from '@/services/ai/ai-usage.service';
 import { AIClientService } from '@/providers/ai/openrouter.provider';
 import { AuditService } from '@/services/logs/audit.service';
 import {
@@ -20,7 +20,7 @@ import {
 } from '@insforge/shared-schemas';
 
 const router = Router();
-const chatService = new ChatService();
+const chatService = new ChatCompletionService();
 const aiConfigService = new AIConfigService();
 const aiUsageService = new AIUsageService();
 const auditService = AuditService.getInstance();
@@ -133,7 +133,7 @@ router.post(
         );
       }
 
-      const result = await ImageService.generate(validationResult.data);
+      const result = await ImageGenerationService.generate(validationResult.data);
 
       res.json(result);
     } catch (error) {

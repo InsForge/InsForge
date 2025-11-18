@@ -2,7 +2,7 @@ import { isCloudEnvironment } from '@/utils/environment';
 import { AIClientService } from '@/providers/ai/openrouter.provider';
 import type { RawOpenRouterModel } from '@/types/ai';
 import type { AIModelSchema } from '@insforge/shared-schemas';
-import { calculatePriceLevel, filterAndSortModalities, getProviderOrder } from './helper';
+import { calculatePriceLevel, filterAndSortModalities, getProviderOrder } from './helpers';
 
 export class AIModelService {
   /**

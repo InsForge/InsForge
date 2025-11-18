@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
-import { AIUsageService } from './usage.service';
-import { AIConfigService } from './config.service';
+import { AIUsageService } from './ai-usage.service';
+import { AIConfigService } from './ai-config.service';
 import { AIClientService } from '@/providers/ai/openrouter.provider';
 import type {
   AIConfigurationSchema,
@@ -10,7 +10,7 @@ import type {
 import logger from '@/utils/logger.js';
 import { ChatCompletionOptions } from '@/types/ai';
 
-export class ChatService {
+export class ChatCompletionService {
   private aiUsageService = new AIUsageService();
   private aiConfigService = new AIConfigService();
   private aiClientService = AIClientService.getInstance();

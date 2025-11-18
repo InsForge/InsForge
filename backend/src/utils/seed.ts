@@ -1,5 +1,5 @@
 import { DatabaseManager } from '@/infra/database/manager.js';
-import { AIConfigService } from '@/services/ai/config.service.js';
+import { AIConfigService } from '@/services/ai/ai-config.service.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service';

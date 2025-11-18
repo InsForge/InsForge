@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 
-import { AIUsageService } from './usage.service';
-import { AIConfigService } from './config.service';
+import { AIUsageService } from './ai-usage.service';
+import { AIConfigService } from './ai-config.service';
 import { AIClientService } from '@/providers/ai/openrouter.provider';
 import type {
   AIConfigurationSchema,
@@ -11,7 +11,7 @@ import type {
 import logger from '@/utils/logger.js';
 import { OpenRouterImageMessage } from '@/types/ai';
 
-export class ImageService {
+export class ImageGenerationService {
   private static aiUsageService = new AIUsageService();
   private static aiConfigService = new AIConfigService();
   private static aiClientService = AIClientService.getInstance();
@@ -22,7 +22,7 @@ export class ImageService {
   private static async validateAndGetConfig(
     modelId: string
   ): Promise<AIConfigurationSchema | null> {
-    const aiConfig = await ImageService.aiConfigService.findByModelId(modelId);
+    const aiConfig = await ImageGenerationService.aiConfigService.findByModelId(modelId);
     if (!aiConfig) {
       throw new Error(
         `Model ${modelId} is not enabled. Please contact your administrator to enable this model.`
@@ -37,7 +37,7 @@ export class ImageService {
    */
   static async generate(options: ImageGenerationRequest): Promise<ImageGenerationResponse> {
     // Validate model and get config
-    const aiConfig = await ImageService.validateAndGetConfig(options.model);
+    const aiConfig = await ImageGenerationService.validateAndGetConfig(options.model);
 
     const model = options.model;
 
@@ -133,7 +133,7 @@ export class ImageService {
         const inputTokens = result.metadata?.usage?.promptTokens;
         const outputTokens = result.metadata?.usage?.completionTokens;
 
-        await ImageService.aiUsageService.trackImageGenerationUsage(
+        await ImageGenerationService.aiUsageService.trackImageGenerationUsage(
           aiConfig.id,
           result.images.length,
           undefined, // image resolution not available from OpenRouter
