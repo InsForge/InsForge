@@ -130,7 +130,7 @@ export default function DashboardPage() {
             {/* Sign-in Component Card */}
             <button
               onClick={() => void navigate('/dashboard/authentication/auth-methods')}
-              className="flex-1 bg-card border border-border rounded-lg p-4 flex items-center gap-3 hover:bg-bg-secondary hover:border-border-hover hover:shadow-sm transition-all group"
+              className="flex-1 bg-card border border-border rounded-lg p-4 flex items-center gap-3 hover:bg-secondary-bg hover:border-hover-border hover:shadow-sm transition-all group"
             >
               <div className="flex-1 flex items-center gap-4">
                 <div className="bg-background rounded p-3.5 flex items-center justify-center shrink-0">
@@ -147,7 +147,7 @@ export default function DashboardPage() {
             {/* Database Templates Card */}
             <button
               onClick={() => void navigate('/dashboard/tables')}
-              className="flex-1 bg-card border border-border rounded-lg p-4 flex items-center gap-3 hover:bg-bg-secondary hover:border-border-hover hover:shadow-sm transition-all group"
+              className="flex-1 bg-card border border-border rounded-lg p-4 flex items-center gap-3 hover:bg-secondary-bg hover:border-hover-border hover:shadow-sm transition-all group"
             >
               <div className="flex-1 flex items-center gap-4">
                 <div className="bg-background rounded p-3.5 flex items-center justify-center shrink-0">
@@ -169,7 +169,7 @@ export default function DashboardPage() {
             <p className="text-xl font-semibold ">MCP Call Records</p>
             <Button
               onClick={handleViewMoreClick}
-              className="h-8 px-4 font-medium dark:bg-primary-emerald"
+              className="h-8 px-4 font-medium dark:bg-primary-emerald dark:hover:bg-secondary-emerald"
             >
               View More
             </Button>

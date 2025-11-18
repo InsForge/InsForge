@@ -154,7 +154,7 @@
     --foreground: 17 24 39; /* near-black */
     --card: 255 255 255; /* white */
     --card-foreground: 17 24 39; /* near-black */
-    --bg-secondary: 250 250 250; /* zinc-100 */
+    --secondary-bg: 250 250 250; /* zinc-100 */
     --text: 113 113 122; /* zinc-500 */
     --popover: 255 255 255; /* white */
     --popover-foreground: 10 10 10; /* near-black */
@@ -169,13 +169,13 @@
     --destructive: 239 68 68; /* red-500 */
     --destructive-foreground: 250 250 250; /* zinc-50 */
     --border: 228 228 231; /* zinc-200 */
-    --border-hover: 212 212 216; /* zinc-300 */
+    --hover-border: 212 212 216; /* zinc-300 */
     --input: 228 228 231; /* zinc-200 */
     --ring: 10 10 10; /* near-black */
     --radius: 0.5rem;
     --background-color: #ffffff;
     --border-color: #737373;
-    --border-hover-color: #d4d4d4;
+    --hover-border-color: #d4d4d4;
   }
 
   .dark {
@@ -184,7 +184,7 @@
     --foreground: 255 255 255; /* white*/
     --card: 51 51 51; /* #333333 */
     --card-foreground: 255 255 255; /* white*/
-    --bg-secondary: 64 64 64; /* neutral-700 */
+    --secondary-bg: 64 64 64; /* neutral-700 */
     --text: 163 163 163; /* neutral-400 */
     --popover: 64 64 64; /* neutral-700 */
     --popover-foreground: 250 250 250; /* zinc-50 */
@@ -199,12 +199,12 @@
     --destructive: 127 29 29; /* red-900 */
     --destructive-foreground: 250 250 250; /* zinc-50 */
     --border: 64 64 64; /* neutral-700 */
-    --border-hover: 82 82 82; /* neutral-600 */
+    --hover-border: 82 82 82; /* neutral-600 */
     --input: 64 64 64; /* neutral-700 */
     --ring: 212 212 212; /* zinc-300 */
     --background-color: #262626;
     --border-color: #737373;
-    --border-hover-color: #d4d4d4;
+    --hover-border-color: #d4d4d4;
   }
 }
 
@@ -224,8 +224,8 @@
 
 @theme {
   /* emerald themes */
-  --color-primary-emerald: theme(--color-emerald-300);
-  --color-secondary-emerald: theme(--color-emerald-400);
+  --color-primary-emerald: var(--color-emerald-300);
+  --color-secondary-emerald: var(--color-emerald-400);
 
   --color-border-gray: #e4e4e7;
   --color-chart-blue-dark: #2c7fff;
@@ -257,5 +257,5 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--border-hover-color);
+  background: var(--hover-border-color);
 }

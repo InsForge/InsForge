@@ -43,7 +43,7 @@ export function PromptDialog({ open, onOpenChange, promptTemplate }: PromptDialo
               <div className="bg-card dark:bg-neutral-900 rounded p-3 h-60 overflow-y-auto relative">
                 {/* Badge only */}
                 <div className="flex items-center justify-between mb-2">
-                  <div className="bg-bg-secondary rounded px-2 py-0 inline-flex items-center justify-center">
+                  <div className="bg-secondary-bg rounded px-2 py-0 inline-flex items-center justify-center">
                     <span className="text-xs leading-5">Prompt</span>
                   </div>
                 </div>
@@ -76,7 +76,7 @@ export function PromptDialog({ open, onOpenChange, promptTemplate }: PromptDialo
           <Button
             onClick={() => onOpenChange(false)}
             variant="secondary"
-            className="h-8 px-3 text-sm font-medium bg-bg-secondary hover:bg-border-hover"
+            className="h-8 px-3 text-sm font-medium bg-secondary-bg hover:bg-hover-border"
           >
             Cancel
           </Button>

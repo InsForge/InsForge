@@ -78,12 +78,14 @@ export function CopyButton({
         // Icon-only mode (when showText is false)
         !showText && 'w-8 px-0 justify-center',
         // Primary variant (black/emerald)
-        isPrimary && !copied && 'bg-black hover:bg-gray-800',
+        isPrimary && !copied && 'bg-primary hover:bg-primary/90',
         isPrimary &&
           !copied &&
           'dark:bg-primary-emerald dark:text-black dark:hover:bg-secondary-emerald',
         // Secondary variant (light gray/neutral)
-        !isPrimary && !copied && 'bg-gray-100 text-gray-900 hover:bg-bg-secondary dark:text-white',
+        !isPrimary &&
+          !copied &&
+          'secondary-bg text-secondary-foreground hover:secondary-bg/90 dark:text-white',
         // Copied state (same for both variants) - stone-600
         copied && 'bg-stone-600 text-white cursor-default hover:bg-stone-600',
         copied && 'dark:bg-stone-600 dark:text-white dark:hover:bg-stone-600',

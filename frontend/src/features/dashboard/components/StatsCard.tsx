@@ -29,7 +29,7 @@ export function StatsCard({
 
         <div className="flex flex-col gap-2">
           {isLoading ? (
-            <Skeleton className="h-8 w-24 bg-bg-secondary" />
+            <Skeleton className="h-8 w-24 bg-secondary-bg" />
           ) : (
             <p className="text-2xl font-normal tracking-[-0.144px] leading-8">
               {value} <span className="text-sm font-normal text-text leading-6">{unit}</span>
@@ -37,7 +37,7 @@ export function StatsCard({
           )}
 
           {isLoading ? (
-            <Skeleton className="h-6 w-32 bg-bg-secondary" />
+            <Skeleton className="h-6 w-32 bg-secondary-bg" />
           ) : (
             <p className="text-base text-text leading-6">{description}</p>
           )}

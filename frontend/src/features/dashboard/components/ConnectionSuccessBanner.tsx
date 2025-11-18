@@ -13,7 +13,7 @@ export function ConnectionSuccessBanner() {
   }
 
   return (
-    <div className="relative w-full bg-card border-l-3 border-dark-mode-border dark:border-primary-emerald rounded-[8px] py-6 px-8">
+    <div className="relative w-full bg-card border-l-3 border-border dark:border-primary-emerald rounded-[8px] py-6 px-8">
       <div className="flex flex-col items-start gap-3">
         <p className="text-xl font-semibold">Connected successfully!</p>
         <p className="text-sm text-text">

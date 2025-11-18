@@ -13,8 +13,8 @@ export default {
     },
     extend: {
       colors: {
-        'border-hover': 'rgb(var(--border-hover))',
-        'bg-secondary': 'rgb(var(--bg-secondary))',
+        'hover-border': 'rgb(var(--hover-border))',
+        'secondary-bg': 'rgb(var(--secondary-bg))',
         text: 'rgb(var(--text))',
         border: 'rgb(var(--border))',
         input: 'rgb(var(--input))',
