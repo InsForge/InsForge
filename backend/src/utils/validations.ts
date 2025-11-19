@@ -1,5 +1,5 @@
-import { AppError } from '@/api/middleware/error';
-import { ERROR_CODES } from '@/types/error-constants';
+import { AppError } from '@/api/middlewares/error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
 import type { AuthConfigSchema } from '@insforge/shared-schemas';
 
 export function validateEmail(email: string) {

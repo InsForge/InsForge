@@ -1,12 +1,12 @@
-import { DatabaseManager } from '@/core/database/manager.js';
-import { AIConfigService } from '@/core/ai/config.js';
+import { DatabaseManager } from '@/infra/database/manager.js';
+import { AIConfigService } from '@/services/ai/ai-config.service.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
-import { SecretService } from '@/core/secrets/secrets';
-import { OAuthConfigService } from '@/core/auth/oauth.config.js';
+import { SecretService } from '@/services/secrets/secret.service.js';
+import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { OAuthProvidersSchema } from '@insforge/shared-schemas';
-import { AuthService } from '@/core/auth/auth.js';
-import { AuthConfigService } from '@/core/auth/auth.config.js';
+import { AuthService } from '@/services/auth/auth.service.js';
+import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 
 /**
  * Validates admin credentials are configured

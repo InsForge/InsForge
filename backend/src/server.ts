@@ -5,29 +5,25 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import authRouter from '@/api/routes/auth.js';
-import { databaseTablesRouter } from '@/api/routes/database.tables.js';
-import { databaseRecordsRouter } from '@/api/routes/database.records.js';
-import databaseAdvanceRouter from '@/api/routes/database.advance.js';
-import { storageRouter } from '@/api/routes/storage.js';
-import { metadataRouter } from '@/api/routes/metadata.js';
-import { logsRouter } from '@/api/routes/logs.js';
-import { docsRouter } from '@/api/routes/docs.js';
-import functionsRouter from '@/api/routes/functions.js';
-import secretsRouter from '@/api/routes/secrets.js';
-import { usageRouter } from '@/api/routes/usage.js';
-import { openAPIRouter } from '@/api/routes/openapi.js';
-import { agentDocsRouter } from '@/api/routes/agent.js';
-import { aiRouter } from '@/api/routes/ai.js';
-import { errorMiddleware } from '@/api/middleware/error.js';
+import authRouter from '@/api/routes/auth/index.routes.js';
+import databaseRouter from '@/api/routes/database/index.routes.js';
+import { storageRouter } from '@/api/routes/storage/index.routes.js';
+import { metadataRouter } from '@/api/routes/metadata/index.routes.js';
+import { logsRouter } from '@/api/routes/logs/index.routes.js';
+import { docsRouter } from '@/api/routes/docs/index.routes.js';
+import functionsRouter from '@/api/routes/functions/index.routes.js';
+import secretsRouter from '@/api/routes/secrets/index.routes.js';
+import { usageRouter } from '@/api/routes/usage/index.routes.js';
+import { aiRouter } from '@/api/routes/ai/index.routes.js';
+import { errorMiddleware } from '@/api/middlewares/error.js';
 import fetch, { HeadersInit } from 'node-fetch';
-import { DatabaseManager } from '@/core/database/manager.js';
-import { LogService } from '@/core/logs/logs.js';
-import { StorageService } from '@/core/storage/storage.js';
-import { SocketService } from '@/core/socket/socket.js';
+import { DatabaseManager } from '@/infra/database/manager.js';
+import { LogService } from '@/services/logs/log.service.js';
+import { StorageService } from '@/services/storage/storage.service.js';
+import { SocketService } from '@/infra/socket/socket.js';
 import { seedBackend } from '@/utils/seed.js';
 import logger from '@/utils/logger.js';
-import { isProduction } from './utils/environment';
+import { isProduction } from './utils/environment.js';
 import packageJson from '../../package.json';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -165,11 +161,9 @@ export async function createApp() {
     });
   });
 
-  // Mount auth routes
+  // Mount all routes
   apiRouter.use('/auth', authRouter);
-  apiRouter.use('/database/tables', databaseTablesRouter);
-  apiRouter.use('/database/records', databaseRecordsRouter);
-  apiRouter.use('/database/advance', databaseAdvanceRouter);
+  apiRouter.use('/database', databaseRouter);
   apiRouter.use('/storage', storageRouter);
   apiRouter.use('/metadata', metadataRouter);
   apiRouter.use('/logs', logsRouter);
@@ -177,36 +171,10 @@ export async function createApp() {
   apiRouter.use('/functions', functionsRouter);
   apiRouter.use('/secrets', secretsRouter);
   apiRouter.use('/usage', usageRouter);
-  apiRouter.use('/openapi', openAPIRouter);
-  apiRouter.use('/agent-docs', agentDocsRouter);
   apiRouter.use('/ai', aiRouter);
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);
-
-  // Add direct OpenAPI route at /openapi
-  app.get('/openapi', async (_req: Request, res: Response) => {
-    try {
-      const { OpenAPIService } = await import('@/core/documentation/openapi.js');
-      const openAPIService = OpenAPIService.getInstance();
-      const openAPIDocument = await openAPIService.generateOpenAPIDocument();
-      res.json(openAPIDocument);
-    } catch {
-      res.status(500).json({ error: 'Failed to generate OpenAPI document' });
-    }
-  });
-
-  // Add direct AI agent documentation route at /agent-docs
-  app.get('/agent-docs', async (_req: Request, res: Response) => {
-    try {
-      const { AgentAPIDocService } = await import('@/core/documentation/agent.js');
-      const agentAPIDocService = AgentAPIDocService.getInstance();
-      const agentDocs = await agentAPIDocService.generateAgentDocumentation();
-      res.json(agentDocs);
-    } catch {
-      res.status(500).json({ error: 'Failed to generate agent API documentation' });
-    }
-  });
 
   // Proxy function execution to Deno runtime
   app.all('/functions/:slug', async (req: Request, res: Response) => {
