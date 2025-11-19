@@ -107,8 +107,8 @@ router.get('/functions', async (_req: AuthRequest, res: Response, next: NextFunc
 // Get API key (admin only)
 router.get('/api-key', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const sercretService = new SecretService();
-    const apiKey = await sercretService.getSecretByKey('API_KEY');
+    const secretService = new SecretService();
+    const apiKey = await secretService.getSecretByKey('API_KEY');
 
     successResponse(res, { apiKey: apiKey });
   } catch (error) {
