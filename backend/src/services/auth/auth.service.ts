@@ -19,17 +19,17 @@ import type {
   AuthMetadataSchema,
   OAuthProvidersSchema,
 } from '@insforge/shared-schemas';
-import { OAuthConfigService } from '@/services/auth/oauth-config.service';
-import { AuthConfigService } from './auth-config.service';
-import { AuthOTPService, OTPPurpose, OTPType } from './auth-otp.service';
-import { GoogleOAuthProvider } from '@/providers/oauth/google.provider';
-import { GitHubOAuthProvider } from '@/providers/oauth/github.provider';
-import { DiscordOAuthProvider } from '@/providers/oauth/discord.provider';
-import { LinkedInOAuthProvider } from '@/providers/oauth/linkedin.provider';
-import { FacebookOAuthProvider } from '@/providers/oauth/facebook.provider';
-import { MicrosoftOAuthProvider } from '@/providers/oauth/microsoft.provider';
-import { validatePassword } from '@/utils/validations';
-import { getPasswordRequirementsMessage } from '@/utils/utils';
+import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
+import { AuthConfigService } from './auth-config.service.js';
+import { AuthOTPService, OTPPurpose, OTPType } from './auth-otp.service.js';
+import { GoogleOAuthProvider } from '@/providers/oauth/google.provider.js';
+import { GitHubOAuthProvider } from '@/providers/oauth/github.provider.js';
+import { DiscordOAuthProvider } from '@/providers/oauth/discord.provider.js';
+import { LinkedInOAuthProvider } from '@/providers/oauth/linkedin.provider.js';
+import { FacebookOAuthProvider } from '@/providers/oauth/facebook.provider.js';
+import { MicrosoftOAuthProvider } from '@/providers/oauth/microsoft.provider.js';
+import { validatePassword } from '@/utils/validations.js';
+import { getPasswordRequirementsMessage } from '@/utils/utils.js';
 import {
   FacebookUserInfo,
   GitHubUserInfo,
@@ -40,13 +40,13 @@ import {
   XUserInfo,
   UserRecord,
   OAuthUserData,
-} from '@/types/auth';
-import { ADMIN_ID } from '@/utils/constants';
-import { getApiBaseUrl } from '@/utils/environment';
-import { AppError } from '@/api/middlewares/error';
-import { ERROR_CODES } from '@/types/error-constants';
-import { EmailService } from '@/services/email/email.service';
-import { XOAuthProvider } from '@/providers/oauth/x.provider';
+} from '@/types/auth.js';
+import { ADMIN_ID } from '@/utils/constants.js';
+import { getApiBaseUrl } from '@/utils/environment.js';
+import { AppError } from '@/api/middlewares/error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
+import { EmailService } from '@/services/email/email.service.js';
+import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
 
 const JWT_SECRET = () => process.env.JWT_SECRET ?? '';
 const JWT_EXPIRES_IN = '7d';

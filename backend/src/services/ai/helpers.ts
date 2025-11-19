@@ -1,4 +1,4 @@
-import type { RawOpenRouterModel } from '@/types/ai';
+import type { RawOpenRouterModel } from '@/types/ai.js';
 import type { ModalitySchema } from '@insforge/shared-schemas';
 
 const MODALITY_ORDER = ['text', 'image', 'audio', 'video', 'file'];

@@ -23,7 +23,7 @@ import { StorageService } from '@/services/storage/storage.service.js';
 import { SocketService } from '@/infra/socket/socket.js';
 import { seedBackend } from '@/utils/seed.js';
 import logger from '@/utils/logger.js';
-import { isProduction } from './utils/environment';
+import { isProduction } from './utils/environment.js';
 import packageJson from '../../package.json';
 
 const __filename = fileURLToPath(import.meta.url);

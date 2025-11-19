@@ -5,7 +5,7 @@ import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { createTableRequestSchema, updateTableSchemaRequestSchema } from '@insforge/shared-schemas';
-import { AuditService } from '@/services/logs/audit.service';
+import { AuditService } from '@/services/logs/audit.service.js';
 
 const router = Router();
 const tableService = new DatabaseTableService();

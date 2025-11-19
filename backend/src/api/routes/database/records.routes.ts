@@ -12,8 +12,8 @@ import { successResponse } from '@/utils/response.js';
 import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { AuthService } from '@/services/auth/auth.service.js';
-import { SocketService } from '@/infra/socket/socket';
-import { DataUpdateResourceType, ServerEvents } from '@/types/socket';
+import { SocketService } from '@/infra/socket/socket.js';
+import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 
 const router = Router();
 const authService = AuthService.getInstance();

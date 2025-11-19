@@ -1,4 +1,4 @@
-import type { OAuthUserData } from '@/types/auth';
+import type { OAuthUserData } from '@/types/auth.js';
 
 /**
  * OAuth provider interface

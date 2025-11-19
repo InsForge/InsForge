@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { UploadStrategyResponse, DownloadStrategyResponse } from '@insforge/shared-schemas';
 import { StorageProvider } from './base.provider.js';
-import { getApiBaseUrl } from '@/utils/environment';
+import { getApiBaseUrl } from '@/utils/environment.js';
 
 /**
  * Local filesystem storage implementation

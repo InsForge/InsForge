@@ -1,15 +1,15 @@
 import { Router, Response, NextFunction } from 'express';
-import { ChatCompletionService } from '@/services/ai/chat-completion.service';
-import { AuthRequest, verifyAdmin, verifyUser } from '../../middlewares/auth';
-import { ImageGenerationService } from '@/services/ai/image-generation.service';
-import { AIModelService } from '@/services/ai/ai-model.service';
-import { AppError } from '@/api/middlewares/error';
-import { ERROR_CODES } from '@/types/error-constants';
-import { successResponse } from '@/utils/response';
-import { AIConfigService } from '@/services/ai/ai-config.service';
-import { AIUsageService } from '@/services/ai/ai-usage.service';
-import { AIClientService } from '@/providers/ai/openrouter.provider';
-import { AuditService } from '@/services/logs/audit.service';
+import { ChatCompletionService } from '@/services/ai/chat-completion.service.js';
+import { AuthRequest, verifyAdmin, verifyUser } from '../../middlewares/auth.js';
+import { ImageGenerationService } from '@/services/ai/image-generation.service.js';
+import { AIModelService } from '@/services/ai/ai-model.service.js';
+import { AppError } from '@/api/middlewares/error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
+import { successResponse } from '@/utils/response.js';
+import { AIConfigService } from '@/services/ai/ai-config.service.js';
+import { AIUsageService } from '@/services/ai/ai-usage.service.js';
+import { AIClientService } from '@/providers/ai/openrouter.provider.js';
+import { AuditService } from '@/services/logs/audit.service.js';
 import {
   createAIConfigurationRequestSchema,
   updateAIConfigurationRequestSchema,

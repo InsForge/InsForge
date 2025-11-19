@@ -12,8 +12,8 @@ import {
   createBucketRequestSchema,
   updateBucketRequestSchema,
 } from '@insforge/shared-schemas';
-import { SocketService } from '@/infra/socket/socket';
-import { DataUpdateResourceType, ServerEvents } from '@/types/socket';
+import { SocketService } from '@/infra/socket/socket.js';
+import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 
 const router = Router();

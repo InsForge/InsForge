@@ -1,9 +1,9 @@
 import axios from 'axios';
 import { OAuth2Client } from 'google-auth-library';
 import logger from '@/utils/logger.js';
-import { getApiBaseUrl } from '@/utils/environment';
-import { OAuthConfigService } from '@/services/auth/oauth-config.service';
-import type { GoogleUserInfo, OAuthUserData } from '@/types/auth';
+import { getApiBaseUrl } from '@/utils/environment.js';
+import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
+import type { GoogleUserInfo, OAuthUserData } from '@/types/auth.js';
 import { OAuthProvider } from './base.provider.js';
 
 /**

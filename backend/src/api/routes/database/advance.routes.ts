@@ -11,9 +11,9 @@ import {
   importRequestSchema,
   bulkUpsertRequestSchema,
 } from '@insforge/shared-schemas';
-import logger from '@/utils/logger';
-import { SocketService } from '@/infra/socket/socket';
-import { DataUpdateResourceType, ServerEvents } from '@/types/socket';
+import logger from '@/utils/logger.js';
+import { SocketService } from '@/infra/socket/socket.js';
+import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 
 const router = Router();
 const dbAdvanceService = new DatabaseAdvanceService();

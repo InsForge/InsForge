@@ -1,9 +1,9 @@
 import axios from 'axios';
 import logger from '@/utils/logger.js';
-import { getApiBaseUrl } from '@/utils/environment';
-import { OAuthConfigService } from '@/services/auth/oauth-config.service';
+import { getApiBaseUrl } from '@/utils/environment.js';
+import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { OAuthProvider } from './base.provider.js';
-import type { MicrosoftUserInfo, OAuthUserData } from '@/types/auth';
+import type { MicrosoftUserInfo, OAuthUserData } from '@/types/auth.js';
 
 /**
  * Microsoft OAuth Service

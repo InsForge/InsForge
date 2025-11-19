@@ -9,8 +9,8 @@ import { successResponse } from '@/utils/response.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { AppError } from '@/api/middlewares/error.js';
 import type { AppMetadataSchema } from '@insforge/shared-schemas';
-import { SecretService } from '@/services/secrets/secret.service';
-import { DatabaseManager } from '@/infra/database/manager';
+import { SecretService } from '@/services/secrets/secret.service.js';
+import { DatabaseManager } from '@/infra/database/manager.js';
 
 const router = Router();
 const authService = AuthService.getInstance();

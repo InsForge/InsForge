@@ -1,8 +1,8 @@
 import OpenAI from 'openai';
 import jwt from 'jsonwebtoken';
-import { isCloudEnvironment } from '@/utils/environment';
-import { AppError } from '@/api/middlewares/error';
-import { ERROR_CODES } from '@/types/error-constants';
+import { isCloudEnvironment } from '@/utils/environment.js';
+import { AppError } from '@/api/middlewares/error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
 
 interface CloudCredentialsResponse {

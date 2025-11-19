@@ -6,11 +6,11 @@ import { StorageProvider } from '@/providers/storage/base.provider.js';
 import { LocalStorageProvider } from '@/providers/storage/local.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
 import logger from '@/utils/logger.js';
-import { ADMIN_ID } from '@/utils/constants';
-import { AppError } from '@/api/middlewares/error';
-import { ERROR_CODES } from '@/types/error-constants';
+import { ADMIN_ID } from '@/utils/constants.js';
+import { AppError } from '@/api/middlewares/error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
 import { escapeSqlLikePattern, escapeRegexPattern } from '@/utils/validations.js';
-import { getApiBaseUrl } from '@/utils/environment';
+import { getApiBaseUrl } from '@/utils/environment.js';
 
 const DEFAULT_LIST_LIMIT = 100;
 const GIGABYTE_IN_BYTES = 1024 * 1024 * 1024;

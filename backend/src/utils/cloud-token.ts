@@ -1,6 +1,6 @@
 import { createRemoteJWKSet, JWTPayload, jwtVerify } from 'jose';
-import { AppError } from '@/api/middlewares/error';
-import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants';
+import { AppError } from '@/api/middlewares/error.js';
+import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 
 /**
  * Create JWKS instance with caching and timeout configuration

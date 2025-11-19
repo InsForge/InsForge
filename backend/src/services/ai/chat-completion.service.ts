@@ -1,14 +1,14 @@
 import OpenAI from 'openai';
-import { AIUsageService } from './ai-usage.service';
-import { AIConfigService } from './ai-config.service';
-import { AIClientService } from '@/providers/ai/openrouter.provider';
+import { AIUsageService } from './ai-usage.service.js';
+import { AIConfigService } from './ai-config.service.js';
+import { AIClientService } from '@/providers/ai/openrouter.provider.js';
 import type {
   AIConfigurationSchema,
   ChatCompletionResponse,
   ChatMessageSchema,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import { ChatCompletionOptions } from '@/types/ai';
+import { ChatCompletionOptions } from '@/types/ai.js';
 
 export class ChatCompletionService {
   private aiUsageService = new AIUsageService();

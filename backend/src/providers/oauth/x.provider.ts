@@ -1,10 +1,10 @@
 import crypto from 'crypto';
-import { XUserInfo, OAuthUserData } from '@/types/auth';
-import { getApiBaseUrl } from '@/utils/environment';
-import logger from '@/utils/logger';
+import { XUserInfo, OAuthUserData } from '@/types/auth.js';
+import { getApiBaseUrl } from '@/utils/environment.js';
+import logger from '@/utils/logger.js';
 import { OAuthProvider } from './base.provider.js';
 import axios from 'axios';
-import { OAuthConfigService } from '@/services/auth/oauth-config.service';
+import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 
 export class XOAuthProvider implements OAuthProvider {
   private static instance: XOAuthProvider;

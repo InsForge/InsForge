@@ -1,6 +1,6 @@
 import splitSqlQuery from '@databases/split-sql-query';
 import sql from '@databases/sql';
-import logger from './logger';
+import logger from './logger.js';
 
 /**
  * Parse a SQL string into individual statements, properly handling:

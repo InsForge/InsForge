@@ -1,15 +1,15 @@
 import OpenAI from 'openai';
 
-import { AIUsageService } from './ai-usage.service';
-import { AIConfigService } from './ai-config.service';
-import { AIClientService } from '@/providers/ai/openrouter.provider';
+import { AIUsageService } from './ai-usage.service.js';
+import { AIConfigService } from './ai-config.service.js';
+import { AIClientService } from '@/providers/ai/openrouter.provider.js';
 import type {
   AIConfigurationSchema,
   ImageGenerationRequest,
   ImageGenerationResponse,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import { OpenRouterImageMessage } from '@/types/ai';
+import { OpenRouterImageMessage } from '@/types/ai.js';
 
 export class ImageGenerationService {
   private static aiUsageService = new AIUsageService();

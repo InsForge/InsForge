@@ -5,8 +5,8 @@ import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import logger from '@/utils/logger.js';
 import { functionUploadRequestSchema, functionUpdateRequestSchema } from '@insforge/shared-schemas';
-import { SocketService } from '@/infra/socket/socket';
-import { DataUpdateResourceType, ServerEvents } from '@/types/socket';
+import { SocketService } from '@/infra/socket/socket.js';
+import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 
 const router = Router();
 const functionService = FunctionService.getInstance();

@@ -1,7 +1,7 @@
 import rateLimit from 'express-rate-limit';
 import { Request, Response, NextFunction } from 'express';
-import { AppError } from './error';
-import { ERROR_CODES } from '@/types/error-constants';
+import { AppError } from './error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
 
 /**
  * Store for tracking per-email cooldowns

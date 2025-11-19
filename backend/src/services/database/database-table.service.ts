@@ -21,7 +21,7 @@ import {
   ForeignKeySchema,
 } from '@insforge/shared-schemas';
 import { validateIdentifier } from '@/utils/validations.js';
-import { convertSqlTypeToColumnType } from '@/utils/utils';
+import { convertSqlTypeToColumnType } from '@/utils/utils.js';
 
 const reservedColumns = {
   id: ColumnType.UUID,
