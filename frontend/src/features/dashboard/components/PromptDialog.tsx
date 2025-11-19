@@ -25,7 +25,7 @@ export function PromptDialog({ open, onOpenChange, promptTemplate }: PromptDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl p-0 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 overflow-hidden">
+      <DialogContent className="max-w-2xl max-h-[90vh] p-0 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 overflow-y-auto">
         {/* Content area with border bottom */}
         <div className="flex flex-col gap-10 p-6 border-b border-gray-200 dark:border-neutral-700">
           {/* Header and Prompt Section */}
