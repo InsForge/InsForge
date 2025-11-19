@@ -3,7 +3,8 @@ import axios from 'axios';
 import http from 'http';
 import https from 'https';
 import { AuthRequest, extractApiKey } from '@/api/middlewares/auth.js';
-import { DatabaseManager } from '@/infra/database/manager.js';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { validateTableName } from '@/utils/validations.js';
@@ -12,7 +13,7 @@ import { successResponse } from '@/utils/response.js';
 import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { AuthService } from '@/services/auth/auth.service.js';
-import { SocketService } from '@/infra/socket/socket.js';
+import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 
 const router = Router();
@@ -53,7 +54,8 @@ const postgrestAxios = axios.create({
 
 // Generate admin token once and reuse
 // If user request with api key, this token should be added automatically.
-const adminToken = authService.generateToken({
+const tokenManager = TokenManager.getInstance();
+const adminToken = tokenManager.generateToken({
   sub: 'project-admin-with-api-key',
   email: 'project-admin@email.com',
   role: 'project_admin',
@@ -208,7 +210,7 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
     // Only send socket events for mutations (POST, DELETE)
     const mutationMethods = ['POST', 'DELETE'];
     if (mutationMethods.includes(req.method.toUpperCase())) {
-      const socket = SocketService.getInstance();
+      const socket = SocketManager.getInstance();
       socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
         resource: DataUpdateResourceType.RECORDS,
         data: {

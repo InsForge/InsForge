@@ -1,7 +1,11 @@
 import path from 'path';
-import { DatabaseManager } from '@/infra/database/manager.js';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { StorageRecord, BucketRecord } from '@/types/storage.js';
-import { StorageFileSchema, StorageMetadataSchema } from '@insforge/shared-schemas';
+import {
+  StorageBucketSchema,
+  StorageFileSchema,
+  StorageMetadataSchema,
+} from '@insforge/shared-schemas';
 import { StorageProvider } from '@/providers/storage/base.provider.js';
 import { LocalStorageProvider } from '@/providers/storage/local.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
@@ -14,10 +18,12 @@ import { getApiBaseUrl } from '@/utils/environment.js';
 
 const DEFAULT_LIST_LIMIT = 100;
 const GIGABYTE_IN_BYTES = 1024 * 1024 * 1024;
+const PUBLIC_BUCKET_EXPIRY = 0; // Public buckets don't expire
+const PRIVATE_BUCKET_EXPIRY = 3600; // Private buckets expire in 1 hour
 
 export class StorageService {
   private static instance: StorageService;
-  private backend: StorageProvider;
+  private provider: StorageProvider;
 
   private constructor() {
     const s3Bucket = process.env.AWS_S3_BUCKET;
@@ -25,11 +31,15 @@ export class StorageService {
 
     if (s3Bucket) {
       // Use S3 backend
-      this.backend = new S3StorageProvider(s3Bucket, appKey, process.env.AWS_REGION || 'us-east-2');
+      this.provider = new S3StorageProvider(
+        s3Bucket,
+        appKey,
+        process.env.AWS_REGION || 'us-east-2'
+      );
     } else {
       // Use local filesystem backend
       const baseDir = process.env.STORAGE_DIR || path.resolve(process.cwd(), 'insforge-storage');
-      this.backend = new LocalStorageProvider(baseDir);
+      this.provider = new LocalStorageProvider(baseDir);
     }
   }
 
@@ -41,7 +51,7 @@ export class StorageService {
   }
 
   async initialize(): Promise<void> {
-    await this.backend.initialize();
+    await this.provider.initialize();
   }
 
   private validateBucketName(bucket: string): void {
@@ -56,6 +66,22 @@ export class StorageService {
     if (key.includes('..') || key.startsWith('/')) {
       throw new Error('Invalid key. Cannot use ".." or start with "/"');
     }
+  }
+
+  /**
+   * Generate a unique object key with timestamp and random string
+   * @param originalFilename - The original filename from the upload
+   * @returns Generated unique key
+   */
+  generateObjectKey(originalFilename: string): string {
+    const timestamp = Date.now();
+    const randomStr = Math.random().toString(36).substring(2, 8);
+    const fileExt = originalFilename ? path.extname(originalFilename) : '';
+    const baseName = originalFilename ? path.basename(originalFilename, fileExt) : 'file';
+    const sanitizedBaseName = baseName.replace(/[^a-zA-Z0-9-_]/g, '-').substring(0, 32);
+    const objectKey = `${sanitizedBaseName}-${timestamp}-${randomStr}${fileExt}`;
+
+    return objectKey;
   }
 
   /**
@@ -131,7 +157,7 @@ export class StorageService {
     const finalKey = await this.generateNextAvailableKey(bucket, originalKey);
 
     // Save file using backend
-    await this.backend.putObject(bucket, finalKey, file);
+    await this.provider.putObject(bucket, finalKey, file);
 
     // Save metadata to database
     await db
@@ -185,7 +211,7 @@ export class StorageService {
       return null;
     }
 
-    const file = await this.backend.getObject(bucket, key);
+    const file = await this.provider.getObject(bucket, key);
     if (!file) {
       return null;
     }
@@ -235,7 +261,7 @@ export class StorageService {
     }
 
     // Delete file using backend
-    await this.backend.deleteObject(bucket, key);
+    await this.provider.deleteObject(bucket, key);
 
     // Delete from database
     const result = await db
@@ -322,15 +348,15 @@ export class StorageService {
     // Metadata is now updated on-demand
   }
 
-  async listBuckets(): Promise<string[]> {
+  async listBuckets(): Promise<StorageBucketSchema[]> {
     const db = DatabaseManager.getInstance().getDb();
 
-    // Get all buckets from _storage_buckets table
+    // Get all buckets with their metadata from _storage_buckets table
     const buckets = (await db
-      .prepare('SELECT name FROM _storage_buckets ORDER BY name')
-      .all()) as Pick<BucketRecord, 'name'>[];
+      .prepare('SELECT name, public, created_at FROM _storage_buckets ORDER BY name')
+      .all()) as StorageBucketSchema[];
 
-    return buckets.map((b) => b.name);
+    return buckets;
   }
 
   async createBucket(bucket: string, isPublic: boolean = true): Promise<void> {
@@ -353,7 +379,7 @@ export class StorageService {
       .run(bucket, isPublic);
 
     // Create bucket using backend
-    await this.backend.createBucket(bucket);
+    await this.provider.createBucket(bucket);
 
     // Update storage metadata
     // Metadata is now updated on-demand
@@ -374,7 +400,7 @@ export class StorageService {
     }
 
     // Delete bucket using backend (handles all files)
-    await this.backend.deleteBucket(bucket);
+    await this.provider.deleteBucket(bucket);
 
     // Delete from storage table (cascade will handle _storage entries)
     await db.prepare('DELETE FROM _storage_buckets WHERE name = ?').run(bucket);
@@ -408,17 +434,20 @@ export class StorageService {
 
     // Generate next available key using (1), (2), (3) pattern if duplicates exist
     const key = await this.generateNextAvailableKey(bucket, metadata.filename);
-    return this.backend.getUploadStrategy(bucket, key, metadata);
+    return this.provider.getUploadStrategy(bucket, key, metadata);
   }
 
-  async getDownloadStrategy(bucket: string, key: string, expiresIn?: number) {
+  async getDownloadStrategy(bucket: string, key: string) {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
     // Check if bucket is public
     const isPublic = await this.isBucketPublic(bucket);
 
-    return this.backend.getDownloadStrategy(bucket, key, expiresIn, isPublic);
+    // Auto-calculate expiry based on bucket visibility if not provided
+    const expiresIn = isPublic ? PUBLIC_BUCKET_EXPIRY : PRIVATE_BUCKET_EXPIRY;
+
+    return this.provider.getDownloadStrategy(bucket, key, expiresIn, isPublic);
   }
 
   async confirmUpload(
@@ -435,7 +464,7 @@ export class StorageService {
     this.validateKey(key);
 
     // Verify the file exists in storage
-    const exists = await this.backend.verifyObjectExists(bucket, key);
+    const exists = await this.provider.verifyObjectExists(bucket, key);
     if (!exists) {
       throw new Error(`Upload not found for key "${key}" in bucket "${bucket}"`);
     }

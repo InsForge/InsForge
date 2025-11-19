@@ -1,6 +1,3 @@
-import dotenv from 'dotenv';
-dotenv.config();
-
 export interface AppConfig {
   app: {
     port: number;

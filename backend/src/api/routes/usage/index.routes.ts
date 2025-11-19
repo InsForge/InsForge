@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { DatabaseManager } from '@/infra/database/manager.js';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { verifyCloudBackend, verifyApiKey, verifyAdmin } from '@/api/middlewares/auth.js';
-import { SocketService } from '@/infra/socket/socket.js';
+import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { ServerEvents } from '@/types/socket.js';
 
 export const usageRouter = Router();
@@ -33,7 +33,7 @@ usageRouter.post('/mcp', verifyApiKey, async (req, res, next) => {
       .get(tool_name, success);
 
     // Broadcast MCP tool usage to frontend via socket
-    const socketService = SocketService.getInstance();
+    const socketService = SocketManager.getInstance();
 
     socketService.broadcastToRoom('role:project_admin', ServerEvents.MCP_CONNECTED, {
       tool_name,

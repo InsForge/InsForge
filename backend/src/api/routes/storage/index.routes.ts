@@ -1,18 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import path from 'path';
 import { verifyAdmin, AuthRequest, verifyUser } from '@/api/middlewares/auth.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { StorageService } from '@/services/storage/storage.service.js';
-import { DatabaseManager } from '@/infra/database/manager.js';
 import { successResponse } from '@/utils/response.js';
 import { upload, handleUploadError } from '@/api/middlewares/upload.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
-import {
-  StorageBucketSchema,
-  createBucketRequestSchema,
-  updateBucketRequestSchema,
-} from '@insforge/shared-schemas';
-import { SocketService } from '@/infra/socket/socket.js';
+import { createBucketRequestSchema, updateBucketRequestSchema } from '@insforge/shared-schemas';
+import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 
@@ -43,12 +37,8 @@ const conditionalAuth = async (req: Request, res: Response, next: NextFunction) 
 // GET /api/storage/buckets - List all buckets (requires auth)
 router.get('/buckets', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const db = DatabaseManager.getInstance().getDb();
-
-    // Get all buckets with their metadata from _storage_buckets table
-    const buckets = (await db
-      .prepare('SELECT name, public, created_at FROM _storage_buckets ORDER BY name')
-      .all()) as StorageBucketSchema[];
+    const storageService = StorageService.getInstance();
+    const buckets = await storageService.listBuckets();
 
     // Traditional REST: return array directly
     successResponse(res, buckets);
@@ -89,7 +79,7 @@ router.post(
         ip_address: req.ip,
       });
 
-      const socket = SocketService.getInstance();
+      const socket = SocketManager.getInstance();
       socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
         resource: DataUpdateResourceType.BUCKETS,
       });
@@ -160,7 +150,7 @@ router.patch(
         ip_address: req.ip,
       });
 
-      const socket = SocketService.getInstance();
+      const socket = SocketManager.getInstance();
       socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
         resource: DataUpdateResourceType.BUCKETS,
         data: {
@@ -287,17 +277,11 @@ router.post(
         throw new AppError('File is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
-      // Generate a unique key for the object
-      const timestamp = Date.now();
-      const randomStr = Math.random().toString(36).substring(2, 8);
-      const fileExt = req.file.originalname ? path.extname(req.file.originalname) : '';
-      const baseName = req.file.originalname
-        ? path.basename(req.file.originalname, fileExt)
-        : 'file';
-      const sanitizedBaseName = baseName.replace(/[^a-zA-Z0-9-_]/g, '-').substring(0, 32);
-      const objectKey = `${sanitizedBaseName}-${timestamp}-${randomStr}${fileExt}`;
-
       const storageService = StorageService.getInstance();
+
+      // Generate a unique key for the object using service
+      const objectKey = storageService.generateObjectKey(req.file.originalname);
+
       const storedFile = await storageService.putObject(
         bucketName,
         objectKey,
@@ -339,12 +323,10 @@ router.get(
       }
 
       const storageService = StorageService.getInstance();
-      const expiresIn = (await storageService.isBucketPublic(bucketName)) ? 0 : 3600;
-      const strategy = await storageService.getDownloadStrategy(
-        bucketName,
-        objectKey,
-        Number(expiresIn)
-      );
+
+      // Get download strategy (service auto-calculates expiry based on bucket visibility)
+      const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
+
       if (strategy.method === 'presigned') {
         return res.redirect(strategy.url);
       }
@@ -397,7 +379,7 @@ router.delete(
         ip_address: req.ip,
       });
 
-      const socket = SocketService.getInstance();
+      const socket = SocketManager.getInstance();
       socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
         resource: DataUpdateResourceType.BUCKETS,
       });
@@ -530,14 +512,9 @@ router.post(
   async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName, objectKey } = req.params;
-      const { expiresIn = 3600 } = req.body;
 
       const storageService = StorageService.getInstance();
-      const strategy = await storageService.getDownloadStrategy(
-        bucketName,
-        objectKey,
-        Number(expiresIn)
-      );
+      const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
 
       successResponse(res, strategy);
     } catch (error) {

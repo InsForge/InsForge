@@ -10,7 +10,7 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { AppError } from '@/api/middlewares/error.js';
 import type { AppMetadataSchema } from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';
-import { DatabaseManager } from '@/infra/database/manager.js';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
 
 const router = Router();
 const authService = AuthService.getInstance();

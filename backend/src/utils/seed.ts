@@ -1,11 +1,11 @@
-import { DatabaseManager } from '@/infra/database/manager.js';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 import { AIConfigService } from '@/services/ai/ai-config.service.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { OAuthProvidersSchema } from '@insforge/shared-schemas';
-import { AuthService } from '@/services/auth/auth.service.js';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 
 /**
@@ -116,11 +116,11 @@ async function seedDefaultAuthConfig(): Promise<void> {
  * Seeds default OAuth configurations for supported providers
  */
 async function seedDefaultOAuthConfigs(): Promise<void> {
-  const oauthService = OAuthConfigService.getInstance();
+  const oauthConfigService = OAuthConfigService.getInstance();
 
   try {
     // Check if OAuth configs already exist
-    const existingConfigs = await oauthService.getAllConfigs();
+    const existingConfigs = await oauthConfigService.getAllConfigs();
     const existingProviders = existingConfigs.map((config) => config.provider.toLowerCase());
 
     // Default providers to seed
@@ -128,7 +128,7 @@ async function seedDefaultOAuthConfigs(): Promise<void> {
 
     for (const provider of defaultProviders) {
       if (!existingProviders.includes(provider)) {
-        await oauthService.createConfig({
+        await oauthConfigService.createConfig({
           provider,
           useSharedKey: true,
         });
@@ -147,11 +147,11 @@ async function seedDefaultOAuthConfigs(): Promise<void> {
  * Seeds OAuth configurations from local environment variables
  */
 async function seedLocalOAuthConfigs(): Promise<void> {
-  const oauthService = OAuthConfigService.getInstance();
+  const oauthConfigService = OAuthConfigService.getInstance();
 
   try {
     // Check if OAuth configs already exist
-    const existingConfigs = await oauthService.getAllConfigs();
+    const existingConfigs = await oauthConfigService.getAllConfigs();
     const existingProviders = existingConfigs.map((config) => config.provider.toLowerCase());
 
     // Environment variable mappings for OAuth providers
@@ -192,7 +192,7 @@ async function seedLocalOAuthConfigs(): Promise<void> {
       const clientSecret = process.env[clientSecretEnv];
 
       if (clientId && clientSecret && !existingProviders.includes(provider)) {
-        await oauthService.createConfig({
+        await oauthConfigService.createConfig({
           provider,
           clientId,
           clientSecret,
@@ -211,7 +211,6 @@ async function seedLocalOAuthConfigs(): Promise<void> {
 // Create api key, admin user, and default AI configs
 export async function seedBackend(): Promise<void> {
   const secretService = new SecretService();
-  const authService = AuthService.getInstance();
 
   const dbManager = DatabaseManager.getInstance();
 
@@ -272,7 +271,8 @@ export async function seedBackend(): Promise<void> {
     const existingAnonKeySecret = await secretService.getSecretByKey('ANON_KEY');
 
     if (existingAnonKeySecret === null) {
-      const anonToken = authService.generateAnonToken();
+      const tokenManager = TokenManager.getInstance();
+      const anonToken = tokenManager.generateAnonToken();
 
       await secretService.createSecret({
         key: 'ANON_KEY',

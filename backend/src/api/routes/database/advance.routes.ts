@@ -12,7 +12,7 @@ import {
   bulkUpsertRequestSchema,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import { SocketService } from '@/infra/socket/socket.js';
+import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 
 const router = Router();
@@ -60,7 +60,7 @@ router.post('/rawsql/unrestricted', verifyAdmin, async (req: AuthRequest, res: R
       ip_address: req.ip,
     });
 
-    const socket = SocketService.getInstance();
+    const socket = SocketManager.getInstance();
     socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
       resource: DataUpdateResourceType.DATABASE,
     });
@@ -123,7 +123,7 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response) => {
       ip_address: req.ip,
     });
 
-    const socket = SocketService.getInstance();
+    const socket = SocketManager.getInstance();
     socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
       resource: DataUpdateResourceType.DATABASE,
     });
@@ -259,7 +259,7 @@ router.post(
         ip_address: req.ip,
       });
 
-      const socket = SocketService.getInstance();
+      const socket = SocketManager.getInstance();
       socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
         resource: DataUpdateResourceType.RECORDS,
         data: {
@@ -338,7 +338,7 @@ router.post(
         ip_address: req.ip,
       });
 
-      const socket = SocketService.getInstance();
+      const socket = SocketManager.getInstance();
       socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
         resource: DataUpdateResourceType.DATABASE,
       });

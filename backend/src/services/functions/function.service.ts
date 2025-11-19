@@ -1,4 +1,4 @@
-import { DatabaseManager } from '@/infra/database/manager.js';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
 import {
   EdgeFunctionMetadataSchema,
   FunctionUploadRequest,

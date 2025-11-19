@@ -5,7 +5,7 @@ import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import logger from '@/utils/logger.js';
 import { functionUploadRequestSchema, functionUpdateRequestSchema } from '@insforge/shared-schemas';
-import { SocketService } from '@/infra/socket/socket.js';
+import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 
 const router = Router();
@@ -75,7 +75,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response) => {
       ip_address: req.ip,
     });
 
-    const socket = SocketService.getInstance();
+    const socket = SocketManager.getInstance();
     socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
       resource: DataUpdateResourceType.FUNCTIONS,
     });
@@ -134,7 +134,7 @@ router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => {
       ip_address: req.ip,
     });
 
-    const socket = SocketService.getInstance();
+    const socket = SocketManager.getInstance();
     socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
       resource: DataUpdateResourceType.FUNCTIONS,
       data: {
@@ -186,7 +186,7 @@ router.delete('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => 
       ip_address: req.ip,
     });
 
-    const socket = SocketService.getInstance();
+    const socket = SocketManager.getInstance();
     socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
       resource: DataUpdateResourceType.FUNCTIONS,
     });

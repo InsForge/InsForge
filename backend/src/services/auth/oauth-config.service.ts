@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { DatabaseManager } from '@/infra/database/manager.js';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -30,7 +30,7 @@ export class OAuthConfigService {
 
   private constructor() {
     this.secretService = new SecretService();
-    logger.info('OAuthService initialized');
+    logger.info('OAuthConfigService initialized');
   }
 
   public static getInstance(): OAuthConfigService {

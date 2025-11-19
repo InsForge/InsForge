@@ -1,12 +1,7 @@
-import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import dotenv from 'dotenv';
-import { verifyCloudToken } from '@/utils/cloud-token.js';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
-import { DatabaseManager } from '@/infra/database/manager.js';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 import logger from '@/utils/logger.js';
 import type {
   UserSchema,
@@ -15,7 +10,6 @@ import type {
   VerifyEmailResponse,
   ResetPasswordResponse,
   CreateAdminSessionResponse,
-  TokenPayloadSchema,
   AuthMetadataSchema,
   OAuthProvidersSchema,
 } from '@insforge/shared-schemas';
@@ -48,9 +42,6 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { EmailService } from '@/services/email/email.service.js';
 import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
 
-const JWT_SECRET = () => process.env.JWT_SECRET ?? '';
-const JWT_EXPIRES_IN = '7d';
-
 /**
  * Simplified JWT-based auth service
  * Handles all authentication operations including OAuth
@@ -60,34 +51,18 @@ export class AuthService {
   private adminEmail: string;
   private adminPassword: string;
   private db;
+  private tokenManager: TokenManager;
 
-  // OAuth service instances (cached singletons)
-  private googleOAuthService: GoogleOAuthProvider;
-  private githubOAuthService: GitHubOAuthProvider;
-  private discordOAuthService: DiscordOAuthProvider;
-  private linkedinOAuthService: LinkedInOAuthProvider;
-  private facebookOAuthService: FacebookOAuthProvider;
-  private microsoftOAuthService: MicrosoftOAuthProvider;
-  private xOAuthService: XOAuthProvider;
+  // OAuth provider instances (cached singletons)
+  private googleOAuthProvider: GoogleOAuthProvider;
+  private githubOAuthProvider: GitHubOAuthProvider;
+  private discordOAuthProvider: DiscordOAuthProvider;
+  private linkedinOAuthProvider: LinkedInOAuthProvider;
+  private facebookOAuthProvider: FacebookOAuthProvider;
+  private microsoftOAuthProvider: MicrosoftOAuthProvider;
+  private xOAuthProvider: XOAuthProvider;
 
   private constructor() {
-    // Load .env file if not already loaded
-    if (!process.env.JWT_SECRET) {
-      const __filename = fileURLToPath(import.meta.url);
-      const __dirname = path.dirname(__filename);
-      const envPath = path.resolve(__dirname, '../../../../.env');
-      if (fs.existsSync(envPath)) {
-        dotenv.config({ path: envPath });
-      } else {
-        logger.warn('No .env file found, using default environment variables.');
-        dotenv.config();
-      }
-    }
-
-    if (!process.env.JWT_SECRET) {
-      throw new Error('JWT_SECRET environment variable is required');
-    }
-
     this.adminEmail = process.env.ADMIN_EMAIL ?? '';
     this.adminPassword = process.env.ADMIN_PASSWORD ?? '';
 
@@ -98,14 +73,17 @@ export class AuthService {
     const dbManager = DatabaseManager.getInstance();
     this.db = dbManager.getDb();
 
-    // Initialize OAuth services (cached singletons)
-    this.googleOAuthService = GoogleOAuthProvider.getInstance();
-    this.githubOAuthService = GitHubOAuthProvider.getInstance();
-    this.discordOAuthService = DiscordOAuthProvider.getInstance();
-    this.linkedinOAuthService = LinkedInOAuthProvider.getInstance();
-    this.facebookOAuthService = FacebookOAuthProvider.getInstance();
-    this.microsoftOAuthService = MicrosoftOAuthProvider.getInstance();
-    this.xOAuthService = XOAuthProvider.getInstance();
+    // Initialize token manager
+    this.tokenManager = TokenManager.getInstance();
+
+    // Initialize OAuth providers (cached singletons)
+    this.googleOAuthProvider = GoogleOAuthProvider.getInstance();
+    this.githubOAuthProvider = GitHubOAuthProvider.getInstance();
+    this.discordOAuthProvider = DiscordOAuthProvider.getInstance();
+    this.linkedinOAuthProvider = LinkedInOAuthProvider.getInstance();
+    this.facebookOAuthProvider = FacebookOAuthProvider.getInstance();
+    this.microsoftOAuthProvider = MicrosoftOAuthProvider.getInstance();
+    this.xOAuthProvider = XOAuthProvider.getInstance();
 
     logger.info('AuthService initialized');
   }
@@ -115,61 +93,6 @@ export class AuthService {
       AuthService.instance = new AuthService();
     }
     return AuthService.instance;
-  }
-
-  /**
-   * Transform database user to API format (snake_case to camelCase)
-   */
-  private dbUserToApiUser(dbUser: UserRecord): UserSchema {
-    return {
-      id: dbUser.id,
-      email: dbUser.email,
-      name: dbUser.name,
-      emailVerified: dbUser.email_verified,
-      createdAt: dbUser.created_at,
-      updatedAt: dbUser.updated_at,
-    };
-  }
-
-  /**
-   * Generate JWT token for users and admins
-   */
-  generateToken(payload: TokenPayloadSchema): string {
-    return jwt.sign(payload, JWT_SECRET(), {
-      algorithm: 'HS256',
-      expiresIn: JWT_EXPIRES_IN,
-    });
-  }
-
-  /**
-   * Generate anonymous JWT token (never expires)
-   */
-  generateAnonToken(): string {
-    const payload = {
-      sub: '12345678-1234-5678-90ab-cdef12345678',
-      email: 'anon@insforge.com',
-      role: 'anon',
-    };
-    return jwt.sign(payload, JWT_SECRET(), {
-      algorithm: 'HS256',
-      // No expiresIn means token never expires
-    });
-  }
-
-  /**
-   * Verify JWT token
-   */
-  verifyToken(token: string): TokenPayloadSchema {
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET()) as TokenPayloadSchema;
-      return {
-        sub: decoded.sub,
-        email: decoded.email,
-        role: decoded.role || 'authenticated',
-      };
-    } catch {
-      throw new AppError('Invalid token', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
-    }
   }
 
   /**
@@ -216,12 +139,11 @@ export class AuthService {
       throw e;
     }
 
-    const dbUser = await this.db
-      .prepare(
-        'SELECT id, email, name, email_verified, created_at, updated_at FROM _accounts WHERE id = ?'
-      )
-      .get(userId);
-    const user = this.dbUserToApiUser(dbUser);
+    const dbUser = await this.getUserById(userId);
+    if (!dbUser) {
+      throw new Error('User not found after registration');
+    }
+    const user = this.transformUserRecordToSchema(dbUser);
 
     if (emailAuthConfig.requireEmailVerification) {
       try {
@@ -240,7 +162,11 @@ export class AuthService {
     }
 
     // Email verification not required, provide access token for immediate login
-    const accessToken = this.generateToken({ sub: userId, email, role: 'authenticated' });
+    const accessToken = this.tokenManager.generateToken({
+      sub: userId,
+      email,
+      role: 'authenticated',
+    });
 
     return {
       user,
@@ -254,7 +180,7 @@ export class AuthService {
    * User login
    */
   async login(email: string, password: string): Promise<CreateSessionResponse> {
-    const dbUser = await this.db.prepare('SELECT * FROM _accounts WHERE email = ?').get(email);
+    const dbUser = await this.getUserByEmail(email);
 
     if (!dbUser || !dbUser.password) {
       throw new AppError('Invalid credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
@@ -278,8 +204,8 @@ export class AuthService {
       );
     }
 
-    const user = this.dbUserToApiUser(dbUser);
-    const accessToken = this.generateToken({
+    const user = this.transformUserRecordToSchema(dbUser);
+    const accessToken = this.tokenManager.generateToken({
       sub: dbUser.id,
       email: dbUser.email,
       role: 'authenticated',
@@ -381,7 +307,7 @@ export class AuthService {
         `UPDATE _accounts
          SET email_verified = true, updated_at = NOW()
          WHERE email = $1
-         RETURNING id, email, name, email_verified, created_at, updated_at`,
+         RETURNING id`,
         [email]
       );
 
@@ -391,9 +317,14 @@ export class AuthService {
 
       await client.query('COMMIT');
 
-      const dbUser = result.rows[0];
-      const user = this.dbUserToApiUser(dbUser);
-      const accessToken = this.generateToken({
+      // Fetch full user record with provider data
+      const userId = result.rows[0].id;
+      const dbUser = await this.getUserById(userId);
+      if (!dbUser) {
+        throw new Error('User not found after verification');
+      }
+      const user = this.transformUserRecordToSchema(dbUser);
+      const accessToken = this.tokenManager.generateToken({
         sub: dbUser.id,
         email: dbUser.email,
         role: 'authenticated',
@@ -442,7 +373,7 @@ export class AuthService {
         `UPDATE _accounts
          SET email_verified = true, updated_at = NOW()
          WHERE email = $1
-         RETURNING id, email, name, email_verified, created_at, updated_at`,
+         RETURNING id`,
         [email]
       );
 
@@ -452,9 +383,14 @@ export class AuthService {
 
       await client.query('COMMIT');
 
-      const dbUser = result.rows[0];
-      const user = this.dbUserToApiUser(dbUser);
-      const accessToken = this.generateToken({
+      // Fetch full user record with provider data
+      const userId = result.rows[0].id;
+      const dbUser = await this.getUserById(userId);
+      if (!dbUser) {
+        throw new Error('User not found after verification');
+      }
+      const user = this.transformUserRecordToSchema(dbUser);
+      const accessToken = this.tokenManager.generateToken({
         sub: dbUser.id,
         email: dbUser.email,
         role: 'authenticated',
@@ -643,7 +579,11 @@ export class AuthService {
     // Use a fixed admin ID for the system administrator
 
     // Return admin user with JWT token - no database interaction
-    const accessToken = this.generateToken({ sub: ADMIN_ID, email, role: 'project_admin' });
+    const accessToken = this.tokenManager.generateToken({
+      sub: ADMIN_ID,
+      email,
+      role: 'project_admin',
+    });
 
     return {
       user: {
@@ -663,14 +603,14 @@ export class AuthService {
    */
   async adminLoginWithAuthorizationCode(code: string): Promise<CreateAdminSessionResponse> {
     try {
-      // Use the helper function to verify cloud token
-      const { payload } = await verifyCloudToken(code);
+      // Use TokenManager to verify cloud token
+      const { payload } = await this.tokenManager.verifyCloudToken(code);
 
       // If verification succeeds, extract user info and generate internal token
       const email = payload['email'] || payload['sub'] || 'admin@insforge.local';
 
       // Generate internal access token
-      const accessToken = this.generateToken({
+      const accessToken = this.tokenManager.generateToken({
         sub: ADMIN_ID,
         email: email as string,
         role: 'project_admin',
@@ -733,14 +673,13 @@ export class AuthService {
         )
         .run(account.user_id);
 
-      const dbUser = await this.db
-        .prepare(
-          'SELECT id, email, name, email_verified, created_at, updated_at FROM _accounts WHERE id = ?'
-        )
-        .get(account.user_id);
+      const dbUser = await this.getUserById(account.user_id);
+      if (!dbUser) {
+        throw new Error('User not found after OAuth login');
+      }
 
-      const user = this.dbUserToApiUser(dbUser);
-      const accessToken = this.generateToken({
+      const user = this.transformUserRecordToSchema(dbUser);
+      const accessToken = this.tokenManager.generateToken({
         sub: user.id,
         email: user.email,
         role: 'authenticated',
@@ -775,13 +714,14 @@ export class AuthService {
         )
         .run(existingUser.id);
 
-      // Fetch updated user data
-      const updatedUser = await this.db
-        .prepare('SELECT * FROM _accounts WHERE id = ?')
-        .get(existingUser.id);
+      // Fetch updated user data with provider information
+      const dbUser = await this.getUserById(existingUser.id);
+      if (!dbUser) {
+        throw new Error('User not found after linking OAuth provider');
+      }
 
-      const user = this.dbUserToApiUser(updatedUser);
-      const accessToken = this.generateToken({
+      const user = this.transformUserRecordToSchema(dbUser);
+      const accessToken = this.tokenManager.generateToken({
         sub: existingUser.id,
         email: existingUser.email,
         role: 'authenticated',
@@ -873,7 +813,7 @@ export class AuthService {
         updatedAt: new Date().toISOString(),
       };
 
-      const accessToken = this.generateToken({
+      const accessToken = this.tokenManager.generateToken({
         sub: userId,
         email,
         role: 'authenticated',
@@ -900,19 +840,19 @@ export class AuthService {
   async generateOAuthUrl(provider: OAuthProvidersSchema, state?: string): Promise<string> {
     switch (provider) {
       case 'google':
-        return this.googleOAuthService.generateOAuthUrl(state);
+        return this.googleOAuthProvider.generateOAuthUrl(state);
       case 'github':
-        return this.githubOAuthService.generateOAuthUrl(state);
+        return this.githubOAuthProvider.generateOAuthUrl(state);
       case 'discord':
-        return this.discordOAuthService.generateOAuthUrl(state);
+        return this.discordOAuthProvider.generateOAuthUrl(state);
       case 'linkedin':
-        return this.linkedinOAuthService.generateOAuthUrl(state);
+        return this.linkedinOAuthProvider.generateOAuthUrl(state);
       case 'facebook':
-        return this.facebookOAuthService.generateOAuthUrl(state);
+        return this.facebookOAuthProvider.generateOAuthUrl(state);
       case 'microsoft':
-        return this.microsoftOAuthService.generateOAuthUrl(state);
+        return this.microsoftOAuthProvider.generateOAuthUrl(state);
       case 'x':
-        return this.xOAuthService.generateOAuthUrl(state);
+        return this.xOAuthProvider.generateOAuthUrl(state);
       default:
         throw new Error(`OAuth provider ${provider} is not implemented yet.`);
     }
@@ -929,25 +869,25 @@ export class AuthService {
 
     switch (provider) {
       case 'google':
-        userData = await this.googleOAuthService.handleCallback(payload);
+        userData = await this.googleOAuthProvider.handleCallback(payload);
         break;
       case 'github':
-        userData = await this.githubOAuthService.handleCallback(payload);
+        userData = await this.githubOAuthProvider.handleCallback(payload);
         break;
       case 'discord':
-        userData = await this.discordOAuthService.handleCallback(payload);
+        userData = await this.discordOAuthProvider.handleCallback(payload);
         break;
       case 'linkedin':
-        userData = await this.linkedinOAuthService.handleCallback(payload);
+        userData = await this.linkedinOAuthProvider.handleCallback(payload);
         break;
       case 'facebook':
-        userData = await this.facebookOAuthService.handleCallback(payload);
+        userData = await this.facebookOAuthProvider.handleCallback(payload);
         break;
       case 'microsoft':
-        userData = await this.microsoftOAuthService.handleCallback(payload);
+        userData = await this.microsoftOAuthProvider.handleCallback(payload);
         break;
       case 'x':
-        userData = await this.xOAuthService.handleCallback(payload);
+        userData = await this.xOAuthProvider.handleCallback(payload);
         break;
       default:
         throw new Error(`OAuth provider ${provider} is not implemented yet.`);
@@ -975,22 +915,22 @@ export class AuthService {
 
     switch (provider) {
       case 'google':
-        userData = this.googleOAuthService.handleSharedCallback(payloadData);
+        userData = this.googleOAuthProvider.handleSharedCallback(payloadData);
         break;
       case 'github':
-        userData = this.githubOAuthService.handleSharedCallback(payloadData);
+        userData = this.githubOAuthProvider.handleSharedCallback(payloadData);
         break;
       case 'discord':
-        userData = this.discordOAuthService.handleSharedCallback(payloadData);
+        userData = this.discordOAuthProvider.handleSharedCallback(payloadData);
         break;
       case 'linkedin':
-        userData = this.linkedinOAuthService.handleSharedCallback(payloadData);
+        userData = this.linkedinOAuthProvider.handleSharedCallback(payloadData);
         break;
       case 'facebook':
-        userData = this.facebookOAuthService.handleSharedCallback(payloadData);
+        userData = this.facebookOAuthProvider.handleSharedCallback(payloadData);
         break;
       case 'x':
-        userData = this.xOAuthService.handleSharedCallback(payloadData);
+        userData = this.xOAuthProvider.handleSharedCallback(payloadData);
         break;
       case 'microsoft':
       default:
@@ -1008,9 +948,170 @@ export class AuthService {
   }
 
   /**
-   * Get database instance for direct queries
+   * Get user by email (helper method for internal use)
+   * @private
    */
-  getDb() {
-    return this.db;
+  private async getUserByEmail(email: string): Promise<UserRecord | null> {
+    const dbUser = (await this.db
+      .prepare(
+        `
+      SELECT
+        u.id,
+        u.email,
+        u.name,
+        u.email_verified,
+        u.created_at,
+        u.updated_at,
+        u.password,
+        STRING_AGG(a.provider, ',') as providers
+      FROM _accounts u
+      LEFT JOIN _account_providers a ON u.id = a.user_id
+      WHERE u.email = ?
+      GROUP BY u.id
+    `
+      )
+      .get(email)) as UserRecord | undefined;
+
+    return dbUser || null;
+  }
+
+  /**
+   * Get user by ID (helper method for internal use)
+   * @private
+   */
+  private async getUserById(userId: string): Promise<UserRecord | null> {
+    const dbUser = (await this.db
+      .prepare(
+        `
+      SELECT
+        u.id,
+        u.email,
+        u.name,
+        u.email_verified,
+        u.created_at,
+        u.updated_at,
+        u.password,
+        STRING_AGG(a.provider, ',') as providers
+      FROM _accounts u
+      LEFT JOIN _account_providers a ON u.id = a.user_id
+      WHERE u.id = ?
+      GROUP BY u.id
+    `
+      )
+      .get(userId)) as UserRecord | undefined;
+
+    return dbUser || null;
+  }
+
+  /**
+   * Transform database user record to API response format (snake_case to camelCase + provider logic)
+   * @private
+   */
+  private transformUserRecordToSchema(dbUser: UserRecord): UserSchema {
+    const identities = [];
+    const providers: string[] = [];
+
+    // Add social providers if any
+    if (dbUser.providers) {
+      dbUser.providers.split(',').forEach((provider: string) => {
+        identities.push({ provider });
+        providers.push(provider);
+      });
+    }
+
+    // Add email provider if password exists
+    if (dbUser.password) {
+      identities.push({ provider: 'email' });
+      providers.push('email');
+    }
+
+    // Use first provider to determine type: 'email' or 'social'
+    const firstProvider = providers[0];
+    const providerType = firstProvider === 'email' ? 'email' : 'social';
+
+    return {
+      id: dbUser.id,
+      email: dbUser.email,
+      name: dbUser.name,
+      emailVerified: dbUser.email_verified,
+      createdAt: dbUser.created_at,
+      updatedAt: dbUser.updated_at,
+      identities: identities,
+      providerType: providerType,
+    };
+  }
+
+  /**
+   * List users with pagination and search
+   */
+  async listUsers(
+    limit: number,
+    offset: number,
+    search?: string
+  ): Promise<{ users: UserSchema[]; total: number }> {
+    let query = `
+      SELECT
+        u.id,
+        u.email,
+        u.name,
+        u.email_verified,
+        u.created_at,
+        u.updated_at,
+        u.password,
+        STRING_AGG(a.provider, ',') as providers
+      FROM _accounts u
+      LEFT JOIN _account_providers a ON u.id = a.user_id
+    `;
+    const params: (string | number)[] = [];
+
+    if (search) {
+      query += ' WHERE u.email LIKE ? OR u.name LIKE ?';
+      params.push(`%${search}%`, `%${search}%`);
+    }
+
+    query += ' GROUP BY u.id ORDER BY u.created_at DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+
+    const dbUsers = (await this.db.prepare(query).all(...params)) as UserRecord[];
+
+    // Transform users
+    const users = dbUsers.map((dbUser) => this.transformUserRecordToSchema(dbUser));
+
+    // Get total count
+    let countQuery = 'SELECT COUNT(*) as count FROM _accounts';
+    const countParams: string[] = [];
+    if (search) {
+      countQuery += ' WHERE email LIKE ? OR name LIKE ?';
+      countParams.push(`%${search}%`, `%${search}%`);
+    }
+    const { count } = (await this.db.prepare(countQuery).get(...countParams)) as { count: number };
+
+    return {
+      users,
+      total: count,
+    };
+  }
+
+  /**
+   * Get user by ID (returns UserSchema for API)
+   */
+  async getUserSchemaById(userId: string): Promise<UserSchema | null> {
+    const dbUser = await this.getUserById(userId);
+    if (!dbUser) {
+      return null;
+    }
+    return this.transformUserRecordToSchema(dbUser);
+  }
+
+  /**
+   * Delete multiple users by IDs
+   */
+  async deleteUsers(userIds: string[]): Promise<number> {
+    const placeholders = userIds.map(() => '?').join(',');
+    const result = await this.db
+      .prepare(`DELETE FROM _accounts WHERE id IN (${placeholders})`)
+      .run(...userIds);
+
+    return result.changes;
   }
 }

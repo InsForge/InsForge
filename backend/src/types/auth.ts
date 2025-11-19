@@ -6,8 +6,8 @@ export interface UserRecord {
   email_verified: boolean;
   created_at: string;
   updated_at: string;
-  password: string | null;
-  providers: string | null;
+  password?: string;
+  providers?: string;
 }
 
 // OAuth provider data from external providers

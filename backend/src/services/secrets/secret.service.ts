@@ -1,8 +1,8 @@
 import { Pool } from 'pg';
 import crypto from 'crypto';
-import { DatabaseManager } from '@/infra/database/manager.js';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
-import { EncryptionUtils } from '@/infra/security/encryption.js';
+import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 
 export interface SecretSchema {
   id: string;
@@ -33,7 +33,7 @@ export class SecretService {
   private pool: Pool | null = null;
 
   constructor() {
-    // Encryption is now handled by the shared EncryptionUtils
+    // Encryption is now handled by the shared EncryptionManager
   }
 
   private getPool(): Pool {
@@ -49,7 +49,7 @@ export class SecretService {
   async createSecret(input: CreateSecretInput): Promise<{ id: string }> {
     const client = await this.getPool().connect();
     try {
-      const encryptedValue = EncryptionUtils.encrypt(input.value);
+      const encryptedValue = EncryptionManager.encrypt(input.value);
 
       const result = await client.query(
         `INSERT INTO _secrets (key, value_ciphertext, is_reserved, expires_at)
@@ -87,7 +87,7 @@ export class SecretService {
         return null;
       }
 
-      const decryptedValue = EncryptionUtils.decrypt(result.rows[0].value_ciphertext);
+      const decryptedValue = EncryptionManager.decrypt(result.rows[0].value_ciphertext);
       logger.info('Secret retrieved', { id });
       return decryptedValue;
     } catch (error) {
@@ -117,7 +117,7 @@ export class SecretService {
         return null;
       }
 
-      const decryptedValue = EncryptionUtils.decrypt(result.rows[0].value_ciphertext);
+      const decryptedValue = EncryptionManager.decrypt(result.rows[0].value_ciphertext);
       logger.info('Secret retrieved by key', { key });
       return decryptedValue;
     } catch (error) {
@@ -168,7 +168,7 @@ export class SecretService {
       let paramCount = 1;
 
       if (input.value !== undefined) {
-        const encryptedValue = EncryptionUtils.encrypt(input.value);
+        const encryptedValue = EncryptionManager.encrypt(input.value);
         updates.push(`value_ciphertext = $${paramCount++}`);
         values.push(encryptedValue);
       }
@@ -230,7 +230,7 @@ export class SecretService {
         return false;
       }
 
-      const decryptedValue = EncryptionUtils.decrypt(result.rows[0].value_ciphertext);
+      const decryptedValue = EncryptionManager.decrypt(result.rows[0].value_ciphertext);
       const matches = decryptedValue === value;
 
       // Update last_used_at if the check was successful
@@ -310,7 +310,7 @@ export class SecretService {
         [id]
       );
 
-      const encryptedValue = EncryptionUtils.encrypt(newValue);
+      const encryptedValue = EncryptionManager.encrypt(newValue);
       const newSecretResult = await client.query(
         `INSERT INTO _secrets (key, value_ciphertext)
          VALUES ($1, $2)

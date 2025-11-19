@@ -1,7 +1,7 @@
 import { Pool, PoolClient } from 'pg';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { DatabaseManager } from '@/infra/database/manager.js';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
