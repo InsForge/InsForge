@@ -12,12 +12,10 @@ import { DatabaseRecord } from '@/types/database.js';
 import { successResponse } from '@/utils/response.js';
 import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
-import { AuthService } from '@/services/auth/auth.service.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 
 const router = Router();
-const authService = AuthService.getInstance();
 const secretService = new SecretService();
 const postgrestUrl = process.env.POSTGREST_BASE_URL || 'http://localhost:5430';
 

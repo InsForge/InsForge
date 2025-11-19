@@ -5,7 +5,7 @@ import { ImageGenerationService } from '@/services/ai/image-generation.service.j
 import { AIModelService } from '@/services/ai/ai-model.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
-import { successResponse } from '@/utils/response.js';
+import { successResponse, errorResponse } from '@/utils/response.js';
 import { AIConfigService } from '@/services/ai/ai-config.service.js';
 import { AIUsageService } from '@/services/ai/ai-usage.service.js';
 import { AIClientService } from '@/providers/ai/openrouter.provider.js';
@@ -32,13 +32,10 @@ const auditService = AuditService.getInstance();
 router.get('/models', verifyAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const models = await AIModelService.getModels();
-    res.json(models);
+    successResponse(res, models);
   } catch (error) {
     console.error('Error getting models:', error);
-    res.status(500).json({
-      error: 'Failed to get models list',
-      details: error instanceof Error ? error.message : String(error),
-    });
+    errorResponse(res, 'INTERNAL_ERROR', error instanceof Error ? error.message : String(error), 500);
   }
 });
 
@@ -98,7 +95,7 @@ router.post(
 
       // Non-streaming requests
       const result = await chatService.chat(messages, options);
-      res.json(result);
+      successResponse(res, result);
     } catch (error) {
       if (error instanceof AppError) {
         next(error);
@@ -135,7 +132,7 @@ router.post(
 
       const result = await ImageGenerationService.generate(validationResult.data);
 
-      res.json(result);
+      successResponse(res, result);
     } catch (error) {
       if (error instanceof AppError) {
         next(error);

@@ -7,6 +7,7 @@ import logger from '@/utils/logger.js';
 import { functionUploadRequestSchema, functionUpdateRequestSchema } from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
+import { successResponse, errorResponse } from '@/utils/response.js';
 
 const router = Router();
 const functionService = FunctionService.getInstance();
@@ -19,9 +20,9 @@ const auditService = AuditService.getInstance();
 router.get('/', verifyAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const result = await functionService.listFunctions();
-    res.json(result);
+    successResponse(res, result);
   } catch {
-    res.status(500).json({ error: 'Failed to list functions' });
+    errorResponse(res, 'INTERNAL_ERROR', 'Failed to list functions', 500);
   }
 });
 
@@ -35,12 +36,12 @@ router.get('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => {
     const func = await functionService.getFunction(slug);
 
     if (!func) {
-      return res.status(404).json({ error: 'Function not found' });
+      return errorResponse(res, 'NOT_FOUND', 'Function not found', 404);
     }
 
-    res.json(func);
+    successResponse(res, func);
   } catch {
-    res.status(500).json({ error: 'Failed to get function' });
+    errorResponse(res, 'INTERNAL_ERROR', 'Failed to get function', 500);
   }
 });
 
@@ -52,10 +53,12 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const validation = functionUploadRequestSchema.safeParse(req.body);
     if (!validation.success) {
-      return res.status(400).json({
-        error: 'Invalid request',
-        details: validation.error.issues,
-      });
+      return errorResponse(
+        res,
+        'VALIDATION_ERROR',
+        JSON.stringify(validation.error.issues),
+        400
+      );
     }
 
     const created = await functionService.createFunction(validation.data);
@@ -80,22 +83,25 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response) => {
       resource: DataUpdateResourceType.FUNCTIONS,
     });
 
-    res.status(201).json({
-      success: true,
-      function: created,
-    });
+    successResponse(
+      res,
+      {
+        success: true,
+        function: created,
+      },
+      201
+    );
   } catch (error) {
     if (error instanceof AppError) {
-      return res.status(error.statusCode).json({
-        error: error.code,
-        message: error.message,
-      });
+      return errorResponse(res, error.code, error.message, error.statusCode);
     }
 
-    res.status(500).json({
-      error: 'INTERNAL_ERROR',
-      message: error instanceof Error ? error.message : 'Failed to create function',
-    });
+    errorResponse(
+      res,
+      'INTERNAL_ERROR',
+      error instanceof Error ? error.message : 'Failed to create function',
+      500
+    );
   }
 });
 
@@ -109,16 +115,18 @@ router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => {
     const validation = functionUpdateRequestSchema.safeParse(req.body);
 
     if (!validation.success) {
-      return res.status(400).json({
-        error: 'Invalid request',
-        details: validation.error.issues,
-      });
+      return errorResponse(
+        res,
+        'VALIDATION_ERROR',
+        JSON.stringify(validation.error.issues),
+        400
+      );
     }
 
     const updated = await functionService.updateFunction(slug, validation.data);
 
     if (!updated) {
-      return res.status(404).json({ error: 'Function not found' });
+      return errorResponse(res, 'NOT_FOUND', 'Function not found', 404);
     }
 
     // Log audit event
@@ -142,22 +150,21 @@ router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => {
       },
     });
 
-    res.json({
+    successResponse(res, {
       success: true,
       function: updated,
     });
   } catch (error) {
     if (error instanceof AppError) {
-      return res.status(error.statusCode).json({
-        error: error.code,
-        message: error.message,
-      });
+      return errorResponse(res, error.code, error.message, error.statusCode);
     }
 
-    res.status(500).json({
-      error: 'INTERNAL_ERROR',
-      message: error instanceof Error ? error.message : 'Failed to update function',
-    });
+    errorResponse(
+      res,
+      'INTERNAL_ERROR',
+      error instanceof Error ? error.message : 'Failed to update function',
+      500
+    );
   }
 });
 
@@ -171,7 +178,7 @@ router.delete('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => 
     const deleted = await functionService.deleteFunction(slug);
 
     if (!deleted) {
-      return res.status(404).json({ error: 'Function not found' });
+      return errorResponse(res, 'NOT_FOUND', 'Function not found', 404);
     }
 
     // Log audit event
@@ -191,12 +198,12 @@ router.delete('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => 
       resource: DataUpdateResourceType.FUNCTIONS,
     });
 
-    res.json({
+    successResponse(res, {
       success: true,
       message: `Function ${slug} deleted successfully`,
     });
   } catch {
-    res.status(500).json({ error: 'Failed to delete function' });
+    errorResponse(res, 'INTERNAL_ERROR', 'Failed to delete function', 500);
   }
 });
 

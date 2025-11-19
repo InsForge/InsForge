@@ -43,7 +43,7 @@ router.get('/configs', verifyAdmin, async (req: AuthRequest, res: Response, next
       data: configs,
       count: configs.length,
     };
-    res.json(response);
+    successResponse(res, response);
   } catch (error) {
     logger.error('Failed to list OAuth configurations', { error });
     next(error);
@@ -68,7 +68,7 @@ router.get(
         );
       }
 
-      res.json({
+      successResponse(res, {
         ...config,
         clientSecret: clientSecret || undefined,
       });
@@ -262,7 +262,7 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
 
     const authUrl = await authService.generateOAuthUrl(validatedProvider, state);
 
-    res.json({ authUrl });
+    successResponse(res, { authUrl });
   } catch (error) {
     logger.error(`${req.params.provider} OAuth error`, { error });
 

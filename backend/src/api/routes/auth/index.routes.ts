@@ -62,7 +62,7 @@ router.get('/public-config', async (req: Request, res: Response, next: NextFunct
       ...authConfigs,
     };
 
-    res.json(response);
+    successResponse(res, response);
   } catch (error) {
     next(error);
   }
@@ -73,7 +73,7 @@ router.get('/public-config', async (req: Request, res: Response, next: NextFunct
 router.get('/config', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const config: GetAuthConfigResponse = await authConfigService.getAuthConfig();
-    res.json(config);
+    successResponse(res, config);
   } catch (error) {
     next(error);
   }
@@ -229,7 +229,7 @@ router.get(
         },
       };
 
-      res.json(response);
+      successResponse(res, response);
     } catch (error) {
       next(error);
     }
@@ -261,7 +261,7 @@ router.get('/users', verifyAdmin, async (req: Request, res: Response, next: Next
       },
     };
 
-    res.json(response);
+    successResponse(res, response);
   } catch (error) {
     next(error);
   }
@@ -286,7 +286,7 @@ router.get(
         throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
       }
 
-      res.json(user);
+      successResponse(res, user);
     } catch (error) {
       next(error);
     }
@@ -329,7 +329,7 @@ router.delete(
         deletedCount,
       };
 
-      res.json(response);
+      successResponse(res, response);
     } catch (error) {
       next(error);
     }
@@ -386,10 +386,10 @@ router.post(
           ? 'If your email is registered, we have sent you a verification link. Please check your inbox.'
           : 'If your email is registered, we have sent you a verification code. Please check your inbox.';
 
-      res.status(202).json({
+      successResponse(res, {
         success: true,
         message,
-      });
+      }, 202);
     } catch (error) {
       next(error);
     }
@@ -479,10 +479,10 @@ router.post(
           ? 'If your email is registered, we have sent you a password reset link. Please check your inbox.'
           : 'If your email is registered, we have sent you a password reset code. Please check your inbox.';
 
-      res.status(202).json({
+      successResponse(res, {
         success: true,
         message,
-      });
+      }, 202);
     } catch (error) {
       next(error);
     }

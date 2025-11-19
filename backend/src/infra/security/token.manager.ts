@@ -4,7 +4,7 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 import type { TokenPayloadSchema } from '@insforge/shared-schemas';
 
-const JWT_SECRET = () => process.env.JWT_SECRET ?? '';
+const JWT_SECRET = process.env.JWT_SECRET ?? '';
 const JWT_EXPIRES_IN = '7d';
 
 /**
@@ -42,7 +42,7 @@ export class TokenManager {
    * Generate JWT token for users and admins
    */
   generateToken(payload: TokenPayloadSchema): string {
-    return jwt.sign(payload, JWT_SECRET(), {
+    return jwt.sign(payload, JWT_SECRET, {
       algorithm: 'HS256',
       expiresIn: JWT_EXPIRES_IN,
     });
@@ -57,7 +57,7 @@ export class TokenManager {
       email: 'anon@insforge.com',
       role: 'anon',
     };
-    return jwt.sign(payload, JWT_SECRET(), {
+    return jwt.sign(payload, JWT_SECRET, {
       algorithm: 'HS256',
       // No expiresIn means token never expires
     });
@@ -68,7 +68,7 @@ export class TokenManager {
    */
   verifyToken(token: string): TokenPayloadSchema {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET()) as TokenPayloadSchema;
+      const decoded = jwt.verify(token, JWT_SECRET) as TokenPayloadSchema;
       return {
         sub: decoded.sub,
         email: decoded.email,

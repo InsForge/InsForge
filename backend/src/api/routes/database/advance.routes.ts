@@ -14,6 +14,7 @@ import {
 import logger from '@/utils/logger.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
+import { successResponse, errorResponse } from '@/utils/response.js';
 
 const router = Router();
 const dbAdvanceService = new DatabaseAdvanceService();
@@ -65,22 +66,14 @@ router.post('/rawsql/unrestricted', verifyAdmin, async (req: AuthRequest, res: R
       resource: DataUpdateResourceType.DATABASE,
     });
 
-    res.json(response);
+    successResponse(res, response);
   } catch (error: unknown) {
     logger.warn('Relaxed raw SQL execution error:', error);
 
     if (error instanceof AppError) {
-      res.status(error.statusCode).json({
-        error: 'SQL_EXECUTION_ERROR',
-        message: error.message,
-        statusCode: error.statusCode,
-      });
+      errorResponse(res, 'SQL_EXECUTION_ERROR', error.message, error.statusCode);
     } else {
-      res.status(400).json({
-        error: 'SQL_EXECUTION_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to execute SQL query',
-        statusCode: 400,
-      });
+      errorResponse(res, 'SQL_EXECUTION_ERROR', error instanceof Error ? error.message : 'Failed to execute SQL query', 400);
     }
   }
 });
@@ -128,22 +121,14 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response) => {
       resource: DataUpdateResourceType.DATABASE,
     });
 
-    res.json(response);
+    successResponse(res, response);
   } catch (error: unknown) {
     logger.warn('Raw SQL execution error:', error);
 
     if (error instanceof AppError) {
-      res.status(error.statusCode).json({
-        error: 'SQL_EXECUTION_ERROR',
-        message: error.message,
-        statusCode: error.statusCode,
-      });
+      errorResponse(res, 'SQL_EXECUTION_ERROR', error.message, error.statusCode);
     } else {
-      res.status(400).json({
-        error: 'SQL_EXECUTION_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to execute SQL query',
-        statusCode: 400,
-      });
+      errorResponse(res, 'SQL_EXECUTION_ERROR', error instanceof Error ? error.message : 'Failed to execute SQL query', 400);
     }
   }
 });
@@ -194,14 +179,10 @@ router.post('/export', verifyAdmin, async (req: AuthRequest, res: Response) => {
       ip_address: req.ip,
     });
 
-    res.json(response);
+    successResponse(res, response);
   } catch (error: unknown) {
     logger.warn('Database export error:', error);
-    res.status(500).json({
-      error: 'EXPORT_ERROR',
-      message: error instanceof Error ? error.message : 'Failed to export database',
-      statusCode: 500,
-    });
+    errorResponse(res, 'EXPORT_ERROR', error instanceof Error ? error.message : 'Failed to export database', 500);
   }
 });
 
@@ -267,22 +248,14 @@ router.post(
         },
       });
 
-      res.json(response);
+      successResponse(res, response);
     } catch (error: unknown) {
       logger.warn('Bulk upsert error:', error);
 
       if (error instanceof AppError) {
-        res.status(error.statusCode).json({
-          error: 'BULK_UPSERT_ERROR',
-          message: error.message,
-          statusCode: error.statusCode,
-        });
+        errorResponse(res, 'BULK_UPSERT_ERROR', error.message, error.statusCode);
       } else {
-        res.status(400).json({
-          error: 'BULK_UPSERT_ERROR',
-          message: error instanceof Error ? error.message : 'Failed to perform bulk upsert',
-          statusCode: 400,
-        });
+        errorResponse(res, 'BULK_UPSERT_ERROR', error instanceof Error ? error.message : 'Failed to perform bulk upsert', 400);
       }
     }
   }
@@ -343,22 +316,14 @@ router.post(
         resource: DataUpdateResourceType.DATABASE,
       });
 
-      res.json(response);
+      successResponse(res, response);
     } catch (error: unknown) {
       logger.warn('Database import error:', error);
 
       if (error instanceof AppError) {
-        res.status(error.statusCode).json({
-          error: 'IMPORT_ERROR',
-          message: error.message,
-          statusCode: error.statusCode,
-        });
+        errorResponse(res, 'IMPORT_ERROR', error.message, error.statusCode);
       } else {
-        res.status(500).json({
-          error: 'IMPORT_ERROR',
-          message: error instanceof Error ? error.message : 'Failed to import database',
-          statusCode: 500,
-        });
+        errorResponse(res, 'IMPORT_ERROR', error instanceof Error ? error.message : 'Failed to import database', 500);
       }
     }
   }

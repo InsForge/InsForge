@@ -19,7 +19,7 @@ describe('TokenManager.verifyCloudToken', () => {
       ...oldEnv,
       PROJECT_ID: 'project_123',
       CLOUD_API_HOST: 'https://mock-api.dev',
-      JWT_SECRET: 'test-secret-key'
+      JWT_SECRET: 'test-secret-key',
     };
     tokenManager = TokenManager.getInstance();
   });
