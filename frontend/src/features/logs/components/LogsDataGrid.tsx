@@ -34,11 +34,7 @@ export function createLogsColumns(columnDefs: LogsColumnDef[]): DataGridColumn<D
         (({ row, column }: RenderCellProps<DataGridRowType>) => {
           const value = row[column.key];
           const displayValue = String(value ?? '');
-          return (
-            <span className="text-sm text-gray-900 dark:text-white font-normal leading-6 truncate">
-              {displayValue}
-            </span>
-          );
+          return <span className="text-sm font-normal leading-6 truncate">{displayValue}</span>;
         }),
     };
 

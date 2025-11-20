@@ -68,6 +68,8 @@
   body {
     overflow: hidden;
     height: 100%;
+    background: rgb(var(--background));
+    color: rgb(var(--foreground));
   }
 
   /* Apply base font settings */
@@ -148,10 +150,12 @@
   /* CSS Variables for Radix UI components - using RGB values for clarity */
   :root {
     /* Light mode colors */
-    --background: 255 255 255; /* white */
-    --foreground: 10 10 10; /* near-black */
+    --background: 250 250 250; /* zinc-50 */
+    --foreground: 17 24 39; /* near-black */
     --card: 255 255 255; /* white */
-    --card-foreground: 10 10 10; /* near-black */
+    --card-foreground: 17 24 39; /* near-black */
+    --secondary-bg: 250 250 250; /* zinc-100 */
+    --text: 113 113 122; /* zinc-500 */
     --popover: 255 255 255; /* white */
     --popover-foreground: 10 10 10; /* near-black */
     --primary: 23 23 23; /* zinc-900 */
@@ -165,20 +169,23 @@
     --destructive: 239 68 68; /* red-500 */
     --destructive-foreground: 250 250 250; /* zinc-50 */
     --border: 228 228 231; /* zinc-200 */
+    --hover-border: 212 212 216; /* zinc-300 */
     --input: 228 228 231; /* zinc-200 */
     --ring: 10 10 10; /* near-black */
     --radius: 0.5rem;
     --background-color: #ffffff;
     --border-color: #737373;
-    --border-hover-color: #d4d4d4;
+    --hover-border-color: #d4d4d4;
   }
 
   .dark {
     /* Dark mode colors - matching your neutral theme */
     --background: 38 38 38; /* neutral-800 */
-    --foreground: 250 250 250; /* zinc-50 */
-    --card: 64 64 64; /* neutral-700 */
-    --card-foreground: 250 250 250; /* zinc-50 */
+    --foreground: 255 255 255; /* white*/
+    --card: 51 51 51; /* #333333 */
+    --card-foreground: 255 255 255; /* white*/
+    --secondary-bg: 64 64 64; /* neutral-700 */
+    --text: 163 163 163; /* neutral-400 */
     --popover: 64 64 64; /* neutral-700 */
     --popover-foreground: 250 250 250; /* zinc-50 */
     --primary: 250 250 250; /* zinc-50 */
@@ -192,11 +199,12 @@
     --destructive: 127 29 29; /* red-900 */
     --destructive-foreground: 250 250 250; /* zinc-50 */
     --border: 64 64 64; /* neutral-700 */
+    --hover-border: 82 82 82; /* neutral-600 */
     --input: 64 64 64; /* neutral-700 */
     --ring: 212 212 212; /* zinc-300 */
     --background-color: #262626;
     --border-color: #737373;
-    --border-hover-color: #d4d4d4;
+    --hover-border-color: #d4d4d4;
   }
 }
 
@@ -215,6 +223,10 @@
 }
 
 @theme {
+  /* emerald themes */
+  --color-primary-emerald: var(--color-emerald-300);
+  --color-secondary-emerald: var(--color-emerald-400);
+
   --color-border-gray: #e4e4e7;
   --color-chart-blue-dark: #2c7fff;
   --color-text-gray: #a1a1a1;
@@ -245,5 +257,5 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--border-hover-color);
+  background: var(--hover-border-color);
 }
