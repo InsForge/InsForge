@@ -10,6 +10,8 @@ export type {
   RenderCellProps,
   RenderEditCellProps,
   RenderHeaderCellProps,
+  // NOTE: react-data-grid@7.0.0-beta.47 still uses CellClickArgs.
+  // Future versions rename this to CellMouseArgs, so this can be updated when we bump the dependency.
   CellClickArgs,
   CellMouseEvent,
 } from 'react-data-grid';
