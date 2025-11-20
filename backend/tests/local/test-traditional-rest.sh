@@ -62,7 +62,7 @@ test_response_format "No data wrapper" "$response" '"data":{' "true"
 print_info "2. Testing Authentication Errors"
 response=$(curl -s "$API_BASE/auth/sessions/current")
 test_response_format "Error format" "$response" '"error":"AUTH_INVALID_CREDENTIALS"'
-test_response_format "Message field" "$response" '"message":"Invalid token"'
+test_response_format "Message field" "$response" '"message":"No token provided"'
 # JWT auth includes error and message fields
 
 # 3. Test Login Endpoint (Missing Credentials)
