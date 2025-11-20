@@ -12,8 +12,8 @@ import logger from '@/utils/logger.js';
 import { OpenRouterImageMessage } from '@/types/ai.js';
 
 export class ImageGenerationService {
-  private static aiUsageService = new AIUsageService();
-  private static aiConfigService = new AIConfigService();
+  private static aiUsageService = AIUsageService.getInstance();
+  private static aiConfigService = AIConfigService.getInstance();
   private static aiClientService = AIClientService.getInstance();
 
   /**

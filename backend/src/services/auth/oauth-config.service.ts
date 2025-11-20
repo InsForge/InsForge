@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { DatabaseManager } from '@/infra/database/manager.js';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -29,8 +29,8 @@ export class OAuthConfigService {
   private secretService: SecretService;
 
   private constructor() {
-    this.secretService = new SecretService();
-    logger.info('OAuthService initialized');
+    this.secretService = SecretService.getInstance();
+    logger.info('OAuthConfigService initialized');
   }
 
   public static getInstance(): OAuthConfigService {
@@ -51,9 +51,8 @@ export class OAuthConfigService {
    * Get all OAuth configurations
    */
   async getAllConfigs(): Promise<OAuthConfigSchema[]> {
-    const client = await this.getPool().connect();
     try {
-      const result = await client.query(
+      const result = await this.getPool().query(
         `SELECT
           id,
           provider,
@@ -71,8 +70,6 @@ export class OAuthConfigService {
     } catch (error) {
       logger.error('Failed to get OAuth configs', { error });
       throw new AppError('Failed to get OAuth configurations', 500, ERROR_CODES.INTERNAL_ERROR);
-    } finally {
-      client.release();
     }
   }
 
@@ -81,9 +78,8 @@ export class OAuthConfigService {
    * Only returns non-sensitive information about configured providers
    */
   async getConfiguredProviders(): Promise<OAuthProvidersSchema[]> {
-    const client = await this.getPool().connect();
     try {
-      const result = await client.query(
+      const result = await this.getPool().query(
         `SELECT
           provider
          FROM _oauth_configs
@@ -94,8 +90,6 @@ export class OAuthConfigService {
     } catch (error) {
       logger.error('Failed to get public OAuth providers', { error });
       throw new AppError('Failed to get OAuth providers', 500, ERROR_CODES.INTERNAL_ERROR);
-    } finally {
-      client.release();
     }
   }
 
@@ -103,9 +97,8 @@ export class OAuthConfigService {
    * Get OAuth configuration by provider name
    */
   async getConfigByProvider(provider: string): Promise<OAuthConfigSchema | null> {
-    const client = await this.getPool().connect();
     try {
-      const result = await client.query(
+      const result = await this.getPool().query(
         `SELECT
           id,
           provider,
@@ -129,8 +122,6 @@ export class OAuthConfigService {
     } catch (error) {
       logger.error('Failed to get OAuth config by provider', { error, provider });
       throw new AppError('Failed to get OAuth configuration', 500, ERROR_CODES.INTERNAL_ERROR);
-    } finally {
-      client.release();
     }
   }
 
@@ -138,9 +129,8 @@ export class OAuthConfigService {
    * Get OAuth provider secret
    */
   async getClientSecretByProvider(provider: string): Promise<string | null> {
-    const client = await this.getPool().connect();
     try {
-      const result = await client.query(
+      const result = await this.getPool().query(
         `SELECT
           secret_id as "secretId"
          FROM _oauth_configs
@@ -164,8 +154,6 @@ export class OAuthConfigService {
     } catch (error) {
       logger.error('Failed to get OAuth config with secret', { error, provider });
       throw new AppError('Failed to get OAuth configuration', 500, ERROR_CODES.INTERNAL_ERROR);
-    } finally {
-      client.release();
     }
   }
 

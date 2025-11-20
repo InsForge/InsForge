@@ -4,9 +4,10 @@ import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
+import { successResponse } from '@/utils/response.js';
 
 const router = Router();
-const secretService = new SecretService();
+const secretService = SecretService.getInstance();
 const auditService = AuditService.getInstance();
 
 /**
@@ -16,7 +17,7 @@ const auditService = AuditService.getInstance();
 router.get('/', verifyAdmin, async (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const secrets = await secretService.listSecrets();
-    res.json({ secrets });
+    successResponse(res, { secrets });
   } catch (error) {
     next(error);
   }
@@ -44,7 +45,7 @@ router.get('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: N
       ip_address: req.ip,
     });
 
-    res.json({ key, value });
+    successResponse(res, { key, value });
   } catch (error) {
     next(error);
   }
@@ -94,11 +95,15 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
       ip_address: req.ip,
     });
 
-    res.status(201).json({
-      success: true,
-      message: `Secret ${key} has been created successfully`,
-      id: result.id,
-    });
+    successResponse(
+      res,
+      {
+        success: true,
+        message: `Secret ${key} has been created successfully`,
+        id: result.id,
+      },
+      201
+    );
   } catch (error) {
     next(error);
   }
@@ -141,7 +146,7 @@ router.put('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: N
       ip_address: req.ip,
     });
 
-    res.json({
+    successResponse(res, {
       success: true,
       message: `Secret ${key} has been updated successfully`,
     });
@@ -187,7 +192,7 @@ router.delete('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next
       ip_address: req.ip,
     });
 
-    res.json({
+    successResponse(res, {
       success: true,
       message: `Secret ${key} has been deleted successfully`,
     });

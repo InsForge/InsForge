@@ -1,6 +1,6 @@
-import { verifyCloudToken } from '../../src/utils/cloud-token';
+import { TokenManager } from '../../src/infra/security/token.manager';
 import { jwtVerify } from 'jose';
-import { AppError } from '../../src/api/middleware/error';
+import { AppError } from '../../src/api/middlewares/error';
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 
 // Mock jose.jwtVerify
@@ -9,12 +9,19 @@ vi.mock('jose', () => ({
   createRemoteJWKSet: vi.fn(() => 'mockedJwks'),
 }));
 
-describe('verifyCloudToken', () => {
+describe('TokenManager.verifyCloudToken', () => {
   const oldEnv = process.env;
+  let tokenManager: TokenManager;
 
   beforeEach(() => {
     vi.resetAllMocks();
-    process.env = { ...oldEnv, PROJECT_ID: 'project_123', CLOUD_API_HOST: 'https://mock-api.dev' };
+    process.env = {
+      ...oldEnv,
+      PROJECT_ID: 'project_123',
+      CLOUD_API_HOST: 'https://mock-api.dev',
+      JWT_SECRET: 'test-secret-key',
+    };
+    tokenManager = TokenManager.getInstance();
   });
 
   afterAll(() => {
@@ -26,7 +33,7 @@ describe('verifyCloudToken', () => {
       payload: { projectId: 'project_123', user: 'testUser' },
     });
 
-    const result = await verifyCloudToken('valid-token');
+    const result = await tokenManager.verifyCloudToken('valid-token');
     expect(result.projectId).toBe('project_123');
     expect(result.payload.user).toBe('testUser');
   });
@@ -36,6 +43,6 @@ describe('verifyCloudToken', () => {
       payload: {}, // missing projectId also counts as mismatch
     });
 
-    await expect(verifyCloudToken('token')).rejects.toThrow(AppError);
+    await expect(tokenManager.verifyCloudToken('token')).rejects.toThrow(AppError);
   });
 });

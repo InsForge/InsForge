@@ -1,7 +1,7 @@
 import { Server as HttpServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import logger from '@/utils/logger.js';
-import { AuthService } from '@/services/auth/auth.service.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 import {
   ServerEvents,
   ClientEvents,
@@ -14,27 +14,27 @@ import {
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 
-const authService = AuthService.getInstance();
+const tokenManager = TokenManager.getInstance();
 
 /**
- * SocketService - Industrial-grade Socket.IO implementation
- * Follows best practices for real-time communication
+ * SocketManager - Industrial-grade Socket.IO implementation
+ * Infrastructure layer for real-time WebSocket communication
  */
-export class SocketService {
-  private static instance: SocketService;
+export class SocketManager {
+  private static instance: SocketManager;
   private io: SocketIOServer | null = null;
   private socketMetadata: Map<string, SocketMetadata> = new Map();
 
   private constructor() {}
 
   /**
-   * Singleton pattern for global socket service access
+   * Singleton pattern for global socket manager access
    */
-  static getInstance(): SocketService {
-    if (!SocketService.instance) {
-      SocketService.instance = new SocketService();
+  static getInstance(): SocketManager {
+    if (!SocketManager.instance) {
+      SocketManager.instance = new SocketManager();
     }
-    return SocketService.instance;
+    return SocketManager.instance;
   }
 
   /**
@@ -66,7 +66,7 @@ export class SocketService {
     this.io.use((socket, next) => {
       try {
         const token = socket.handshake.auth.token;
-        const payload = authService.verifyToken(token);
+        const payload = tokenManager.verifyToken(token);
         if (!payload.role) {
           throw new AppError(
             'Invalid token: missing role',
@@ -385,4 +385,4 @@ export class SocketService {
 }
 
 // Export singleton instance for convenience
-export const socketService = SocketService.getInstance();
+export const socketService = SocketManager.getInstance();

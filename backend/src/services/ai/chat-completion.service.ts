@@ -11,9 +11,19 @@ import logger from '@/utils/logger.js';
 import { ChatCompletionOptions } from '@/types/ai.js';
 
 export class ChatCompletionService {
-  private aiUsageService = new AIUsageService();
-  private aiConfigService = new AIConfigService();
+  private static instance: ChatCompletionService;
+  private aiUsageService = AIUsageService.getInstance();
+  private aiConfigService = AIConfigService.getInstance();
   private aiClientService = AIClientService.getInstance();
+
+  private constructor() {}
+
+  public static getInstance(): ChatCompletionService {
+    if (!ChatCompletionService.instance) {
+      ChatCompletionService.instance = new ChatCompletionService();
+    }
+    return ChatCompletionService.instance;
+  }
 
   /**
    * Format messages for OpenAI API with multimodal support

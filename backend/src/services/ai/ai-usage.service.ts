@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { DatabaseManager } from '@/infra/database/manager.js';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
 import type {
   AIUsageDataSchema,
@@ -9,7 +9,17 @@ import type {
 } from '@insforge/shared-schemas';
 
 export class AIUsageService {
+  private static instance: AIUsageService;
   private pool: Pool | null = null;
+
+  private constructor() {}
+
+  public static getInstance(): AIUsageService {
+    if (!AIUsageService.instance) {
+      AIUsageService.instance = new AIUsageService();
+    }
+    return AIUsageService.instance;
+  }
 
   private getPool(): Pool {
     if (!this.pool) {
@@ -19,9 +29,8 @@ export class AIUsageService {
   }
 
   async trackUsage(data: AIUsageDataSchema): Promise<{ id: string }> {
-    const client = await this.getPool().connect();
     try {
-      const result = await client.query(
+      const result = await this.getPool().query(
         `INSERT INTO _ai_usage (config_id, input_tokens, output_tokens, image_count, image_resolution)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
@@ -46,8 +55,6 @@ export class AIUsageService {
     } catch (error) {
       logger.error('Failed to track AI usage', { error, data });
       throw new Error('Failed to track AI usage');
-    } finally {
-      client.release();
     }
   }
 
@@ -59,9 +66,8 @@ export class AIUsageService {
   ): Promise<{ id: string }> {
     const totalTokens = (inputTokens || 0) + (outputTokens || 0);
 
-    const client = await this.getPool().connect();
     try {
-      const usageResult = await client.query(
+      const usageResult = await this.getPool().query(
         `INSERT INTO _ai_usage (config_id, input_tokens, output_tokens, model_id)
          VALUES ($1, $2, $3, $4)
          RETURNING id`,
@@ -81,8 +87,6 @@ export class AIUsageService {
     } catch (error) {
       logger.error('Failed to track chat usage', { error, configId });
       throw new Error('Failed to track chat usage');
-    } finally {
-      client.release();
     }
   }
 
@@ -94,9 +98,8 @@ export class AIUsageService {
     outputTokens?: number,
     modelId?: string
   ): Promise<{ id: string }> {
-    const client = await this.getPool().connect();
     try {
-      const usageResult = await client.query(
+      const usageResult = await this.getPool().query(
         `INSERT INTO _ai_usage (config_id, image_count, image_resolution, input_tokens, output_tokens, model_id)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id`,
@@ -124,8 +127,6 @@ export class AIUsageService {
     } catch (error) {
       logger.error('Failed to track image usage', { error, configId });
       throw new Error('Failed to track image usage');
-    } finally {
-      client.release();
     }
   }
 
@@ -134,10 +135,9 @@ export class AIUsageService {
     startDate?: Date,
     endDate?: Date
   ): Promise<AIUsageRecordSchema[]> {
-    const client = await this.getPool().connect();
     try {
       let query = `
-        SELECT id, config_id as "configId", input_tokens as "inputTokens", 
+        SELECT id, config_id as "configId", input_tokens as "inputTokens",
                output_tokens as "outputTokens", image_count as "imageCount",
                image_resolution as "imageResolution", created_at as "createdAt"
         FROM _ai_usage
@@ -158,14 +158,12 @@ export class AIUsageService {
 
       query += ' ORDER BY created_at DESC';
 
-      const result = await client.query(query, params);
+      const result = await this.getPool().query(query, params);
 
       return result.rows;
     } catch (error) {
       logger.error('Failed to fetch usage by config', { error, configId });
       throw new Error('Failed to fetch usage records');
-    } finally {
-      client.release();
     }
   }
 
@@ -174,10 +172,9 @@ export class AIUsageService {
     startDate?: Date,
     endDate?: Date
   ): Promise<AIUsageSummarySchema> {
-    const client = await this.getPool().connect();
     try {
       let query = `
-        SELECT 
+        SELECT
           COALESCE(SUM(input_tokens), 0) as "totalInputTokens",
           COALESCE(SUM(output_tokens), 0) as "totalOutputTokens",
           COALESCE(SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0) as "totalTokens",
@@ -204,7 +201,7 @@ export class AIUsageService {
         query += ` AND created_at <= $${params.length}`;
       }
 
-      const result = await client.query(query, params);
+      const result = await this.getPool().query(query, params);
 
       return {
         totalInputTokens: parseInt(result.rows[0].totalInputTokens),
@@ -216,8 +213,6 @@ export class AIUsageService {
     } catch (error) {
       logger.error('Failed to fetch usage summary', { error, configId });
       throw new Error('Failed to fetch usage summary');
-    } finally {
-      client.release();
     }
   }
 
@@ -227,16 +222,15 @@ export class AIUsageService {
     limit?: number,
     offset?: number
   ): Promise<ListAIUsageResponse> {
-    const client = await this.getPool().connect();
     try {
       let query = `
-        SELECT 
-          u.id, 
-          u.config_id as "configId", 
-          u.input_tokens as "inputTokens", 
-          u.output_tokens as "outputTokens", 
+        SELECT
+          u.id,
+          u.config_id as "configId",
+          u.input_tokens as "inputTokens",
+          u.output_tokens as "outputTokens",
           u.image_count as "imageCount",
-          u.image_resolution as "imageResolution", 
+          u.image_resolution as "imageResolution",
           u.created_at as "createdAt",
           u.model_id as "modelId",
           COALESCE(u.model_id, c.model_id) as "model",
@@ -261,7 +255,7 @@ export class AIUsageService {
       }
 
       const countQuery = `SELECT COUNT(*) as total FROM (${query}) as subquery`;
-      const countResult = await client.query(countQuery, params);
+      const countResult = await this.getPool().query(countQuery, params);
 
       query += ' ORDER BY u.created_at DESC';
 
@@ -275,7 +269,7 @@ export class AIUsageService {
         query += ` OFFSET $${params.length}`;
       }
 
-      const result = await client.query(query, params);
+      const result = await this.getPool().query(query, params);
 
       return {
         records: result.rows,
@@ -284,8 +278,6 @@ export class AIUsageService {
     } catch (error) {
       logger.error('Failed to fetch all usage records', { error });
       throw new Error('Failed to fetch usage records');
-    } finally {
-      client.release();
     }
   }
 }

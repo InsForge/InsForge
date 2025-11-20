@@ -1,11 +1,11 @@
-import { DatabaseManager } from '@/infra/database/manager.js';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 import { AIConfigService } from '@/services/ai/ai-config.service.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { OAuthProvidersSchema } from '@insforge/shared-schemas';
-import { AuthService } from '@/services/auth/auth.service.js';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 
 /**
@@ -29,7 +29,7 @@ async function seedDefaultAIConfigs(): Promise<void> {
     return;
   }
 
-  const aiConfigService = new AIConfigService();
+  const aiConfigService = AIConfigService.getInstance();
 
   // Check if AI configs already exist
   const existingConfigs = await aiConfigService.findAll();
@@ -63,11 +63,12 @@ async function seedDefaultAIConfigs(): Promise<void> {
  */
 async function seedDefaultAuthConfig(): Promise<void> {
   const dbManager = DatabaseManager.getInstance();
-  const db = dbManager.getDb();
+  const pool = dbManager.getPool();
+  const client = await pool.connect();
 
   try {
-    const result = await db.prepare('SELECT COUNT(*) as count FROM _auth_configs').get();
-    const hasConfig = result && Number(result.count) > 0;
+    const result = await client.query('SELECT COUNT(*) as count FROM _auth_configs');
+    const hasConfig = result.rows.length > 0 && Number(result.rows[0].count) > 0;
 
     if (hasConfig) {
       const authConfigService = AuthConfigService.getInstance();
@@ -82,26 +83,25 @@ async function seedDefaultAuthConfig(): Promise<void> {
     // Table is empty - this is first startup, insert default cloud configuration
     // Note: Migration 016 will add verify_email_method, reset_password_method, sign_in_redirect_to
     // so we only insert fields that exist in migration 015
-    await db
-      .prepare(
-        `INSERT INTO _auth_configs (
-          require_email_verification,
-          password_min_length,
-          require_number,
-          require_lowercase,
-          require_uppercase,
-          require_special_char
-        ) VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT DO NOTHING`
-      )
-      .run(
+    await client.query(
+      `INSERT INTO _auth_configs (
+        require_email_verification,
+        password_min_length,
+        require_number,
+        require_lowercase,
+        require_uppercase,
+        require_special_char
+      ) VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT DO NOTHING`,
+      [
         isCloudEnvironment(), // Enable email verification for cloud
         6, // password_min_length
         false, // require_number
         false, // require_lowercase
         false, // require_uppercase
-        false // require_special_char
-      );
+        false, // require_special_char
+      ]
+    );
 
     logger.info('✅ Email verification enabled (cloud environment)');
   } catch (error) {
@@ -109,6 +109,8 @@ async function seedDefaultAuthConfig(): Promise<void> {
       error: error instanceof Error ? error.message : String(error),
     });
     // Don't throw - this is not critical for app startup
+  } finally {
+    client.release();
   }
 }
 
@@ -116,11 +118,11 @@ async function seedDefaultAuthConfig(): Promise<void> {
  * Seeds default OAuth configurations for supported providers
  */
 async function seedDefaultOAuthConfigs(): Promise<void> {
-  const oauthService = OAuthConfigService.getInstance();
+  const oauthConfigService = OAuthConfigService.getInstance();
 
   try {
     // Check if OAuth configs already exist
-    const existingConfigs = await oauthService.getAllConfigs();
+    const existingConfigs = await oauthConfigService.getAllConfigs();
     const existingProviders = existingConfigs.map((config) => config.provider.toLowerCase());
 
     // Default providers to seed
@@ -128,7 +130,7 @@ async function seedDefaultOAuthConfigs(): Promise<void> {
 
     for (const provider of defaultProviders) {
       if (!existingProviders.includes(provider)) {
-        await oauthService.createConfig({
+        await oauthConfigService.createConfig({
           provider,
           useSharedKey: true,
         });
@@ -147,11 +149,11 @@ async function seedDefaultOAuthConfigs(): Promise<void> {
  * Seeds OAuth configurations from local environment variables
  */
 async function seedLocalOAuthConfigs(): Promise<void> {
-  const oauthService = OAuthConfigService.getInstance();
+  const oauthConfigService = OAuthConfigService.getInstance();
 
   try {
     // Check if OAuth configs already exist
-    const existingConfigs = await oauthService.getAllConfigs();
+    const existingConfigs = await oauthConfigService.getAllConfigs();
     const existingProviders = existingConfigs.map((config) => config.provider.toLowerCase());
 
     // Environment variable mappings for OAuth providers
@@ -192,7 +194,7 @@ async function seedLocalOAuthConfigs(): Promise<void> {
       const clientSecret = process.env[clientSecretEnv];
 
       if (clientId && clientSecret && !existingProviders.includes(provider)) {
-        await oauthService.createConfig({
+        await oauthConfigService.createConfig({
           provider,
           clientId,
           clientSecret,
@@ -210,8 +212,7 @@ async function seedLocalOAuthConfigs(): Promise<void> {
 
 // Create api key, admin user, and default AI configs
 export async function seedBackend(): Promise<void> {
-  const secretService = new SecretService();
-  const authService = AuthService.getInstance();
+  const secretService = SecretService.getInstance();
 
   const dbManager = DatabaseManager.getInstance();
 
@@ -272,7 +273,8 @@ export async function seedBackend(): Promise<void> {
     const existingAnonKeySecret = await secretService.getSecretByKey('ANON_KEY');
 
     if (existingAnonKeySecret === null) {
-      const anonToken = authService.generateAnonToken();
+      const tokenManager = TokenManager.getInstance();
+      const anonToken = tokenManager.generateAnonToken();
 
       await secretService.createSecret({
         key: 'ANON_KEY',

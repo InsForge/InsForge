@@ -3,10 +3,11 @@ import { AuthService } from '@/services/auth/auth.service.js';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
-import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
+import { AuthRequest, verifyAdmin, verifyToken } from '@/api/middlewares/auth.js';
 import oauthRouter from './oauth.routes.js';
 import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-limiters.js';
 import {
@@ -35,8 +36,7 @@ import {
   type GetAuthConfigResponse,
   updateAuthConfigRequestSchema,
 } from '@insforge/shared-schemas';
-import { UserRecord } from '@/types/auth.js';
-import { SocketService } from '@/infra/socket/socket.js';
+import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 
 const router = Router();
@@ -62,7 +62,7 @@ router.get('/public-config', async (req: Request, res: Response, next: NextFunct
       ...authConfigs,
     };
 
-    res.json(response);
+    successResponse(res, response);
   } catch (error) {
     next(error);
   }
@@ -73,7 +73,7 @@ router.get('/public-config', async (req: Request, res: Response, next: NextFunct
 router.get('/config', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const config: GetAuthConfigResponse = await authConfigService.getAuthConfig();
-    res.json(config);
+    successResponse(res, config);
   } catch (error) {
     next(error);
   }
@@ -125,7 +125,7 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
     const { email, password, name } = validationResult.data;
     const result: CreateUserResponse = await authService.register(email, password, name);
 
-    const socket = SocketService.getInstance();
+    const socket = SocketManager.getInstance();
     socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
       resource: DataUpdateResourceType.USERS,
     });
@@ -212,29 +212,29 @@ router.post('/admin/sessions', (req: Request, res: Response, next: NextFunction)
 });
 
 // GET /api/auth/sessions/current - Get current session user
-router.get('/sessions/current', (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new AppError('No token provided', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
+router.get(
+  '/sessions/current',
+  verifyToken,
+  (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user) {
+        throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
+      }
+
+      const response: GetCurrentSessionResponse = {
+        user: {
+          id: req.user.id,
+          email: req.user.email,
+          role: req.user.role as 'authenticated' | 'project_admin',
+        },
+      };
+
+      successResponse(res, response);
+    } catch (error) {
+      next(error);
     }
-
-    const token = authHeader.substring(7);
-    const payload = authService.verifyToken(token);
-
-    const response: GetCurrentSessionResponse = {
-      user: {
-        id: payload.sub,
-        email: payload.email,
-        role: payload.role,
-      },
-    };
-
-    res.json(response);
-  } catch {
-    next(new AppError('Invalid token', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS));
   }
-});
+);
 
 // GET /api/auth/users - List all users (admin only)
 router.get('/users', verifyAdmin, async (req: Request, res: Response, next: NextFunction) => {
@@ -242,87 +242,26 @@ router.get('/users', verifyAdmin, async (req: Request, res: Response, next: Next
     const queryValidation = listUsersRequestSchema.safeParse(req.query);
     const queryParams = queryValidation.success ? queryValidation.data : req.query;
     const { limit = '10', offset = '0', search } = queryParams || {};
-    const db = authService.getDb();
 
-    let query = `
-      SELECT 
-        u.id, 
-        u.email, 
-        u.name, 
-        u.email_verified, 
-        u.created_at, 
-        u.updated_at,
-        u.password,
-        STRING_AGG(a.provider, ',') as providers
-      FROM _accounts u
-      LEFT JOIN _account_providers a ON u.id = a.user_id
-    `;
-    const params: (string | number)[] = [];
+    const parsedLimit = parseInt(limit as string);
+    const parsedOffset = parseInt(offset as string);
 
-    if (search) {
-      query += ' WHERE u.email LIKE ? OR u.name LIKE ?';
-      params.push(`%${search}%`, `%${search}%`);
-    }
-
-    query += ' GROUP BY u.id ORDER BY u.created_at DESC LIMIT ? OFFSET ?';
-    params.push(parseInt(limit as string), parseInt(offset as string));
-
-    const dbUsers = await db.prepare(query).all(...params);
-
-    // Simple transformation - just format the provider as identities
-    const users = dbUsers.map((dbUser: UserRecord) => {
-      const identities = [];
-      const providers: string[] = [];
-
-      // Add social providers if any
-      if (dbUser.providers) {
-        dbUser.providers.split(',').forEach((provider: string) => {
-          identities.push({ provider });
-          providers.push(provider);
-        });
-      }
-
-      // Add email provider if password exists
-      if (dbUser.password) {
-        identities.push({ provider: 'email' });
-        providers.push('email');
-      }
-
-      // Use first provider to determine type: 'email' or 'social'
-      const firstProvider = providers[0];
-      const provider_type = firstProvider === 'email' ? 'email' : 'social';
-
-      // Return for frontend compatibility
-      return {
-        id: dbUser.id,
-        email: dbUser.email,
-        name: dbUser.name,
-        emailVerified: dbUser.email_verified,
-        createdAt: dbUser.created_at,
-        updatedAt: dbUser.updated_at,
-        identities: identities,
-        providerType: provider_type,
-      };
-    });
-
-    let countQuery = 'SELECT COUNT(*) as count FROM _accounts';
-    const countParams: string[] = [];
-    if (search) {
-      countQuery += ' WHERE email LIKE ? OR name LIKE ?';
-      countParams.push(`%${search}%`, `%${search}%`);
-    }
-    const { count } = (await db.prepare(countQuery).get(...countParams)) as { count: number };
+    const { users, total } = await authService.listUsers(
+      parsedLimit,
+      parsedOffset,
+      search as string | undefined
+    );
 
     const response: ListUsersResponse = {
       data: users,
       pagination: {
-        offset: parseInt(offset as string),
-        limit: parseInt(limit as string),
-        total: count,
+        offset: parsedOffset,
+        limit: parsedLimit,
+        total: total,
       },
     };
 
-    res.json(response);
+    successResponse(res, response);
   } catch (error) {
     next(error);
   }
@@ -341,67 +280,13 @@ router.get(
       }
 
       const userId = userIdValidation.data;
-      const db = authService.getDb();
+      const user = await authService.getUserSchemaById(userId);
 
-      const dbUser = (await db
-        .prepare(
-          `
-      SELECT
-        u.id,
-        u.email,
-        u.name,
-        u.email_verified,
-        u.created_at,
-        u.updated_at,
-        u.password,
-        STRING_AGG(a.provider, ',') as providers
-      FROM _accounts u
-      LEFT JOIN _account_providers a ON u.id = a.user_id
-      WHERE u.id = ?
-      GROUP BY u.id
-    `
-        )
-        .get(userId)) as UserRecord | undefined;
-
-      if (!dbUser) {
+      if (!user) {
         throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
       }
 
-      // Simple transformation - just format the provider as identities
-      const identities = [];
-      const providers: string[] = [];
-
-      // Add social providers if any
-      if (dbUser.providers) {
-        dbUser.providers.split(',').forEach((provider: string) => {
-          identities.push({ provider });
-          providers.push(provider);
-        });
-      }
-
-      // Add email provider if password exists
-      if (dbUser.password) {
-        identities.push({ provider: 'Email' });
-        providers.push('email');
-      }
-
-      // Use first provider to determine type: 'email' or 'social'
-      const firstProvider = providers[0];
-      const provider_type = firstProvider === 'email' ? 'Email' : 'Social';
-
-      // Return snake_case for frontend compatibility
-      const user = {
-        id: dbUser.id,
-        email: dbUser.email,
-        name: dbUser.name,
-        email_verified: dbUser.email_verified,
-        created_at: dbUser.created_at,
-        updated_at: dbUser.updated_at,
-        identities: identities,
-        provider_type: provider_type,
-      };
-
-      res.json(user);
+      successResponse(res, user);
     } catch (error) {
       next(error);
     }
@@ -425,10 +310,7 @@ router.delete(
 
       const { userIds } = validationResult.data;
 
-      const db = authService.getDb();
-      const placeholders = userIds.map(() => '?').join(',');
-
-      await db.prepare(`DELETE FROM _accounts WHERE id IN (${placeholders})`).run(...userIds);
+      const deletedCount = await authService.deleteUsers(userIds);
 
       // Log audit for user deletion
       await auditService.log({
@@ -437,17 +319,17 @@ router.delete(
         module: 'AUTH',
         details: {
           userIds,
-          deletedCount: userIds.length,
+          deletedCount,
         },
         ip_address: req.ip,
       });
 
       const response: DeleteUsersResponse = {
         message: 'Users deleted successfully',
-        deletedCount: userIds.length,
+        deletedCount,
       };
 
-      res.json(response);
+      successResponse(res, response);
     } catch (error) {
       next(error);
     }
@@ -457,7 +339,8 @@ router.delete(
 // POST /api/auth/tokens/anon - Generate anonymous JWT token (never expires)
 router.post('/tokens/anon', verifyAdmin, (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const token = authService.generateAnonToken();
+    const tokenManager = TokenManager.getInstance();
+    const token = tokenManager.generateAnonToken();
 
     successResponse(res, {
       accessToken: token,
@@ -503,10 +386,14 @@ router.post(
           ? 'If your email is registered, we have sent you a verification link. Please check your inbox.'
           : 'If your email is registered, we have sent you a verification code. Please check your inbox.';
 
-      res.status(202).json({
-        success: true,
-        message,
-      });
+      successResponse(
+        res,
+        {
+          success: true,
+          message,
+        },
+        202
+      );
     } catch (error) {
       next(error);
     }
@@ -596,10 +483,14 @@ router.post(
           ? 'If your email is registered, we have sent you a password reset link. Please check your inbox.'
           : 'If your email is registered, we have sent you a password reset code. Please check your inbox.';
 
-      res.status(202).json({
-        success: true,
-        message,
-      });
+      successResponse(
+        res,
+        {
+          success: true,
+          message,
+        },
+        202
+      );
     } catch (error) {
       next(error);
     }

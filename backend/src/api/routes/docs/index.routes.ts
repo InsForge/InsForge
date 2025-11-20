@@ -1,9 +1,10 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { readFile } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { successResponse, errorResponse } from '@/utils/response.js';
+import { successResponse } from '@/utils/response.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
+import { AppError } from '@/api/middlewares/error.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,14 +26,14 @@ const DOCS_MAP: Record<string, string> = {
 };
 
 // GET /api/docs/:docType - Get specific documentation
-router.get('/:docType', async (req, res, next) => {
+router.get('/:docType', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { docType } = req.params;
 
     // Validate doc type
     const docFileName = DOCS_MAP[docType];
     if (!docFileName) {
-      return errorResponse(res, ERROR_CODES.NOT_FOUND, 'Documentation not found', 404);
+      throw new AppError('Documentation not found', 404, ERROR_CODES.NOT_FOUND);
     }
 
     // Read the documentation file
@@ -49,22 +50,27 @@ router.get('/:docType', async (req, res, next) => {
   } catch (error) {
     // If file doesn't exist or other error
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-      return errorResponse(res, ERROR_CODES.NOT_FOUND, 'Documentation file not found', 404);
+      next(new AppError('Documentation file not found', 404, ERROR_CODES.NOT_FOUND));
+    } else {
+      next(error);
     }
-    next(error);
   }
 });
 
 // GET /api/docs - List available documentation
-router.get('/', (_req, res) => {
-  const available = Object.keys(DOCS_MAP).map((key) => ({
-    type: key,
-    filename: DOCS_MAP[key],
-    endpoint: `/api/docs/${key}`,
-  }));
+router.get('/', (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const available = Object.keys(DOCS_MAP).map((key) => ({
+      type: key,
+      filename: DOCS_MAP[key],
+      endpoint: `/api/docs/${key}`,
+    }));
 
-  // Traditional REST: return list directly
-  return successResponse(res, available);
+    // Traditional REST: return list directly
+    return successResponse(res, available);
+  } catch (error) {
+    next(error);
+  }
 });
 
 export { router as docsRouter };

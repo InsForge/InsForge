@@ -4,6 +4,8 @@ import { AuditService } from '@/services/logs/audit.service.js';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
 import { successResponse, paginatedResponse } from '@/utils/response.js';
 import { GetLogsResponse } from '@insforge/shared-schemas';
+import { AppError } from '@/api/middlewares/error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
 
 const router = Router();
 
@@ -99,11 +101,7 @@ router.get('/search', async (req: AuthRequest, res: Response, next: NextFunction
     const { q, source, limit = 100, offset = 0 } = req.query;
 
     if (!q || typeof q !== 'string') {
-      return res.status(400).json({
-        error: 'MISSING_QUERY',
-        message: 'Search query parameter (q) is required',
-        statusCode: 400,
-      });
+      throw new AppError('Search query parameter (q) is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
     const logService = LogService.getInstance();

@@ -1,12 +1,14 @@
-import { Router, Response } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
 import { functionUploadRequestSchema, functionUpdateRequestSchema } from '@insforge/shared-schemas';
-import { SocketService } from '@/infra/socket/socket.js';
+import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
+import { successResponse } from '@/utils/response.js';
 
 const router = Router();
 const functionService = FunctionService.getInstance();
@@ -16,12 +18,13 @@ const auditService = AuditService.getInstance();
  * GET /api/functions
  * List all edge functions
  */
-router.get('/', verifyAdmin, async (req: AuthRequest, res: Response) => {
+router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const result = await functionService.listFunctions();
-    res.json(result);
-  } catch {
-    res.status(500).json({ error: 'Failed to list functions' });
+    successResponse(res, result);
+  } catch (error) {
+    logger.error('Failed to list functions', { error });
+    next(new AppError('Failed to list functions', 500, ERROR_CODES.INTERNAL_ERROR));
   }
 });
 
@@ -29,18 +32,18 @@ router.get('/', verifyAdmin, async (req: AuthRequest, res: Response) => {
  * GET /api/functions/:slug
  * Get specific function details including code
  */
-router.get('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => {
+router.get('/:slug', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { slug } = req.params;
     const func = await functionService.getFunction(slug);
 
     if (!func) {
-      return res.status(404).json({ error: 'Function not found' });
+      throw new AppError('Function not found', 404, ERROR_CODES.NOT_FOUND);
     }
 
-    res.json(func);
-  } catch {
-    res.status(500).json({ error: 'Failed to get function' });
+    successResponse(res, func);
+  } catch (error) {
+    next(error);
   }
 });
 
@@ -48,14 +51,11 @@ router.get('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => {
  * POST /api/functions
  * Create a new function
  */
-router.post('/', verifyAdmin, async (req: AuthRequest, res: Response) => {
+router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const validation = functionUploadRequestSchema.safeParse(req.body);
     if (!validation.success) {
-      return res.status(400).json({
-        error: 'Invalid request',
-        details: validation.error.issues,
-      });
+      throw new AppError(JSON.stringify(validation.error.issues), 400, ERROR_CODES.INVALID_INPUT);
     }
 
     const created = await functionService.createFunction(validation.data);
@@ -75,27 +75,21 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response) => {
       ip_address: req.ip,
     });
 
-    const socket = SocketService.getInstance();
+    const socket = SocketManager.getInstance();
     socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
       resource: DataUpdateResourceType.FUNCTIONS,
     });
 
-    res.status(201).json({
-      success: true,
-      function: created,
-    });
+    successResponse(
+      res,
+      {
+        success: true,
+        function: created,
+      },
+      201
+    );
   } catch (error) {
-    if (error instanceof AppError) {
-      return res.status(error.statusCode).json({
-        error: error.code,
-        message: error.message,
-      });
-    }
-
-    res.status(500).json({
-      error: 'INTERNAL_ERROR',
-      message: error instanceof Error ? error.message : 'Failed to create function',
-    });
+    next(error);
   }
 });
 
@@ -103,22 +97,19 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response) => {
  * PUT /api/functions/:slug
  * Update an existing function
  */
-router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => {
+router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { slug } = req.params;
     const validation = functionUpdateRequestSchema.safeParse(req.body);
 
     if (!validation.success) {
-      return res.status(400).json({
-        error: 'Invalid request',
-        details: validation.error.issues,
-      });
+      throw new AppError(JSON.stringify(validation.error.issues), 400, ERROR_CODES.INVALID_INPUT);
     }
 
     const updated = await functionService.updateFunction(slug, validation.data);
 
     if (!updated) {
-      return res.status(404).json({ error: 'Function not found' });
+      throw new AppError('Function not found', 404, ERROR_CODES.NOT_FOUND);
     }
 
     // Log audit event
@@ -134,7 +125,7 @@ router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => {
       ip_address: req.ip,
     });
 
-    const socket = SocketService.getInstance();
+    const socket = SocketManager.getInstance();
     socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
       resource: DataUpdateResourceType.FUNCTIONS,
       data: {
@@ -142,22 +133,12 @@ router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => {
       },
     });
 
-    res.json({
+    successResponse(res, {
       success: true,
       function: updated,
     });
   } catch (error) {
-    if (error instanceof AppError) {
-      return res.status(error.statusCode).json({
-        error: error.code,
-        message: error.message,
-      });
-    }
-
-    res.status(500).json({
-      error: 'INTERNAL_ERROR',
-      message: error instanceof Error ? error.message : 'Failed to update function',
-    });
+    next(error);
   }
 });
 
@@ -165,39 +146,43 @@ router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => {
  * DELETE /api/functions/:slug
  * Delete a function
  */
-router.delete('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => {
-  try {
-    const { slug } = req.params;
-    const deleted = await functionService.deleteFunction(slug);
+router.delete(
+  '/:slug',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { slug } = req.params;
+      const deleted = await functionService.deleteFunction(slug);
 
-    if (!deleted) {
-      return res.status(404).json({ error: 'Function not found' });
+      if (!deleted) {
+        throw new AppError('Function not found', 404, ERROR_CODES.NOT_FOUND);
+      }
+
+      // Log audit event
+      logger.info(`Function ${slug} deleted by ${req.user?.email}`);
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'DELETE_FUNCTION',
+        module: 'FUNCTIONS',
+        details: {
+          slug,
+        },
+        ip_address: req.ip,
+      });
+
+      const socket = SocketManager.getInstance();
+      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
+        resource: DataUpdateResourceType.FUNCTIONS,
+      });
+
+      successResponse(res, {
+        success: true,
+        message: `Function ${slug} deleted successfully`,
+      });
+    } catch (error) {
+      next(error);
     }
-
-    // Log audit event
-    logger.info(`Function ${slug} deleted by ${req.user?.email}`);
-    await auditService.log({
-      actor: req.user?.email || 'api-key',
-      action: 'DELETE_FUNCTION',
-      module: 'FUNCTIONS',
-      details: {
-        slug,
-      },
-      ip_address: req.ip,
-    });
-
-    const socket = SocketService.getInstance();
-    socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-      resource: DataUpdateResourceType.FUNCTIONS,
-    });
-
-    res.json({
-      success: true,
-      message: `Function ${slug} deleted successfully`,
-    });
-  } catch {
-    res.status(500).json({ error: 'Failed to delete function' });
   }
-});
+);
 
 export default router;

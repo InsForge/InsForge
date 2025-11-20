@@ -1,8 +1,8 @@
 import { Pool } from 'pg';
 import crypto from 'crypto';
-import { DatabaseManager } from '@/infra/database/manager.js';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
-import { EncryptionUtils } from '@/infra/security/encryption.js';
+import { EncryptionManager } from '@/infra/security/encryption.manager.js';
 
 export interface SecretSchema {
   id: string;
@@ -30,10 +30,18 @@ export interface UpdateSecretInput {
 }
 
 export class SecretService {
+  private static instance: SecretService;
   private pool: Pool | null = null;
 
-  constructor() {
-    // Encryption is now handled by the shared EncryptionUtils
+  private constructor() {
+    // Encryption is now handled by the shared EncryptionManager
+  }
+
+  public static getInstance(): SecretService {
+    if (!SecretService.instance) {
+      SecretService.instance = new SecretService();
+    }
+    return SecretService.instance;
   }
 
   private getPool(): Pool {
@@ -47,11 +55,10 @@ export class SecretService {
    * Create a new secret
    */
   async createSecret(input: CreateSecretInput): Promise<{ id: string }> {
-    const client = await this.getPool().connect();
     try {
-      const encryptedValue = EncryptionUtils.encrypt(input.value);
+      const encryptedValue = EncryptionManager.encrypt(input.value);
 
-      const result = await client.query(
+      const result = await this.getPool().query(
         `INSERT INTO _secrets (key, value_ciphertext, is_reserved, expires_at)
          VALUES ($1, $2, $3, $4)
          RETURNING id`,
@@ -63,8 +70,6 @@ export class SecretService {
     } catch (error) {
       logger.error('Failed to create secret', { error, key: input.key });
       throw new Error('Failed to create secret');
-    } finally {
-      client.release();
     }
   }
 
@@ -72,9 +77,8 @@ export class SecretService {
    * Get a decrypted secret by ID
    */
   async getSecretById(id: string): Promise<string | null> {
-    const client = await this.getPool().connect();
     try {
-      const result = await client.query(
+      const result = await this.getPool().query(
         `UPDATE _secrets
          SET last_used_at = NOW()
          WHERE id = $1 AND is_active = true
@@ -87,14 +91,12 @@ export class SecretService {
         return null;
       }
 
-      const decryptedValue = EncryptionUtils.decrypt(result.rows[0].value_ciphertext);
+      const decryptedValue = EncryptionManager.decrypt(result.rows[0].value_ciphertext);
       logger.info('Secret retrieved', { id });
       return decryptedValue;
     } catch (error) {
       logger.error('Failed to get secret', { error, id });
       throw new Error('Failed to get secret');
-    } finally {
-      client.release();
     }
   }
 
@@ -102,9 +104,8 @@ export class SecretService {
    * Get a decrypted secret by key
    */
   async getSecretByKey(key: string): Promise<string | null> {
-    const client = await this.getPool().connect();
     try {
-      const result = await client.query(
+      const result = await this.getPool().query(
         `UPDATE _secrets
          SET last_used_at = NOW()
          WHERE key = $1 AND is_active = true
@@ -117,14 +118,12 @@ export class SecretService {
         return null;
       }
 
-      const decryptedValue = EncryptionUtils.decrypt(result.rows[0].value_ciphertext);
+      const decryptedValue = EncryptionManager.decrypt(result.rows[0].value_ciphertext);
       logger.info('Secret retrieved by key', { key });
       return decryptedValue;
     } catch (error) {
       logger.error('Failed to get secret by key', { error, key });
       throw new Error('Failed to get secret');
-    } finally {
-      client.release();
     }
   }
 
@@ -132,9 +131,8 @@ export class SecretService {
    * List all secrets (without decrypting values)
    */
   async listSecrets(): Promise<SecretSchema[]> {
-    const client = await this.getPool().connect();
     try {
-      const result = await client.query(
+      const result = await this.getPool().query(
         `SELECT
           id,
           key,
@@ -152,8 +150,6 @@ export class SecretService {
     } catch (error) {
       logger.error('Failed to list secrets', { error });
       throw new Error('Failed to list secrets');
-    } finally {
-      client.release();
     }
   }
 
@@ -161,14 +157,13 @@ export class SecretService {
    * Update a secret
    */
   async updateSecret(id: string, input: UpdateSecretInput): Promise<boolean> {
-    const client = await this.getPool().connect();
     try {
       const updates: string[] = [];
       const values: (string | boolean | Date | null)[] = [];
       let paramCount = 1;
 
       if (input.value !== undefined) {
-        const encryptedValue = EncryptionUtils.encrypt(input.value);
+        const encryptedValue = EncryptionManager.encrypt(input.value);
         updates.push(`value_ciphertext = $${paramCount++}`);
         values.push(encryptedValue);
       }
@@ -190,7 +185,7 @@ export class SecretService {
 
       values.push(id);
 
-      const result = await client.query(
+      const result = await this.getPool().query(
         `UPDATE _secrets
          SET ${updates.join(', ')}
          WHERE id = $${paramCount}`,
@@ -205,8 +200,6 @@ export class SecretService {
     } catch (error) {
       logger.error('Failed to update secret', { error, id });
       throw new Error('Failed to update secret');
-    } finally {
-      client.release();
     }
   }
 
@@ -214,14 +207,15 @@ export class SecretService {
    * Check if a secret value matches the stored value
    */
   async checkSecretByKey(key: string, value: string): Promise<boolean> {
-    const client = await this.getPool().connect();
     try {
-      const result = await client.query(
-        `SELECT value_ciphertext FROM _secrets
+      // Optimized: Single query that retrieves and updates in one operation
+      const result = await this.getPool().query(
+        `UPDATE _secrets
+         SET last_used_at = NOW()
          WHERE key = $1
          AND is_active = true
          AND (expires_at IS NULL OR expires_at > NOW())
-         LIMIT 1`,
+         RETURNING value_ciphertext`,
         [key]
       );
 
@@ -230,18 +224,10 @@ export class SecretService {
         return false;
       }
 
-      const decryptedValue = EncryptionUtils.decrypt(result.rows[0].value_ciphertext);
+      const decryptedValue = EncryptionManager.decrypt(result.rows[0].value_ciphertext);
       const matches = decryptedValue === value;
 
-      // Update last_used_at if the check was successful
       if (matches) {
-        await client.query(
-          `UPDATE _secrets
-           SET last_used_at = NOW()
-           WHERE key = $1
-           AND is_active = true`,
-          [key]
-        );
         logger.info('Secret check successful', { key });
       } else {
         logger.warn('Secret check failed - value mismatch', { key });
@@ -251,8 +237,6 @@ export class SecretService {
     } catch (error) {
       logger.error('Failed to check secret', { error, key });
       return false;
-    } finally {
-      client.release();
     }
   }
 
@@ -260,29 +244,30 @@ export class SecretService {
    * Delete a secret
    */
   async deleteSecret(id: string): Promise<boolean> {
-    const client = await this.getPool().connect();
     try {
-      // Check if secret is reserved first
-      const checkResult = await client.query('SELECT is_reserved FROM _secrets WHERE id = $1', [
-        id,
-      ]);
-
-      if (checkResult.rows.length && checkResult.rows[0].is_reserved) {
-        throw new Error('Cannot delete reserved secret');
-      }
-
-      const result = await client.query('DELETE FROM _secrets WHERE id = $1', [id]);
+      // Optimized: Single query with WHERE clause to prevent deleting reserved secrets
+      const result = await this.getPool().query(
+        'DELETE FROM _secrets WHERE id = $1 AND is_reserved = false',
+        [id]
+      );
 
       const success = (result.rowCount ?? 0) > 0;
       if (success) {
         logger.info('Secret deleted', { id });
+      } else {
+        // Check if it exists but is reserved
+        const checkResult = await this.getPool().query(
+          'SELECT is_reserved FROM _secrets WHERE id = $1',
+          [id]
+        );
+        if (checkResult.rows.length && checkResult.rows[0].is_reserved) {
+          throw new Error('Cannot delete reserved secret');
+        }
       }
       return success;
     } catch (error) {
       logger.error('Failed to delete secret', { error, id });
       throw new Error('Failed to delete secret');
-    } finally {
-      client.release();
     }
   }
 
@@ -310,7 +295,7 @@ export class SecretService {
         [id]
       );
 
-      const encryptedValue = EncryptionUtils.encrypt(newValue);
+      const encryptedValue = EncryptionManager.encrypt(newValue);
       const newSecretResult = await client.query(
         `INSERT INTO _secrets (key, value_ciphertext)
          VALUES ($1, $2)
@@ -340,9 +325,8 @@ export class SecretService {
    * Clean up expired secrets
    */
   async cleanupExpiredSecrets(): Promise<number> {
-    const client = await this.getPool().connect();
     try {
-      const result = await client.query(
+      const result = await this.getPool().query(
         `DELETE FROM _secrets
          WHERE expires_at IS NOT NULL
          AND expires_at < NOW()
@@ -357,8 +341,6 @@ export class SecretService {
     } catch (error) {
       logger.error('Failed to cleanup expired secrets', { error });
       throw new Error('Failed to cleanup expired secrets');
-    } finally {
-      client.release();
     }
   }
 

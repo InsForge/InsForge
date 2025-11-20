@@ -1,4 +1,4 @@
-import { DatabaseManager } from '@/infra/database/manager.js';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import {
   type RawSQLResponse,
@@ -16,7 +16,17 @@ import { parse } from 'csv-parse/sync';
 import { DatabaseError, type PoolClient } from 'pg';
 
 export class DatabaseAdvanceService {
+  private static instance: DatabaseAdvanceService;
   private dbManager = DatabaseManager.getInstance();
+
+  private constructor() {}
+
+  public static getInstance(): DatabaseAdvanceService {
+    if (!DatabaseAdvanceService.instance) {
+      DatabaseAdvanceService.instance = new DatabaseAdvanceService();
+    }
+    return DatabaseAdvanceService.instance;
+  }
 
   /**
    * Get table data using simple SELECT query
@@ -945,7 +955,6 @@ export class DatabaseAdvanceService {
     }
 
     const pool = this.dbManager.getPool();
-    const client = await pool.connect();
 
     try {
       // Get column names from first record
@@ -1006,10 +1015,10 @@ export class DatabaseAdvanceService {
       }
 
       // Execute query
-      const result = await client.query(query);
+      const result = await pool.query(query);
 
       // Refresh schema cache if needed
-      await client.query(`NOTIFY pgrst, 'reload schema';`);
+      await pool.query(`NOTIFY pgrst, 'reload schema';`);
 
       return {
         rowCount: result.rowCount || 0,
@@ -1026,8 +1035,6 @@ export class DatabaseAdvanceService {
 
       const message = error instanceof Error ? error.message : 'Bulk insert failed';
       throw new AppError(message, 400, ERROR_CODES.INVALID_INPUT);
-    } finally {
-      client.release();
     }
   }
 }

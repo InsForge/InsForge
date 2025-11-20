@@ -1,9 +1,10 @@
 import crypto from 'crypto';
 
 /**
- * Encryption utilities for secrets management
+ * EncryptionManager - Handles encryption/decryption operations
+ * Infrastructure layer for secrets encryption
  */
-export class EncryptionUtils {
+export class EncryptionManager {
   private static encryptionKey: Buffer | null = null;
 
   private static getEncryptionKey(): Buffer {

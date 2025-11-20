@@ -17,10 +17,10 @@ import { usageRouter } from '@/api/routes/usage/index.routes.js';
 import { aiRouter } from '@/api/routes/ai/index.routes.js';
 import { errorMiddleware } from '@/api/middlewares/error.js';
 import fetch, { HeadersInit } from 'node-fetch';
-import { DatabaseManager } from '@/infra/database/manager.js';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { LogService } from '@/services/logs/log.service.js';
 import { StorageService } from '@/services/storage/storage.service.js';
-import { SocketService } from '@/infra/socket/socket.js';
+import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { seedBackend } from '@/utils/seed.js';
 import logger from '@/utils/logger.js';
 import { isProduction } from './utils/environment.js';
@@ -46,8 +46,6 @@ export async function createApp() {
   // Initialize storage service
   const storageService = StorageService.getInstance();
   await storageService.initialize(); // create data/storage
-
-  // Metadata is now handled by individual modules on-demand
 
   // Initialize logs service
   const logService = LogService.getInstance();
@@ -264,7 +262,7 @@ async function initializeServer() {
     });
 
     // Initialize Socket.IO service
-    const socketService = SocketService.getInstance();
+    const socketService = SocketManager.getInstance();
     socketService.initialize(server);
   } catch (error) {
     logger.error('Failed to initialize server', {

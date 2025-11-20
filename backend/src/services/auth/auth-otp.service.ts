@@ -1,7 +1,7 @@
 import { Pool, PoolClient } from 'pg';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { DatabaseManager } from '@/infra/database/manager.js';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
@@ -103,7 +103,6 @@ export class AuthOTPService {
     purpose: OTPPurpose,
     otpType: OTPType = OTPType.NUMERIC_CODE
   ): Promise<CreateOTPResult> {
-    const client = await this.getPool().connect();
     try {
       // Generate token based on type
       let otp: string;
@@ -126,7 +125,7 @@ export class AuthOTPService {
 
       // Upsert token record - insert or update if email+purpose combination already exists
       // This ensures only one active token per email/purpose (replaces any existing token)
-      await client.query(
+      await this.getPool().query(
         `INSERT INTO _email_otps (email, purpose, otp_hash, expires_at, consumed_at)
          VALUES ($1, $2, $3, $4, NULL)
          ON CONFLICT (email, purpose)
@@ -152,8 +151,6 @@ export class AuthOTPService {
     } catch (error) {
       logger.error('Failed to create email verification token', { error, purpose, otpType });
       throw new AppError('Failed to create verification token', 500, ERROR_CODES.INTERNAL_ERROR);
-    } finally {
-      client.release();
     }
   }
 

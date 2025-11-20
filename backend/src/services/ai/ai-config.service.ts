@@ -1,10 +1,20 @@
 import { Pool } from 'pg';
-import { DatabaseManager } from '@/infra/database/manager.js';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
 import { AIConfigurationSchema, AIConfigurationWithUsageSchema } from '@insforge/shared-schemas';
 
 export class AIConfigService {
+  private static instance: AIConfigService;
   private pool: Pool | null = null;
+
+  private constructor() {}
+
+  public static getInstance(): AIConfigService {
+    if (!AIConfigService.instance) {
+      AIConfigService.instance = new AIConfigService();
+    }
+    return AIConfigService.instance;
+  }
 
   private getPool(): Pool {
     if (!this.pool) {
@@ -20,9 +30,8 @@ export class AIConfigService {
     modelId: string,
     systemPrompt?: string
   ): Promise<{ id: string }> {
-    const client = await this.getPool().connect();
     try {
-      const result = await client.query(
+      const result = await this.getPool().query(
         `INSERT INTO _ai_configs (input_modality, output_modality, provider, model_id, system_prompt)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
@@ -34,17 +43,14 @@ export class AIConfigService {
     } catch (error) {
       logger.error('Failed to create AI configuration', { error });
       throw new Error('Failed to create AI configuration');
-    } finally {
-      client.release();
     }
   }
 
   async findAll(): Promise<AIConfigurationWithUsageSchema[]> {
-    const client = await this.getPool().connect();
     try {
       // Use a single query with aggregation to get configs with usage stats
-      const result = await client.query(
-        `SELECT 
+      const result = await this.getPool().query(
+        `SELECT
           c.id,
           c.input_modality as "inputModality",
           c.output_modality as "outputModality",
@@ -80,16 +86,13 @@ export class AIConfigService {
     } catch (error) {
       logger.error('Failed to fetch AI configurations with usage', { error });
       throw new Error('Failed to fetch AI configurations');
-    } finally {
-      client.release();
     }
   }
 
   async update(id: string, systemPrompt: string | null): Promise<boolean> {
-    const client = await this.getPool().connect();
     try {
-      const result = await client.query(
-        `UPDATE _ai_configs 
+      const result = await this.getPool().query(
+        `UPDATE _ai_configs
          SET system_prompt = $1, updated_at = NOW()
          WHERE id = $2`,
         [systemPrompt, id]
@@ -103,15 +106,12 @@ export class AIConfigService {
     } catch (error) {
       logger.error('Failed to update AI configuration', { error, id });
       throw new Error('Failed to update AI configuration');
-    } finally {
-      client.release();
     }
   }
 
   async delete(id: string): Promise<boolean> {
-    const client = await this.getPool().connect();
     try {
-      const result = await client.query('DELETE FROM _ai_configs WHERE id = $1', [id]);
+      const result = await this.getPool().query('DELETE FROM _ai_configs WHERE id = $1', [id]);
 
       const success = (result.rowCount ?? 0) > 0;
       if (success) {
@@ -121,15 +121,12 @@ export class AIConfigService {
     } catch (error) {
       logger.error('Failed to delete AI configuration', { error, id });
       throw new Error('Failed to delete AI configuration');
-    } finally {
-      client.release();
     }
   }
 
   async findByModelId(modelId: string): Promise<AIConfigurationSchema | null> {
-    const client = await this.getPool().connect();
     try {
-      const result = await client.query(
+      const result = await this.getPool().query(
         `SELECT id, input_modality as "inputModality", output_modality as "outputModality", provider, model_id as "modelId", system_prompt as "systemPrompt", created_at, updated_at
          FROM _ai_configs
          WHERE model_id = $1`,
@@ -155,8 +152,6 @@ export class AIConfigService {
         modelId,
       });
       throw new Error('Failed to fetch AI configuration');
-    } finally {
-      client.release();
     }
   }
 

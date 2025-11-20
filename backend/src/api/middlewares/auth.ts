@@ -1,8 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { AuthService } from '@/services/auth/auth.service.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from './error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
-import { verifyCloudToken } from '@/utils/cloud-token.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 
 export interface AuthRequest extends Request {
@@ -16,8 +15,8 @@ export interface AuthRequest extends Request {
   projectId?: string;
 }
 
-const authService = AuthService.getInstance();
-const secretService = new SecretService();
+const tokenManager = TokenManager.getInstance();
+const secretService = SecretService.getInstance();
 
 // Helper function to extract Bearer token
 function extractBearerToken(authHeader: string | undefined): string | null {
@@ -86,7 +85,7 @@ export async function verifyAdmin(req: AuthRequest, res: Response, next: NextFun
     }
 
     // For admin, we use JWT tokens
-    const payload = authService.verifyToken(token);
+    const payload = tokenManager.verifyToken(token);
 
     if (payload.role !== 'project_admin') {
       throw new AppError(
@@ -167,7 +166,7 @@ export function verifyToken(req: AuthRequest, _res: Response, next: NextFunction
     }
 
     // Verify JWT token
-    const payload = authService.verifyToken(token);
+    const payload = tokenManager.verifyToken(token);
 
     // Validate token has a role
     if (!payload.role) {
@@ -215,8 +214,8 @@ export async function verifyCloudBackend(req: AuthRequest, _res: Response, next:
       );
     }
 
-    // Use helper function to verify cloud token
-    const { projectId } = await verifyCloudToken(token);
+    // Use TokenManager to verify cloud token
+    const { projectId } = await tokenManager.verifyCloudToken(token);
 
     // Set project_id on request for use in route handlers
     req.projectId = projectId;

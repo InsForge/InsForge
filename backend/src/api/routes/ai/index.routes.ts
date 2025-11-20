@@ -20,25 +20,21 @@ import {
 } from '@insforge/shared-schemas';
 
 const router = Router();
-const chatService = new ChatCompletionService();
-const aiConfigService = new AIConfigService();
-const aiUsageService = new AIUsageService();
+const chatService = ChatCompletionService.getInstance();
+const aiConfigService = AIConfigService.getInstance();
+const aiUsageService = AIUsageService.getInstance();
 const auditService = AuditService.getInstance();
 
 /**
  * GET /api/ai/models
  * Get all available AI models in ListModelsResponse format
  */
-router.get('/models', verifyAdmin, async (req: AuthRequest, res: Response) => {
+router.get('/models', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const models = await AIModelService.getModels();
-    res.json(models);
+    successResponse(res, models);
   } catch (error) {
-    console.error('Error getting models:', error);
-    res.status(500).json({
-      error: 'Failed to get models list',
-      details: error instanceof Error ? error.message : String(error),
-    });
+    next(error);
   }
 });
 
@@ -98,7 +94,7 @@ router.post(
 
       // Non-streaming requests
       const result = await chatService.chat(messages, options);
-      res.json(result);
+      successResponse(res, result);
     } catch (error) {
       if (error instanceof AppError) {
         next(error);
@@ -135,7 +131,7 @@ router.post(
 
       const result = await ImageGenerationService.generate(validationResult.data);
 
-      res.json(result);
+      successResponse(res, result);
     } catch (error) {
       if (error instanceof AppError) {
         next(error);

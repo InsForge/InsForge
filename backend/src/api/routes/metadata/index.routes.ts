@@ -10,15 +10,15 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { AppError } from '@/api/middlewares/error.js';
 import type { AppMetadataSchema } from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';
-import { DatabaseManager } from '@/infra/database/manager.js';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
 const storageService = StorageService.getInstance();
 const functionService = FunctionService.getInstance();
 const dbManager = DatabaseManager.getInstance();
-const dbAdvanceService = new DatabaseAdvanceService();
-const aiConfigService = new AIConfigService();
+const dbAdvanceService = DatabaseAdvanceService.getInstance();
+const aiConfigService = AIConfigService.getInstance();
 
 router.use(verifyAdmin);
 
@@ -107,7 +107,7 @@ router.get('/functions', async (_req: AuthRequest, res: Response, next: NextFunc
 // Get API key (admin only)
 router.get('/api-key', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const secretService = new SecretService();
+    const secretService = SecretService.getInstance();
     const apiKey = await secretService.getSecretByKey('API_KEY');
 
     successResponse(res, { apiKey: apiKey });

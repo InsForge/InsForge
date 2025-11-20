@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import { DatabaseAdvanceService } from '@/services/database/database-advance.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
@@ -12,11 +12,12 @@ import {
   bulkUpsertRequestSchema,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import { SocketService } from '@/infra/socket/socket.js';
+import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
+import { successResponse } from '@/utils/response.js';
 
 const router = Router();
-const dbAdvanceService = new DatabaseAdvanceService();
+const dbAdvanceService = DatabaseAdvanceService.getInstance();
 const auditService = AuditService.getInstance();
 
 /**
@@ -26,70 +27,61 @@ const auditService = AuditService.getInstance();
  * ⚠️ This endpoint has relaxed restrictions compared to /rawsql
  * - Allows SELECT and INSERT into system tables and users table
  */
-router.post('/rawsql/unrestricted', verifyAdmin, async (req: AuthRequest, res: Response) => {
-  try {
-    // Validate request body
-    const validation = rawSQLRequestSchema.safeParse(req.body);
-    if (!validation.success) {
-      throw new AppError(
-        validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
+router.post(
+  '/rawsql/unrestricted',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      // Validate request body
+      const validation = rawSQLRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
 
-    const { query, params = [] } = validation.data;
+      const { query, params = [] } = validation.data;
 
-    // Sanitize query with relaxed mode
-    const sanitizedQuery = dbAdvanceService.sanitizeQuery(query, 'relaxed');
+      // Sanitize query with relaxed mode
+      const sanitizedQuery = dbAdvanceService.sanitizeQuery(query, 'relaxed');
 
-    // Execute SQL
-    const response = await dbAdvanceService.executeRawSQL(sanitizedQuery, params);
+      // Execute SQL
+      const response = await dbAdvanceService.executeRawSQL(sanitizedQuery, params);
 
-    // Log audit for relaxed raw SQL execution
-    await auditService.log({
-      actor: req.user?.email || 'api-key',
-      action: 'EXECUTE_RAW_SQL_RELAXED',
-      module: 'DATABASE',
-      details: {
-        query: query.substring(0, 300), // Limit query length in audit log
-        paramCount: params.length,
-        rowsAffected: response.rowCount,
-        mode: 'relaxed',
-      },
-      ip_address: req.ip,
-    });
-
-    const socket = SocketService.getInstance();
-    socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-      resource: DataUpdateResourceType.DATABASE,
-    });
-
-    res.json(response);
-  } catch (error: unknown) {
-    logger.warn('Relaxed raw SQL execution error:', error);
-
-    if (error instanceof AppError) {
-      res.status(error.statusCode).json({
-        error: 'SQL_EXECUTION_ERROR',
-        message: error.message,
-        statusCode: error.statusCode,
+      // Log audit for relaxed raw SQL execution
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'EXECUTE_RAW_SQL_RELAXED',
+        module: 'DATABASE',
+        details: {
+          query: query.substring(0, 300), // Limit query length in audit log
+          paramCount: params.length,
+          rowsAffected: response.rowCount,
+          mode: 'relaxed',
+        },
+        ip_address: req.ip,
       });
-    } else {
-      res.status(400).json({
-        error: 'SQL_EXECUTION_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to execute SQL query',
-        statusCode: 400,
+
+      const socket = SocketManager.getInstance();
+      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
+        resource: DataUpdateResourceType.DATABASE,
       });
+
+      successResponse(res, response);
+    } catch (error: unknown) {
+      logger.warn('Relaxed raw SQL execution error:', error);
+      next(error);
     }
   }
-});
+);
 
 /**
  * Execute raw SQL query with strict sanitization
  * POST /api/database/advance/rawsql
  */
-router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response) => {
+router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     // Validate request body
     const validation = rawSQLRequestSchema.safeParse(req.body);
@@ -123,28 +115,15 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response) => {
       ip_address: req.ip,
     });
 
-    const socket = SocketService.getInstance();
+    const socket = SocketManager.getInstance();
     socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
       resource: DataUpdateResourceType.DATABASE,
     });
 
-    res.json(response);
+    successResponse(res, response);
   } catch (error: unknown) {
     logger.warn('Raw SQL execution error:', error);
-
-    if (error instanceof AppError) {
-      res.status(error.statusCode).json({
-        error: 'SQL_EXECUTION_ERROR',
-        message: error.message,
-        statusCode: error.statusCode,
-      });
-    } else {
-      res.status(400).json({
-        error: 'SQL_EXECUTION_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to execute SQL query',
-        statusCode: 400,
-      });
-    }
+    next(error);
   }
 });
 
@@ -152,7 +131,7 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response) => {
  * Export database data
  * POST /api/database/advance/export
  */
-router.post('/export', verifyAdmin, async (req: AuthRequest, res: Response) => {
+router.post('/export', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     // Validate request body
     const validation = exportRequestSchema.safeParse(req.body);
@@ -194,14 +173,10 @@ router.post('/export', verifyAdmin, async (req: AuthRequest, res: Response) => {
       ip_address: req.ip,
     });
 
-    res.json(response);
+    successResponse(res, response);
   } catch (error: unknown) {
     logger.warn('Database export error:', error);
-    res.status(500).json({
-      error: 'EXPORT_ERROR',
-      message: error instanceof Error ? error.message : 'Failed to export database',
-      statusCode: 500,
-    });
+    next(error);
   }
 });
 
@@ -218,7 +193,7 @@ router.post(
   verifyAdmin,
   upload.single('file'),
   handleUploadError,
-  async (req: AuthRequest, res: Response) => {
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       if (!req.file) {
         throw new AppError('File is required', 400, ERROR_CODES.INVALID_INPUT);
@@ -259,7 +234,7 @@ router.post(
         ip_address: req.ip,
       });
 
-      const socket = SocketService.getInstance();
+      const socket = SocketManager.getInstance();
       socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
         resource: DataUpdateResourceType.RECORDS,
         data: {
@@ -267,23 +242,11 @@ router.post(
         },
       });
 
-      res.json(response);
+      successResponse(res, response);
     } catch (error: unknown) {
       logger.warn('Bulk upsert error:', error);
 
-      if (error instanceof AppError) {
-        res.status(error.statusCode).json({
-          error: 'BULK_UPSERT_ERROR',
-          message: error.message,
-          statusCode: error.statusCode,
-        });
-      } else {
-        res.status(400).json({
-          error: 'BULK_UPSERT_ERROR',
-          message: error instanceof Error ? error.message : 'Failed to perform bulk upsert',
-          statusCode: 400,
-        });
-      }
+      next(error);
     }
   }
 );
@@ -298,7 +261,7 @@ router.post(
   verifyAdmin,
   upload.single('file'),
   handleUploadError,
-  async (req: AuthRequest, res: Response) => {
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       // Validate request body
       const validation = importRequestSchema.safeParse(req.body);
@@ -338,28 +301,15 @@ router.post(
         ip_address: req.ip,
       });
 
-      const socket = SocketService.getInstance();
+      const socket = SocketManager.getInstance();
       socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
         resource: DataUpdateResourceType.DATABASE,
       });
 
-      res.json(response);
+      successResponse(res, response);
     } catch (error: unknown) {
       logger.warn('Database import error:', error);
-
-      if (error instanceof AppError) {
-        res.status(error.statusCode).json({
-          error: 'IMPORT_ERROR',
-          message: error.message,
-          statusCode: error.statusCode,
-        });
-      } else {
-        res.status(500).json({
-          error: 'IMPORT_ERROR',
-          message: error instanceof Error ? error.message : 'Failed to import database',
-          statusCode: 500,
-        });
-      }
+      next(error);
     }
   }
 );
