@@ -5,7 +5,7 @@ import { ImageGenerationService } from '@/services/ai/image-generation.service.j
 import { AIModelService } from '@/services/ai/ai-model.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
-import { successResponse, errorResponse } from '@/utils/response.js';
+import { successResponse } from '@/utils/response.js';
 import { AIConfigService } from '@/services/ai/ai-config.service.js';
 import { AIUsageService } from '@/services/ai/ai-usage.service.js';
 import { AIClientService } from '@/providers/ai/openrouter.provider.js';
@@ -20,22 +20,21 @@ import {
 } from '@insforge/shared-schemas';
 
 const router = Router();
-const chatService = new ChatCompletionService();
-const aiConfigService = new AIConfigService();
-const aiUsageService = new AIUsageService();
+const chatService = ChatCompletionService.getInstance();
+const aiConfigService = AIConfigService.getInstance();
+const aiUsageService = AIUsageService.getInstance();
 const auditService = AuditService.getInstance();
 
 /**
  * GET /api/ai/models
  * Get all available AI models in ListModelsResponse format
  */
-router.get('/models', verifyAdmin, async (req: AuthRequest, res: Response) => {
+router.get('/models', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const models = await AIModelService.getModels();
     successResponse(res, models);
   } catch (error) {
-    console.error('Error getting models:', error);
-    errorResponse(res, 'INTERNAL_ERROR', error instanceof Error ? error.message : String(error), 500);
+    next(error);
   }
 });
 

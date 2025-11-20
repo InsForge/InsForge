@@ -5,7 +5,7 @@ import {
   FunctionUpdateRequest,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import { DatabaseError } from 'pg';
+import { DatabaseError, Pool } from 'pg';
 import fetch from 'node-fetch';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -19,11 +19,9 @@ export interface FunctionWithRuntime {
 
 export class FunctionService {
   private static instance: FunctionService;
-  private db;
+  private pool: Pool | null = null;
 
-  private constructor() {
-    this.db = DatabaseManager.getInstance();
-  }
+  private constructor() {}
 
   static getInstance(): FunctionService {
     if (!FunctionService.instance) {
@@ -32,20 +30,28 @@ export class FunctionService {
     return FunctionService.instance;
   }
 
+  private getPool(): Pool {
+    if (!this.pool) {
+      const dbManager = DatabaseManager.getInstance();
+      this.pool = dbManager.getPool();
+    }
+    return this.pool;
+  }
+
   /**
    * List all functions with runtime health check
    */
   async listFunctions(): Promise<FunctionWithRuntime> {
     try {
-      const functions = await this.db
-        .prepare(
-          `SELECT 
-            id, slug, name, description, status, 
-            created_at, updated_at, deployed_at
-          FROM _functions
-          ORDER BY created_at DESC`
-        )
-        .all();
+      const result = await this.getPool().query(
+        `SELECT
+          id, slug, name, description, status,
+          created_at, updated_at, deployed_at
+        FROM _functions
+        ORDER BY created_at DESC`
+      );
+
+      const functions = result.rows;
 
       // Check if Deno runtime is healthy
       let runtimeHealthy = false;
@@ -82,17 +88,16 @@ export class FunctionService {
    */
   async getFunction(slug: string): Promise<Record<string, unknown> | undefined> {
     try {
-      const func = await this.db
-        .prepare(
-          `SELECT 
-            id, slug, name, description, code, status,
-            created_at, updated_at, deployed_at
-          FROM _functions
-          WHERE slug = ?`
-        )
-        .get(slug);
+      const result = await this.getPool().query(
+        `SELECT
+          id, slug, name, description, code, status,
+          created_at, updated_at, deployed_at
+        FROM _functions
+        WHERE slug = $1`,
+        [slug]
+      );
 
-      return func;
+      return result.rows[0];
     } catch (error) {
       logger.error('Failed to get function', {
         error: error instanceof Error ? error.message : String(error),
@@ -107,6 +112,7 @@ export class FunctionService {
    * Create a new function
    */
   async createFunction(data: FunctionUploadRequest): Promise<Record<string, unknown>> {
+    const client = await this.getPool().connect();
     try {
       const { name, code, description, status } = data;
       const slug = data.slug || name.toLowerCase().replace(/\s+/g, '-');
@@ -118,29 +124,28 @@ export class FunctionService {
       const id = crypto.randomUUID();
 
       // Insert function
-      await this.db
-        .prepare(
-          `INSERT INTO _functions (id, slug, name, description, code, status)
-          VALUES (?, ?, ?, ?, ?, ?)`
-        )
-        .run(id, slug, name, description || null, code, status);
+      await client.query(
+        `INSERT INTO _functions (id, slug, name, description, code, status)
+        VALUES ($1, $2, $3, $4, $5, $6)`,
+        [id, slug, name, description || null, code, status]
+      );
 
       // If status is active, update deployed_at
       if (status === 'active') {
-        await this.db
-          .prepare(`UPDATE _functions SET deployed_at = CURRENT_TIMESTAMP WHERE id = ?`)
-          .run(id);
+        await client.query(
+          `UPDATE _functions SET deployed_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          [id]
+        );
       }
 
       // Fetch the created function
-      const created = await this.db
-        .prepare(
-          `SELECT id, slug, name, description, status, created_at
-          FROM _functions WHERE id = ?`
-        )
-        .get(id);
+      const result = await client.query(
+        `SELECT id, slug, name, description, status, created_at
+        FROM _functions WHERE id = $1`,
+        [id]
+      );
 
-      return created;
+      return result.rows[0];
     } catch (error) {
       // Re-throw AppErrors as-is
       if (error instanceof AppError) {
@@ -162,6 +167,8 @@ export class FunctionService {
       }
 
       throw error;
+    } finally {
+      client.release();
     }
   }
 
@@ -172,10 +179,14 @@ export class FunctionService {
     slug: string,
     updates: FunctionUpdateRequest
   ): Promise<Record<string, unknown> | null> {
+    const client = await this.getPool().connect();
     try {
       // Check if function exists
-      const existing = await this.db.prepare('SELECT id FROM _functions WHERE slug = ?').get(slug);
-      if (!existing) {
+      const existingResult = await client.query(
+        'SELECT id FROM _functions WHERE slug = $1',
+        [slug]
+      );
+      if (existingResult.rows.length === 0) {
         return null;
       }
 
@@ -186,50 +197,55 @@ export class FunctionService {
 
       // Update fields
       if (updates.name !== undefined) {
-        await this.db
-          .prepare('UPDATE _functions SET name = ? WHERE slug = ?')
-          .run(updates.name, slug);
+        await client.query(
+          'UPDATE _functions SET name = $1 WHERE slug = $2',
+          [updates.name, slug]
+        );
       }
 
       if (updates.description !== undefined) {
-        await this.db
-          .prepare('UPDATE _functions SET description = ? WHERE slug = ?')
-          .run(updates.description, slug);
+        await client.query(
+          'UPDATE _functions SET description = $1 WHERE slug = $2',
+          [updates.description, slug]
+        );
       }
 
       if (updates.code !== undefined) {
-        await this.db
-          .prepare('UPDATE _functions SET code = ? WHERE slug = ?')
-          .run(updates.code, slug);
+        await client.query(
+          'UPDATE _functions SET code = $1 WHERE slug = $2',
+          [updates.code, slug]
+        );
       }
 
       if (updates.status !== undefined) {
-        await this.db
-          .prepare('UPDATE _functions SET status = ? WHERE slug = ?')
-          .run(updates.status, slug);
+        await client.query(
+          'UPDATE _functions SET status = $1 WHERE slug = $2',
+          [updates.status, slug]
+        );
 
         // Update deployed_at if status changes to active
         if (updates.status === 'active') {
-          await this.db
-            .prepare('UPDATE _functions SET deployed_at = CURRENT_TIMESTAMP WHERE slug = ?')
-            .run(slug);
+          await client.query(
+            'UPDATE _functions SET deployed_at = CURRENT_TIMESTAMP WHERE slug = $1',
+            [slug]
+          );
         }
       }
 
       // Update updated_at
-      await this.db
-        .prepare('UPDATE _functions SET updated_at = CURRENT_TIMESTAMP WHERE slug = ?')
-        .run(slug);
+      await client.query(
+        'UPDATE _functions SET updated_at = CURRENT_TIMESTAMP WHERE slug = $1',
+        [slug]
+      );
 
       // Fetch updated function
-      const updated = await this.db
-        .prepare(
-          `SELECT id, slug, name, description, status, updated_at
-          FROM _functions WHERE slug = ?`
-        )
-        .get(slug);
+      const result = await client.query(
+        `SELECT id, slug, name, description, status, updated_at
+        FROM _functions WHERE slug = $1`,
+        [slug]
+      );
 
-      return updated;
+      return result.rows[0];
     } catch (error) {
       logger.error('Failed to update function', {
         error: error instanceof Error ? error.message : String(error),
@@ -237,6 +253,8 @@ export class FunctionService {
         slug,
       });
       throw error;
+    } finally {
+      client.release();
     }
   }
 
@@ -245,9 +263,9 @@ export class FunctionService {
    */
   async deleteFunction(slug: string): Promise<boolean> {
     try {
-      const result = await this.db.prepare('DELETE FROM _functions WHERE slug = ?').run(slug);
+      const result = await this.getPool().query('DELETE FROM _functions WHERE slug = $1', [slug]);
 
-      if (result.changes === 0) {
+      if (result.rowCount === 0) {
         return false;
       }
 
@@ -267,15 +285,13 @@ export class FunctionService {
    */
   async getMetadata(): Promise<Array<EdgeFunctionMetadataSchema>> {
     try {
-      const functions = await this.db
-        .prepare(
-          `SELECT slug, name, description, status
-          FROM _functions
-          ORDER BY created_at DESC`
-        )
-        .all();
+      const result = await this.getPool().query(
+        `SELECT slug, name, description, status
+        FROM _functions
+        ORDER BY created_at DESC`
+      );
 
-      return functions as Array<EdgeFunctionMetadataSchema>;
+      return result.rows as Array<EdgeFunctionMetadataSchema>;
     } catch (error) {
       logger.error('Failed to get edge functions metadata', {
         error: error instanceof Error ? error.message : String(error),

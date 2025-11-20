@@ -16,7 +16,7 @@ import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 
 const router = Router();
-const secretService = new SecretService();
+const secretService = SecretService.getInstance();
 const postgrestUrl = process.env.POSTGREST_BASE_URL || 'http://localhost:5430';
 
 // Create a dedicated HTTP agent with connection pooling for PostgREST

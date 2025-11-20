@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import { DatabaseAdvanceService } from '@/services/database/database-advance.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
@@ -14,10 +14,10 @@ import {
 import logger from '@/utils/logger.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
-import { successResponse, errorResponse } from '@/utils/response.js';
+import { successResponse } from '@/utils/response.js';
 
 const router = Router();
-const dbAdvanceService = new DatabaseAdvanceService();
+const dbAdvanceService = DatabaseAdvanceService.getInstance();
 const auditService = AuditService.getInstance();
 
 /**
@@ -27,62 +27,61 @@ const auditService = AuditService.getInstance();
  * ⚠️ This endpoint has relaxed restrictions compared to /rawsql
  * - Allows SELECT and INSERT into system tables and users table
  */
-router.post('/rawsql/unrestricted', verifyAdmin, async (req: AuthRequest, res: Response) => {
-  try {
-    // Validate request body
-    const validation = rawSQLRequestSchema.safeParse(req.body);
-    if (!validation.success) {
-      throw new AppError(
-        validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
+router.post(
+  '/rawsql/unrestricted',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      // Validate request body
+      const validation = rawSQLRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
 
-    const { query, params = [] } = validation.data;
+      const { query, params = [] } = validation.data;
 
-    // Sanitize query with relaxed mode
-    const sanitizedQuery = dbAdvanceService.sanitizeQuery(query, 'relaxed');
+      // Sanitize query with relaxed mode
+      const sanitizedQuery = dbAdvanceService.sanitizeQuery(query, 'relaxed');
 
-    // Execute SQL
-    const response = await dbAdvanceService.executeRawSQL(sanitizedQuery, params);
+      // Execute SQL
+      const response = await dbAdvanceService.executeRawSQL(sanitizedQuery, params);
 
-    // Log audit for relaxed raw SQL execution
-    await auditService.log({
-      actor: req.user?.email || 'api-key',
-      action: 'EXECUTE_RAW_SQL_RELAXED',
-      module: 'DATABASE',
-      details: {
-        query: query.substring(0, 300), // Limit query length in audit log
-        paramCount: params.length,
-        rowsAffected: response.rowCount,
-        mode: 'relaxed',
-      },
-      ip_address: req.ip,
-    });
+      // Log audit for relaxed raw SQL execution
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'EXECUTE_RAW_SQL_RELAXED',
+        module: 'DATABASE',
+        details: {
+          query: query.substring(0, 300), // Limit query length in audit log
+          paramCount: params.length,
+          rowsAffected: response.rowCount,
+          mode: 'relaxed',
+        },
+        ip_address: req.ip,
+      });
 
-    const socket = SocketManager.getInstance();
-    socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-      resource: DataUpdateResourceType.DATABASE,
-    });
+      const socket = SocketManager.getInstance();
+      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
+        resource: DataUpdateResourceType.DATABASE,
+      });
 
-    successResponse(res, response);
-  } catch (error: unknown) {
-    logger.warn('Relaxed raw SQL execution error:', error);
-
-    if (error instanceof AppError) {
-      errorResponse(res, 'SQL_EXECUTION_ERROR', error.message, error.statusCode);
-    } else {
-      errorResponse(res, 'SQL_EXECUTION_ERROR', error instanceof Error ? error.message : 'Failed to execute SQL query', 400);
+      successResponse(res, response);
+    } catch (error: unknown) {
+      logger.warn('Relaxed raw SQL execution error:', error);
+      next(error);
     }
   }
-});
+);
 
 /**
  * Execute raw SQL query with strict sanitization
  * POST /api/database/advance/rawsql
  */
-router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response) => {
+router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     // Validate request body
     const validation = rawSQLRequestSchema.safeParse(req.body);
@@ -124,12 +123,7 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response) => {
     successResponse(res, response);
   } catch (error: unknown) {
     logger.warn('Raw SQL execution error:', error);
-
-    if (error instanceof AppError) {
-      errorResponse(res, 'SQL_EXECUTION_ERROR', error.message, error.statusCode);
-    } else {
-      errorResponse(res, 'SQL_EXECUTION_ERROR', error instanceof Error ? error.message : 'Failed to execute SQL query', 400);
-    }
+    next(error);
   }
 });
 
@@ -137,7 +131,7 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response) => {
  * Export database data
  * POST /api/database/advance/export
  */
-router.post('/export', verifyAdmin, async (req: AuthRequest, res: Response) => {
+router.post('/export', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     // Validate request body
     const validation = exportRequestSchema.safeParse(req.body);
@@ -182,7 +176,7 @@ router.post('/export', verifyAdmin, async (req: AuthRequest, res: Response) => {
     successResponse(res, response);
   } catch (error: unknown) {
     logger.warn('Database export error:', error);
-    errorResponse(res, 'EXPORT_ERROR', error instanceof Error ? error.message : 'Failed to export database', 500);
+    next(error);
   }
 });
 
@@ -199,7 +193,7 @@ router.post(
   verifyAdmin,
   upload.single('file'),
   handleUploadError,
-  async (req: AuthRequest, res: Response) => {
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       if (!req.file) {
         throw new AppError('File is required', 400, ERROR_CODES.INVALID_INPUT);
@@ -252,11 +246,7 @@ router.post(
     } catch (error: unknown) {
       logger.warn('Bulk upsert error:', error);
 
-      if (error instanceof AppError) {
-        errorResponse(res, 'BULK_UPSERT_ERROR', error.message, error.statusCode);
-      } else {
-        errorResponse(res, 'BULK_UPSERT_ERROR', error instanceof Error ? error.message : 'Failed to perform bulk upsert', 400);
-      }
+      next(error);
     }
   }
 );
@@ -271,7 +261,7 @@ router.post(
   verifyAdmin,
   upload.single('file'),
   handleUploadError,
-  async (req: AuthRequest, res: Response) => {
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       // Validate request body
       const validation = importRequestSchema.safeParse(req.body);
@@ -319,12 +309,7 @@ router.post(
       successResponse(res, response);
     } catch (error: unknown) {
       logger.warn('Database import error:', error);
-
-      if (error instanceof AppError) {
-        errorResponse(res, 'IMPORT_ERROR', error.message, error.statusCode);
-      } else {
-        errorResponse(res, 'IMPORT_ERROR', error instanceof Error ? error.message : 'Failed to import database', 500);
-      }
+      next(error);
     }
   }
 );

@@ -1,3 +1,4 @@
+import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
 import { AppError } from '@/api/middlewares/error.js';
@@ -7,12 +8,17 @@ import { AuditLogSchema, GetAuditLogStatsResponse } from '@insforge/shared-schem
 
 export class AuditService {
   private static instance: AuditService;
-  private db: ReturnType<DatabaseManager['getDb']>;
+  private pool: Pool | null = null;
 
   private constructor() {
-    const dbManager = DatabaseManager.getInstance();
-    this.db = dbManager.getDb();
     logger.info('AuditService initialized');
+  }
+
+  private getPool(): Pool {
+    if (!this.pool) {
+      this.pool = DatabaseManager.getInstance().getPool();
+    }
+    return this.pool;
   }
 
   public static getInstance(): AuditService {
@@ -27,19 +33,21 @@ export class AuditService {
    */
   async log(entry: AuditLogEntry): Promise<AuditLogSchema> {
     try {
-      const result = await this.db
-        .prepare(
-          `INSERT INTO _audit_logs (actor, action, module, details, ip_address)
-           VALUES ($1, $2, $3, $4, $5)
-           RETURNING *`
-        )
-        .get(
+      const pool = this.getPool();
+      const result = await pool.query(
+        `INSERT INTO _audit_logs (actor, action, module, details, ip_address)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [
           entry.actor,
           entry.action,
           entry.module,
           entry.details ? JSON.stringify(entry.details) : null,
-          entry.ip_address || null
-        );
+          entry.ip_address || null,
+        ]
+      );
+
+      const row = result.rows[0];
 
       logger.info('Audit log created', {
         actor: entry.actor,
@@ -48,14 +56,14 @@ export class AuditService {
       });
 
       return {
-        id: result.id,
-        actor: result.actor,
-        action: result.action,
-        module: result.module,
-        details: result.details,
-        ipAddress: result.ip_address,
-        createdAt: result.created_at,
-        updatedAt: result.updated_at,
+        id: row.id,
+        actor: row.actor,
+        action: row.action,
+        module: row.module,
+        details: row.details,
+        ipAddress: row.ip_address,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
       };
     } catch (error) {
       logger.error('Failed to create audit log', error);
@@ -68,6 +76,8 @@ export class AuditService {
    */
   async query(query: AuditLogQuery): Promise<{ records: AuditLogSchema[]; total: number }> {
     try {
+      const pool = this.getPool();
+
       // Build base WHERE clause
       let whereClause = 'WHERE 1=1';
       const params: unknown[] = [];
@@ -100,8 +110,8 @@ export class AuditService {
 
       // Get total count first
       const countSql = `SELECT COUNT(*) as count FROM _audit_logs ${whereClause}`;
-      const countResult = (await this.db.prepare(countSql).get(...params)) as { count: number };
-      const total = countResult.count;
+      const countResult = await pool.query(countSql, params);
+      const total = parseInt(countResult.rows[0].count, 10);
 
       // Get paginated records
       let dataSql = `SELECT * FROM _audit_logs ${whereClause} ORDER BY created_at DESC`;
@@ -117,10 +127,10 @@ export class AuditService {
         dataParams.push(query.offset);
       }
 
-      const records = await this.db.prepare(dataSql).all(...dataParams);
+      const dataResult = await pool.query(dataSql, dataParams);
 
       return {
-        records: records.map((record) => ({
+        records: dataResult.rows.map((record) => ({
           id: record.id,
           actor: record.actor,
           action: record.action,
@@ -143,18 +153,21 @@ export class AuditService {
    */
   async getById(id: string): Promise<AuditLogSchema | null> {
     try {
-      const result = await this.db.prepare('SELECT * FROM _audit_logs WHERE id = $1').get(id);
+      const pool = this.getPool();
+      const result = await pool.query('SELECT * FROM _audit_logs WHERE id = $1', [id]);
 
-      return result
+      const row = result.rows[0];
+
+      return row
         ? {
-            id: result.id,
-            actor: result.actor,
-            action: result.action,
-            module: result.module,
-            details: result.details,
-            ipAddress: result.ip_address,
-            createdAt: result.created_at,
-            updatedAt: result.updated_at,
+            id: row.id,
+            actor: row.actor,
+            action: row.action,
+            module: row.module,
+            details: row.details,
+            ipAddress: row.ip_address,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
           }
         : null;
     } catch (error) {
@@ -168,50 +181,52 @@ export class AuditService {
    */
   async getStats(days: number = 7): Promise<GetAuditLogStatsResponse> {
     try {
+      const pool = this.getPool();
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
-      const [totalLogs] = await this.db
-        .prepare('SELECT COUNT(*) as count FROM _audit_logs WHERE created_at >= $1')
-        .get(startDate.toISOString());
+      const totalLogsResult = await pool.query(
+        'SELECT COUNT(*) as count FROM _audit_logs WHERE created_at >= $1',
+        [startDate.toISOString()]
+      );
 
-      const [uniqueActors] = await this.db
-        .prepare('SELECT COUNT(DISTINCT actor) as count FROM _audit_logs WHERE created_at >= $1')
-        .get(startDate.toISOString());
+      const uniqueActorsResult = await pool.query(
+        'SELECT COUNT(DISTINCT actor) as count FROM _audit_logs WHERE created_at >= $1',
+        [startDate.toISOString()]
+      );
 
-      const [uniqueModules] = await this.db
-        .prepare('SELECT COUNT(DISTINCT module) as count FROM _audit_logs WHERE created_at >= $1')
-        .get(startDate.toISOString());
+      const uniqueModulesResult = await pool.query(
+        'SELECT COUNT(DISTINCT module) as count FROM _audit_logs WHERE created_at >= $1',
+        [startDate.toISOString()]
+      );
 
-      const actionsByModule = await this.db
-        .prepare(
-          `SELECT module, COUNT(*) as count
-           FROM _audit_logs
-           WHERE created_at >= $1
-           GROUP BY module`
-        )
-        .all(startDate.toISOString());
+      const actionsByModuleResult = await pool.query(
+        `SELECT module, COUNT(*) as count
+         FROM _audit_logs
+         WHERE created_at >= $1
+         GROUP BY module`,
+        [startDate.toISOString()]
+      );
 
-      const recentActivity = await this.db
-        .prepare(
-          `SELECT * FROM _audit_logs
-           WHERE created_at >= $1
-           ORDER BY created_at DESC
-           LIMIT 10`
-        )
-        .all(startDate.toISOString());
+      const recentActivityResult = await pool.query(
+        `SELECT * FROM _audit_logs
+         WHERE created_at >= $1
+         ORDER BY created_at DESC
+         LIMIT 10`,
+        [startDate.toISOString()]
+      );
 
       const moduleStats: Record<string, number> = {};
-      actionsByModule.forEach((row: { module: string; count: string }) => {
-        moduleStats[row.module] = parseInt(row.count);
+      actionsByModuleResult.rows.forEach((row: { module: string; count: string }) => {
+        moduleStats[row.module] = parseInt(row.count, 10);
       });
 
       return {
-        totalLogs: parseInt(totalLogs?.count || 0),
-        uniqueActors: parseInt(uniqueActors?.count || 0),
-        uniqueModules: parseInt(uniqueModules?.count || 0),
+        totalLogs: parseInt(totalLogsResult.rows[0]?.count || '0', 10),
+        uniqueActors: parseInt(uniqueActorsResult.rows[0]?.count || '0', 10),
+        uniqueModules: parseInt(uniqueModulesResult.rows[0]?.count || '0', 10),
         actionsByModule: moduleStats,
-        recentActivity: recentActivity.map((record) => ({
+        recentActivity: recentActivityResult.rows.map((record) => ({
           id: record.id,
           actor: record.actor,
           action: record.action,
@@ -233,14 +248,16 @@ export class AuditService {
    */
   async cleanup(daysToKeep: number = 90): Promise<number> {
     try {
+      const pool = this.getPool();
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
 
-      const result = await this.db
-        .prepare('DELETE FROM _audit_logs WHERE created_at < $1 RETURNING id')
-        .all(cutoffDate.toISOString());
+      const result = await pool.query(
+        'DELETE FROM _audit_logs WHERE created_at < $1 RETURNING id',
+        [cutoffDate.toISOString()]
+      );
 
-      const deletedCount = result.length;
+      const deletedCount = result.rows.length;
 
       if (deletedCount > 0) {
         logger.info(`Cleaned up ${deletedCount} audit logs older than ${daysToKeep} days`);

@@ -1,13 +1,14 @@
-import { Router, Response } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
 import { functionUploadRequestSchema, functionUpdateRequestSchema } from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
-import { successResponse, errorResponse } from '@/utils/response.js';
+import { successResponse } from '@/utils/response.js';
 
 const router = Router();
 const functionService = FunctionService.getInstance();
@@ -17,12 +18,12 @@ const auditService = AuditService.getInstance();
  * GET /api/functions
  * List all edge functions
  */
-router.get('/', verifyAdmin, async (req: AuthRequest, res: Response) => {
+router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const result = await functionService.listFunctions();
     successResponse(res, result);
-  } catch {
-    errorResponse(res, 'INTERNAL_ERROR', 'Failed to list functions', 500);
+  } catch (error) {
+    next(new AppError('Failed to list functions', 500, ERROR_CODES.INTERNAL_ERROR));
   }
 });
 
@@ -30,18 +31,18 @@ router.get('/', verifyAdmin, async (req: AuthRequest, res: Response) => {
  * GET /api/functions/:slug
  * Get specific function details including code
  */
-router.get('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => {
+router.get('/:slug', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { slug } = req.params;
     const func = await functionService.getFunction(slug);
 
     if (!func) {
-      return errorResponse(res, 'NOT_FOUND', 'Function not found', 404);
+      throw new AppError('Function not found', 404, ERROR_CODES.NOT_FOUND);
     }
 
     successResponse(res, func);
-  } catch {
-    errorResponse(res, 'INTERNAL_ERROR', 'Failed to get function', 500);
+  } catch (error) {
+    next(error);
   }
 });
 
@@ -49,15 +50,14 @@ router.get('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => {
  * POST /api/functions
  * Create a new function
  */
-router.post('/', verifyAdmin, async (req: AuthRequest, res: Response) => {
+router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const validation = functionUploadRequestSchema.safeParse(req.body);
     if (!validation.success) {
-      return errorResponse(
-        res,
-        'VALIDATION_ERROR',
+      throw new AppError(
         JSON.stringify(validation.error.issues),
-        400
+        400,
+        ERROR_CODES.INVALID_INPUT
       );
     }
 
@@ -92,16 +92,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response) => {
       201
     );
   } catch (error) {
-    if (error instanceof AppError) {
-      return errorResponse(res, error.code, error.message, error.statusCode);
-    }
-
-    errorResponse(
-      res,
-      'INTERNAL_ERROR',
-      error instanceof Error ? error.message : 'Failed to create function',
-      500
-    );
+    next(error);
   }
 });
 
@@ -109,24 +100,23 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response) => {
  * PUT /api/functions/:slug
  * Update an existing function
  */
-router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => {
+router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { slug } = req.params;
     const validation = functionUpdateRequestSchema.safeParse(req.body);
 
     if (!validation.success) {
-      return errorResponse(
-        res,
-        'VALIDATION_ERROR',
+      throw new AppError(
         JSON.stringify(validation.error.issues),
-        400
+        400,
+        ERROR_CODES.INVALID_INPUT
       );
     }
 
     const updated = await functionService.updateFunction(slug, validation.data);
 
     if (!updated) {
-      return errorResponse(res, 'NOT_FOUND', 'Function not found', 404);
+      throw new AppError('Function not found', 404, ERROR_CODES.NOT_FOUND);
     }
 
     // Log audit event
@@ -155,16 +145,7 @@ router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => {
       function: updated,
     });
   } catch (error) {
-    if (error instanceof AppError) {
-      return errorResponse(res, error.code, error.message, error.statusCode);
-    }
-
-    errorResponse(
-      res,
-      'INTERNAL_ERROR',
-      error instanceof Error ? error.message : 'Failed to update function',
-      500
-    );
+    next(error);
   }
 });
 
@@ -172,13 +153,13 @@ router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => {
  * DELETE /api/functions/:slug
  * Delete a function
  */
-router.delete('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => {
+router.delete('/:slug', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { slug } = req.params;
     const deleted = await functionService.deleteFunction(slug);
 
     if (!deleted) {
-      return errorResponse(res, 'NOT_FOUND', 'Function not found', 404);
+      throw new AppError('Function not found', 404, ERROR_CODES.NOT_FOUND);
     }
 
     // Log audit event
@@ -202,8 +183,8 @@ router.delete('/:slug', verifyAdmin, async (req: AuthRequest, res: Response) => 
       success: true,
       message: `Function ${slug} deleted successfully`,
     });
-  } catch {
-    errorResponse(res, 'INTERNAL_ERROR', 'Failed to delete function', 500);
+  } catch (error) {
+    next(error);
   }
 });
 

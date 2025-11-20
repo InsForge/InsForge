@@ -16,7 +16,7 @@ export interface AuthRequest extends Request {
 }
 
 const tokenManager = TokenManager.getInstance();
-const secretService = new SecretService();
+const secretService = SecretService.getInstance();
 
 // Helper function to extract Bearer token
 function extractBearerToken(authHeader: string | undefined): string | null {

@@ -32,9 +32,8 @@ export class AuthConfigService {
    * Returns all configuration fields except metadata (id, created_at, updated_at)
    */
   async getPublicAuthConfig() {
-    const client = await this.getPool().connect();
     try {
-      const result = await client.query(
+      const result = await this.getPool().query(
         `SELECT
           require_email_verification as "requireEmailVerification",
           password_min_length as "passwordMinLength",
@@ -71,8 +70,6 @@ export class AuthConfigService {
         500,
         ERROR_CODES.INTERNAL_ERROR
       );
-    } finally {
-      client.release();
     }
   }
 
@@ -81,9 +78,8 @@ export class AuthConfigService {
    * Returns the singleton configuration row with all columns
    */
   async getAuthConfig(): Promise<AuthConfigSchema> {
-    const client = await this.getPool().connect();
     try {
-      const result = await client.query(
+      const result = await this.getPool().query(
         `SELECT
           id,
           require_email_verification as "requireEmailVerification",
@@ -129,8 +125,6 @@ export class AuthConfigService {
         500,
         ERROR_CODES.INTERNAL_ERROR
       );
-    } finally {
-      client.release();
     }
   }
 

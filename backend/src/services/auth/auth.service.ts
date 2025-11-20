@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import logger from '@/utils/logger.js';
@@ -50,7 +51,7 @@ export class AuthService {
   private static instance: AuthService;
   private adminEmail: string;
   private adminPassword: string;
-  private db;
+  private pool: Pool | null = null;
   private tokenManager: TokenManager;
 
   // OAuth provider instances (cached singletons)
@@ -69,9 +70,6 @@ export class AuthService {
     if (!this.adminEmail || !this.adminPassword) {
       throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD environment variables are required');
     }
-
-    const dbManager = DatabaseManager.getInstance();
-    this.db = dbManager.getDb();
 
     // Initialize token manager
     this.tokenManager = TokenManager.getInstance();
@@ -95,6 +93,14 @@ export class AuthService {
     return AuthService.instance;
   }
 
+  private getPool(): Pool {
+    if (!this.pool) {
+      const dbManager = DatabaseManager.getInstance();
+      this.pool = dbManager.getPool();
+    }
+    return this.pool;
+  }
+
   /**
    * User registration
    * Otherwise, returns user with access token for immediate login
@@ -114,29 +120,34 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const userId = crypto.randomUUID();
-    await this.db.exec('BEGIN');
-    try {
-      await this.db
-        .prepare(
-          `INSERT INTO _accounts (id, email, password, name, email_verified, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, NOW(), NOW())`
-        )
-        .run(userId, email, hashedPassword, name || null, false);
 
-      await this.db
-        .prepare(
-          `INSERT INTO users (id, nickname, created_at, updated_at)
-           VALUES (?, ?, NOW(), NOW())`
-        )
-        .run(userId, name || null);
-      await this.db.exec('COMMIT');
+    const pool = this.getPool();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      await client.query(
+        `INSERT INTO _accounts (id, email, password, name, email_verified, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+        [userId, email, hashedPassword, name || null, false]
+      );
+
+      await client.query(
+        `INSERT INTO users (id, nickname, created_at, updated_at)
+         VALUES ($1, $2, NOW(), NOW())`,
+        [userId, name || null]
+      );
+
+      await client.query('COMMIT');
     } catch (e) {
-      await this.db.exec('ROLLBACK');
+      await client.query('ROLLBACK');
       // Postgres unique_violation
       if (e && typeof e === 'object' && 'code' in e && e.code === '23505') {
         throw new AppError('User already exists', 409, ERROR_CODES.ALREADY_EXISTS);
       }
       throw e;
+    } finally {
+      client.release();
     }
 
     const dbUser = await this.getUserById(userId);
@@ -227,7 +238,9 @@ export class AuthService {
    */
   async sendVerificationEmailWithCode(email: string): Promise<void> {
     // Check if user exists
-    const dbUser = await this.db.prepare('SELECT * FROM _accounts WHERE email = ?').get(email);
+    const pool = this.getPool();
+    const result = await pool.query('SELECT * FROM _accounts WHERE email = $1', [email]);
+    const dbUser = result.rows[0];
     if (!dbUser) {
       // Silently succeed to prevent user enumeration
       logger.info('Verification email requested for non-existent user', { email });
@@ -256,7 +269,9 @@ export class AuthService {
    */
   async sendVerificationEmailWithLink(email: string): Promise<void> {
     // Check if user exists
-    const dbUser = await this.db.prepare('SELECT * FROM _accounts WHERE email = ?').get(email);
+    const pool = this.getPool();
+    const result = await pool.query('SELECT * FROM _accounts WHERE email = $1', [email]);
+    const dbUser = result.rows[0];
     if (!dbUser) {
       // Silently succeed to prevent user enumeration
       logger.info('Verification email requested for non-existent user', { email });
@@ -419,7 +434,9 @@ export class AuthService {
    */
   async sendResetPasswordEmailWithCode(email: string): Promise<void> {
     // Check if user exists
-    const dbUser = await this.db.prepare('SELECT * FROM _accounts WHERE email = ?').get(email);
+    const pool = this.getPool();
+    const result = await pool.query('SELECT * FROM _accounts WHERE email = $1', [email]);
+    const dbUser = result.rows[0];
     if (!dbUser) {
       // Silently succeed to prevent user enumeration
       logger.info('Password reset requested for non-existent user', { email });
@@ -448,7 +465,9 @@ export class AuthService {
    */
   async sendResetPasswordEmailWithLink(email: string): Promise<void> {
     // Check if user exists
-    const dbUser = await this.db.prepare('SELECT * FROM _accounts WHERE email = ?').get(email);
+    const pool = this.getPool();
+    const result = await pool.query('SELECT * FROM _accounts WHERE email = $1', [email]);
+    const dbUser = result.rows[0];
     if (!dbUser) {
       // Silently succeed to prevent user enumeration
       logger.info('Password reset requested for non-existent user', { email });
@@ -653,25 +672,27 @@ export class AuthService {
       | XUserInfo
       | Record<string, unknown>
   ): Promise<CreateSessionResponse> {
+    const pool = this.getPool();
+
     // First, try to find existing user by provider ID in _account_providers table
-    const account = await this.db
-      .prepare('SELECT * FROM _account_providers WHERE provider = ? AND provider_account_id = ?')
-      .get(provider, providerId);
+    const accountResult = await pool.query(
+      'SELECT * FROM _account_providers WHERE provider = $1 AND provider_account_id = $2',
+      [provider, providerId]
+    );
+    const account = accountResult.rows[0];
 
     if (account) {
       // Found existing OAuth user, update last login time
-      await this.db
-        .prepare(
-          'UPDATE _account_providers SET updated_at = CURRENT_TIMESTAMP WHERE provider = ? AND provider_account_id = ?'
-        )
-        .run(provider, providerId);
+      await pool.query(
+        'UPDATE _account_providers SET updated_at = CURRENT_TIMESTAMP WHERE provider = $1 AND provider_account_id = $2',
+        [provider, providerId]
+      );
 
       // Update email_verified to true if not already verified (OAuth login means email is trusted)
-      await this.db
-        .prepare(
-          'UPDATE _accounts SET email_verified = true WHERE id = ? AND email_verified = false'
-        )
-        .run(account.user_id);
+      await pool.query(
+        'UPDATE _accounts SET email_verified = true WHERE id = $1 AND email_verified = false',
+        [account.user_id]
+      );
 
       const dbUser = await this.getUserById(account.user_id);
       if (!dbUser) {
@@ -689,30 +710,29 @@ export class AuthService {
     }
 
     // If not found by provider_id, try to find by email in _user table
-    const existingUser = await this.db
-      .prepare('SELECT * FROM _accounts WHERE email = ?')
-      .get(email);
+    const existingUserResult = await pool.query('SELECT * FROM _accounts WHERE email = $1', [
+      email,
+    ]);
+    const existingUser = existingUserResult.rows[0];
 
     if (existingUser) {
       // Found existing user by email, create _account_providers record to link OAuth
-      await this.db
-        .prepare(
-          `
+      await pool.query(
+        `
         INSERT INTO _account_providers (
-          user_id, provider, provider_account_id, 
+          user_id, provider, provider_account_id,
           provider_data, created_at, updated_at
         )
-        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `
-        )
-        .run(existingUser.id, provider, providerId, JSON.stringify(identityData));
+        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `,
+        [existingUser.id, provider, providerId, JSON.stringify(identityData)]
+      );
 
       // Update email_verified to true (OAuth login means email is trusted)
-      await this.db
-        .prepare(
-          'UPDATE _accounts SET email_verified = true WHERE id = ? AND email_verified = false'
-        )
-        .run(existingUser.id);
+      await pool.query(
+        'UPDATE _accounts SET email_verified = true WHERE id = $1 AND email_verified = false',
+        [existingUser.id]
+      );
 
       // Fetch updated user data with provider information
       const dbUser = await this.getUserById(existingUser.id);
@@ -762,47 +782,42 @@ export class AuthService {
   ): Promise<CreateSessionResponse> {
     const userId = crypto.randomUUID();
 
-    await this.db.exec('BEGIN');
+    const pool = this.getPool();
+    const client = await pool.connect();
 
     try {
-      // Create user record (without password for OAuth users)
-      await this.db
-        .prepare(
-          `
-        INSERT INTO _accounts (id, email, name, email_verified, created_at, updated_at)
-        VALUES (?, ?, ?, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `
-        )
-        .run(userId, email, userName);
+      await client.query('BEGIN');
 
-      await this.db
-        .prepare(
-          `
+      // Create user record (without password for OAuth users)
+      await client.query(
+        `
+        INSERT INTO _accounts (id, email, name, email_verified, created_at, updated_at)
+        VALUES ($1, $2, $3, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `,
+        [userId, email, userName]
+      );
+
+      await client.query(
+        `
         INSERT INTO users (id, nickname, avatar_url, created_at, updated_at)
-        VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `
-        )
-        .run(userId, userName, avatarUrl);
+        VALUES ($1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `,
+        [userId, userName, avatarUrl]
+      );
 
       // Create _account_providers record
-      await this.db
-        .prepare(
-          `
+      await client.query(
+        `
         INSERT INTO _account_providers (
           user_id, provider, provider_account_id,
           provider_data, created_at, updated_at
         )
-        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `
-        )
-        .run(
-          userId,
-          provider,
-          providerId,
-          JSON.stringify({ ...identityData, avatar_url: avatarUrl })
-        );
+        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `,
+        [userId, provider, providerId, JSON.stringify({ ...identityData, avatar_url: avatarUrl })]
+      );
 
-      await this.db.exec('COMMIT');
+      await client.query('COMMIT');
 
       const user: UserSchema = {
         id: userId,
@@ -821,8 +836,10 @@ export class AuthService {
 
       return { user, accessToken };
     } catch (error) {
-      await this.db.exec('ROLLBACK');
+      await client.query('ROLLBACK');
       throw error;
+    } finally {
+      client.release();
     }
   }
 
@@ -952,9 +969,9 @@ export class AuthService {
    * @private
    */
   private async getUserByEmail(email: string): Promise<UserRecord | null> {
-    const dbUser = (await this.db
-      .prepare(
-        `
+    const pool = this.getPool();
+    const result = await pool.query(
+      `
       SELECT
         u.id,
         u.email,
@@ -966,13 +983,13 @@ export class AuthService {
         STRING_AGG(a.provider, ',') as providers
       FROM _accounts u
       LEFT JOIN _account_providers a ON u.id = a.user_id
-      WHERE u.email = ?
+      WHERE u.email = $1
       GROUP BY u.id
-    `
-      )
-      .get(email)) as UserRecord | undefined;
+    `,
+      [email]
+    );
 
-    return dbUser || null;
+    return result.rows[0] || null;
   }
 
   /**
@@ -980,9 +997,9 @@ export class AuthService {
    * @private
    */
   private async getUserById(userId: string): Promise<UserRecord | null> {
-    const dbUser = (await this.db
-      .prepare(
-        `
+    const pool = this.getPool();
+    const result = await pool.query(
+      `
       SELECT
         u.id,
         u.email,
@@ -994,13 +1011,13 @@ export class AuthService {
         STRING_AGG(a.provider, ',') as providers
       FROM _accounts u
       LEFT JOIN _account_providers a ON u.id = a.user_id
-      WHERE u.id = ?
+      WHERE u.id = $1
       GROUP BY u.id
-    `
-      )
-      .get(userId)) as UserRecord | undefined;
+    `,
+      [userId]
+    );
 
-    return dbUser || null;
+    return result.rows[0] || null;
   }
 
   /**
@@ -1049,6 +1066,7 @@ export class AuthService {
     offset: number,
     search?: string
   ): Promise<{ users: UserSchema[]; total: number }> {
+    const pool = this.getPool();
     let query = `
       SELECT
         u.id,
@@ -1065,14 +1083,15 @@ export class AuthService {
     const params: (string | number)[] = [];
 
     if (search) {
-      query += ' WHERE u.email LIKE ? OR u.name LIKE ?';
+      query += ' WHERE u.email LIKE $1 OR u.name LIKE $2';
       params.push(`%${search}%`, `%${search}%`);
     }
 
-    query += ' GROUP BY u.id ORDER BY u.created_at DESC LIMIT ? OFFSET ?';
+    query += ` GROUP BY u.id ORDER BY u.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     params.push(limit, offset);
 
-    const dbUsers = (await this.db.prepare(query).all(...params)) as UserRecord[];
+    const result = await pool.query(query, params);
+    const dbUsers = result.rows as UserRecord[];
 
     // Transform users
     const users = dbUsers.map((dbUser) => this.transformUserRecordToSchema(dbUser));
@@ -1081,10 +1100,11 @@ export class AuthService {
     let countQuery = 'SELECT COUNT(*) as count FROM _accounts';
     const countParams: string[] = [];
     if (search) {
-      countQuery += ' WHERE email LIKE ? OR name LIKE ?';
+      countQuery += ' WHERE email LIKE $1 OR name LIKE $2';
       countParams.push(`%${search}%`, `%${search}%`);
     }
-    const { count } = (await this.db.prepare(countQuery).get(...countParams)) as { count: number };
+    const countResult = await pool.query(countQuery, countParams);
+    const count = countResult.rows[0].count;
 
     return {
       users,
@@ -1107,11 +1127,10 @@ export class AuthService {
    * Delete multiple users by IDs
    */
   async deleteUsers(userIds: string[]): Promise<number> {
-    const placeholders = userIds.map(() => '?').join(',');
-    const result = await this.db
-      .prepare(`DELETE FROM _accounts WHERE id IN (${placeholders})`)
-      .run(...userIds);
+    const pool = this.getPool();
+    const placeholders = userIds.map((_, i) => `$${i + 1}`).join(',');
+    const result = await pool.query(`DELETE FROM _accounts WHERE id IN (${placeholders})`, userIds);
 
-    return result.changes;
+    return result.rowCount || 0;
   }
 }

@@ -1,3 +1,4 @@
+import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
 
@@ -19,11 +20,15 @@ interface UsageStats {
  */
 export class UsageService {
   private static instance: UsageService;
-  private db;
+  private pool: Pool | null = null;
 
-  private constructor() {
-    const dbManager = DatabaseManager.getInstance();
-    this.db = dbManager.getDb();
+  private constructor() {}
+
+  private getPool(): Pool {
+    if (!this.pool) {
+      this.pool = DatabaseManager.getInstance().getPool();
+    }
+    return this.pool;
   }
 
   public static getInstance(): UsageService {
@@ -38,18 +43,17 @@ export class UsageService {
    */
   async createMcpUsage(toolName: string, success: boolean = true): Promise<{ created_at: string }> {
     try {
-      const result = await this.db
-        .prepare(
-          `
+      const result = await this.getPool().query(
+        `
           INSERT INTO _mcp_usage (tool_name, success)
           VALUES ($1, $2)
           RETURNING created_at
-        `
-        )
-        .get(toolName, success);
+        `,
+        [toolName, success]
+      );
 
       return {
-        created_at: result.created_at,
+        created_at: result.rows[0].created_at,
       };
     } catch (error) {
       logger.error('Error creating MCP usage record', {
@@ -66,19 +70,18 @@ export class UsageService {
    */
   async getMcpUsage(limit: number = 5, success: boolean = true): Promise<McpUsageRecord[]> {
     try {
-      const records = await this.db
-        .prepare(
-          `
+      const result = await this.getPool().query(
+        `
           SELECT tool_name, success, created_at
           FROM _mcp_usage
           WHERE success = $1
           ORDER BY created_at DESC
           LIMIT $2
-        `
-        )
-        .all(success, limit);
+        `,
+        [success, limit]
+      );
 
-      return records as McpUsageRecord[];
+      return result.rows as McpUsageRecord[];
     } catch (error) {
       logger.error('Error getting MCP usage records', {
         error: error instanceof Error ? error.message : String(error),
@@ -96,39 +99,34 @@ export class UsageService {
   async getUsageStats(startDate: Date, endDate: Date): Promise<UsageStats> {
     try {
       // Get MCP tool usage count within date range
-      const mcpResult = await this.db
-        .prepare(
-          `
+      const mcpResult = await this.getPool().query(
+        `
           SELECT COUNT(*) as count
           FROM _mcp_usage
           WHERE success = true
             AND created_at >= $1
             AND created_at < $2
-        `
-        )
-        .get(startDate, endDate);
-      const mcpUsageCount = parseInt(mcpResult?.count || '0');
+        `,
+        [startDate, endDate]
+      );
+      const mcpUsageCount = parseInt(mcpResult.rows[0]?.count || '0');
 
       // Get database size (in bytes)
-      const dbSizeResult = await this.db
-        .prepare(
-          `
+      const dbSizeResult = await this.getPool().query(
+        `
           SELECT pg_database_size(current_database()) as size
         `
-        )
-        .get();
-      const databaseSize = parseInt(dbSizeResult?.size || '0');
+      );
+      const databaseSize = parseInt(dbSizeResult.rows[0]?.size || '0');
 
       // Get total storage size from _storage table
-      const storageResult = await this.db
-        .prepare(
-          `
+      const storageResult = await this.getPool().query(
+        `
           SELECT COALESCE(SUM(size), 0) as total_size
           FROM _storage
         `
-        )
-        .get();
-      const storageSize = parseInt(storageResult?.total_size || '0');
+      );
+      const storageSize = parseInt(storageResult.rows[0]?.total_size || '0');
 
       return {
         mcp_usage_count: mcpUsageCount,

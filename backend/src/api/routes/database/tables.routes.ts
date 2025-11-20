@@ -8,7 +8,7 @@ import { createTableRequestSchema, updateTableSchemaRequestSchema } from '@insfo
 import { AuditService } from '@/services/logs/audit.service.js';
 
 const router = Router();
-const tableService = new DatabaseTableService();
+const tableService = DatabaseTableService.getInstance();
 const auditService = AuditService.getInstance();
 
 // All table routes accept either JWT token or API key authentication

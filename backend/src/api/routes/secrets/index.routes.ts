@@ -7,7 +7,7 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
 
 const router = Router();
-const secretService = new SecretService();
+const secretService = SecretService.getInstance();
 const auditService = AuditService.getInstance();
 
 /**
