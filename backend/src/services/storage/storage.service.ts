@@ -372,7 +372,7 @@ export class StorageService {
   async listBuckets(): Promise<StorageBucketSchema[]> {
     // Get all buckets with their metadata from _storage_buckets table
     const result = await this.getPool().query(
-      'SELECT name, public, created_at FROM _storage_buckets ORDER BY name'
+      'SELECT name, public, created_at as "createdAt" FROM _storage_buckets ORDER BY name'
     );
 
     return result.rows as StorageBucketSchema[];
@@ -550,23 +550,17 @@ export class StorageService {
   async getMetadata(): Promise<StorageMetadataSchema> {
     // Get storage buckets from _storage_buckets table
     const result = await this.getPool().query(
-      'SELECT name, public, created_at FROM _storage_buckets ORDER BY name'
+      'SELECT name, public, created_at as "createdAt" FROM _storage_buckets ORDER BY name'
     );
 
-    const storageBuckets = result.rows as { name: string; public: boolean; created_at: string }[];
-
-    const bucketsMetadata = storageBuckets.map((b) => ({
-      name: b.name,
-      public: b.public,
-      createdAt: b.created_at,
-    }));
+    const storageBuckets = result.rows as StorageBucketSchema[];
 
     // Get object counts for each bucket
     const bucketsObjectCountMap = await this.getBucketsObjectCount();
     const storageSize = await this.getStorageSizeInGB();
 
     return {
-      buckets: bucketsMetadata.map((bucket) => ({
+      buckets: storageBuckets.map((bucket) => ({
         ...bucket,
         objectCount: bucketsObjectCountMap.get(bucket.name) ?? 0,
       })),

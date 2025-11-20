@@ -34,20 +34,19 @@ const conditionalAuth = async (req: Request, res: Response, next: NextFunction) 
   return verifyUser(req, res, next);
 };
 
-// GET /api/storage/buckets - List all buckets (requires auth)
+// GET /api/storage/buckets - List all buckets (requires admin)
 router.get('/buckets', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const storageService = StorageService.getInstance();
     const buckets = await storageService.listBuckets();
 
-    // Traditional REST: return array directly
     successResponse(res, buckets);
   } catch (error) {
     next(error);
   }
 });
 
-// POST /api/storage/buckets - Create a new bucket (requires auth)
+// POST /api/storage/buckets - Create a new bucket (requires admin)
 router.post(
   '/buckets',
   verifyAdmin,
