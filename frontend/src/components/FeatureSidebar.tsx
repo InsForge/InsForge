@@ -1,15 +1,15 @@
 import { useState, ReactNode } from 'react';
 import { Plus, LucideIcon } from 'lucide-react';
-import { ScrollArea } from '@/components/radix/ScrollArea';
-import { Button } from '@/components/radix/Button';
-import { SearchInput } from '@/components/SearchInput';
-import { FeatureSidebarItem } from '@/components/FeatureSidebarItem';
 import {
+  ScrollArea,
+  Button,
+  SearchInput,
+  FeatureSidebarItem,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/radix/Tooltip';
+} from '@/components';
 
 interface FeatureSidebarProps {
   title: string;

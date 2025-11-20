@@ -1,11 +1,13 @@
 import { useState, useEffect, useMemo, useCallback, ReactNode } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/radix/Dialog';
-import { Button } from '@/components/radix/Button';
-import { useTables } from '@/features/database/hooks/useTables';
-import { useRecords } from '@/features/database/hooks/useRecords';
-import { convertSchemaToColumns } from '@/features/database/components/DatabaseDataGrid';
-import { SearchInput, DataGrid, TypeBadge } from '@/components';
 import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  SearchInput,
+  DataGrid,
+  TypeBadge,
   type CellMouseEvent,
   type CellClickArgs,
   type RenderCellProps,
@@ -15,7 +17,10 @@ import {
   type DatabaseRecord,
   type ConvertedValue,
   type DataGridRowType,
-} from '@/components/datagrid';
+} from '@/components';
+import { useTables } from '@/features/database/hooks/useTables';
+import { useRecords } from '@/features/database/hooks/useRecords';
+import { convertSchemaToColumns } from '@/features/database/components/DatabaseDataGrid';
 import { formatValueForDisplay } from '@/lib/utils/utils';
 import { ColumnType } from '@insforge/shared-schemas';
 

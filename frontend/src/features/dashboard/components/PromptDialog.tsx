@@ -1,7 +1,5 @@
-import { Dialog, DialogContent } from '@/components/radix/Dialog';
+import { Button, CopyButton, Dialog, DialogContent } from '@/components';
 import { CheckCircle, Lock, Database, HardDrive, Code2, Box } from 'lucide-react';
-import { CopyButton } from '@/components/CopyButton';
-import { Button } from '@/components/radix/Button';
 import type { PromptTemplate } from '../prompts';
 
 interface PromptDialogProps {

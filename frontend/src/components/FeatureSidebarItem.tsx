@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Pencil, Trash2, MoreVertical, LucideIcon } from 'lucide-react';
-import { Button } from '@/components/radix/Button';
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/radix/DropdownMenu';
+} from '@/components';
 import { cn } from '@/lib/utils/utils';
 
 interface FeatureSidebarItemProps {

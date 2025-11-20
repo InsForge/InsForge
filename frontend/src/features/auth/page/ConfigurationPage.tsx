@@ -1,11 +1,16 @@
 import { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Button } from '@/components/radix/Button';
-import { Input } from '@/components/radix/Input';
-import { Switch } from '@/components/radix/Switch';
-import { Checkbox } from '@/components/Checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/radix/Select';
+import {
+  Button,
+  Input,
+  Switch,
+  Checkbox,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from '@/components';
 import {
   updateAuthConfigRequestSchema,
   type UpdateAuthConfigRequest,

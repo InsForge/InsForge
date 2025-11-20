@@ -5,27 +5,30 @@ import PencilIcon from '@/assets/icons/pencil.svg?react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import { useTables } from '@/features/database/hooks/useTables';
 import { useRecords } from '@/features/database/hooks/useRecords';
-import { Button } from '@/components/radix/Button';
-import { Alert, AlertDescription } from '@/components/radix/Alert';
 import { TableSidebar } from '@/features/database/components/TableSidebar';
 import { RecordFormDialog } from '@/features/database/components/RecordFormDialog';
 import { TableForm } from '@/features/database/components/TableForm';
-import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { EmptyState } from '@/components/EmptyState';
 import { TablesEmptyState } from '@/features/database/components/TablesEmptyState';
 import { TemplatePreview } from '@/features/database/components/TemplatePreview';
 import { DATABASE_TEMPLATES, DatabaseTemplate } from '@/features/database/templates';
 import {
+  Alert,
+  AlertDescription,
+  Button,
+  ConfirmDialog,
+  ConnectCTA,
+  EmptyState,
+  SearchInput,
+  SelectionClearButton,
+  DeleteActionButton,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/radix/Tooltip';
+} from '@/components';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
 import { DatabaseDataGrid } from '@/features/database/components/DatabaseDataGrid';
-import { SearchInput, SelectionClearButton, DeleteActionButton } from '@/components';
-import { ConnectCTA } from '@/components/ConnectCTA';
 import { SortColumn } from 'react-data-grid';
 import { convertValueForColumn } from '@/lib/utils/utils';
 import {

@@ -1,19 +1,21 @@
 import { useState, useEffect, useMemo } from 'react';
 import { UserPlus } from 'lucide-react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
-import { Button, SearchInput, SelectionClearButton, DeleteActionButton } from '@/components';
-import { UsersDataGrid } from '@/features/auth/components/UsersDataGrid';
-import { SortColumn } from 'react-data-grid';
-import { UserSchema } from '@insforge/shared-schemas';
-import { ConnectCTA } from '@/components/ConnectCTA';
 import {
+  Button,
+  ConnectCTA,
+  SearchInput,
+  SelectionClearButton,
+  DeleteActionButton,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/radix/Tooltip';
-import { UserFormDialog } from '@/features/auth/components/UserFormDialog';
-import { ConfirmDialog } from '@/components/ConfirmDialog';
+  ConfirmDialog,
+} from '@/components';
+import { UsersDataGrid, UserFormDialog } from '@/features/auth/components';
+import { SortColumn } from 'react-data-grid';
+import { UserSchema } from '@insforge/shared-schemas';
 import { useToast } from '@/lib/hooks/useToast';
 import { useUsers } from '@/features/auth/hooks/useUsers';
 import {

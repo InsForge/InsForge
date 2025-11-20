@@ -1,21 +1,21 @@
 import React, { useState } from 'react';
 import { Control, Controller, FieldError, UseFormReturn } from 'react-hook-form';
-import { Input } from '@/components/radix/Input';
-import { Label } from '@/components/radix/Label';
-import { Button } from '@/components/radix/Button';
 import { Calendar, Clock, Link2, X } from 'lucide-react';
 import {
+  Button,
+  Label,
+  Input,
   BooleanCellEditor,
   DateCellEditor,
   JsonCellEditor,
   type DatabaseRecord,
   type ConvertedValue,
   type UserInputValue,
-} from '@/components/datagrid';
+  TypeBadge,
+} from '@/components';
 import { ColumnSchema, ColumnType } from '@insforge/shared-schemas';
 import { convertValueForColumn, cn, formatValueForDisplay } from '@/lib/utils/utils';
 import { LinkRecordModal } from '@/features/database/components/LinkRecordModal';
-import { TypeBadge } from '@/components/TypeBadge';
 import { isValid, parseISO } from 'date-fns';
 
 // Helper function to get appropriate placeholder text

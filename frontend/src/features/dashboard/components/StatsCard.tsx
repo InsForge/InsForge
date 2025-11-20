@@ -1,5 +1,4 @@
-import { Card, CardContent } from '@/components/radix/Card';
-import { Skeleton } from '@/components/radix/Skeleton';
+import { Card, CardContent, Skeleton } from '@/components';
 import { LucideIcon } from 'lucide-react';
 
 interface StatsCardProps {

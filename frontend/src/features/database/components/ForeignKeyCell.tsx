@@ -1,17 +1,20 @@
 import { useState, useMemo } from 'react';
 import { Link2, AlertCircle, X } from 'lucide-react';
-import { Button } from '@/components/radix/Button';
-import { TypeBadge } from '@/components/TypeBadge';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/radix/Popover';
 import {
+  Button,
+  TypeBadge,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/radix/Tooltip';
+  ConvertedValue,
+  DataGrid,
+} from '@/components';
 import { useTables } from '@/features/database/hooks/useTables';
 import { useRecords } from '@/features/database/hooks/useRecords';
-import { ConvertedValue, DataGrid } from '@/components/datagrid';
 import { convertSchemaToColumns } from '@/features/database/components/DatabaseDataGrid';
 import { formatValueForDisplay } from '@/lib/utils/utils';
 

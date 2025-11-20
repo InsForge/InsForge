@@ -1,6 +1,5 @@
 import { AlertCircle } from 'lucide-react';
-import { Button } from '@/components/radix/Button';
-import { Alert, AlertDescription, AlertTitle } from '@/components/radix/Alert';
+import { Alert, AlertTitle, AlertDescription, Button } from '@/components';
 import { cn } from '@/lib/utils/utils';
 
 interface ErrorStateProps {

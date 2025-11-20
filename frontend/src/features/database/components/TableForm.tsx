@@ -3,9 +3,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Plus, X, Link, MoveRight } from 'lucide-react';
-import { Button } from '@/components/radix/Button';
-import { Input } from '@/components/radix/Input';
-import { Alert, AlertDescription } from '@/components/radix/Alert';
+import { Alert, AlertDescription, Button, Input } from '@/components';
 import { tableService } from '@/features/database/services/table.service';
 import {
   TableFormColumnSchema,

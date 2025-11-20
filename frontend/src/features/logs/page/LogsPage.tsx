@@ -2,15 +2,15 @@ import { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
 import { useLogs } from '../hooks/useLogs';
-import { SearchInput } from '@/components/SearchInput';
-import { EmptyState } from '@/components/EmptyState';
 import {
+  Button,
+  Checkbox,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from '@/components/radix/DropdownMenu';
-import { Button } from '@/components/radix/Button';
-import { Checkbox } from '@/components/Checkbox';
+  EmptyState,
+  SearchInput,
+} from '@/components/';
 import { LogsDataGrid, type LogsColumnDef } from '../components/LogsDataGrid';
 import { SeverityBadge } from '../components/SeverityBadge';
 import { SEVERITY_OPTIONS, LOGS_PAGE_SIZE } from '../helpers';

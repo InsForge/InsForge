@@ -1,18 +1,20 @@
 import { useMemo, useState, useEffect } from 'react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
-import { Button } from '@/components';
 import {
+  Button,
+  EmptyState,
+  SearchInput,
+  DataGrid,
+  type DataGridColumn,
+  type DataGridRowType,
+  type ConvertedValue,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/radix/Tooltip';
+} from '@/components';
 import { useFullMetadata } from '../hooks/useFullMetadata';
-import { SearchInput } from '@/components/SearchInput';
-import { EmptyState } from '@/components/EmptyState';
-import { DataGrid, type DataGridColumn, type DataGridRowType } from '@/components/datagrid';
 import type { ExportDatabaseResponse, ExportDatabaseJsonData } from '@insforge/shared-schemas';
-import type { ConvertedValue } from '@/components/datagrid/datagridTypes';
 import { isSystemFunction } from '../constants';
 import {
   DataUpdatePayload,

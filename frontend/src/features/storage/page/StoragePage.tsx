@@ -4,23 +4,27 @@ import { Upload } from 'lucide-react';
 import PencilIcon from '@/assets/icons/pencil.svg?react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import { useStorage } from '@/features/storage/hooks/useStorage';
-import { Button } from '@/components/radix/Button';
-import { Alert, AlertDescription } from '@/components/radix/Alert';
 import { StorageSidebar } from '@/features/storage/components/StorageSidebar';
 import { StorageManager } from '@/features/storage/components/StorageManager';
 import { BucketFormDialog } from '@/features/storage/components/BucketFormDialog';
-import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { EmptyState } from '@/components/EmptyState';
+
+import { useConfirm } from '@/lib/hooks/useConfirm';
+import { useToast } from '@/lib/hooks/useToast';
+import { useUploadToast } from '@/features/storage/components/UploadToast';
 import {
+  SearchInput,
+  SelectionClearButton,
+  DeleteActionButton,
+  Alert,
+  AlertDescription,
+  Button,
+  ConfirmDialog,
+  EmptyState,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/radix/Tooltip';
-import { useConfirm } from '@/lib/hooks/useConfirm';
-import { useToast } from '@/lib/hooks/useToast';
-import { useUploadToast } from '@/features/storage/components/UploadToast';
-import { SearchInput, SelectionClearButton, DeleteActionButton } from '@/components';
+} from '@/components';
 import {
   DataUpdatePayload,
   DataUpdateResourceType,

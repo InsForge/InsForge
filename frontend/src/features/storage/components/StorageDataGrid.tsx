@@ -6,8 +6,8 @@ import {
   type RenderCellProps,
   type DataGridColumn,
   type DataGridRowType,
-} from '@/components/datagrid';
-import { Button } from '@/components/radix/Button';
+  Button,
+} from '@/components';
 import { Download, Eye, Trash2, Image, FileText, Music, Video, Archive, File } from 'lucide-react';
 import { StorageFileSchema } from '@insforge/shared-schemas';
 
