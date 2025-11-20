@@ -28,7 +28,7 @@ usageRouter.post(
       }
 
       // Create MCP usage record via service
-      const result = await usageService.createMcpUsage(tool_name, success);
+      const result = await usageService.recordMCPUsage(tool_name, success);
 
       // Broadcast MCP tool usage to frontend via socket
       const socketService = SocketManager.getInstance();
@@ -54,7 +54,7 @@ usageRouter.get(
       const { limit = '5', success = 'true' } = req.query;
 
       // Get MCP usage records via service
-      const records = await usageService.getMcpUsage(parseInt(limit as string), success === 'true');
+      const records = await usageService.getMCPUsage(parseInt(limit as string), success === 'true');
 
       successResponse(res, { records });
     } catch (error) {
