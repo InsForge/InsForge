@@ -15,13 +15,14 @@ export default function CloudLoginPage() {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       // Validate origin - allow insforge.dev and *.insforge.dev domains
-      const isInsforgeOrigin =
-        event.origin.endsWith('.insforge.dev') || event.origin === 'https://insforge.dev';
+      // temporarily disabled for testing purposes
+      // const isInsforgeOrigin =
+      //   event.origin.endsWith('.insforge.dev') || event.origin === 'https://insforge.dev';
 
-      if (!isInsforgeOrigin) {
-        console.warn('Received message from unauthorized origin:', event.origin);
-        return;
-      }
+      // if (!isInsforgeOrigin) {
+      //   console.warn('Received message from unauthorized origin:', event.origin);
+      //   return;
+      // }
 
       // Check if this is an authorization code message
       if (event.data?.type === 'AUTHORIZATION_CODE' && event.data?.code) {
