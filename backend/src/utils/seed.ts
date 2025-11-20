@@ -1,4 +1,3 @@
-import { Pool, PoolClient } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { AIConfigService } from '@/services/ai/ai-config.service.js';

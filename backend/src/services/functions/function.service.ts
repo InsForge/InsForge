@@ -132,10 +132,9 @@ export class FunctionService {
 
       // If status is active, update deployed_at
       if (status === 'active') {
-        await client.query(
-          `UPDATE _functions SET deployed_at = CURRENT_TIMESTAMP WHERE id = $1`,
-          [id]
-        );
+        await client.query(`UPDATE _functions SET deployed_at = CURRENT_TIMESTAMP WHERE id = $1`, [
+          id,
+        ]);
       }
 
       // Fetch the created function
@@ -182,10 +181,9 @@ export class FunctionService {
     const client = await this.getPool().connect();
     try {
       // Check if function exists
-      const existingResult = await client.query(
-        'SELECT id FROM _functions WHERE slug = $1',
-        [slug]
-      );
+      const existingResult = await client.query('SELECT id FROM _functions WHERE slug = $1', [
+        slug,
+      ]);
       if (existingResult.rows.length === 0) {
         return null;
       }
@@ -197,31 +195,25 @@ export class FunctionService {
 
       // Update fields
       if (updates.name !== undefined) {
-        await client.query(
-          'UPDATE _functions SET name = $1 WHERE slug = $2',
-          [updates.name, slug]
-        );
+        await client.query('UPDATE _functions SET name = $1 WHERE slug = $2', [updates.name, slug]);
       }
 
       if (updates.description !== undefined) {
-        await client.query(
-          'UPDATE _functions SET description = $1 WHERE slug = $2',
-          [updates.description, slug]
-        );
+        await client.query('UPDATE _functions SET description = $1 WHERE slug = $2', [
+          updates.description,
+          slug,
+        ]);
       }
 
       if (updates.code !== undefined) {
-        await client.query(
-          'UPDATE _functions SET code = $1 WHERE slug = $2',
-          [updates.code, slug]
-        );
+        await client.query('UPDATE _functions SET code = $1 WHERE slug = $2', [updates.code, slug]);
       }
 
       if (updates.status !== undefined) {
-        await client.query(
-          'UPDATE _functions SET status = $1 WHERE slug = $2',
-          [updates.status, slug]
-        );
+        await client.query('UPDATE _functions SET status = $1 WHERE slug = $2', [
+          updates.status,
+          slug,
+        ]);
 
         // Update deployed_at if status changes to active
         if (updates.status === 'active') {
@@ -233,10 +225,9 @@ export class FunctionService {
       }
 
       // Update updated_at
-      await client.query(
-        'UPDATE _functions SET updated_at = CURRENT_TIMESTAMP WHERE slug = $1',
-        [slug]
-      );
+      await client.query('UPDATE _functions SET updated_at = CURRENT_TIMESTAMP WHERE slug = $1', [
+        slug,
+      ]);
 
       // Fetch updated function
       const result = await client.query(

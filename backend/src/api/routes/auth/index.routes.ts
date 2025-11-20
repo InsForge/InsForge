@@ -386,10 +386,14 @@ router.post(
           ? 'If your email is registered, we have sent you a verification link. Please check your inbox.'
           : 'If your email is registered, we have sent you a verification code. Please check your inbox.';
 
-      successResponse(res, {
-        success: true,
-        message,
-      }, 202);
+      successResponse(
+        res,
+        {
+          success: true,
+          message,
+        },
+        202
+      );
     } catch (error) {
       next(error);
     }
@@ -479,10 +483,14 @@ router.post(
           ? 'If your email is registered, we have sent you a password reset link. Please check your inbox.'
           : 'If your email is registered, we have sent you a password reset code. Please check your inbox.';
 
-      successResponse(res, {
-        success: true,
-        message,
-      }, 202);
+      successResponse(
+        res,
+        {
+          success: true,
+          message,
+        },
+        202
+      );
     } catch (error) {
       next(error);
     }

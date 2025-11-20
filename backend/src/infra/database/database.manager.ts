@@ -47,7 +47,6 @@ export class DatabaseManager {
     await client.query('COMMIT');
   }
 
-
   static async getColumnTypeMap(tableName: string): Promise<Record<string, string>> {
     const instance = DatabaseManager.getInstance();
     const client = await instance.pool.connect();

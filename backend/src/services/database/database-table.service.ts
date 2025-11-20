@@ -185,31 +185,31 @@ export class DatabaseTableService {
         );
       }
 
-    // Map columns to SQL with proper type conversion
-    const columnDefs = validatedColumns
-      .map((col: ColumnSchema) => {
-        const fieldType = COLUMN_TYPES[col.type as ColumnType];
-        const sqlType = fieldType.sqlType;
+      // Map columns to SQL with proper type conversion
+      const columnDefs = validatedColumns
+        .map((col: ColumnSchema) => {
+          const fieldType = COLUMN_TYPES[col.type as ColumnType];
+          const sqlType = fieldType.sqlType;
 
-        // Handle default values
-        const defaultClause = formatDefaultValue(
-          col.defaultValue,
-          col.type as ColumnType,
-          col.isNullable
-        );
+          // Handle default values
+          const defaultClause = formatDefaultValue(
+            col.defaultValue,
+            col.type as ColumnType,
+            col.isNullable
+          );
 
-        const nullable = col.isNullable ? '' : 'NOT NULL';
-        const unique = col.isUnique ? 'UNIQUE' : '';
+          const nullable = col.isNullable ? '' : 'NOT NULL';
+          const unique = col.isUnique ? 'UNIQUE' : '';
 
-        return `${this.quoteIdentifier(col.columnName)} ${sqlType} ${nullable} ${unique} ${defaultClause}`.trim();
-      })
-      .join(', ');
+          return `${this.quoteIdentifier(col.columnName)} ${sqlType} ${nullable} ${unique} ${defaultClause}`.trim();
+        })
+        .join(', ');
 
-    // Prepare foreign key constraints
-    const foreignKeyConstraints = validatedColumns
-      .filter((col) => col.foreignKey)
-      .map((col) => this.generateFkeyConstraintStatement(col, true))
-      .join(', ');
+      // Prepare foreign key constraints
+      const foreignKeyConstraints = validatedColumns
+        .filter((col) => col.foreignKey)
+        .map((col) => this.generateFkeyConstraintStatement(col, true))
+        .join(', ');
 
       // Create table with auto fields and foreign keys
       const tableDefinition = [
@@ -260,7 +260,8 @@ export class DatabaseTableService {
           sqlType: COLUMN_TYPES[col.type as ColumnType].sqlType,
         })),
         autoFields: ['id', 'created_at', 'updated_at'],
-        nextActions: 'you can now use the table with the POST /api/database/tables/{table} endpoint',
+        nextActions:
+          'you can now use the table with the POST /api/database/tables/{table} endpoint',
       };
     } finally {
       client.release();
@@ -443,28 +444,28 @@ export class DatabaseTableService {
         );
       }
       const currentSchema = await this.getTableSchema(tableName);
-    const currentUserColumns = currentSchema.columns.filter(
-      (col) => !Object.keys(reservedColumns).includes(col.columnName)
-    );
-
-    // Filter dropped and added user columns
-    const droppedUserColumns = dropColumns
-      ? dropColumns.filter((col) => !Object.keys(reservedColumns).includes(col))
-      : [];
-    const addedUserColumns = addColumns ? this.validateReservedFields(addColumns) : [];
-
-    // Calculate final user column count
-    const finalUserColumnsCount =
-      currentUserColumns.length - droppedUserColumns.length + addedUserColumns.length;
-
-    if (finalUserColumnsCount <= 0) {
-      throw new AppError(
-        'Table must have at least one user-defined column after update',
-        400,
-        ERROR_CODES.DATABASE_VALIDATION_ERROR,
-        'The update would leave the table with no custom columns. Please add columns or avoid dropping all user-defined columns.'
+      const currentUserColumns = currentSchema.columns.filter(
+        (col) => !Object.keys(reservedColumns).includes(col.columnName)
       );
-    }
+
+      // Filter dropped and added user columns
+      const droppedUserColumns = dropColumns
+        ? dropColumns.filter((col) => !Object.keys(reservedColumns).includes(col))
+        : [];
+      const addedUserColumns = addColumns ? this.validateReservedFields(addColumns) : [];
+
+      // Calculate final user column count
+      const finalUserColumnsCount =
+        currentUserColumns.length - droppedUserColumns.length + addedUserColumns.length;
+
+      if (finalUserColumnsCount <= 0) {
+        throw new AppError(
+          'Table must have at least one user-defined column after update',
+          400,
+          ERROR_CODES.DATABASE_VALIDATION_ERROR,
+          'The update would leave the table with no custom columns. Please add columns or avoid dropping all user-defined columns.'
+        );
+      }
 
       const safeTableName = this.quoteIdentifier(tableName);
       const foreignKeyMap = await this.getFkeyConstraints(tableName);

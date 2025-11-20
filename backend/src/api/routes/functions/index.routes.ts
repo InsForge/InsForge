@@ -22,7 +22,7 @@ router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextF
   try {
     const result = await functionService.listFunctions();
     successResponse(res, result);
-  } catch (error) {
+  } catch {
     next(new AppError('Failed to list functions', 500, ERROR_CODES.INTERNAL_ERROR));
   }
 });
@@ -54,11 +54,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
   try {
     const validation = functionUploadRequestSchema.safeParse(req.body);
     if (!validation.success) {
-      throw new AppError(
-        JSON.stringify(validation.error.issues),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
+      throw new AppError(JSON.stringify(validation.error.issues), 400, ERROR_CODES.INVALID_INPUT);
     }
 
     const created = await functionService.createFunction(validation.data);
@@ -106,11 +102,7 @@ router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response, next: 
     const validation = functionUpdateRequestSchema.safeParse(req.body);
 
     if (!validation.success) {
-      throw new AppError(
-        JSON.stringify(validation.error.issues),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
+      throw new AppError(JSON.stringify(validation.error.issues), 400, ERROR_CODES.INVALID_INPUT);
     }
 
     const updated = await functionService.updateFunction(slug, validation.data);
@@ -153,39 +145,43 @@ router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response, next: 
  * DELETE /api/functions/:slug
  * Delete a function
  */
-router.delete('/:slug', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const { slug } = req.params;
-    const deleted = await functionService.deleteFunction(slug);
+router.delete(
+  '/:slug',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { slug } = req.params;
+      const deleted = await functionService.deleteFunction(slug);
 
-    if (!deleted) {
-      throw new AppError('Function not found', 404, ERROR_CODES.NOT_FOUND);
+      if (!deleted) {
+        throw new AppError('Function not found', 404, ERROR_CODES.NOT_FOUND);
+      }
+
+      // Log audit event
+      logger.info(`Function ${slug} deleted by ${req.user?.email}`);
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'DELETE_FUNCTION',
+        module: 'FUNCTIONS',
+        details: {
+          slug,
+        },
+        ip_address: req.ip,
+      });
+
+      const socket = SocketManager.getInstance();
+      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
+        resource: DataUpdateResourceType.FUNCTIONS,
+      });
+
+      successResponse(res, {
+        success: true,
+        message: `Function ${slug} deleted successfully`,
+      });
+    } catch (error) {
+      next(error);
     }
-
-    // Log audit event
-    logger.info(`Function ${slug} deleted by ${req.user?.email}`);
-    await auditService.log({
-      actor: req.user?.email || 'api-key',
-      action: 'DELETE_FUNCTION',
-      module: 'FUNCTIONS',
-      details: {
-        slug,
-      },
-      ip_address: req.ip,
-    });
-
-    const socket = SocketManager.getInstance();
-    socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-      resource: DataUpdateResourceType.FUNCTIONS,
-    });
-
-    successResponse(res, {
-      success: true,
-      message: `Function ${slug} deleted successfully`,
-    });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 export default router;
