@@ -166,11 +166,12 @@ export class StorageService {
 
     const client = await this.getPool().connect();
     try {
-      // Save metadata to database
-      await client.query(
+      // Save metadata to database and return the timestamp in one operation
+      const result = await client.query(
         `
         INSERT INTO _storage (bucket, key, size, mime_type, uploaded_by)
         VALUES ($1, $2, $3, $4, $5)
+        RETURNING uploaded_at as "uploadedAt"
       `,
         [
           bucket,
@@ -179,12 +180,6 @@ export class StorageService {
           file.mimetype || null,
           userId && userId !== ADMIN_ID ? userId : null,
         ]
-      );
-
-      // Get the actual uploaded_at timestamp from database (with alias for camelCase)
-      const result = await client.query(
-        'SELECT uploaded_at as "uploadedAt" FROM _storage WHERE bucket = $1 AND key = $2',
-        [bucket, finalKey]
       );
 
       if (!result.rows[0]) {
@@ -516,11 +511,12 @@ export class StorageService {
         throw new Error(`File "${key}" already confirmed in bucket "${bucket}"`);
       }
 
-      // Save metadata to database
-      await client.query(
+      // Save metadata to database and return the timestamp in one operation
+      const result = await client.query(
         `
         INSERT INTO _storage (bucket, key, size, mime_type, uploaded_by)
         VALUES ($1, $2, $3, $4, $5)
+        RETURNING uploaded_at as "uploadedAt"
       `,
         [
           bucket,
@@ -529,12 +525,6 @@ export class StorageService {
           metadata.contentType || null,
           userId && userId !== ADMIN_ID ? userId : null,
         ]
-      );
-
-      // Get the actual uploaded_at timestamp from database
-      const result = await client.query(
-        'SELECT uploaded_at as "uploadedAt" FROM _storage WHERE bucket = $1 AND key = $2',
-        [bucket, key]
       );
 
       if (!result.rows[0]) {

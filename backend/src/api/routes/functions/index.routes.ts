@@ -22,7 +22,8 @@ router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextF
   try {
     const result = await functionService.listFunctions();
     successResponse(res, result);
-  } catch {
+  } catch (error) {
+    logger.error('Failed to list functions', { error });
     next(new AppError('Failed to list functions', 500, ERROR_CODES.INTERNAL_ERROR));
   }
 });

@@ -1108,7 +1108,7 @@ export class AuthService {
 
     return {
       users,
-      total: count,
+      total: parseInt(count, 10),
     };
   }
 

@@ -47,8 +47,6 @@ export async function createApp() {
   const storageService = StorageService.getInstance();
   await storageService.initialize(); // create data/storage
 
-  // Metadata is now handled by individual modules on-demand
-
   // Initialize logs service
   const logService = LogService.getInstance();
   await logService.initialize(); // connect to CloudWatch
