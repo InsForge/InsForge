@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
   EmptyState,
   SearchInput,
-} from '@/components/';
+} from '@/components';
 import { LogsDataGrid, type LogsColumnDef } from '../components/LogsDataGrid';
 import { SeverityBadge } from '../components/SeverityBadge';
 import { SEVERITY_OPTIONS, LOGS_PAGE_SIZE } from '../helpers';
