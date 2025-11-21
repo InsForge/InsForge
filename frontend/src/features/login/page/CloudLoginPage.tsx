@@ -1,66 +1,76 @@
-﻿import { useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LockIcon } from 'lucide-react';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
+import { usePartnerOrigin } from '../hooks/usePartnerOrigin';
 
 export default function CloudLoginPage() {
   const navigate = useNavigate();
   const { loginWithAuthorizationCode, isAuthenticated } = useAuth();
   const { hasCompletedOnboarding, isLoading: isMcpUsageLoading } = useMcpUsage();
+  const { isPartnerOrigin } = usePartnerOrigin();
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Handle authorization code from postMessage
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      // Validate origin - allow insforge.dev and *.insforge.dev domains
-      const isInsforgeOrigin =
-        event.origin.endsWith('.insforge.dev') || event.origin === 'https://insforge.dev';
+  const onAuthorizationCodeReceived = useCallback(
+    async (event: MessageEvent) => {
+      try {
+        // Validate origin - allow insforge.dev, *.insforge.dev, and partner domains
+        const isInsforgeOrigin =
+          event.origin.endsWith('.insforge.dev') || event.origin === 'https://insforge.dev';
 
-      if (!isInsforgeOrigin) {
-        console.warn('Received message from unauthorized origin:', event.origin);
-        return;
-      }
+        if (!isInsforgeOrigin) {
+          const isPartner = await isPartnerOrigin(event.origin);
+          if (!isPartner) {
+            console.warn('Received message from unauthorized origin:', event.origin);
+            return;
+          }
+        }
 
-      // Check if this is an authorization code message
-      if (event.data?.type === 'AUTHORIZATION_CODE' && event.data?.code) {
         const authorizationCode = event.data.code;
 
         setAuthError(null);
         // Exchange the authorization code for an access token
-        loginWithAuthorizationCode(authorizationCode)
-          .then((success) => {
-            if (success) {
-              // Notify parent of success
-              postMessageToParent(
-                {
-                  type: 'AUTH_SUCCESS',
-                },
-                event.origin
-              );
-            } else {
-              setAuthError('The authorization code may have expired or already been used.');
-              postMessageToParent(
-                {
-                  type: 'AUTH_ERROR',
-                  message: 'Authorization code validation failed',
-                },
-                event.origin
-              );
-            }
-          })
-          .catch((error) => {
-            console.error('Authorization code exchange failed:', error);
-            setAuthError('The authorization code may have expired or already been used.');
-            postMessageToParent(
-              {
-                type: 'AUTH_ERROR',
-                message: 'Authorization code validation failed',
-              },
-              event.origin
-            );
-          });
+        const success = await loginWithAuthorizationCode(authorizationCode);
+        if (success) {
+          // Notify parent of success
+          postMessageToParent(
+            {
+              type: 'AUTH_SUCCESS',
+            },
+            event.origin
+          );
+        } else {
+          setAuthError('The authorization code may have expired or already been used.');
+          postMessageToParent(
+            {
+              type: 'AUTH_ERROR',
+              message: 'Authorization code validation failed',
+            },
+            event.origin
+          );
+        }
+      } catch (error) {
+        console.error('Authorization code exchange failed:', error);
+        setAuthError('The authorization code may have expired or already been used.');
+        postMessageToParent(
+          {
+            type: 'AUTH_ERROR',
+            message: 'Authorization code validation failed',
+          },
+          event.origin
+        );
+      }
+    },
+    [loginWithAuthorizationCode, isPartnerOrigin]
+  );
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'AUTHORIZATION_CODE' && event.data?.code) {
+        void onAuthorizationCodeReceived(event);
       }
     };
 
@@ -69,7 +79,7 @@ export default function CloudLoginPage() {
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [loginWithAuthorizationCode]);
+  }, [onAuthorizationCodeReceived]);
 
   useEffect(() => {
     if (isAuthenticated && !isMcpUsageLoading) {
