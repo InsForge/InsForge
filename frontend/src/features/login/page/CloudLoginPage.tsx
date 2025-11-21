@@ -15,39 +15,52 @@ export default function CloudLoginPage() {
 
   // Handle authorization code from postMessage
   useEffect(() => {
-    const handleMessage = async (event: MessageEvent) => {
+    const handleMessage = (event: MessageEvent) => {
       // Quick synchronous check first
       if (event.data?.type !== 'AUTHORIZATION_CODE' || !event.data?.code) {
         return;
       }
 
-      // Validate origin - allow insforge.dev, *.insforge.dev, and partner domains
-      const isInsforgeOrigin =
-        event.origin.endsWith('.insforge.dev') || event.origin === 'https://insforge.dev';
+      // Handle async logic without returning a promise
+      void (async () => {
+        // Validate origin - allow insforge.dev, *.insforge.dev, and partner domains
+        const isInsforgeOrigin =
+          event.origin.endsWith('.insforge.dev') || event.origin === 'https://insforge.dev';
 
-      if (!isInsforgeOrigin) {
-        const isPartner = await isPartnerOrigin(event.origin);
-        if (!isPartner) {
-          console.warn('Received message from unauthorized origin:', event.origin);
-          return;
+        if (!isInsforgeOrigin) {
+          const isPartner = await isPartnerOrigin(event.origin);
+          if (!isPartner) {
+            console.warn('Received message from unauthorized origin:', event.origin);
+            return;
+          }
         }
-      }
 
-      const authorizationCode = event.data.code;
+        const authorizationCode = event.data.code;
 
-      setAuthError(null);
-      // Exchange the authorization code for an access token
-      try {
-        const success = await loginWithAuthorizationCode(authorizationCode);
-        if (success) {
-          // Notify parent of success
-          postMessageToParent(
-            {
-              type: 'AUTH_SUCCESS',
-            },
-            event.origin
-          );
-        } else {
+        setAuthError(null);
+        // Exchange the authorization code for an access token
+        try {
+          const success = await loginWithAuthorizationCode(authorizationCode);
+          if (success) {
+            // Notify parent of success
+            postMessageToParent(
+              {
+                type: 'AUTH_SUCCESS',
+              },
+              event.origin
+            );
+          } else {
+            setAuthError('The authorization code may have expired or already been used.');
+            postMessageToParent(
+              {
+                type: 'AUTH_ERROR',
+                message: 'Authorization code validation failed',
+              },
+              event.origin
+            );
+          }
+        } catch (error) {
+          console.error('Authorization code exchange failed:', error);
           setAuthError('The authorization code may have expired or already been used.');
           postMessageToParent(
             {
@@ -57,17 +70,7 @@ export default function CloudLoginPage() {
             event.origin
           );
         }
-      } catch (error) {
-        console.error('Authorization code exchange failed:', error);
-        setAuthError('The authorization code may have expired or already been used.');
-        postMessageToParent(
-          {
-            type: 'AUTH_ERROR',
-            message: 'Authorization code validation failed',
-          },
-          event.origin
-        );
-      }
+      })();
     };
 
     window.addEventListener('message', handleMessage);

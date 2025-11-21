@@ -5,8 +5,7 @@ export interface PartnershipConfig {
 export class PartnershipService {
   private configCache: PartnershipConfig | null = null;
   private fetchPromise: Promise<PartnershipConfig | null> | null = null;
-  private readonly CONFIG_URL =
-    'https://config.insforge.dev/partnership.json';
+  private readonly CONFIG_URL = 'https://config.insforge.dev/partnership.json';
   private readonly FETCH_TIMEOUT_MS = 5000; // 5 seconds
 
   /**
