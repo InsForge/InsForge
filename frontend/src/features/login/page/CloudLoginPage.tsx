@@ -15,60 +15,59 @@ export default function CloudLoginPage() {
 
   // Handle authorization code from postMessage
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      void (async () => {
-        // Validate origin - allow insforge.dev, *.insforge.dev, and partner domains
-        const isInsforgeOrigin =
-          event.origin.endsWith('.insforge.dev') || event.origin === 'https://insforge.dev';
+    const handleMessage = async (event: MessageEvent) => {
+      // Quick synchronous check first
+      if (event.data?.type !== 'AUTHORIZATION_CODE' || !event.data?.code) {
+        return;
+      }
 
-        if (!isInsforgeOrigin) {
-          const isPartner = await isPartnerOrigin(event.origin);
-          if (!isPartner) {
-            console.warn('Received message from unauthorized origin:', event.origin);
-            return;
-          }
+      // Validate origin - allow insforge.dev, *.insforge.dev, and partner domains
+      const isInsforgeOrigin =
+        event.origin.endsWith('.insforge.dev') || event.origin === 'https://insforge.dev';
+
+      if (!isInsforgeOrigin) {
+        const isPartner = await isPartnerOrigin(event.origin);
+        if (!isPartner) {
+          console.warn('Received message from unauthorized origin:', event.origin);
+          return;
         }
+      }
 
-        // Check if this is an authorization code message
-        if (event.data?.type === 'AUTHORIZATION_CODE' && event.data?.code) {
-          const authorizationCode = event.data.code;
+      const authorizationCode = event.data.code;
 
-          setAuthError(null);
-          // Exchange the authorization code for an access token
-          loginWithAuthorizationCode(authorizationCode)
-            .then((success) => {
-              if (success) {
-                // Notify parent of success
-                postMessageToParent(
-                  {
-                    type: 'AUTH_SUCCESS',
-                  },
-                  event.origin
-                );
-              } else {
-                setAuthError('The authorization code may have expired or already been used.');
-                postMessageToParent(
-                  {
-                    type: 'AUTH_ERROR',
-                    message: 'Authorization code validation failed',
-                  },
-                  event.origin
-                );
-              }
-            })
-            .catch((error) => {
-              console.error('Authorization code exchange failed:', error);
-              setAuthError('The authorization code may have expired or already been used.');
-              postMessageToParent(
-                {
-                  type: 'AUTH_ERROR',
-                  message: 'Authorization code validation failed',
-                },
-                event.origin
-              );
-            });
+      setAuthError(null);
+      // Exchange the authorization code for an access token
+      try {
+        const success = await loginWithAuthorizationCode(authorizationCode);
+        if (success) {
+          // Notify parent of success
+          postMessageToParent(
+            {
+              type: 'AUTH_SUCCESS',
+            },
+            event.origin
+          );
+        } else {
+          setAuthError('The authorization code may have expired or already been used.');
+          postMessageToParent(
+            {
+              type: 'AUTH_ERROR',
+              message: 'Authorization code validation failed',
+            },
+            event.origin
+          );
         }
-      })();
+      } catch (error) {
+        console.error('Authorization code exchange failed:', error);
+        setAuthError('The authorization code may have expired or already been used.');
+        postMessageToParent(
+          {
+            type: 'AUTH_ERROR',
+            message: 'Authorization code validation failed',
+          },
+          event.origin
+        );
+      }
     };
 
     window.addEventListener('message', handleMessage);

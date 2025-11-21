@@ -6,7 +6,8 @@ export class PartnershipService {
   private configCache: PartnershipConfig | null = null;
   private fetchPromise: Promise<PartnershipConfig | null> | null = null;
   private readonly CONFIG_URL =
-    'https://insforge-config.s3.us-east-2.amazonaws.com/partnership.json';
+    'https://config.insforge.dev/partnership.json';
+  private readonly FETCH_TIMEOUT_MS = 5000; // 5 seconds
 
   /**
    * Fetches the partnership configuration from S3
@@ -26,16 +27,36 @@ export class PartnershipService {
     // Start a new fetch
     this.fetchPromise = (async () => {
       try {
-        const response = await fetch(this.CONFIG_URL);
+        // Create timeout controller
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), this.FETCH_TIMEOUT_MS);
+
+        const response = await fetch(this.CONFIG_URL, {
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
         if (response.ok) {
-          this.configCache = await response.json();
-          return this.configCache;
+          const data = await response.json();
+
+          // Basic validation - ensure partner_sites exists and is an array
+          if (data && Array.isArray(data.partner_sites)) {
+            this.configCache = data;
+            return this.configCache;
+          } else {
+            console.warn('Invalid partnership config structure:', data);
+            return null;
+          }
         } else {
           console.warn('Failed to fetch partnership config:', response.status);
           return null;
         }
       } catch (error) {
-        console.warn('Error fetching partnership config:', error);
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.warn('Partnership config fetch timed out after', this.FETCH_TIMEOUT_MS, 'ms');
+        } else {
+          console.warn('Error fetching partnership config:', error);
+        }
         return null;
       } finally {
         this.fetchPromise = null;
