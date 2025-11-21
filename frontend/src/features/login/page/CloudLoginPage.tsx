@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LockIcon } from 'lucide-react';
 import { useAuth } from '@/lib/contexts/AuthContext';
@@ -14,53 +14,35 @@ export default function CloudLoginPage() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Handle authorization code from postMessage
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      // Quick synchronous check first
-      if (event.data?.type !== 'AUTHORIZATION_CODE' || !event.data?.code) {
-        return;
+  const onAuthorizationCodeReceived = useCallback(
+    async (event: MessageEvent) => {
+      // Validate origin - allow insforge.dev, *.insforge.dev, and partner domains
+      const isInsforgeOrigin =
+        event.origin.endsWith('.insforge.dev') || event.origin === 'https://insforge.dev';
+
+      if (!isInsforgeOrigin) {
+        const isPartner = await isPartnerOrigin(event.origin);
+        if (!isPartner) {
+          console.warn('Received message from unauthorized origin:', event.origin);
+          return;
+        }
       }
 
-      // Handle async logic without returning a promise
-      void (async () => {
-        // Validate origin - allow insforge.dev, *.insforge.dev, and partner domains
-        const isInsforgeOrigin =
-          event.origin.endsWith('.insforge.dev') || event.origin === 'https://insforge.dev';
+      const authorizationCode = event.data.code;
 
-        if (!isInsforgeOrigin) {
-          const isPartner = await isPartnerOrigin(event.origin);
-          if (!isPartner) {
-            console.warn('Received message from unauthorized origin:', event.origin);
-            return;
-          }
-        }
-
-        const authorizationCode = event.data.code;
-
-        setAuthError(null);
-        // Exchange the authorization code for an access token
-        try {
-          const success = await loginWithAuthorizationCode(authorizationCode);
-          if (success) {
-            // Notify parent of success
-            postMessageToParent(
-              {
-                type: 'AUTH_SUCCESS',
-              },
-              event.origin
-            );
-          } else {
-            setAuthError('The authorization code may have expired or already been used.');
-            postMessageToParent(
-              {
-                type: 'AUTH_ERROR',
-                message: 'Authorization code validation failed',
-              },
-              event.origin
-            );
-          }
-        } catch (error) {
-          console.error('Authorization code exchange failed:', error);
+      setAuthError(null);
+      // Exchange the authorization code for an access token
+      try {
+        const success = await loginWithAuthorizationCode(authorizationCode);
+        if (success) {
+          // Notify parent of success
+          postMessageToParent(
+            {
+              type: 'AUTH_SUCCESS',
+            },
+            event.origin
+          );
+        } else {
           setAuthError('The authorization code may have expired or already been used.');
           postMessageToParent(
             {
@@ -70,7 +52,26 @@ export default function CloudLoginPage() {
             event.origin
           );
         }
-      })();
+      } catch (error) {
+        console.error('Authorization code exchange failed:', error);
+        setAuthError('The authorization code may have expired or already been used.');
+        postMessageToParent(
+          {
+            type: 'AUTH_ERROR',
+            message: 'Authorization code validation failed',
+          },
+          event.origin
+        );
+      }
+    },
+    [loginWithAuthorizationCode, isPartnerOrigin, setAuthError]
+  );
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'AUTHORIZATION_CODE' && event.data?.code) {
+        void onAuthorizationCodeReceived(event);
+      }
     };
 
     window.addEventListener('message', handleMessage);
@@ -78,7 +79,7 @@ export default function CloudLoginPage() {
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [loginWithAuthorizationCode, isPartnerOrigin]);
+  }, [onAuthorizationCodeReceived]);
 
   useEffect(() => {
     if (isAuthenticated && !isMcpUsageLoading) {

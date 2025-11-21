@@ -6,7 +6,6 @@ export class PartnershipService {
   private configCache: PartnershipConfig | null = null;
   private fetchPromise: Promise<PartnershipConfig | null> | null = null;
   private readonly CONFIG_URL = 'https://config.insforge.dev/partnership.json';
-  private readonly FETCH_TIMEOUT_MS = 5000; // 5 seconds
 
   /**
    * Fetches the partnership configuration from S3
@@ -26,14 +25,7 @@ export class PartnershipService {
     // Start a new fetch
     this.fetchPromise = (async () => {
       try {
-        // Create timeout controller
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), this.FETCH_TIMEOUT_MS);
-
-        const response = await fetch(this.CONFIG_URL, {
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
+        const response = await fetch(this.CONFIG_URL);
 
         if (response.ok) {
           const data = await response.json();
@@ -51,11 +43,7 @@ export class PartnershipService {
           return null;
         }
       } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') {
-          console.warn('Partnership config fetch timed out after', this.FETCH_TIMEOUT_MS, 'ms');
-        } else {
-          console.warn('Error fetching partnership config:', error);
-        }
+        console.warn('Error fetching partnership config:', error);
         return null;
       } finally {
         this.fetchPromise = null;
