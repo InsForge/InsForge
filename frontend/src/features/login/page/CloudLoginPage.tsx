@@ -16,23 +16,23 @@ export default function CloudLoginPage() {
   // Handle authorization code from postMessage
   const onAuthorizationCodeReceived = useCallback(
     async (event: MessageEvent) => {
-      // Validate origin - allow insforge.dev, *.insforge.dev, and partner domains
-      const isInsforgeOrigin =
-        event.origin.endsWith('.insforge.dev') || event.origin === 'https://insforge.dev';
-
-      if (!isInsforgeOrigin) {
-        const isPartner = await isPartnerOrigin(event.origin);
-        if (!isPartner) {
-          console.warn('Received message from unauthorized origin:', event.origin);
-          return;
-        }
-      }
-
-      const authorizationCode = event.data.code;
-
-      setAuthError(null);
-      // Exchange the authorization code for an access token
       try {
+        // Validate origin - allow insforge.dev, *.insforge.dev, and partner domains
+        const isInsforgeOrigin =
+          event.origin.endsWith('.insforge.dev') || event.origin === 'https://insforge.dev';
+
+        if (!isInsforgeOrigin) {
+          const isPartner = await isPartnerOrigin(event.origin);
+          if (!isPartner) {
+            console.warn('Received message from unauthorized origin:', event.origin);
+            return;
+          }
+        }
+
+        const authorizationCode = event.data.code;
+
+        setAuthError(null);
+        // Exchange the authorization code for an access token
         const success = await loginWithAuthorizationCode(authorizationCode);
         if (success) {
           // Notify parent of success
@@ -64,7 +64,7 @@ export default function CloudLoginPage() {
         );
       }
     },
-    [loginWithAuthorizationCode, isPartnerOrigin, setAuthError]
+    [loginWithAuthorizationCode, isPartnerOrigin]
   );
 
   useEffect(() => {
