@@ -1,9 +1,5 @@
 import { useState } from 'react';
-import { Button } from '@/components/radix/Button';
-import { Input } from '@/components/radix/Input';
-import { Skeleton } from '@/components/radix/Skeleton';
-import { SearchInput } from '@/components/SearchInput';
-import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { Button, Input, Skeleton, SearchInput, ConfirmDialog } from '@/components';
 import { SecretRow } from '../components/SecretRow';
 import SecretEmptyState from '../components/SecretEmptyState';
 import { useSecrets } from '@/features/functions/hooks/useSecrets';

@@ -1,5 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/radix/Dialog';
-import { CopyButton } from '@/components/CopyButton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, CopyButton } from '@/components';
 import { cn } from '@/lib/utils/utils';
 
 interface PromptDialogProps {

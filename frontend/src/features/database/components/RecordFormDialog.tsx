@@ -4,15 +4,16 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertCircle } from 'lucide-react';
 import {
+  Alert,
+  AlertDescription,
+  Button,
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/radix/Dialog';
-import { Button } from '@/components/radix/Button';
-import { Alert, AlertDescription } from '@/components/radix/Alert';
-import { ScrollArea } from '@/components/radix/ScrollArea';
+  ScrollArea,
+} from '@/components';
 import { useRecords } from '@/features/database/hooks/useRecords';
 import { buildDynamicSchema, getInitialValues } from '@/features/database';
 import { RecordFormField } from '@/features/database/components/RecordFormField';

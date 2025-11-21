@@ -4,24 +4,23 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Lock, Mail } from 'lucide-react';
 import {
+  Alert,
+  AlertDescription,
   Card,
   CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@/components/radix/Card';
-import {
   Form,
   FormControl,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/radix/Form';
-import { Input } from '@/components/radix/Input';
-import { ButtonWithLoading } from '@/components/ButtonWithLoading';
-import { Alert, AlertDescription } from '@/components/radix/Alert';
+  Input,
+  ButtonWithLoading,
+} from '@/components';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { loginFormSchema, LoginForm } from '@/lib/utils/schemaValidations';

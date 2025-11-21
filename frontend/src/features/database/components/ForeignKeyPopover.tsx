@@ -1,8 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Button } from '@/components/radix/Button';
-import { Label } from '@/components/radix/Label';
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/radix/Dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/radix/Select';
+import {
+  Button,
+  Label,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from '@/components';
 import { useTables } from '@/features/database/hooks/useTables';
 import { UseFormReturn } from 'react-hook-form';
 import { TableFormSchema, TableFormForeignKeySchema } from '../schema';

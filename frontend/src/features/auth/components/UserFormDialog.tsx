@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, Lock, AlertCircle } from 'lucide-react';
-import { Button, Input, Label, Alert, AlertDescription } from '@/components';
 import {
+  Button,
+  Input,
+  Label,
+  Alert,
+  AlertDescription,
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/radix/Dialog';
+} from '@/components';
 import ErrorIcon from '@/assets/icons/error.svg';
 import { useToast } from '@/lib/hooks/useToast';
 import { useUsers } from '@/features/auth/hooks/useUsers';

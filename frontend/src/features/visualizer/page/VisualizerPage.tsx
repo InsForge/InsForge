@@ -4,8 +4,7 @@ import { useCallback, useEffect } from 'react';
 import { useMetadata } from '@/lib/hooks/useMetadata';
 import { useUsers } from '@/features/auth/hooks/useUsers';
 import { SchemaVisualizer, VisualizerSkeleton } from '../components';
-import { Button } from '@/components/radix/Button';
-import { Alert, AlertDescription } from '@/components/radix/Alert';
+import { Alert, AlertDescription, Button } from '@/components';
 import {
   useSocket,
   ServerEvents,

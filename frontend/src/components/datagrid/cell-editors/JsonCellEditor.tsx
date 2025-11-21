@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FileJson, AlertCircle, CheckCircle } from 'lucide-react';
-import { Button } from '@/components/radix/Button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/radix/Popover';
-import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { ConfirmDialog, Button, Popover, PopoverContent, PopoverTrigger } from '@/components';
 import { cn } from '@/lib/utils/utils';
 import type { JsonCellEditorProps } from './types';
 

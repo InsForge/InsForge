@@ -1,8 +1,7 @@
 import { memo } from 'react';
 import { Controller, Control } from 'react-hook-form';
 import { X, Key } from 'lucide-react';
-import { Input } from '@/components/radix/Input';
-import { Checkbox } from '@/components';
+import { Input, Checkbox } from '@/components';
 import { TableFormColumnSchema, TableFormSchema } from '../schema';
 import { ColumnTypeSelect } from './ColumnTypeSelect';
 

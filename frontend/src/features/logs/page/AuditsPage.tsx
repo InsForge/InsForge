@@ -1,19 +1,20 @@
 import { useState, useEffect, useMemo } from 'react';
 import { RefreshCw, Search, FileText, Trash2 } from 'lucide-react';
-import { Button } from '@/components/radix/Button';
-import { Input } from '@/components/radix/Input';
-import { Alert, AlertDescription } from '@/components/radix/Alert';
 import { LogsDataGrid, type LogsColumnDef } from '@/features/logs/components/LogsDataGrid';
 import { formatTime } from '@/lib/utils/utils';
 import { LOGS_PAGE_SIZE } from '@/features/logs/helpers';
-import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import {
+  Alert,
+  AlertDescription,
+  Button,
+  ConfirmDialog,
+  Input,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/radix/Tooltip';
+} from '@/components';
 import { useAuditLogs, useClearAuditLogs } from '@/features/logs/hooks/useAuditLogs';
 import type { GetAuditLogsRequest } from '@insforge/shared-schemas';
 

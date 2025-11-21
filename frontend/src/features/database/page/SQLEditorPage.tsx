@@ -1,10 +1,14 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useRawSQL } from '@/features/database/hooks/useRawSQL';
 import { useSQLEditorContext } from '@/features/database/contexts/SQLEditorContext';
-import { Button } from '@/components/radix/Button';
-import { Badge } from '@/components/radix/Badge';
-import { CodeEditor } from '@/components/CodeEditor';
-import { DataGrid, type DataGridColumn, type DataGridRow } from '@/components/datagrid';
+import {
+  Badge,
+  Button,
+  CodeEditor,
+  DataGrid,
+  type DataGridColumn,
+  type DataGridRow,
+} from '@/components';
 import { X, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils/utils';
 

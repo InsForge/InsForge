@@ -2,14 +2,12 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Folder } from 'lucide-react';
 import { useStorage } from '@/features/storage/hooks/useStorage';
 import { StorageFileSchema } from '@insforge/shared-schemas';
-import { LoadingState, ErrorState, EmptyState } from '@/components';
+import { LoadingState, ErrorState, EmptyState, ConfirmDialog, ConnectCTA } from '@/components';
 import { StorageDataGrid } from './StorageDataGrid';
 import { FilePreviewDialog } from './FilePreviewDialog';
-import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
 import { SortColumn } from 'react-data-grid';
-import { ConnectCTA } from '@/components/ConnectCTA';
 
 interface StorageManagerProps {
   bucketName: string;

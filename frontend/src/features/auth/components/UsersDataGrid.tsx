@@ -1,13 +1,13 @@
 import { useMemo } from 'react';
 import {
+  Badge,
   DataGrid,
   createDefaultCellRenderer,
   type DataGridProps,
   type DataGridColumn,
   type RenderCellProps,
   ConvertedValue,
-} from '@/components/datagrid';
-import { Badge } from '@/components/radix/Badge';
+} from '@/components';
 import { cn } from '@/lib/utils/utils';
 import type { UserSchema } from '@insforge/shared-schemas';
 

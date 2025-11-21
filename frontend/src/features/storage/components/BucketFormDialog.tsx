@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useStorage } from '@/features/storage/hooks/useStorage';
 import {
+  Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/radix/Dialog';
-import { Button } from '@/components/radix/Button';
-import { Input } from '@/components/radix/Input';
-import { Label } from '@/components/radix/Label';
-import { Switch } from '@/components/radix/Switch';
+  Input,
+  Label,
+  Switch,
+} from '@/components';
 
 interface BucketFormDialogProps {
   open: boolean;

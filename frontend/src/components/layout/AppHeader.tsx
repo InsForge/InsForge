@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import { LogOut, ChevronDown } from 'lucide-react';
 import {
+  Avatar,
+  AvatarFallback,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/radix/DropdownMenu';
-import { Avatar, AvatarFallback } from '@/components/radix/Avatar';
-import { Separator } from '@/components/radix/Separator';
+  Separator,
+  ThemeToggle,
+} from '@/components';
 import { cn } from '@/lib/utils/utils';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 
 // Import SVG icons

@@ -3,18 +3,18 @@ import { useForm, Controller, useFormState } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ExternalLink } from 'lucide-react';
-import { Button } from '@/components/radix/Button';
-import { Input } from '@/components/radix/Input';
-import { Switch } from '@/components/radix/Switch';
 import {
+  Button,
+  Input,
+  Switch,
+  CopyButton,
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/radix/Dialog';
+} from '@/components';
 import WarningIcon from '@/assets/icons/warning.svg';
-import { CopyButton } from '@/components/CopyButton';
 import {
   oAuthConfigSchema,
   OAuthConfigSchema,

@@ -1,9 +1,15 @@
 import { useState, useMemo } from 'react';
 import { cn, getBackendUrl } from '@/lib/utils/utils';
-import { CodeBlock } from '@/components/CodeBlock';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/radix/Tabs';
-import { Alert, AlertDescription } from '@/components/radix/Alert';
-import { JsonHighlight } from '@/components/JsonHighlight';
+import {
+  Alert,
+  AlertDescription,
+  CodeBlock,
+  JsonHighlight,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from '@/components';
 import { CursorDeeplinkGenerator } from './CursorDeeplinkGenerator';
 import {
   MCP_AGENTS,

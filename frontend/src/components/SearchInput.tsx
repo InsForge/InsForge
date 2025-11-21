@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Search, X } from 'lucide-react';
-import { Input } from '@/components/radix/Input';
-import { Button } from '@/components/radix/Button';
+import { Input, Button } from '@/components';
 
 interface SearchInputProps {
   value: string;

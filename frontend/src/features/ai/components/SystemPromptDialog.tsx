@@ -2,15 +2,15 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
+  Button,
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/radix/Dialog';
-import { Button } from '@/components/radix/Button';
-import { Label } from '@/components/radix/Label';
-import { Textarea } from '@/components/radix/Textarea';
+  Label,
+  Textarea,
+} from '@/components';
 import {
   UpdateAIConfigurationRequest,
   updateAIConfigurationRequestSchema,

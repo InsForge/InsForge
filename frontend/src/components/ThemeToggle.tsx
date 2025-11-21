@@ -1,12 +1,12 @@
 import { Sun, Moon, Monitor } from 'lucide-react';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/radix/DropdownMenu';
-import { Button } from '@/components/radix/Button';
+} from '@/components';
 
 export function ThemeToggle() {
   const { theme, resolvedTheme, setTheme } = useTheme();

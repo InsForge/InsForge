@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
+  Button,
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/radix/Dialog';
-import { Button } from '@/components/radix/Button';
+} from '@/components';
 import { CreateAIConfigurationRequest, ModalitySchema } from '@insforge/shared-schemas';
 import { useAIConfigs } from '../hooks/useAIConfigs';
 import { useToast } from '@/lib/hooks/useToast';

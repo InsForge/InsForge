@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Plus, Loader2 } from 'lucide-react';
-import { Button } from '@/components/radix/Button';
-import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { Button, ConfirmDialog } from '@/components';
 import { useAIConfigs } from '../hooks/useAIConfigs';
 import { useAIRemainingCredits } from '../hooks/useAIUsage';
 import {
@@ -9,10 +8,12 @@ import {
   UpdateAIConfigurationRequest,
 } from '@insforge/shared-schemas';
 import { useConfirm } from '@/lib/hooks/useConfirm';
-import { ModelSelectionDialog } from '@/features/ai/components/ModelSelectionDialog';
-import { SystemPromptDialog } from '@/features/ai/components/SystemPromptDialog';
-import { AIModelCard } from '@/features/ai/components/AIConfigCard';
-import AIEmptyState from '@/features/ai/components/AIEmptyState';
+import {
+  AIEmptyState,
+  ModelSelectionDialog,
+  SystemPromptDialog,
+  AIModelCard,
+} from '@/features/ai/components';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
 
 export default function AIPage() {

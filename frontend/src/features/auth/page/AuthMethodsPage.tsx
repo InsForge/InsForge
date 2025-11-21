@@ -1,19 +1,18 @@
 import { useState, useCallback, useMemo } from 'react';
-import { Button } from '@/components/radix/Button';
 import { MoreHorizontal, Plus, Trash2, Pencil, Mail, ChevronDown } from 'lucide-react';
-import { OAuthConfigDialog } from '@/features/auth/components/OAuthConfigDialog';
-import { AuthPreview } from '@/features/auth/components/AuthPreview';
-import { CopyButton } from '@/components/CopyButton';
+import { OAuthConfigDialog, AuthPreview } from '@/features/auth/components';
 import { useOAuthConfig } from '@/features/auth/hooks/useOAuthConfig';
 import { useConfirm } from '@/lib/hooks/useConfirm';
-import { ConfirmDialog } from '@/components/ConfirmDialog';
 import {
+  Button,
+  ConfirmDialog,
+  CopyButton,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-} from '@/components/radix/DropdownMenu';
+} from '@/components';
 import type { OAuthProvidersSchema } from '@insforge/shared-schemas';
 import {
   oauthProviders,

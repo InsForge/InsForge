@@ -1,11 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Download, ExternalLink } from 'lucide-react';
-import { Dialog, DialogContent } from '@/components/radix/Dialog';
-import { Button } from '@/components/radix/Button';
-import { LoadingState } from '@/components';
+import { Button, Dialog, DialogContent, LoadingState, TypeBadge } from '@/components';
 import { useStorage } from '@/features/storage/hooks/useStorage';
 import { StorageFileSchema } from '@insforge/shared-schemas';
-import { TypeBadge } from '@/components/TypeBadge';
 
 interface FilePreviewDialogProps {
   open: boolean;

@@ -1,5 +1,4 @@
-import { Checkbox } from '@/components/Checkbox';
-import { Label } from '@/components/radix/Label';
+import { Checkbox, Label } from '@/components';
 import { ModalitySchema } from '@insforge/shared-schemas';
 
 interface ModalityFilterSidebarProps {

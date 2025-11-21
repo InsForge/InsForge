@@ -1,19 +1,19 @@
 import { ChevronRight } from 'lucide-react';
-import { Skeleton } from '@/components/radix/Skeleton';
 import { FunctionRow } from '../components/FunctionRow';
-import { CodeEditor } from '@/components/CodeEditor';
 import FunctionEmptyState from '../components/FunctionEmptyState';
 import { useFunctions } from '../hooks/useFunctions';
 import { useToast } from '@/lib/hooks/useToast';
 import { useEffect, useRef, useState } from 'react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
-import { Button } from '@/components';
 import {
+  CodeEditor,
+  Button,
+  Skeleton,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/radix/Tooltip';
+} from '@/components';
 import {
   DataUpdatePayload,
   DataUpdateResourceType,

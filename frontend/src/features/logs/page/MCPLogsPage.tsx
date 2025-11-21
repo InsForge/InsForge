@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
-import { SearchInput } from '@/components/SearchInput';
-import { EmptyState } from '@/components/EmptyState';
+import { EmptyState, SearchInput } from '@/components';
 import { LogsDataGrid, type LogsColumnDef } from '../components/LogsDataGrid';
 import { useMcpUsage } from '../hooks/useMcpUsage';
 import { formatTime } from '@/lib/utils/utils';

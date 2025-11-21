@@ -1,16 +1,15 @@
-import { Button } from '@/components/radix/Button';
 import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-  TooltipProvider,
-} from '@/components/radix/Tooltip';
-import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/radix/DropdownMenu';
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from '@/components';
+
 import { MoreHorizontal, Pencil, Trash2, DollarSign } from 'lucide-react';
 import {
   //   formatTokenCount,

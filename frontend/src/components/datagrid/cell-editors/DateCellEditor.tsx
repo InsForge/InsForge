@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
-import { Button } from '@/components/radix/Button';
 import { cn } from '@/lib/utils/utils';
 import { format, parse } from 'date-fns';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/radix/Popover';
+import { Button, Popover, PopoverContent, PopoverTrigger } from '@/components';
 import type { DateCellEditorProps } from './types';
 import { ColumnType } from '@insforge/shared-schemas';
 
