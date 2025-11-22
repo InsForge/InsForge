@@ -85,6 +85,8 @@ Partner platforms can:
 - ✅ Query project metadata to leverage the completed backend capabilities.
 - ✅ Pause projects
 - ✅ Restore projects
+- ✅ Get project's authorization token for access
+- ✅ Get project's usage
 
 ## API Reference
 
@@ -279,6 +281,71 @@ Partner platforms can:
         "id": "uuid-string",
         "status": "active"
       }
+    }
+    ```
+
+    ### Generate Project Authorization
+    Generate a short-lived asymmetric JWT token for project access. The token is signed with RSA private key and can be verified using the public JWKS endpoint. Token expires in 10 minutes.
+
+    ```bash
+    POST /partnership/v1/:partnerId/:projectId/authorization
+    ```
+
+    **Response:**
+    ```json
+    {
+      "code": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6Imluc2ZvcmdlLWtleS0yMDI1LTA4LTEzIn0...",
+      "expires_in": 600,
+      "type": "Bearer"
+    }
+    ```
+
+    ### Get Project Usage
+    Retrieve usage metrics for a specific project over a date range. Returns both summary statistics and daily breakdown of usage metrics. If dates are not specified, returns data for the last 7 days.
+
+    ```bash
+    GET /partnership/v1/:partnerId/:projectId/usage?start_date=2025-11-10&end_date=2025-11-18
+    ```
+
+    **Query Parameters:**
+    - `start_date` (optional): Start date in YYYY-MM-DD format (defaults to 7 days ago)
+    - `end_date` (optional): End date in YYYY-MM-DD format (defaults to today)
+
+    **Response:**
+    ```json
+    {
+      "project": {
+        "id": "uuid-string",
+        "name": "project-name",
+        "status": "active"
+      },
+      "period": {
+        "start": "2025-11-10T00:00:00Z",
+        "end": "2025-11-18T23:59:59Z"
+      },
+      "summary": {
+        "max_database_size_bytes": 1048576,
+        "max_file_storage_bytes": 5242880,
+        "total_ai_tokens": 15000,
+        "total_mcp_calls": 120,
+        "total_egress_bytes": 2097152,
+        "total_ai_credits": 1.5,
+        "total_email_requests": 50,
+        "total_function_calls": 300
+      },
+      "daily_usage": [
+        {
+          "usage_date": "2025-11-10",
+          "database_size_bytes": 1048576,
+          "file_storage_bytes": 5242880,
+          "ai_tokens": 1500,
+          "mcp_calls": 12,
+          "egress_bytes": 204800,
+          "ai_credits": 0.15,
+          "email_requests": 5,
+          "function_calls": 30
+        }
+      ]
     }
     ```
 
