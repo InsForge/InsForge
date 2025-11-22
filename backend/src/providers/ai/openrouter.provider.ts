@@ -340,9 +340,13 @@ export class AIClientService {
     try {
       return await request(client);
     } catch (error) {
-      // Check if error is a 403 insufficient credits error in cloud environment
-      if (isCloudEnvironment() && error instanceof OpenAI.APIError && error.status === 403) {
-        logger.info('Received 403 insufficient credits, renewing API key...');
+      // Check if error is a 402/403 insufficient credits error in cloud environment
+      if (
+        isCloudEnvironment() &&
+        error instanceof OpenAI.APIError &&
+        (error.status === 402 || error.status === 403)
+      ) {
+        logger.info(`Received ${error.status} insufficient credits, renewing API key...`);
         await this.renewCloudApiKey();
 
         // Retry with exponential backoff (3 attempts)
