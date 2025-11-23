@@ -50,7 +50,7 @@ async function seedDefaultAIConfigs(): Promise<void> {
     ['text', 'image'],
     ['text', 'image'],
     'openrouter',
-    'google/gemini-2.5-flash-image-preview'
+    'google/gemini-3-pro-image-preview'
   );
 
   logger.info('✅ Default AI models configured (cloud environment)');
