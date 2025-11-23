@@ -5,7 +5,7 @@ metadata:
     name: InsForge
 spec:
     description: InsForge is the Agent-Native Supabase Alternative, enabling AI agents to build and manage full-stack applications autonomously.
-    coverImage: https://raw.githubusercontent.com/InsForge/InsForge/main/assets/userflow.png
+    coverImage: https://cdn.zeabur.com/insforge.png
     icon: https://avatars.githubusercontent.com/u/198419463?s=96&v=4
     variables:
         - key: PUBLIC_DOMAIN
@@ -890,7 +890,7 @@ spec:
           template: PREBUILT
           spec:
             source:
-                image: ghcr.io/insforge/insforge-oss:v1.1.6
+                image: ghcr.io/insforge/insforge-oss:v1.2.6
             ports:
                 - id: web
                   port: 7130
