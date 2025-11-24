@@ -616,6 +616,34 @@ export class DatabaseTableService {
               `You cannot add foreign key on the system column '${col.columnName}'`
             );
           }
+          const { columnName, foreignKey } = col;
+          const { referenceTable, referenceColumn } = foreignKey;
+
+          //Check for mismatched existing data
+          const checkQuery = `
+                              SELECT COUNT(*) AS invalid_count
+                              FROM ${safeTableName} t
+                              WHERE t.${this.quoteIdentifier(columnName)} IS NOT NULL
+                                AND NOT EXISTS (
+                                  SELECT 1
+                                  FROM ${this.quoteIdentifier(referenceTable)} r
+                                  WHERE r.${this.quoteIdentifier(referenceColumn)} = t.${this.quoteIdentifier(columnName)}
+                                )
+                            `;
+
+          const { rows } = await client.query(checkQuery);
+          const invalidCount = Number(rows[0]?.invalid_count || 0);
+
+          if (invalidCount > 0) {
+            throw new AppError(
+              `Cannot add foreign key on '${columnName}' ${invalidCount} existing record${
+                invalidCount === 1 ? '' : 's'
+              } in '${tableName}' have values that do not exist in '${referenceTable}.${referenceColumn}'.`,
+              400,
+              ERROR_CODES.CONSTRAINT_VIOLATION,
+              'Make sure all rows have valid matching values before adding this constraint.'
+            );
+          }
           const fkeyConstraint = this.generateFkeyConstraintStatement(col, true);
           await client.query(
             `
