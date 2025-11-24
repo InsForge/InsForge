@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { DatabaseError, Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -616,43 +616,64 @@ export class DatabaseTableService {
               `You cannot add foreign key on the system column '${col.columnName}'`
             );
           }
-          const { columnName, foreignKey } = col;
-          const { referenceTable, referenceColumn } = foreignKey;
 
-          //Check for mismatched existing data
-          const checkQuery = `
-                              SELECT COUNT(*) AS invalid_count
-                              FROM ${safeTableName} t
-                              WHERE t.${this.quoteIdentifier(columnName)} IS NOT NULL
-                                AND NOT EXISTS (
-                                  SELECT 1
-                                  FROM ${this.quoteIdentifier(referenceTable)} r
-                                  WHERE r.${this.quoteIdentifier(referenceColumn)} = t.${this.quoteIdentifier(columnName)}
-                                )
-                            `;
-
-          const { rows } = await client.query(checkQuery);
-          const invalidCount = Number(rows[0]?.invalid_count || 0);
-
-          if (invalidCount > 0) {
-            throw new AppError(
-              `Cannot add foreign key on '${columnName}' ${invalidCount} existing record${
-                invalidCount === 1 ? '' : 's'
-              } in '${tableName}' have values that do not exist in '${referenceTable}.${referenceColumn}'.`,
-              400,
-              ERROR_CODES.CONSTRAINT_VIOLATION,
-              'Make sure all rows have valid matching values before adding this constraint.'
-            );
-          }
           const fkeyConstraint = this.generateFkeyConstraintStatement(col, true);
-          await client.query(
-            `
+          try {
+            await client.query(
+              `
               ALTER TABLE ${safeTableName}
               ADD ${fkeyConstraint}
             `
-          );
+            );
 
-          completedOperations.push(`Added foreign key constraint on column: ${col.columnName}`);
+            completedOperations.push(`Added foreign key constraint on column: ${col.columnName}`);
+          } catch (error: unknown) {
+            if (error instanceof DatabaseError) {
+              const message = error?.message?.toLowerCase() ?? '';
+              const { columnName, foreignKey } = col;
+              const { referenceTable, referenceColumn } = foreignKey;
+
+              // PostgreSQL error code 23503 = foreign_key_violation
+              if (
+                error.code === '23503' ||
+                message.includes('violates foreign key constraint') ||
+                message.includes('foreign key constraint fails')
+              ) {
+                const diagnoseQuery = `
+            SELECT COUNT(*) AS invalid_count
+            FROM ${safeTableName} t
+            WHERE t.${this.quoteIdentifier(columnName)} IS NOT NULL
+              AND NOT EXISTS (
+                SELECT 1
+                FROM ${this.quoteIdentifier(referenceTable)} r
+                WHERE r.${this.quoteIdentifier(referenceColumn)} = t.${this.quoteIdentifier(columnName)}
+              )
+          `;
+                const { rows } = await client.query(diagnoseQuery);
+                const invalidCount = Number(rows[0]?.invalid_count || 0);
+
+                if (invalidCount > 0) {
+                  throw new AppError(
+                    `Cannot add foreign key on '${columnName}' — ${invalidCount} existing record${
+                      invalidCount === 1 ? '' : 's'
+                    } in '${tableName}' have values that do not exist in '${referenceTable}.${referenceColumn}'.`,
+                    400,
+                    ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION,
+                    'Make sure all rows have valid matching values before adding this constraint.'
+                  );
+                }
+                throw new AppError(
+                  `Failed to add foreign key on '${columnName}': a foreign key constraint error occurred.`,
+                  400,
+                  ERROR_CODES.DATABASE_CONSTRAINT_VIOLATION,
+                  'Ensure referenced column and data types are valid.'
+                );
+              }
+            }
+
+            // If it's not a FK-related error, let the normal error handler take it
+            throw error;
+          }
         }
       }
 
