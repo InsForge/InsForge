@@ -5,7 +5,6 @@ import { TokenManager } from '@/infra/security/token.manager.js';
 import {
   ServerEvents,
   ClientEvents,
-  SocketMessage,
   SocketMetadata,
   NotificationPayload,
   SubscribePayload,
@@ -244,34 +243,25 @@ export class SocketManager {
   }
 
   /**
-   * Emit event to specific socket with type safety
+   * Emit event to specific socket
+   * Adds messageId (if not present) and timestamp to payload
    */
-  emitToSocket<T>(socket: Socket, event: ServerEvents, payload: T): void {
-    const message: SocketMessage<T> = {
-      type: event,
-      payload,
-      timestamp: Date.now(),
-      id: this.generateMessageId(),
-    };
+  emitToSocket<T extends object>(socket: Socket, event: string, payload: T): void {
+    const message = this.buildMessage(payload);
     socket.emit(event, message);
   }
 
   /**
    * Broadcast to all connected clients
+   * Adds messageId (if not present) and timestamp to payload
    */
-  broadcastToAll<T>(event: ServerEvents, payload: T): void {
+  broadcastToAll<T extends object>(event: string, payload: T): void {
     if (!this.io) {
       logger.warn('Socket.IO server not initialized');
       return;
     }
 
-    const message: SocketMessage<T> = {
-      type: event,
-      payload,
-      timestamp: Date.now(),
-      id: this.generateMessageId(),
-    };
-
+    const message = this.buildMessage(payload);
     this.io.emit(event, message);
 
     logger.info('Broadcasted message to all clients', {
@@ -282,26 +272,43 @@ export class SocketManager {
 
   /**
    * Broadcast to specific room
+   * Adds messageId (if not present) and timestamp to payload
    */
-  broadcastToRoom<T>(room: string, event: ServerEvents, payload?: T): void {
+  broadcastToRoom<T extends object>(room: string, event: string, payload: T): void {
     if (!this.io) {
       logger.warn('Socket.IO server not initialized');
       return;
     }
 
-    const message: SocketMessage<T> = {
-      type: event,
-      payload,
-      timestamp: Date.now(),
-      id: this.generateMessageId(),
-    };
-
+    const message = this.buildMessage(payload);
     this.io.to(room).emit(event, message);
 
-    logger.info('Broadcasted message to room', {
+    logger.debug('Broadcasted message to room', {
       event,
       room,
     });
+  }
+
+  /**
+   * Build message with messageId and timestamp
+   */
+  private buildMessage<T extends object>(payload: T): T & { messageId: string; timestamp: number } {
+    const payloadWithId = payload as T & { messageId?: string };
+    return {
+      ...payload,
+      messageId: payloadWithId.messageId || this.generateMessageId(),
+      timestamp: Date.now(),
+    };
+  }
+
+  /**
+   * Get the number of sockets in a room
+   */
+  getRoomSize(room: string): number {
+    if (!this.io) {
+      return 0;
+    }
+    return this.io.sockets.adapter.rooms.get(room)?.size || 0;
   }
 
   /**
@@ -368,11 +375,11 @@ export class SocketManager {
   close(): void {
     if (this.io) {
       // Notify all clients about server shutdown
-      this.broadcastToAll<NotificationPayload>(ServerEvents.NOTIFICATION, {
+      this.broadcastToAll(ServerEvents.NOTIFICATION, {
         level: 'warning',
         title: 'Server Shutdown',
         message: 'Server is shutting down',
-      });
+      } as NotificationPayload);
 
       // Close all connections
       void this.io.close();
