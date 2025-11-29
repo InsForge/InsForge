@@ -10,6 +10,11 @@ export enum ServerEvents {
   NOTIFICATION = 'notification',
   DATA_UPDATE = 'data:update',
   MCP_CONNECTED = 'mcp:connected',
+  // Realtime events
+  REALTIME_EVENT = 'realtime:event',
+  REALTIME_JOINED = 'realtime:joined',
+  REALTIME_LEFT = 'realtime:left',
+  REALTIME_ERROR = 'realtime:error',
 }
 
 /**
@@ -18,16 +23,10 @@ export enum ServerEvents {
 export enum ClientEvents {
   SUBSCRIBE = 'subscribe',
   UNSUBSCRIBE = 'unsubscribe',
-}
-
-/**
- * Generic message interface
- */
-export interface SocketMessage<T = unknown> {
-  type: string;
-  payload?: T;
-  timestamp: number;
-  id?: string;
+  // Realtime events
+  REALTIME_JOIN = 'realtime:join',
+  REALTIME_LEAVE = 'realtime:leave',
+  REALTIME_SEND = 'realtime:send',
 }
 
 /**
