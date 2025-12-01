@@ -16,6 +16,8 @@ import VisualizerPage from '@/features/visualizer/page/VisualizerPage';
 import FunctionsPage from '@/features/functions/page/FunctionsPage';
 import SecretsPage from '@/features/functions/page/SecretsPage';
 import AIPage from '@/features/ai/page/AIPage';
+import RealtimeChannelsPage from '@/features/realtime/page/RealtimeChannelsPage';
+import RealtimeMessagesPage from '@/features/realtime/page/RealtimeMessagesPage';
 import SQLEditorPage from '@/features/database/page/SQLEditorPage';
 import IndexesPage from '@/features/database/page/IndexesPage';
 import DatabaseFunctionsPage from '@/features/database/page/FunctionsPage';
@@ -75,6 +77,12 @@ export function AppRoutes() {
                 <Route path="/dashboard/visualizer" element={<VisualizerPage />} />
                 <Route path="/dashboard/onboard" element={<OnBoardPage />} />
                 <Route path="/dashboard/ai" element={<AIPage />} />
+                <Route
+                  path="/dashboard/realtime"
+                  element={<Navigate to="/dashboard/realtime/channels" replace />}
+                />
+                <Route path="/dashboard/realtime/channels" element={<RealtimeChannelsPage />} />
+                <Route path="/dashboard/realtime/messages" element={<RealtimeMessagesPage />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </Layout>
