@@ -29,8 +29,10 @@ export enum ServerEvents {
  * Client-to-server event types
  */
 export enum ClientEvents {
-  SUBSCRIBE = 'subscribe',
-  UNSUBSCRIBE = 'unsubscribe',
+  // Realtime events
+  REALTIME_SUBSCRIBE = 'realtime:subscribe',
+  REALTIME_UNSUBSCRIBE = 'realtime:unsubscribe',
+  REALTIME_PUBLISH = 'realtime:publish',
 }
 
 /**
@@ -80,8 +82,6 @@ interface SocketState {
 interface SocketActions {
   connect: (token: string | null) => void;
   disconnect: () => void;
-  subscribe: (channel: string, filters?: Record<string, unknown>) => void;
-  unsubscribe: (channel: string) => void;
   emit: (event: ClientEvents, data?: unknown) => void;
 }
 
@@ -114,7 +114,6 @@ export function SocketProvider({ children }: SocketProviderProps) {
 
   // Refs
   const socketRef = useRef<Socket | null>(null);
-  const subscriptionsRef = useRef<Set<string>>(new Set());
 
   /**
    * Update state helper
@@ -167,11 +166,6 @@ export function SocketProvider({ children }: SocketProviderProps) {
           isConnected: true,
           connectionError: null,
         });
-
-        // Re-subscribe to channels after reconnection
-        subscriptionsRef.current.forEach((channel) => {
-          socket.emit(ClientEvents.SUBSCRIBE, { channel });
-        });
       });
 
       return socket;
@@ -219,33 +213,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
       connectionError: null,
       socketId: null,
     });
-
-    subscriptionsRef.current.clear();
   }, [updateState]);
-
-  /**
-   * Subscribe to a channel
-   */
-  const subscribe = useCallback((channel: string, filters?: Record<string, unknown>) => {
-    if (!socketRef.current?.connected) {
-      return;
-    }
-
-    socketRef.current.emit(ClientEvents.SUBSCRIBE, { channel, filters });
-    subscriptionsRef.current.add(channel);
-  }, []);
-
-  /**
-   * Unsubscribe from a channel
-   */
-  const unsubscribe = useCallback((channel: string) => {
-    if (!socketRef.current?.connected) {
-      return;
-    }
-
-    socketRef.current.emit(ClientEvents.UNSUBSCRIBE, { channel });
-    subscriptionsRef.current.delete(channel);
-  }, []);
 
   /**
    * Emit event to server
@@ -283,11 +251,9 @@ export function SocketProvider({ children }: SocketProviderProps) {
       // Actions
       connect,
       disconnect,
-      subscribe,
-      unsubscribe,
       emit,
     }),
-    [state, connect, disconnect, subscribe, unsubscribe, emit]
+    [state, connect, disconnect, emit]
   );
 
   return <SocketContext.Provider value={contextValue}>{children}</SocketContext.Provider>;

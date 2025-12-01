@@ -2,16 +2,12 @@ import { Server as HttpServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import logger from '@/utils/logger.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
-import {
-  ServerEvents,
-  ClientEvents,
-  SocketMetadata,
-  NotificationPayload,
-  SubscribePayload,
-  UnsubscribePayload,
-} from '@/types/socket.js';
+import { ServerEvents, ClientEvents, SocketMetadata, NotificationPayload } from '@/types/socket.js';
+import type { SubscribeChannelPayload, PublishEventPayload } from '@/types/realtime.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
+import { RealtimeAuthService } from '@/services/realtime/realtime-auth.service.js';
+import { RealtimeManager } from '@/infra/realtime/realtime.manager.js';
 
 const tokenManager = TokenManager.getInstance();
 
@@ -187,14 +183,19 @@ export class SocketManager {
    * Setup handlers for client events
    */
   private setupClientEventHandlers(socket: Socket): void {
-    // Handle subscription requests
-    socket.on(ClientEvents.SUBSCRIBE, (payload: SubscribePayload) => {
-      this.handleSubscribe(socket, payload);
+    // Handle realtime channel subscribe
+    socket.on(ClientEvents.REALTIME_SUBSCRIBE, (payload: SubscribeChannelPayload) => {
+      void this.handleRealtimeSubscribe(socket, payload);
     });
 
-    // Handle unsubscription requests
-    socket.on(ClientEvents.UNSUBSCRIBE, (payload: UnsubscribePayload) => {
-      this.handleUnsubscribe(socket, payload);
+    // Handle realtime channel unsubscribe
+    socket.on(ClientEvents.REALTIME_UNSUBSCRIBE, (payload: SubscribeChannelPayload) => {
+      this.handleRealtimeUnsubscribe(socket, payload);
+    });
+
+    // Handle realtime publish (client-initiated messages)
+    socket.on(ClientEvents.REALTIME_PUBLISH, (payload: PublishEventPayload) => {
+      void this.handleRealtimePublish(socket, payload);
     });
 
     // Update last activity on any event
@@ -207,39 +208,129 @@ export class SocketManager {
   }
 
   /**
-   * Handle channel subscription
+   * Handle realtime channel subscribe request
    */
-  private handleSubscribe(socket: Socket, payload: SubscribePayload): void {
-    const metadata = this.socketMetadata.get(socket.id);
-    if (!metadata) {
-      return;
+  private async handleRealtimeSubscribe(
+    socket: Socket,
+    payload: SubscribeChannelPayload
+  ): Promise<void> {
+    const authService = RealtimeAuthService.getInstance();
+    const { channel } = payload;
+    const userId = socket.data.user?.id;
+    const userRole = socket.data.user?.role;
+
+    try {
+      // Check subscribe permission via RLS SELECT policy
+      const canSubscribe = await authService.checkSubscribePermission(channel, userId, userRole);
+
+      if (!canSubscribe) {
+        socket.emit(ServerEvents.REALTIME_ERROR, {
+          channel,
+          code: 'UNAUTHORIZED',
+          message: 'Not authorized to subscribe to this channel',
+        });
+        return;
+      }
+
+      const roomName = `realtime:${channel}`;
+      await socket.join(roomName);
+
+      const metadata = this.socketMetadata.get(socket.id);
+      if (metadata) {
+        metadata.subscriptions.add(roomName);
+      }
+
+      socket.emit(ServerEvents.REALTIME_SUBSCRIBED, {
+        channel,
+      });
+
+      logger.debug('Socket subscribed to realtime channel', {
+        socketId: socket.id,
+        channel,
+      });
+    } catch (error) {
+      logger.error('Error handling realtime subscribe', { error, channel });
+      socket.emit(ServerEvents.REALTIME_ERROR, {
+        channel,
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to subscribe to channel',
+      });
     }
-
-    void socket.join(payload.channel);
-    metadata.subscriptions.add(payload.channel);
-
-    logger.debug('Socket subscribed to channel', {
-      socketId: socket.id,
-      channel: payload.channel,
-    });
   }
 
   /**
-   * Handle channel unsubscription
+   * Handle realtime channel unsubscribe request
    */
-  private handleUnsubscribe(socket: Socket, payload: UnsubscribePayload): void {
+  private handleRealtimeUnsubscribe(socket: Socket, payload: SubscribeChannelPayload): void {
+    const { channel } = payload;
+    const roomName = `realtime:${channel}`;
+
+    void socket.leave(roomName);
+
     const metadata = this.socketMetadata.get(socket.id);
-    if (!metadata) {
+    if (metadata) {
+      metadata.subscriptions.delete(roomName);
+    }
+
+    socket.emit(ServerEvents.REALTIME_UNSUBSCRIBED, { channel });
+    logger.debug('Socket unsubscribed from realtime channel', { socketId: socket.id, channel });
+  }
+
+  /**
+   * Handle realtime publish request (client-initiated message)
+   * Delegates to RealtimeManager which handles insert, broadcast, and stats update.
+   */
+  private async handleRealtimePublish(socket: Socket, payload: PublishEventPayload): Promise<void> {
+    const { channel, event, payload: eventPayload } = payload;
+    const userId = socket.data.user?.id;
+    const userRole = socket.data.user?.role;
+
+    // Check if client has subscribed to this channel
+    const roomName = `realtime:${channel}`;
+    const metadata = this.socketMetadata.get(socket.id);
+    if (!metadata?.subscriptions.has(roomName)) {
+      socket.emit(ServerEvents.REALTIME_ERROR, {
+        channel,
+        code: 'NOT_SUBSCRIBED',
+        message: 'Must subscribe to channel before publishing messages',
+      });
       return;
     }
 
-    void socket.leave(payload.channel);
-    metadata.subscriptions.delete(payload.channel);
+    try {
+      // Delegate to RealtimeManager for insert, broadcast, and stats update
+      const realtimeManager = RealtimeManager.getInstance();
+      const result = await realtimeManager.broadcastClientMessage(
+        channel,
+        event,
+        eventPayload,
+        userId,
+        userRole
+      );
 
-    logger.debug('Socket unsubscribed from channel', {
-      socketId: socket.id,
-      channel: payload.channel,
-    });
+      if (!result.success) {
+        socket.emit(ServerEvents.REALTIME_ERROR, {
+          channel,
+          code: result.error?.code || 'UNAUTHORIZED',
+          message: result.error?.message || 'Not authorized to publish to this channel',
+        });
+        return;
+      }
+
+      logger.debug('Client message published', {
+        socketId: socket.id,
+        messageId: result.messageId,
+        channel,
+        event,
+      });
+    } catch (error) {
+      logger.error('Error handling realtime publish', { error, channel });
+      socket.emit(ServerEvents.REALTIME_ERROR, {
+        channel,
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to publish message',
+      });
+    }
   }
 
   /**

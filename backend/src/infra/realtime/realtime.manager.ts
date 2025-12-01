@@ -1,7 +1,9 @@
-import type { Client, Pool } from 'pg';
+import type { Client } from 'pg';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { WebhookSender } from './webhook-sender.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
+import { RealtimeChannelService } from '@/services/realtime/realtime-channel.service.js';
+import { RealtimeMessageService } from '@/services/realtime/realtime-message.service.js';
 import logger from '@/utils/logger.js';
 import type {
   RealtimeEvent,
@@ -15,7 +17,7 @@ import type {
  *
  * This is a singleton that:
  * 1. Maintains a dedicated PostgreSQL connection for LISTEN
- * 2. Receives notifications from insforge_realtime.send() function
+ * 2. Receives notifications from insforge_realtime.publish() function
  * 3. Emits events to WebSocket clients (via Socket.IO rooms)
  * 4. Emits events to webhook URLs (via HTTP POST)
  * 5. Updates usage records with delivery statistics
@@ -23,7 +25,6 @@ import type {
 export class RealtimeManager {
   private static instance: RealtimeManager;
   private listenerClient: Client | null = null;
-  private pool: Pool | null = null;
   private isConnected = false;
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private reconnectAttempts = 0;
@@ -40,13 +41,6 @@ export class RealtimeManager {
       RealtimeManager.instance = new RealtimeManager();
     }
     return RealtimeManager.instance;
-  }
-
-  private getPool(): Pool {
-    if (!this.pool) {
-      this.pool = DatabaseManager.getInstance().getPool();
-    }
-    return this.pool;
   }
 
   /**
@@ -106,7 +100,7 @@ export class RealtimeManager {
 
     try {
       // 1. Look up channel configuration
-      const channel = await this.getChannelById(channel_id);
+      const channel = await RealtimeChannelService.getInstance().getById(channel_id);
 
       if (!channel) {
         logger.warn('Channel not found for realtime event', { channel_id });
@@ -121,8 +115,8 @@ export class RealtimeManager {
       // 2. Emit to WebSocket and/or Webhooks
       const result = await this.emitEvent(event, channel);
 
-      // 3. Update usage record with delivery stats
-      await this.updateUsageRecord(message_id, result);
+      // 3. Update message record with delivery stats
+      await RealtimeMessageService.getInstance().updateDeliveryStats(message_id, result);
 
       logger.debug('Realtime event emitted', {
         message_id,
@@ -153,7 +147,10 @@ export class RealtimeManager {
     const { message_id, channel_name, event_name, payload } = event;
 
     // Emit to WebSocket clients
-    result.wsAudienceCount = this.emitToWebSocket(channel_name, event_name, payload);
+    result.wsAudienceCount = this.emitToWebSocket(channel_name, event_name, {
+      messageId: message_id,
+      ...payload,
+    });
 
     // Emit to Webhook URLs if configured
     if (channel.webhookUrls && channel.webhookUrls.length > 0) {
@@ -207,39 +204,64 @@ export class RealtimeManager {
   }
 
   /**
-   * Get channel configuration by ID
+   * Broadcast a client-initiated message to the channel.
+   * Inserts the message to DB (with RLS check), broadcasts to WebSocket subscribers,
+   * and updates delivery statistics.
+   *
+   * Note: Client messages do NOT trigger webhooks - only system messages do.
+   *
+   * @returns Object with success status, messageId (if successful), and error info (if failed)
    */
-  private async getChannelById(channelId: string): Promise<RealtimeChannel | null> {
-    const result = await this.getPool().query(
-      `SELECT
-        id,
-        name,
-        description,
-        webhook_urls as "webhookUrls",
-        enabled,
-        created_at as "createdAt",
-        updated_at as "updatedAt"
-      FROM insforge_realtime.channels
-      WHERE id = $1`,
-      [channelId]
+  async broadcastClientMessage(
+    channelName: string,
+    eventName: string,
+    payload: Record<string, unknown>,
+    userId: string | undefined,
+    userRole: string | undefined
+  ): Promise<{
+    success: boolean;
+    messageId?: string;
+    error?: { code: string; message: string };
+  }> {
+    const messageService = RealtimeMessageService.getInstance();
+
+    // Insert message - RLS INSERT policy will allow/deny
+    const message = await messageService.insertMessage(
+      channelName,
+      eventName,
+      payload,
+      userId,
+      userRole
     );
 
-    return result.rows[0] || null;
-  }
+    if (!message) {
+      return {
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Not authorized to publish to this channel' },
+      };
+    }
 
-  /**
-   * Update usage record with delivery statistics
-   */
-  private async updateUsageRecord(messageId: string, result: DeliveryResult): Promise<void> {
-    await this.getPool().query(
-      `UPDATE insforge_realtime.usage
-       SET
-         ws_audience_count = $2,
-         wh_audience_count = $3,
-         wh_delivered_count = $4
-       WHERE id = $1`,
-      [messageId, result.wsAudienceCount, result.whAudienceCount, result.whDeliveredCount]
-    );
+    // Broadcast to WebSocket subscribers (no webhooks for client messages)
+    const wsAudienceCount = this.emitToWebSocket(channelName, message.eventName, {
+      messageId: message.id,
+      ...payload,
+    });
+
+    // Update message record with delivery stats
+    await messageService.updateDeliveryStats(message.id, {
+      wsAudienceCount,
+      whAudienceCount: 0,
+      whDeliveredCount: 0,
+    });
+
+    logger.debug('Client message broadcasted', {
+      messageId: message.id,
+      channelName,
+      eventName,
+      wsAudienceCount,
+    });
+
+    return { success: true, messageId: message.id };
   }
 
   /**
@@ -261,7 +283,9 @@ export class RealtimeManager {
       if (!this.reconnectTimeout) {
         this.reconnectTimeout = setTimeout(() => {
           this.reconnectTimeout = null;
-          logger.info(`Attempting to reconnect RealtimeManager (attempt ${this.reconnectAttempts})...`);
+          logger.info(
+            `Attempting to reconnect RealtimeManager (attempt ${this.reconnectAttempts})...`
+          );
           void this.initialize();
         }, delay);
       }

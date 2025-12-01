@@ -11,9 +11,8 @@ export enum ServerEvents {
   DATA_UPDATE = 'data:update',
   MCP_CONNECTED = 'mcp:connected',
   // Realtime events
-  REALTIME_EVENT = 'realtime:event',
-  REALTIME_JOINED = 'realtime:joined',
-  REALTIME_LEFT = 'realtime:left',
+  REALTIME_SUBSCRIBED = 'realtime:subscribed',
+  REALTIME_UNSUBSCRIBED = 'realtime:unsubscribed',
   REALTIME_ERROR = 'realtime:error',
 }
 
@@ -21,12 +20,10 @@ export enum ServerEvents {
  * Client-to-Server events
  */
 export enum ClientEvents {
-  SUBSCRIBE = 'subscribe',
-  UNSUBSCRIBE = 'unsubscribe',
   // Realtime events
-  REALTIME_JOIN = 'realtime:join',
-  REALTIME_LEAVE = 'realtime:leave',
-  REALTIME_SEND = 'realtime:send',
+  REALTIME_SUBSCRIBE = 'realtime:subscribe',
+  REALTIME_UNSUBSCRIBE = 'realtime:unsubscribe',
+  REALTIME_PUBLISH = 'realtime:publish',
 }
 
 /**
@@ -51,18 +48,6 @@ export interface DataUpdatePayload {
   resource: DataUpdateResourceType;
   action: 'created' | 'updated' | 'deleted';
   data: unknown;
-}
-
-/**
- * Client event payloads
- */
-export interface SubscribePayload {
-  channel: string;
-  filters?: Record<string, unknown>;
-}
-
-export interface UnsubscribePayload {
-  channel: string;
 }
 
 /**
