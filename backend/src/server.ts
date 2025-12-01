@@ -15,7 +15,9 @@ import functionsRouter from '@/api/routes/functions/index.routes.js';
 import secretsRouter from '@/api/routes/secrets/index.routes.js';
 import { usageRouter } from '@/api/routes/usage/index.routes.js';
 import { aiRouter } from '@/api/routes/ai/index.routes.js';
+import { realtimeRouter } from '@/api/routes/realtime/index.routes.js';
 import { errorMiddleware } from '@/api/middlewares/error.js';
+import { RealtimeManager } from '@/infra/realtime/realtime.manager.js';
 import fetch, { HeadersInit } from 'node-fetch';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { LogService } from '@/services/logs/log.service.js';
@@ -170,6 +172,7 @@ export async function createApp() {
   apiRouter.use('/secrets', secretsRouter);
   apiRouter.use('/usage', usageRouter);
   apiRouter.use('/ai', aiRouter);
+  apiRouter.use('/realtime', realtimeRouter);
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);
@@ -264,6 +267,10 @@ async function initializeServer() {
     // Initialize Socket.IO service
     const socketService = SocketManager.getInstance();
     socketService.initialize(server);
+
+    // Initialize RealtimeManager (pg_notify listener)
+    const realtimeManager = RealtimeManager.getInstance();
+    await realtimeManager.initialize();
   } catch (error) {
     logger.error('Failed to initialize server', {
       error: error instanceof Error ? error.message : String(error),
@@ -275,10 +282,19 @@ async function initializeServer() {
 
 void initializeServer();
 
-function cleanup() {
+async function cleanup() {
   logger.info('Shutting down gracefully...');
+
+  // Close RealtimeManager
+  const realtimeManager = RealtimeManager.getInstance();
+  await realtimeManager.close();
+
+  // Close SocketManager
+  const socketService = SocketManager.getInstance();
+  socketService.close();
+
   process.exit(0);
 }
 
-process.on('SIGINT', cleanup);
-process.on('SIGTERM', cleanup);
+process.on('SIGINT', () => void cleanup());
+process.on('SIGTERM', () => void cleanup());
