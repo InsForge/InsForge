@@ -33,13 +33,13 @@ export class RealtimeChannelService {
     const result = await this.getPool().query(`
       SELECT
         id,
-        name,
+        pattern,
         description,
         webhook_urls as "webhookUrls",
         enabled,
         created_at as "createdAt",
         updated_at as "updatedAt"
-      FROM insforge_realtime.channels
+      FROM realtime.channels
       ORDER BY created_at DESC
     `);
     return result.rows;
@@ -49,13 +49,13 @@ export class RealtimeChannelService {
     const result = await this.getPool().query(
       `SELECT
         id,
-        name,
+        pattern,
         description,
         webhook_urls as "webhookUrls",
         enabled,
         created_at as "createdAt",
         updated_at as "updatedAt"
-      FROM insforge_realtime.channels
+      FROM realtime.channels
       WHERE id = $1`,
       [id]
     );
@@ -71,16 +71,16 @@ export class RealtimeChannelService {
     const result = await this.getPool().query(
       `SELECT
         id,
-        name,
+        pattern,
         description,
         webhook_urls as "webhookUrls",
         enabled,
         created_at as "createdAt",
         updated_at as "updatedAt"
-      FROM insforge_realtime.channels
+      FROM realtime.channels
       WHERE enabled = TRUE
-        AND (name = $1 OR $1 LIKE name)
-      ORDER BY name = $1 DESC
+        AND (pattern = $1 OR $1 LIKE pattern)
+      ORDER BY pattern = $1 DESC
       LIMIT 1`,
       [channelName]
     );
@@ -88,24 +88,24 @@ export class RealtimeChannelService {
   }
 
   async create(input: CreateChannelRequest): Promise<RealtimeChannel> {
-    this.validateChannelName(input.name);
+    this.validateChannelPattern(input.pattern);
 
     const result = await this.getPool().query(
-      `INSERT INTO insforge_realtime.channels (
-        name, description, webhook_urls, enabled
+      `INSERT INTO realtime.channels (
+        pattern, description, webhook_urls, enabled
       ) VALUES ($1, $2, $3, $4)
       RETURNING
         id,
-        name,
+        pattern,
         description,
         webhook_urls as "webhookUrls",
         enabled,
         created_at as "createdAt",
         updated_at as "updatedAt"`,
-      [input.name, input.description || null, input.webhookUrls || null, input.enabled ?? true]
+      [input.pattern, input.description || null, input.webhookUrls || null, input.enabled ?? true]
     );
 
-    logger.info('Realtime channel created', { name: input.name });
+    logger.info('Realtime channel created', { pattern: input.pattern });
     return result.rows[0];
   }
 
@@ -115,27 +115,27 @@ export class RealtimeChannelService {
       throw new AppError('Channel not found', 404, ERROR_CODES.NOT_FOUND);
     }
 
-    if (input.name) {
-      this.validateChannelName(input.name);
+    if (input.pattern) {
+      this.validateChannelPattern(input.pattern);
     }
 
     const result = await this.getPool().query(
-      `UPDATE insforge_realtime.channels
+      `UPDATE realtime.channels
        SET
-         name = COALESCE($2, name),
+         pattern = COALESCE($2, pattern),
          description = COALESCE($3, description),
          webhook_urls = COALESCE($4, webhook_urls),
          enabled = COALESCE($5, enabled)
        WHERE id = $1
        RETURNING
          id,
-         name,
+         pattern,
          description,
          webhook_urls as "webhookUrls",
          enabled,
          created_at as "createdAt",
          updated_at as "updatedAt"`,
-      [id, input.name, input.description, input.webhookUrls, input.enabled]
+      [id, input.pattern, input.description, input.webhookUrls, input.enabled]
     );
 
     logger.info('Realtime channel updated', { id });
@@ -148,16 +148,16 @@ export class RealtimeChannelService {
       throw new AppError('Channel not found', 404, ERROR_CODES.NOT_FOUND);
     }
 
-    await this.getPool().query('DELETE FROM insforge_realtime.channels WHERE id = $1', [id]);
-    logger.info('Realtime channel deleted', { id, name: existing.name });
+    await this.getPool().query('DELETE FROM realtime.channels WHERE id = $1', [id]);
+    logger.info('Realtime channel deleted', { id, pattern: existing.pattern });
   }
 
-  private validateChannelName(name: string): void {
+  private validateChannelPattern(pattern: string): void {
     // Allow alphanumeric, colons, hyphens, underscores, and % for wildcards
     const validPattern = /^[a-zA-Z0-9_-]+(:[a-zA-Z0-9_%:-]+)*$/;
-    if (!validPattern.test(name)) {
+    if (!validPattern.test(pattern)) {
       throw new AppError(
-        'Invalid channel name. Use alphanumeric characters, colons, hyphens, underscores, and % for wildcards.',
+        'Invalid channel pattern. Use alphanumeric characters, colons, hyphens, underscores, and % for wildcards.',
         400,
         ERROR_CODES.INVALID_INPUT
       );

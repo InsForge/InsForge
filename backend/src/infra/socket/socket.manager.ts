@@ -7,7 +7,7 @@ import type { SubscribeChannelPayload, PublishEventPayload } from '@/types/realt
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 import { RealtimeAuthService } from '@/services/realtime/realtime-auth.service.js';
-import { RealtimeManager } from '@/infra/realtime/realtime.manager.js';
+import { RealtimeMessageService } from '@/services/realtime/realtime-message.service.js';
 
 const tokenManager = TokenManager.getInstance();
 
@@ -278,7 +278,7 @@ export class SocketManager {
 
   /**
    * Handle realtime publish request (client-initiated message)
-   * Delegates to RealtimeManager which handles insert, broadcast, and stats update.
+   * Inserts message to DB - trigger handles pg_notify, broadcast, and stats update.
    */
   private async handleRealtimePublish(socket: Socket, payload: PublishEventPayload): Promise<void> {
     const { channel, event, payload: eventPayload } = payload;
@@ -298,28 +298,27 @@ export class SocketManager {
     }
 
     try {
-      // Delegate to RealtimeManager for insert, broadcast, and stats update
-      const realtimeManager = RealtimeManager.getInstance();
-      const result = await realtimeManager.broadcastClientMessage(
+      // Insert message directly - trigger will handle pg_notify and broadcasting
+      const messageService = RealtimeMessageService.getInstance();
+      const result = await messageService.insertMessage(
         channel,
         event,
         eventPayload,
         userId,
-        userRole
+        userRole as 'authenticated' | 'anon'
       );
 
-      if (!result.success) {
+      if (!result) {
         socket.emit(ServerEvents.REALTIME_ERROR, {
           channel,
-          code: result.error?.code || 'UNAUTHORIZED',
-          message: result.error?.message || 'Not authorized to publish to this channel',
+          code: 'UNAUTHORIZED',
+          message: 'Not authorized to publish to this channel',
         });
         return;
       }
 
-      logger.debug('Client message published', {
+      logger.debug('Client message inserted', {
         socketId: socket.id,
-        messageId: result.messageId,
         channel,
         event,
       });

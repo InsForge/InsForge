@@ -28,7 +28,7 @@ export class RealtimeMessageService {
   /**
    * Insert a message into the channel (client-initiated send).
    * RLS INSERT policy controls who can send to which channels.
-   * Does NOT trigger pg_notify - caller is responsible for broadcasting via WebSocket.
+   * pg_notify is automatically triggered by database trigger on insert.
    *
    * @returns The inserted message data for broadcasting, or null if RLS denied the insert
    */
@@ -37,9 +37,8 @@ export class RealtimeMessageService {
     eventName: string,
     payload: Record<string, unknown>,
     userId: string | undefined,
-    userRole: string | undefined
+    userRole: 'authenticated' | 'anon' = 'anon'
   ): Promise<{
-    id: string;
     channelId: string;
     channelName: string;
     eventName: string;
@@ -58,38 +57,50 @@ export class RealtimeMessageService {
     const client = await this.getPool().connect();
 
     try {
-      // Set user context for RLS
+      // Begin transaction to ensure settings persist across queries
+      await client.query('BEGIN');
+
+      // Switch to specified role to enforce RLS policies
+      await client.query(`SET LOCAL ROLE ${userRole}`);
+
+      // Set user context for RLS policy evaluation
       const authService = RealtimeAuthService.getInstance();
-      await authService.setUserContext(client, userId, userRole, channelName);
+      await authService.setUserContext(client, userId, channelName);
 
       // Attempt INSERT with sender info - RLS will allow/deny based on policies
-      const result = await client.query(
-        `INSERT INTO insforge_realtime.messages (event_name, channel_id, channel_name, payload, sender_type, sender_id)
-         VALUES ($1, $2, $3, $4, 'user', $5)
-         RETURNING id`,
+      // No RETURNING clause needed - trigger handles pg_notify
+      await client.query(
+        `INSERT INTO realtime.messages (event_name, channel_id, channel_name, payload, sender_type, sender_id)
+         VALUES ($1, $2, $3, $4, 'user', $5)`,
         [eventName, channel.id, channelName, JSON.stringify(payload), userId || null]
       );
 
-      const messageId = result.rows[0]?.id;
+      // Commit transaction - insert succeeded
+      await client.query('COMMIT');
 
-      if (messageId) {
-        logger.debug('Client message inserted', { messageId, channelName, eventName, userId });
-        return {
-          id: messageId,
-          channelId: channel.id,
-          channelName,
-          eventName,
-          payload,
-          senderId: userId || null,
-        };
-      }
+      logger.debug('Client message inserted', {
+        channelName,
+        eventName,
+        userId,
+      });
 
-      return null;
+      return {
+        channelId: channel.id,
+        channelName,
+        eventName,
+        payload,
+        senderId: userId || null,
+      };
     } catch (error) {
+      // Rollback transaction on error
+      await client.query('ROLLBACK').catch(() => {});
+
       // RLS policy denied the INSERT or other error
       logger.debug('Message insert denied or failed', { channelName, eventName, userId, error });
       return null;
     } finally {
+      // Reset role back to default before releasing connection
+      await client.query('RESET ROLE');
       client.release();
     }
   }
@@ -117,7 +128,7 @@ export class RealtimeMessageService {
         wh_audience_count as "whAudienceCount",
         wh_delivered_count as "whDeliveredCount",
         created_at as "createdAt"
-      FROM insforge_realtime.messages
+      FROM realtime.messages
       WHERE 1=1
     `;
 
@@ -153,7 +164,7 @@ export class RealtimeMessageService {
     }
   ): Promise<void> {
     await this.getPool().query(
-      `UPDATE insforge_realtime.messages
+      `UPDATE realtime.messages
        SET
          ws_audience_count = $2,
          wh_audience_count = $3,
@@ -194,14 +205,14 @@ export class RealtimeMessageService {
         COUNT(*) as total_messages,
         SUM(wh_audience_count) as wh_audience_total,
         SUM(wh_delivered_count) as wh_delivered_total
-      FROM insforge_realtime.messages
+      FROM realtime.messages
       WHERE ${whereClause}`,
       params
     );
 
     const topEventsResult = await this.getPool().query(
       `SELECT event_name, COUNT(*) as count
-       FROM insforge_realtime.messages
+       FROM realtime.messages
        WHERE ${whereClause}
        GROUP BY event_name
        ORDER BY count DESC

@@ -1,7 +1,6 @@
 import { Pool, PoolClient } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
-import { RealtimeChannelService } from './realtime-channel.service.js';
 
 /**
  * Handles channel authorization by checking RLS policies on the messages table.
@@ -10,7 +9,7 @@ import { RealtimeChannelService } from './realtime-channel.service.js';
  * - SELECT on messages = 'join' permission (can subscribe to channel)
  * - INSERT on messages = 'send' permission (can publish to channel)
  *
- * Developers define RLS policies on insforge_realtime.messages that check:
+ * Developers define RLS policies on realtime.messages that check:
  * - current_setting('request.jwt.claim.sub', true) = user ID
  * - current_setting('request.jwt.claim.role', true) = user role
  * - channel_name for channel-specific access
@@ -37,41 +36,48 @@ export class RealtimeAuthService {
 
   /**
    * Check if user has permission to subscribe to a channel.
-   * Tests SELECT permission on messages table via RLS.
+   * Tests SELECT permission on channels table via RLS.
    *
+   * @param channelName - The channel to check access for
+   * @param userId - The user ID (undefined for anonymous users)
+   * @param role - The database role to use (authenticated or anon)
    * @returns true if user can subscribe, false otherwise
    */
   async checkSubscribePermission(
     channelName: string,
     userId: string | undefined,
-    userRole: string | undefined
+    role: 'authenticated' | 'anon' = 'anon'
   ): Promise<boolean> {
-    // Verify channel exists and is enabled
-    const channelService = RealtimeChannelService.getInstance();
-    const channel = await channelService.getByName(channelName);
-    if (!channel) {
-      return false;
-    }
-
     const client = await this.getPool().connect();
-
     try {
-      await this.setUserContext(client, userId, userRole, channelName);
+      // Begin transaction to ensure settings persist across queries
+      await client.query('BEGIN');
+      // Switch to specified role to enforce RLS policies
+      await client.query(`SET LOCAL ROLE ${role}`);
+      await this.setUserContext(client, userId, channelName);
 
-      // Test SELECT permission via RLS
-      await client.query(
-        `SELECT 1 FROM insforge_realtime.messages
-         WHERE channel_name = $1
+      // Test SELECT permission via RLS on channels table
+      const result = await client.query(
+        `SELECT 1 FROM realtime.channels
+         WHERE enabled = TRUE
+           AND (pattern = $1 OR $1 LIKE pattern)
          LIMIT 1`,
         [channelName]
       );
 
-      // If query succeeds (even with empty result), user has SELECT permission
-      return true;
+      // Commit transaction
+      await client.query('COMMIT');
+
+      // If query returns a row, user has permission
+      return result.rowCount !== null && result.rowCount > 0;
     } catch (error) {
+      // Rollback transaction on error
+      await client.query('ROLLBACK').catch(() => {});
       logger.debug('Subscribe permission denied', { channelName, userId, error });
       return false;
     } finally {
+      // Reset role back to default before releasing connection
+      await client.query('RESET ROLE');
       client.release();
     }
   }
@@ -83,19 +89,15 @@ export class RealtimeAuthService {
   async setUserContext(
     client: PoolClient,
     userId: string | undefined,
-    userRole: string | undefined,
     channelName: string
   ): Promise<void> {
     if (userId) {
       await client.query("SELECT set_config('request.jwt.claim.sub', $1, true)", [userId]);
-      await client.query("SELECT set_config('request.jwt.claim.role', $1, true)", [
-        userRole || 'authenticated',
-      ]);
     } else {
       await client.query("SELECT set_config('request.jwt.claim.sub', '', true)");
-      await client.query("SELECT set_config('request.jwt.claim.role', 'anon', true)");
     }
 
+    // Set the channel being accessed (used by realtime.channel_name())
     await client.query("SELECT set_config('realtime.channel_name', $1, true)", [channelName]);
   }
 }

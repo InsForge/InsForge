@@ -18,10 +18,10 @@ export function ChannelRow({ channel, onClick, className }: ChannelRowProps) {
       onClick={onClick}
     >
       <div className="grid grid-cols-12 h-full items-center">
-        {/* Name Column */}
+        {/* Pattern Column */}
         <div className="col-span-3 min-w-0 px-3 py-1.5">
-          <p className="text-sm text-zinc-950 dark:text-white truncate" title={channel.name}>
-            {channel.name}
+          <p className="text-sm text-zinc-950 dark:text-white truncate" title={channel.pattern}>
+            {channel.pattern}
           </p>
         </div>
 

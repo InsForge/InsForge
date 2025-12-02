@@ -23,6 +23,7 @@ import DatabaseFunctionsPage from '@/features/database/page/FunctionsPage';
 import TriggersPage from '@/features/database/page/TriggersPage';
 import PoliciesPage from '@/features/database/page/PoliciesPage';
 import TemplatesPage from '@/features/database/page/TemplatesPage';
+import AuditsPage from '@/features/logs/page/AuditsPage';
 
 export function AppRoutes() {
   return (
@@ -66,6 +67,7 @@ export function AppRoutes() {
                   element={<Navigate to="/dashboard/logs/MCP" replace />}
                 />
                 <Route path="/dashboard/logs/MCP" element={<MCPLogsPage />} />
+                <Route path="/dashboard/logs/audits" element={<AuditsPage />} />
                 <Route path="/dashboard/logs/:source" element={<LogsPage />} />
                 <Route
                   path="/dashboard/functions"
