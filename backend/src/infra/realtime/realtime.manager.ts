@@ -17,7 +17,7 @@ import type {
  *
  * This is a singleton that:
  * 1. Maintains a dedicated PostgreSQL connection for LISTEN
- * 2. Receives notifications from insforge_realtime.publish() function
+ * 2. Receives notifications from realtime.publish() function
  * 3. Emits events to WebSocket clients (via Socket.IO rooms)
  * 4. Emits events to webhook URLs (via HTTP POST)
  * 5. Updates usage records with delivery statistics
@@ -56,12 +56,12 @@ export class RealtimeManager {
 
     try {
       await this.listenerClient.connect();
-      await this.listenerClient.query('LISTEN insforge_realtime');
+      await this.listenerClient.query('LISTEN realtime');
       this.isConnected = true;
       this.reconnectAttempts = 0;
 
       this.listenerClient.on('notification', (msg) => {
-        if (msg.channel === 'insforge_realtime' && msg.payload) {
+        if (msg.channel === 'realtime' && msg.payload) {
           void this.handlePGNotification(msg.payload);
         }
       });
@@ -108,7 +108,7 @@ export class RealtimeManager {
       }
 
       if (!channel.enabled) {
-        logger.debug('Channel is disabled, skipping event', { channelName: channel.name });
+        logger.debug('Channel is disabled, skipping event', { channelName: channel.pattern });
         return;
       }
 
@@ -120,7 +120,7 @@ export class RealtimeManager {
 
       logger.debug('Realtime event emitted', {
         message_id,
-        channelName: channel.name,
+        channelName: channel.pattern,
         event_name,
         ...result,
       });
@@ -201,67 +201,6 @@ export class RealtimeManager {
     const deliveredCount = results.filter((r) => r.success).length;
 
     return { audienceCount, deliveredCount };
-  }
-
-  /**
-   * Broadcast a client-initiated message to the channel.
-   * Inserts the message to DB (with RLS check), broadcasts to WebSocket subscribers,
-   * and updates delivery statistics.
-   *
-   * Note: Client messages do NOT trigger webhooks - only system messages do.
-   *
-   * @returns Object with success status, messageId (if successful), and error info (if failed)
-   */
-  async broadcastClientMessage(
-    channelName: string,
-    eventName: string,
-    payload: Record<string, unknown>,
-    userId: string | undefined,
-    userRole: string | undefined
-  ): Promise<{
-    success: boolean;
-    messageId?: string;
-    error?: { code: string; message: string };
-  }> {
-    const messageService = RealtimeMessageService.getInstance();
-
-    // Insert message - RLS INSERT policy will allow/deny
-    const message = await messageService.insertMessage(
-      channelName,
-      eventName,
-      payload,
-      userId,
-      userRole
-    );
-
-    if (!message) {
-      return {
-        success: false,
-        error: { code: 'UNAUTHORIZED', message: 'Not authorized to publish to this channel' },
-      };
-    }
-
-    // Broadcast to WebSocket subscribers (no webhooks for client messages)
-    const wsAudienceCount = this.emitToWebSocket(channelName, message.eventName, {
-      messageId: message.id,
-      ...payload,
-    });
-
-    // Update message record with delivery stats
-    await messageService.updateDeliveryStats(message.id, {
-      wsAudienceCount,
-      whAudienceCount: 0,
-      whDeliveredCount: 0,
-    });
-
-    logger.debug('Client message broadcasted', {
-      messageId: message.id,
-      channelName,
-      eventName,
-      wsAudienceCount,
-    });
-
-    return { success: true, messageId: message.id };
   }
 
   /**

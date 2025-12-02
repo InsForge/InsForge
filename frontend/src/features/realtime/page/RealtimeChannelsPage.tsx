@@ -68,7 +68,7 @@ export default function RealtimeChannelsPage() {
             Channels
           </button>
           <ChevronRight className="w-5 h-5 text-muted-foreground dark:text-neutral-400" />
-          <p className="text-xl text-zinc-950 dark:text-white">{selectedChannel.name}</p>
+          <p className="text-xl text-zinc-950 dark:text-white">{selectedChannel.pattern}</p>
         </div>
 
         <div className="flex-1 min-h-0 p-4 overflow-auto">
@@ -155,7 +155,7 @@ export default function RealtimeChannelsPage() {
         <div className="flex flex-col gap-2 relative">
           {/* Table Header */}
           <div className="grid grid-cols-12 px-3 text-sm text-muted-foreground dark:text-neutral-400">
-            <div className="col-span-3 py-1 px-3">Name</div>
+            <div className="col-span-3 py-1 px-3">Pattern</div>
             <div className="col-span-4 py-1 px-3">Description</div>
             <div className="col-span-2 py-1 px-3">Webhooks</div>
             <div className="col-span-1 py-1 px-3">Status</div>

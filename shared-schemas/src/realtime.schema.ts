@@ -13,7 +13,7 @@ export type SenderType = z.infer<typeof senderTypeSchema>;
 
 export const realtimeChannelSchema = z.object({
   id: z.string().uuid(),
-  name: z.string().min(1),
+  pattern: z.string().min(1),
   description: z.string().nullable(),
   webhookUrls: z.array(z.string().url()).nullable(),
   enabled: z.boolean(),

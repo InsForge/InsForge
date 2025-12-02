@@ -7,7 +7,7 @@ import { realtimeChannelSchema, realtimeMessageSchema } from './realtime.schema'
 
 // Create Channel
 export const createChannelRequestSchema = z.object({
-  name: z.string().min(1, 'Channel name is required'),
+  pattern: z.string().min(1, 'Channel pattern is required'),
   description: z.string().optional(),
   webhookUrls: z.array(z.string().url()).optional(),
   enabled: z.boolean().optional().default(true),
@@ -20,7 +20,7 @@ export type CreateChannelResponse = z.infer<typeof createChannelResponseSchema>;
 
 // Update Channel
 export const updateChannelRequestSchema = z.object({
-  name: z.string().min(1).optional(),
+  pattern: z.string().min(1).optional(),
   description: z.string().optional(),
   webhookUrls: z.array(z.string().url()).optional(),
   enabled: z.boolean().optional(),
