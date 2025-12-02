@@ -85,6 +85,7 @@ Partner platforms can:
 - ✅ Query project metadata to leverage the completed backend capabilities.
 - ✅ Pause projects
 - ✅ Restore projects
+- ✅ Delete projects
 - ✅ Get project's authorization token for access
 - ✅ Get project's usage
 
@@ -281,6 +282,21 @@ Partner platforms can:
         "id": "uuid-string",
         "status": "active"
       }
+    }
+    ```
+
+    ### Delete Project
+    Permanently delete a project. This operation cannot be undone.
+
+    ```bash
+    DELETE /partnership/v1/:partnerId/:projectId
+    ```
+
+    **Response:**
+    ```json
+    {
+      "success": true,
+      "message": "Project deleted successfully"
     }
     ```
 
@@ -553,6 +569,26 @@ const restoreProject = async (projectId: string) => {
 
   const { project } = await response.json();
   console.log(`Project ${project.id} status: ${project.status}`);
+};
+
+// 3. Delete project
+const deleteProject = async (projectId: string) => {
+  const response = await fetch(
+    `https://api.insforge.dev/partnership/v1/${PARTNER_ID}/${projectId}`,
+    {
+      method: 'DELETE',
+      headers: {
+        'X-Partnership-Secret': `${SECRET_KEY}`
+      }
+    }
+  );
+
+  const data = await response.json();
+  if (data.success) {
+    console.log(data.message);
+  } else {
+    throw new Error(data.message);
+  }
 };
 ```
 
