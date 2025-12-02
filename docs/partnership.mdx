@@ -292,11 +292,11 @@ Partner platforms can:
     DELETE /partnership/v1/:partnerId/:projectId
     ```
 
-    **Response:**
+    **Response (200 OK):**
     ```json
     {
-      "success": true,
-      "message": "Project deleted successfully"
+      "message": "Project deleted successfully",
+      "requestId": "xhiahif-fehfe-feae"
     }
     ```
 
@@ -583,11 +583,12 @@ const deleteProject = async (projectId: string) => {
     }
   );
 
-  const data = await response.json();
-  if (data.success) {
-    console.log(data.message);
+  if (response.ok) {
+    const data = await response.json();
+    console.log(data.message); // "Project deleted successfully"
+    console.log(`Request ID: ${data.requestId}`);
   } else {
-    throw new Error(data.message);
+    throw new Error(`Failed to delete project: ${response.status}`);
   }
 };
 ```
