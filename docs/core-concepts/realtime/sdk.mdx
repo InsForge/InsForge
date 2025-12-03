@@ -1,0 +1,402 @@
+---
+title: Realtime SDK Reference
+description: Real-time subscriptions and messaging with the InsForge SDK
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+<Installation />
+
+## connect()
+
+Establish a WebSocket connection to the realtime server.
+
+### Returns
+
+```typescript
+Promise<void>
+```
+
+<Note>
+The SDK automatically includes the authentication token from the logged-in user.
+</Note>
+
+### Example
+
+```javascript
+await insforge.realtime.connect()
+console.log('Connected:', insforge.realtime.isConnected)
+```
+
+---
+
+## subscribe()
+
+Subscribe to a channel to receive events.
+
+### Parameters
+
+- `channel` (string, required) - Channel name (e.g., `'orders:123'`, `'chat:room-1'`)
+
+### Returns
+
+```typescript
+Promise<{
+  ok: boolean,
+  channel: string,
+  error?: { code: string, message: string }
+}>
+```
+
+<Warning>
+Channel subscriptions are subject to RLS policies. The server will reject unauthorized subscriptions.
+</Warning>
+
+### Example
+
+```javascript
+const response = await insforge.realtime.subscribe('orders:123')
+
+if (response.ok) {
+  console.log('Subscribed to:', response.channel)
+} else {
+  console.error('Failed:', response.error?.message)
+}
+```
+
+### Output (Success)
+
+```json
+{
+  "ok": true,
+  "channel": "orders:123"
+}
+```
+
+### Output (Error)
+
+```json
+{
+  "ok": false,
+  "channel": "orders:123",
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Not authorized to subscribe to this channel"
+  }
+}
+```
+
+---
+
+## unsubscribe()
+
+Unsubscribe from a channel. This is a fire-and-forget operation.
+
+### Parameters
+
+- `channel` (string, required) - Channel name to unsubscribe from
+
+### Example
+
+```javascript
+insforge.realtime.unsubscribe('orders:123')
+```
+
+---
+
+## publish()
+
+Publish a message to a channel.
+
+### Parameters
+
+- `channel` (string, required) - Channel name
+- `event` (string, required) - Event name
+- `payload` (object, required) - Message payload
+
+<Warning>
+You must be subscribed to a channel before publishing to it. Otherwise, you'll receive an `error` event.
+</Warning>
+
+### Example
+
+```javascript
+await insforge.realtime.publish('orders:123', 'status_changed', {
+  status: 'shipped',
+  trackingNumber: 'ABC123'
+})
+```
+
+---
+
+## on()
+
+Listen for events.
+
+### Parameters
+
+- `event` (string, required) - Event name to listen for
+- `callback` (function, required) - Callback function receiving the payload
+
+### Reserved Events
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `connect` | - | Fired when connected to the server |
+| `connect_error` | `Error` | Fired when connection fails (including reconnection attempts) |
+| `disconnect` | `string` (reason) | Fired when disconnected from the server |
+| `error` | `RealtimeErrorPayload` | Fired when a realtime error occurs |
+
+### Example
+
+```javascript
+// Custom events
+insforge.realtime.on('order_updated', (payload) => {
+  console.log('Order updated:', payload)
+})
+
+// Connection events
+insforge.realtime.on('connect', () => {
+  console.log('Connected! Socket ID:', insforge.realtime.socketId)
+})
+
+insforge.realtime.on('connect_error', (error) => {
+  console.error('Connection failed:', error.message)
+})
+
+insforge.realtime.on('disconnect', (reason) => {
+  console.log('Disconnected:', reason)
+})
+
+// Realtime error handling
+insforge.realtime.on('error', (error) => {
+  console.error('Realtime error:', error.code, error.message)
+})
+```
+
+### Error Codes
+
+| Code | Description |
+|------|-------------|
+| `UNAUTHORIZED` | Not authorized to subscribe/publish to this channel |
+| `NOT_SUBSCRIBED` | Must subscribe to channel before publishing |
+| `INTERNAL_ERROR` | Server error occurred |
+
+---
+
+## Message Types
+
+All messages from the server include a `meta` field with metadata enforced by the server.
+
+### SocketMessage
+
+```typescript
+import type { SocketMessage, SocketMessageMeta } from '@insforge/sdk'
+
+interface SocketMessage {
+  meta: SocketMessageMeta
+  // ...your custom payload fields
+}
+
+interface SocketMessageMeta {
+  channel?: string        // Channel the message was sent to
+  messageId: string       // Unique message ID (UUID)
+  senderType: 'system' | 'user'
+  senderId?: string       // User ID of sender (UUID)
+  timestamp: Date         // Server timestamp
+}
+```
+
+### Example with Type Safety
+
+```typescript
+import type { SocketMessage } from '@insforge/sdk'
+
+interface ChatMessage extends SocketMessage {
+  text: string
+  sender: string
+}
+
+insforge.realtime.on<ChatMessage>('new_message', (payload) => {
+  console.log('Message ID:', payload.meta.messageId)
+  console.log('Sender ID:', payload.meta.senderId)
+  console.log('Sent at:', payload.meta.timestamp)
+  console.log('Text:', payload.text)
+})
+```
+
+---
+
+## off()
+
+Remove an event listener.
+
+### Parameters
+
+- `event` (string, required) - Event name
+- `callback` (function, required) - The callback function to remove
+
+### Example
+
+```javascript
+function handleOrderUpdate(payload) {
+  console.log('Order updated:', payload)
+}
+
+// Add listener
+insforge.realtime.on('order_updated', handleOrderUpdate)
+
+// Remove listener
+insforge.realtime.off('order_updated', handleOrderUpdate)
+```
+
+---
+
+## disconnect()
+
+Disconnect from the realtime server and clear all subscriptions.
+
+### Example
+
+```javascript
+insforge.realtime.disconnect()
+```
+
+---
+
+## Properties
+
+### isConnected
+
+Check if connected to the realtime server.
+
+```javascript
+if (insforge.realtime.isConnected) {
+  console.log('Connected')
+}
+```
+
+### connectionState
+
+Get the current connection state.
+
+```typescript
+type ConnectionState = 'disconnected' | 'connecting' | 'connected'
+```
+
+```javascript
+console.log(insforge.realtime.connectionState) // 'connected'
+```
+
+### socketId
+
+Get the socket ID (available when connected).
+
+```javascript
+console.log(insforge.realtime.socketId) // 'abc123xyz'
+```
+
+### getSubscribedChannels()
+
+Get all currently subscribed channels.
+
+```javascript
+const channels = insforge.realtime.getSubscribedChannels()
+console.log(channels) // ['orders:123', 'chat:room-1']
+```
+
+---
+
+## Complete Example
+
+### Chat Room
+
+```javascript
+const insforge = createClient({ baseUrl: 'https://your-app.insforge.app' })
+
+// Setup error handling
+insforge.realtime.on('error', (error) => {
+  console.error('Error:', error.message)
+})
+
+// Connect and subscribe
+await insforge.realtime.connect()
+const { ok } = await insforge.realtime.subscribe('chat:room-1')
+
+if (!ok) {
+  console.error('Failed to join room')
+  return
+}
+
+// Listen for messages
+insforge.realtime.on('new_message', (payload) => {
+  displayMessage(payload.sender, payload.text)
+})
+
+// Send a message
+async function sendMessage(text) {
+  await insforge.realtime.publish('chat:room-1', 'new_message', {
+    sender: currentUser.name,
+    text,
+    timestamp: new Date().toISOString()
+  })
+}
+
+// Cleanup on leave
+function leaveRoom() {
+  insforge.realtime.unsubscribe('chat:room-1')
+  insforge.realtime.disconnect()
+}
+```
+
+### React Hook
+
+```javascript
+import { useEffect, useCallback } from 'react'
+import { insforge } from './lib/insforge'
+
+export function useRealtime(channel, eventHandlers) {
+  useEffect(() => {
+    let mounted = true
+
+    async function setup() {
+      await insforge.realtime.connect()
+      const { ok } = await insforge.realtime.subscribe(channel)
+
+      if (!ok || !mounted) return
+
+      // Register event handlers
+      Object.entries(eventHandlers).forEach(([event, handler]) => {
+        insforge.realtime.on(event, handler)
+      })
+    }
+
+    setup()
+
+    return () => {
+      mounted = false
+      Object.entries(eventHandlers).forEach(([event, handler]) => {
+        insforge.realtime.off(event, handler)
+      })
+      insforge.realtime.unsubscribe(channel)
+    }
+  }, [channel])
+
+  const publish = useCallback(
+    (event, payload) => insforge.realtime.publish(channel, event, payload),
+    [channel]
+  )
+
+  return { publish }
+}
+
+// Usage
+function ChatRoom({ roomId }) {
+  const { publish } = useRealtime(`chat:${roomId}`, {
+    new_message: (msg) => setMessages(prev => [...prev, msg]),
+    user_joined: (user) => console.log(`${user.name} joined`)
+  })
+
+  return <button onClick={() => publish('new_message', { text: 'Hello!' })}>Send</button>
+}
+```
