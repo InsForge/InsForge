@@ -18,6 +18,7 @@ import SecretsPage from '@/features/functions/page/SecretsPage';
 import AIPage from '@/features/ai/page/AIPage';
 import RealtimeChannelsPage from '@/features/realtime/page/RealtimeChannelsPage';
 import RealtimeMessagesPage from '@/features/realtime/page/RealtimeMessagesPage';
+import RealtimePermissionsPage from '@/features/realtime/page/RealtimePermissionsPage';
 import SQLEditorPage from '@/features/database/page/SQLEditorPage';
 import IndexesPage from '@/features/database/page/IndexesPage';
 import DatabaseFunctionsPage from '@/features/database/page/FunctionsPage';
@@ -85,6 +86,10 @@ export function AppRoutes() {
                 />
                 <Route path="/dashboard/realtime/channels" element={<RealtimeChannelsPage />} />
                 <Route path="/dashboard/realtime/messages" element={<RealtimeMessagesPage />} />
+                <Route
+                  path="/dashboard/realtime/permissions"
+                  element={<RealtimePermissionsPage />}
+                />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </Layout>

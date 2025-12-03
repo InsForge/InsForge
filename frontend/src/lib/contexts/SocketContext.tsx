@@ -24,8 +24,6 @@ export enum ServerEvents {
   DATA_UPDATE = 'data:update',
   MCP_CONNECTED = 'mcp:connected',
   // Realtime events
-  REALTIME_SUBSCRIBED = 'realtime:subscribed',
-  REALTIME_UNSUBSCRIBED = 'realtime:unsubscribed',
   REALTIME_ERROR = 'realtime:error',
 }
 

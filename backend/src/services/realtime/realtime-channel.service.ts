@@ -7,7 +7,7 @@ import type {
   RealtimeChannel,
   CreateChannelRequest,
   UpdateChannelRequest,
-} from '@/types/realtime.js';
+} from '@insforge/shared-schemas';
 
 export class RealtimeChannelService {
   private static instance: RealtimeChannelService;
@@ -153,11 +153,12 @@ export class RealtimeChannelService {
   }
 
   private validateChannelPattern(pattern: string): void {
-    // Allow alphanumeric, colons, hyphens, underscores, and % for wildcards
-    const validPattern = /^[a-zA-Z0-9_-]+(:[a-zA-Z0-9_%:-]+)*$/;
+    // Allow alphanumeric, colons, hyphens, and % for wildcards
+    // Note: underscore is not allowed as it's a SQL wildcard character
+    const validPattern = /^[a-zA-Z0-9-]+(:[a-zA-Z0-9%:-]+)*$/;
     if (!validPattern.test(pattern)) {
       throw new AppError(
-        'Invalid channel pattern. Use alphanumeric characters, colons, hyphens, underscores, and % for wildcards.',
+        'Invalid channel pattern. Use alphanumeric characters, colons, hyphens, and % for wildcards.',
         400,
         ERROR_CODES.INVALID_INPUT
       );

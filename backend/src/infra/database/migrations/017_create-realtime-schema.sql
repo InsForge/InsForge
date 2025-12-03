@@ -197,15 +197,9 @@ REVOKE ALL ON FUNCTION realtime.publish FROM PUBLIC;
 CREATE OR REPLACE FUNCTION realtime.notify_on_message_insert()
 RETURNS TRIGGER AS $$
 BEGIN
-  -- Send notification to backend listener
-  PERFORM pg_notify('realtime', jsonb_build_object(
-    'message_id', NEW.id,
-    'channel_id', NEW.channel_id,
-    'channel_name', NEW.channel_name,
-    'event_name', NEW.event_name,
-    'payload', NEW.payload
-  )::text);
-
+  -- Send only message_id to bypass pg_notify 8KB payload limit
+  -- Backend will fetch full message from DB
+  PERFORM pg_notify('realtime_message', NEW.id::text);
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;

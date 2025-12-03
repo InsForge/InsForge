@@ -159,6 +159,11 @@ export const staticMenuItems: PrimaryMenuItem[] = [
         label: 'Messages',
         href: '/dashboard/realtime/messages',
       },
+      {
+        id: 'permissions',
+        label: 'Permissions',
+        href: '/dashboard/realtime/permissions',
+      },
     ],
   },
   {

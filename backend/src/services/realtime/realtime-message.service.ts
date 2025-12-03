@@ -1,7 +1,7 @@
 import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
-import type { RealtimeMessage } from '@/types/realtime.js';
+import type { RealtimeMessage } from '@insforge/shared-schemas';
 import { RealtimeChannelService } from './realtime-channel.service.js';
 import { RealtimeAuthService } from './realtime-auth.service.js';
 
@@ -103,6 +103,30 @@ export class RealtimeMessageService {
       await client.query('RESET ROLE');
       client.release();
     }
+  }
+
+  /**
+   * Get a message by ID (used by RealtimeManager after pg_notify)
+   */
+  async getById(id: string): Promise<RealtimeMessage | null> {
+    const result = await this.getPool().query(
+      `SELECT
+        id,
+        event_name as "eventName",
+        channel_id as "channelId",
+        channel_name as "channelName",
+        payload,
+        sender_type as "senderType",
+        sender_id as "senderId",
+        ws_audience_count as "wsAudienceCount",
+        wh_audience_count as "whAudienceCount",
+        wh_delivered_count as "whDeliveredCount",
+        created_at as "createdAt"
+      FROM realtime.messages
+      WHERE id = $1`,
+      [id]
+    );
+    return result.rows[0] || null;
   }
 
   async list(
