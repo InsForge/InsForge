@@ -6,9 +6,11 @@ import type {
   UpdateChannelRequest,
   ListMessagesRequest,
   MessageStatsResponse,
+  RlsPolicy,
+  RealtimePermissionsResponse,
 } from '@insforge/shared-schemas';
 
-export type { RealtimeChannel, RealtimeMessage };
+export type { RealtimeChannel, RealtimeMessage, RlsPolicy, RealtimePermissionsResponse };
 
 export class RealtimeService {
   // ============================================================================
@@ -87,6 +89,16 @@ export class RealtimeService {
     const endpoint = `/realtime/messages/stats${query ? `?${query}` : ''}`;
 
     return apiClient.request(endpoint, {
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  // ============================================================================
+  // Permissions
+  // ============================================================================
+
+  async getPermissions(): Promise<RealtimePermissionsResponse> {
+    return apiClient.request('/realtime/permissions', {
       headers: apiClient.withAccessToken(),
     });
   }

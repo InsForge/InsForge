@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import logger from '@/utils/logger.js';
-import type { WebhookEventPayload } from '@/types/realtime.js';
+import type { WebhookMessage } from '@insforge/shared-schemas';
 
 export interface WebhookResult {
   url: string;
@@ -10,35 +10,35 @@ export interface WebhookResult {
 }
 
 /**
- * WebhookSender - Handles HTTP delivery of realtime events to webhook endpoints
+ * WebhookSender - Handles HTTP delivery of realtime messages to webhook endpoints
  */
 export class WebhookSender {
   private readonly timeout = 10000; // 10 seconds
   private readonly maxRetries = 2;
 
   /**
-   * Send event to all webhook URLs in parallel
+   * Send message to all webhook URLs in parallel
    */
-  async sendToAll(urls: string[], payload: WebhookEventPayload): Promise<WebhookResult[]> {
-    const promises = urls.map((url) => this.sendToOne(url, payload));
+  async sendToAll(urls: string[], message: WebhookMessage): Promise<WebhookResult[]> {
+    const promises = urls.map((url) => this.send(url, message));
     return Promise.all(promises);
   }
 
   /**
-   * Send event to a single webhook URL with retry logic
+   * Send message to a single webhook URL with retry logic
    */
-  private async sendToOne(url: string, payload: WebhookEventPayload): Promise<WebhookResult> {
+  private async send(url: string, message: WebhookMessage): Promise<WebhookResult> {
     let lastError: string | undefined;
 
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       try {
-        const response = await axios.post(url, payload, {
+        const response = await axios.post(url, message.payload, {
           timeout: this.timeout,
           headers: {
             'Content-Type': 'application/json',
-            'X-InsForge-Event': payload.eventName,
-            'X-InsForge-Channel': payload.channel,
-            'X-InsForge-Message-Id': payload.messageId,
+            'X-InsForge-Event': message.eventName,
+            'X-InsForge-Channel': message.channel,
+            'X-InsForge-Message-Id': message.messageId,
           },
         });
 
@@ -67,7 +67,6 @@ export class WebhookSender {
         }
       }
     }
-
     logger.warn('Webhook delivery failed after retries', { url, error: lastError });
 
     return {

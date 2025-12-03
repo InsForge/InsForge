@@ -65,9 +65,12 @@ router.post(
       });
 
       const socket = SocketManager.getInstance();
-      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.DATABASE,
-      });
+      socket.broadcastToRoom(
+        'role:project_admin',
+        ServerEvents.DATA_UPDATE,
+        { resource: DataUpdateResourceType.DATABASE },
+        'system'
+      );
 
       successResponse(res, response);
     } catch (error: unknown) {
@@ -116,9 +119,12 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response, next
     });
 
     const socket = SocketManager.getInstance();
-    socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-      resource: DataUpdateResourceType.DATABASE,
-    });
+    socket.broadcastToRoom(
+      'role:project_admin',
+      ServerEvents.DATA_UPDATE,
+      { resource: DataUpdateResourceType.DATABASE },
+      'system'
+    );
 
     successResponse(res, response);
   } catch (error: unknown) {
@@ -235,12 +241,12 @@ router.post(
       });
 
       const socket = SocketManager.getInstance();
-      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.RECORDS,
-        data: {
-          tableName: table,
-        },
-      });
+      socket.broadcastToRoom(
+        'role:project_admin',
+        ServerEvents.DATA_UPDATE,
+        { resource: DataUpdateResourceType.RECORDS, data: { tableName: table } },
+        'system'
+      );
 
       successResponse(res, response);
     } catch (error: unknown) {
@@ -302,9 +308,12 @@ router.post(
       });
 
       const socket = SocketManager.getInstance();
-      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.DATABASE,
-      });
+      socket.broadcastToRoom(
+        'role:project_admin',
+        ServerEvents.DATA_UPDATE,
+        { resource: DataUpdateResourceType.DATABASE },
+        'system'
+      );
 
       successResponse(res, response);
     } catch (error: unknown) {

@@ -5,7 +5,6 @@ import { z } from 'zod';
 // ============================================================================
 
 export const senderTypeSchema = z.enum(['system', 'user']);
-export type SenderType = z.infer<typeof senderTypeSchema>;
 
 // ============================================================================
 // Channel Schema
@@ -68,25 +67,27 @@ export const publishEventPayloadSchema = z.object({
 export type PublishEventPayload = z.infer<typeof publishEventPayloadSchema>;
 
 /**
- * Payload for realtime:subscribed server event
+ * Response for subscribe operations (used in Socket.IO ack callbacks)
  */
-export const subscribedChannelPayloadSchema = z.object({
-  channel: z.string().min(1),
-});
+export const subscribeResponseSchema = z.discriminatedUnion('ok', [
+  z.object({
+    ok: z.literal(true),
+    channel: z.string().min(1),
+  }),
+  z.object({
+    ok: z.literal(false),
+    channel: z.string().min(1),
+    error: z.object({
+      code: z.string().min(1),
+      message: z.string().min(1),
+    }),
+  }),
+]);
 
-export type SubscribedChannelPayload = z.infer<typeof subscribedChannelPayloadSchema>;
+export type SubscribeResponse = z.infer<typeof subscribeResponseSchema>;
 
 /**
- * Payload for realtime:unsubscribed server event
- */
-export const unsubscribedChannelPayloadSchema = z.object({
-  channel: z.string().min(1),
-});
-
-export type UnsubscribedChannelPayload = z.infer<typeof unsubscribedChannelPayloadSchema>;
-
-/**
- * Payload for realtime:error server event
+ * Payload for realtime:error server event (for unsolicited errors like publish failures)
  */
 export const realtimeErrorPayloadSchema = z.object({
   channel: z.string().optional(),
@@ -99,11 +100,39 @@ export type RealtimeErrorPayload = z.infer<typeof realtimeErrorPayloadSchema>;
 /**
  * Payload sent to webhook endpoints
  */
-export const webhookEventPayloadSchema = z.object({
+export const webhookMessageSchema = z.object({
   messageId: z.string().uuid(),
   channel: z.string().min(1),
   eventName: z.string().min(1),
   payload: z.record(z.string(), z.unknown()),
 });
 
-export type WebhookEventPayload = z.infer<typeof webhookEventPayloadSchema>;
+export type WebhookMessage = z.infer<typeof webhookMessageSchema>;
+
+// ============================================================================
+// Socket Message Schema
+// ============================================================================
+
+/**
+ * Meta object included in all socket messages
+ */
+export const socketMessageMetaSchema = z.object({
+  channel: z.string().optional(), // Present for room broadcasts
+  messageId: z.string().uuid(),
+  senderType: senderTypeSchema,
+  senderId: z.string().uuid().optional(),
+  timestamp: z.date(),
+});
+
+export type SocketMessageMeta = z.infer<typeof socketMessageMetaSchema>;
+
+/**
+ * Base socket message schema (meta + passthrough for payload)
+ */
+export const socketMessageSchema = z
+  .object({
+    meta: socketMessageMetaSchema,
+  })
+  .passthrough();
+
+export type SocketMessage = z.infer<typeof socketMessageSchema>;

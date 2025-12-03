@@ -60,14 +60,14 @@ export function MessageRow({ message, onClick, className }: MessageRowProps) {
         {/* WS Audience Column */}
         <div className="col-span-1 px-3 py-1.5">
           <span className="text-sm text-muted-foreground dark:text-neutral-400">
-            {message.wsAudienceCount} WS
+            {message.wsAudienceCount}
           </span>
         </div>
 
         {/* WH Delivered Column */}
         <div className="col-span-1 px-3 py-1.5">
           <span className="text-sm text-muted-foreground dark:text-neutral-400">
-            {message.whDeliveredCount}/{message.whAudienceCount} WH
+            {message.whDeliveredCount}/{message.whAudienceCount}
           </span>
         </div>
 

@@ -84,3 +84,28 @@ export const messageStatsResponseSchema = z.object({
 
 export type MessageStatsRequest = z.infer<typeof messageStatsRequestSchema>;
 export type MessageStatsResponse = z.infer<typeof messageStatsResponseSchema>;
+
+// ============================================================================
+// Permissions Schemas
+// ============================================================================
+
+export const rlsPolicySchema = z.object({
+  policyName: z.string(),
+  tableName: z.string(),
+  command: z.string(),
+  roles: z.array(z.string()),
+  using: z.string().nullable(),
+  withCheck: z.string().nullable(),
+});
+
+export const realtimePermissionsResponseSchema = z.object({
+  subscribe: z.object({
+    policies: z.array(rlsPolicySchema),
+  }),
+  publish: z.object({
+    policies: z.array(rlsPolicySchema),
+  }),
+});
+
+export type RlsPolicy = z.infer<typeof rlsPolicySchema>;
+export type RealtimePermissionsResponse = z.infer<typeof realtimePermissionsResponseSchema>;

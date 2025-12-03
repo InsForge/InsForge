@@ -5,22 +5,18 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { RealtimeChannelService } from '@/services/realtime/realtime-channel.service.js';
 import { RealtimeMessageService } from '@/services/realtime/realtime-message.service.js';
 import logger from '@/utils/logger.js';
-import type {
-  RealtimeEvent,
-  RealtimeChannel,
-  DeliveryResult,
-  WebhookEventPayload,
-} from '@/types/realtime.js';
+import type { RealtimeMessage, RealtimeChannel, WebhookMessage } from '@insforge/shared-schemas';
+import type { DeliveryResult } from '@/types/realtime.js';
 
 /**
- * RealtimeManager - Listens to pg_notify and emits events to WebSocket/webhooks
+ * RealtimeManager - Listens to pg_notify and publishes messages to WebSocket/webhooks
  *
  * This is a singleton that:
  * 1. Maintains a dedicated PostgreSQL connection for LISTEN
  * 2. Receives notifications from realtime.publish() function
- * 3. Emits events to WebSocket clients (via Socket.IO rooms)
- * 4. Emits events to webhook URLs (via HTTP POST)
- * 5. Updates usage records with delivery statistics
+ * 3. Publishes messages to WebSocket clients (via Socket.IO rooms)
+ * 4. Publishes messages to webhook URLs (via HTTP POST)
+ * 5. Updates message records with delivery statistics
  */
 export class RealtimeManager {
   private static instance: RealtimeManager;
@@ -56,12 +52,12 @@ export class RealtimeManager {
 
     try {
       await this.listenerClient.connect();
-      await this.listenerClient.query('LISTEN realtime');
+      await this.listenerClient.query('LISTEN realtime_message');
       this.isConnected = true;
       this.reconnectAttempts = 0;
 
       this.listenerClient.on('notification', (msg) => {
-        if (msg.channel === 'realtime' && msg.payload) {
+        if (msg.channel === 'realtime_message' && msg.payload) {
           void this.handlePGNotification(msg.payload);
         }
       });
@@ -85,82 +81,69 @@ export class RealtimeManager {
 
   /**
    * Handle incoming pg_notify notification
+   * Payload is just the message_id (UUID string) to bypass 8KB limit
    */
-  private async handlePGNotification(payload: string): Promise<void> {
-    let event: RealtimeEvent;
-
+  private async handlePGNotification(messageId: string): Promise<void> {
     try {
-      event = JSON.parse(payload) as RealtimeEvent;
-    } catch (error) {
-      logger.error('Failed to parse pg_notify payload', { error, payload });
-      return;
-    }
+      // 1. Fetch message and channel in parallel
+      // channelId is guaranteed non-null for fresh messages (publish/insertMessage validate channel)
+      const message = await RealtimeMessageService.getInstance().getById(messageId);
 
-    const { message_id, channel_id, event_name } = event;
-
-    try {
-      // 1. Look up channel configuration
-      const channel = await RealtimeChannelService.getInstance().getById(channel_id);
-
-      if (!channel) {
-        logger.warn('Channel not found for realtime event', { channel_id });
+      if (!message || !message.channelId) {
+        logger.warn('Message not found or invalid for realtime notification', { messageId });
         return;
       }
 
-      if (!channel.enabled) {
-        logger.debug('Channel is disabled, skipping event', { channelName: channel.pattern });
+      // 2. Look up channel configuration (for enabled check and webhook URLs)
+      const channel = await RealtimeChannelService.getInstance().getById(message.channelId);
+
+      if (!channel?.enabled) {
+        logger.debug('Channel not found or disabled, skipping', { channelId: message.channelId });
         return;
       }
 
-      // 2. Emit to WebSocket and/or Webhooks
-      const result = await this.emitEvent(event, channel);
+      // 3. Publish to WebSocket and/or Webhooks
+      const result = await this.publishMessage(message, channel);
 
-      // 3. Update message record with delivery stats
-      await RealtimeMessageService.getInstance().updateDeliveryStats(message_id, result);
+      // 4. Update message record with delivery stats
+      await RealtimeMessageService.getInstance().updateDeliveryStats(messageId, result);
 
-      logger.debug('Realtime event emitted', {
-        message_id,
+      logger.debug('Realtime message published', {
+        messageId,
         channelName: channel.pattern,
-        event_name,
+        eventName: message.eventName,
         ...result,
       });
     } catch (error) {
-      logger.error('Failed to emit realtime event', {
-        error,
-        message_id,
-        channel_id,
-        event_name,
-      });
+      logger.error('Failed to publish realtime message', { error, messageId });
     }
   }
 
   /**
-   * Emit event to WebSocket clients and webhook URLs
+   * Publish message to WebSocket clients and webhook URLs
    */
-  private async emitEvent(event: RealtimeEvent, channel: RealtimeChannel): Promise<DeliveryResult> {
+  private async publishMessage(
+    message: RealtimeMessage,
+    channel: RealtimeChannel
+  ): Promise<DeliveryResult> {
     const result: DeliveryResult = {
       wsAudienceCount: 0,
       whAudienceCount: 0,
       whDeliveredCount: 0,
     };
 
-    const { message_id, channel_name, event_name, payload } = event;
+    // Publish to WebSocket clients
+    result.wsAudienceCount = this.publishToWebSocket(message);
 
-    // Emit to WebSocket clients
-    result.wsAudienceCount = this.emitToWebSocket(channel_name, event_name, {
-      messageId: message_id,
-      ...payload,
-    });
-
-    // Emit to Webhook URLs if configured
+    // Publish to Webhook URLs if configured
     if (channel.webhookUrls && channel.webhookUrls.length > 0) {
-      const webhookPayload: WebhookEventPayload = {
-        messageId: message_id,
-        channel: channel_name,
-        eventName: event_name,
-        payload,
+      const webhookPayload: WebhookMessage = {
+        messageId: message.id,
+        channel: message.channelName,
+        eventName: message.eventName,
+        payload: message.payload,
       };
-      const whResult = await this.emitToWebhooks(channel.webhookUrls, webhookPayload);
+      const whResult = await this.publishToWebhooks(channel.webhookUrls, webhookPayload);
       result.whAudienceCount = whResult.audienceCount;
       result.whDeliveredCount = whResult.deliveredCount;
     }
@@ -169,35 +152,38 @@ export class RealtimeManager {
   }
 
   /**
-   * Emit event to WebSocket clients subscribed to the channel
+   * Publish message to WebSocket clients subscribed to the channel
    * Returns the number of clients in the room (audience count)
    */
-  private emitToWebSocket(
-    channelName: string,
-    eventName: string,
-    payload: Record<string, unknown>
-  ): number {
+  private publishToWebSocket(message: RealtimeMessage): number {
     const socketManager = SocketManager.getInstance();
-    const roomName = `realtime:${channelName}`;
+    const roomName = `realtime:${message.channelName}`;
 
     const audienceCount = socketManager.getRoomSize(roomName);
 
     if (audienceCount > 0) {
-      socketManager.broadcastToRoom(roomName, eventName, payload);
+      socketManager.broadcastToRoom(
+        roomName,
+        message.eventName,
+        message.payload,
+        message.senderType,
+        message.senderId ?? undefined,
+        message.id
+      );
     }
 
     return audienceCount;
   }
 
   /**
-   * Emit event to all configured webhook URLs
+   * Publish message to all configured webhook URLs
    */
-  private async emitToWebhooks(
+  private async publishToWebhooks(
     urls: string[],
-    payload: WebhookEventPayload
+    message: WebhookMessage
   ): Promise<{ audienceCount: number; deliveredCount: number }> {
     const audienceCount = urls.length;
-    const results = await this.webhookSender.sendToAll(urls, payload);
+    const results = await this.webhookSender.sendToAll(urls, message);
     const deliveredCount = results.filter((r) => r.success).length;
 
     return { audienceCount, deliveredCount };

@@ -171,9 +171,9 @@ export default function RealtimeMessagesPage() {
             <div className="col-span-2 py-1 px-3">Channel</div>
             <div className="col-span-1 py-1 px-3">Sender</div>
             <div className="col-span-3 py-1 px-3">Payload</div>
-            <div className="col-span-1 py-1 px-3">WS</div>
-            <div className="col-span-1 py-1 px-3">WH</div>
-            <div className="col-span-2 py-1 px-3">Time</div>
+            <div className="col-span-1 py-1 px-3">Websockets</div>
+            <div className="col-span-1 py-1 px-3">Webhooks</div>
+            <div className="col-span-2 py-1 px-3">Sent At</div>
           </div>
 
           {isLoadingMessages ? (

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { ChevronRight } from 'lucide-react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import {
   Button,
@@ -17,14 +16,16 @@ import {
 } from '@/lib/contexts/SocketContext';
 import { useRealtime } from '../hooks/useRealtime';
 import { ChannelRow } from '../components/ChannelRow';
+import { EditChannelModal } from '../components/EditChannelModal';
 import RealtimeEmptyState from '../components/RealtimeEmptyState';
 import type { RealtimeChannel } from '../services/realtime.service';
 
 export default function RealtimeChannelsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState<RealtimeChannel | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const { channels, isLoadingChannels, refetchChannels } = useRealtime();
+  const { channels, isLoadingChannels, refetchChannels, updateChannel, isUpdating } = useRealtime();
 
   const { socket, isConnected } = useSocket();
 
@@ -56,72 +57,26 @@ export default function RealtimeChannelsPage() {
     };
   }, [socket, isConnected, refetchChannels]);
 
-  // Channel detail view
-  if (selectedChannel) {
-    return (
-      <div className="h-full flex flex-col overflow-hidden">
-        <div className="flex items-center gap-2.5 p-4 border-b border-border-gray dark:border-neutral-600">
-          <button
-            onClick={() => setSelectedChannel(null)}
-            className="text-xl text-zinc-500 dark:text-neutral-400 hover:text-zinc-950 dark:hover:text-white transition-colors"
-          >
-            Channels
-          </button>
-          <ChevronRight className="w-5 h-5 text-muted-foreground dark:text-neutral-400" />
-          <p className="text-xl text-zinc-950 dark:text-white">{selectedChannel.pattern}</p>
-        </div>
+  const handleRowClick = (channel: RealtimeChannel) => {
+    setSelectedChannel(channel);
+    setIsModalOpen(true);
+  };
 
-        <div className="flex-1 min-h-0 p-4 overflow-auto">
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 rounded-lg bg-neutral-100 dark:bg-[#333333]">
-                <p className="text-sm text-muted-foreground dark:text-neutral-400 mb-1">Status</p>
-                <p className="text-sm text-zinc-950 dark:text-white">
-                  {selectedChannel.enabled ? 'Active' : 'Disabled'}
-                </p>
-              </div>
-              <div className="p-4 rounded-lg bg-neutral-100 dark:bg-[#333333]">
-                <p className="text-sm text-muted-foreground dark:text-neutral-400 mb-1">Created</p>
-                <p className="text-sm text-zinc-950 dark:text-white">{selectedChannel.createdAt}</p>
-              </div>
-            </div>
+  const handleToggleEnabled = (channel: RealtimeChannel, enabled: boolean) => {
+    updateChannel({ id: channel.id, data: { enabled } });
+  };
 
-            {selectedChannel.description && (
-              <div className="p-4 rounded-lg bg-neutral-100 dark:bg-[#333333]">
-                <p className="text-sm text-muted-foreground dark:text-neutral-400 mb-1">
-                  Description
-                </p>
-                <p className="text-sm text-zinc-950 dark:text-white">
-                  {selectedChannel.description}
-                </p>
-              </div>
-            )}
-
-            <div className="p-4 rounded-lg bg-neutral-100 dark:bg-[#333333]">
-              <p className="text-sm text-muted-foreground dark:text-neutral-400 mb-2">
-                Webhook URLs
-              </p>
-              {selectedChannel.webhookUrls && selectedChannel.webhookUrls.length > 0 ? (
-                <ul className="space-y-1">
-                  {selectedChannel.webhookUrls.map((url, index) => (
-                    <li key={index} className="text-sm text-zinc-950 dark:text-white font-mono">
-                      {url}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                  No webhooks configured
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+  const handleModalSave = (id: string, data: Parameters<typeof updateChannel>[0]['data']) => {
+    updateChannel(
+      { id, data },
+      {
+        onSuccess: () => {
+          setIsModalOpen(false);
+          setSelectedChannel(null);
+        },
+      }
     );
-  }
-
-  // Default list view
+  };
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <div className="flex flex-col gap-6 p-4">
@@ -155,10 +110,9 @@ export default function RealtimeChannelsPage() {
         <div className="flex flex-col gap-2 relative">
           {/* Table Header */}
           <div className="grid grid-cols-12 px-3 text-sm text-muted-foreground dark:text-neutral-400">
-            <div className="col-span-3 py-1 px-3">Pattern</div>
-            <div className="col-span-4 py-1 px-3">Description</div>
-            <div className="col-span-2 py-1 px-3">Webhooks</div>
-            <div className="col-span-1 py-1 px-3">Status</div>
+            <div className="col-span-4 py-1 px-3">Pattern</div>
+            <div className="col-span-5 py-1 px-3">Description</div>
+            <div className="col-span-1 py-1 px-3">Enabled</div>
             <div className="col-span-2 py-1 px-3">Created</div>
           </div>
 
@@ -174,7 +128,9 @@ export default function RealtimeChannelsPage() {
                 <ChannelRow
                   key={channel.id}
                   channel={channel}
-                  onClick={() => setSelectedChannel(channel)}
+                  onClick={() => handleRowClick(channel)}
+                  onToggleEnabled={(enabled) => handleToggleEnabled(channel, enabled)}
+                  isUpdating={isUpdating}
                 />
               ))}
             </>
@@ -193,6 +149,19 @@ export default function RealtimeChannelsPage() {
           )}
         </div>
       </div>
+
+      <EditChannelModal
+        channel={selectedChannel}
+        open={isModalOpen}
+        onOpenChange={(open) => {
+          setIsModalOpen(open);
+          if (!open) {
+            setSelectedChannel(null);
+          }
+        }}
+        onSave={handleModalSave}
+        isUpdating={isUpdating}
+      />
     </div>
   );
 }
