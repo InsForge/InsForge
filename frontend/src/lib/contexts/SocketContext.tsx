@@ -37,16 +37,6 @@ export enum ClientEvents {
   REALTIME_PUBLISH = 'realtime:publish',
 }
 
-/**
- * Base message structure for all socket communications
- */
-export interface SocketMessage<T = unknown> {
-  type: string;
-  payload?: T;
-  timestamp: number;
-  id?: string;
-}
-
 // ============================================================================
 // Payload Types
 // ============================================================================

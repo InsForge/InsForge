@@ -31,13 +31,8 @@ import { useToast } from '@/lib/hooks/useToast';
 import { DatabaseDataGrid } from '@/features/database/components/DatabaseDataGrid';
 import { SortColumn } from 'react-data-grid';
 import { convertValueForColumn } from '@/lib/utils/utils';
-import {
-  DataUpdatePayload,
-  DataUpdateResourceType,
-  ServerEvents,
-  SocketMessage,
-  useSocket,
-} from '@/lib/contexts/SocketContext';
+import type { SocketMessage } from '@insforge/shared-schemas';
+import { DataUpdateResourceType, ServerEvents, useSocket } from '@/lib/contexts/SocketContext';
 import { useCSVImport } from '@/features/database/hooks/useCSVImport';
 
 const PAGE_SIZE = 50;
@@ -189,16 +184,16 @@ export default function TablesPage() {
       return;
     }
 
-    const handleDataUpdate = (message: SocketMessage<DataUpdatePayload>) => {
-      if (message.payload?.resource === DataUpdateResourceType.DATABASE) {
+    const handleDataUpdate = (message: SocketMessage) => {
+      if (message.resource === DataUpdateResourceType.DATABASE) {
         // Invalidate all tables queries
         void queryClient.invalidateQueries({ queryKey: ['tables'] });
         void queryClient.invalidateQueries({ queryKey: ['records', selectedTable] });
       }
 
-      if (message.payload?.resource === DataUpdateResourceType.RECORDS) {
+      if (message.resource === DataUpdateResourceType.RECORDS) {
         // Invalidate records queries for the updated table
-        const data = message.payload.data as { tableName?: string };
+        const data = message.data as { tableName?: string };
         const updatedTableName = data?.tableName;
 
         // Only invalidate if this is the currently selected table

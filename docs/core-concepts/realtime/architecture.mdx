@@ -115,6 +115,11 @@ FOR SELECT
 TO authenticated
 USING (
   realtime.channel_name() LIKE 'order:%'
+  AND EXISTS (
+    SELECT 1 FROM orders
+    WHERE id = NULLIF(split_part(realtime.channel_name(), ':', 2), '')::uuid
+      AND user_id = auth.uid()
+  )
 );
 ```
 

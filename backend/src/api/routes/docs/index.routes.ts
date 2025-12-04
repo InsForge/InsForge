@@ -23,7 +23,7 @@ const DOCS_MAP: Record<string, string> = {
   'storage-sdk': 'core-concepts/storage/sdk.mdx',
   'functions-sdk': 'core-concepts/functions/sdk.mdx',
   'ai-integration-sdk': 'core-concepts/ai/sdk.mdx',
-  'realtime-sdk': 'core-concepts/realtime/sdk.mdx',
+  'real-time': 'agent-docs/real-time.md',
 };
 
 // GET /api/docs/:docType - Get specific documentation

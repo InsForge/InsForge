@@ -15,16 +15,10 @@ import {
 } from '@/components';
 import { UsersDataGrid, UserFormDialog } from '@/features/auth/components';
 import { SortColumn } from 'react-data-grid';
-import { UserSchema } from '@insforge/shared-schemas';
+import { UserSchema, type SocketMessage } from '@insforge/shared-schemas';
 import { useToast } from '@/lib/hooks/useToast';
 import { useUsers } from '@/features/auth/hooks/useUsers';
-import {
-  DataUpdatePayload,
-  DataUpdateResourceType,
-  ServerEvents,
-  SocketMessage,
-  useSocket,
-} from '@/lib/contexts/SocketContext';
+import { DataUpdateResourceType, ServerEvents, useSocket } from '@/lib/contexts/SocketContext';
 
 export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -70,8 +64,8 @@ export default function UsersPage() {
       return;
     }
 
-    const handleDataUpdate = (message: SocketMessage<DataUpdatePayload>) => {
-      if (message.payload?.resource === DataUpdateResourceType.USERS) {
+    const handleDataUpdate = (message: SocketMessage) => {
+      if (message.resource === DataUpdateResourceType.USERS) {
         // Refetch data
         void refetch();
       }
