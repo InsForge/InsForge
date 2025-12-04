@@ -55,6 +55,11 @@ export const subscribeChannelPayloadSchema = z.object({
 
 export type SubscribeChannelPayload = z.infer<typeof subscribeChannelPayloadSchema>;
 
+export const unsubscribeChannelPayloadSchema = z.object({
+  channel: z.string().min(1), // The resolved channel instance, e.g., "order:123"
+});
+
+export type UnsubscribeChannelPayload = z.infer<typeof unsubscribeChannelPayloadSchema>;
 /**
  * Payload for realtime:publish client event
  */

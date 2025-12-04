@@ -5,13 +5,8 @@ import { useMetadata } from '@/lib/hooks/useMetadata';
 import { useUsers } from '@/features/auth/hooks/useUsers';
 import { SchemaVisualizer, VisualizerSkeleton } from '../components';
 import { Alert, AlertDescription, Button } from '@/components';
-import {
-  useSocket,
-  ServerEvents,
-  DataUpdatePayload,
-  DataUpdateResourceType,
-  SocketMessage,
-} from '@/lib/contexts/SocketContext';
+import type { SocketMessage } from '@insforge/shared-schemas';
+import { useSocket, ServerEvents, DataUpdateResourceType } from '@/lib/contexts/SocketContext';
 
 const VisualizerPage = () => {
   const { socket, isConnected } = useSocket();
@@ -44,10 +39,10 @@ const VisualizerPage = () => {
       return;
     }
 
-    const handleDataUpdate = (message: SocketMessage<DataUpdatePayload>) => {
+    const handleDataUpdate = (message: SocketMessage) => {
       if (
-        message.payload?.resource === DataUpdateResourceType.DATABASE ||
-        message.payload?.resource === DataUpdateResourceType.BUCKETS
+        message.resource === DataUpdateResourceType.DATABASE ||
+        message.resource === DataUpdateResourceType.BUCKETS
       ) {
         // Invalidate all metadata-related queries
         void queryClient.invalidateQueries({ queryKey: ['metadata'] });

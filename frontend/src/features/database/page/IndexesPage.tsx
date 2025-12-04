@@ -14,15 +14,13 @@ import {
   TooltipTrigger,
 } from '@/components';
 import { useFullMetadata } from '../hooks/useFullMetadata';
-import type { ExportDatabaseResponse, ExportDatabaseJsonData } from '@insforge/shared-schemas';
-import { isSystemTable } from '../constants';
-import {
-  DataUpdatePayload,
-  DataUpdateResourceType,
-  ServerEvents,
+import type {
+  ExportDatabaseResponse,
+  ExportDatabaseJsonData,
   SocketMessage,
-  useSocket,
-} from '@/lib/contexts/SocketContext';
+} from '@insforge/shared-schemas';
+import { isSystemTable } from '../constants';
+import { DataUpdateResourceType, ServerEvents, useSocket } from '@/lib/contexts/SocketContext';
 
 interface IndexRow extends DataGridRowType {
   id: string;
@@ -76,8 +74,8 @@ export default function IndexesPage() {
       return;
     }
 
-    const handleDataUpdate = (message: SocketMessage<DataUpdatePayload>) => {
-      if (message.payload?.resource === DataUpdateResourceType.DATABASE) {
+    const handleDataUpdate = (message: SocketMessage) => {
+      if (message.resource === DataUpdateResourceType.DATABASE) {
         void refetch();
       }
     };

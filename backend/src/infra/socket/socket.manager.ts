@@ -9,6 +9,7 @@ import type {
   SocketMessage,
   SocketMessageMeta,
   SubscribeResponse,
+  UnsubscribeChannelPayload,
 } from '@insforge/shared-schemas';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
@@ -198,7 +199,7 @@ export class SocketManager {
     );
 
     // Handle realtime channel unsubscribe (fire-and-forget, no ack needed)
-    socket.on(ClientEvents.REALTIME_UNSUBSCRIBE, (payload: SubscribeChannelPayload) => {
+    socket.on(ClientEvents.REALTIME_UNSUBSCRIBE, (payload: UnsubscribeChannelPayload) => {
       this.handleRealtimeUnsubscribe(socket, payload);
     });
 
@@ -222,7 +223,7 @@ export class SocketManager {
   private async handleRealtimeSubscribe(
     socket: Socket,
     payload: SubscribeChannelPayload,
-    ack: (response: SubscribeResponse) => void
+    ack?: (response: SubscribeResponse) => void
   ): Promise<void> {
     const authService = RealtimeAuthService.getInstance();
     const { channel } = payload;
@@ -234,7 +235,7 @@ export class SocketManager {
       const canSubscribe = await authService.checkSubscribePermission(channel, userId, userRole);
 
       if (!canSubscribe) {
-        ack({
+        ack?.({
           ok: false,
           channel,
           error: { code: 'UNAUTHORIZED', message: 'Not authorized to subscribe to this channel' },
@@ -250,7 +251,7 @@ export class SocketManager {
         metadata.subscriptions.add(roomName);
       }
 
-      ack({ ok: true, channel });
+      ack?.({ ok: true, channel });
 
       logger.debug('Socket subscribed to realtime channel', {
         socketId: socket.id,
@@ -258,7 +259,7 @@ export class SocketManager {
       });
     } catch (error) {
       logger.error('Error handling realtime subscribe', { error, channel });
-      ack({
+      ack?.({
         ok: false,
         channel,
         error: { code: 'INTERNAL_ERROR', message: 'Failed to subscribe to channel' },
@@ -269,7 +270,7 @@ export class SocketManager {
   /**
    * Handle realtime channel unsubscribe request (fire-and-forget)
    */
-  private handleRealtimeUnsubscribe(socket: Socket, payload: SubscribeChannelPayload): void {
+  private handleRealtimeUnsubscribe(socket: Socket, payload: UnsubscribeChannelPayload): void {
     const { channel } = payload;
     const roomName = `realtime:${channel}`;
 

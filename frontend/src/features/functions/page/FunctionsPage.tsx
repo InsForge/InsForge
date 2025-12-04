@@ -14,13 +14,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components';
-import {
-  DataUpdatePayload,
-  DataUpdateResourceType,
-  ServerEvents,
-  SocketMessage,
-  useSocket,
-} from '@/lib/contexts/SocketContext';
+import type { SocketMessage } from '@insforge/shared-schemas';
+import { DataUpdateResourceType, ServerEvents, useSocket } from '@/lib/contexts/SocketContext';
 
 export default function FunctionsPage() {
   const toastShownRef = useRef(false);
@@ -59,8 +54,8 @@ export default function FunctionsPage() {
       return;
     }
 
-    const handleDataUpdate = (message: SocketMessage<DataUpdatePayload>) => {
-      if (message.payload?.resource === DataUpdateResourceType.FUNCTIONS) {
+    const handleDataUpdate = (message: SocketMessage) => {
+      if (message.resource === DataUpdateResourceType.FUNCTIONS) {
         void refetch();
       }
     };

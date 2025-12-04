@@ -8,12 +8,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components';
-import {
-  useSocket,
-  ServerEvents,
-  SocketMessage,
-  DataUpdatePayload,
-} from '@/lib/contexts/SocketContext';
+import type { SocketMessage } from '@insforge/shared-schemas';
+import { useSocket, ServerEvents } from '@/lib/contexts/SocketContext';
 import { useRealtime } from '../hooks/useRealtime';
 import { ChannelRow } from '../components/ChannelRow';
 import { EditChannelModal } from '../components/EditChannelModal';
@@ -44,8 +40,8 @@ export default function RealtimeChannelsPage() {
       return;
     }
 
-    const handleDataUpdate = (message: SocketMessage<DataUpdatePayload>) => {
-      if (message.payload?.resource === ('realtime' as DataUpdatePayload['resource'])) {
+    const handleDataUpdate = (message: SocketMessage) => {
+      if (message.resource === 'realtime') {
         void refetchChannels();
       }
     };
