@@ -6,6 +6,17 @@ import type { TokenPayloadSchema } from '@insforge/shared-schemas';
 
 const JWT_SECRET = process.env.JWT_SECRET ?? '';
 const JWT_EXPIRES_IN = '7d';
+const REFRESH_TOKEN_EXPIRES_IN = '7d';
+
+/**
+ * Refresh token payload interface
+ */
+export interface RefreshTokenPayload {
+  sub: string;
+  email: string;
+  role: 'authenticated' | 'project_admin';
+  type: 'refresh';
+}
 
 /**
  * Create JWKS instance with caching and timeout configuration
@@ -39,13 +50,57 @@ export class TokenManager {
   }
 
   /**
-   * Generate JWT token for users and admins
+   * Generate JWT access token for users and admins
    */
   generateToken(payload: TokenPayloadSchema): string {
     return jwt.sign(payload, JWT_SECRET, {
       algorithm: 'HS256',
       expiresIn: JWT_EXPIRES_IN,
     });
+  }
+
+  /**
+   * Generate refresh token for secure session management
+   * Refresh tokens are stored in httpOnly cookies and used to obtain new access tokens
+   */
+  generateRefreshToken(payload: TokenPayloadSchema): string {
+    const refreshPayload: RefreshTokenPayload = {
+      sub: payload.sub,
+      email: payload.email,
+      role: payload.role,
+      type: 'refresh',
+    };
+    return jwt.sign(refreshPayload, JWT_SECRET, {
+      algorithm: 'HS256',
+      expiresIn: REFRESH_TOKEN_EXPIRES_IN,
+    });
+  }
+
+  /**
+   * Verify refresh token and return payload
+   * Ensures the token is a valid refresh token (not an access token)
+   */
+  verifyRefreshToken(token: string): RefreshTokenPayload {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as RefreshTokenPayload;
+
+      // Ensure this is a refresh token, not an access token
+      if (decoded.type !== 'refresh') {
+        throw new AppError('Invalid refresh token type', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      }
+
+      return {
+        sub: decoded.sub,
+        email: decoded.email,
+        role: decoded.role,
+        type: 'refresh',
+      };
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new AppError('Invalid or expired refresh token', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
   }
 
   /**
