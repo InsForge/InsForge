@@ -11,6 +11,12 @@ import { AuthRequest, verifyAdmin, verifyToken } from '@/api/middlewares/auth.js
 import oauthRouter from './oauth.routes.js';
 import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-limiters.js';
 import {
+  REFRESH_TOKEN_COOKIE_NAME,
+  setRefreshTokenCookie,
+  clearRefreshTokenCookie,
+} from '@/utils/cookies.js';
+import logger from '@/utils/logger.js';
+import {
   userIdSchema,
   createUserRequestSchema,
   createSessionRequestSchema,
@@ -125,6 +131,17 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
     const { email, password, name } = validationResult.data;
     const result: CreateUserResponse = await authService.register(email, password, name);
 
+    // Set refresh token in httpOnly cookie for enhanced security (when login is immediate)
+    if (result.accessToken && result.user) {
+      const tokenManager = TokenManager.getInstance();
+      const refreshToken = tokenManager.generateRefreshToken({
+        sub: result.user.id,
+        email: result.user.email,
+        role: 'authenticated',
+      });
+      setRefreshTokenCookie(res, refreshToken);
+    }
+
     const socket = SocketManager.getInstance();
     socket.broadcastToRoom(
       'role:project_admin',
@@ -154,7 +171,106 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
     const { email, password } = validationResult.data;
     const result: CreateSessionResponse = await authService.login(email, password);
 
+    logger.info('[Auth:Login] Login successful', {
+      userId: result.user?.id,
+      email: result.user?.email,
+      hasAccessToken: !!result.accessToken,
+    });
+
+    // Set refresh token in httpOnly cookie for enhanced security
+    if (result.accessToken && result.user) {
+      const tokenManager = TokenManager.getInstance();
+      const refreshToken = tokenManager.generateRefreshToken({
+        sub: result.user.id,
+        email: result.user.email,
+        role: 'authenticated',
+      });
+      logger.info('[Auth:Login] Setting refresh token cookie', {
+        userId: result.user.id,
+        refreshTokenPrefix: refreshToken.substring(0, 20) + '...',
+      });
+      setRefreshTokenCookie(res, refreshToken);
+    }
+
     successResponse(res, result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/auth/refresh - Refresh access token using httpOnly cookie
+router.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    logger.info('[Auth:Refresh] Refresh token request received', {
+      hasCookies: !!req.cookies,
+      cookieNames: req.cookies ? Object.keys(req.cookies) : [],
+    });
+
+    const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
+
+    if (!refreshToken) {
+      logger.warn('[Auth:Refresh] No refresh token in cookies');
+      throw new AppError('No refresh token provided', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+
+    logger.info('[Auth:Refresh] Refresh token found, verifying...', {
+      tokenPrefix: refreshToken.substring(0, 20) + '...',
+    });
+
+    const tokenManager = TokenManager.getInstance();
+
+    // Verify the refresh token
+    const payload = tokenManager.verifyRefreshToken(refreshToken);
+
+    logger.info('[Auth:Refresh] Token verified successfully', {
+      userId: payload.sub,
+      email: payload.email,
+    });
+
+    // Generate new access token
+    const newAccessToken = tokenManager.generateToken({
+      sub: payload.sub,
+      email: payload.email,
+      role: payload.role,
+    });
+
+    // Generate new refresh token (token rotation for security)
+    const newRefreshToken = tokenManager.generateRefreshToken({
+      sub: payload.sub,
+      email: payload.email,
+      role: payload.role,
+    });
+
+    // Set new refresh token cookie
+    setRefreshTokenCookie(res, newRefreshToken);
+
+    // Fetch user data for response
+    const user = await authService.getUserSchemaById(payload.sub);
+
+    logger.info('[Auth:Refresh] Refresh successful, returning new tokens');
+
+    successResponse(res, {
+      accessToken: newAccessToken,
+      user: user || undefined,
+    });
+  } catch (error) {
+    // Clear invalid cookie on error
+    logger.error('[Auth:Refresh] Refresh failed', { error });
+    clearRefreshTokenCookie(res);
+    next(error);
+  }
+});
+
+// POST /api/auth/logout - Logout and clear refresh token cookie
+router.post('/logout', (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Clear refresh token cookie
+    clearRefreshTokenCookie(res);
+
+    successResponse(res, {
+      success: true,
+      message: 'Logged out successfully',
+    });
   } catch (error) {
     next(error);
   }
@@ -442,6 +558,17 @@ router.post(
           );
         }
         result = await authService.verifyEmailWithCode(email, otp);
+      }
+
+      // Set refresh token in httpOnly cookie for enhanced security
+      if (result.accessToken && result.user) {
+        const tokenManager = TokenManager.getInstance();
+        const refreshToken = tokenManager.generateRefreshToken({
+          sub: result.user.id,
+          email: result.user.email,
+          role: 'authenticated',
+        });
+        setRefreshTokenCookie(res, refreshToken);
       }
 
       successResponse(res, result); // Return session info with optional redirectTo upon successful verification
