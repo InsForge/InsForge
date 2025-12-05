@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -76,6 +77,7 @@ export async function createApp() {
       credentials: true, // Allow cookies/credentials
     })
   );
+  app.use(cookieParser()); // Parse cookies for refresh token handling
   if (isProduction()) {
     app.use(limiter);
   }

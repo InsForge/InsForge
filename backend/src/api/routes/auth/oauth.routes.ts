@@ -2,10 +2,12 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { AuthService } from '@/services/auth/auth.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
+import { setRefreshTokenCookie } from '@/utils/cookies.js';
 import logger from '@/utils/logger.js';
 import jwt from 'jsonwebtoken';
 import {
@@ -341,6 +343,17 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     // Handle shared callback - transforms payload and creates/finds user
     const result = await authService.handleSharedCallback(validatedProvider, payloadData);
 
+    // Set refresh token in httpOnly cookie before redirect
+    if (result?.accessToken && result?.user) {
+      const tokenManager = TokenManager.getInstance();
+      const refreshToken = tokenManager.generateRefreshToken({
+        sub: result.user.id,
+        email: result.user.email,
+        role: 'authenticated',
+      });
+      setRefreshTokenCookie(res, refreshToken);
+    }
+
     const params = new URLSearchParams();
     params.set('access_token', result?.accessToken ?? '');
     params.set('user_id', result?.user?.id ?? '');
@@ -411,6 +424,17 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
         token: token || undefined,
         state: state || undefined,
       });
+
+      // Set refresh token in httpOnly cookie before redirect
+      if (result?.accessToken && result?.user) {
+        const tokenManager = TokenManager.getInstance();
+        const refreshToken = tokenManager.generateRefreshToken({
+          sub: result.user.id,
+          email: result.user.email,
+          role: 'authenticated',
+        });
+        setRefreshTokenCookie(res, refreshToken);
+      }
 
       // Construct redirect URL with query parameters
       const params = new URLSearchParams();
