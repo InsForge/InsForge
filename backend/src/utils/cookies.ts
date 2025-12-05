@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { isProduction } from './environment.js';
+import { isCloudEnvironment } from './environment.js';
 
 /**
  * Cookie configuration for refresh tokens
@@ -16,11 +16,11 @@ export const REFRESH_TOKEN_COOKIE_NAME = 'insforge_refresh_token';
  * - maxAge: 7 days
  */
 export function getRefreshTokenCookieOptions() {
-  const isProd = isProduction();
+  const isCloud = isCloudEnvironment();
   return {
     httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? ('none' as const) : ('lax' as const),
+    secure: isCloud,
+    sameSite: isCloud ? ('none' as const) : ('lax' as const),
     path: '/api/auth',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
   };
@@ -38,11 +38,11 @@ export function setRefreshTokenCookie(res: Response, refreshToken: string): void
  * IMPORTANT: Must use the same options (especially path) as when setting the cookie
  */
 export function clearRefreshTokenCookie(res: Response): void {
-  const isProd = isProduction();
+  const isCloud = isCloudEnvironment();
   res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, {
     httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? ('none' as const) : ('lax' as const),
+    secure: isCloud,
+    sameSite: isCloud ? ('none' as const) : ('lax' as const),
     path: '/api/auth',
   });
 }
