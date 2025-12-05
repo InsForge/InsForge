@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import {
   DataGrid,
   type ConvertedValue,
@@ -7,8 +6,9 @@ import {
   type DataGridRowType,
   EmptyState,
 } from '@/components';
-import { PolicyModal, PolicyCellButton, usePolicyModal } from '@/features/database';
-import { realtimeService, type RlsPolicy } from '../services/realtime.service';
+import { SQLModal, SQLCellButton } from '@/features/database';
+import { useRealtime } from '../hooks/useRealtime';
+import type { RlsPolicy } from '../services/realtime.service';
 import { cn } from '@/lib/utils/utils';
 
 type TabType = 'subscribe' | 'publish';
@@ -36,16 +36,9 @@ function mapPoliciesToRows(policies: RlsPolicy[]): PolicyRow[] {
 
 export default function RealtimePermissionsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('subscribe');
-  const { modalProps, openModal } = usePolicyModal();
+  const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
 
-  const {
-    data: permissions,
-    isLoading,
-    error,
-  } = useQuery({
-    queryKey: ['realtime', 'permissions'],
-    queryFn: () => realtimeService.getPermissions(),
-  });
+  const { permissions, isLoadingPermissions: isLoading, permissionsError: error } = useRealtime();
 
   const subscribePolicies = useMemo(
     () => (permissions ? mapPoliciesToRows(permissions.subscribe.policies) : []),
@@ -94,7 +87,12 @@ export default function RealtimePermissionsPage() {
         width: 'minmax(200px, 2fr)',
         resizable: true,
         renderCell: ({ row }) => (
-          <PolicyCellButton value={row.using} field="using" onOpenModal={openModal} />
+          <SQLCellButton
+            value={row.using}
+            onClick={() =>
+              row.using && setSqlModal({ open: true, title: 'Using', value: row.using })
+            }
+          />
         ),
       },
       {
@@ -103,11 +101,17 @@ export default function RealtimePermissionsPage() {
         width: 'minmax(200px, 2fr)',
         resizable: true,
         renderCell: ({ row }) => (
-          <PolicyCellButton value={row.withCheck} field="withCheck" onOpenModal={openModal} />
+          <SQLCellButton
+            value={row.withCheck}
+            onClick={() =>
+              row.withCheck &&
+              setSqlModal({ open: true, title: 'With Check', value: row.withCheck })
+            }
+          />
         ),
       },
     ],
-    [openModal]
+    [setSqlModal]
   );
 
   if (error) {
@@ -175,8 +179,13 @@ export default function RealtimePermissionsPage() {
         )}
       </div>
 
-      {/* Policy Detail Modal */}
-      <PolicyModal {...modalProps} />
+      {/* SQL Detail Modal */}
+      <SQLModal
+        open={sqlModal.open}
+        onOpenChange={(open) => setSqlModal((prev) => ({ ...prev, open }))}
+        title={sqlModal.title}
+        value={sqlModal.value}
+      />
     </div>
   );
 }

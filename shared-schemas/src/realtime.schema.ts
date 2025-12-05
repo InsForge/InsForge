@@ -16,8 +16,8 @@ export const realtimeChannelSchema = z.object({
   description: z.string().nullable(),
   webhookUrls: z.array(z.string().url()).nullable(),
   enabled: z.boolean(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
 });
 
 export type RealtimeChannel = z.infer<typeof realtimeChannelSchema>;
@@ -37,7 +37,7 @@ export const realtimeMessageSchema = z.object({
   wsAudienceCount: z.number().int().min(0),
   whAudienceCount: z.number().int().min(0),
   whDeliveredCount: z.number().int().min(0),
-  createdAt: z.string(),
+  createdAt: z.string().datetime(),
 });
 
 export type RealtimeMessage = z.infer<typeof realtimeMessageSchema>;
@@ -126,7 +126,7 @@ export const socketMessageMetaSchema = z.object({
   messageId: z.string().uuid(),
   senderType: senderTypeSchema,
   senderId: z.string().uuid().optional(),
-  timestamp: z.date(),
+  timestamp: z.string().datetime(),
 });
 
 export type SocketMessageMeta = z.infer<typeof socketMessageMetaSchema>;

@@ -1,7 +1,7 @@
 import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
-import type { RealtimeMessage } from '@insforge/shared-schemas';
+import type { RealtimeMessage, RoleSchema } from '@insforge/shared-schemas';
 import { RealtimeChannelService } from './realtime-channel.service.js';
 import { RealtimeAuthService } from './realtime-auth.service.js';
 
@@ -37,7 +37,7 @@ export class RealtimeMessageService {
     eventName: string,
     payload: Record<string, unknown>,
     userId: string | undefined,
-    userRole: 'authenticated' | 'anon' = 'anon'
+    userRole: RoleSchema
   ): Promise<{
     channelId: string;
     channelName: string;

@@ -313,7 +313,7 @@ export class SocketManager {
         event,
         eventPayload,
         userId,
-        userRole as 'authenticated' | 'anon'
+        userRole
       );
 
       if (!result) {
@@ -352,7 +352,7 @@ export class SocketManager {
       meta: {
         ...meta,
         messageId: meta.messageId || this.generateMessageId(),
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
       },
     } as SocketMessage & T;
   }

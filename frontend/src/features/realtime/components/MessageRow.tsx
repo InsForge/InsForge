@@ -8,6 +8,8 @@ interface MessageRowProps {
 }
 
 export function MessageRow({ message, onClick, className }: MessageRowProps) {
+  const payloadStr = JSON.stringify(message.payload);
+
   return (
     <div
       className={cn(
@@ -49,8 +51,8 @@ export function MessageRow({ message, onClick, className }: MessageRowProps) {
         {/* Payload Preview Column */}
         <div className="col-span-3 min-w-0 px-3 py-1.5">
           <span className="text-sm text-muted-foreground dark:text-neutral-400 truncate block">
-            {JSON.stringify(message.payload).slice(0, 50)}
-            {JSON.stringify(message.payload).length > 50 ? '...' : ''}
+            {payloadStr.slice(0, 50)}
+            {payloadStr.length > 50 ? '...' : ''}
           </span>
         </div>
 

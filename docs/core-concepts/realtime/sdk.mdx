@@ -202,8 +202,8 @@ interface SocketMessageMeta {
   channel?: string        // Channel the message was sent to
   messageId: string       // Unique message ID (UUID)
   senderType: 'system' | 'user'
-  senderId?: string       // User ID of sender (UUID)
-  timestamp: Date         // Server timestamp
+  senderId?: string       // User ID of sender (UUID) if senderType is 'user'
+  timestamp: string         // Server timestamp ISO string
 }
 ```
 
@@ -352,10 +352,14 @@ function leaveRoom() {
 ### React Hook
 
 ```javascript
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useRef } from 'react'
 import { insforge } from './lib/insforge'
 
 export function useRealtime(channel, eventHandlers) {
+  // Use ref to always have latest handlers without re-running effect
+  const handlersRef = useRef(eventHandlers)
+  handlersRef.current = eventHandlers
+
   useEffect(() => {
     let mounted = true
 
@@ -366,7 +370,7 @@ export function useRealtime(channel, eventHandlers) {
       if (!ok || !mounted) return
 
       // Register event handlers
-      Object.entries(eventHandlers).forEach(([event, handler]) => {
+      Object.entries(handlersRef.current).forEach(([event, handler]) => {
         insforge.realtime.on(event, handler)
       })
     }
@@ -375,7 +379,7 @@ export function useRealtime(channel, eventHandlers) {
 
     return () => {
       mounted = false
-      Object.entries(eventHandlers).forEach(([event, handler]) => {
+      Object.entries(handlersRef.current).forEach(([event, handler]) => {
         insforge.realtime.off(event, handler)
       })
       insforge.realtime.unsubscribe(channel)

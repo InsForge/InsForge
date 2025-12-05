@@ -1,6 +1,10 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { realtimeService, type RealtimeChannel } from '../services/realtime.service';
+import {
+  realtimeService,
+  type RealtimeChannel,
+  type RealtimePermissionsResponse,
+} from '../services/realtime.service';
 import { useToast } from '@/lib/hooks/useToast';
 import type {
   CreateChannelRequest,
@@ -63,6 +67,21 @@ export function useRealtime() {
   });
 
   // ============================================================================
+  // Permissions Query
+  // ============================================================================
+
+  const {
+    data: permissions,
+    isLoading: isLoadingPermissions,
+    error: permissionsError,
+    refetch: refetchPermissions,
+  } = useQuery<RealtimePermissionsResponse>({
+    queryKey: ['realtime', 'permissions'],
+    queryFn: () => realtimeService.getPermissions(),
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // ============================================================================
   // Channel Mutations
   // ============================================================================
 
@@ -116,7 +135,7 @@ export function useRealtime() {
   }, []);
 
   const filterMessages = useCallback((params: Partial<ListMessagesRequest>) => {
-    setMessagesParams((prev) => ({ ...prev, ...params }));
+    setMessagesParams((prev) => ({ ...prev, offset: 0, ...params }));
   }, []);
 
   const refetch = useCallback(() => {
@@ -129,8 +148,8 @@ export function useRealtime() {
   // Computed Values
   // ============================================================================
 
-  const channelsCount = useMemo(() => channels.length, [channels]);
-  const messagesCount = useMemo(() => messages.length, [messages]);
+  const channelsCount = channels.length;
+  const messagesCount = messages.length;
 
   // Pagination computed values
   const messagesPageSize = messagesParams.limit || 100;
@@ -170,6 +189,12 @@ export function useRealtime() {
     // Stats
     stats,
     isLoadingStats,
+
+    // Permissions
+    permissions,
+    isLoadingPermissions,
+    permissionsError,
+    refetchPermissions,
 
     // Loading states
     isLoading: isLoadingChannels || isLoadingMessages,
