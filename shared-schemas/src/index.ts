@@ -14,3 +14,4 @@ export * from './functions-api.schema';
 export * from './cloud-events.schema';
 export * from './realtime.schema';
 export * from './realtime-api.schema';
+export * from './docs.schema';

@@ -114,7 +114,7 @@ ON realtime.channels
 FOR SELECT
 TO authenticated
 USING (
-  realtime.channel_name() LIKE 'order:%'
+  pattern = 'order:%'
   AND EXISTS (
     SELECT 1 FROM orders
     WHERE id = NULLIF(split_part(realtime.channel_name(), ':', 2), '')::uuid
@@ -289,7 +289,7 @@ System events are trusted and bypass publish RLS checks. User events must pass I
     ON realtime.channels FOR SELECT
     TO authenticated
     USING (
-      pattern LIKE 'order:%'
+      pattern = 'order:%'
       AND EXISTS (
         SELECT 1 FROM orders
         WHERE id = NULLIF(split_part(realtime.channel_name(), ':', 2), '')::uuid

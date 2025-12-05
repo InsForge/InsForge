@@ -2,38 +2,63 @@
 
 ## Overview
 
-InsForge Realtime provides event-driven messaging via PostgreSQL triggers � WebSockets (Socket.IO). Events are controlled by RLS policies on two tables:
-- `realtime.channels` - SELECT policy controls **subscribe** access
-- `realtime.messages` - INSERT policy controls **publish** access
+InsForge Realtime enables real-time pub/sub messaging via WebSockets:
+- **Database events**: Emit events when data changes using triggers
+- **Client events**: Clients can publish custom events to each other
 
-## Backend Configuration (Raw SQL)
+## Backend Setup (Raw SQL)
 
-### 1. Create Channel Patterns
+### Step 1: Create Channel Patterns
+
+Define which channels are available:
 
 ```sql
-INSERT INTO realtime.channels (pattern, description, webhook_urls, enabled)
+INSERT INTO realtime.channels (pattern, description, enabled)
 VALUES
-  ('orders', 'Global order events', NULL, true),
-  ('order:%', 'Order-specific events (order:123)', NULL, true),
-  ('chat:%', 'Chat room events', ARRAY['https://hooks.example.com/chat'], true);
+  ('orders', 'Global order events', true),
+  ('order:%', 'Order-specific events (order:123, order:456)', true),
+  ('chat:%', 'Chat room events', true);
 ```
 
-**Pattern syntax**: Use `:` as separator, `%` for wildcards (SQL LIKE). `order:%` matches `order:123`, `order:456`, etc.
+**Pattern syntax**: Use `:` as separator, `%` as wildcard (SQL LIKE pattern).
 
-### 2. Configure RLS Policies
+### Step 2: Create Triggers for Database Events
 
-#### Subscribe Policies (SELECT on realtime.channels)
-
-Use `realtime.channel_name()` to access the requested channel name:
+**IMPORTANT**: To emit events when database rows change, create a trigger that calls `realtime.publish()`:
 
 ```sql
--- Public channel: anyone can subscribe
-CREATE POLICY "public_subscribe_orders"
-ON realtime.channels FOR SELECT
-TO authenticated
-USING (pattern = 'orders');
+-- Step 2a: Create the trigger function
+CREATE OR REPLACE FUNCTION notify_order_changes()
+RETURNS TRIGGER AS $$
+BEGIN
+  PERFORM realtime.publish(
+    'order:' || NEW.id::text,    -- channel name
+    TG_OP || '_order',           -- event name: INSERT_order, UPDATE_order, DELETE_order
+    jsonb_build_object(          -- payload (what clients receive)
+      'id', NEW.id,
+      'status', NEW.status,
+      'total', NEW.total
+    )
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- User-specific: only owner can subscribe to their order channel
+-- Step 2b: Attach trigger to table
+CREATE TRIGGER order_realtime
+  AFTER INSERT OR UPDATE ON orders
+  FOR EACH ROW
+  EXECUTE FUNCTION notify_order_changes();
+```
+
+### Step 3: Add Access Control (Optional)
+
+By default, all authenticated users can subscribe to any channel. To restrict access, add RLS policies:
+
+#### Restrict who can subscribe (SELECT on realtime.channels)
+
+```sql
+-- Only order owner can subscribe to their order channel
 CREATE POLICY "users_subscribe_own_orders"
 ON realtime.channels FOR SELECT
 TO authenticated
@@ -47,19 +72,12 @@ USING (
 );
 ```
 
-#### Publish Policies (INSERT on realtime.messages)
+**Note**: Use `realtime.channel_name()` in subscribe policies to get the actual channel (e.g., `order:123`) since the table only stores patterns (e.g., `order:%`).
+
+#### Restrict who can publish from client (INSERT on realtime.messages)
 
 ```sql
--- Only admins can publish to order channels
-CREATE POLICY "admins_publish_orders"
-ON realtime.messages FOR INSERT
-TO authenticated
-WITH CHECK (
-  channel_name LIKE 'order:%'
-  AND EXISTS (SELECT 1 FROM admins WHERE user_id = auth.uid())
-);
-
--- Users can publish to chat rooms they're members of
+-- Only chat room members can publish messages
 CREATE POLICY "members_publish_chat"
 ON realtime.messages FOR INSERT
 TO authenticated
@@ -73,44 +91,9 @@ WITH CHECK (
 );
 ```
 
-### 3. Create Database Triggers
+## Frontend SDK
 
-Use `realtime.publish(channel, event, payload)` to emit events from triggers:
-
-```sql
-CREATE OR REPLACE FUNCTION notify_order_changes()
-RETURNS TRIGGER AS $$
-BEGIN
-  PERFORM realtime.publish(
-    'order:' || NEW.id::text,           -- channel name
-    TG_OP || '_order',                   -- event: INSERT_order, UPDATE_order, DELETE_order
-    jsonb_build_object(
-      'id', NEW.id,
-      'status', NEW.status,
-      'total', NEW.total
-    )
-  );
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE TRIGGER order_realtime
-  AFTER INSERT OR UPDATE ON orders
-  FOR EACH ROW
-  EXECUTE FUNCTION notify_order_changes();
-```
-
-**Note**: `realtime.publish()` bypasses RLS (SECURITY DEFINER) - only callable from triggers.
-
-## Frontend SDK Integration
-
-### Installation
-
-```bash
-npm install @insforge/sdk
-```
-
-### Initialize Client
+### Setup
 
 ```typescript
 import { createClient } from '@insforge/sdk'
@@ -120,144 +103,172 @@ const insforge = createClient({
 })
 ```
 
-### SDK Methods
+### Core Methods
 
-#### connect()
+#### connect() - Establish WebSocket connection
 
 ```typescript
 await insforge.realtime.connect()
-// Auth token automatically included from logged-in user
 ```
 
-#### subscribe(channel)
+#### subscribe(channel) - Subscribe to a channel
 
 ```typescript
-const response = await insforge.realtime.subscribe('order:123')
-// Returns: { ok: boolean, channel: string, error?: { code: string, message: string } }
-
-if (!response.ok) {
-  console.error('Subscription failed:', response.error?.message)
-}
+const { ok, error } = await insforge.realtime.subscribe('order:123')
+if (!ok) console.error('Failed:', error?.message)
 ```
 
-#### unsubscribe(channel)
+#### on(event, callback) - Listen for events
 
 ```typescript
-insforge.realtime.unsubscribe('order:123')  // Fire-and-forget
+// Listen for database-triggered events
+insforge.realtime.on('INSERT_order', (payload) => {
+  console.log('New order:', payload.id, payload.status)
+})
+
+insforge.realtime.on('UPDATE_order', (payload) => {
+  console.log('Order updated:', payload)
+})
 ```
 
-#### publish(channel, event, payload)
-
-**Requirement**: Must be subscribed to channel before publishing.
+#### publish(channel, event, payload) - Send client events
 
 ```typescript
+// Must be subscribed to channel first
 await insforge.realtime.publish('chat:room-1', 'new_message', {
   text: 'Hello!',
   sender: 'Alice'
 })
 ```
 
-#### on(event, callback)
+#### unsubscribe(channel)
 
 ```typescript
-// Custom events
-insforge.realtime.on('INSERT_order', (payload) => {
-  console.log('New order:', payload)
-})
-
-// With TypeScript generics
-insforge.realtime.on<MyPayloadType>('my_event', (payload) => {
-  // payload is typed as MyPayloadType
-})
+insforge.realtime.unsubscribe('order:123')
 ```
 
-**Reserved events**:
-| Event | Payload | Description |
-|-------|---------|-------------|
-| `connect` | - | Connected to server |
-| `connect_error` | `Error` | Connection failed |
-| `disconnect` | `string` (reason) | Disconnected |
-| `error` | `{ code, message }` | Realtime error |
+#### off(event, callback) - Remove listener
+
+```typescript
+insforge.realtime.off('UPDATE_order', handler)
+```
+
+#### disconnect() - Close connection
+
+```typescript
+insforge.realtime.disconnect()
+```
+
+### Connection Events
+
+```typescript
+insforge.realtime.on('connect', () => console.log('Connected'))
+insforge.realtime.on('disconnect', (reason) => console.log('Disconnected:', reason))
+insforge.realtime.on('connect_error', (err) => console.error('Connection failed:', err))
+insforge.realtime.on('error', ({ code, message }) => console.error('Error:', code, message))
+```
 
 **Error codes**: `UNAUTHORIZED`, `NOT_SUBSCRIBED`, `INTERNAL_ERROR`
-
-#### off(event, callback)
-
-```typescript
-const handler = (payload) => console.log(payload)
-insforge.realtime.on('my_event', handler)
-insforge.realtime.off('my_event', handler)  // Must pass same function reference
-```
-
-#### disconnect()
-
-```typescript
-insforge.realtime.disconnect()  // Clears all subscriptions
-```
 
 ### Properties
 
 ```typescript
-insforge.realtime.isConnected        // boolean
-insforge.realtime.connectionState    // 'disconnected' | 'connecting' | 'connected'
-insforge.realtime.socketId           // string (when connected)
-insforge.realtime.getSubscribedChannels()  // string[]
+insforge.realtime.isConnected           // boolean
+insforge.realtime.connectionState       // 'disconnected' | 'connecting' | 'connected'
+insforge.realtime.socketId              // string (when connected)
+insforge.realtime.getSubscribedChannels() // string[]
 ```
 
-### Message Structure
+### Message Metadata
 
-All messages include server-enforced `meta`:
+All received messages include a `meta` field:
 
 ```typescript
-interface SocketMessage {
-  meta: {
-    channel?: string           // Channel name
-    messageId: string          // UUID
-    senderType: 'system' | 'user'  // 'system' = trigger, 'user' = client
-    senderId?: string          // User UUID (for user messages)
-    timestamp: Date
-  }
-  // ...custom payload fields
-}
+insforge.realtime.on('UPDATE_order', (payload) => {
+  console.log(payload.meta.messageId)   // UUID
+  console.log(payload.meta.channel)     // 'order:123'
+  console.log(payload.meta.senderType)  // 'system' (trigger) or 'user' (client)
+  console.log(payload.meta.timestamp)   // Date
+
+  // Your payload fields
+  console.log(payload.status)
+})
 ```
 
-### Complete Example
+## Complete Examples
 
+### Database Events (Order Status Updates)
+
+**Backend SQL:**
+```sql
+-- 1. Create channel
+INSERT INTO realtime.channels (pattern, description, enabled)
+VALUES ('order:%', 'Order updates', true);
+
+-- 2. Create trigger
+CREATE OR REPLACE FUNCTION notify_order_status()
+RETURNS TRIGGER AS $$
+BEGIN
+  PERFORM realtime.publish(
+    'order:' || NEW.id::text,
+    'status_changed',
+    jsonb_build_object('id', NEW.id, 'status', NEW.status, 'updated_at', NEW.updated_at)
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER order_status_trigger
+  AFTER UPDATE ON orders
+  FOR EACH ROW
+  WHEN (OLD.status IS DISTINCT FROM NEW.status)
+  EXECUTE FUNCTION notify_order_status();
+```
+
+**Frontend:**
 ```typescript
-import { createClient } from '@insforge/sdk'
-
-const insforge = createClient({ baseUrl: 'https://your-project.insforge.app' })
-
-// Error handling
-insforge.realtime.on('error', (err) => console.error('RT Error:', err.code, err.message))
-insforge.realtime.on('disconnect', (reason) => console.log('Disconnected:', reason))
-
-// Connect and subscribe
 await insforge.realtime.connect()
-const { ok } = await insforge.realtime.subscribe('order:123')
+await insforge.realtime.subscribe(`order:${orderId}`)
 
-if (ok) {
-  // Listen for events
-  insforge.realtime.on('UPDATE_order', (payload) => {
-    console.log('Order updated:', payload.status)
-    console.log('Message ID:', payload.meta.messageId)
+insforge.realtime.on('status_changed', (payload) => {
+  updateUI(payload.status)
+})
+```
+
+### Client Events (Chat Room)
+
+**Backend SQL:**
+```sql
+INSERT INTO realtime.channels (pattern, description, enabled)
+VALUES ('chat:%', 'Chat rooms', true);
+```
+
+**Frontend:**
+```typescript
+await insforge.realtime.connect()
+await insforge.realtime.subscribe('chat:room-1')
+
+// Listen for messages from other users
+insforge.realtime.on('message', (payload) => {
+  addMessage(payload.text, payload.sender)
+})
+
+// Send a message
+async function sendMessage(text: string) {
+  await insforge.realtime.publish('chat:room-1', 'message', {
+    text,
+    sender: currentUser.name
   })
 }
-
-// Cleanup
-function cleanup() {
-  insforge.realtime.unsubscribe('order:123')
-  insforge.realtime.disconnect()
-}
 ```
 
-### React Hook Example
+### React Hook
 
 ```typescript
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useState } from 'react'
 import { insforge } from './lib/insforge'
 
-export function useRealtime(channel: string, handlers: Record<string, Function>) {
+export function useRealtime(channel: string, handlers: Record<string, (payload: any) => void>) {
   useEffect(() => {
     let mounted = true
 
@@ -267,7 +278,7 @@ export function useRealtime(channel: string, handlers: Record<string, Function>)
       if (!ok || !mounted) return
 
       Object.entries(handlers).forEach(([event, handler]) => {
-        insforge.realtime.on(event, handler as any)
+        insforge.realtime.on(event, handler)
       })
     }
 
@@ -276,7 +287,7 @@ export function useRealtime(channel: string, handlers: Record<string, Function>)
     return () => {
       mounted = false
       Object.entries(handlers).forEach(([event, handler]) => {
-        insforge.realtime.off(event, handler as any)
+        insforge.realtime.off(event, handler)
       })
       insforge.realtime.unsubscribe(channel)
     }
@@ -291,67 +302,23 @@ export function useRealtime(channel: string, handlers: Record<string, Function>)
 }
 
 // Usage
-function OrderStatus({ orderId }: { orderId: string }) {
+function OrderTracker({ orderId }: { orderId: string }) {
   const [status, setStatus] = useState('')
 
   useRealtime(`order:${orderId}`, {
-    UPDATE_order: (payload) => setStatus(payload.status)
+    status_changed: (p) => setStatus(p.status)
   })
 
-  return <div>Status: {status}</div>
+  return <div>Order Status: {status}</div>
 }
 ```
 
-## Database Schema Reference
+## Quick Reference
 
-### realtime.channels
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | UUID | Primary key |
-| pattern | TEXT | Channel pattern (`orders`, `order:%`) |
-| description | TEXT | Human-readable description |
-| webhook_urls | TEXT[] | Webhook endpoints (optional) |
-| enabled | BOOLEAN | Active status |
-
-### realtime.messages
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | UUID | Primary key |
-| event_name | TEXT | Event type |
-| channel_id | UUID | FK to channels |
-| channel_name | TEXT | Resolved channel name |
-| payload | JSONB | Event data |
-| sender_type | TEXT | `system` or `user` |
-| sender_id | UUID | User ID (for user messages) |
-| ws_audience_count | INTEGER | WebSocket subscribers at delivery |
-| wh_audience_count | INTEGER | Webhook URLs configured |
-| wh_delivered_count | INTEGER | Successful webhook deliveries |
-
-## Webhook Delivery
-
-When `webhook_urls` configured on channel, messages are POSTed:
-
-```http
-POST /webhook-endpoint HTTP/1.1
-Content-Type: application/json
-X-InsForge-Event: order_created
-X-InsForge-Channel: order:123
-X-InsForge-Message-Id: uuid
-
-{ ...payload }
-```
-
-- **Retries**: 2 retries (1s, 2s backoff)
-- **Timeout**: 10s per request
-
-## Key Points
-
-1. **RLS controls access**: Subscribe = SELECT on channels, Publish = INSERT on messages
-2. **Channel patterns**: Use `%` wildcard, `:` separator
-3. **Helper function**: `realtime.channel_name()` returns requested channel in policies
-4. **Sender types**: `system` (triggers, bypasses RLS) vs `user` (client SDK, respects RLS)
-5. **Must subscribe before publish**: Client must subscribe to channel first
-6. **No message replay**: Missed messages during disconnect are not resent
-7. **Auto reconnection**: Socket.IO handles reconnection automatically
+| Task | How |
+|------|-----|
+| Emit event on DB change | Create trigger calling `realtime.publish(channel, event, payload)` |
+| Client sends event | `insforge.realtime.publish(channel, event, payload)` |
+| Listen for events | `insforge.realtime.on(eventName, callback)` |
+| Restrict subscribe access | RLS SELECT policy on `realtime.channels` |
+| Restrict client publish | RLS INSERT policy on `realtime.messages` |
