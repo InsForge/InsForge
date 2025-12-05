@@ -138,15 +138,12 @@ export function useRealtime() {
   const messagesTotalCount = stats?.totalMessages || 0;
   const messagesTotalPages = Math.ceil(messagesTotalCount / messagesPageSize) || 1;
 
-  const setMessagesPage = useCallback(
-    (page: number) => {
-      setMessagesParams((prev) => ({
-        ...prev,
-        offset: (page - 1) * (prev.limit || 100),
-      }));
-    },
-    []
-  );
+  const setMessagesPage = useCallback((page: number) => {
+    setMessagesParams((prev) => ({
+      ...prev,
+      offset: (page - 1) * (prev.limit || 100),
+    }));
+  }, []);
 
   return {
     // Channels
