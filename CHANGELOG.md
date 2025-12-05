@@ -1,5 +1,7 @@
 # Changelog
 
+## [1.2.8](https://github.com/InsForge/InsForge/compare/v1.2.6...v1.2.8) (2025-12-05)
+
 ## [1.2.6](https://github.com/InsForge/InsForge/compare/v1.2.4...v1.2.6) (2025-11-22)
 
 ## [1.2.4](https://github.com/InsForge/InsForge/compare/v1.2.3...v1.2.4) (2025-11-22)
