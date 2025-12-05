@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import {
   Button,
+  ConfirmDialog,
   Skeleton,
   Tooltip,
   TooltipContent,
@@ -10,6 +11,7 @@ import {
 } from '@/components';
 import type { SocketMessage } from '@insforge/shared-schemas';
 import { useSocket, ServerEvents } from '@/lib/contexts/SocketContext';
+import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useRealtime } from '../hooks/useRealtime';
 import { ChannelRow } from '../components/ChannelRow';
 import { EditChannelModal } from '../components/EditChannelModal';
@@ -21,9 +23,18 @@ export default function RealtimeChannelsPage() {
   const [selectedChannel, setSelectedChannel] = useState<RealtimeChannel | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const { channels, isLoadingChannels, refetchChannels, updateChannel, isUpdating } = useRealtime();
+  const {
+    channels,
+    isLoadingChannels,
+    refetchChannels,
+    updateChannel,
+    isUpdating,
+    deleteChannel,
+    isDeleting,
+  } = useRealtime();
 
   const { socket, isConnected } = useSocket();
+  const { confirm, confirmDialogProps } = useConfirm();
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -60,6 +71,19 @@ export default function RealtimeChannelsPage() {
 
   const handleToggleEnabled = (channel: RealtimeChannel, enabled: boolean) => {
     updateChannel({ id: channel.id, data: { enabled } });
+  };
+
+  const handleDelete = async (channel: RealtimeChannel) => {
+    const shouldDelete = await confirm({
+      title: 'Delete Channel',
+      description: `Are you sure you want to delete the channel "${channel.pattern}"? This action cannot be undone.`,
+      confirmText: 'Delete',
+      destructive: true,
+    });
+
+    if (shouldDelete) {
+      deleteChannel(channel.id);
+    }
   };
 
   const handleModalSave = (id: string, data: Parameters<typeof updateChannel>[0]['data']) => {
@@ -105,11 +129,11 @@ export default function RealtimeChannelsPage() {
 
         <div className="flex flex-col gap-2 relative">
           {/* Table Header */}
-          <div className="grid grid-cols-12 px-3 text-sm text-muted-foreground dark:text-neutral-400">
-            <div className="col-span-4 py-1 px-3">Pattern</div>
-            <div className="col-span-5 py-1 px-3">Description</div>
-            <div className="col-span-1 py-1 px-3">Enabled</div>
-            <div className="col-span-2 py-1 px-3">Created</div>
+          <div className="flex items-center pl-3 pr-[44px] text-sm text-muted-foreground dark:text-neutral-400">
+            <div className="w-[76px] shrink-0 py-1 px-3">Enabled</div>
+            <div className="flex-1 py-1 px-3">Pattern</div>
+            <div className="w-[640px] py-1 px-3">Description</div>
+            <div className="flex-1 py-1 px-3">Created</div>
           </div>
 
           {isLoadingChannels ? (
@@ -126,7 +150,9 @@ export default function RealtimeChannelsPage() {
                   channel={channel}
                   onClick={() => handleRowClick(channel)}
                   onToggleEnabled={(enabled) => handleToggleEnabled(channel, enabled)}
+                  onDelete={() => void handleDelete(channel)}
                   isUpdating={isUpdating}
+                  isDeleting={isDeleting}
                 />
               ))}
             </>
@@ -158,6 +184,8 @@ export default function RealtimeChannelsPage() {
         onSave={handleModalSave}
         isUpdating={isUpdating}
       />
+
+      <ConfirmDialog {...confirmDialogProps} />
     </div>
   );
 }

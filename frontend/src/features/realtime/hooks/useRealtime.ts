@@ -132,6 +132,22 @@ export function useRealtime() {
   const channelsCount = useMemo(() => channels.length, [channels]);
   const messagesCount = useMemo(() => messages.length, [messages]);
 
+  // Pagination computed values
+  const messagesPageSize = messagesParams.limit || 100;
+  const messagesCurrentPage = Math.floor((messagesParams.offset || 0) / messagesPageSize) + 1;
+  const messagesTotalCount = stats?.totalMessages || 0;
+  const messagesTotalPages = Math.ceil(messagesTotalCount / messagesPageSize) || 1;
+
+  const setMessagesPage = useCallback(
+    (page: number) => {
+      setMessagesParams((prev) => ({
+        ...prev,
+        offset: (page - 1) * (prev.limit || 100),
+      }));
+    },
+    []
+  );
+
   return {
     // Channels
     channels,
@@ -146,6 +162,13 @@ export function useRealtime() {
     messagesParams,
     isLoadingMessages,
     messagesError,
+
+    // Messages Pagination
+    messagesPageSize,
+    messagesCurrentPage,
+    messagesTotalCount,
+    messagesTotalPages,
+    setMessagesPage,
 
     // Stats
     stats,

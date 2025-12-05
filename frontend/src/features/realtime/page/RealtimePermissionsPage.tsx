@@ -1,24 +1,21 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import {
-  Button,
   DataGrid,
   type ConvertedValue,
   type DataGridColumn,
   type DataGridRowType,
   EmptyState,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
 } from '@/components';
+import { PolicyModal, PolicyCellButton, usePolicyModal } from '@/features/database';
 import { realtimeService, type RlsPolicy } from '../services/realtime.service';
+import { cn } from '@/lib/utils/utils';
+
+type TabType = 'subscribe' | 'publish';
 
 interface PolicyRow extends DataGridRowType {
   id: string;
   policyName: string;
-  tableName: string;
   command: string;
   roles: string;
   using: string | null;
@@ -30,118 +27,88 @@ function mapPoliciesToRows(policies: RlsPolicy[]): PolicyRow[] {
   return policies.map((policy, index) => ({
     id: `${policy.tableName}_${policy.policyName}_${index}`,
     policyName: policy.policyName,
-    tableName: policy.tableName,
-    command: policy.command,
+    command: policy.command === '*' ? 'ALL' : policy.command,
     roles: Array.isArray(policy.roles) ? policy.roles.join(', ') : String(policy.roles),
     using: policy.using,
     withCheck: policy.withCheck,
   }));
 }
 
-const columns: DataGridColumn<PolicyRow>[] = [
-  {
-    key: 'policyName',
-    name: 'Policy Name',
-    width: 'minmax(200px, 2fr)',
-    resizable: true,
-    sortable: true,
-  },
-  {
-    key: 'command',
-    name: 'Command',
-    width: 'minmax(100px, 1fr)',
-    resizable: true,
-    sortable: true,
-    renderCell: ({ row }) => {
-      const cmd = row.command;
-      const cmdLabel = cmd === '*' ? 'ALL' : cmd;
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-          {cmdLabel}
-        </span>
-      );
-    },
-  },
-  {
-    key: 'roles',
-    name: 'Roles',
-    width: 'minmax(150px, 1.5fr)',
-    resizable: true,
-  },
-  {
-    key: 'using',
-    name: 'Using',
-    width: 'minmax(200px, 2fr)',
-    resizable: true,
-    renderCell: ({ row }) => {
-      return <span className="text-xs font-mono">{row.using || '-'}</span>;
-    },
-  },
-  {
-    key: 'withCheck',
-    name: 'With Check',
-    width: 'minmax(200px, 2fr)',
-    resizable: true,
-    renderCell: ({ row }) => {
-      return <span className="text-xs font-mono">{row.withCheck || '-'}</span>;
-    },
-  },
-];
-
-interface PolicySectionProps {
-  title: string;
-  description: string;
-  policies: PolicyRow[];
-  isRefreshing: boolean;
-}
-
-function PolicySection({ title, description, policies, isRefreshing }: PolicySectionProps) {
-  return (
-    <div className="flex flex-col gap-3">
-      <h2 className="text-lg font-medium text-zinc-900 dark:text-white">{title}</h2>
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">{description}</p>
-      <div className="overflow-hidden">
-        <DataGrid
-          data={policies}
-          columns={columns}
-          showSelection={false}
-          showPagination={false}
-          noPadding={true}
-          className="h-full"
-          isRefreshing={isRefreshing}
-          emptyState={
-            <div className="text-sm text-zinc-500 dark:text-zinc-400">No policies defined</div>
-          }
-        />
-      </div>
-    </div>
-  );
-}
-
 export default function RealtimePermissionsPage() {
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>('subscribe');
+  const { modalProps, openModal } = usePolicyModal();
 
   const {
     data: permissions,
     isLoading,
     error,
-    refetch,
   } = useQuery({
     queryKey: ['realtime', 'permissions'],
     queryFn: () => realtimeService.getPermissions(),
   });
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      await refetch();
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
+  const subscribePolicies = useMemo(
+    () => (permissions ? mapPoliciesToRows(permissions.subscribe.policies) : []),
+    [permissions]
+  );
 
-  const subscribePolicies = permissions ? mapPoliciesToRows(permissions.subscribe.policies) : [];
-  const publishPolicies = permissions ? mapPoliciesToRows(permissions.publish.policies) : [];
+  const publishPolicies = useMemo(
+    () => (permissions ? mapPoliciesToRows(permissions.publish.policies) : []),
+    [permissions]
+  );
+
+  const activePolicies = activeTab === 'subscribe' ? subscribePolicies : publishPolicies;
+
+  const columns: DataGridColumn<PolicyRow>[] = useMemo(
+    () => [
+      {
+        key: 'policyName',
+        name: 'Policy Name',
+        width: 'minmax(200px, 2fr)',
+        resizable: true,
+        sortable: true,
+      },
+      {
+        key: 'command',
+        name: 'Command',
+        width: 'minmax(100px, 1fr)',
+        resizable: true,
+        sortable: true,
+        renderCell: ({ row }) => {
+          return (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-xs font-medium bg-slate-600 text-white">
+              {row.command}
+            </span>
+          );
+        },
+      },
+      {
+        key: 'roles',
+        name: 'Roles',
+        width: 'minmax(150px, 1.5fr)',
+        resizable: true,
+      },
+      {
+        key: 'using',
+        name: 'Using',
+        width: 'minmax(200px, 2fr)',
+        resizable: true,
+        renderCell: ({ row }) => (
+          <PolicyCellButton value={row.using} field="using" onOpenModal={openModal} />
+        ),
+      },
+      {
+        key: 'withCheck',
+        name: 'With Check',
+        width: 'minmax(200px, 2fr)',
+        resizable: true,
+        renderCell: ({ row }) => (
+          <PolicyCellButton value={row.withCheck} field="withCheck" onOpenModal={openModal} />
+        ),
+      },
+    ],
+    [openModal]
+  );
 
   if (error) {
     return (
@@ -155,55 +122,61 @@ export default function RealtimePermissionsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 h-full p-4 bg-bg-gray dark:bg-neutral-800 overflow-auto">
-      <div className="flex items-center gap-3">
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* Fixed Header */}
+      <div className="shrink-0 bg-bg-gray dark:bg-neutral-800 p-4 flex flex-col gap-6">
+        {/* Title */}
         <h1 className="text-xl font-normal text-zinc-950 dark:text-white">Permissions</h1>
 
-        {/* Separator */}
-        <div className="h-6 w-px bg-gray-200 dark:bg-neutral-700" />
-
-        {/* Refresh button */}
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="p-1 h-9 w-9"
-                onClick={() => void handleRefresh()}
-                disabled={isRefreshing}
-              >
-                <RefreshIcon className="h-5 w-5 text-zinc-400 dark:text-neutral-400" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" align="center">
-              <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        {/* Tabs */}
+        <div className="flex gap-6 items-start">
+          <button
+            onClick={() => setActiveTab('subscribe')}
+            className={cn(
+              'h-8 text-sm font-medium transition-colors',
+              activeTab === 'subscribe'
+                ? 'text-zinc-950 dark:text-white border-b-2 border-zinc-950 dark:border-white'
+                : 'text-zinc-500 dark:text-neutral-400 hover:text-zinc-700 dark:hover:text-neutral-300'
+            )}
+          >
+            Subscribe Policies
+          </button>
+          <button
+            onClick={() => setActiveTab('publish')}
+            className={cn(
+              'h-8 text-sm font-medium transition-colors',
+              activeTab === 'publish'
+                ? 'text-zinc-950 dark:text-white border-b-2 border-zinc-950 dark:border-white'
+                : 'text-zinc-500 dark:text-neutral-400 hover:text-zinc-700 dark:hover:text-neutral-300'
+            )}
+          >
+            Publish Policies
+          </button>
+        </div>
       </div>
 
-      {isLoading ? (
-        <div className="flex-1 flex items-center justify-center">
-          <EmptyState title="Loading permissions..." description="Please wait" />
-        </div>
-      ) : (
-        <div className="flex flex-col gap-8">
-          <PolicySection
-            title="Subscribe Policies"
-            description="RLS policies on realtime.channels table control who can subscribe to channels (SELECT permission)."
-            policies={subscribePolicies}
-            isRefreshing={isRefreshing}
+      {/* Content */}
+      <div className="flex-1 min-h-0 overflow-hidden px-3 pb-2">
+        {isLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <EmptyState title="Loading policies..." description="Please wait" />
+          </div>
+        ) : (
+          <DataGrid
+            data={activePolicies}
+            columns={columns}
+            showSelection={false}
+            showPagination={false}
+            noPadding={true}
+            emptyState={
+              <div className="text-sm text-zinc-500 dark:text-zinc-400">No policies defined</div>
+            }
           />
+        )}
+      </div>
 
-          <PolicySection
-            title="Publish Policies"
-            description="RLS policies on realtime.messages table control who can publish messages (INSERT permission)."
-            policies={publishPolicies}
-            isRefreshing={isRefreshing}
-          />
-        </div>
-      )}
+      {/* Policy Detail Modal */}
+      <PolicyModal {...modalProps} />
     </div>
   );
 }
