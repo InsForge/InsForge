@@ -12,7 +12,7 @@ export const REFRESH_TOKEN_COOKIE_NAME = 'insforge_refresh_token';
  * - httpOnly: JavaScript cannot access (XSS protection)
  * - secure: HTTPS only in production
  * - sameSite: 'none' for cross-origin requests in production, 'lax' in development
- * - path: Only sent to auth endpoints
+ * - path: '/api/auth' - Only sent to auth endpoints (reduces attack surface)
  * - maxAge: 7 days
  */
 export function getRefreshTokenCookieOptions() {
@@ -21,6 +21,7 @@ export function getRefreshTokenCookieOptions() {
     httpOnly: true,
     secure: isProd,
     sameSite: isProd ? ('none' as const) : ('lax' as const),
+    path: '/api/auth',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
   };
 }
@@ -34,6 +35,7 @@ export function setRefreshTokenCookie(res: Response, refreshToken: string): void
 
 /**
  * Clear refresh token cookie on response
+ * IMPORTANT: Must use the same options (especially path) as when setting the cookie
  */
 export function clearRefreshTokenCookie(res: Response): void {
   const isProd = isProduction();
@@ -41,5 +43,6 @@ export function clearRefreshTokenCookie(res: Response): void {
     httpOnly: true,
     secure: isProd,
     sameSite: isProd ? ('none' as const) : ('lax' as const),
+    path: '/api/auth',
   });
 }
