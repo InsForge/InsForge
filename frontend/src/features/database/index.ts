@@ -4,6 +4,7 @@ export { TableListSkeleton } from './components/TableListSkeleton';
 export { TableSidebar } from './components/TableSidebar';
 export { TableForm } from './components/TableForm';
 export { RecordFormDialog } from './components/RecordFormDialog';
+export { PolicyModal, PolicyCellButton, usePolicyModal } from './components/PolicyModal';
 
 // Services
 export { tableService } from './services/table.service';

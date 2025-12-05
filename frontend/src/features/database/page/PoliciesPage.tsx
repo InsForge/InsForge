@@ -14,6 +14,7 @@ import {
   TooltipTrigger,
 } from '@/components';
 import { useFullMetadata } from '../hooks/useFullMetadata';
+import { PolicyModal, PolicyCellButton, usePolicyModal } from '../components/PolicyModal';
 import type {
   ExportDatabaseResponse,
   ExportDatabaseJsonData,
@@ -66,6 +67,7 @@ export default function PoliciesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { data: metadata, isLoading, error, refetch } = useFullMetadata(true);
+  const { modalProps, openModal } = usePolicyModal();
 
   const { socket, isConnected } = useSocket();
 
@@ -155,21 +157,21 @@ export default function PoliciesPage() {
         name: 'Using',
         width: 'minmax(200px, 2fr)',
         resizable: true,
-        renderCell: ({ row }) => {
-          return <span className="text-xs font-mono">{row.qual || '-'}</span>;
-        },
+        renderCell: ({ row }) => (
+          <PolicyCellButton value={row.qual} field="using" onOpenModal={openModal} />
+        ),
       },
       {
         key: 'withCheck',
         name: 'With Check',
         width: 'minmax(200px, 2fr)',
         resizable: true,
-        renderCell: ({ row }) => {
-          return <span className="text-xs font-mono">{row.withCheck || '-'}</span>;
-        },
+        renderCell: ({ row }) => (
+          <PolicyCellButton value={row.withCheck} field="withCheck" onOpenModal={openModal} />
+        ),
       },
     ],
-    []
+    [openModal]
   );
 
   if (error) {
@@ -241,6 +243,9 @@ export default function PoliciesPage() {
           />
         </div>
       )}
+
+      {/* Policy Detail Modal */}
+      <PolicyModal {...modalProps} />
     </div>
   );
 }

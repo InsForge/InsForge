@@ -1,5 +1,4 @@
-import { cn } from '@/lib/utils/utils';
-import { format } from 'date-fns';
+import { cn, formatTime } from '@/lib/utils/utils';
 import type { RealtimeMessage } from '../services/realtime.service';
 
 interface MessageRowProps {
@@ -28,7 +27,7 @@ export function MessageRow({ message, onClick, className }: MessageRowProps) {
         {/* Channel Column */}
         <div className="col-span-2 min-w-0 px-3 py-1.5">
           <span
-            className="text-sm text-muted-foreground dark:text-neutral-400 truncate"
+            className="text-sm text-muted-foreground dark:text-neutral-400 truncate block"
             title={message.channelName}
           >
             {message.channelName}
@@ -39,10 +38,8 @@ export function MessageRow({ message, onClick, className }: MessageRowProps) {
         <div className="col-span-1 px-3 py-1.5">
           <span
             className={cn(
-              'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium',
-              message.senderType === 'system'
-                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-                : 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400'
+              'inline-flex items-center justify-center h-5 px-1.5 rounded-sm text-xs font-medium text-white capitalize',
+              message.senderType === 'system' ? 'bg-sky-700' : 'bg-teal-700'
             )}
           >
             {message.senderType}
@@ -77,7 +74,7 @@ export function MessageRow({ message, onClick, className }: MessageRowProps) {
             className="text-sm text-muted-foreground dark:text-neutral-400 truncate"
             title={message.createdAt}
           >
-            {format(new Date(message.createdAt), 'MMM dd HH:mm:ss')}
+            {formatTime(message.createdAt)}
           </span>
         </div>
       </div>

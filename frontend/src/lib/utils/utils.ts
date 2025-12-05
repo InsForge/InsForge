@@ -169,7 +169,7 @@ export const isIframe = () => {
 };
 
 /**
- * Formats a timestamp string to a human-readable format
+ * Formats a timestamp string to a human-readable format with time
  * Used consistently across the application for displaying timestamps
  * @param timestamp - ISO timestamp string
  * @returns Formatted date string (e.g., "Jan 15, 2025, 03:30 PM")
@@ -180,4 +180,17 @@ export function formatTime(timestamp: string): string {
     return timestamp; // Return original if invalid
   }
   return format(date, 'MMM dd, yyyy, hh:mm a');
+}
+
+/**
+ * Formats a timestamp string to a date-only format
+ * @param timestamp - ISO timestamp string
+ * @returns Formatted date string (e.g., "Jan 15, 2025")
+ */
+export function formatDate(timestamp: string): string {
+  const date = parseISO(timestamp);
+  if (!isValid(date)) {
+    return timestamp; // Return original if invalid
+  }
+  return format(date, 'MMM dd, yyyy');
 }
