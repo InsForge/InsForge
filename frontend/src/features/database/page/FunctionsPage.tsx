@@ -14,15 +14,14 @@ import {
   TooltipTrigger,
 } from '@/components';
 import { useFullMetadata } from '../hooks/useFullMetadata';
-import type { ExportDatabaseResponse, ExportDatabaseJsonData } from '@insforge/shared-schemas';
-import { isSystemFunction } from '../constants';
-import {
-  DataUpdatePayload,
-  DataUpdateResourceType,
-  ServerEvents,
+import { SQLModal, SQLCellButton } from '../components/SQLModal';
+import type {
+  ExportDatabaseResponse,
+  ExportDatabaseJsonData,
   SocketMessage,
-  useSocket,
-} from '@/lib/contexts/SocketContext';
+} from '@insforge/shared-schemas';
+import { isSystemFunction } from '../constants';
+import { DataUpdateResourceType, ServerEvents, useSocket } from '@/lib/contexts/SocketContext';
 
 interface FunctionRow extends DataGridRowType {
   id: string;
@@ -60,6 +59,7 @@ export default function FunctionsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { data: metadata, isLoading, error, refetch } = useFullMetadata(true);
+  const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
 
   const { socket, isConnected } = useSocket();
 
@@ -70,8 +70,8 @@ export default function FunctionsPage() {
       return;
     }
 
-    const handleDataUpdate = (message: SocketMessage<DataUpdatePayload>) => {
-      if (message.payload?.resource === DataUpdateResourceType.DATABASE) {
+    const handleDataUpdate = (message: SocketMessage) => {
+      if (message.resource === DataUpdateResourceType.DATABASE) {
         void refetch();
       }
     };
@@ -132,9 +132,17 @@ export default function FunctionsPage() {
         name: 'Definition',
         width: 'minmax(400px, 8fr)',
         resizable: true,
+        renderCell: ({ row }) => (
+          <SQLCellButton
+            value={row.functionDef}
+            onClick={() =>
+              setSqlModal({ open: true, title: 'Function Definition', value: row.functionDef })
+            }
+          />
+        ),
       },
     ],
-    []
+    [setSqlModal]
   );
 
   if (error) {
@@ -206,6 +214,14 @@ export default function FunctionsPage() {
           />
         </div>
       )}
+
+      {/* SQL Detail Modal */}
+      <SQLModal
+        open={sqlModal.open}
+        onOpenChange={(open) => setSqlModal((prev) => ({ ...prev, open }))}
+        title={sqlModal.title}
+        value={sqlModal.value}
+      />
     </div>
   );
 }

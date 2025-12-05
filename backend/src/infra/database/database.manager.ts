@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { Pool, Client } from 'pg';
 import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
@@ -161,6 +161,19 @@ export class DatabaseManager {
 
   getPool(): Pool {
     return this.pool;
+  }
+
+  /**
+   * Create a dedicated client for operations that can't use pooled connections (e.g., LISTEN/NOTIFY)
+   */
+  createClient(): Client {
+    return new Client({
+      host: process.env.POSTGRES_HOST || 'localhost',
+      port: parseInt(process.env.POSTGRES_PORT || '5432'),
+      database: process.env.POSTGRES_DB || 'insforge',
+      user: process.env.POSTGRES_USER || 'postgres',
+      password: process.env.POSTGRES_PASSWORD || 'postgres',
+    });
   }
 
   async close(): Promise<void> {

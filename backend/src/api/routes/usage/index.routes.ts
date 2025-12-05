@@ -33,10 +33,12 @@ usageRouter.post(
       // Broadcast MCP tool usage to frontend via socket
       const socketService = SocketManager.getInstance();
 
-      socketService.broadcastToRoom('role:project_admin', ServerEvents.MCP_CONNECTED, {
-        tool_name,
-        created_at: result.created_at,
-      });
+      socketService.broadcastToRoom(
+        'role:project_admin',
+        ServerEvents.MCP_CONNECTED,
+        { tool_name, created_at: result.created_at },
+        'system'
+      );
 
       successResponse(res, { success: true });
     } catch (error) {

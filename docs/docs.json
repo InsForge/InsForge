@@ -78,6 +78,13 @@
                   "core-concepts/functions/architecture",
                   "core-concepts/functions/sdk"
                 ]
+              },
+              {
+                "group": "Realtime",
+                "pages": [
+                  "core-concepts/realtime/architecture",
+                  "core-concepts/realtime/sdk"
+                ]
               }
             ]
           },

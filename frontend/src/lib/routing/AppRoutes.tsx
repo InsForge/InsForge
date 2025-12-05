@@ -16,12 +16,16 @@ import VisualizerPage from '@/features/visualizer/page/VisualizerPage';
 import FunctionsPage from '@/features/functions/page/FunctionsPage';
 import SecretsPage from '@/features/functions/page/SecretsPage';
 import AIPage from '@/features/ai/page/AIPage';
+import RealtimeChannelsPage from '@/features/realtime/page/RealtimeChannelsPage';
+import RealtimeMessagesPage from '@/features/realtime/page/RealtimeMessagesPage';
+import RealtimePermissionsPage from '@/features/realtime/page/RealtimePermissionsPage';
 import SQLEditorPage from '@/features/database/page/SQLEditorPage';
 import IndexesPage from '@/features/database/page/IndexesPage';
 import DatabaseFunctionsPage from '@/features/database/page/FunctionsPage';
 import TriggersPage from '@/features/database/page/TriggersPage';
 import PoliciesPage from '@/features/database/page/PoliciesPage';
 import TemplatesPage from '@/features/database/page/TemplatesPage';
+import AuditsPage from '@/features/logs/page/AuditsPage';
 
 export function AppRoutes() {
   return (
@@ -65,6 +69,7 @@ export function AppRoutes() {
                   element={<Navigate to="/dashboard/logs/MCP" replace />}
                 />
                 <Route path="/dashboard/logs/MCP" element={<MCPLogsPage />} />
+                <Route path="/dashboard/logs/audits" element={<AuditsPage />} />
                 <Route path="/dashboard/logs/:source" element={<LogsPage />} />
                 <Route
                   path="/dashboard/functions"
@@ -75,6 +80,16 @@ export function AppRoutes() {
                 <Route path="/dashboard/visualizer" element={<VisualizerPage />} />
                 <Route path="/dashboard/onboard" element={<OnBoardPage />} />
                 <Route path="/dashboard/ai" element={<AIPage />} />
+                <Route
+                  path="/dashboard/realtime"
+                  element={<Navigate to="/dashboard/realtime/channels" replace />}
+                />
+                <Route path="/dashboard/realtime/channels" element={<RealtimeChannelsPage />} />
+                <Route path="/dashboard/realtime/messages" element={<RealtimeMessagesPage />} />
+                <Route
+                  path="/dashboard/realtime/permissions"
+                  element={<RealtimePermissionsPage />}
+                />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </Layout>

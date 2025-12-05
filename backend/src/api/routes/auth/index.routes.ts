@@ -126,9 +126,12 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
     const result: CreateUserResponse = await authService.register(email, password, name);
 
     const socket = SocketManager.getInstance();
-    socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-      resource: DataUpdateResourceType.USERS,
-    });
+    socket.broadcastToRoom(
+      'role:project_admin',
+      ServerEvents.DATA_UPDATE,
+      { resource: DataUpdateResourceType.USERS },
+      'system'
+    );
 
     successResponse(res, result);
   } catch (error) {

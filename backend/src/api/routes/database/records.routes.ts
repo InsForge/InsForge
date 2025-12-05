@@ -209,12 +209,12 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
     const mutationMethods = ['POST', 'DELETE'];
     if (mutationMethods.includes(req.method.toUpperCase())) {
       const socket = SocketManager.getInstance();
-      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.RECORDS,
-        data: {
-          tableName: tableName,
-        },
-      });
+      socket.broadcastToRoom(
+        'role:project_admin',
+        ServerEvents.DATA_UPDATE,
+        { resource: DataUpdateResourceType.RECORDS, data: { tableName } },
+        'system'
+      );
     }
 
     successResponse(res, responseData, response.status);

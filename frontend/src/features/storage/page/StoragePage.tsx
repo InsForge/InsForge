@@ -25,13 +25,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components';
-import {
-  DataUpdatePayload,
-  DataUpdateResourceType,
-  ServerEvents,
-  SocketMessage,
-  useSocket,
-} from '@/lib/contexts/SocketContext';
+import type { SocketMessage } from '@insforge/shared-schemas';
+import { DataUpdateResourceType, ServerEvents, useSocket } from '@/lib/contexts/SocketContext';
 
 interface BucketFormState {
   mode: 'create' | 'edit';
@@ -85,8 +80,8 @@ export default function StoragePage() {
       return;
     }
 
-    const handleDataUpdate = (message: SocketMessage<DataUpdatePayload>) => {
-      if (message.payload?.resource === DataUpdateResourceType.BUCKETS) {
+    const handleDataUpdate = (message: SocketMessage) => {
+      if (message.resource === DataUpdateResourceType.BUCKETS) {
         // Invalidate all buckets queries
         void queryClient.invalidateQueries({ queryKey: ['storage'] });
       }

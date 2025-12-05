@@ -2,17 +2,19 @@ import { Server as HttpServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import logger from '@/utils/logger.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
-import {
-  ServerEvents,
-  ClientEvents,
+import { ServerEvents, ClientEvents, SocketMetadata, NotificationPayload } from '@/types/socket.js';
+import type {
+  SubscribeChannelPayload,
+  PublishEventPayload,
   SocketMessage,
-  SocketMetadata,
-  NotificationPayload,
-  SubscribePayload,
-  UnsubscribePayload,
-} from '@/types/socket.js';
+  SocketMessageMeta,
+  SubscribeResponse,
+  UnsubscribeChannelPayload,
+} from '@insforge/shared-schemas';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
+import { RealtimeAuthService } from '@/services/realtime/realtime-auth.service.js';
+import { RealtimeMessageService } from '@/services/realtime/realtime-message.service.js';
 
 const tokenManager = TokenManager.getInstance();
 
@@ -188,14 +190,22 @@ export class SocketManager {
    * Setup handlers for client events
    */
   private setupClientEventHandlers(socket: Socket): void {
-    // Handle subscription requests
-    socket.on(ClientEvents.SUBSCRIBE, (payload: SubscribePayload) => {
-      this.handleSubscribe(socket, payload);
+    // Handle realtime channel subscribe with ack callback
+    socket.on(
+      ClientEvents.REALTIME_SUBSCRIBE,
+      (payload: SubscribeChannelPayload, ack: (response: SubscribeResponse) => void) => {
+        void this.handleRealtimeSubscribe(socket, payload, ack);
+      }
+    );
+
+    // Handle realtime channel unsubscribe (fire-and-forget, no ack needed)
+    socket.on(ClientEvents.REALTIME_UNSUBSCRIBE, (payload: UnsubscribeChannelPayload) => {
+      this.handleRealtimeUnsubscribe(socket, payload);
     });
 
-    // Handle unsubscription requests
-    socket.on(ClientEvents.UNSUBSCRIBE, (payload: UnsubscribePayload) => {
-      this.handleUnsubscribe(socket, payload);
+    // Handle realtime publish (client-initiated messages)
+    socket.on(ClientEvents.REALTIME_PUBLISH, (payload: PublishEventPayload) => {
+      void this.handleRealtimePublish(socket, payload);
     });
 
     // Update last activity on any event
@@ -208,70 +218,181 @@ export class SocketManager {
   }
 
   /**
-   * Handle channel subscription
+   * Handle realtime channel subscribe request
    */
-  private handleSubscribe(socket: Socket, payload: SubscribePayload): void {
-    const metadata = this.socketMetadata.get(socket.id);
-    if (!metadata) {
-      return;
+  private async handleRealtimeSubscribe(
+    socket: Socket,
+    payload: SubscribeChannelPayload,
+    ack?: (response: SubscribeResponse) => void
+  ): Promise<void> {
+    const authService = RealtimeAuthService.getInstance();
+    const { channel } = payload;
+    const userId = socket.data.user?.id;
+    const userRole = socket.data.user?.role;
+
+    try {
+      // Check subscribe permission via RLS SELECT policy
+      const canSubscribe = await authService.checkSubscribePermission(channel, userId, userRole);
+
+      if (!canSubscribe) {
+        ack?.({
+          ok: false,
+          channel,
+          error: { code: 'UNAUTHORIZED', message: 'Not authorized to subscribe to this channel' },
+        });
+        return;
+      }
+
+      const roomName = `realtime:${channel}`;
+      await socket.join(roomName);
+
+      const metadata = this.socketMetadata.get(socket.id);
+      if (metadata) {
+        metadata.subscriptions.add(roomName);
+      }
+
+      ack?.({ ok: true, channel });
+
+      logger.debug('Socket subscribed to realtime channel', {
+        socketId: socket.id,
+        channel,
+      });
+    } catch (error) {
+      logger.error('Error handling realtime subscribe', { error, channel });
+      ack?.({
+        ok: false,
+        channel,
+        error: { code: 'INTERNAL_ERROR', message: 'Failed to subscribe to channel' },
+      });
     }
-
-    void socket.join(payload.channel);
-    metadata.subscriptions.add(payload.channel);
-
-    logger.debug('Socket subscribed to channel', {
-      socketId: socket.id,
-      channel: payload.channel,
-    });
   }
 
   /**
-   * Handle channel unsubscription
+   * Handle realtime channel unsubscribe request (fire-and-forget)
    */
-  private handleUnsubscribe(socket: Socket, payload: UnsubscribePayload): void {
+  private handleRealtimeUnsubscribe(socket: Socket, payload: UnsubscribeChannelPayload): void {
+    const { channel } = payload;
+    const roomName = `realtime:${channel}`;
+
+    void socket.leave(roomName);
+
     const metadata = this.socketMetadata.get(socket.id);
-    if (!metadata) {
-      return;
+    if (metadata) {
+      metadata.subscriptions.delete(roomName);
     }
 
-    void socket.leave(payload.channel);
-    metadata.subscriptions.delete(payload.channel);
-
-    logger.debug('Socket unsubscribed from channel', {
-      socketId: socket.id,
-      channel: payload.channel,
-    });
+    logger.debug('Socket unsubscribed from realtime channel', { socketId: socket.id, channel });
   }
 
   /**
-   * Emit event to specific socket with type safety
+   * Handle realtime publish request (client-initiated message)
+   * Inserts message to DB - trigger handles pg_notify, broadcast, and stats update.
    */
-  emitToSocket<T>(socket: Socket, event: ServerEvents, payload: T): void {
-    const message: SocketMessage<T> = {
-      type: event,
-      payload,
-      timestamp: Date.now(),
-      id: this.generateMessageId(),
-    };
+  private async handleRealtimePublish(socket: Socket, payload: PublishEventPayload): Promise<void> {
+    const { channel, event, payload: eventPayload } = payload;
+    const userId = socket.data.user?.id;
+    const userRole = socket.data.user?.role;
+
+    // Check if client has subscribed to this channel
+    const roomName = `realtime:${channel}`;
+    const metadata = this.socketMetadata.get(socket.id);
+    if (!metadata?.subscriptions.has(roomName)) {
+      socket.emit(ServerEvents.REALTIME_ERROR, {
+        channel,
+        code: 'NOT_SUBSCRIBED',
+        message: 'Must subscribe to channel before publishing messages',
+      });
+      return;
+    }
+
+    try {
+      // Insert message directly - trigger will handle pg_notify and broadcasting
+      const messageService = RealtimeMessageService.getInstance();
+      const result = await messageService.insertMessage(
+        channel,
+        event,
+        eventPayload,
+        userId,
+        userRole
+      );
+
+      if (!result) {
+        socket.emit(ServerEvents.REALTIME_ERROR, {
+          channel,
+          code: 'UNAUTHORIZED',
+          message: 'Not authorized to publish to this channel',
+        });
+        return;
+      }
+
+      logger.debug('Client message inserted', {
+        socketId: socket.id,
+        channel,
+        event,
+      });
+    } catch (error) {
+      logger.error('Error handling realtime publish', { error, channel });
+      socket.emit(ServerEvents.REALTIME_ERROR, {
+        channel,
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to publish message',
+      });
+    }
+  }
+
+  /**
+   * Build a SocketMessage with meta and payload
+   */
+  private buildSocketMessage<T extends object>(
+    payload: T,
+    meta: Omit<SocketMessageMeta, 'messageId' | 'timestamp'> & { messageId?: string }
+  ): SocketMessage & T {
+    return {
+      ...payload,
+      meta: {
+        ...meta,
+        messageId: meta.messageId || this.generateMessageId(),
+        timestamp: new Date().toISOString(),
+      },
+    } as SocketMessage & T;
+  }
+
+  /**
+   * Emit message to specific socket
+   */
+  emitToSocket<T extends object>(
+    socket: Socket,
+    event: string,
+    payload: T,
+    senderType: 'system' | 'user' = 'system',
+    senderId?: string,
+    messageId?: string
+  ): void {
+    const message = this.buildSocketMessage(payload, {
+      channel: socket.id,
+      senderType,
+      senderId,
+      messageId,
+    });
     socket.emit(event, message);
   }
 
   /**
    * Broadcast to all connected clients
    */
-  broadcastToAll<T>(event: ServerEvents, payload: T): void {
+  broadcastToAll<T extends object>(
+    event: string,
+    payload: T,
+    senderType: 'system' | 'user' = 'system',
+    senderId?: string,
+    messageId?: string
+  ): void {
     if (!this.io) {
       logger.warn('Socket.IO server not initialized');
       return;
     }
 
-    const message: SocketMessage<T> = {
-      type: event,
-      payload,
-      timestamp: Date.now(),
-      id: this.generateMessageId(),
-    };
-
+    const message = this.buildSocketMessage(payload, { senderType, senderId, messageId });
     this.io.emit(event, message);
 
     logger.info('Broadcasted message to all clients', {
@@ -283,25 +404,38 @@ export class SocketManager {
   /**
    * Broadcast to specific room
    */
-  broadcastToRoom<T>(room: string, event: ServerEvents, payload?: T): void {
+  broadcastToRoom<T extends object>(
+    room: string,
+    event: string,
+    payload: T,
+    senderType: 'system' | 'user',
+    senderId?: string,
+    messageId?: string
+  ): void {
     if (!this.io) {
       logger.warn('Socket.IO server not initialized');
       return;
     }
 
-    const message: SocketMessage<T> = {
-      type: event,
-      payload,
-      timestamp: Date.now(),
-      id: this.generateMessageId(),
-    };
-
+    const message = this.buildSocketMessage(payload, {
+      channel: room,
+      senderType,
+      senderId,
+      messageId,
+    });
     this.io.to(room).emit(event, message);
 
-    logger.info('Broadcasted message to room', {
-      event,
-      room,
-    });
+    logger.debug('Broadcasted message to room', { event, room });
+  }
+
+  /**
+   * Get the number of sockets in a room
+   */
+  getRoomSize(room: string): number {
+    if (!this.io) {
+      return 0;
+    }
+    return this.io.sockets.adapter.rooms.get(room)?.size || 0;
   }
 
   /**
@@ -368,11 +502,11 @@ export class SocketManager {
   close(): void {
     if (this.io) {
       // Notify all clients about server shutdown
-      this.broadcastToAll<NotificationPayload>(ServerEvents.NOTIFICATION, {
+      this.broadcastToAll(ServerEvents.NOTIFICATION, {
         level: 'warning',
         title: 'Server Shutdown',
         message: 'Server is shutting down',
-      });
+      } as NotificationPayload);
 
       // Close all connections
       void this.io.close();
