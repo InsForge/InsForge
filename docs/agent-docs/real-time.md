@@ -265,10 +265,14 @@ async function sendMessage(text: string) {
 ### React Hook
 
 ```typescript
-import { useEffect, useCallback, useState } from 'react'
+import { useEffect, useCallback, useRef, useState } from 'react'
 import { insforge } from './lib/insforge'
 
 export function useRealtime(channel: string, handlers: Record<string, (payload: any) => void>) {
+  // Use ref to always have latest handlers without re-running effect
+  const handlersRef = useRef(handlers)
+  handlersRef.current = handlers
+
   useEffect(() => {
     let mounted = true
 
@@ -277,7 +281,7 @@ export function useRealtime(channel: string, handlers: Record<string, (payload: 
       const { ok } = await insforge.realtime.subscribe(channel)
       if (!ok || !mounted) return
 
-      Object.entries(handlers).forEach(([event, handler]) => {
+      Object.entries(handlersRef.current).forEach(([event, handler]) => {
         insforge.realtime.on(event, handler)
       })
     }
@@ -286,7 +290,7 @@ export function useRealtime(channel: string, handlers: Record<string, (payload: 
 
     return () => {
       mounted = false
-      Object.entries(handlers).forEach(([event, handler]) => {
+      Object.entries(handlersRef.current).forEach(([event, handler]) => {
         insforge.realtime.off(event, handler)
       })
       insforge.realtime.unsubscribe(channel)

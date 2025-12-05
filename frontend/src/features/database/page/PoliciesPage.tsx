@@ -14,7 +14,7 @@ import {
   TooltipTrigger,
 } from '@/components';
 import { useFullMetadata } from '../hooks/useFullMetadata';
-import { PolicyModal, PolicyCellButton, usePolicyModal } from '../components/PolicyModal';
+import { SQLModal, SQLCellButton } from '../components/SQLModal';
 import type {
   ExportDatabaseResponse,
   ExportDatabaseJsonData,
@@ -67,7 +67,7 @@ export default function PoliciesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { data: metadata, isLoading, error, refetch } = useFullMetadata(true);
-  const { modalProps, openModal } = usePolicyModal();
+  const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
 
   const { socket, isConnected } = useSocket();
 
@@ -158,7 +158,10 @@ export default function PoliciesPage() {
         width: 'minmax(200px, 2fr)',
         resizable: true,
         renderCell: ({ row }) => (
-          <PolicyCellButton value={row.qual} field="using" onOpenModal={openModal} />
+          <SQLCellButton
+            value={row.qual}
+            onClick={() => row.qual && setSqlModal({ open: true, title: 'Using', value: row.qual })}
+          />
         ),
       },
       {
@@ -167,11 +170,17 @@ export default function PoliciesPage() {
         width: 'minmax(200px, 2fr)',
         resizable: true,
         renderCell: ({ row }) => (
-          <PolicyCellButton value={row.withCheck} field="withCheck" onOpenModal={openModal} />
+          <SQLCellButton
+            value={row.withCheck}
+            onClick={() =>
+              row.withCheck &&
+              setSqlModal({ open: true, title: 'With Check', value: row.withCheck })
+            }
+          />
         ),
       },
     ],
-    [openModal]
+    [setSqlModal]
   );
 
   if (error) {
@@ -244,8 +253,13 @@ export default function PoliciesPage() {
         </div>
       )}
 
-      {/* Policy Detail Modal */}
-      <PolicyModal {...modalProps} />
+      {/* SQL Detail Modal */}
+      <SQLModal
+        open={sqlModal.open}
+        onOpenChange={(open) => setSqlModal((prev) => ({ ...prev, open }))}
+        title={sqlModal.title}
+        value={sqlModal.value}
+      />
     </div>
   );
 }

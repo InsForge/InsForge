@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import { successResponse } from '@/utils/response.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { DocTypeSchema } from '@insforge/shared-schemas/src/docs.schema';
+import { DocTypeSchema, docTypeSchema } from '@insforge/shared-schemas';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,11 +32,13 @@ router.get('/:docType', async (req: Request, res: Response, next: NextFunction) 
   try {
     const { docType } = req.params;
 
-    // Validate doc type
-    const docFileName = DOCS_MAP[docType as DocTypeSchema];
-    if (!docFileName) {
+    // Validate doc type using Zod enum
+    const parsed = docTypeSchema.safeParse(docType);
+    if (!parsed.success) {
       throw new AppError('Documentation not found', 404, ERROR_CODES.NOT_FOUND);
     }
+
+    const docFileName = DOCS_MAP[parsed.data];
 
     // Read the documentation file
     // PROJECT_ROOT is set in the docker-compose.yml file to point to the InsForge directory
@@ -50,21 +52,16 @@ router.get('/:docType', async (req: Request, res: Response, next: NextFunction) 
       content,
     });
   } catch (error) {
-    // If file doesn't exist or other error
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-      next(new AppError('Documentation file not found', 404, ERROR_CODES.NOT_FOUND));
-    } else {
-      next(error);
-    }
+    next(error);
   }
 });
 
 // GET /api/docs - List available documentation
 router.get('/', (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const available = Object.keys(DOCS_MAP).map((key) => ({
+    const available = (Object.keys(DOCS_MAP) as DocTypeSchema[]).map((key) => ({
       type: key,
-      filename: DOCS_MAP[key as DocTypeSchema],
+      filename: DOCS_MAP[key],
       endpoint: `/api/docs/${key}`,
     }));
 

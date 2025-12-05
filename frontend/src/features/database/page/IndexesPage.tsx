@@ -14,6 +14,7 @@ import {
   TooltipTrigger,
 } from '@/components';
 import { useFullMetadata } from '../hooks/useFullMetadata';
+import { SQLModal, SQLCellButton } from '../components/SQLModal';
 import type {
   ExportDatabaseResponse,
   ExportDatabaseJsonData,
@@ -64,6 +65,7 @@ export default function IndexesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { data: metadata, isLoading, error, refetch } = useFullMetadata(true);
+  const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
 
   const { socket, isConnected } = useSocket();
 
@@ -159,9 +161,17 @@ export default function IndexesPage() {
         name: 'Definition',
         width: 'minmax(300px, 5fr)',
         resizable: true,
+        renderCell: ({ row }) => (
+          <SQLCellButton
+            value={row.indexDef}
+            onClick={() =>
+              setSqlModal({ open: true, title: 'Index Definition', value: row.indexDef })
+            }
+          />
+        ),
       },
     ],
-    []
+    [setSqlModal]
   );
 
   if (error) {
@@ -233,6 +243,14 @@ export default function IndexesPage() {
           />
         </div>
       )}
+
+      {/* SQL Detail Modal */}
+      <SQLModal
+        open={sqlModal.open}
+        onOpenChange={(open) => setSqlModal((prev) => ({ ...prev, open }))}
+        title={sqlModal.title}
+        value={sqlModal.value}
+      />
     </div>
   );
 }

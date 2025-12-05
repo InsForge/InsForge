@@ -285,13 +285,23 @@ void initializeServer();
 async function cleanup() {
   logger.info('Shutting down gracefully...');
 
-  // Close RealtimeManager
-  const realtimeManager = RealtimeManager.getInstance();
-  await realtimeManager.close();
+  try {
+    const realtimeManager = RealtimeManager.getInstance();
+    await realtimeManager.close();
+  } catch (error) {
+    logger.error('Error closing RealtimeManager', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
-  // Close SocketManager
-  const socketService = SocketManager.getInstance();
-  socketService.close();
+  try {
+    const socketService = SocketManager.getInstance();
+    socketService.close();
+  } catch (error) {
+    logger.error('Error closing SocketManager', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   process.exit(0);
 }

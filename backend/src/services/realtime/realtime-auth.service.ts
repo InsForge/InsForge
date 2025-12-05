@@ -1,6 +1,7 @@
 import { Pool, PoolClient } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
+import { RoleSchema } from '@insforge/shared-schemas';
 
 /**
  * Handles channel authorization by checking RLS policies on the messages table.
@@ -46,7 +47,7 @@ export class RealtimeAuthService {
   async checkSubscribePermission(
     channelName: string,
     userId: string | undefined,
-    role: 'authenticated' | 'anon' = 'anon'
+    role: RoleSchema
   ): Promise<boolean> {
     const client = await this.getPool().connect();
     try {

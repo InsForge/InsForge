@@ -14,6 +14,7 @@ import {
   TooltipTrigger,
 } from '@/components';
 import { useFullMetadata } from '../hooks/useFullMetadata';
+import { SQLModal, SQLCellButton } from '../components/SQLModal';
 import type {
   ExportDatabaseResponse,
   ExportDatabaseJsonData,
@@ -64,6 +65,7 @@ export default function TriggersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { data: metadata, isLoading, error, refetch } = useFullMetadata(true);
+  const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
 
   const { socket, isConnected } = useSocket();
 
@@ -161,9 +163,17 @@ export default function TriggersPage() {
         name: 'Statement',
         width: 'minmax(300px, 3fr)',
         resizable: true,
+        renderCell: ({ row }) => (
+          <SQLCellButton
+            value={row.actionStatement}
+            onClick={() =>
+              setSqlModal({ open: true, title: 'Trigger Statement', value: row.actionStatement })
+            }
+          />
+        ),
       },
     ],
-    []
+    [setSqlModal]
   );
 
   if (error) {
@@ -235,6 +245,14 @@ export default function TriggersPage() {
           />
         </div>
       )}
+
+      {/* SQL Detail Modal */}
+      <SQLModal
+        open={sqlModal.open}
+        onOpenChange={(open) => setSqlModal((prev) => ({ ...prev, open }))}
+        title={sqlModal.title}
+        value={sqlModal.value}
+      />
     </div>
   );
 }

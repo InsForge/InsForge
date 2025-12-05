@@ -110,7 +110,7 @@ export class RealtimeManager {
 
       logger.debug('Realtime message published', {
         messageId,
-        channelName: channel.pattern,
+        channelName: message.channelName,
         eventName: message.eventName,
         ...result,
       });
