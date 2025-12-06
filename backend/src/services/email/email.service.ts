@@ -1,6 +1,7 @@
 import { EmailProvider } from '@/providers/email/base.provider.js';
 import { CloudEmailProvider } from '@/providers/email/cloud.provider.js';
 import { EmailTemplate } from '@/types/email.js';
+import { SendRawEmailRequest } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 
 /**
@@ -53,17 +54,11 @@ export class EmailService {
   }
 
   /**
-   * Send raw email (if provider supports it)
-   * @param to - Recipient email address
-   * @param subject - Email subject
-   * @param html - HTML email body
-   * @param text - Plain text email body (optional)
+   * Send custom/raw email
+   * @param options - Email options (to, subject, html, cc, bcc, from, replyTo)
    */
-  public async sendRaw(to: string, subject: string, html: string, text?: string): Promise<void> {
-    if (!this.provider.sendRaw) {
-      throw new Error('Current email provider does not support raw email sending');
-    }
-    return this.provider.sendRaw(to, subject, html, text);
+  public async sendRaw(options: SendRawEmailRequest): Promise<void> {
+    return this.provider.sendRaw(options);
   }
 
   /**
