@@ -58,6 +58,9 @@ export class EmailService {
    * @param options - Email options (to, subject, html, cc, bcc, from, replyTo)
    */
   public async sendRaw(options: SendRawEmailRequest): Promise<void> {
+    if (!this.provider.sendRaw) {
+      throw new Error('Current email provider does not support raw email sending');
+    }
     return this.provider.sendRaw(options);
   }
 
