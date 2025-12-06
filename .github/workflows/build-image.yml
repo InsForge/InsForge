@@ -64,3 +64,4 @@ jobs:
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
             COMMIT_SHA=${{ github.sha }}
             VITE_PUBLIC_POSTHOG_KEY=${{ secrets.POSTHOG_KEY }}
+            VITE_PUBLIC_CONTACT_SERVICE_TOKEN=${{ secrets.CONTACT_KEY }}

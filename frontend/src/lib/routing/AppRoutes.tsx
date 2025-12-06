@@ -11,7 +11,6 @@ import ConfigurationPage from '@/features/auth/page/ConfigurationPage';
 import LogsPage from '@/features/logs/page/LogsPage';
 import MCPLogsPage from '@/features/logs/page/MCPLogsPage';
 import StoragePage from '@/features/storage/page/StoragePage';
-import OnBoardPage from '@/features/onboard/page/OnBoardPage';
 import VisualizerPage from '@/features/visualizer/page/VisualizerPage';
 import FunctionsPage from '@/features/functions/page/FunctionsPage';
 import SecretsPage from '@/features/functions/page/SecretsPage';
@@ -73,7 +72,6 @@ export function AppRoutes() {
                 <Route path="/dashboard/functions/list" element={<FunctionsPage />} />
                 <Route path="/dashboard/functions/secrets" element={<SecretsPage />} />
                 <Route path="/dashboard/visualizer" element={<VisualizerPage />} />
-                <Route path="/dashboard/onboard" element={<OnBoardPage />} />
                 <Route path="/dashboard/ai" element={<AIPage />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>

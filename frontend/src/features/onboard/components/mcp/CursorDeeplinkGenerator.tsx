@@ -26,7 +26,7 @@ export function CursorDeeplinkGenerator({
   return (
     <button
       onClick={handleOpenInCursor}
-      className="h-10 bg-black dark:bg-neutral-800 py-2 px-4 flex items-center justify-center gap-2.5 rounded-md text-white text-sm font-medium"
+      className="h-8 bg-black dark:bg-white px-4 flex items-center justify-center gap-2.5 rounded text-white dark:text-black text-sm font-medium"
     >
       <CursorLogo className="h-6 w-6" />
       <span>Add to Cursor</span>

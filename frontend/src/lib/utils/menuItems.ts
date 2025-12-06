@@ -7,8 +7,6 @@ import {
   Code2,
   Sparkles,
   ChartLine,
-  RotateCw,
-  Link2,
   BookOpen,
   GitFork,
   Settings,
@@ -165,16 +163,6 @@ export const staticMenuItems: PrimaryMenuItem[] = [
 ];
 
 /**
- * Get started menu item for onboarding
- */
-export const getStartedMenuItem: PrimaryMenuItem = {
-  id: 'get-started',
-  label: 'Get Started',
-  href: '/dashboard/onboard',
-  icon: Link2,
-};
-
-/**
  * Bottom menu items that may be conditionally shown
  */
 export const documentationMenuItem: PrimaryMenuItem = {
@@ -183,14 +171,6 @@ export const documentationMenuItem: PrimaryMenuItem = {
   href: 'https://docs.insforge.dev',
   icon: BookOpen,
   external: true,
-};
-
-export const reinstallMenuItem: PrimaryMenuItem = {
-  id: 'reinstall',
-  label: 'Reinstall',
-  href: '/dashboard/onboard',
-  icon: RotateCw,
-  external: false,
 };
 
 export const usageMenuItem: PrimaryMenuItem = {
