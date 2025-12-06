@@ -233,9 +233,17 @@ export class CloudEmailProvider implements EmailProvider {
         } else if (status === 429) {
           throw new AppError('Email rate limit exceeded.', status, ERROR_CODES.RATE_LIMITED);
         } else if (status === 400) {
-          throw new AppError(`Invalid email request: ${message}`, status, ERROR_CODES.INVALID_INPUT);
+          throw new AppError(
+            `Invalid email request: ${message}`,
+            status,
+            ERROR_CODES.INVALID_INPUT
+          );
         } else {
-          throw new AppError(`Failed to send email: ${message}`, status || 500, ERROR_CODES.INTERNAL_ERROR);
+          throw new AppError(
+            `Failed to send email: ${message}`,
+            status || 500,
+            ERROR_CODES.INTERNAL_ERROR
+          );
         }
       }
 
