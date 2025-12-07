@@ -59,7 +59,7 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
     items.push(documentationMenuItem);
     items.push(settingsMenuItem);
     return items;
-  }, [isInIframe, settingsMenuItem]);
+  }, [isCloud, isInIframe, settingsMenuItem]);
 
   // Find which primary menu item matches the current route
   // Items with secondary menus use prefix matching (end: false)
