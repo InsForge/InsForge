@@ -13,7 +13,7 @@ export function VideoDemoModal({ open, className }: VideoDemoModalProps) {
   return (
     <div
       className={cn(
-        'bg-[#3A3A3A] border border-neutral-700 rounded-lg p-3 flex flex-col gap-2.5',
+        'bg-gray-100 dark:bg-[#3A3A3A] border border-gray-200 dark:border-neutral-700 rounded-lg p-3 flex flex-col gap-2.5',
         className
       )}
     >

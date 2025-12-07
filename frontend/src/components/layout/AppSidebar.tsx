@@ -5,12 +5,12 @@ import { SecondaryMenu } from './SecondaryMenu';
 import {
   staticMenuItems,
   documentationMenuItem,
-  settingsMenuItem,
   usageMenuItem,
   type PrimaryMenuItem,
 } from '@/lib/utils/menuItems';
 import { useLocation, matchPath } from 'react-router-dom';
 import { isInsForgeCloudProject, isIframe } from '@/lib/utils/utils';
+import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 import { ProjectInfoModal } from '@/components/ProjectInfoModal';
 import { Settings } from 'lucide-react';
 
@@ -27,16 +27,24 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   const isCloud = isInsForgeCloudProject();
   const isInIframe = isIframe();
 
-  // Create a settings menu item for non-iframe cloud deployments
-  const projectInfoSettingsMenuItem: PrimaryMenuItem = useMemo(
+  // Create a settings menu item that behaves differently based on iframe context
+  const settingsMenuItem: PrimaryMenuItem = useMemo(
     () => ({
       id: 'settings',
       label: 'Settings',
       href: '',
       icon: Settings,
-      onClick: () => setIsProjectInfoModalOpen(true),
+      onClick: () => {
+        if (isInIframe) {
+          // In iframe: use postMessage to show cloud's settings overlay
+          postMessageToParent({ type: 'SHOW_SETTINGS_OVERLAY' }, '*');
+        } else {
+          // Not in iframe: show local project info modal
+          setIsProjectInfoModalOpen(true);
+        }
+      },
     }),
-    []
+    [isInIframe]
   );
 
   // Build bottom menu items based on deployment environment
@@ -52,17 +60,11 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
 
     // Add settings button if this is an InsForge Cloud project
     if (isCloud) {
-      if (isInIframe) {
-        // In iframe: use postMessage to show cloud's settings overlay
-        items.push(settingsMenuItem);
-      } else {
-        // Not in iframe: show local project info modal
-        items.push(projectInfoSettingsMenuItem);
-      }
+      items.push(settingsMenuItem);
     }
 
     return items;
-  }, [isCloud, isInIframe, projectInfoSettingsMenuItem]);
+  }, [isCloud, isInIframe, settingsMenuItem]);
 
   // Find which primary menu item matches the current route
   // Items with secondary menus use prefix matching (end: false)

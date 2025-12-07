@@ -9,7 +9,6 @@ import {
   ChartLine,
   BookOpen,
   GitFork,
-  Settings,
   Users,
   Table,
   ChartBarBig,
@@ -180,15 +179,5 @@ export const usageMenuItem: PrimaryMenuItem = {
   icon: ChartBarBig,
   onClick: () => {
     postMessageToParent({ type: 'NAVIGATE_TO_USAGE' }, '*');
-  },
-};
-
-export const settingsMenuItem: PrimaryMenuItem = {
-  id: 'settings',
-  label: 'Settings',
-  href: '',
-  icon: Settings,
-  onClick: () => {
-    postMessageToParent({ type: 'SHOW_SETTINGS_OVERLAY' }, '*');
   },
 };
