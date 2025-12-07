@@ -1,5 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
-import { AuthRequest, verifyToken } from '@/api/middlewares/auth.js';
+import { AuthRequest, verifyUser } from '@/api/middlewares/auth.js';
 import { EmailService } from '@/services/email/email.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -13,7 +13,7 @@ const emailService = EmailService.getInstance();
  * POST /api/email/send
  * Send a custom email
  */
-router.post('/send', verifyToken, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/send', verifyUser, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const validation = sendRawEmailRequestSchema.safeParse(req.body);
     if (!validation.success) {
