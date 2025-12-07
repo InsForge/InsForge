@@ -14,7 +14,7 @@ import {
 import { cn, isInsForgeCloudProject } from '@/lib/utils/utils';
 import { feedbackService } from '@/lib/services/feedback.service';
 
-const CONTACT_INFORMATION = import.meta.env.VITE_CONTACT_INFORMATION || "";
+const CONTACT_INFORMATION = import.meta.env.VITE_CONTACT_INFORMATION || '';
 const MAX_FILES = 10;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
