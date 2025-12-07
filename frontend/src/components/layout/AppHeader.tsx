@@ -26,7 +26,6 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 // Import SVG icons
 import DiscordIcon from '@/assets/logos/discord.svg?react';
 import GitHubIcon from '@/assets/logos/github.svg?react';
-import XIcon from '@/assets/logos/x.svg?react';
 import InsForgeLogoLight from '@/assets/logos/insforge_light.svg';
 import InsForgeLogoDark from '@/assets/logos/insforge_dark.svg';
 
