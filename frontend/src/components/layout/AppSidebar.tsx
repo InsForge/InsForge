@@ -57,14 +57,9 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
     }
 
     items.push(documentationMenuItem);
-
-    // Add settings button if this is an InsForge Cloud project
-    if (isCloud) {
-      items.push(settingsMenuItem);
-    }
-
+    items.push(settingsMenuItem);
     return items;
-  }, [isCloud, isInIframe, settingsMenuItem]);
+  }, [isInIframe, settingsMenuItem]);
 
   // Find which primary menu item matches the current route
   // Items with secondary menus use prefix matching (end: false)
