@@ -7,7 +7,12 @@ import type {
   RealtimeChannel,
   CreateChannelRequest,
   UpdateChannelRequest,
+  RealtimeMetadataSchema,
+  RlsPolicy,
+  RealtimePermissionsResponse,
 } from '@insforge/shared-schemas';
+
+const SYSTEM_POLICIES = ['project_admin_policy'];
 
 export class RealtimeChannelService {
   private static instance: RealtimeChannelService;
@@ -151,6 +156,71 @@ export class RealtimeChannelService {
     await this.getPool().query('DELETE FROM realtime.channels WHERE id = $1', [id]);
     logger.info('Realtime channel deleted', { id, pattern: existing.pattern });
   }
+
+  /**
+   * Get realtime metadata including channels and permissions
+   */
+  async getMetadata(): Promise<RealtimeMetadataSchema> {
+    const [channels, permissions] = await Promise.all([this.list(), this.getPermissions()]);
+
+    return {
+      channels,
+      permissions,
+    };
+  }
+
+  // ============================================================================
+  // Permissions Methods
+  // ============================================================================
+
+  /**
+   * Get RLS policies for a table in the realtime schema, excluding system policies
+   */
+  private async getPolicies(tableName: string): Promise<RlsPolicy[]> {
+    const result = await this.getPool().query(
+      `SELECT
+         policyname as "policyName",
+         tablename as "tableName",
+         cmd as "command",
+         roles,
+         qual as "using",
+         with_check as "withCheck"
+       FROM pg_policies
+       WHERE schemaname = 'realtime'
+         AND tablename = $1
+       ORDER BY policyname`,
+      [tableName]
+    );
+
+    // Filter out system policies
+    return result.rows.filter((policy) => !SYSTEM_POLICIES.includes(policy.policyName));
+  }
+
+  /**
+   * Get all realtime permissions (RLS policies for channels and messages tables)
+   *
+   * - Subscribe permission: RLS policies on realtime.channels (SELECT)
+   * - Publish permission: RLS policies on realtime.messages (INSERT)
+   */
+  async getPermissions(): Promise<RealtimePermissionsResponse> {
+    const [channelsPolicies, messagesPolicies] = await Promise.all([
+      this.getPolicies('channels'),
+      this.getPolicies('messages'),
+    ]);
+
+    return {
+      subscribe: {
+        policies: channelsPolicies,
+      },
+      publish: {
+        policies: messagesPolicies,
+      },
+    };
+  }
+
+  // ============================================================================
+  // Validation
+  // ============================================================================
 
   private validateChannelPattern(pattern: string): void {
     // Allow alphanumeric, colons, hyphens, and % for wildcards

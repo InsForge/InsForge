@@ -18,14 +18,22 @@ Promise<void>
 ```
 
 <Note>
-The SDK automatically includes the authentication token from the logged-in user.
+The SDK automatically includes the authentication token from the logged-in user. Multiple calls to `connect()` while connecting will safely return the same promise.
 </Note>
+
+### Connection Timeout
+
+The connection will timeout after **10 seconds** if the server is unreachable, rejecting the promise with a timeout error.
 
 ### Example
 
 ```javascript
-await insforge.realtime.connect()
-console.log('Connected:', insforge.realtime.isConnected)
+try {
+  await insforge.realtime.connect()
+  console.log('Connected:', insforge.realtime.isConnected)
+} catch (error) {
+  console.error('Connection failed:', error.message)
+}
 ```
 
 ---
@@ -48,13 +56,17 @@ Promise<{
 }>
 ```
 
-<Warning>
-Channel subscriptions are subject to RLS policies. The server will reject unauthorized subscriptions.
-</Warning>
+<Note>
+**Auto-connect**: If not connected, `subscribe()` will automatically call `connect()` for you. However, calling `connect()` explicitly is still recommended so you can set up connection event listeners (`connect`, `disconnect`, `connect_error`) beforehand.
+
+<Tip>
+By default, all users can subscribe to any channel. If RLS is enabled on `realtime.channels`, subscriptions are subject to SELECT policies.
+</Tip>
 
 ### Example
 
 ```javascript
+await insforge.realtime.connect()
 const response = await insforge.realtime.subscribe('orders:123')
 
 if (response.ok) {
@@ -62,6 +74,8 @@ if (response.ok) {
 } else {
   console.error('Failed:', response.error?.message)
 }
+
+const response = await insforge.realtime.subscribe('orders:456')
 ```
 
 ### Output (Success)
@@ -73,7 +87,20 @@ if (response.ok) {
 }
 ```
 
-### Output (Error)
+### Output (Error - Connection Failed)
+
+```json
+{
+  "ok": false,
+  "channel": "orders:123",
+  "error": {
+    "code": "CONNECTION_FAILED",
+    "message": "Connection timeout after 10000ms"
+  }
+}
+```
+
+### Output (Error - Unauthorized)
 
 ```json
 {
@@ -115,7 +142,7 @@ Publish a message to a channel.
 - `payload` (object, required) - Message payload
 
 <Warning>
-You must be subscribed to a channel before publishing to it. Otherwise, you'll receive an `error` event.
+You must be subscribed to a channel before publishing to it. If RLS is enabled on `realtime.messages`, publishing is also subject to INSERT policies.
 </Warning>
 
 ### Example
@@ -252,6 +279,32 @@ insforge.realtime.off('order_updated', handleOrderUpdate)
 
 ---
 
+## once()
+
+Listen for an event only once, then automatically remove the listener.
+
+### Parameters
+
+- `event` (string, required) - Event name to listen for
+- `callback` (function, required) - Callback function receiving the payload
+
+### Example
+
+```javascript
+// Wait for a single event
+insforge.realtime.once('order_completed', (payload) => {
+  console.log('Order completed:', payload)
+  // Listener is automatically removed after this callback
+})
+
+// Useful for one-time confirmations
+insforge.realtime.once('connect', () => {
+  console.log('First connection established')
+})
+```
+
+---
+
 ## disconnect()
 
 Disconnect from the realtime server and clear all subscriptions.
@@ -319,6 +372,10 @@ insforge.realtime.on('error', (error) => {
   console.error('Error:', error.message)
 })
 
+insforge.realtime.on('disconnect', (reason) => {
+  console.log('Disconnected:', reason)
+})
+
 // Connect and subscribe
 await insforge.realtime.connect()
 const { ok } = await insforge.realtime.subscribe('chat:room-1')
@@ -349,58 +406,3 @@ function leaveRoom() {
 }
 ```
 
-### React Hook
-
-```javascript
-import { useEffect, useCallback, useRef } from 'react'
-import { insforge } from './lib/insforge'
-
-export function useRealtime(channel, eventHandlers) {
-  // Use ref to always have latest handlers without re-running effect
-  const handlersRef = useRef(eventHandlers)
-  handlersRef.current = eventHandlers
-
-  useEffect(() => {
-    let mounted = true
-
-    async function setup() {
-      await insforge.realtime.connect()
-      const { ok } = await insforge.realtime.subscribe(channel)
-
-      if (!ok || !mounted) return
-
-      // Register event handlers
-      Object.entries(handlersRef.current).forEach(([event, handler]) => {
-        insforge.realtime.on(event, handler)
-      })
-    }
-
-    setup()
-
-    return () => {
-      mounted = false
-      Object.entries(handlersRef.current).forEach(([event, handler]) => {
-        insforge.realtime.off(event, handler)
-      })
-      insforge.realtime.unsubscribe(channel)
-    }
-  }, [channel])
-
-  const publish = useCallback(
-    (event, payload) => insforge.realtime.publish(channel, event, payload),
-    [channel]
-  )
-
-  return { publish }
-}
-
-// Usage
-function ChatRoom({ roomId }) {
-  const { publish } = useRealtime(`chat:${roomId}`, {
-    new_message: (msg) => setMessages(prev => [...prev, msg]),
-    user_joined: (user) => console.log(`${user.name} joined`)
-  })
-
-  return <button onClick={() => publish('new_message', { text: 'Hello!' })}>Send</button>
-}
-```

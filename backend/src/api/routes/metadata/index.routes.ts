@@ -4,6 +4,7 @@ import { AuthService } from '@/services/auth/auth.service.js';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { AIConfigService } from '@/services/ai/ai-config.service.js';
 import { FunctionService } from '@/services/functions/function.service.js';
+import { RealtimeChannelService } from '@/services/realtime/realtime-channel.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { successResponse } from '@/utils/response.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -16,6 +17,7 @@ const router = Router();
 const authService = AuthService.getInstance();
 const storageService = StorageService.getInstance();
 const functionService = FunctionService.getInstance();
+const realtimeChannelService = RealtimeChannelService.getInstance();
 const dbManager = DatabaseManager.getInstance();
 const dbAdvanceService = DatabaseAdvanceService.getInstance();
 const aiConfigService = AIConfigService.getInstance();
@@ -99,6 +101,16 @@ router.get('/functions', async (_req: AuthRequest, res: Response, next: NextFunc
   try {
     const functionsMetadata = await functionService.getMetadata();
     successResponse(res, functionsMetadata);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get realtime metadata
+router.get('/realtime', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const realtimeMetadata = await realtimeChannelService.getMetadata();
+    successResponse(res, realtimeMetadata);
   } catch (error) {
     next(error);
   }

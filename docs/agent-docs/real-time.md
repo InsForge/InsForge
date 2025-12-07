@@ -53,9 +53,18 @@ CREATE TRIGGER order_realtime
 
 ### Step 3: Add Access Control (Optional)
 
-By default, all authenticated users can subscribe to any channel. To restrict access, add RLS policies:
+**RLS is disabled by default** for the best developer experience. All authenticated and anonymous users can subscribe to any channel and publish messages out of the box.
 
-#### Restrict who can subscribe (SELECT on realtime.channels)
+To restrict access, first enable RLS, then add policies:
+
+#### Step 3a: Enable RLS
+
+```sql
+ALTER TABLE realtime.channels ENABLE ROW LEVEL SECURITY;
+ALTER TABLE realtime.messages ENABLE ROW LEVEL SECURITY;
+```
+
+#### Step 3b: Restrict who can subscribe (SELECT on realtime.channels)
 
 ```sql
 -- Only order owner can subscribe to their order channel
@@ -74,7 +83,7 @@ USING (
 
 **Note**: Use `realtime.channel_name()` in subscribe policies to get the actual channel (e.g., `order:123`) since the table only stores patterns (e.g., `order:%`).
 
-#### Restrict who can publish from client (INSERT on realtime.messages)
+#### Step 3c: Restrict who can publish from client (INSERT on realtime.messages)
 
 ```sql
 -- Only chat room members can publish messages
@@ -128,6 +137,15 @@ insforge.realtime.on('INSERT_order', (payload) => {
 
 insforge.realtime.on('UPDATE_order', (payload) => {
   console.log('Order updated:', payload)
+})
+```
+
+#### once(event, callback) - Listen for event once
+
+```typescript
+// Auto-removes after first invocation
+insforge.realtime.once('order_completed', (payload) => {
+  console.log('Order completed:', payload)
 })
 ```
 
@@ -195,9 +213,7 @@ insforge.realtime.on('UPDATE_order', (payload) => {
 })
 ```
 
-## Complete Examples
-
-### Database Events (Order Status Updates)
+## Complete Example
 
 **Backend SQL:**
 ```sql
@@ -205,7 +221,7 @@ insforge.realtime.on('UPDATE_order', (payload) => {
 INSERT INTO realtime.channels (pattern, description, enabled)
 VALUES ('order:%', 'Order updates', true);
 
--- 2. Create trigger
+-- 2. Create trigger for database events
 CREATE OR REPLACE FUNCTION notify_order_status()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -230,91 +246,15 @@ CREATE TRIGGER order_status_trigger
 await insforge.realtime.connect()
 await insforge.realtime.subscribe(`order:${orderId}`)
 
+// Listen for database-triggered events
 insforge.realtime.on('status_changed', (payload) => {
   updateUI(payload.status)
 })
-```
 
-### Client Events (Chat Room)
-
-**Backend SQL:**
-```sql
-INSERT INTO realtime.channels (pattern, description, enabled)
-VALUES ('chat:%', 'Chat rooms', true);
-```
-
-**Frontend:**
-```typescript
-await insforge.realtime.connect()
-await insforge.realtime.subscribe('chat:room-1')
-
-// Listen for messages from other users
-insforge.realtime.on('message', (payload) => {
-  addMessage(payload.text, payload.sender)
+// Client can also publish events to the same channel
+await insforge.realtime.publish(`order:${orderId}`, 'customer_viewed', {
+  viewedAt: new Date().toISOString()
 })
-
-// Send a message
-async function sendMessage(text: string) {
-  await insforge.realtime.publish('chat:room-1', 'message', {
-    text,
-    sender: currentUser.name
-  })
-}
-```
-
-### React Hook
-
-```typescript
-import { useEffect, useCallback, useRef, useState } from 'react'
-import { insforge } from './lib/insforge'
-
-export function useRealtime(channel: string, handlers: Record<string, (payload: any) => void>) {
-  // Use ref to always have latest handlers without re-running effect
-  const handlersRef = useRef(handlers)
-  handlersRef.current = handlers
-
-  useEffect(() => {
-    let mounted = true
-
-    async function setup() {
-      await insforge.realtime.connect()
-      const { ok } = await insforge.realtime.subscribe(channel)
-      if (!ok || !mounted) return
-
-      Object.entries(handlersRef.current).forEach(([event, handler]) => {
-        insforge.realtime.on(event, handler)
-      })
-    }
-
-    setup()
-
-    return () => {
-      mounted = false
-      Object.entries(handlersRef.current).forEach(([event, handler]) => {
-        insforge.realtime.off(event, handler)
-      })
-      insforge.realtime.unsubscribe(channel)
-    }
-  }, [channel])
-
-  const publish = useCallback(
-    (event: string, payload: object) => insforge.realtime.publish(channel, event, payload),
-    [channel]
-  )
-
-  return { publish }
-}
-
-// Usage
-function OrderTracker({ orderId }: { orderId: string }) {
-  const [status, setStatus] = useState('')
-
-  useRealtime(`order:${orderId}`, {
-    status_changed: (p) => setStatus(p.status)
-  })
-
-  return <div>Order Status: {status}</div>
-}
 ```
 
 ## Quick Reference
@@ -324,5 +264,6 @@ function OrderTracker({ orderId }: { orderId: string }) {
 | Emit event on DB change | Create trigger calling `realtime.publish(channel, event, payload)` |
 | Client sends event | `insforge.realtime.publish(channel, event, payload)` |
 | Listen for events | `insforge.realtime.on(eventName, callback)` |
-| Restrict subscribe access | RLS SELECT policy on `realtime.channels` |
-| Restrict client publish | RLS INSERT policy on `realtime.messages` |
+| Listen once | `insforge.realtime.once(eventName, callback)` |
+| Restrict subscribe access | Enable RLS on `realtime.channels`, then add SELECT policy |
+| Restrict client publish | Enable RLS on `realtime.messages`, then add INSERT policy |

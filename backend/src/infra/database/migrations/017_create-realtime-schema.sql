@@ -111,11 +111,16 @@ BEFORE UPDATE ON realtime.channels
 FOR EACH ROW EXECUTE FUNCTION realtime.update_updated_at();
 
 -- ============================================================================
--- ENABLE RLS
+-- ROW LEVEL SECURITY (DISABLED BY DEFAULT)
 -- ============================================================================
-
-ALTER TABLE realtime.channels ENABLE ROW LEVEL SECURITY;
-ALTER TABLE realtime.messages ENABLE ROW LEVEL SECURITY;
+-- RLS is disabled by default for the best developer experience.
+-- Channels and messages are open to all authenticated/anon users out of the box.
+--
+-- To enable access control, developers can:
+--   1. Enable RLS: ALTER TABLE realtime.channels ENABLE ROW LEVEL SECURITY;
+--   2. Add policies using the helper function realtime.channel_name()
+--
+-- See documentation for policy examples.
 
 -- ============================================================================
 -- HELPER FUNCTIONS FOR RLS POLICIES
@@ -212,17 +217,17 @@ CREATE TRIGGER trg_message_notify
   EXECUTE FUNCTION realtime.notify_on_message_insert();
 
 -- ============================================================================
--- GRANTS FOR RLS PERMISSION CHECKS
+-- GRANTS
 -- ============================================================================
 
 -- Grant schema access to both authenticated and anonymous users
 GRANT USAGE ON SCHEMA realtime TO authenticated, anon;
 
--- Grant SELECT on channels table (RLS will filter which channels they can see)
+-- Grant SELECT on channels table (allows subscribe)
 GRANT SELECT ON realtime.channels TO authenticated, anon;
 
--- Grant INSERT on messages table (RLS will filter who can publish to which channels)
+-- Grant INSERT on messages table (allows publish)
 GRANT INSERT ON realtime.messages TO authenticated, anon;
 
--- Grant execution permission on helper function (used in RLS policies)
+-- Grant execution permission on helper function (used when RLS is enabled)
 GRANT EXECUTE ON FUNCTION realtime.channel_name() TO authenticated, anon;
