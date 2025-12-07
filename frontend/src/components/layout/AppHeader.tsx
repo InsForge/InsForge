@@ -130,15 +130,6 @@ export default function AppHeader() {
             <DiscordIcon className="h-5 w-5" />
           </a>
           <a
-            href="https://x.com/InsForge_dev"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-2 text-gray-600 dark:text-zinc-400 hover:text-neutral-900 dark:hover:text-white transition-colors duration-200"
-            aria-label="X (Twitter)"
-          >
-            <XIcon className="h-5 w-5" />
-          </a>
-          <a
             href="https://github.com/InsForge/InsForge"
             target="_blank"
             rel="noopener noreferrer"
