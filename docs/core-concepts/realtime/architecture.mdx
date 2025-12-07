@@ -45,7 +45,7 @@ graph TB
 | Component | Technology | Purpose |
 |-----------|------------|---------|
 | **Realtime Schema** | PostgreSQL | Channels, messages tables and publish function |
-| **Permission Model** | RLS Policy | Controls subscribe and publish access |
+| **Permission Model** | Grants + RLS (optional) | Controls subscribe and publish access |
 | **Notification Bridge** | pg_notify | Bridges database to Node.js process |
 | **Realtime Manager** | Node.js | Listens for notifications, dispatches messages |
 | **WebSocket Server** | Socket.IO | Bidirectional client communication |
@@ -89,14 +89,37 @@ The `realtime.messages` table stores all published messages for audit purposes:
 
 ## Permission Model
 
-InsForge Realtime uses PostgreSQL Row Level Security (RLS) to control channel access:
+InsForge Realtime uses PostgreSQL grants and optional Row Level Security (RLS) to control channel access.
+
+<Note>
+**RLS is disabled by default** for the best developer experience. Channels and messages are open to all authenticated and anonymous users out of the box. Enable RLS when you need fine-grained access control.
+</Note>
+
+### Default Permissions (RLS Disabled)
+
+| Permission | Table | Grant | Access |
+|------------|-------|-------|--------|
+| **Subscribe** | `realtime.channels` | SELECT | All authenticated/anon users |
+| **Publish** | `realtime.messages` | INSERT | All authenticated/anon users |
+
+### Enabling Access Control
+
+To restrict access, enable RLS and add policies:
+
+```sql
+-- Step 1: Enable RLS
+ALTER TABLE realtime.channels ENABLE ROW LEVEL SECURITY;
+ALTER TABLE realtime.messages ENABLE ROW LEVEL SECURITY;
+
+-- Step 2: Add policies (see examples below)
+```
+
+### How RLS Works (When Enabled)
 
 | Permission | Table | Policy Type | Description |
 |------------|-------|-------------|-------------|
 | **Subscribe** | `realtime.channels` | SELECT | Who can subscribe to a channel |
 | **Publish** | `realtime.messages` | INSERT | Who can publish to a channel |
-
-### How It Works
 
 1. When a client subscribes, the backend executes a SELECT query on `realtime.channels` with the user's role
 2. RLS policies filter the result. If a matching channel is returned, subscription is allowed
@@ -281,9 +304,14 @@ System events are trusted and bypass publish RLS checks. User events must pass I
     ```
   </Step>
 
-  <Step title="Configure Permissions">
-    Add RLS policies for subscribe and publish access:
+  <Step title="Configure Permissions (Optional)">
+    RLS is disabled by default, so all users can subscribe and publish. To restrict access, enable RLS and add policies:
     ```sql
+    -- Step 1: Enable RLS
+    ALTER TABLE realtime.channels ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE realtime.messages ENABLE ROW LEVEL SECURITY;
+
+    -- Step 2: Add policies
     -- Subscribe: users can only subscribe to their own order channels
     CREATE POLICY "users_subscribe_own_orders"
     ON realtime.channels FOR SELECT
@@ -351,8 +379,8 @@ System events are trusted and bypass publish RLS checks. User events must pass I
     Events originate from PostgreSQL triggers, ensuring consistency with your data
   </Card>
 
-  <Card title="RLS Security" icon="shield">
-    Uses PostgreSQL RLS policies you already know
+  <Card title="Optional RLS Security" icon="shield">
+    Works out of the box, with optional RLS for fine-grained access control
   </Card>
 
   <Card title="Dual Delivery" icon="arrows-split-up-and-left">
@@ -393,8 +421,8 @@ System events are trusted and bypass publish RLS checks. User events must pass I
     Prefer `order:123` over broadcasting to `orders` for reducing the traffic
   </Card>
 
-  <Card title="Design Policies Carefully" icon="gavel">
-    Test RLS policies thoroughly since they control all realtime access
+  <Card title="Add RLS When Needed" icon="gavel">
+    Enable RLS and add policies when you need to restrict channel access
   </Card>
 
   <Card title="Monitor Delivery" icon="chart-bar">
