@@ -41,7 +41,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.536.0",
-    "posthog-js": "^1.280.1",
+    "posthog-js": "^1.302.2",
     "react": "^19.2.0",
     "react-data-grid": "7.0.0-beta.47",
     "react-dom": "^19.2.0",
