@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ChevronDown, HelpCircle, Smartphone } from 'lucide-react';
+import { ChevronDown, HelpCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -36,10 +36,9 @@ export function setOnboardingSkipped(skipped: boolean): void {
 interface OnboardingModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onTextUsClick?: () => void;
 }
 
-export function OnboardingModal({ open, onOpenChange, onTextUsClick }: OnboardingModalProps) {
+export function OnboardingModal({ open, onOpenChange }: OnboardingModalProps) {
   const [selectedAgent, setSelectedAgent] = useState<MCPAgent>(MCP_AGENTS[0]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isVideoTooltipOpen, setIsVideoTooltipOpen] = useState(false);
@@ -232,20 +231,10 @@ export function OnboardingModal({ open, onOpenChange, onTextUsClick }: Onboardin
                 <span className="text-gray-500 dark:text-neutral-400 text-sm leading-6">
                   Need help?
                 </span>
-                {onTextUsClick && (
-                  <Button
-                    variant="ghost"
-                    onClick={onTextUsClick}
-                    className="gap-1.5 px-2 py-1 h-auto text-gray-900 dark:text-white group hover:bg-transparent"
-                  >
-                    <Smartphone className="w-5 h-5" />
-                    <span className="text-sm font-medium group-hover:underline">Text Us</span>
-                  </Button>
-                )}
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-gray-500 dark:text-neutral-400 text-sm leading-6">
-                  or join our
+                  Join our
                 </span>
                 <a
                   href="https://discord.gg/DvBtaEc9Jz"

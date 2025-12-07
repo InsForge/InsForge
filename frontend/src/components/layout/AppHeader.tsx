@@ -9,9 +9,7 @@ import {
   DropdownMenuTrigger,
   Separator,
   ThemeToggle,
-  Button,
 } from '@/components';
-import { ContactModal } from '@/components/ContactModal';
 import {
   McpConnectionStatus,
   OnboardingModal,
@@ -19,7 +17,7 @@ import {
   setOnboardingSkipped,
 } from '@/features/onboard';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
-import { cn, isInsForgeCloudProject } from '@/lib/utils/utils';
+import { cn } from '@/lib/utils/utils';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
 
@@ -34,7 +32,6 @@ export default function AppHeader() {
   const { user, logout } = useAuth();
   const { hasCompletedOnboarding, isLoading: isMcpLoading } = useMcpUsage();
   const [githubStars, setGithubStars] = useState<number | null>(null);
-  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
 
   // Fetch GitHub stars
@@ -100,8 +97,6 @@ export default function AppHeader() {
     return colors[hash % colors.length];
   };
 
-  const isCloud = isInsForgeCloudProject();
-
   return (
     <>
       <div className="h-12 w-full bg-white dark:bg-neutral-800 border-b border-border-gray dark:border-neutral-700 z-50 flex items-center justify-between px-6">
@@ -144,77 +139,49 @@ export default function AppHeader() {
           {/* Theme Toggle */}
           <ThemeToggle />
           <Separator className="h-5 mx-2" orientation="vertical" />
-          {/* Text Us Button */}
-          <Button
-            variant="outline"
-            onClick={() => setIsContactModalOpen(true)}
-            className="h-9 py-2 bg-black dark:bg-white text-white dark:text-black border-neutral-600 dark:border-neutral-600 hover:bg-gray-900 dark:hover:bg-neutral-100 hover:text-white dark:hover:text-black rounded-full"
-          >
-            Text Us
-          </Button>
           {/* MCP Connection Status */}
           <McpConnectionStatus onConnectClick={() => setIsOnboardingModalOpen(true)} />
 
-          {/* User Profile - Only show in non-Cloud (OSS) environment */}
-          {!isCloud && (
-            <>
-              <Separator className="h-5 mx-2" orientation="vertical" />
-              <DropdownMenu modal={false}>
-                <DropdownMenuTrigger asChild>
-                  <button className="w-50 flex items-center gap-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[8px] pr-3 transition-all duration-200 group">
-                    <Avatar className="h-10 w-10 ring-2 ring-white dark:ring-gray-700 shadow-sm">
-                      <AvatarFallback
-                        className={cn(
-                          'text-white font-medium text-sm',
-                          getAvatarColor(user?.email ?? '')
-                        )}
-                      >
-                        {getUserInitials(user?.email ?? '')}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="text-left hidden md:block">
-                      <p className="text-sm font-medium text-zinc-950 dark:text-zinc-100 leading-tight">
-                        Admin
-                      </p>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                        {user?.email || 'Administrator'}
-                      </p>
-                    </div>
-                    <ChevronDown className="h-5 w-5 text-black dark:text-white hidden md:block ml-auto" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className="w-48"
-                  sideOffset={8}
-                  collisionPadding={16}
-                >
-                  <DropdownMenuItem
-                    onClick={logout}
-                    className="cursor-pointer text-red-600 dark:text-red-400"
+          {/* User Profile*/}
+          <Separator className="h-5 mx-2" orientation="vertical" />
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <button className="w-50 flex items-center gap-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[8px] pr-3 transition-all duration-200 group">
+                <Avatar className="h-10 w-10 ring-2 ring-white dark:ring-gray-700 shadow-sm">
+                  <AvatarFallback
+                    className={cn(
+                      'text-white font-medium text-sm',
+                      getAvatarColor(user?.email ?? '')
+                    )}
                   >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Sign Out</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </>
-          )}
+                    {getUserInitials(user?.email ?? '')}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="text-left hidden md:block">
+                  <p className="text-sm font-medium text-zinc-950 dark:text-zinc-100 leading-tight">
+                    Admin
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {user?.email || 'Administrator'}
+                  </p>
+                </div>
+                <ChevronDown className="h-5 w-5 text-black dark:text-white hidden md:block ml-auto" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48" sideOffset={8} collisionPadding={16}>
+              <DropdownMenuItem
+                onClick={logout}
+                className="cursor-pointer text-red-600 dark:text-red-400"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Sign Out</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
-
-      {/* Contact Modal */}
-      <ContactModal open={isContactModalOpen} onOpenChange={setIsContactModalOpen} />
-
       {/* Onboarding Modal */}
-      <OnboardingModal
-        open={isOnboardingModalOpen}
-        onOpenChange={setIsOnboardingModalOpen}
-        onTextUsClick={() => {
-          setIsOnboardingModalOpen(false);
-          setIsContactModalOpen(true);
-        }}
-      />
+      <OnboardingModal open={isOnboardingModalOpen} onOpenChange={setIsOnboardingModalOpen} />
     </>
   );
 }
