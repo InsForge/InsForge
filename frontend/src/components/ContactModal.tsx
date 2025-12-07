@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Plus, Smartphone, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import {
@@ -10,6 +13,11 @@ import {
   TabsTrigger,
   TabsContent,
   ButtonWithLoading,
+  Form,
+  FormField,
+  FormItem,
+  FormControl,
+  FormMessage,
 } from '@/components';
 import { cn, isInsForgeCloudProject } from '@/lib/utils/utils';
 import { feedbackService } from '@/lib/services/feedback.service';
@@ -19,6 +27,24 @@ const MAX_FILES = 10;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
 
+// Zod schema for form validation
+const feedbackFormSchema = z.object({
+  message: z.string().min(1, 'Message is required').max(5000, 'Message is too long'),
+  attachments: z
+    .array(z.instanceof(File))
+    .max(MAX_FILES, `Maximum ${MAX_FILES} files allowed`)
+    .refine(
+      (files) => files.every((file) => ALLOWED_IMAGE_TYPES.includes(file.type)),
+      'Only image files (JPEG, PNG, GIF, WebP) are allowed'
+    )
+    .refine(
+      (files) => files.every((file) => file.size <= MAX_FILE_SIZE),
+      'Each file must be 10MB or less'
+    ),
+});
+
+type FeedbackFormData = z.infer<typeof feedbackFormSchema>;
+
 interface ContactModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -26,14 +52,22 @@ interface ContactModalProps {
 
 export function ContactModal({ open, onOpenChange }: ContactModalProps) {
   const location = useLocation();
-  const [message, setMessage] = useState('');
-  const [files, setFiles] = useState<File[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
   const dragCounterRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isMac, setIsMac] = useState(false);
+
+  const form = useForm<FeedbackFormData>({
+    resolver: zodResolver(feedbackFormSchema),
+    defaultValues: {
+      message: '',
+      attachments: [],
+    },
+  });
+
+  const { isSubmitting } = form.formState;
+  const attachments = form.watch('attachments');
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -41,31 +75,31 @@ export function ContactModal({ open, onOpenChange }: ContactModalProps) {
     }
   }, []);
 
+  const addFiles = (newFiles: File[]) => {
+    const currentFiles = form.getValues('attachments');
+    const remainingSlots = MAX_FILES - currentFiles.length;
+    const filesToAdd = newFiles.slice(0, remainingSlots);
+
+    if (filesToAdd.length > 0) {
+      form.setValue('attachments', [...currentFiles, ...filesToAdd], { shouldValidate: true });
+    }
+    void form.trigger('attachments');
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) {
       return;
     }
-
-    const selectedFiles = Array.from(e.target.files);
-    const validFiles = selectedFiles.filter((file) => {
-      if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-        return false;
-      }
-      if (file.size > MAX_FILE_SIZE) {
-        alert(`File "${file.name}" is too large. Maximum size is 10MB.`);
-        return false;
-      }
-      return true;
-    });
-
-    const remainingSlots = MAX_FILES - files.length;
-    const filesToAdd = validFiles.slice(0, remainingSlots);
-
-    setFiles((prev) => [...prev, ...filesToAdd]);
+    addFiles(Array.from(e.target.files));
   };
 
   const removeFile = (index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
+    const currentFiles = form.getValues('attachments');
+    form.setValue(
+      'attachments',
+      currentFiles.filter((_, i) => i !== index),
+      { shouldValidate: true }
+    );
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -85,23 +119,13 @@ export function ContactModal({ open, onOpenChange }: ContactModalProps) {
       if (item.type.startsWith('image/')) {
         const file = item.getAsFile();
         if (file) {
-          if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-            continue;
-          }
-          if (file.size > MAX_FILE_SIZE) {
-            alert(`Pasted image is too large. Maximum size is 10MB.`);
-            continue;
-          }
           imageFiles.push(file);
         }
       }
     }
 
     if (imageFiles.length > 0) {
-      const remainingSlots = MAX_FILES - files.length;
-      const filesToAdd = imageFiles.slice(0, remainingSlots);
-
-      setFiles((prev) => [...prev, ...filesToAdd]);
+      addFiles(imageFiles);
       e.preventDefault();
     }
   };
@@ -136,39 +160,17 @@ export function ContactModal({ open, onOpenChange }: ContactModalProps) {
     setIsDragging(false);
 
     const droppedFiles = Array.from(e.dataTransfer.files);
-    const validFiles = droppedFiles.filter((file) => {
-      if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-        return false;
-      }
-      if (file.size > MAX_FILE_SIZE) {
-        alert(`File "${file.name}" is too large. Maximum size is 10MB.`);
-        return false;
-      }
-      return true;
-    });
-
-    const remainingSlots = MAX_FILES - files.length;
-    const filesToAdd = validFiles.slice(0, remainingSlots);
-
-    if (filesToAdd.length > 0) {
-      setFiles((prev) => [...prev, ...filesToAdd]);
-    }
+    addFiles(droppedFiles);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!message.trim() || isUploading) {
-      return;
-    }
-
-    setIsUploading(true);
+  const onSubmit = async (data: FeedbackFormData) => {
     const screenshotUrls: string[] = [];
 
     try {
       // Upload all files one by one
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        setUploadProgress(`Uploading ${i + 1}/${files.length}...`);
+      for (let i = 0; i < data.attachments.length; i++) {
+        const file = data.attachments[i];
+        setUploadProgress(`Uploading ${i + 1}/${data.attachments.length}...`);
 
         try {
           const uniqueFileName = feedbackService.generateUniqueFileName(file.name);
@@ -189,13 +191,12 @@ export function ContactModal({ open, onOpenChange }: ContactModalProps) {
         name: 'OSS User',
         email: 'oss@insforge.dev',
         page,
-        feedback: message.trim(),
+        feedback: data.message.trim(),
         screenshots: screenshotUrls,
       });
 
       // Clean up and close modal
-      setMessage('');
-      setFiles([]);
+      form.reset();
       setUploadProgress('');
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -204,18 +205,15 @@ export function ContactModal({ open, onOpenChange }: ContactModalProps) {
     } catch (error) {
       console.error('Error sending feedback:', error);
       setUploadProgress('');
-    } finally {
-      setIsUploading(false);
+      throw error; // Re-throw to keep isSubmitting accurate
     }
   };
 
   const handleModalClose = (isOpen: boolean) => {
     onOpenChange(isOpen);
     if (!isOpen) {
-      setMessage('');
-      setFiles([]);
+      form.reset();
       setUploadProgress('');
-      setIsUploading(false);
       setIsDragging(false);
       dragCounterRef.current = 0;
       if (fileInputRef.current) {
@@ -254,7 +252,7 @@ export function ContactModal({ open, onOpenChange }: ContactModalProps) {
 
             {isMac ? (
               <a
-                href={`imessage:${CONTACT_INFORMATION.replace(/[()-\s]/g, '')}`}
+                href={`imessage:${CONTACT_INFORMATION.replace(/\D/g, '')}`}
                 className="pl-3 pr-4 h-12 bg-gray-100 dark:bg-neutral-700 hover:bg-gray-200 dark:hover:bg-neutral-600 rounded-md transition-colors flex items-center justify-center gap-2 text-gray-900 dark:text-white"
               >
                 <Smartphone className="w-5 h-5" /> Text us at {CONTACT_INFORMATION}
@@ -266,7 +264,7 @@ export function ContactModal({ open, onOpenChange }: ContactModalProps) {
             )}
 
             <a
-              href="https://wa.me/16179926332"
+              href={`https://wa.me/${CONTACT_INFORMATION.replace(/\D/g, '')}`}
               target="_blank"
               rel="noopener noreferrer"
               className="h-12 pl-3 pr-4 bg-[#1E8D2E] rounded-md flex items-center justify-center gap-2 hover:bg-[#1E8D2E]/80 transition-colors text-white"
@@ -279,124 +277,143 @@ export function ContactModal({ open, onOpenChange }: ContactModalProps) {
           </TabsContent>
 
           <TabsContent value="form">
-            <form
-              onSubmit={(e) => void handleSubmit(e)}
-              onPaste={handlePaste}
-              onDragEnter={handleDragEnter}
-              onDragLeave={handleDragLeave}
-              onDragOver={handleDragOver}
-              onDrop={handleDrop}
-              className="space-y-2 relative"
-            >
-              <div>
-                <p className="text-gray-500 dark:text-neutral-400 text-base font-medium mb-2">
-                  Submit your feedback to us
-                </p>
-                <p className="text-gray-400 dark:text-neutral-400 text-sm leading-relaxed">
-                  You can upload, paste or drag screenshots to the message box (max {MAX_FILES}{' '}
-                  files, 10MB each). Clear screenshots and detailed descriptions help us resolve
-                  your issue faster.
-                </p>
-              </div>
+            <Form {...form}>
+              <form
+                onSubmit={(e) => void form.handleSubmit(onSubmit)(e)}
+                onPaste={handlePaste}
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                className="space-y-2 relative"
+              >
+                <div>
+                  <p className="text-gray-500 dark:text-neutral-400 text-base font-medium mb-2">
+                    Submit your feedback to us
+                  </p>
+                  <p className="text-gray-400 dark:text-neutral-400 text-sm leading-relaxed">
+                    You can upload, paste or drag screenshots to the message box (max {MAX_FILES}{' '}
+                    files, 10MB each). Clear screenshots and detailed descriptions help us resolve
+                    your issue faster.
+                  </p>
+                </div>
 
-              {/* Message Textarea */}
-              <textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Enter your message or paste/drag images here"
-                rows={8}
-                className={cn(
-                  'w-full pl-3 pr-2 py-2 rounded-md border bg-gray-50 dark:bg-neutral-900 border-gray-300 dark:border-neutral-600',
-                  'text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-neutral-400 placeholder:text-sm resize-none text-sm',
-                  'transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500',
-                  isDragging && 'opacity-30'
-                )}
-                required
-              />
+                {/* Message Textarea */}
+                <FormField
+                  control={form.control}
+                  name="message"
+                  render={({ field }) => (
+                    <FormItem className="space-y-1">
+                      <FormControl>
+                        <textarea
+                          {...field}
+                          placeholder="Enter your message or paste/drag images here"
+                          rows={8}
+                          className={cn(
+                            'w-full pl-3 pr-2 py-2 rounded-md border bg-gray-50 dark:bg-neutral-900 border-gray-300 dark:border-neutral-600',
+                            'text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-neutral-400 placeholder:text-sm resize-none text-sm',
+                            'transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500',
+                            isDragging && 'opacity-30'
+                          )}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              {/* Drag Overlay */}
-              {isDragging && (
-                <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
-                  <div className="absolute inset-4 flex items-center justify-center bg-gray-100/95 dark:bg-neutral-900/95 border-4 border-dashed border-emerald-400 rounded-lg backdrop-blur-sm">
-                    <div className="text-center pointer-events-none">
-                      <div className="text-emerald-500 dark:text-emerald-400 text-2xl font-bold mb-2">
-                        Drop your attachments here
-                      </div>
-                      <div className="text-gray-500 dark:text-neutral-300 text-base">
-                        Max {MAX_FILES} files, 10MB each
+                {/* Drag Overlay */}
+                {isDragging && (
+                  <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
+                    <div className="absolute inset-4 flex items-center justify-center bg-gray-100/95 dark:bg-neutral-900/95 border-4 border-dashed border-emerald-400 rounded-lg backdrop-blur-sm">
+                      <div className="text-center pointer-events-none">
+                        <div className="text-emerald-500 dark:text-emerald-400 text-2xl font-bold mb-2">
+                          Drop your attachments here
+                        </div>
+                        <div className="text-gray-500 dark:text-neutral-300 text-base">
+                          Max {MAX_FILES} files, 10MB each
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* File Upload */}
-              <div className="space-y-3">
-                {/* File List */}
-                {files.length > 0 &&
-                  files.map((file, index) => (
-                    <div key={index} className="flex items-center gap-2">
+                {/* File Upload */}
+                <FormField
+                  control={form.control}
+                  name="attachments"
+                  render={() => (
+                    <FormItem className="space-y-3">
+                      {/* File List */}
+                      {attachments.length > 0 &&
+                        attachments.map((file, index) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => removeFile(index)}
+                              className="cursor-pointer flex-shrink-0"
+                              disabled={isSubmitting}
+                            >
+                              <X className="w-5 h-5 text-gray-400 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white" />
+                            </button>
+                            <p className="text-gray-900 dark:text-white text-sm font-medium truncate">
+                              {file.name}
+                            </p>
+                          </div>
+                        ))}
+
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        accept={ALLOWED_IMAGE_TYPES.join(',')}
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+
                       <button
                         type="button"
-                        onClick={() => removeFile(index)}
-                        className="cursor-pointer flex-shrink-0"
-                        disabled={isUploading}
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={attachments.length >= MAX_FILES || isSubmitting}
+                        className={cn(
+                          'pl-2 pr-3 h-8 border rounded-md border-gray-300 dark:border-neutral-600 flex items-center gap-1 cursor-pointer',
+                          'text-gray-700 dark:text-white hover:border-gray-500 dark:hover:border-white',
+                          'transition-colors',
+                          (attachments.length >= MAX_FILES || isSubmitting) &&
+                            'opacity-50 cursor-not-allowed'
+                        )}
                       >
-                        <X className="w-5 h-5 text-gray-400 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white" />
+                        <Plus className="w-6 h-6" />
+                        Add Attachment ({attachments.length}/{MAX_FILES})
                       </button>
-                      <p className="text-gray-900 dark:text-white text-sm font-medium truncate">
-                        {file.name}
-                      </p>
-                    </div>
-                  ))}
-
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept={ALLOWED_IMAGE_TYPES.join(',')}
-                  onChange={handleFileChange}
-                  className="hidden"
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
 
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={files.length >= MAX_FILES || isUploading}
-                  className={cn(
-                    'pl-2 pr-3 h-8 border rounded-md border-gray-300 dark:border-neutral-600 flex items-center gap-1 cursor-pointer',
-                    'text-gray-700 dark:text-white hover:border-gray-500 dark:hover:border-white',
-                    'transition-colors',
-                    (files.length >= MAX_FILES || isUploading) && 'opacity-50 cursor-not-allowed'
-                  )}
-                >
-                  <Plus className="w-6 h-6" />
-                  Add Attachment ({files.length}/{MAX_FILES})
-                </button>
-              </div>
+                {/* Upload Progress */}
+                {uploadProgress && (
+                  <p className="text-emerald-500 dark:text-emerald-400 text-sm font-medium">
+                    {uploadProgress}
+                  </p>
+                )}
 
-              {/* Upload Progress */}
-              {uploadProgress && (
-                <p className="text-emerald-500 dark:text-emerald-400 text-sm font-medium">
-                  {uploadProgress}
-                </p>
-              )}
-
-              {/* Submit Button */}
-              <div className="flex justify-end mt-4">
-                <ButtonWithLoading
-                  type="submit"
-                  disabled={!message.trim() || isUploading}
-                  loading={isUploading}
-                  className={cn(
-                    'px-3 h-8 bg-emerald-300 hover:bg-emerald-400 text-black font-medium text-sm rounded-md',
-                    'disabled:opacity-50 disabled:cursor-not-allowed'
-                  )}
-                >
-                  {isUploading ? uploadProgress || 'Uploading...' : 'Submit'}
-                </ButtonWithLoading>
-              </div>
-            </form>
+                {/* Submit Button */}
+                <div className="flex justify-end mt-4">
+                  <ButtonWithLoading
+                    type="submit"
+                    disabled={isSubmitting}
+                    loading={isSubmitting}
+                    className={cn(
+                      'px-3 h-8 bg-emerald-300 hover:bg-emerald-400 text-black font-medium text-sm rounded-md',
+                      'disabled:opacity-50 disabled:cursor-not-allowed'
+                    )}
+                  >
+                    {isSubmitting ? uploadProgress || 'Submitting...' : 'Submit'}
+                  </ButtonWithLoading>
+                </div>
+              </form>
+            </Form>
           </TabsContent>
         </Tabs>
       </DialogContent>
