@@ -3,6 +3,7 @@ import { Info } from 'lucide-react';
 import { CopyButton } from '@/components';
 import { cn, getBackendUrl } from '@/lib/utils/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/radix/Dialog';
+import { useApiKey } from '@/lib/hooks/useMetadata';
 
 interface ProjectInfoModalProps {
   open: boolean;
@@ -11,14 +12,12 @@ interface ProjectInfoModalProps {
 
 export function ProjectInfoModal({ open, onClose }: ProjectInfoModalProps) {
   const [version, setVersion] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isVersionLoading, setIsVersionLoading] = useState(true);
+
+  const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
 
   // Get project URL from current hostname
   const projectUrl = window.location.origin;
-
-  // Extract appId from hostname (e.g., "appId.region.insforge.app")
-  const hostname = window.location.hostname;
-  const appId = hostname.split('.')[0];
 
   // Fetch version on mount
   useEffect(() => {
@@ -26,7 +25,7 @@ export function ProjectInfoModal({ open, onClose }: ProjectInfoModalProps) {
       return;
     }
 
-    setIsLoading(true);
+    setIsVersionLoading(true);
     const backendUrl = getBackendUrl();
 
     fetch(`${backendUrl}/api/health`)
@@ -40,9 +39,12 @@ export function ProjectInfoModal({ open, onClose }: ProjectInfoModalProps) {
         console.error('Failed to fetch version:', err);
       })
       .finally(() => {
-        setIsLoading(false);
+        setIsVersionLoading(false);
       });
   }, [open]);
+
+  // Masked API key display
+  const maskedApiKey = apiKey ? `ik_${'•'.repeat(32)}` : '';
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -57,17 +59,6 @@ export function ProjectInfoModal({ open, onClose }: ProjectInfoModalProps) {
 
         {/* Content */}
         <div className="px-6 py-5 flex flex-col gap-5">
-          {/* App ID */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-gray-700 dark:text-neutral-300">
-              App ID
-            </label>
-            <div className="flex items-center justify-between bg-gray-50 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg px-3 py-2">
-              <span className="text-sm text-gray-900 dark:text-white font-mono">{appId}</span>
-              <CopyButton text={appId} showText={false} className="h-6 w-6 p-1 min-w-0" />
-            </div>
-          </div>
-
           {/* Project URL */}
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-gray-700 dark:text-neutral-300">
@@ -80,7 +71,7 @@ export function ProjectInfoModal({ open, onClose }: ProjectInfoModalProps) {
               <CopyButton
                 text={projectUrl}
                 showText={false}
-                className="h-6 w-6 p-1 min-w-0 shrink-0"
+                className="h-6 w-6 p-1 min-w-0 shrink-0 text-black bg-white dark:text-white dark:bg-neutral-700"
               />
             </div>
           </div>
@@ -91,14 +82,25 @@ export function ProjectInfoModal({ open, onClose }: ProjectInfoModalProps) {
               API Key
             </label>
             <div className="flex flex-col gap-1">
-              <div className="flex items-center justify-between bg-gray-50 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg px-3 py-2">
-                <span className="text-sm text-gray-500 dark:text-neutral-400">
-                  API key is managed on InsForge Cloud
+              <div
+                className={cn(
+                  'flex items-center justify-between bg-gray-50 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg px-3 py-2',
+                  isApiKeyLoading && 'animate-pulse'
+                )}
+              >
+                <span className="text-sm text-gray-900 dark:text-white font-mono">
+                  {isApiKeyLoading ? '•'.repeat(35) : maskedApiKey || 'Not available'}
                 </span>
+                {!isApiKeyLoading && apiKey && (
+                  <CopyButton
+                    text={apiKey}
+                    showText={false}
+                    className="h-6 w-6 p-1 min-w-0 shrink-0 text-black bg-white dark:text-white dark:bg-neutral-700"
+                  />
+                )}
               </div>
               <p className="text-xs text-gray-500 dark:text-neutral-500">
-                To view or regenerate your API key, access this project from the InsForge Cloud
-                dashboard.
+                This key has full access control to your project and should be kept secure.
               </p>
             </div>
           </div>
@@ -111,11 +113,11 @@ export function ProjectInfoModal({ open, onClose }: ProjectInfoModalProps) {
             <div
               className={cn(
                 'bg-gray-50 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg px-3 py-2',
-                isLoading && 'animate-pulse'
+                isVersionLoading && 'animate-pulse'
               )}
             >
               <span className="text-sm text-gray-900 dark:text-white">
-                {isLoading ? 'Loading...' : version || 'Unknown'}
+                {isVersionLoading ? 'Loading...' : version || 'Unknown'}
               </span>
             </div>
           </div>
