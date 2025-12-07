@@ -10,33 +10,65 @@ import {
   Separator,
   ThemeToggle,
 } from '@/components';
+import {
+  McpConnectionStatus,
+  OnboardingModal,
+  getOnboardingSkipped,
+  setOnboardingSkipped,
+} from '@/features/onboard';
+import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { cn } from '@/lib/utils/utils';
 import { useTheme } from '@/lib/contexts/ThemeContext';
+import { useAuth } from '@/lib/contexts/AuthContext';
 
 // Import SVG icons
 import DiscordIcon from '@/assets/logos/discord.svg?react';
 import GitHubIcon from '@/assets/logos/github.svg?react';
 import InsForgeLogoLight from '@/assets/logos/insforge_light.svg';
 import InsForgeLogoDark from '@/assets/logos/insforge_dark.svg';
-import { User } from '@/lib/contexts/AuthContext';
 
-interface AppHeaderProps {
-  currentUser: User | null;
-  onLogout: () => void;
-}
-
-export default function AppHeader({ currentUser, onLogout }: AppHeaderProps) {
+export default function AppHeader() {
   const { resolvedTheme } = useTheme();
-  const [currentEmojiIndex, setCurrentEmojiIndex] = useState(0);
-  const emojis = ['🙏', '🥺', '🫵'];
+  const { user, logout } = useAuth();
+  const { hasCompletedOnboarding, isLoading: isMcpLoading } = useMcpUsage();
+  const [githubStars, setGithubStars] = useState<number | null>(null);
+  const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
 
+  // Fetch GitHub stars
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentEmojiIndex((prevIndex) => (prevIndex + 1) % emojis.length);
-    }, 2000);
+    fetch('https://api.github.com/repos/InsForge/InsForge')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.stargazers_count !== undefined) {
+          setGithubStars(data.stargazers_count);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch GitHub stars:', err);
+      });
+  }, []);
 
-    return () => clearInterval(interval);
-  }, [emojis.length]);
+  // Auto-open onboarding modal if user hasn't connected and hasn't skipped
+  useEffect(() => {
+    if (!isMcpLoading && !hasCompletedOnboarding && !getOnboardingSkipped()) {
+      setIsOnboardingModalOpen(true);
+    }
+  }, [isMcpLoading, hasCompletedOnboarding]);
+
+  // When MCP connection is established, close onboarding modal and clear skip flag
+  useEffect(() => {
+    if (hasCompletedOnboarding) {
+      setIsOnboardingModalOpen(false);
+      setOnboardingSkipped(false);
+    }
+  }, [hasCompletedOnboarding]);
+
+  const formatStars = (count: number): string => {
+    if (count >= 1000) {
+      return `${(count / 1000).toFixed(1)}k`;
+    }
+    return count.toString();
+  };
 
   const getUserInitials = (email: string) => {
     if (!email) {
@@ -66,84 +98,90 @@ export default function AppHeader({ currentUser, onLogout }: AppHeaderProps) {
   };
 
   return (
-    <div className="h-16 w-full bg-white dark:bg-neutral-800 border-b border-border-gray dark:border-neutral-700 z-50 flex items-center justify-between px-6">
-      {/* Logo */}
-      <div className="px-2 py-3">
-        <a href="https://insforge.dev" target="_blank" rel="noopener noreferrer">
-          <img
-            src={resolvedTheme === 'light' ? InsForgeLogoLight : InsForgeLogoDark}
-            alt="Insforge Logo"
-            className="h-8 w-auto"
-          />
-        </a>
-      </div>
+    <>
+      <div className="h-12 w-full bg-white dark:bg-neutral-800 border-b border-border-gray dark:border-neutral-700 z-50 flex items-center justify-between px-6">
+        {/* Logo */}
+        <div className="px-2 py-3">
+          <a href="https://insforge.dev" target="_blank" rel="noopener noreferrer">
+            <img
+              src={resolvedTheme === 'light' ? InsForgeLogoLight : InsForgeLogoDark}
+              alt="Insforge Logo"
+              className="h-8 w-auto"
+            />
+          </a>
+        </div>
 
-      {/* Social Links */}
-      <div className="flex items-center gap-3">
-        {/* GitHub Badge */}
-        <a
-          href="https://github.com/InsForge/InsForge"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-3 h-10 px-4 text-zinc-50 text-sm font-medium bg-black hover:bg-[#28282F] rounded-full transition-all duration-200"
-        >
-          <GitHubIcon className="h-5 w-5 dark:text-white" />
-          <p className="text-sm text-white">
-            We need you
-            <span className="text-md ml-1">{emojis[currentEmojiIndex]}</span>
-          </p>
-        </a>
+        {/* Right side controls */}
+        <div className="flex items-center gap-1">
+          {/* Social Links - Small Icon Buttons */}
+          <a
+            href="https://discord.gg/DvBtaEc9Jz"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-2 text-gray-600 dark:text-zinc-400 hover:text-neutral-900 dark:hover:text-white transition-colors duration-200"
+            aria-label="Discord"
+          >
+            <DiscordIcon className="h-5 w-5" />
+          </a>
+          <a
+            href="https://github.com/InsForge/InsForge"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 p-2 text-gray-600 dark:text-zinc-400 hover:text-neutral-900 dark:hover:text-white transition-colors duration-200"
+            aria-label="GitHub"
+          >
+            <GitHubIcon className="h-5 w-5" />
+            {githubStars !== null && (
+              <span className="text-sm font-medium">{formatStars(githubStars)}</span>
+            )}
+          </a>
+          <Separator className="h-5 mx-2" orientation="vertical" />
+          {/* Theme Toggle */}
+          <ThemeToggle />
+          <Separator className="h-5 mx-2" orientation="vertical" />
+          {/* MCP Connection Status */}
+          <McpConnectionStatus onConnectClick={() => setIsOnboardingModalOpen(true)} />
 
-        {/* Discord Badge */}
-        <a
-          href="https://discord.com/invite/MPxwj5xVvW"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-3 h-10 px-4 text-zinc-50 text-sm font-medium bg-[#5765F2] hover:bg-[#3E4CD7] rounded-full transition-all duration-200"
-        >
-          <DiscordIcon className="h-5 w-5" />
-          <p className="text-sm text-white mr-1.5">Ask us anything</p>
-        </a>
-        <Separator className="h-6 mx-1" orientation="vertical" />
-        {/* Theme Toggle */}
-        <ThemeToggle />
-        <Separator className="h-6 mx-1" orientation="vertical" />
-        {/* User Profile */}
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <button className="w-50 flex items-center gap-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[8px] pr-3 transition-all duration-200 group">
-              <Avatar className="h-10 w-10 ring-2 ring-white dark:ring-gray-700 shadow-sm">
-                <AvatarFallback
-                  className={cn(
-                    'text-white font-medium text-sm',
-                    getAvatarColor(currentUser?.email ?? '')
-                  )}
-                >
-                  {getUserInitials(currentUser?.email ?? '')}
-                </AvatarFallback>
-              </Avatar>
-              <div className="text-left hidden md:block">
-                <p className="text-sm font-medium text-zinc-950 dark:text-zinc-100 leading-tight">
-                  Admin
-                </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {currentUser?.email || 'Administrator'}
-                </p>
-              </div>
-              <ChevronDown className="h-5 w-5 text-black dark:text-white hidden md:block ml-auto" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48" sideOffset={8} collisionPadding={16}>
-            <DropdownMenuItem
-              onClick={onLogout}
-              className="cursor-pointer text-red-600 dark:text-red-400"
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              <span>Sign Out</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          {/* User Profile*/}
+          <Separator className="h-5 mx-2" orientation="vertical" />
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <button className="w-50 flex items-center gap-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[8px] pr-3 transition-all duration-200 group">
+                <Avatar className="h-10 w-10 ring-2 ring-white dark:ring-gray-700 shadow-sm">
+                  <AvatarFallback
+                    className={cn(
+                      'text-white font-medium text-sm',
+                      getAvatarColor(user?.email ?? '')
+                    )}
+                  >
+                    {getUserInitials(user?.email ?? '')}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="text-left hidden md:block">
+                  <p className="text-sm font-medium text-zinc-950 dark:text-zinc-100 leading-tight">
+                    Admin
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {user?.email || 'Administrator'}
+                  </p>
+                </div>
+                <ChevronDown className="h-5 w-5 text-black dark:text-white hidden md:block ml-auto" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48" sideOffset={8} collisionPadding={16}>
+              <DropdownMenuItem
+                onClick={logout}
+                className="cursor-pointer text-red-600 dark:text-red-400"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Sign Out</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
-    </div>
+      {/* Onboarding Modal */}
+      <OnboardingModal open={isOnboardingModalOpen} onOpenChange={setIsOnboardingModalOpen} />
+    </>
   );
 }

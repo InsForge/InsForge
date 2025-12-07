@@ -7,11 +7,8 @@ import {
   Code2,
   Sparkles,
   ChartLine,
-  RotateCw,
-  Link2,
   BookOpen,
   GitFork,
-  Settings,
   Users,
   Table,
   ChartBarBig,
@@ -165,16 +162,6 @@ export const staticMenuItems: PrimaryMenuItem[] = [
 ];
 
 /**
- * Get started menu item for onboarding
- */
-export const getStartedMenuItem: PrimaryMenuItem = {
-  id: 'get-started',
-  label: 'Get Started',
-  href: '/dashboard/onboard',
-  icon: Link2,
-};
-
-/**
  * Bottom menu items that may be conditionally shown
  */
 export const documentationMenuItem: PrimaryMenuItem = {
@@ -185,14 +172,6 @@ export const documentationMenuItem: PrimaryMenuItem = {
   external: true,
 };
 
-export const reinstallMenuItem: PrimaryMenuItem = {
-  id: 'reinstall',
-  label: 'Reinstall',
-  href: '/dashboard/onboard',
-  icon: RotateCw,
-  external: false,
-};
-
 export const usageMenuItem: PrimaryMenuItem = {
   id: 'usage',
   label: 'Usage',
@@ -200,15 +179,5 @@ export const usageMenuItem: PrimaryMenuItem = {
   icon: ChartBarBig,
   onClick: () => {
     postMessageToParent({ type: 'NAVIGATE_TO_USAGE' }, '*');
-  },
-};
-
-export const settingsMenuItem: PrimaryMenuItem = {
-  id: 'settings',
-  label: 'Settings',
-  href: '',
-  icon: Settings,
-  onClick: () => {
-    postMessageToParent({ type: 'SHOW_SETTINGS_OVERLAY' }, '*');
   },
 };
