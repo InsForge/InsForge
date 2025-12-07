@@ -17,7 +17,7 @@ export function VideoDemoModal({ open, className }: VideoDemoModalProps) {
         className
       )}
     >
-      <p className="text-white text-sm leading-6">
+      <p className="text-gray-900 dark:text-white text-sm leading-6">
         InsForge MCP lets your coding agent build and control your backend
       </p>
       <div className="w-full aspect-video rounded overflow-hidden bg-neutral-800">
