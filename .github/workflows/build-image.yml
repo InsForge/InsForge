@@ -65,3 +65,4 @@ jobs:
             COMMIT_SHA=${{ github.sha }}
             VITE_PUBLIC_POSTHOG_KEY=${{ secrets.POSTHOG_KEY }}
             VITE_PUBLIC_CONTACT_SERVICE_TOKEN=${{ secrets.CONTACT_KEY }}
+            VITE_CONTACT_INFORMATION=${{ secrets.CONTACT_INFORMATION }}

@@ -20,6 +20,7 @@ COPY . .
 ARG VITE_API_BASE_URL
 ARG VITE_PUBLIC_POSTHOG_KEY
 ARG VITE_PUBLIC_CONTACT_SERVICE_TOKEN
+ARG VITE_CONTACT_INFORMATION
 
 # Build frontend and auth app with environment variables baked in
 RUN npm run build

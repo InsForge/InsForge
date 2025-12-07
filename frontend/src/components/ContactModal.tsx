@@ -14,7 +14,7 @@ import {
 import { cn, isInsForgeCloudProject } from '@/lib/utils/utils';
 import { feedbackService } from '@/lib/services/feedback.service';
 
-const FOUNDER_PHONE = '+1 (617) 992-6332';
+const CONTACT_INFORMATION = import.meta.env.VITE_CONTACT_INFORMATION || "";
 const MAX_FILES = 10;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
@@ -254,14 +254,14 @@ export function ContactModal({ open, onOpenChange }: ContactModalProps) {
 
             {isMac ? (
               <a
-                href={`imessage:${FOUNDER_PHONE.replace(/[()-\s]/g, '')}`}
+                href={`imessage:${CONTACT_INFORMATION.replace(/[()-\s]/g, '')}`}
                 className="pl-3 pr-4 h-12 bg-gray-100 dark:bg-neutral-700 hover:bg-gray-200 dark:hover:bg-neutral-600 rounded-md transition-colors flex items-center justify-center gap-2 text-gray-900 dark:text-white"
               >
-                <Smartphone className="w-5 h-5" /> Text us at {FOUNDER_PHONE}
+                <Smartphone className="w-5 h-5" /> Text us at {CONTACT_INFORMATION}
               </a>
             ) : (
               <div className="pl-3 pr-4 h-12 bg-gray-50 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-md flex items-center justify-center gap-2 text-gray-900 dark:text-white">
-                <Smartphone className="w-5 h-5" /> Text us at {FOUNDER_PHONE}
+                <Smartphone className="w-5 h-5" /> Text us at {CONTACT_INFORMATION}
               </div>
             )}
 
