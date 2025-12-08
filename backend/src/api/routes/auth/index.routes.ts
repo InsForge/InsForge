@@ -15,7 +15,6 @@ import {
   setRefreshTokenCookie,
   clearRefreshTokenCookie,
 } from '@/utils/cookies.js';
-import logger from '@/utils/logger.js';
 import {
   userIdSchema,
   createUserRequestSchema,
@@ -168,12 +167,6 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
     const { email, password } = validationResult.data;
     const result: CreateSessionResponse = await authService.login(email, password);
 
-    logger.info('[Auth:Login] Login successful', {
-      userId: result.user?.id,
-      email: result.user?.email,
-      hasAccessToken: !!result.accessToken,
-    });
-
     // Set refresh token in httpOnly cookie for enhanced security
     if (result.accessToken && result.user) {
       const tokenManager = TokenManager.getInstance();
@@ -181,10 +174,6 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
         sub: result.user.id,
         email: result.user.email,
         role: 'authenticated',
-      });
-      logger.info('[Auth:Login] Setting refresh token cookie', {
-        userId: result.user.id,
-        refreshTokenPrefix: refreshToken.substring(0, 20) + '...',
       });
       setRefreshTokenCookie(res, refreshToken);
     }
@@ -198,31 +187,16 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
 // POST /api/auth/refresh - Refresh access token using httpOnly cookie
 router.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    logger.info('[Auth:Refresh] Refresh token request received', {
-      hasCookies: !!req.cookies,
-      cookieNames: req.cookies ? Object.keys(req.cookies) : [],
-    });
-
     const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
 
     if (!refreshToken) {
-      logger.warn('[Auth:Refresh] No refresh token in cookies');
       throw new AppError('No refresh token provided', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
-
-    logger.info('[Auth:Refresh] Refresh token found, verifying...', {
-      tokenPrefix: refreshToken.substring(0, 20) + '...',
-    });
 
     const tokenManager = TokenManager.getInstance();
 
     // Verify the refresh token
     const payload = tokenManager.verifyRefreshToken(refreshToken);
-
-    logger.info('[Auth:Refresh] Token verified successfully', {
-      userId: payload.sub,
-      email: payload.email,
-    });
 
     // Generate new access token
     const newAccessToken = tokenManager.generateToken({
@@ -244,15 +218,12 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     // Fetch user data for response
     const user = await authService.getUserSchemaById(payload.sub);
 
-    logger.info('[Auth:Refresh] Refresh successful, returning new tokens');
-
     successResponse(res, {
       accessToken: newAccessToken,
       user: user || undefined,
     });
   } catch (error) {
     // Clear invalid cookie on error
-    logger.error('[Auth:Refresh] Refresh failed', { error });
     clearRefreshTokenCookie(res);
     next(error);
   }
