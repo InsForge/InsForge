@@ -6,15 +6,7 @@ import { usageService, McpUsageRecord } from '@/features/logs/services/usage.ser
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
 import { LOGS_PAGE_SIZE } from '../helpers';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
-
-// ============================================================================
-// Types
-// ============================================================================
-
-export interface McpConnectedPayload {
-  tool_name: string;
-  created_at: string;
-}
+import { SocketMessage } from '@insforge/shared-schemas';
 
 // ============================================================================
 // Main Hook
@@ -113,15 +105,15 @@ export function useMcpUsage() {
 
   // Handle real-time MCP connection events from socket
   const handleMcpConnected = useCallback(
-    (data: { id: string; payload: McpConnectedPayload; timestamp: number; type: string }) => {
+    (message: SocketMessage) => {
       // Notify parent window with latest MCP call info
       if (window.parent !== window) {
         window.parent.postMessage(
           {
             type: 'MCP_CONNECTION_STATUS',
             connected: true,
-            tool_name: data.payload.tool_name,
-            timestamp: data.payload.created_at,
+            tool_name: message.tool_name,
+            timestamp: message.created_at,
           },
           '*'
         );
