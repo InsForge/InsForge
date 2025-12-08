@@ -158,6 +158,10 @@ export async function createApp() {
       version,
       service: 'Insforge OSS Backend',
       timestamp: new Date().toISOString(),
+      capabilities: {
+        secureSessionStorage: true,
+        refreshTokens: true,
+      },
     });
   });
 
