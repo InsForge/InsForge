@@ -158,14 +158,13 @@ export async function createApp() {
   const apiRouter = express.Router();
 
   apiRouter.get('/health', (_req: Request, res: Response) => {
-    // Traditional REST: return data directly
     const version = packageJson.version;
     res.json({
       status: 'ok',
       version,
       service: 'Insforge OSS Backend',
       timestamp: new Date().toISOString(),
-      capabilities: {
+      config: {
         secureSessionStorage: true,
         refreshTokens: true,
       },
