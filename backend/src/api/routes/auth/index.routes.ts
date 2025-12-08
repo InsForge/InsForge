@@ -16,7 +16,6 @@ import {
   setRefreshTokenCookie,
   clearRefreshTokenCookie,
 } from '@/utils/cookies.js';
-import logger from '@/utils/logger.js';
 import {
   userIdSchema,
   createUserRequestSchema,
