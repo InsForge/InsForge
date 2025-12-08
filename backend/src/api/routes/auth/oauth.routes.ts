@@ -445,13 +445,6 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
 
       const finalRedirectUri = `${redirectUri}?${params.toString()}`;
 
-      logger.info('OAuth callback successful, redirecting with token', {
-        redirectUri: finalRedirectUri,
-        hasAccessToken: !!result?.accessToken,
-        hasUserId: !!result?.user?.id,
-        provider: validatedProvider,
-      });
-
       return res.redirect(finalRedirectUri);
     } catch (error) {
       logger.error('OAuth callback error', {
