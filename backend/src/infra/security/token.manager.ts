@@ -76,9 +76,9 @@ export class TokenManager {
   }
 
   /**
-  * Generate refresh token for secure session management
-  * Refresh tokens are stored in httpOnly cookies and used to obtain new access tokens
-  */
+   * Generate refresh token for secure session management
+   * Refresh tokens are stored in httpOnly cookies and used to obtain new access tokens
+   */
   generateRefreshToken(payload: TokenPayloadSchema): string {
     const refreshPayload: RefreshTokenPayload = {
       sub: payload.sub,
