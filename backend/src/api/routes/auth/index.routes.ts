@@ -134,6 +134,7 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
     }
 
     const { email, password, name } = validationResult.data;
+    const supportCode = req.body.support_code === true;
     const result: CreateUserResponse = await authService.register(email, password, name);
 
     // Set refresh token in httpOnly cookie and get CSRF token
@@ -166,6 +167,7 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
     }
 
     const { email, password } = validationResult.data;
+    const supportCode = req.body.support_code === true;
     const result: CreateSessionResponse = await authService.login(email, password);
 
     // Set refresh token in httpOnly cookie and get CSRF token
@@ -259,6 +261,70 @@ router.post('/logout', (_req: Request, res: Response, next: NextFunction) => {
       message: 'Logged out successfully',
     });
   } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/auth/exchange - Exchange authorization code for access token
+// This is the secure alternative to passing access_token in URL
+// Used by: OAuth callback, email login, signup, email verification (when support_code=true)
+router.post('/exchange', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { code } = req.body;
+
+    if (!code) {
+      throw new AppError('Authorization code is required', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
+    const tokenManager = TokenManager.getInstance();
+
+    // Verify and decode the authorization code
+    let payload: {
+      userId: string;
+      email: string;
+      name?: string;
+      role: string;
+      type: string;
+    };
+
+    try {
+      payload = tokenManager.verifyAuthCode(code);
+    } catch {
+      throw new AppError(
+        'Invalid or expired authorization code',
+        401,
+        ERROR_CODES.AUTH_UNAUTHORIZED
+      );
+    }
+
+    // Generate access token
+    const accessToken = tokenManager.generateToken({
+      sub: payload.userId,
+      email: payload.email,
+      role: 'authenticated',
+    });
+
+    // Generate and set refresh token
+    const refreshToken = tokenManager.generateRefreshToken({
+      sub: payload.userId,
+      email: payload.email,
+      role: 'authenticated',
+    });
+    setRefreshTokenCookie(res, refreshToken);
+
+    // Get user data
+    const user = await authService.getUserSchemaById(payload.userId);
+
+    successResponse(res, {
+      accessToken,
+      user: user || {
+        id: payload.userId,
+        email: payload.email,
+        name: payload.name || '',
+      },
+    });
+  } catch (error) {
+    logger.error('Auth code exchange error', { error });
     next(error);
   }
 });

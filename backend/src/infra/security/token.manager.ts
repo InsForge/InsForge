@@ -19,6 +19,17 @@ export interface RefreshTokenPayload {
 }
 
 /**
+ * Auth code payload interface (for secure code exchange)
+ */
+export interface AuthCodePayload {
+  userId: string;
+  email: string;
+  name: string;
+  role: string;
+  type: 'auth_code';
+}
+
+/**
  * Create JWKS instance with caching and timeout configuration
  * The instance will automatically cache keys and handle refetching
  */
@@ -90,6 +101,57 @@ export class TokenManager {
       algorithm: 'HS256',
       expiresIn: REFRESH_TOKEN_EXPIRES_IN,
     });
+  }
+
+  /**
+   * Generate short-lived authorization code for secure code exchange
+   * Used as alternative to passing access_token in URL (more secure)
+   * SDK exchanges this code for access_token via POST /api/auth/exchange
+   */
+  generateAuthCode(payload: { userId: string; email: string; name: string; role: string }): string {
+    const authCodePayload: AuthCodePayload = {
+      userId: payload.userId,
+      email: payload.email,
+      name: payload.name,
+      role: payload.role,
+      type: 'auth_code',
+    };
+    return jwt.sign(authCodePayload, JWT_SECRET, {
+      algorithm: 'HS256',
+      expiresIn: '60s', // Very short-lived for security
+    });
+  }
+
+  /**
+   * Verify authorization code and return payload
+   * Ensures the token is a valid auth code (not another type of token)
+   */
+  verifyAuthCode(code: string): AuthCodePayload {
+    try {
+      const decoded = jwt.verify(code, JWT_SECRET) as AuthCodePayload;
+
+      // Ensure this is an auth code, not another type of token
+      if (decoded.type !== 'auth_code') {
+        throw new AppError('Invalid authorization code type', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      }
+
+      return {
+        userId: decoded.userId,
+        email: decoded.email,
+        name: decoded.name,
+        role: decoded.role,
+        type: 'auth_code',
+      };
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new AppError(
+        'Invalid or expired authorization code',
+        401,
+        ERROR_CODES.AUTH_UNAUTHORIZED
+      );
+    }
   }
 
   /**

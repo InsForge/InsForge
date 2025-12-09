@@ -234,7 +234,7 @@ router.delete(
 router.get('/:provider', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { provider } = req.params;
-    const { redirect_uri } = req.query;
+    const { redirect_uri, support_code } = req.query;
 
     // Validate provider using OAuthProvidersSchema
     const providerValidation = oAuthProvidersSchema.safeParse(provider);
@@ -255,6 +255,7 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
     const jwtPayload = {
       provider: validatedProvider,
       redirectUri: redirect_uri ? (redirect_uri as string) : undefined,
+      supportCode: support_code,
       createdAt: Date.now(),
     };
     const jwtSecret = validateJwtSecret();
@@ -299,14 +300,17 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
 
     let redirectUri: string;
     let provider: string;
+    let supportCode = false;
     try {
       const jwtSecret = validateJwtSecret();
       const decodedState = jwt.verify(state, jwtSecret) as {
         provider: string;
         redirectUri: string;
+        supportCode?: boolean;
       };
       redirectUri = decodedState.redirectUri || '';
       provider = decodedState.provider || '';
+      supportCode = decodedState.supportCode === true;
     } catch {
       logger.warn('Invalid state parameter', { state });
       throw new AppError('Invalid state parameter', 400, ERROR_CODES.INVALID_INPUT);
@@ -382,16 +386,19 @@ router.get('/:provider/callback', async (req: Request, res: Response, next: Next
       throw new AppError('State parameter is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    // Decode redirectUri from state (needed for both success and error paths)
+    // Decode redirectUri and supportCode from state
     let redirectUri: string;
+    let supportCode = false;
 
     try {
       const jwtSecret = validateJwtSecret();
       const stateData = jwt.verify(state as string, jwtSecret) as {
         provider: string;
         redirectUri: string;
+        supportCode?: boolean;
       };
       redirectUri = stateData.redirectUri || '';
+      supportCode = stateData.supportCode === true;
     } catch {
       // Invalid state
       logger.warn('Invalid state in provider callback', { state });
@@ -443,7 +450,6 @@ router.get('/:provider/callback', async (req: Request, res: Response, next: Next
       params.set('csrf_token', csrfToken);
 
       const finalRedirectUri = `${redirectUri}?${params.toString()}`;
-
       return res.redirect(finalRedirectUri);
     } catch (error) {
       logger.error('OAuth callback error', {

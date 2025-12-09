@@ -8,6 +8,7 @@ export interface BroadcastEvent {
   timestamp: number;
   data?: {
     accessToken?: string;
+    code?: string; // New backend returns code instead of accessToken
     user?: { id: string; email: string; name: string };
     csrfToken?: string;
   };
