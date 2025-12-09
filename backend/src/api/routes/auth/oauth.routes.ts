@@ -362,9 +362,11 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
   try {
     const { provider } = req.params;
     // Support both query params (GET) and body params (POST for Apple)
-    const code = (req.query.code as string) || (req.body.code as string);
-    const state = (req.query.state as string) || (req.body.state as string);
-    const token = (req.query.token as string) || (req.body.id_token as string);
+    // Use method-based source selection to prevent parameter pollution attacks
+    const isPostRequest = req.method === 'POST';
+    const code = isPostRequest ? (req.body.code as string) : (req.query.code as string);
+    const state = isPostRequest ? (req.body.state as string) : (req.query.state as string);
+    const token = isPostRequest ? (req.body.id_token as string) : (req.query.token as string);
 
     if (!state) {
       logger.warn('OAuth callback called without state parameter');
