@@ -40,9 +40,11 @@ import {
   exchangeAdminSessionRequestSchema,
   type GetAuthConfigResponse,
   updateAuthConfigRequestSchema,
+  RoleSchema,
 } from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
+import logger from '@/utils/logger.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -218,9 +220,15 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     // Fetch user data for response
     const user = await authService.getUserSchemaById(payload.sub);
 
+    if (!user) {
+      logger.warn('[Auth:Refresh] User not found for valid refresh token', { userId: payload.sub });
+      clearRefreshTokenCookie(res);
+      throw new AppError('User not found', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+
     successResponse(res, {
       accessToken: newAccessToken,
-      user: user || undefined,
+      user: user,
     });
   } catch (error) {
     // Clear invalid cookie on error
