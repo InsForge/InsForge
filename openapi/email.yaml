@@ -1,0 +1,161 @@
+openapi: 3.0.3
+info:
+  title: Insforge Email API
+  version: 1.0.0
+  description: Custom email sending endpoints for sending raw HTML emails
+
+paths:
+  /api/email/send:
+    post:
+      summary: Send raw HTML email
+      description: Send a custom HTML email to one or more recipients. Requires admin authentication.
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendRawEmailRequest'
+      responses:
+        '200':
+          description: Email sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Email sent successfully"
+                  messageId:
+                    type: string
+                    description: Unique identifier for the sent email (if available from provider)
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - requires authentication
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Email provider error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    SendRawEmailRequest:
+      type: object
+      required:
+        - to
+        - subject
+        - html
+      properties:
+        to:
+          oneOf:
+            - type: string
+              format: email
+              description: Single recipient email address
+              example: user@example.com
+            - type: array
+              items:
+                type: string
+                format: email
+              minItems: 1
+              description: Multiple recipient email addresses
+              example: ["user1@example.com", "user2@example.com"]
+          description: Recipient email address(es)
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Email subject line
+          example: "Welcome to our platform"
+        html:
+          type: string
+          minLength: 1
+          description: HTML content of the email body
+          example: "<h1>Welcome!</h1><p>Thank you for joining us.</p>"
+        cc:
+          oneOf:
+            - type: string
+              format: email
+              description: Single CC recipient email address
+            - type: array
+              items:
+                type: string
+                format: email
+              minItems: 1
+              description: Multiple CC recipient email addresses
+          description: Carbon copy recipient(s)
+        bcc:
+          oneOf:
+            - type: string
+              format: email
+              description: Single BCC recipient email address
+            - type: array
+              items:
+                type: string
+                format: email
+              minItems: 1
+              description: Multiple BCC recipient email addresses
+          description: Blind carbon copy recipient(s)
+        from:
+          type: string
+          maxLength: 100
+          description: Custom sender name (uses default if not provided)
+          example: "My App"
+        replyTo:
+          type: string
+          format: email
+          description: Reply-to email address
+          example: "support@example.com"
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - statusCode
+      properties:
+        error:
+          type: string
+          description: Error code for programmatic handling
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Subject is required"
+        statusCode:
+          type: integer
+          description: HTTP status code
+          example: 400
+        nextActions:
+          type: string
+          description: Suggested action to resolve the error
+          example: "Please provide a valid subject line"
