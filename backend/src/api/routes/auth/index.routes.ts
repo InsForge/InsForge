@@ -132,7 +132,7 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
     const { email, password, name } = validationResult.data;
     const result: CreateUserResponse = await authService.register(email, password, name);
 
-    // Set refresh token in httpOnly cookie for enhanced security (when login is immediate)
+    // Set refresh token in httpOnly cookie
     if (result.accessToken && result.user) {
       issueRefreshTokenCookie(res, result.user);
     }
@@ -142,8 +142,7 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
       resource: DataUpdateResourceType.USERS,
     });
 
-    // Add sessionMode to tell SDK to use secure storage (access token in memory, not localStorage)
-    successResponse(res, { ...result, sessionMode: 'secure' as const });
+    successResponse(res, result);
   } catch (error) {
     next(error);
   }
@@ -164,13 +163,12 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
     const { email, password } = validationResult.data;
     const result: CreateSessionResponse = await authService.login(email, password);
 
-    // Set refresh token in httpOnly cookie for enhanced security
+    // Set refresh token in httpOnly cookie
     if (result.accessToken && result.user) {
       issueRefreshTokenCookie(res, result.user);
     }
 
-    // Add sessionMode to tell SDK to use secure storage (access token in memory, not localStorage)
-    successResponse(res, { ...result, sessionMode: 'secure' as const });
+    successResponse(res, result);
   } catch (error) {
     next(error);
   }
@@ -216,11 +214,9 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       throw new AppError('User not found', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
-    // Add sessionMode to tell SDK to use secure storage (access token in memory, not localStorage)
     successResponse(res, {
       accessToken: newAccessToken,
       user: user,
-      sessionMode: 'secure' as const,
     });
   } catch (error) {
     // Clear invalid cookie on error
@@ -528,13 +524,12 @@ router.post(
         result = await authService.verifyEmailWithCode(email, otp);
       }
 
-      // Set refresh token in httpOnly cookie for enhanced security
+      // Set refresh token in httpOnly cookie
       if (result.accessToken && result.user) {
         issueRefreshTokenCookie(res, result.user);
       }
 
-      // Add sessionMode to tell SDK to use secure storage (access token in memory, not localStorage)
-      successResponse(res, { ...result, sessionMode: 'secure' as const }); // Return session info with optional redirectTo upon successful verification
+      successResponse(res, result);
     } catch (error) {
       next(error);
     }
