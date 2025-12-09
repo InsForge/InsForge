@@ -105,7 +105,12 @@ export class AuthService {
    * User registration
    * Otherwise, returns user with access token for immediate login
    */
-  async register(email: string, password: string, name?: string): Promise<CreateUserResponse> {
+  async register(
+    email: string,
+    password: string,
+    name?: string,
+    options?: { supportCode?: boolean }
+  ): Promise<CreateUserResponse> {
     // Get email auth configuration and validate password
     const authConfigService = AuthConfigService.getInstance();
     const emailAuthConfig = await authConfigService.getAuthConfig();
@@ -172,7 +177,27 @@ export class AuthService {
       };
     }
 
-    // Email verification not required, provide access token for immediate login
+    // Email verification not required, provide credentials for immediate login
+    const redirectTo = emailAuthConfig.signInRedirectTo || undefined;
+
+    // New SDK with support_code: return authorization code
+    if (options?.supportCode) {
+      const code = this.tokenManager.generateAuthCode({
+        userId,
+        email,
+        name: name || '',
+        role: 'authenticated',
+      });
+      return {
+        code,
+        user,
+        accessToken: null,
+        requireEmailVerification: false,
+        redirectTo,
+      };
+    }
+
+    // Legacy SDK: return access token directly
     const accessToken = this.tokenManager.generateToken({
       sub: userId,
       email,
@@ -183,14 +208,18 @@ export class AuthService {
       user,
       accessToken,
       requireEmailVerification: false,
-      redirectTo: emailAuthConfig.signInRedirectTo || undefined,
+      redirectTo,
     };
   }
 
   /**
    * User login
    */
-  async login(email: string, password: string): Promise<CreateSessionResponse> {
+  async login(
+    email: string,
+    password: string,
+    options?: { supportCode?: boolean }
+  ): Promise<CreateSessionResponse> {
     const dbUser = await this.getUserByEmail(email);
 
     if (!dbUser || !dbUser.password) {
@@ -216,20 +245,35 @@ export class AuthService {
     }
 
     const user = this.transformUserRecordToSchema(dbUser);
+    const redirectTo = emailAuthConfig.signInRedirectTo || undefined;
+
+    // New SDK with support_code: return authorization code
+    if (options?.supportCode) {
+      const code = this.tokenManager.generateAuthCode({
+        userId: dbUser.id,
+        email: dbUser.email,
+        name: dbUser.name || '',
+        role: 'authenticated',
+      });
+      return {
+        code,
+        user,
+        redirectTo,
+      };
+    }
+
+    // Legacy SDK: return access token directly
     const accessToken = this.tokenManager.generateToken({
       sub: dbUser.id,
       email: dbUser.email,
       role: 'authenticated',
     });
 
-    // Include redirect URL if configured
-    const response: CreateSessionResponse = {
+    return {
       user,
       accessToken,
-      redirectTo: emailAuthConfig.signInRedirectTo || undefined,
+      redirectTo,
     };
-
-    return response;
   }
 
   /**
@@ -300,7 +344,11 @@ export class AuthService {
    * Verify email with numeric code
    * Verifies the email OTP code and updates the account in a single transaction
    */
-  async verifyEmailWithCode(email: string, verificationCode: string): Promise<VerifyEmailResponse> {
+  async verifyEmailWithCode(
+    email: string,
+    verificationCode: string,
+    options?: { supportCode?: boolean }
+  ): Promise<VerifyEmailResponse> {
     const dbManager = DatabaseManager.getInstance();
     const pool = dbManager.getPool();
     const client = await pool.connect();
@@ -339,20 +387,38 @@ export class AuthService {
         throw new Error('User not found after verification');
       }
       const user = this.transformUserRecordToSchema(dbUser);
+
+      // Get redirect URL from auth config if configured
+      const authConfigService = AuthConfigService.getInstance();
+      const emailAuthConfig = await authConfigService.getAuthConfig();
+      const redirectTo = emailAuthConfig.signInRedirectTo || undefined;
+
+      // New SDK with support_code: return authorization code
+      if (options?.supportCode) {
+        const code = this.tokenManager.generateAuthCode({
+          userId: dbUser.id,
+          email: dbUser.email,
+          name: dbUser.name || '',
+          role: 'authenticated',
+        });
+        return {
+          code,
+          user,
+          redirectTo,
+        };
+      }
+
+      // Legacy SDK: return access token directly
       const accessToken = this.tokenManager.generateToken({
         sub: dbUser.id,
         email: dbUser.email,
         role: 'authenticated',
       });
 
-      // Get redirect URL from auth config if configured
-      const authConfigService = AuthConfigService.getInstance();
-      const emailAuthConfig = await authConfigService.getAuthConfig();
-
       return {
         user,
         accessToken,
-        redirectTo: emailAuthConfig.signInRedirectTo || undefined,
+        redirectTo,
       };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -367,7 +433,10 @@ export class AuthService {
    * Verifies the token (without needing email), looks up the email, and updates the account
    * This is more secure as the email is not exposed in the URL
    */
-  async verifyEmailWithToken(token: string): Promise<VerifyEmailResponse> {
+  async verifyEmailWithToken(
+    token: string,
+    options?: { supportCode?: boolean }
+  ): Promise<VerifyEmailResponse> {
     const dbManager = DatabaseManager.getInstance();
     const pool = dbManager.getPool();
     const client = await pool.connect();
@@ -405,20 +474,38 @@ export class AuthService {
         throw new Error('User not found after verification');
       }
       const user = this.transformUserRecordToSchema(dbUser);
+
+      // Get redirect URL from auth config if configured
+      const authConfigService = AuthConfigService.getInstance();
+      const emailAuthConfig = await authConfigService.getAuthConfig();
+      const redirectTo = emailAuthConfig.signInRedirectTo || undefined;
+
+      // New SDK with support_code: return authorization code
+      if (options?.supportCode) {
+        const code = this.tokenManager.generateAuthCode({
+          userId: dbUser.id,
+          email: dbUser.email,
+          name: dbUser.name || '',
+          role: 'authenticated',
+        });
+        return {
+          code,
+          user,
+          redirectTo,
+        };
+      }
+
+      // Legacy SDK: return access token directly
       const accessToken = this.tokenManager.generateToken({
         sub: dbUser.id,
         email: dbUser.email,
         role: 'authenticated',
       });
 
-      // Get redirect URL from auth config if configured
-      const authConfigService = AuthConfigService.getInstance();
-      const emailAuthConfig = await authConfigService.getAuthConfig();
-
       return {
         user,
         accessToken,
-        redirectTo: emailAuthConfig.signInRedirectTo || undefined,
+        redirectTo,
       };
     } catch (error) {
       await client.query('ROLLBACK');

@@ -135,7 +135,9 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
 
     const { email, password, name } = validationResult.data;
     const supportCode = req.body.support_code === true;
-    const result: CreateUserResponse = await authService.register(email, password, name);
+    const result: CreateUserResponse = await authService.register(email, password, name, {
+      supportCode,
+    });
 
     // Set refresh token in httpOnly cookie and get CSRF token
     let csrfToken: string | null = null;
@@ -168,7 +170,7 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
 
     const { email, password } = validationResult.data;
     const supportCode = req.body.support_code === true;
-    const result: CreateSessionResponse = await authService.login(email, password);
+    const result: CreateSessionResponse = await authService.login(email, password, { supportCode });
 
     // Set refresh token in httpOnly cookie and get CSRF token
     let csrfToken: string | null = null;
@@ -591,6 +593,7 @@ router.post(
       }
 
       const { email, otp } = validationResult.data;
+      const supportCode = req.body.support_code === true;
 
       // Get auth config to determine verification method
       const authConfig = await authConfigService.getAuthConfig();
@@ -600,7 +603,7 @@ router.post(
 
       if (method === 'link') {
         // Link verification: otp is 64-char hex token
-        result = await authService.verifyEmailWithToken(otp);
+        result = await authService.verifyEmailWithToken(otp, { supportCode });
       } else {
         // Code verification: requires email + 6-digit code
         if (!email) {
@@ -610,7 +613,7 @@ router.post(
             ERROR_CODES.INVALID_INPUT
           );
         }
-        result = await authService.verifyEmailWithCode(email, otp);
+        result = await authService.verifyEmailWithCode(email, otp, { supportCode });
       }
 
       // Set refresh token in httpOnly cookie and get CSRF token

@@ -122,10 +122,14 @@ export const resetPasswordRequestSchema = z.object({
 /**
  * Response for POST /api/auth/users
  * Includes optional redirectTo URL when user is successfully registered and email verification is not required
+ * Returns either:
+ * - code (new SDK with support_code=true): authorization code for exchange
+ * - accessToken (legacy SDK): direct access token
  */
 export const createUserResponseSchema = z.object({
   user: userSchema.optional(),
   accessToken: z.string().nullable(),
+  code: z.string().optional(), // Authorization code for new SDKs
   requireEmailVerification: z.boolean().optional(),
   redirectTo: z.string().url().optional(),
 });
@@ -133,20 +137,28 @@ export const createUserResponseSchema = z.object({
 /**
  * Response for POST /api/auth/sessions
  * Includes user and access token, plus optional redirectTo URL for frontend navigation
+ * Returns either:
+ * - code (new SDK with support_code=true): authorization code for exchange
+ * - accessToken (legacy SDK): direct access token
  */
 export const createSessionResponseSchema = z.object({
-  user: userSchema,
-  accessToken: z.string(),
+  user: userSchema.optional(), // Optional when returning code
+  accessToken: z.string().optional(), // Optional when returning code
+  code: z.string().optional(), // Authorization code for new SDKs
   redirectTo: z.string().url().optional(),
 });
 
 /**
  * Response for POST /api/auth/email/verify
  * Includes user and access token, plus optional redirectTo URL for frontend navigation
+ * Returns either:
+ * - code (new SDK with support_code=true): authorization code for exchange
+ * - accessToken (legacy SDK): direct access token
  */
 export const verifyEmailResponseSchema = z.object({
-  user: userSchema,
-  accessToken: z.string(),
+  user: userSchema.optional(), // Optional when returning code
+  accessToken: z.string().optional(), // Optional when returning code
+  code: z.string().optional(), // Authorization code for new SDKs
   redirectTo: z.string().url().optional(),
 });
 
