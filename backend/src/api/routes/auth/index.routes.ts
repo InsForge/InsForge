@@ -145,7 +145,8 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
       'system'
     );
 
-    successResponse(res, result);
+    // Add sessionMode to tell SDK to use secure storage (access token in memory, not localStorage)
+    successResponse(res, { ...result, sessionMode: 'secure' as const });
   } catch (error) {
     next(error);
   }
@@ -171,7 +172,8 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
       issueRefreshTokenCookie(res, result.user);
     }
 
-    successResponse(res, result);
+    // Add sessionMode to tell SDK to use secure storage (access token in memory, not localStorage)
+    successResponse(res, { ...result, sessionMode: 'secure' as const });
   } catch (error) {
     next(error);
   }
@@ -217,9 +219,11 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       throw new AppError('User not found', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
+    // Add sessionMode to tell SDK to use secure storage (access token in memory, not localStorage)
     successResponse(res, {
       accessToken: newAccessToken,
       user: user,
+      sessionMode: 'secure' as const,
     });
   } catch (error) {
     // Clear invalid cookie on error
@@ -532,7 +536,8 @@ router.post(
         issueRefreshTokenCookie(res, result.user);
       }
 
-      successResponse(res, result); // Return session info with optional redirectTo upon successful verification
+      // Add sessionMode to tell SDK to use secure storage (access token in memory, not localStorage)
+      successResponse(res, { ...result, sessionMode: 'secure' as const }); // Return session info with optional redirectTo upon successful verification
     } catch (error) {
       next(error);
     }
