@@ -9,13 +9,6 @@ import { TokenManager } from '@/infra/security/token.manager.js';
 export const REFRESH_TOKEN_COOKIE_NAME = 'insforge_refresh_token';
 
 /**
- * Cookie name for authentication flag
- * This is a non-httpOnly cookie that signals to the SDK that a refresh token exists
- * Used by SDK to detect secure session mode and attempt token refresh on page reload
- */
-export const AUTH_FLAG_COOKIE_NAME = 'isAuthenticated';
-
-/**
  * Cookie options for refresh token
  * - httpOnly: JavaScript cannot access (XSS protection)
  * - secure: HTTPS only in production
@@ -35,31 +28,10 @@ export function getRefreshTokenCookieOptions() {
 }
 
 /**
- * Cookie options for auth flag
- * - httpOnly: false (must be accessible to JavaScript for SDK detection)
- * - secure: HTTPS only in production
- * - sameSite: 'lax' for all environments (doesn't need cross-origin)
- * - path: '/' - Accessible from all paths
- * - maxAge: 7 days (same as refresh token)
- */
-export function getAuthFlagCookieOptions() {
-  const isCloud = isCloudEnvironment();
-  return {
-    httpOnly: false, // SDK needs to read this
-    secure: isCloud,
-    sameSite: 'lax' as const,
-    path: '/',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
-  };
-}
-
-/**
  * Set refresh token cookie on response
- * Also sets the auth flag cookie to signal SDK that secure session is active
  */
 export function setRefreshTokenCookie(res: Response, refreshToken: string): void {
   res.cookie(REFRESH_TOKEN_COOKIE_NAME, refreshToken, getRefreshTokenCookieOptions());
-  res.cookie(AUTH_FLAG_COOKIE_NAME, 'true', getAuthFlagCookieOptions());
 }
 
 /**
@@ -73,12 +45,6 @@ export function clearRefreshTokenCookie(res: Response): void {
     secure: isCloud,
     sameSite: isCloud ? ('none' as const) : ('lax' as const),
     path: '/api/auth',
-  });
-  res.clearCookie(AUTH_FLAG_COOKIE_NAME, {
-    httpOnly: false,
-    secure: isCloud,
-    sameSite: 'lax' as const,
-    path: '/',
   });
 }
 
