@@ -15,6 +15,7 @@ import {
   REFRESH_TOKEN_COOKIE_NAME,
   setRefreshTokenCookie,
   clearRefreshTokenCookie,
+  issueRefreshTokenCookie,
 } from '@/utils/cookies.js';
 import {
   userIdSchema,
@@ -41,7 +42,6 @@ import {
   exchangeAdminSessionRequestSchema,
   type GetAuthConfigResponse,
   updateAuthConfigRequestSchema,
-  RoleSchema,
 } from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
