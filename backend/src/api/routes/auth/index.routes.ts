@@ -41,6 +41,7 @@ import {
   exchangeAdminSessionRequestSchema,
   type GetAuthConfigResponse,
   updateAuthConfigRequestSchema,
+  RoleSchema,
 } from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
@@ -222,6 +223,12 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
 
     setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, newRefreshToken);
     const newCsrfToken = tokenManager.generateCsrfToken(newRefreshToken);
+
+    if (!user) {
+      logger.warn('[Auth:Refresh] User not found for valid refresh token', { userId: payload.sub });
+      clearRefreshTokenCookie(res);
+      throw new AppError('User not found', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
 
     successResponse(res, {
       accessToken: newAccessToken,
