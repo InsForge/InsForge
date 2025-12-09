@@ -359,7 +359,6 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     params.set('user_id', result?.user?.id ?? '');
     params.set('email', result?.user?.email ?? '');
     params.set('name', result?.user?.name ?? '');
-    params.set('session_mode', 'secure'); // Tell SDK to use secure storage
 
     res.redirect(`${redirectUri}?${params.toString()}`);
   } catch (error) {
@@ -443,7 +442,6 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
       params.set('user_id', result?.user?.id ?? '');
       params.set('email', result?.user?.email ?? '');
       params.set('name', result?.user?.name ?? '');
-      params.set('session_mode', 'secure'); // Tell SDK to use secure storage
 
       const finalRedirectUri = `${redirectUri}?${params.toString()}`;
 
