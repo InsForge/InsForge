@@ -5,3 +5,4 @@ export { LinkedInOAuthProvider } from './linkedin.provider.js';
 export { FacebookOAuthProvider } from './facebook.provider.js';
 export { MicrosoftOAuthProvider } from './microsoft.provider.js';
 export { XOAuthProvider } from './x.provider.js';
+export { AppleOAuthProvider } from './apple.provider.js';
