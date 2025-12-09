@@ -53,11 +53,7 @@ const postgrestAxios = axios.create({
 // Generate admin token once and reuse
 // If user request with api key, this token should be added automatically.
 const tokenManager = TokenManager.getInstance();
-const adminToken = tokenManager.generateToken({
-  sub: 'project-admin-with-api-key',
-  email: 'project-admin@email.com',
-  role: 'project_admin',
-});
+const adminToken = tokenManager.generateAdminToken();
 
 // anonymous users can access the database, postgREST does not require authentication, however we seed to unwrap session token for better auth, thus
 // we need to verify user token below.

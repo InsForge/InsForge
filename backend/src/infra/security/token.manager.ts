@@ -49,6 +49,22 @@ export class TokenManager {
   }
 
   /**
+   * Generate admin JWT token (never expires)
+   * Used for internal API key authenticated requests to PostgREST
+   */
+  generateAdminToken(): string {
+    const payload = {
+      sub: 'project-admin-with-api-key',
+      email: 'project-admin@email.com',
+      role: 'project_admin',
+    };
+    return jwt.sign(payload, JWT_SECRET, {
+      algorithm: 'HS256',
+      // No expiresIn means token never expires
+    });
+  }
+
+  /**
    * Generate anonymous JWT token (never expires)
    */
   generateAnonToken(): string {
