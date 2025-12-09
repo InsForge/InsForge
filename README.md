@@ -17,6 +17,9 @@
 
 # InsForge
 
+[![Run in Smithery](https://smithery.ai/badge/skills/insforge)](https://smithery.ai/skills?ns=insforge&utm_source=github&utm_medium=badge)
+
+
 **InsForge is the backend built for AI-assisted development.**
 Connect InsForge with any agent. Add authentication, database, storage, functions, and AI integrations to your app in seconds.
 ## Key Features & Use Cases
