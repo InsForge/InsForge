@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import { isCloudEnvironment } from './environment.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 
 /**
  * Cookie configuration for refresh tokens
@@ -79,4 +80,26 @@ export function clearRefreshTokenCookie(res: Response): void {
     sameSite: 'lax' as const,
     path: '/',
   });
+}
+
+/**
+ * Issue refresh token cookie for authenticated user
+ * Generates refresh token and sets both refresh token and auth flag cookies
+ *
+ * @param res - Express response object
+ * @param user - User object with id and email
+ * @returns void - Only issues cookie if user has valid id and email
+ */
+export function issueRefreshTokenCookie(res: Response, user: { id: string; email: string }): void {
+  if (!user?.id || !user?.email) {
+    return;
+  }
+
+  const tokenManager = TokenManager.getInstance();
+  const refreshToken = tokenManager.generateRefreshToken({
+    sub: user.id,
+    email: user.email,
+    role: 'authenticated',
+  });
+  setRefreshTokenCookie(res, refreshToken);
 }

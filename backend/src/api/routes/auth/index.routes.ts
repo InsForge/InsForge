@@ -14,6 +14,7 @@ import {
   REFRESH_TOKEN_COOKIE_NAME,
   setRefreshTokenCookie,
   clearRefreshTokenCookie,
+  issueRefreshTokenCookie,
 } from '@/utils/cookies.js';
 import {
   userIdSchema,
@@ -40,7 +41,6 @@ import {
   exchangeAdminSessionRequestSchema,
   type GetAuthConfigResponse,
   updateAuthConfigRequestSchema,
-  RoleSchema,
 } from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
@@ -134,13 +134,7 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
 
     // Set refresh token in httpOnly cookie for enhanced security (when login is immediate)
     if (result.accessToken && result.user) {
-      const tokenManager = TokenManager.getInstance();
-      const refreshToken = tokenManager.generateRefreshToken({
-        sub: result.user.id,
-        email: result.user.email,
-        role: 'authenticated',
-      });
-      setRefreshTokenCookie(res, refreshToken);
+      issueRefreshTokenCookie(res, result.user);
     }
 
     const socket = SocketManager.getInstance();
@@ -171,13 +165,7 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
 
     // Set refresh token in httpOnly cookie for enhanced security
     if (result.accessToken && result.user) {
-      const tokenManager = TokenManager.getInstance();
-      const refreshToken = tokenManager.generateRefreshToken({
-        sub: result.user.id,
-        email: result.user.email,
-        role: 'authenticated',
-      });
-      setRefreshTokenCookie(res, refreshToken);
+      issueRefreshTokenCookie(res, result.user);
     }
 
     successResponse(res, result);
@@ -538,13 +526,7 @@ router.post(
 
       // Set refresh token in httpOnly cookie for enhanced security
       if (result.accessToken && result.user) {
-        const tokenManager = TokenManager.getInstance();
-        const refreshToken = tokenManager.generateRefreshToken({
-          sub: result.user.id,
-          email: result.user.email,
-          role: 'authenticated',
-        });
-        setRefreshTokenCookie(res, refreshToken);
+        issueRefreshTokenCookie(res, result.user);
       }
 
       successResponse(res, result); // Return session info with optional redirectTo upon successful verification
