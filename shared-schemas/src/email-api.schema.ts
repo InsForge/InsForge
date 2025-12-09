@@ -3,7 +3,7 @@ import { emailSchema } from './auth.schema';
 
 const emailOrEmails = z.union([
   emailSchema,
-  z.array(emailSchema).min(1, 'At least one email is required'),
+  z.array(emailSchema).min(1, 'At least one email is required').max(50, 'Maximum 50 recipients allowed'),
 ]);
 
 export const sendRawEmailRequestSchema = z.object({

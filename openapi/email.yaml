@@ -87,9 +87,10 @@ components:
                 type: string
                 format: email
               minItems: 1
-              description: Multiple recipient email addresses
+              maxItems: 50
+              description: Multiple recipient email addresses (max 50)
               example: ["user1@example.com", "user2@example.com"]
-          description: Recipient email address(es)
+          description: Recipient email address(es) - maximum 50 recipients
         subject:
           type: string
           minLength: 1
@@ -111,8 +112,9 @@ components:
                 type: string
                 format: email
               minItems: 1
-              description: Multiple CC recipient email addresses
-          description: Carbon copy recipient(s)
+              maxItems: 50
+              description: Multiple CC recipient email addresses (max 50)
+          description: Carbon copy recipient(s) - maximum 50 recipients
         bcc:
           oneOf:
             - type: string
@@ -123,8 +125,9 @@ components:
                 type: string
                 format: email
               minItems: 1
-              description: Multiple BCC recipient email addresses
-          description: Blind carbon copy recipient(s)
+              maxItems: 50
+              description: Multiple BCC recipient email addresses (max 50)
+          description: Blind carbon copy recipient(s) - maximum 50 recipients
         from:
           type: string
           maxLength: 100
