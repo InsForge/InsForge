@@ -354,11 +354,17 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
   }
 });
 
-// GET /api/auth/oauth/:provider/callback - OAuth provider callback
-router.get('/:provider/callback', async (req: Request, res: Response, next: NextFunction) => {
+/**
+ * Handle OAuth provider callback (shared logic for GET and POST)
+ * Most providers use GET, but Apple uses POST with form data
+ */
+const handleOAuthCallback = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { provider } = req.params;
-    const { code, state, token } = req.query;
+    // Support both query params (GET) and body params (POST for Apple)
+    const code = (req.query.code as string) || (req.body.code as string);
+    const state = (req.query.state as string) || (req.body.state as string);
+    const token = (req.query.token as string) || (req.body.id_token as string);
 
     if (!state) {
       logger.warn('OAuth callback called without state parameter');
@@ -370,7 +376,7 @@ router.get('/:provider/callback', async (req: Request, res: Response, next: Next
 
     try {
       const jwtSecret = validateJwtSecret();
-      const stateData = jwt.verify(state as string, jwtSecret) as {
+      const stateData = jwt.verify(state, jwtSecret) as {
         provider: string;
         redirectUri: string;
       };
@@ -399,9 +405,9 @@ router.get('/:provider/callback', async (req: Request, res: Response, next: Next
       const validatedProvider = providerValidation.data;
 
       const result = await authService.handleOAuthCallback(validatedProvider, {
-        code: code as string | undefined,
-        token: token as string | undefined,
-        state: state as string | undefined,
+        code: code || undefined,
+        token: token || undefined,
+        state: state || undefined,
       });
 
       // Construct redirect URL with query parameters
@@ -426,9 +432,9 @@ router.get('/:provider/callback', async (req: Request, res: Response, next: Next
         error: error instanceof Error ? error.message : error,
         stack: error instanceof Error ? error.stack : undefined,
         provider: req.params.provider,
-        hasCode: !!req.query.code,
-        hasState: !!req.query.state,
-        hasToken: !!req.query.token,
+        hasCode: !!code,
+        hasState: !!state,
+        hasToken: !!token,
       });
 
       const errorMessage = error instanceof Error ? error.message : 'OAuth Authentication Failed';
@@ -443,6 +449,12 @@ router.get('/:provider/callback', async (req: Request, res: Response, next: Next
     logger.error('OAuth callback error', { error });
     next(error);
   }
-});
+};
+
+// GET /api/auth/oauth/:provider/callback - OAuth provider callback (most providers)
+router.get('/:provider/callback', handleOAuthCallback);
+
+// POST /api/auth/oauth/:provider/callback - OAuth provider callback (Apple uses POST with form_post)
+router.post('/:provider/callback', handleOAuthCallback);
 
 export default router;
