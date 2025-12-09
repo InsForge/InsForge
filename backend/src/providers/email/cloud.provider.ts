@@ -139,11 +139,17 @@ export class CloudEmailProvider implements EmailProvider {
         });
 
         // Provide more specific error messages
-        if (status === 401 || status === 403) {
+        if (status === 401) {
           throw new AppError(
             'Authentication failed with cloud email service. Check PROJECT_ID and JWT_SECRET.',
             status,
             ERROR_CODES.AUTH_UNAUTHORIZED
+          );
+        } else if (status === 403) {
+          throw new AppError(
+            'Custom email service is not available for free plan. Please upgrade to use this feature.',
+            status,
+            ERROR_CODES.FORBIDDEN
           );
         } else if (status === 429) {
           throw new AppError(
@@ -224,14 +230,24 @@ export class CloudEmailProvider implements EmailProvider {
           message,
         });
 
-        if (status === 401 || status === 403) {
+        if (status === 401) {
           throw new AppError(
             'Authentication failed with cloud email service.',
             status,
             ERROR_CODES.AUTH_UNAUTHORIZED
           );
+        } else if (status === 403) {
+          throw new AppError(
+            'Custom email service is not available for free plan. Please upgrade to use this feature.',
+            status,
+            ERROR_CODES.FORBIDDEN
+          );
         } else if (status === 429) {
-          throw new AppError('Email rate limit exceeded.', status, ERROR_CODES.RATE_LIMITED);
+          throw new AppError(
+            'Email rate limit exceeded. Starter plan is limited 10 emails per hour, and Pro plan is limited 50 emails per hour',
+            status,
+            ERROR_CODES.RATE_LIMITED
+          );
         } else if (status === 400) {
           throw new AppError(
             `Invalid email request: ${message}`,

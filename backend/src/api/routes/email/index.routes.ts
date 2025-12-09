@@ -10,22 +10,26 @@ const router = Router();
 const emailService = EmailService.getInstance();
 
 /**
- * POST /api/email/send
- * Send a custom email
+ * POST /api/email/send-raw
+ * Send a raw/custom email with explicit to, subject, and body
  */
-router.post('/send', verifyUser, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const validation = sendRawEmailRequestSchema.safeParse(req.body);
-    if (!validation.success) {
-      throw new AppError(JSON.stringify(validation.error.issues), 400, ERROR_CODES.INVALID_INPUT);
+router.post(
+  '/send-raw',
+  verifyUser,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validation = sendRawEmailRequestSchema.safeParse(req.body);
+      if (!validation.success) {
+        throw new AppError(JSON.stringify(validation.error.issues), 400, ERROR_CODES.INVALID_INPUT);
+      }
+
+      await emailService.sendRaw(validation.data);
+
+      successResponse(res, { success: true });
+    } catch (error) {
+      next(error);
     }
-
-    await emailService.sendRaw(validation.data);
-
-    successResponse(res, { success: true });
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 export const emailRouter = router;
