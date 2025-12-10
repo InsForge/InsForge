@@ -5,6 +5,7 @@ import {
   Lock,
   HardDrive,
   Code2,
+  Radio,
   Sparkles,
   ChartLine,
   BookOpen,
@@ -136,6 +137,29 @@ export const staticMenuItems: PrimaryMenuItem[] = [
         id: 'secrets',
         label: 'Secrets',
         href: '/dashboard/functions/secrets',
+      },
+    ],
+  },
+  {
+    id: 'realtime',
+    label: 'Realtime',
+    href: '/dashboard/realtime',
+    icon: Radio,
+    secondaryMenu: [
+      {
+        id: 'channels',
+        label: 'Channels',
+        href: '/dashboard/realtime/channels',
+      },
+      {
+        id: 'messages',
+        label: 'Messages',
+        href: '/dashboard/realtime/messages',
+      },
+      {
+        id: 'permissions',
+        label: 'Permissions',
+        href: '/dashboard/realtime/permissions',
       },
     ],
   },

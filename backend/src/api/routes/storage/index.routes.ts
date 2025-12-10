@@ -79,9 +79,12 @@ router.post(
       });
 
       const socket = SocketManager.getInstance();
-      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.BUCKETS,
-      });
+      socket.broadcastToRoom(
+        'role:project_admin',
+        ServerEvents.DATA_UPDATE,
+        { resource: DataUpdateResourceType.BUCKETS },
+        'system'
+      );
 
       const accessInfo = isPublic
         ? 'This is a PUBLIC bucket - objects can be accessed without authentication.'
@@ -150,12 +153,12 @@ router.patch(
       });
 
       const socket = SocketManager.getInstance();
-      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.BUCKETS,
-        data: {
-          bucketName,
-        },
-      });
+      socket.broadcastToRoom(
+        'role:project_admin',
+        ServerEvents.DATA_UPDATE,
+        { resource: DataUpdateResourceType.BUCKETS, data: { bucketName } },
+        'system'
+      );
 
       const accessInfo = isPublic
         ? 'Bucket is now PUBLIC - objects can be accessed without authentication.'
@@ -379,9 +382,12 @@ router.delete(
       });
 
       const socket = SocketManager.getInstance();
-      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.BUCKETS,
-      });
+      socket.broadcastToRoom(
+        'role:project_admin',
+        ServerEvents.DATA_UPDATE,
+        { resource: DataUpdateResourceType.BUCKETS },
+        'system'
+      );
 
       successResponse(
         res,

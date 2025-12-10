@@ -58,6 +58,7 @@ Available documentation types:
 - `"storage-sdk"` - File storage operations
 - `"functions-sdk"` - Serverless functions invocation
 - `"ai-integration-sdk"` - AI chat and image generation
+- `"real-time"` - Real-time pub/sub (database + client events) via WebSockets
 
 ## When to Use SDK vs MCP Tools
 

@@ -14,15 +14,14 @@ import {
   TooltipTrigger,
 } from '@/components';
 import { useFullMetadata } from '../hooks/useFullMetadata';
-import type { ExportDatabaseResponse, ExportDatabaseJsonData } from '@insforge/shared-schemas';
-import { isSystemTable } from '../constants';
-import {
-  DataUpdatePayload,
-  DataUpdateResourceType,
-  ServerEvents,
+import { SQLModal, SQLCellButton } from '../components/SQLModal';
+import type {
+  ExportDatabaseResponse,
+  ExportDatabaseJsonData,
   SocketMessage,
-  useSocket,
-} from '@/lib/contexts/SocketContext';
+} from '@insforge/shared-schemas';
+import { isSystemTable } from '../constants';
+import { DataUpdateResourceType, ServerEvents, useSocket } from '@/lib/contexts/SocketContext';
 
 interface PolicyRow extends DataGridRowType {
   id: string;
@@ -68,6 +67,7 @@ export default function PoliciesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { data: metadata, isLoading, error, refetch } = useFullMetadata(true);
+  const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
 
   const { socket, isConnected } = useSocket();
 
@@ -78,8 +78,8 @@ export default function PoliciesPage() {
       return;
     }
 
-    const handleDataUpdate = (message: SocketMessage<DataUpdatePayload>) => {
-      if (message.payload?.resource === DataUpdateResourceType.DATABASE) {
+    const handleDataUpdate = (message: SocketMessage) => {
+      if (message.resource === DataUpdateResourceType.DATABASE) {
         void refetch();
       }
     };
@@ -157,21 +157,30 @@ export default function PoliciesPage() {
         name: 'Using',
         width: 'minmax(200px, 2fr)',
         resizable: true,
-        renderCell: ({ row }) => {
-          return <span className="text-xs font-mono">{row.qual || '-'}</span>;
-        },
+        renderCell: ({ row }) => (
+          <SQLCellButton
+            value={row.qual}
+            onClick={() => row.qual && setSqlModal({ open: true, title: 'Using', value: row.qual })}
+          />
+        ),
       },
       {
         key: 'withCheck',
         name: 'With Check',
         width: 'minmax(200px, 2fr)',
         resizable: true,
-        renderCell: ({ row }) => {
-          return <span className="text-xs font-mono">{row.withCheck || '-'}</span>;
-        },
+        renderCell: ({ row }) => (
+          <SQLCellButton
+            value={row.withCheck}
+            onClick={() =>
+              row.withCheck &&
+              setSqlModal({ open: true, title: 'With Check', value: row.withCheck })
+            }
+          />
+        ),
       },
     ],
-    []
+    [setSqlModal]
   );
 
   if (error) {
@@ -243,6 +252,14 @@ export default function PoliciesPage() {
           />
         </div>
       )}
+
+      {/* SQL Detail Modal */}
+      <SQLModal
+        open={sqlModal.open}
+        onOpenChange={(open) => setSqlModal((prev) => ({ ...prev, open }))}
+        title={sqlModal.title}
+        value={sqlModal.value}
+      />
     </div>
   );
 }

@@ -76,9 +76,12 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
     });
 
     const socket = SocketManager.getInstance();
-    socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-      resource: DataUpdateResourceType.FUNCTIONS,
-    });
+    socket.broadcastToRoom(
+      'role:project_admin',
+      ServerEvents.DATA_UPDATE,
+      { resource: DataUpdateResourceType.FUNCTIONS },
+      'system'
+    );
 
     successResponse(
       res,
@@ -126,12 +129,12 @@ router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response, next: 
     });
 
     const socket = SocketManager.getInstance();
-    socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-      resource: DataUpdateResourceType.FUNCTIONS,
-      data: {
-        slug,
-      },
-    });
+    socket.broadcastToRoom(
+      'role:project_admin',
+      ServerEvents.DATA_UPDATE,
+      { resource: DataUpdateResourceType.FUNCTIONS, data: { slug } },
+      'system'
+    );
 
     successResponse(res, {
       success: true,
@@ -171,9 +174,12 @@ router.delete(
       });
 
       const socket = SocketManager.getInstance();
-      socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
-        resource: DataUpdateResourceType.FUNCTIONS,
-      });
+      socket.broadcastToRoom(
+        'role:project_admin',
+        ServerEvents.DATA_UPDATE,
+        { resource: DataUpdateResourceType.FUNCTIONS },
+        'system'
+      );
 
       successResponse(res, {
         success: true,

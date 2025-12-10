@@ -21,7 +21,7 @@ export const nameSchema = z
   .max(100, 'Name must be less than 100 characters')
   .trim();
 
-export const roleSchema = z.enum(['authenticated', 'project_admin']);
+export const roleSchema = z.enum(['anon', 'authenticated', 'project_admin']);
 
 export const verificationMethodSchema = z.enum(['code', 'link']);
 
