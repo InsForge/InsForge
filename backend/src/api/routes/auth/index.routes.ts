@@ -13,8 +13,11 @@ import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-li
 import { REFRESH_TOKEN_COOKIE_NAME, setAuthCookie, clearAuthCookie } from '@/utils/cookies.js';
 import {
   REFRESH_TOKEN_COOKIE_NAME,
+  CSRF_TOKEN_COOKIE_NAME,
   setRefreshTokenCookie,
+  setCsrfTokenCookie,
   clearRefreshTokenCookie,
+  clearCsrfTokenCookie,
   issueRefreshTokenCookie,
 } from '@/utils/cookies.js';
 import { CsrfManager } from '@/infra/security/csrf.manager.js';
@@ -195,7 +198,8 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
 
     // Verify CSRF token to prevent CSRF attacks
     const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
-    if (!CsrfManager.verify(csrfHeader, refreshToken)) {
+    const csrfCookie = req.cookies?.[CSRF_TOKEN_COOKIE_NAME];
+    if (!CsrfManager.verify(csrfHeader, csrfCookie)) {
       logger.warn('[Auth:Refresh] CSRF token validation failed');
       throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
@@ -235,6 +239,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     if (!user) {
       logger.warn('[Auth:Refresh] User not found for valid refresh token', { userId: payload.sub });
       clearRefreshTokenCookie(res);
+      clearCsrfTokenCookie(res);
       throw new AppError('User not found', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
