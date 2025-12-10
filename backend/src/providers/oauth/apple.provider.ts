@@ -42,6 +42,25 @@ export class AppleOAuthProvider implements OAuthProvider {
 
     const selfBaseUrl = getApiBaseUrl();
 
+    if (config?.useSharedKey) {
+      if (!state) {
+        logger.warn('Shared Apple OAuth called without state parameter');
+        throw new Error('State parameter is required for shared Apple OAuth');
+      }
+      // Use shared keys if configured
+      const cloudBaseUrl = process.env.CLOUD_API_HOST || 'https://api.insforge.dev';
+      const redirectUri = `${selfBaseUrl}/api/auth/oauth/shared/callback/${state}`;
+      const response = await axios.get(
+        `${cloudBaseUrl}/auth/v1/shared/apple?redirect_uri=${encodeURIComponent(redirectUri)}`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      return response.data.auth_url || response.data.url || '';
+    }
+
     logger.debug('Apple OAuth Config (fresh from DB):', {
       clientId: config.clientId ? 'SET' : 'NOT SET',
     });
