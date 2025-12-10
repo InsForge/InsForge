@@ -16,6 +16,8 @@ import {
   setRefreshTokenCookie,
   clearRefreshTokenCookie,
   issueRefreshTokenCookie,
+  generateCsrfToken,
+  verifyCsrfToken,
 } from '@/utils/cookies.js';
 import {
   userIdSchema,
@@ -149,7 +151,7 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
       'system'
     );
 
-    successResponse(res, result);
+    successResponse(res, { ...result, csrfToken });
   } catch (error) {
     next(error);
   }
@@ -176,7 +178,7 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
     setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
     result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
 
-    successResponse(res, result);
+    successResponse(res, { ...result, csrfToken });
   } catch (error) {
     next(error);
   }
@@ -190,6 +192,13 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
 
     if (!refreshToken) {
       throw new AppError('No refresh token provided', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+
+    // Verify CSRF token to prevent CSRF attacks
+    const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
+    if (!verifyCsrfToken(csrfHeader, refreshToken)) {
+      logger.warn('[Auth:Refresh] CSRF token validation failed');
+      throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
     const tokenManager = TokenManager.getInstance();
