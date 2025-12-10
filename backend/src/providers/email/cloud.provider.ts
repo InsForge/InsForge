@@ -5,6 +5,7 @@ import logger from '@/utils/logger.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { EmailTemplate } from '@/types/email.js';
+import { SendRawEmailRequest } from '@insforge/shared-schemas';
 import { EmailProvider } from './base.provider.js';
 
 /**
@@ -176,6 +177,89 @@ export class CloudEmailProvider implements EmailProvider {
         template,
         error: error instanceof Error ? error.message : 'Unknown error',
       });
+
+      throw new AppError(
+        `Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+  }
+
+  /**
+   * Send custom/raw email via cloud backend
+   */
+  async sendRaw(options: SendRawEmailRequest): Promise<void> {
+    try {
+      const projectId = config.cloud.projectId;
+      const apiHost = config.cloud.apiHost;
+      const signToken = this.generateSignToken();
+
+      const url = `${apiHost}/email/v1/${projectId}/send-on-demand`;
+      const response = await axios.post(url, options, {
+        headers: {
+          'Content-Type': 'application/json',
+          sign: signToken,
+        },
+        timeout: 10000,
+      });
+
+      if (response.data?.success) {
+        logger.info('Raw email sent successfully', { projectId });
+      } else {
+        throw new AppError(
+          'Email service returned unsuccessful response',
+          500,
+          ERROR_CODES.INTERNAL_ERROR
+        );
+      }
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const message = error.response?.data?.message || error.message;
+
+        logger.error('Failed to send raw email via cloud backend', {
+          projectId: config.cloud.projectId,
+          status,
+          message,
+        });
+
+        if (status === 401) {
+          throw new AppError(
+            'Authentication failed with cloud email service.',
+            status,
+            ERROR_CODES.AUTH_UNAUTHORIZED
+          );
+        } else if (status === 403) {
+          throw new AppError(
+            'Custom email service is not available for free plan. Please upgrade to use this feature.',
+            status,
+            ERROR_CODES.FORBIDDEN
+          );
+        } else if (status === 429) {
+          throw new AppError(
+            'Email rate limit exceeded. Starter plan is limited 10 emails per hour, and Pro plan is limited 50 emails per hour',
+            status,
+            ERROR_CODES.RATE_LIMITED
+          );
+        } else if (status === 400) {
+          throw new AppError(
+            `Invalid email request: ${message}`,
+            status,
+            ERROR_CODES.INVALID_INPUT
+          );
+        } else {
+          throw new AppError(
+            `Failed to send email: ${message}`,
+            status || 500,
+            ERROR_CODES.INTERNAL_ERROR
+          );
+        }
+      }
+
+      if (error instanceof AppError) {
+        throw error;
+      }
 
       throw new AppError(
         `Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`,
