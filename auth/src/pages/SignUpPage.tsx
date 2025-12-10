@@ -17,7 +17,7 @@ export function SignUpPage() {
     const unsubscribeVerified = broadcastService.subscribe(
       BroadcastEventType.EMAIL_VERIFIED_SUCCESS,
       (event: BroadcastEvent) => {
-        const { accessToken, user } = event.data || {};
+        const { accessToken, user, csrfToken } = event.data || {};
         if (accessToken && user) {
           // Email verified in another tab, redirect with token
           try {
@@ -27,6 +27,9 @@ export function SignUpPage() {
             params.set('user_id', user.id);
             params.set('email', user.email);
             params.set('name', user.name);
+            if (csrfToken) {
+              params.set('csrf_token', csrfToken);
+            }
             finalUrl.search = params.toString();
             window.location.href = finalUrl.toString();
           } catch {
