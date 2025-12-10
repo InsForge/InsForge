@@ -7,7 +7,7 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
-import { setRefreshTokenCookie } from '@/utils/cookies.js';
+import { setRefreshTokenCookie, generateCsrfToken } from '@/utils/cookies.js';
 import logger from '@/utils/logger.js';
 import jwt from 'jsonwebtoken';
 import {
@@ -343,7 +343,8 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     // Handle shared callback - transforms payload and creates/finds user
     const result = await authService.handleSharedCallback(validatedProvider, payloadData);
 
-    // Set refresh token in httpOnly cookie before redirect
+    // Set refresh token in httpOnly cookie before redirect and generate CSRF token
+    let csrfToken = '';
     if (result?.accessToken && result?.user) {
       const tokenManager = TokenManager.getInstance();
       const refreshToken = tokenManager.generateRefreshToken({
@@ -352,6 +353,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
         role: 'authenticated',
       });
       setRefreshTokenCookie(res, refreshToken);
+      csrfToken = generateCsrfToken(refreshToken);
     }
 
     const params = new URLSearchParams();
@@ -359,6 +361,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     params.set('user_id', result?.user?.id ?? '');
     params.set('email', result?.user?.email ?? '');
     params.set('name', result?.user?.name ?? '');
+    params.set('csrf_token', csrfToken);
 
     res.redirect(`${redirectUri}?${params.toString()}`);
   } catch (error) {
@@ -417,7 +420,8 @@ router.get('/:provider/callback', async (req: Request, res: Response, next: Next
         state: state as string | undefined,
       });
 
-      // Set refresh token in httpOnly cookie before redirect
+      // Set refresh token in httpOnly cookie before redirect and generate CSRF token
+      let csrfToken = '';
       if (result?.accessToken && result?.user) {
         const tokenManager = TokenManager.getInstance();
         const refreshToken = tokenManager.generateRefreshToken({
@@ -426,6 +430,7 @@ router.get('/:provider/callback', async (req: Request, res: Response, next: Next
           role: 'authenticated',
         });
         setRefreshTokenCookie(res, refreshToken);
+        csrfToken = generateCsrfToken(refreshToken);
       }
 
       // Construct redirect URL with query parameters
@@ -434,6 +439,7 @@ router.get('/:provider/callback', async (req: Request, res: Response, next: Next
       params.set('user_id', result?.user?.id ?? '');
       params.set('email', result?.user?.email ?? '');
       params.set('name', result?.user?.name ?? '');
+      params.set('csrf_token', csrfToken);
 
       const finalRedirectUri = `${redirectUri}?${params.toString()}`;
 

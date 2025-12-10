@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import crypto from 'crypto';
 import { isCloudEnvironment } from './environment.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 
@@ -7,6 +8,52 @@ import { TokenManager } from '@/infra/security/token.manager.js';
  * Following security best practices from the auth rework design document
  */
 export const REFRESH_TOKEN_COOKIE_NAME = 'insforge_refresh_token';
+
+/**
+ * CSRF Token Generation
+ *
+ * Generates a CSRF token derived from the refresh token using HMAC.
+ * This allows stateless verification - no need to store CSRF tokens separately.
+ *
+ * The CSRF token is returned in the response body, and the SDK stores it
+ * in a frontend-domain cookie. On refresh requests, the SDK sends it in
+ * the X-CSRF-Token header, which is validated against HMAC(refreshToken).
+ *
+ * This prevents CSRF attacks because:
+ * 1. Attackers can't read cross-origin cookies (same-origin policy)
+ * 2. Attackers can't compute the CSRF token without knowing the secret
+ */
+export function generateCsrfToken(refreshToken: string): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET is required for CSRF token generation');
+  }
+  return crypto.createHmac('sha256', secret).update(refreshToken).digest('hex').substring(0, 32);
+}
+
+/**
+ * Verify CSRF Token
+ *
+ * Validates that the provided CSRF token matches the expected value
+ * derived from the refresh token.
+ *
+ * @param csrfToken - The CSRF token from X-CSRF-Token header
+ * @param refreshToken - The refresh token from httpOnly cookie
+ * @returns true if valid, false otherwise
+ */
+export function verifyCsrfToken(csrfToken: string | undefined, refreshToken: string): boolean {
+  if (!csrfToken) {
+    return false;
+  }
+  const expectedToken = generateCsrfToken(refreshToken);
+  // Use timing-safe comparison to prevent timing attacks
+  try {
+    return crypto.timingSafeEqual(Buffer.from(csrfToken), Buffer.from(expectedToken));
+  } catch {
+    // Buffers have different lengths
+    return false;
+  }
+}
 
 /**
  * Cookie options for refresh token
@@ -50,15 +97,18 @@ export function clearRefreshTokenCookie(res: Response): void {
 
 /**
  * Issue refresh token cookie for authenticated user
- * Generates refresh token and sets both refresh token and auth flag cookies
+ * Generates refresh token, sets httpOnly cookie, and returns CSRF token
  *
  * @param res - Express response object
  * @param user - User object with id and email
- * @returns void - Only issues cookie if user has valid id and email
+ * @returns csrfToken - The CSRF token to include in response body, or null if user is invalid
  */
-export function issueRefreshTokenCookie(res: Response, user: { id: string; email: string }): void {
+export function issueRefreshTokenCookie(
+  res: Response,
+  user: { id: string; email: string }
+): string | null {
   if (!user?.id || !user?.email) {
-    return;
+    return null;
   }
 
   const tokenManager = TokenManager.getInstance();
@@ -68,4 +118,7 @@ export function issueRefreshTokenCookie(res: Response, user: { id: string; email
     role: 'authenticated',
   });
   setRefreshTokenCookie(res, refreshToken);
+
+  // Return CSRF token for response body (SDK will store in frontend cookie)
+  return generateCsrfToken(refreshToken);
 }
