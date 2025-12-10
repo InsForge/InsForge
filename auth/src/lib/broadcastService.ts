@@ -10,6 +10,7 @@ export interface BroadcastEvent {
   data?: {
     accessToken?: string;
     user?: { id: string; email: string; name: string };
+    csrfToken?: string;
   };
 }
 
