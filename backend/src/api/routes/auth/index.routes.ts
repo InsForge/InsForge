@@ -15,9 +15,8 @@ import {
   setRefreshTokenCookie,
   clearRefreshTokenCookie,
   issueRefreshTokenCookie,
-  generateCsrfToken,
-  verifyCsrfToken,
 } from '@/utils/cookies.js';
+import { CsrfManager } from '@/infra/security/csrf.manager.js';
 import {
   userIdSchema,
   createUserRequestSchema,
@@ -193,7 +192,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
 
     // Verify CSRF token to prevent CSRF attacks
     const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
-    if (!verifyCsrfToken(csrfHeader, refreshToken)) {
+    if (!CsrfManager.verify(csrfHeader, refreshToken)) {
       logger.warn('[Auth:Refresh] CSRF token validation failed');
       throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
@@ -221,7 +220,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     setRefreshTokenCookie(res, newRefreshToken);
 
     // Generate new CSRF token for the new refresh token
-    const newCsrfToken = generateCsrfToken(newRefreshToken);
+    const newCsrfToken = CsrfManager.generate(newRefreshToken);
 
     // Fetch user data for response
     const user = await authService.getUserSchemaById(payload.sub);
