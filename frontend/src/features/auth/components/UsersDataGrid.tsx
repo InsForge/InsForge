@@ -69,6 +69,12 @@ const ProviderIcon = ({ provider }: { provider: string }) => {
           color:
             'bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-zinc-300 dark:border-gray-500',
         };
+      case 'apple':
+        return {
+          label: 'Apple',
+          color:
+            'bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-zinc-300 dark:border-gray-500',
+        };
       default:
         return {
           label: provider,

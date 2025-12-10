@@ -6,6 +6,7 @@ import Discord from '@/assets/logos/discord.svg?react';
 import LinkedIn from '@/assets/logos/linkedin.svg?react';
 import Facebook from '@/assets/logos/facebook.svg?react';
 import X from '@/assets/logos/x.svg?react';
+import Apple from '@/assets/logos/apple.svg?react';
 import type { OAuthProvidersSchema } from '@insforge/shared-schemas';
 
 export enum AuthTab {
@@ -71,6 +72,13 @@ export const oauthProviders: OAuthProviderInfo[] = [
     icon: <X className="w-6 h-6 text-black dark:text-white" />,
     description: 'Configure X authentication for your users',
     setupUrl: 'https://developer.x.com/en/portal/dashboard',
+  },
+  {
+    id: 'apple',
+    name: 'Apple OAuth',
+    icon: <Apple className="w-6 h-6 text-black dark:text-white" />,
+    description: 'Configure Apple Sign In for your users',
+    setupUrl: 'https://developer.apple.com/account/resources/identifiers/list',
   },
 ];
 

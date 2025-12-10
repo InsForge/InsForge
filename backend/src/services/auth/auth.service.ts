@@ -33,6 +33,7 @@ import {
   LinkedInUserInfo,
   DiscordUserInfo,
   XUserInfo,
+  AppleUserInfo,
   UserRecord,
   OAuthUserData,
 } from '@/types/auth.js';
@@ -42,6 +43,7 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { EmailService } from '@/services/email/email.service.js';
 import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
+import { AppleOAuthProvider } from '@/providers/oauth/apple.provider.js';
 
 /**
  * Simplified JWT-based auth service
@@ -62,6 +64,7 @@ export class AuthService {
   private facebookOAuthProvider: FacebookOAuthProvider;
   private microsoftOAuthProvider: MicrosoftOAuthProvider;
   private xOAuthProvider: XOAuthProvider;
+  private appleOAuthProvider: AppleOAuthProvider;
 
   private constructor() {
     this.adminEmail = process.env.ADMIN_EMAIL ?? '';
@@ -82,6 +85,7 @@ export class AuthService {
     this.facebookOAuthProvider = FacebookOAuthProvider.getInstance();
     this.microsoftOAuthProvider = MicrosoftOAuthProvider.getInstance();
     this.xOAuthProvider = XOAuthProvider.getInstance();
+    this.appleOAuthProvider = AppleOAuthProvider.getInstance();
 
     logger.info('AuthService initialized');
   }
@@ -670,6 +674,7 @@ export class AuthService {
       | MicrosoftUserInfo
       | FacebookUserInfo
       | XUserInfo
+      | AppleUserInfo
       | Record<string, unknown>
   ): Promise<CreateSessionResponse> {
     const pool = this.getPool();
@@ -777,6 +782,7 @@ export class AuthService {
       | MicrosoftUserInfo
       | FacebookUserInfo
       | XUserInfo
+      | AppleUserInfo
       | Record<string, unknown>,
     avatarUrl: string
   ): Promise<CreateSessionResponse> {
@@ -870,6 +876,8 @@ export class AuthService {
         return this.microsoftOAuthProvider.generateOAuthUrl(state);
       case 'x':
         return this.xOAuthProvider.generateOAuthUrl(state);
+      case 'apple':
+        return this.appleOAuthProvider.generateOAuthUrl(state);
       default:
         throw new Error(`OAuth provider ${provider} is not implemented yet.`);
     }
@@ -905,6 +913,9 @@ export class AuthService {
         break;
       case 'x':
         userData = await this.xOAuthProvider.handleCallback(payload);
+        break;
+      case 'apple':
+        userData = await this.appleOAuthProvider.handleCallback(payload);
         break;
       default:
         throw new Error(`OAuth provider ${provider} is not implemented yet.`);
@@ -948,6 +959,9 @@ export class AuthService {
         break;
       case 'x':
         userData = this.xOAuthProvider.handleSharedCallback(payloadData);
+        break;
+      case 'apple':
+        userData = this.appleOAuthProvider.handleSharedCallback(payloadData);
         break;
       case 'microsoft':
       default:

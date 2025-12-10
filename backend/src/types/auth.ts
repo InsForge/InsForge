@@ -135,6 +135,16 @@ export interface XUserInfo {
   created_at?: string;
 }
 
+export interface AppleUserInfo {
+  sub: string;
+  email: string;
+  email_verified?: boolean;
+  is_private_email?: boolean;
+  name?: string;
+  given_name?: string;
+  family_name?: string;
+}
+
 // Generic OAuth user data returned by provider services
 export interface OAuthUserData {
   provider: string;
@@ -150,5 +160,6 @@ export interface OAuthUserData {
     | FacebookUserInfo
     | MicrosoftUserInfo
     | XUserInfo
+    | AppleUserInfo
     | Record<string, unknown>;
 }
