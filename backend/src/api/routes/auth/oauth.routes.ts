@@ -7,7 +7,8 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
-import { setRefreshTokenCookie, generateCsrfToken } from '@/utils/cookies.js';
+import { setRefreshTokenCookie } from '@/utils/cookies.js';
+import { CsrfManager } from '@/infra/security/csrf.manager.js';
 import logger from '@/utils/logger.js';
 import jwt from 'jsonwebtoken';
 import {
@@ -353,7 +354,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
         role: 'authenticated',
       });
       setRefreshTokenCookie(res, refreshToken);
-      csrfToken = generateCsrfToken(refreshToken);
+      csrfToken = CsrfManager.generate(refreshToken);
     }
 
     const params = new URLSearchParams();
@@ -430,7 +431,7 @@ router.get('/:provider/callback', async (req: Request, res: Response, next: Next
           role: 'authenticated',
         });
         setRefreshTokenCookie(res, refreshToken);
-        csrfToken = generateCsrfToken(refreshToken);
+        csrfToken = CsrfManager.generate(refreshToken);
       }
 
       // Construct redirect URL with query parameters
