@@ -15,6 +15,7 @@ import functionsRouter from '@/api/routes/functions/index.routes.js';
 import secretsRouter from '@/api/routes/secrets/index.routes.js';
 import { usageRouter } from '@/api/routes/usage/index.routes.js';
 import { aiRouter } from '@/api/routes/ai/index.routes.js';
+import { emailRouter } from '@/api/routes/email/index.routes.js';
 import { errorMiddleware } from '@/api/middlewares/error.js';
 import fetch, { HeadersInit } from 'node-fetch';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
@@ -170,6 +171,7 @@ export async function createApp() {
   apiRouter.use('/secrets', secretsRouter);
   apiRouter.use('/usage', usageRouter);
   apiRouter.use('/ai', aiRouter);
+  apiRouter.use('/email', emailRouter);
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);

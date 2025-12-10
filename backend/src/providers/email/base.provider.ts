@@ -1,4 +1,5 @@
 import { EmailTemplate } from '@/types/email.js';
+import { SendRawEmailRequest } from '@insforge/shared-schemas';
 
 /**
  * Email provider interface
@@ -25,14 +26,10 @@ export interface EmailProvider {
   ): Promise<void>;
 
   /**
-   * Send raw email with custom subject and body
-   * Optional - not all providers may support this
-   * @param to - Recipient email address
-   * @param subject - Email subject
-   * @param html - HTML email body
-   * @param text - Plain text email body (optional)
+   * Send custom/raw email (optional - not all providers may support this)
+   * @param options - Email options (to, subject, html, cc, bcc, from, replyTo)
    */
-  sendRaw?(to: string, subject: string, html: string, text?: string): Promise<void>;
+  sendRaw?(options: SendRawEmailRequest): Promise<void>;
 
   /**
    * Check if provider supports template-based emails
