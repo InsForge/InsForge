@@ -1,32 +1,27 @@
-import { useCallback, useMemo, useEffect, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSocket, ServerEvents } from '@/lib/contexts/SocketContext';
+import { useMemo, useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { usageService, McpUsageRecord } from '@/features/logs/services/usage.service';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
 import { LOGS_PAGE_SIZE } from '../helpers';
-import { postMessageToParent } from '@/lib/utils/cloudMessaging';
-import { SocketMessage } from '@insforge/shared-schemas';
 
 // ============================================================================
 // Main Hook
 // ============================================================================
 
 /**
- * Hook to manage MCP usage data and real-time updates
+ * Hook to manage MCP usage data
  *
  * Features:
- * - Fetches initial MCP logs from backend
- * - Listens to real-time socket updates for new MCP calls
- * - Invalidates queries on WebSocket events to refetch latest data
+ * - Fetches MCP logs from backend
  * - Provides helper functions for data access
- * - Handles parent window communication for onboarding (if in iframe)
+ * - Handles initial parent window notification for onboarding (if in iframe)
  * - Supports search and pagination
+ *
+ * Note: Real-time socket updates are handled centrally in SocketContext
  */
 export function useMcpUsage() {
   // Hooks
-  const queryClient = useQueryClient();
-  const { socket, isConnected } = useSocket();
   const { isAuthenticated } = useAuth();
 
   // State
@@ -102,43 +97,6 @@ export function useMcpUsage() {
       '*'
     );
   }, [isLoading, records]);
-
-  // Handle real-time MCP connection events from socket
-  const handleMcpConnected = useCallback(
-    (message: SocketMessage) => {
-      // Notify parent window with latest MCP call info
-      if (window.parent !== window) {
-        window.parent.postMessage(
-          {
-            type: 'MCP_CONNECTION_STATUS',
-            connected: true,
-            tool_name: message.tool_name,
-            timestamp: message.created_at,
-          },
-          '*'
-        );
-        if (!records.length) {
-          postMessageToParent({ type: 'ONBOARDING_SUCCESS' });
-        }
-      }
-      // Invalidate query to refetch latest data (follows codebase pattern)
-      void queryClient.invalidateQueries({ queryKey: ['mcp-usage'] });
-    },
-    [queryClient, records.length]
-  );
-
-  // Subscribe to socket MCP connection events
-  useEffect(() => {
-    if (!socket || !isConnected) {
-      return;
-    }
-
-    socket.on(ServerEvents.MCP_CONNECTED, handleMcpConnected);
-
-    return () => {
-      socket.off(ServerEvents.MCP_CONNECTED, handleMcpConnected);
-    };
-  }, [socket, isConnected, handleMcpConnected]);
 
   // Computed values
   const hasCompletedOnboarding = useMemo(() => !!records.length, [records]);

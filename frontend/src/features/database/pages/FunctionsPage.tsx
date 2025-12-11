@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import {
   Button,
@@ -15,13 +15,8 @@ import {
 } from '@/components';
 import { useFullMetadata } from '../hooks/useFullMetadata';
 import { SQLModal, SQLCellButton } from '../components/SQLModal';
-import type {
-  ExportDatabaseResponse,
-  ExportDatabaseJsonData,
-  SocketMessage,
-} from '@insforge/shared-schemas';
+import type { ExportDatabaseResponse, ExportDatabaseJsonData } from '@insforge/shared-schemas';
 import { isSystemFunction } from '../constants';
-import { DataUpdateResourceType, ServerEvents, useSocket } from '@/lib/contexts/SocketContext';
 
 interface FunctionRow extends DataGridRowType {
   id: string;
@@ -61,27 +56,7 @@ export default function FunctionsPage() {
   const { data: metadata, isLoading, error, refetch } = useFullMetadata(true);
   const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
 
-  const { socket, isConnected } = useSocket();
-
   const allFunctions = useMemo(() => parseFunctionsFromMetadata(metadata), [metadata]);
-
-  useEffect(() => {
-    if (!socket || !isConnected) {
-      return;
-    }
-
-    const handleDataUpdate = (message: SocketMessage) => {
-      if (message.resource === DataUpdateResourceType.DATABASE) {
-        void refetch();
-      }
-    };
-
-    socket.on(ServerEvents.DATA_UPDATE, handleDataUpdate);
-
-    return () => {
-      socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
-    };
-  }, [socket, isConnected, refetch]);
 
   const filteredFunctions = useMemo(() => {
     if (!searchQuery.trim()) {

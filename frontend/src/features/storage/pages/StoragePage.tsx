@@ -25,8 +25,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components';
-import type { SocketMessage } from '@insforge/shared-schemas';
-import { DataUpdateResourceType, ServerEvents, useSocket } from '@/lib/contexts/SocketContext';
 
 interface BucketFormState {
   mode: 'create' | 'edit';
@@ -48,14 +46,12 @@ export default function StoragePage() {
     name: null,
     isPublic: false,
   });
+  const queryClient = useQueryClient();
   const { confirm, confirmDialogProps } = useConfirm();
   const { showToast } = useToast();
   const { showUploadToast, updateUploadProgress, cancelUpload } = useUploadToast();
-  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadAbortControllerRef = useRef<AbortController | null>(null);
-
-  const { socket, isConnected } = useSocket();
 
   const {
     buckets,
@@ -74,25 +70,6 @@ export default function StoragePage() {
   const bucketInfo = React.useMemo(() => {
     return bucketStats || {};
   }, [bucketStats]);
-
-  useEffect(() => {
-    if (!socket || !isConnected) {
-      return;
-    }
-
-    const handleDataUpdate = (message: SocketMessage) => {
-      if (message.resource === DataUpdateResourceType.BUCKETS) {
-        // Invalidate all buckets queries
-        void queryClient.invalidateQueries({ queryKey: ['storage'] });
-      }
-    };
-
-    socket.on(ServerEvents.DATA_UPDATE, handleDataUpdate);
-
-    return () => {
-      socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
-    };
-  }, [socket, isConnected, queryClient]);
 
   // Auto-select first bucket
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import {
@@ -10,8 +10,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components';
-import type { SocketMessage } from '@insforge/shared-schemas';
-import { useSocket, ServerEvents } from '@/lib/contexts/SocketContext';
 import { useRealtime } from '../hooks/useRealtime';
 import { MessageRow } from '../components/MessageRow';
 import RealtimeEmptyState from '../components/RealtimeEmptyState';
@@ -32,8 +30,6 @@ export default function RealtimeMessagesPage() {
     setMessagesPage,
   } = useRealtime();
 
-  const { socket, isConnected } = useSocket();
-
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
@@ -42,25 +38,6 @@ export default function RealtimeMessagesPage() {
       setIsRefreshing(false);
     }
   };
-
-  // Listen for real-time updates
-  useEffect(() => {
-    if (!socket || !isConnected) {
-      return;
-    }
-
-    const handleDataUpdate = (message: SocketMessage) => {
-      if (message.resource === 'realtime') {
-        void refetchMessages();
-      }
-    };
-
-    socket.on(ServerEvents.DATA_UPDATE, handleDataUpdate);
-
-    return () => {
-      socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
-    };
-  }, [socket, isConnected, refetchMessages]);
 
   // Message detail view
   if (selectedMessage) {
