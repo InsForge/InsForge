@@ -538,7 +538,8 @@ describe('analyzeQuery', () => {
         CREATE TABLE new_data (id INT);
         ALTER TABLE users ADD COLUMN new_col TEXT;
       `);
-      expect(result).toHaveLength(5);
+      // tables is deduplicated (DROP + CREATE both emit 'tables')
+      expect(result).toHaveLength(4);
       expect(result).toContainEqual({ type: 'tables' });
       expect(result).toContainEqual({ type: 'index' });
       expect(result).toContainEqual({ type: 'policy' });
@@ -551,11 +552,8 @@ describe('analyzeQuery', () => {
         UPDATE products SET price = 100 WHERE name = 'new';
         DELETE FROM products WHERE stock = 0;
       `);
-      expect(result).toEqual([
-        { type: 'records', name: 'products' },
-        { type: 'records', name: 'products' },
-        { type: 'records', name: 'products' },
-      ]);
+      // Deduplicated to single entry
+      expect(result).toEqual([{ type: 'records', name: 'products' }]);
     });
 
     it('mixed with selects (selects ignored)', () => {
@@ -579,12 +577,13 @@ describe('analyzeQuery', () => {
         CREATE POLICY posts_policy ON posts FOR ALL USING (user_id = auth.uid());
         CREATE FUNCTION auth.uid() RETURNS UUID AS $$ SELECT current_setting('app.user_id')::UUID $$ LANGUAGE sql;
       `);
-      expect(result).toHaveLength(9);
+      // Deduplicated: 2 CREATE TABLEs -> 1 'tables', 2 CREATE POLICYs -> 1 'policy'
+      expect(result).toHaveLength(7);
       expect(result.filter((r) => r.type === 'extension')).toHaveLength(1);
-      expect(result.filter((r) => r.type === 'tables')).toHaveLength(2);
+      expect(result.filter((r) => r.type === 'tables')).toHaveLength(1);
       expect(result.filter((r) => r.type === 'index')).toHaveLength(1);
-      expect(result.filter((r) => r.type === 'table')).toHaveLength(2);
-      expect(result.filter((r) => r.type === 'policy')).toHaveLength(2);
+      expect(result.filter((r) => r.type === 'table')).toHaveLength(2); // ALTER users + ALTER posts (different names)
+      expect(result.filter((r) => r.type === 'policy')).toHaveLength(1);
       expect(result.filter((r) => r.type === 'function')).toHaveLength(1);
     });
   });
@@ -635,6 +634,60 @@ describe('analyzeQuery', () => {
       expect(analyzeQuery("INSERT INTO logs (msg) VALUES ('hello; world')")).toEqual([
         { type: 'records', name: 'logs' },
       ]);
+    });
+  });
+
+  // ===================
+  // DEDUPLICATION
+  // ===================
+  describe('deduplication', () => {
+    it('deduplicates multiple inserts to same table', () => {
+      const result = analyzeQuery(`
+        INSERT INTO users (name) VALUES ('a');
+        INSERT INTO users (name) VALUES ('b');
+        INSERT INTO users (name) VALUES ('c');
+      `);
+      expect(result).toEqual([{ type: 'records', name: 'users' }]);
+    });
+
+    it('deduplicates multiple updates to same table', () => {
+      const result = analyzeQuery(`
+        UPDATE products SET price = 10 WHERE id = 1;
+        UPDATE products SET price = 20 WHERE id = 2;
+      `);
+      expect(result).toEqual([{ type: 'records', name: 'products' }]);
+    });
+
+    it('keeps different tables separate', () => {
+      const result = analyzeQuery(`
+        INSERT INTO users (name) VALUES ('a');
+        INSERT INTO posts (title) VALUES ('b');
+        INSERT INTO users (name) VALUES ('c');
+      `);
+      expect(result).toEqual([
+        { type: 'records', name: 'users' },
+        { type: 'records', name: 'posts' },
+      ]);
+    });
+
+    it('keeps different types separate', () => {
+      const result = analyzeQuery(`
+        INSERT INTO users (name) VALUES ('a');
+        ALTER TABLE users ADD COLUMN foo TEXT;
+      `);
+      expect(result).toEqual([
+        { type: 'records', name: 'users' },
+        { type: 'table', name: 'users' },
+      ]);
+    });
+
+    it('deduplicates DDL without names', () => {
+      const result = analyzeQuery(`
+        CREATE INDEX idx1 ON users (a);
+        CREATE INDEX idx2 ON users (b);
+        CREATE INDEX idx3 ON posts (c);
+      `);
+      expect(result).toEqual([{ type: 'index' }]);
     });
   });
 });

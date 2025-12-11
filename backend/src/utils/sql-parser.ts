@@ -38,9 +38,20 @@ const DROP_TYPES: Record<string, QueryChange['type']> = {
 export function analyzeQuery(query: string): QueryChange[] {
   try {
     const { stmts } = parseSync(query);
-    return stmts
+    const changes = stmts
       .map((s: { stmt: Record<string, unknown> }) => extractChange(s.stmt))
       .filter((c: QueryChange | null): c is QueryChange => c !== null);
+
+    // Deduplicate by type+name
+    const seen = new Set<string>();
+    return changes.filter((c: QueryChange) => {
+      const key = `${c.type}:${c.name ?? ''}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
   } catch (e) {
     logger.warn('SQL parse error:', e);
     return [];
