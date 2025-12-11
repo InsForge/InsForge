@@ -67,3 +67,42 @@ export type ColumnSchema = z.infer<typeof columnSchema>;
 export type ForeignKeySchema = z.infer<typeof foreignKeySchema>;
 export type OnUpdateActionSchema = z.infer<typeof onUpdateActionSchema>;
 export type OnDeleteActionSchema = z.infer<typeof onDeleteActionSchema>;
+
+// Database Metadata Object Schemas
+export const databaseFunctionSchema = z.object({
+  functionName: z.string(),
+  functionDef: z.string(),
+  kind: z.string(),
+});
+
+export const databaseIndexSchema = z.object({
+  tableName: z.string(),
+  indexName: z.string(),
+  indexDef: z.string(),
+  isUnique: z.boolean().nullable(),
+  isPrimary: z.boolean().nullable(),
+});
+
+export const databasePolicySchema = z.object({
+  tableName: z.string(),
+  policyName: z.string(),
+  cmd: z.string(),
+  roles: z.array(z.string()),
+  qual: z.string().nullable(),
+  withCheck: z.string().nullable(),
+});
+
+export const databaseTriggerSchema = z.object({
+  tableName: z.string(),
+  triggerName: z.string(),
+  actionTiming: z.string(),
+  eventManipulation: z.string(),
+  actionOrientation: z.string(),
+  actionCondition: z.string().nullable(),
+  actionStatement: z.string(),
+});
+
+export type DatabaseFunction = z.infer<typeof databaseFunctionSchema>;
+export type DatabaseIndex = z.infer<typeof databaseIndexSchema>;
+export type DatabasePolicy = z.infer<typeof databasePolicySchema>;
+export type DatabaseTrigger = z.infer<typeof databaseTriggerSchema>;

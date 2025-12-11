@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useEffectEvent,
   useRef,
   useState,
   useCallback,
@@ -9,8 +10,12 @@ import {
   useMemo,
 } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { postMessageToParent } from '@/lib/utils/cloudMessaging';
+import type { SocketMessage } from '@insforge/shared-schemas';
+import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 
 // ============================================================================
 // Types & Enums
@@ -23,42 +28,23 @@ export enum ServerEvents {
   NOTIFICATION = 'notification',
   DATA_UPDATE = 'data:update',
   MCP_CONNECTED = 'mcp:connected',
-  // Realtime events
-  REALTIME_ERROR = 'realtime:error',
-}
-
-/**
- * Client-to-server event types
- */
-export enum ClientEvents {
-  // Realtime events
-  REALTIME_SUBSCRIBE = 'realtime:subscribe',
-  REALTIME_UNSUBSCRIBE = 'realtime:unsubscribe',
-  REALTIME_PUBLISH = 'realtime:publish',
 }
 
 // ============================================================================
 // Payload Types
 // ============================================================================
 
-export interface NotificationPayload {
-  level: 'info' | 'warning' | 'error' | 'success';
-  title: string;
-  message: string;
-}
-
 export enum DataUpdateResourceType {
   DATABASE = 'database',
   USERS = 'users',
-  RECORDS = 'records',
   BUCKETS = 'buckets',
   FUNCTIONS = 'functions',
+  REALTIME = 'realtime',
 }
 
-export interface DataUpdatePayload {
-  resource: DataUpdateResourceType;
-  action: 'created' | 'updated' | 'deleted';
-  data: unknown;
+export interface DatabaseResourceUpdate {
+  type: 'tables' | 'table' | 'records' | 'index' | 'trigger' | 'policy' | 'function' | 'extension';
+  name?: string;
 }
 
 // ============================================================================
@@ -74,7 +60,6 @@ interface SocketState {
 interface SocketActions {
   connect: (token: string | null) => void;
   disconnect: () => void;
-  emit: (event: ClientEvents, data?: unknown) => void;
 }
 
 interface SocketContextValue extends SocketState, SocketActions {
@@ -97,6 +82,9 @@ interface SocketProviderProps {
 export function SocketProvider({ children }: SocketProviderProps) {
   // Get authentication state
   const { isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
+  const { recordsCount: mcpUsageCount } = useMcpUsage();
+
   // State
   const [state, setState] = useState<SocketState>({
     isConnected: false,
@@ -207,13 +195,6 @@ export function SocketProvider({ children }: SocketProviderProps) {
     });
   }, [updateState]);
 
-  /**
-   * Emit event to server
-   */
-  const emit = useCallback((event: ClientEvents, data?: unknown) => {
-    socketRef.current?.emit(event, data);
-  }, []);
-
   // Monitor authentication state and token changes
   useEffect(() => {
     const token = apiClient.getToken();
@@ -234,6 +215,112 @@ export function SocketProvider({ children }: SocketProviderProps) {
     };
   }, [disconnect]);
 
+  // Send onboarding success only on first MCP connection
+  const onMcpConnectedSuccess = useEffectEvent(() => {
+    if (mcpUsageCount === 0) {
+      postMessageToParent({ type: 'ONBOARDING_SUCCESS' });
+    }
+  });
+
+  // Register business event handlers when socket is connected
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket || !state.isConnected) {
+      return;
+    }
+
+    // Handle DATA_UPDATE events - invalidate relevant queries
+    const handleDataUpdate = (message: SocketMessage) => {
+      const resource = message.resource as DataUpdateResourceType;
+
+      switch (resource) {
+        case DataUpdateResourceType.DATABASE: {
+          const { changes } = (message.data ?? {}) as { changes?: DatabaseResourceUpdate[] };
+
+          if (!changes || changes.length === 0) {
+            break;
+          }
+
+          // Invalidate specific queries based on resource types changed
+          for (const change of changes) {
+            switch (change.type) {
+              case 'tables':
+                // CREATE TABLE / DROP TABLE - affects table list
+                void queryClient.invalidateQueries({ queryKey: ['tables'] });
+                void queryClient.invalidateQueries({ queryKey: ['metadata', 'full'] });
+                break;
+              case 'table':
+                // ALTER TABLE / RENAME - affects specific table and list
+                void queryClient.invalidateQueries({ queryKey: ['tables'] });
+                if (change.name) {
+                  void queryClient.invalidateQueries({ queryKey: ['table', change.name] });
+                }
+                break;
+              case 'records':
+                // INSERT / UPDATE / DELETE - affects records for specific table
+                if (change.name) {
+                  void queryClient.invalidateQueries({ queryKey: ['records', change.name] });
+                }
+                break;
+              case 'index':
+                void queryClient.invalidateQueries({ queryKey: ['database', 'indexes'] });
+                break;
+              case 'trigger':
+                void queryClient.invalidateQueries({ queryKey: ['database', 'triggers'] });
+                break;
+              case 'policy':
+                void queryClient.invalidateQueries({ queryKey: ['database', 'policies'] });
+                break;
+              case 'function':
+                void queryClient.invalidateQueries({ queryKey: ['database', 'functions'] });
+                break;
+              case 'extension':
+                // Extensions are not supported yet
+                break;
+            }
+          }
+          break;
+        }
+        case DataUpdateResourceType.BUCKETS:
+          void queryClient.invalidateQueries({ queryKey: ['storage', 'buckets'] });
+          void queryClient.invalidateQueries({ queryKey: ['metadata', 'full'] });
+          break;
+        case DataUpdateResourceType.USERS:
+          void queryClient.invalidateQueries({ queryKey: ['users'] });
+          break;
+        case DataUpdateResourceType.FUNCTIONS:
+          void queryClient.invalidateQueries({ queryKey: ['functions'] });
+          break;
+        case DataUpdateResourceType.REALTIME:
+          void queryClient.invalidateQueries({ queryKey: ['realtime'] });
+          break;
+      }
+    };
+
+    // Handle MCP_CONNECTED events
+    const handleMcpConnected = (message: SocketMessage) => {
+      void queryClient.invalidateQueries({ queryKey: ['mcp-usage'] });
+
+      // Notify parent window (for cloud onboarding)
+      postMessageToParent({
+        type: 'MCP_CONNECTION_STATUS',
+        connected: true,
+        tool_name: message.tool_name as string,
+        timestamp: message.created_at as string,
+      });
+
+      onMcpConnectedSuccess();
+    };
+
+    socket.on(ServerEvents.DATA_UPDATE, handleDataUpdate);
+    socket.on(ServerEvents.MCP_CONNECTED, handleMcpConnected);
+
+    return () => {
+      socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
+      socket.off(ServerEvents.MCP_CONNECTED, handleMcpConnected);
+    };
+  }, [state.isConnected, queryClient]);
+
   // Context value
   const contextValue = useMemo<SocketContextValue>(
     () => ({
@@ -243,9 +330,8 @@ export function SocketProvider({ children }: SocketProviderProps) {
       // Actions
       connect,
       disconnect,
-      emit,
     }),
-    [state, connect, disconnect, emit]
+    [state, connect, disconnect]
   );
 
   return <SocketContext.Provider value={contextValue}>{children}</SocketContext.Provider>;

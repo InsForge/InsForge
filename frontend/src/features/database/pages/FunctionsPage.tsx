@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import {
   Button,
@@ -13,15 +13,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components';
-import { useFullMetadata } from '../hooks/useFullMetadata';
+import { useFunctions } from '../hooks/useDatabase';
 import { SQLModal, SQLCellButton } from '../components/SQLModal';
-import type {
-  ExportDatabaseResponse,
-  ExportDatabaseJsonData,
-  SocketMessage,
-} from '@insforge/shared-schemas';
+import type { DatabaseFunctionsResponse } from '@insforge/shared-schemas';
 import { isSystemFunction } from '../constants';
-import { DataUpdateResourceType, ServerEvents, useSocket } from '@/lib/contexts/SocketContext';
 
 interface FunctionRow extends DataGridRowType {
   id: string;
@@ -31,15 +26,16 @@ interface FunctionRow extends DataGridRowType {
   [key: string]: ConvertedValue | { [key: string]: string }[];
 }
 
-function parseFunctionsFromMetadata(metadata: ExportDatabaseResponse | undefined): FunctionRow[] {
-  if (!metadata || metadata.format !== 'json' || typeof metadata.data === 'string') {
+function parseFunctionsFromResponse(
+  response: DatabaseFunctionsResponse | undefined
+): FunctionRow[] {
+  if (!response?.functions) {
     return [];
   }
 
-  const data = metadata.data as ExportDatabaseJsonData;
   const functions: FunctionRow[] = [];
 
-  data.functions.forEach((func) => {
+  response.functions.forEach((func) => {
     if (isSystemFunction(func.functionName)) {
       return;
     }
@@ -58,30 +54,10 @@ function parseFunctionsFromMetadata(metadata: ExportDatabaseResponse | undefined
 export default function FunctionsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { data: metadata, isLoading, error, refetch } = useFullMetadata(true);
+  const { data, isLoading, error, refetch } = useFunctions(true);
   const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
 
-  const { socket, isConnected } = useSocket();
-
-  const allFunctions = useMemo(() => parseFunctionsFromMetadata(metadata), [metadata]);
-
-  useEffect(() => {
-    if (!socket || !isConnected) {
-      return;
-    }
-
-    const handleDataUpdate = (message: SocketMessage) => {
-      if (message.resource === DataUpdateResourceType.DATABASE) {
-        void refetch();
-      }
-    };
-
-    socket.on(ServerEvents.DATA_UPDATE, handleDataUpdate);
-
-    return () => {
-      socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
-    };
-  }, [socket, isConnected, refetch]);
+  const allFunctions = useMemo(() => parseFunctionsFromResponse(data), [data]);
 
   const filteredFunctions = useMemo(() => {
     if (!searchQuery.trim()) {

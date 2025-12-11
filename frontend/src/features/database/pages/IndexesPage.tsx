@@ -1,9 +1,9 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import {
   Button,
+  ConvertedValue,
   DataGrid,
-  type ConvertedValue,
   type DataGridColumn,
   type DataGridRowType,
   EmptyState,
@@ -13,96 +13,66 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components';
-import { useFullMetadata } from '../hooks/useFullMetadata';
+import { useIndexes } from '../hooks/useDatabase';
 import { SQLModal, SQLCellButton } from '../components/SQLModal';
-import type {
-  ExportDatabaseResponse,
-  ExportDatabaseJsonData,
-  SocketMessage,
-} from '@insforge/shared-schemas';
+import type { DatabaseIndexesResponse } from '@insforge/shared-schemas';
 import { isSystemTable } from '../constants';
-import { DataUpdateResourceType, ServerEvents, useSocket } from '@/lib/contexts/SocketContext';
 
-interface PolicyRow extends DataGridRowType {
+interface IndexRow extends DataGridRowType {
   id: string;
   tableName: string;
-  policyName: string;
-  cmd: string;
-  roles: string;
-  qual: string | null;
-  withCheck: string | null;
+  indexName: string;
+  indexDef: string;
+  isUnique: boolean | null;
+  isPrimary: boolean | null;
   [key: string]: ConvertedValue | { [key: string]: string }[];
 }
 
-function parsePoliciesFromMetadata(metadata: ExportDatabaseResponse | undefined): PolicyRow[] {
-  if (!metadata || metadata.format !== 'json' || typeof metadata.data === 'string') {
+function parseIndexesFromResponse(response: DatabaseIndexesResponse | undefined): IndexRow[] {
+  if (!response?.indexes) {
     return [];
   }
 
-  const data = metadata.data as ExportDatabaseJsonData;
-  const policies: PolicyRow[] = [];
+  const indexes: IndexRow[] = [];
 
-  Object.entries(data.tables).forEach(([tableName, tableData]) => {
-    if (isSystemTable(tableName)) {
+  response.indexes.forEach((index) => {
+    if (isSystemTable(index.tableName)) {
       return;
     }
 
-    tableData.policies.forEach((policy) => {
-      policies.push({
-        id: `${tableName}_${policy.policyname}`,
-        tableName,
-        policyName: policy.policyname,
-        cmd: policy.cmd,
-        roles: Array.isArray(policy.roles) ? policy.roles.join(', ') : String(policy.roles),
-        qual: policy.qual,
-        withCheck: policy.withCheck,
-      });
+    indexes.push({
+      id: `${index.tableName}_${index.indexName}`,
+      tableName: index.tableName,
+      indexName: index.indexName,
+      indexDef: index.indexDef,
+      isUnique: index.isUnique,
+      isPrimary: index.isPrimary,
     });
   });
 
-  return policies;
+  return indexes;
 }
 
-export default function PoliciesPage() {
+export default function IndexesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { data: metadata, isLoading, error, refetch } = useFullMetadata(true);
+  const { data, isLoading, error, refetch } = useIndexes(true);
   const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
 
-  const { socket, isConnected } = useSocket();
+  const allIndexes = useMemo(() => parseIndexesFromResponse(data), [data]);
 
-  const allPolicies = useMemo(() => parsePoliciesFromMetadata(metadata), [metadata]);
-
-  useEffect(() => {
-    if (!socket || !isConnected) {
-      return;
-    }
-
-    const handleDataUpdate = (message: SocketMessage) => {
-      if (message.resource === DataUpdateResourceType.DATABASE) {
-        void refetch();
-      }
-    };
-
-    socket.on(ServerEvents.DATA_UPDATE, handleDataUpdate);
-
-    return () => {
-      socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
-    };
-  }, [socket, isConnected, refetch]);
-
-  const filteredPolicies = useMemo(() => {
+  const filteredIndexes = useMemo(() => {
     if (!searchQuery.trim()) {
-      return allPolicies;
+      return allIndexes;
     }
 
     const query = searchQuery.toLowerCase();
-    return allPolicies.filter(
-      (policy) =>
-        policy.policyName.toLowerCase().includes(query) ||
-        policy.tableName.toLowerCase().includes(query)
+    return allIndexes.filter(
+      (index) =>
+        index.indexName.toLowerCase().includes(query) ||
+        index.tableName.toLowerCase().includes(query)
     );
-  }, [allPolicies, searchQuery]);
+  }, [allIndexes, searchQuery]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -114,7 +84,7 @@ export default function PoliciesPage() {
     }
   };
 
-  const columns: DataGridColumn<PolicyRow>[] = useMemo(
+  const columns: DataGridColumn<IndexRow>[] = useMemo(
     () => [
       {
         key: 'tableName',
@@ -124,57 +94,50 @@ export default function PoliciesPage() {
         sortable: true,
       },
       {
-        key: 'policyName',
+        key: 'indexName',
         name: 'Name',
         width: 'minmax(200px, 2fr)',
         resizable: true,
         sortable: true,
       },
       {
-        key: 'cmd',
-        name: 'Command',
-        width: 'minmax(100px, 1fr)',
+        key: 'isPrimary',
+        name: 'Type',
+        width: 'minmax(120px, 1fr)',
         resizable: true,
         sortable: true,
         renderCell: ({ row }) => {
-          const cmd = row.cmd;
-          const cmdLabel = cmd === '*' ? 'ALL' : cmd;
+          if (row.isPrimary) {
+            return (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                Primary
+              </span>
+            );
+          }
+          if (row.isUnique) {
+            return (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                Unique
+              </span>
+            );
+          }
           return (
             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-              {cmdLabel}
+              Index
             </span>
           );
         },
       },
       {
-        key: 'roles',
-        name: 'Roles',
-        width: 'minmax(150px, 1.5fr)',
-        resizable: true,
-      },
-      {
-        key: 'qual',
-        name: 'Using',
-        width: 'minmax(200px, 2fr)',
+        key: 'indexDef',
+        name: 'Definition',
+        width: 'minmax(300px, 5fr)',
         resizable: true,
         renderCell: ({ row }) => (
           <SQLCellButton
-            value={row.qual}
-            onClick={() => row.qual && setSqlModal({ open: true, title: 'Using', value: row.qual })}
-          />
-        ),
-      },
-      {
-        key: 'withCheck',
-        name: 'With Check',
-        width: 'minmax(200px, 2fr)',
-        resizable: true,
-        renderCell: ({ row }) => (
-          <SQLCellButton
-            value={row.withCheck}
+            value={row.indexDef}
             onClick={() =>
-              row.withCheck &&
-              setSqlModal({ open: true, title: 'With Check', value: row.withCheck })
+              setSqlModal({ open: true, title: 'Index Definition', value: row.indexDef })
             }
           />
         ),
@@ -187,7 +150,7 @@ export default function PoliciesPage() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <EmptyState
-          title="Failed to load policies"
+          title="Failed to load indexes"
           description={error instanceof Error ? error.message : 'An error occurred'}
         />
       </div>
@@ -197,7 +160,7 @@ export default function PoliciesPage() {
   return (
     <div className="flex flex-col gap-4 h-full p-4 bg-bg-gray dark:bg-neutral-800">
       <div className="flex items-center gap-3">
-        <h1 className="text-xl font-normal text-zinc-950 dark:text-white">RLS Policies</h1>
+        <h1 className="text-xl font-normal text-zinc-950 dark:text-white">Database Indexes</h1>
 
         {/* Separator */}
         <div className="h-6 w-px bg-gray-200 dark:bg-neutral-700" />
@@ -226,18 +189,18 @@ export default function PoliciesPage() {
       <SearchInput
         value={searchQuery}
         onChange={setSearchQuery}
-        placeholder="Search for a policy"
+        placeholder="Search for an index"
         className="w-64"
       />
 
       {isLoading ? (
         <div className="flex-1 flex items-center justify-center">
-          <EmptyState title="Loading policies..." description="Please wait" />
+          <EmptyState title="Loading indexes..." description="Please wait" />
         </div>
       ) : (
         <div className="flex-1 overflow-hidden">
           <DataGrid
-            data={filteredPolicies}
+            data={filteredIndexes}
             columns={columns}
             showSelection={false}
             showPagination={false}
@@ -246,7 +209,7 @@ export default function PoliciesPage() {
             isRefreshing={isRefreshing}
             emptyState={
               <div className="text-sm text-zinc-500 dark:text-zinc-400">
-                {searchQuery ? 'No policies match your search criteria' : 'No policies found'}
+                {searchQuery ? 'No indexes match your search criteria' : 'No indexes found'}
               </div>
             }
           />

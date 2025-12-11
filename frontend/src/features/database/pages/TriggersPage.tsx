@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import {
   Button,
@@ -13,94 +13,66 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components';
-import { useFullMetadata } from '../hooks/useFullMetadata';
+import { useTriggers } from '../hooks/useDatabase';
 import { SQLModal, SQLCellButton } from '../components/SQLModal';
-import type {
-  ExportDatabaseResponse,
-  ExportDatabaseJsonData,
-  SocketMessage,
-} from '@insforge/shared-schemas';
+import type { DatabaseTriggersResponse } from '@insforge/shared-schemas';
 import { isSystemTable } from '../constants';
-import { DataUpdateResourceType, ServerEvents, useSocket } from '@/lib/contexts/SocketContext';
 
-interface IndexRow extends DataGridRowType {
+interface TriggerRow extends DataGridRowType {
   id: string;
   tableName: string;
-  indexName: string;
-  indexDef: string;
-  isUnique: boolean | null;
-  isPrimary: boolean | null;
+  triggerName: string;
+  actionTiming: string;
+  eventManipulation: string;
+  actionStatement: string;
   [key: string]: ConvertedValue | { [key: string]: string }[];
 }
 
-function parseIndexesFromMetadata(metadata: ExportDatabaseResponse | undefined): IndexRow[] {
-  if (!metadata || metadata.format !== 'json' || typeof metadata.data === 'string') {
+function parseTriggersFromResponse(response: DatabaseTriggersResponse | undefined): TriggerRow[] {
+  if (!response?.triggers) {
     return [];
   }
 
-  const data = metadata.data as ExportDatabaseJsonData;
-  const indexes: IndexRow[] = [];
+  const triggers: TriggerRow[] = [];
 
-  Object.entries(data.tables).forEach(([tableName, tableData]) => {
-    if (isSystemTable(tableName)) {
+  response.triggers.forEach((trigger) => {
+    if (isSystemTable(trigger.tableName)) {
       return;
     }
 
-    tableData.indexes.forEach((index) => {
-      indexes.push({
-        id: `${tableName}_${index.indexname}`,
-        tableName,
-        indexName: index.indexname,
-        indexDef: index.indexdef,
-        isUnique: index.isUnique,
-        isPrimary: index.isPrimary,
-      });
+    triggers.push({
+      id: `${trigger.tableName}_${trigger.triggerName}`,
+      tableName: trigger.tableName,
+      triggerName: trigger.triggerName,
+      actionTiming: trigger.actionTiming,
+      eventManipulation: trigger.eventManipulation,
+      actionStatement: trigger.actionStatement,
     });
   });
 
-  return indexes;
+  return triggers;
 }
 
-export default function IndexesPage() {
+export default function TriggersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { data: metadata, isLoading, error, refetch } = useFullMetadata(true);
+  const { data, isLoading, error, refetch } = useTriggers(true);
   const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
 
-  const { socket, isConnected } = useSocket();
+  const allTriggers = useMemo(() => parseTriggersFromResponse(data), [data]);
 
-  const allIndexes = useMemo(() => parseIndexesFromMetadata(metadata), [metadata]);
-
-  useEffect(() => {
-    if (!socket || !isConnected) {
-      return;
-    }
-
-    const handleDataUpdate = (message: SocketMessage) => {
-      if (message.resource === DataUpdateResourceType.DATABASE) {
-        void refetch();
-      }
-    };
-
-    socket.on(ServerEvents.DATA_UPDATE, handleDataUpdate);
-
-    return () => {
-      socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
-    };
-  }, [socket, isConnected, refetch]);
-
-  const filteredIndexes = useMemo(() => {
+  const filteredTriggers = useMemo(() => {
     if (!searchQuery.trim()) {
-      return allIndexes;
+      return allTriggers;
     }
 
     const query = searchQuery.toLowerCase();
-    return allIndexes.filter(
-      (index) =>
-        index.indexName.toLowerCase().includes(query) ||
-        index.tableName.toLowerCase().includes(query)
+    return allTriggers.filter(
+      (trigger) =>
+        trigger.triggerName.toLowerCase().includes(query) ||
+        trigger.tableName.toLowerCase().includes(query)
     );
-  }, [allIndexes, searchQuery]);
+  }, [allTriggers, searchQuery]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -112,7 +84,7 @@ export default function IndexesPage() {
     }
   };
 
-  const columns: DataGridColumn<IndexRow>[] = useMemo(
+  const columns: DataGridColumn<TriggerRow>[] = useMemo(
     () => [
       {
         key: 'tableName',
@@ -122,50 +94,52 @@ export default function IndexesPage() {
         sortable: true,
       },
       {
-        key: 'indexName',
+        key: 'triggerName',
         name: 'Name',
         width: 'minmax(200px, 2fr)',
         resizable: true,
         sortable: true,
       },
       {
-        key: 'isPrimary',
-        name: 'Type',
-        width: 'minmax(120px, 1fr)',
+        key: 'actionTiming',
+        name: 'Timing',
+        width: 'minmax(100px, 1fr)',
         resizable: true,
         sortable: true,
         renderCell: ({ row }) => {
-          if (row.isPrimary) {
-            return (
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-                Primary
-              </span>
-            );
-          }
-          if (row.isUnique) {
-            return (
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-                Unique
-              </span>
-            );
-          }
+          const timing = row.actionTiming.toUpperCase();
           return (
             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-              Index
+              {timing}
             </span>
           );
         },
       },
       {
-        key: 'indexDef',
-        name: 'Definition',
-        width: 'minmax(300px, 5fr)',
+        key: 'eventManipulation',
+        name: 'Event',
+        width: 'minmax(100px, 1fr)',
+        resizable: true,
+        sortable: true,
+        renderCell: ({ row }) => {
+          const event = row.eventManipulation.toUpperCase();
+          return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+              {event}
+            </span>
+          );
+        },
+      },
+      {
+        key: 'actionStatement',
+        name: 'Statement',
+        width: 'minmax(300px, 3fr)',
         resizable: true,
         renderCell: ({ row }) => (
           <SQLCellButton
-            value={row.indexDef}
+            value={row.actionStatement}
             onClick={() =>
-              setSqlModal({ open: true, title: 'Index Definition', value: row.indexDef })
+              setSqlModal({ open: true, title: 'Trigger Statement', value: row.actionStatement })
             }
           />
         ),
@@ -178,7 +152,7 @@ export default function IndexesPage() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <EmptyState
-          title="Failed to load indexes"
+          title="Failed to load triggers"
           description={error instanceof Error ? error.message : 'An error occurred'}
         />
       </div>
@@ -188,7 +162,7 @@ export default function IndexesPage() {
   return (
     <div className="flex flex-col gap-4 h-full p-4 bg-bg-gray dark:bg-neutral-800">
       <div className="flex items-center gap-3">
-        <h1 className="text-xl font-normal text-zinc-950 dark:text-white">Database Indexes</h1>
+        <h1 className="text-xl font-normal text-zinc-950 dark:text-white">Database Triggers</h1>
 
         {/* Separator */}
         <div className="h-6 w-px bg-gray-200 dark:bg-neutral-700" />
@@ -217,18 +191,18 @@ export default function IndexesPage() {
       <SearchInput
         value={searchQuery}
         onChange={setSearchQuery}
-        placeholder="Search for an index"
+        placeholder="Search for a trigger"
         className="w-64"
       />
 
       {isLoading ? (
         <div className="flex-1 flex items-center justify-center">
-          <EmptyState title="Loading indexes..." description="Please wait" />
+          <EmptyState title="Loading triggers..." description="Please wait" />
         </div>
       ) : (
         <div className="flex-1 overflow-hidden">
           <DataGrid
-            data={filteredIndexes}
+            data={filteredTriggers}
             columns={columns}
             showSelection={false}
             showPagination={false}
@@ -237,7 +211,7 @@ export default function IndexesPage() {
             isRefreshing={isRefreshing}
             emptyState={
               <div className="text-sm text-zinc-500 dark:text-zinc-400">
-                {searchQuery ? 'No indexes match your search criteria' : 'No indexes found'}
+                {searchQuery ? 'No triggers match your search criteria' : 'No triggers found'}
               </div>
             }
           />

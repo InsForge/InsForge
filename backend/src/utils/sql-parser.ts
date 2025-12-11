@@ -1,6 +1,96 @@
 import splitSqlQuery from '@databases/split-sql-query';
 import sql from '@databases/sql';
+import { parseSync, loadModule } from 'libpg-query';
 import logger from './logger.js';
+
+let initialized = false;
+
+/**
+ * Initialize the SQL parser WASM module.
+ * Must be called and awaited before using analyzeQuery().
+ */
+export async function initSqlParser(): Promise<void> {
+  if (initialized) {
+    return;
+  }
+  await loadModule();
+  initialized = true;
+  logger.info('SQL parser initialized');
+}
+
+export interface DatabaseResourceUpdate {
+  type: 'tables' | 'table' | 'records' | 'index' | 'trigger' | 'policy' | 'function' | 'extension';
+  name?: string;
+}
+
+const STMT_TYPES: Record<string, DatabaseResourceUpdate['type']> = {
+  InsertStmt: 'records',
+  UpdateStmt: 'records',
+  DeleteStmt: 'records',
+  CreateStmt: 'tables',
+  AlterTableStmt: 'table',
+  RenameStmt: 'table',
+  IndexStmt: 'index',
+  CreateTrigStmt: 'trigger',
+  CreatePolicyStmt: 'policy',
+  AlterPolicyStmt: 'policy',
+  CreateFunctionStmt: 'function',
+  CreateExtensionStmt: 'extension',
+};
+
+const DROP_TYPES: Record<string, DatabaseResourceUpdate['type']> = {
+  OBJECT_TABLE: 'tables',
+  OBJECT_INDEX: 'index',
+  OBJECT_TRIGGER: 'trigger',
+  OBJECT_POLICY: 'policy',
+  OBJECT_FUNCTION: 'function',
+  OBJECT_EXTENSION: 'extension',
+};
+
+export function analyzeQuery(query: string): DatabaseResourceUpdate[] {
+  try {
+    const { stmts } = parseSync(query);
+    const changes = stmts
+      .map((s: { stmt: Record<string, unknown> }) => extractChange(s.stmt))
+      .filter((c: DatabaseResourceUpdate | null): c is DatabaseResourceUpdate => c !== null);
+
+    // Deduplicate by type+name
+    const seen = new Set<string>();
+    return changes.filter((c: DatabaseResourceUpdate) => {
+      const key = `${c.type}:${c.name ?? ''}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  } catch (e) {
+    logger.warn('SQL parse error:', e);
+    return [];
+  }
+}
+
+function extractChange(stmt: Record<string, unknown>): DatabaseResourceUpdate | null {
+  const [stmtType, data] = Object.entries(stmt)[0] as [string, Record<string, unknown>];
+
+  if (stmtType === 'DropStmt') {
+    const type = DROP_TYPES[data.removeType as string];
+    return type ? { type } : null;
+  }
+
+  const type = STMT_TYPES[stmtType];
+  if (!type) {
+    return null;
+  }
+
+  // Only include name for 'table' (ALTER) and 'records' (DML)
+  if (type === 'table' || type === 'records') {
+    const name = (data.relation as Record<string, unknown>)?.relname as string;
+    return { type, name };
+  }
+
+  return { type };
+}
 
 /**
  * Parse a SQL string into individual statements, properly handling:

@@ -15,10 +15,9 @@ import {
 } from '@/components';
 import { UsersDataGrid, UserFormDialog } from '@/features/auth/components';
 import { SortColumn } from 'react-data-grid';
-import { UserSchema, type SocketMessage } from '@insforge/shared-schemas';
+import { UserSchema } from '@insforge/shared-schemas';
 import { useToast } from '@/lib/hooks/useToast';
 import { useUsers } from '@/features/auth/hooks/useUsers';
-import { DataUpdateResourceType, ServerEvents, useSocket } from '@/lib/contexts/SocketContext';
 
 export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,8 +26,6 @@ export default function UsersPage() {
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
-
-  const { socket, isConnected } = useSocket();
 
   const { showToast } = useToast();
 
@@ -58,25 +55,6 @@ export default function UsersPage() {
     window.addEventListener('refreshUsers', handleRefreshEvent);
     return () => window.removeEventListener('refreshUsers', handleRefreshEvent);
   }, [refetch]);
-
-  useEffect(() => {
-    if (!socket || !isConnected) {
-      return;
-    }
-
-    const handleDataUpdate = (message: SocketMessage) => {
-      if (message.resource === DataUpdateResourceType.USERS) {
-        // Refetch data
-        void refetch();
-      }
-    };
-
-    socket.on(ServerEvents.DATA_UPDATE, handleDataUpdate);
-
-    return () => {
-      socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
-    };
-  }, [socket, isConnected, refetch]);
 
   // Clear selection when page changes or search changes
   useEffect(() => {

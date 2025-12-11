@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Upload } from 'lucide-react';
 import PencilIcon from '@/assets/icons/pencil.svg?react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
@@ -31,8 +30,6 @@ import { useToast } from '@/lib/hooks/useToast';
 import { DatabaseDataGrid } from '@/features/database/components/DatabaseDataGrid';
 import { SortColumn } from 'react-data-grid';
 import { convertValueForColumn } from '@/lib/utils/utils';
-import type { SocketMessage } from '@insforge/shared-schemas';
-import { DataUpdateResourceType, ServerEvents, useSocket } from '@/lib/contexts/SocketContext';
 import { useCSVImport } from '@/features/database/hooks/useCSVImport';
 
 const PAGE_SIZE = 50;
@@ -57,14 +54,11 @@ export default function TablesPage() {
 
   const { confirm, confirmDialogProps } = useConfirm();
   const { showToast } = useToast();
-  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { tables, isLoadingTables, tablesError, deleteTable, useTableSchema, refetchTables } =
     useTables();
 
   const recordsHook = useRecords(selectedTable || '');
-
-  const { socket, isConnected } = useSocket();
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -178,37 +172,6 @@ export default function TablesPage() {
   const isLoadingTable = isLoadingRecords;
   const tableError = recordsError;
   const refetchTableData = refetchRecords;
-
-  useEffect(() => {
-    if (!socket || !isConnected) {
-      return;
-    }
-
-    const handleDataUpdate = (message: SocketMessage) => {
-      if (message.resource === DataUpdateResourceType.DATABASE) {
-        // Invalidate all tables queries
-        void queryClient.invalidateQueries({ queryKey: ['tables'] });
-        void queryClient.invalidateQueries({ queryKey: ['records', selectedTable] });
-      }
-
-      if (message.resource === DataUpdateResourceType.RECORDS) {
-        // Invalidate records queries for the updated table
-        const data = message.data as { tableName?: string };
-        const updatedTableName = data?.tableName;
-
-        // Only invalidate if this is the currently selected table
-        if (updatedTableName && updatedTableName === selectedTable) {
-          void queryClient.invalidateQueries({ queryKey: ['records', selectedTable] });
-        }
-      }
-    };
-
-    socket.on(ServerEvents.DATA_UPDATE, handleDataUpdate);
-
-    return () => {
-      socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
-    };
-  }, [socket, isConnected, queryClient, selectedTable]);
 
   // Reset sorting flag when loading completes
   useEffect(() => {

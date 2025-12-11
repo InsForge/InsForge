@@ -269,15 +269,6 @@ export class DatabaseTableService {
   }
 
   /**
-   * Get all table schemas
-   */
-  async getAllTableSchemas(): Promise<GetTableSchemaResponse[]> {
-    const tables = await this.listTables();
-    const schemas = await Promise.all(tables.map((table) => this.getTableSchema(table)));
-    return schemas;
-  }
-
-  /**
    * Get table schema
    */
   /**

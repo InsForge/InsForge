@@ -15,6 +15,7 @@ import logger from '@/utils/logger.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { successResponse } from '@/utils/response.js';
+import { analyzeQuery, DatabaseResourceUpdate } from '@/utils/sql-parser.js';
 
 const router = Router();
 const dbAdvanceService = DatabaseAdvanceService.getInstance();
@@ -64,13 +65,17 @@ router.post(
         ip_address: req.ip,
       });
 
-      const socket = SocketManager.getInstance();
-      socket.broadcastToRoom(
-        'role:project_admin',
-        ServerEvents.DATA_UPDATE,
-        { resource: DataUpdateResourceType.DATABASE },
-        'system'
-      );
+      // Broadcast changes if any modifying statements detected
+      const changes = analyzeQuery(query);
+      if (changes.length > 0) {
+        const socket = SocketManager.getInstance();
+        socket.broadcastToRoom(
+          'role:project_admin',
+          ServerEvents.DATA_UPDATE,
+          { resource: DataUpdateResourceType.DATABASE, data: { changes } },
+          'system'
+        );
+      }
 
       successResponse(res, response);
     } catch (error: unknown) {
@@ -118,13 +123,17 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response, next
       ip_address: req.ip,
     });
 
-    const socket = SocketManager.getInstance();
-    socket.broadcastToRoom(
-      'role:project_admin',
-      ServerEvents.DATA_UPDATE,
-      { resource: DataUpdateResourceType.DATABASE },
-      'system'
-    );
+    // Broadcast changes if any modifying statements detected
+    const changes = analyzeQuery(query);
+    if (changes.length > 0) {
+      const socket = SocketManager.getInstance();
+      socket.broadcastToRoom(
+        'role:project_admin',
+        ServerEvents.DATA_UPDATE,
+        { resource: DataUpdateResourceType.DATABASE, data: { changes } },
+        'system'
+      );
+    }
 
     successResponse(res, response);
   } catch (error: unknown) {
@@ -244,7 +253,10 @@ router.post(
       socket.broadcastToRoom(
         'role:project_admin',
         ServerEvents.DATA_UPDATE,
-        { resource: DataUpdateResourceType.RECORDS, data: { tableName: table } },
+        {
+          resource: DataUpdateResourceType.DATABASE,
+          data: { changes: [{ type: 'records', name: table }] as DatabaseResourceUpdate[] },
+        },
         'system'
       );
 

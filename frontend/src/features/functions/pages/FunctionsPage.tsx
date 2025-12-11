@@ -14,8 +14,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components';
-import type { SocketMessage } from '@insforge/shared-schemas';
-import { DataUpdateResourceType, ServerEvents, useSocket } from '@/lib/contexts/SocketContext';
 
 export default function FunctionsPage() {
   const toastShownRef = useRef(false);
@@ -30,8 +28,6 @@ export default function FunctionsPage() {
     clearSelection,
     refetch,
   } = useFunctions();
-
-  const { socket, isConnected } = useSocket();
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -48,24 +44,6 @@ export default function FunctionsPage() {
       showToast('Function container is unhealthy.', 'error');
     }
   }, [isRuntimeAvailable, showToast]);
-
-  useEffect(() => {
-    if (!socket || !isConnected) {
-      return;
-    }
-
-    const handleDataUpdate = (message: SocketMessage) => {
-      if (message.resource === DataUpdateResourceType.FUNCTIONS) {
-        void refetch();
-      }
-    };
-
-    socket.on(ServerEvents.DATA_UPDATE, handleDataUpdate);
-
-    return () => {
-      socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
-    };
-  }, [socket, isConnected, refetch]);
 
   // If a function is selected, show the detail view
   if (selectedFunction) {

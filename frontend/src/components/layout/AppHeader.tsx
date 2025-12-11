@@ -101,15 +101,14 @@ export default function AppHeader() {
     <>
       <div className="h-12 w-full bg-white dark:bg-neutral-800 border-b border-border-gray dark:border-neutral-700 z-50 flex items-center justify-between px-6">
         {/* Logo */}
-        <div className="px-2 py-3">
-          <a href="https://insforge.dev" target="_blank" rel="noopener noreferrer">
-            <img
-              src={resolvedTheme === 'light' ? InsForgeLogoLight : InsForgeLogoDark}
-              alt="Insforge Logo"
-              className="h-8 w-auto"
-            />
-          </a>
-        </div>
+
+        <a href="https://insforge.dev" target="_blank" rel="noopener noreferrer">
+          <img
+            src={resolvedTheme === 'light' ? InsForgeLogoLight : InsForgeLogoDark}
+            alt="Insforge Logo"
+            className="h-7 w-auto"
+          />
+        </a>
 
         {/* Right side controls */}
         <div className="flex items-center gap-1">
@@ -147,7 +146,7 @@ export default function AppHeader() {
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <button className="w-50 flex items-center gap-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[8px] pr-3 transition-all duration-200 group">
-                <Avatar className="h-10 w-10 ring-2 ring-white dark:ring-gray-700 shadow-sm">
+                <Avatar className="h-8 w-8 ring-2 ring-white dark:ring-gray-700 shadow-sm">
                   <AvatarFallback
                     className={cn(
                       'text-white font-medium text-sm',

@@ -41,8 +41,8 @@ interface OpenRouterLimitation {
   };
 }
 
-export class AIClientService {
-  private static instance: AIClientService;
+export class OpenRouterProvider {
+  private static instance: OpenRouterProvider;
   private cloudCredentials: CloudCredentials | undefined;
   private openRouterClient: OpenAI | null = null;
   private currentApiKey: string | undefined;
@@ -51,11 +51,11 @@ export class AIClientService {
 
   private constructor() {}
 
-  static getInstance(): AIClientService {
-    if (!AIClientService.instance) {
-      AIClientService.instance = new AIClientService();
+  static getInstance(): OpenRouterProvider {
+    if (!OpenRouterProvider.instance) {
+      OpenRouterProvider.instance = new OpenRouterProvider();
     }
-    return AIClientService.instance;
+    return OpenRouterProvider.instance;
   }
 
   /**
@@ -100,9 +100,9 @@ export class AIClientService {
 
   /**
    * Get the OpenAI client, creating or updating it as needed
-   * This is the main method services should use
+   * Used internally by sendRequest()
    */
-  async getClient(): Promise<OpenAI> {
+  private async getClient(): Promise<OpenAI> {
     if (!this.openRouterClient) {
       this.openRouterClient = this.createClient(await this.getApiKey());
       return this.openRouterClient;
@@ -349,6 +349,9 @@ export class AIClientService {
         logger.info(`Received ${error.status} insufficient credits, renewing API key...`);
         await this.renewCloudApiKey();
 
+        // Get fresh client with renewed API key
+        const renewedClient = await this.getClient();
+
         // Retry with exponential backoff (3 attempts)
         const maxRetries = 3;
 
@@ -360,7 +363,7 @@ export class AIClientService {
             );
             await new Promise((resolve) => setTimeout(resolve, backoffMs));
 
-            const result = await request(client);
+            const result = await request(renewedClient);
             logger.info('Request succeeded after API key renewal');
             return result;
           } catch (retryError) {
