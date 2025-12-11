@@ -15,7 +15,7 @@ import '@xyflow/react/dist/style.css';
 import { TableNode } from './TableNode';
 import { AuthNode } from './AuthNode';
 import { BucketNode } from './BucketNode';
-import { useTables } from '@/features/database/hooks/useTables';
+import { useAllTableSchemas } from '@/features/database/hooks/useTables';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import {
   AppMetadataSchema,
@@ -198,8 +198,8 @@ export function SchemaVisualizer({
 }: SchemaVisualizerProps) {
   const { resolvedTheme } = useTheme();
 
-  // Fetch all table schemas only if external schemas are not provided
-  const { allSchemas, isLoadingSchemas } = useTables();
+  // Fetch all table schemas (only when external schemas are not provided)
+  const { allSchemas, isLoading: isLoadingSchemas } = useAllTableSchemas(!externalSchemas);
 
   // Use external schemas if provided, otherwise use fetched schemas
   const tables = externalSchemas || allSchemas;
