@@ -13,9 +13,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components';
-import { useFullMetadata } from '../hooks/useFullMetadata';
+import { usePolicies } from '../hooks/useDatabase';
 import { SQLModal, SQLCellButton } from '../components/SQLModal';
-import type { ExportDatabaseResponse, ExportDatabaseJsonData } from '@insforge/shared-schemas';
+import type { DatabasePoliciesResponse } from '@insforge/shared-schemas';
 import { isSystemTable } from '../constants';
 
 interface PolicyRow extends DataGridRowType {
@@ -29,29 +29,26 @@ interface PolicyRow extends DataGridRowType {
   [key: string]: ConvertedValue | { [key: string]: string }[];
 }
 
-function parsePoliciesFromMetadata(metadata: ExportDatabaseResponse | undefined): PolicyRow[] {
-  if (!metadata || metadata.format !== 'json' || typeof metadata.data === 'string') {
+function parsePoliciesFromResponse(response: DatabasePoliciesResponse | undefined): PolicyRow[] {
+  if (!response?.policies) {
     return [];
   }
 
-  const data = metadata.data as ExportDatabaseJsonData;
   const policies: PolicyRow[] = [];
 
-  Object.entries(data.tables).forEach(([tableName, tableData]) => {
-    if (isSystemTable(tableName)) {
+  response.policies.forEach((policy) => {
+    if (isSystemTable(policy.tableName)) {
       return;
     }
 
-    tableData.policies.forEach((policy) => {
-      policies.push({
-        id: `${tableName}_${policy.policyname}`,
-        tableName,
-        policyName: policy.policyname,
-        cmd: policy.cmd,
-        roles: Array.isArray(policy.roles) ? policy.roles.join(', ') : String(policy.roles),
-        qual: policy.qual,
-        withCheck: policy.withCheck,
-      });
+    policies.push({
+      id: `${policy.tableName}_${policy.policyName}`,
+      tableName: policy.tableName,
+      policyName: policy.policyName,
+      cmd: policy.cmd,
+      roles: Array.isArray(policy.roles) ? policy.roles.join(', ') : String(policy.roles),
+      qual: policy.qual,
+      withCheck: policy.withCheck,
     });
   });
 
@@ -61,10 +58,10 @@ function parsePoliciesFromMetadata(metadata: ExportDatabaseResponse | undefined)
 export default function PoliciesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { data: metadata, isLoading, error, refetch } = useFullMetadata(true);
+  const { data, isLoading, error, refetch } = usePolicies(true);
   const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
 
-  const allPolicies = useMemo(() => parsePoliciesFromMetadata(metadata), [metadata]);
+  const allPolicies = useMemo(() => parsePoliciesFromResponse(data), [data]);
 
   const filteredPolicies = useMemo(() => {
     if (!searchQuery.trim()) {

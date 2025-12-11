@@ -13,9 +13,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components';
-import { useFullMetadata } from '../hooks/useFullMetadata';
+import { useFunctions } from '../hooks/useDatabase';
 import { SQLModal, SQLCellButton } from '../components/SQLModal';
-import type { ExportDatabaseResponse, ExportDatabaseJsonData } from '@insforge/shared-schemas';
+import type { DatabaseFunctionsResponse } from '@insforge/shared-schemas';
 import { isSystemFunction } from '../constants';
 
 interface FunctionRow extends DataGridRowType {
@@ -26,15 +26,16 @@ interface FunctionRow extends DataGridRowType {
   [key: string]: ConvertedValue | { [key: string]: string }[];
 }
 
-function parseFunctionsFromMetadata(metadata: ExportDatabaseResponse | undefined): FunctionRow[] {
-  if (!metadata || metadata.format !== 'json' || typeof metadata.data === 'string') {
+function parseFunctionsFromResponse(
+  response: DatabaseFunctionsResponse | undefined
+): FunctionRow[] {
+  if (!response?.functions) {
     return [];
   }
 
-  const data = metadata.data as ExportDatabaseJsonData;
   const functions: FunctionRow[] = [];
 
-  data.functions.forEach((func) => {
+  response.functions.forEach((func) => {
     if (isSystemFunction(func.functionName)) {
       return;
     }
@@ -53,10 +54,10 @@ function parseFunctionsFromMetadata(metadata: ExportDatabaseResponse | undefined
 export default function FunctionsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { data: metadata, isLoading, error, refetch } = useFullMetadata(true);
+  const { data, isLoading, error, refetch } = useFunctions(true);
   const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
 
-  const allFunctions = useMemo(() => parseFunctionsFromMetadata(metadata), [metadata]);
+  const allFunctions = useMemo(() => parseFunctionsFromResponse(data), [data]);
 
   const filteredFunctions = useMemo(() => {
     if (!searchQuery.trim()) {

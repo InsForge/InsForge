@@ -13,9 +13,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components';
-import { useFullMetadata } from '../hooks/useFullMetadata';
+import { useIndexes } from '../hooks/useDatabase';
 import { SQLModal, SQLCellButton } from '../components/SQLModal';
-import type { ExportDatabaseResponse, ExportDatabaseJsonData } from '@insforge/shared-schemas';
+import type { DatabaseIndexesResponse } from '@insforge/shared-schemas';
 import { isSystemTable } from '../constants';
 
 interface IndexRow extends DataGridRowType {
@@ -28,28 +28,25 @@ interface IndexRow extends DataGridRowType {
   [key: string]: ConvertedValue | { [key: string]: string }[];
 }
 
-function parseIndexesFromMetadata(metadata: ExportDatabaseResponse | undefined): IndexRow[] {
-  if (!metadata || metadata.format !== 'json' || typeof metadata.data === 'string') {
+function parseIndexesFromResponse(response: DatabaseIndexesResponse | undefined): IndexRow[] {
+  if (!response?.indexes) {
     return [];
   }
 
-  const data = metadata.data as ExportDatabaseJsonData;
   const indexes: IndexRow[] = [];
 
-  Object.entries(data.tables).forEach(([tableName, tableData]) => {
-    if (isSystemTable(tableName)) {
+  response.indexes.forEach((index) => {
+    if (isSystemTable(index.tableName)) {
       return;
     }
 
-    tableData.indexes.forEach((index) => {
-      indexes.push({
-        id: `${tableName}_${index.indexname}`,
-        tableName,
-        indexName: index.indexname,
-        indexDef: index.indexdef,
-        isUnique: index.isUnique,
-        isPrimary: index.isPrimary,
-      });
+    indexes.push({
+      id: `${index.tableName}_${index.indexName}`,
+      tableName: index.tableName,
+      indexName: index.indexName,
+      indexDef: index.indexDef,
+      isUnique: index.isUnique,
+      isPrimary: index.isPrimary,
     });
   });
 
@@ -59,10 +56,10 @@ function parseIndexesFromMetadata(metadata: ExportDatabaseResponse | undefined):
 export default function IndexesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { data: metadata, isLoading, error, refetch } = useFullMetadata(true);
+  const { data, isLoading, error, refetch } = useIndexes(true);
   const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
 
-  const allIndexes = useMemo(() => parseIndexesFromMetadata(metadata), [metadata]);
+  const allIndexes = useMemo(() => parseIndexesFromResponse(data), [data]);
 
   const filteredIndexes = useMemo(() => {
     if (!searchQuery.trim()) {

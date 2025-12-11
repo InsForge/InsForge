@@ -13,9 +13,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components';
-import { useFullMetadata } from '../hooks/useFullMetadata';
+import { useTriggers } from '../hooks/useDatabase';
 import { SQLModal, SQLCellButton } from '../components/SQLModal';
-import type { ExportDatabaseResponse, ExportDatabaseJsonData } from '@insforge/shared-schemas';
+import type { DatabaseTriggersResponse } from '@insforge/shared-schemas';
 import { isSystemTable } from '../constants';
 
 interface TriggerRow extends DataGridRowType {
@@ -28,28 +28,25 @@ interface TriggerRow extends DataGridRowType {
   [key: string]: ConvertedValue | { [key: string]: string }[];
 }
 
-function parseTriggersFromMetadata(metadata: ExportDatabaseResponse | undefined): TriggerRow[] {
-  if (!metadata || metadata.format !== 'json' || typeof metadata.data === 'string') {
+function parseTriggersFromResponse(response: DatabaseTriggersResponse | undefined): TriggerRow[] {
+  if (!response?.triggers) {
     return [];
   }
 
-  const data = metadata.data as ExportDatabaseJsonData;
   const triggers: TriggerRow[] = [];
 
-  Object.entries(data.tables).forEach(([tableName, tableData]) => {
-    if (isSystemTable(tableName)) {
+  response.triggers.forEach((trigger) => {
+    if (isSystemTable(trigger.tableName)) {
       return;
     }
 
-    tableData.triggers.forEach((trigger) => {
-      triggers.push({
-        id: `${tableName}_${trigger.triggerName}`,
-        tableName,
-        triggerName: trigger.triggerName,
-        actionTiming: trigger.actionTiming,
-        eventManipulation: trigger.eventManipulation,
-        actionStatement: trigger.actionStatement,
-      });
+    triggers.push({
+      id: `${trigger.tableName}_${trigger.triggerName}`,
+      tableName: trigger.tableName,
+      triggerName: trigger.triggerName,
+      actionTiming: trigger.actionTiming,
+      eventManipulation: trigger.eventManipulation,
+      actionStatement: trigger.actionStatement,
     });
   });
 
@@ -59,10 +56,10 @@ function parseTriggersFromMetadata(metadata: ExportDatabaseResponse | undefined)
 export default function TriggersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { data: metadata, isLoading, error, refetch } = useFullMetadata(true);
+  const { data, isLoading, error, refetch } = useTriggers(true);
   const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
 
-  const allTriggers = useMemo(() => parseTriggersFromMetadata(metadata), [metadata]);
+  const allTriggers = useMemo(() => parseTriggersFromResponse(data), [data]);
 
   const filteredTriggers = useMemo(() => {
     if (!searchQuery.trim()) {

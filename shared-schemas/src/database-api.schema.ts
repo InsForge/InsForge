@@ -1,5 +1,13 @@
 import { z } from 'zod';
-import { columnSchema, foreignKeySchema, tableSchema } from './database.schema';
+import {
+  columnSchema,
+  foreignKeySchema,
+  tableSchema,
+  databaseFunctionSchema,
+  databaseIndexSchema,
+  databasePolicySchema,
+  databaseTriggerSchema,
+} from './database.schema';
 
 export const createTableRequestSchema = tableSchema
   .pick({
@@ -257,3 +265,26 @@ export type ImportDatabaseResponse = z.infer<typeof importResponseSchema>;
 // Bulk Upsert Types
 export type BulkUpsertRequest = z.infer<typeof bulkUpsertRequestSchema>;
 export type BulkUpsertResponse = z.infer<typeof bulkUpsertResponseSchema>;
+
+// Database Metadata Response Schemas
+export const databaseFunctionsResponseSchema = z.object({
+  functions: z.array(databaseFunctionSchema),
+});
+
+export const databaseIndexesResponseSchema = z.object({
+  indexes: z.array(databaseIndexSchema),
+});
+
+export const databasePoliciesResponseSchema = z.object({
+  policies: z.array(databasePolicySchema),
+});
+
+export const databaseTriggersResponseSchema = z.object({
+  triggers: z.array(databaseTriggerSchema),
+});
+
+// Database Metadata Response Types
+export type DatabaseFunctionsResponse = z.infer<typeof databaseFunctionsResponseSchema>;
+export type DatabaseIndexesResponse = z.infer<typeof databaseIndexesResponseSchema>;
+export type DatabasePoliciesResponse = z.infer<typeof databasePoliciesResponseSchema>;
+export type DatabaseTriggersResponse = z.infer<typeof databaseTriggersResponseSchema>;
