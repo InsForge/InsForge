@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { analyzeQuery } from './sql-parser.js';
+import { analyzeQuery } from '../../src/utils/sql-parser.js';
 
 describe('analyzeQuery', () => {
   // ===================
