@@ -28,7 +28,9 @@ async function seedDefaultAIConfigs(): Promise<void> {
   const aiConfigService = AIConfigService.getInstance();
 
   const existingConfigs = await aiConfigService.findAll();
-  if (existingConfigs.length) return;
+  if (existingConfigs.length) {
+    return;
+  }
 
   const defaultModels = await fetchS3Config<AIConfigurationInputSchema[]>('default-ai-models.json');
 
