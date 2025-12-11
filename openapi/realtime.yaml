@@ -1,0 +1,699 @@
+openapi: 3.0.3
+info:
+  title: Insforge Realtime API
+  version: 1.0.0
+  description: Realtime pub/sub channel management and message history API
+
+paths:
+  /api/realtime/channels:
+    get:
+      summary: List All Channels
+      description: Retrieve all configured realtime channels
+      tags:
+        - Channels
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      responses:
+        '200':
+          description: List of channels
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Channel'
+              example:
+                - id: "550e8400-e29b-41d4-a716-446655440000"
+                  pattern: "order:*"
+                  description: "Order updates channel"
+                  webhookUrls: ["https://example.com/webhook"]
+                  enabled: true
+                  createdAt: "2024-01-15T10:30:00Z"
+                  updatedAt: "2024-01-15T10:30:00Z"
+                - id: "550e8400-e29b-41d4-a716-446655440001"
+                  pattern: "chat:*"
+                  description: "Chat room messages"
+                  webhookUrls: null
+                  enabled: true
+                  createdAt: "2024-01-16T11:00:00Z"
+                  updatedAt: "2024-01-16T11:00:00Z"
+
+    post:
+      summary: Create Channel
+      description: Create a new realtime channel with a pattern for subscription matching
+      tags:
+        - Channels
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateChannelRequest'
+            example:
+              pattern: "order:*"
+              description: "Order updates channel"
+              webhookUrls: ["https://example.com/webhook"]
+              enabled: true
+      responses:
+        '201':
+          description: Channel created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Channel'
+              example:
+                id: "550e8400-e29b-41d4-a716-446655440000"
+                pattern: "order:*"
+                description: "Order updates channel"
+                webhookUrls: ["https://example.com/webhook"]
+                enabled: true
+                createdAt: "2024-01-15T10:30:00Z"
+                updatedAt: "2024-01-15T10:30:00Z"
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "INVALID_INPUT"
+                message: "pattern: Channel pattern is required"
+                statusCode: 400
+
+  /api/realtime/channels/{id}:
+    get:
+      summary: Get Channel by ID
+      description: Retrieve a specific channel by its UUID
+      tags:
+        - Channels
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '200':
+          description: Channel details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Channel'
+              example:
+                id: "550e8400-e29b-41d4-a716-446655440000"
+                pattern: "order:*"
+                description: "Order updates channel"
+                webhookUrls: ["https://example.com/webhook"]
+                enabled: true
+                createdAt: "2024-01-15T10:30:00Z"
+                updatedAt: "2024-01-15T10:30:00Z"
+        '404':
+          description: Channel not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "NOT_FOUND"
+                message: "Channel not found"
+                statusCode: 404
+
+    put:
+      summary: Update Channel
+      description: Update an existing channel's configuration
+      tags:
+        - Channels
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateChannelRequest'
+            example:
+              description: "Updated order channel description"
+              enabled: false
+      responses:
+        '200':
+          description: Channel updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Channel'
+              example:
+                id: "550e8400-e29b-41d4-a716-446655440000"
+                pattern: "order:*"
+                description: "Updated order channel description"
+                webhookUrls: ["https://example.com/webhook"]
+                enabled: false
+                createdAt: "2024-01-15T10:30:00Z"
+                updatedAt: "2024-01-17T14:00:00Z"
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "INVALID_INPUT"
+                message: "webhookUrls.0: Invalid url"
+                statusCode: 400
+        '404':
+          description: Channel not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "NOT_FOUND"
+                message: "Channel not found"
+                statusCode: 404
+
+    delete:
+      summary: Delete Channel
+      description: Delete a channel and all associated subscriptions
+      tags:
+        - Channels
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '200':
+          description: Channel deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: "Channel deleted"
+        '404':
+          description: Channel not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "NOT_FOUND"
+                message: "Channel not found"
+                statusCode: 404
+
+  /api/realtime/messages:
+    get:
+      summary: List Messages
+      description: Retrieve message history with optional filters
+      tags:
+        - Messages
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - name: channelId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Filter messages by channel ID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        - name: eventName
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter messages by event name
+          example: "order.created"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+          description: Maximum number of messages to return
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Number of messages to skip
+      responses:
+        '200':
+          description: List of messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Message'
+              example:
+                - id: "660e8400-e29b-41d4-a716-446655440000"
+                  eventName: "order.created"
+                  channelId: "550e8400-e29b-41d4-a716-446655440000"
+                  channelName: "order:123"
+                  payload:
+                    orderId: "123"
+                    status: "pending"
+                  senderType: "user"
+                  senderId: "770e8400-e29b-41d4-a716-446655440000"
+                  wsAudienceCount: 5
+                  whAudienceCount: 1
+                  whDeliveredCount: 1
+                  createdAt: "2024-01-15T10:30:00Z"
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "INVALID_INPUT"
+                message: "channelId: Invalid uuid"
+                statusCode: 400
+
+  /api/realtime/messages/stats:
+    get:
+      summary: Get Message Statistics
+      description: Retrieve aggregated statistics about messages
+      tags:
+        - Messages
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      parameters:
+        - name: channelId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Filter stats by channel ID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        - name: since
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Filter stats since this timestamp
+          example: "2024-01-01T00:00:00Z"
+      responses:
+        '200':
+          description: Message statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageStats'
+              example:
+                totalMessages: 1250
+                whDeliveryRate: 0.98
+                topEvents:
+                  - eventName: "order.created"
+                    count: 450
+                  - eventName: "order.updated"
+                    count: 380
+                  - eventName: "order.completed"
+                    count: 220
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "INVALID_INPUT"
+                message: "since: Invalid datetime"
+                statusCode: 400
+
+  /api/realtime/permissions:
+    get:
+      summary: Get Realtime Permissions
+      description: Retrieve RLS policies for subscribe (channels) and publish (messages) operations
+      tags:
+        - Permissions
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      responses:
+        '200':
+          description: Realtime RLS permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RealtimePermissions'
+              example:
+                subscribe:
+                  policies:
+                    - policyName: "allow_authenticated_subscribe"
+                      tableName: "realtime_channels"
+                      command: "SELECT"
+                      roles: ["authenticated"]
+                      using: "enabled = true"
+                      withCheck: null
+                publish:
+                  policies:
+                    - policyName: "allow_authenticated_publish"
+                      tableName: "realtime_messages"
+                      command: "INSERT"
+                      roles: ["authenticated"]
+                      using: null
+                      withCheck: "true"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    Channel:
+      type: object
+      required:
+        - id
+        - pattern
+        - enabled
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the channel
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        pattern:
+          type: string
+          minLength: 1
+          description: Channel pattern for subscription matching (supports wildcards like "order:*")
+          example: "order:*"
+        description:
+          type: string
+          nullable: true
+          description: Human-readable description of the channel
+          example: "Order updates channel"
+        webhookUrls:
+          type: array
+          nullable: true
+          items:
+            type: string
+            format: uri
+          description: URLs to receive webhook notifications for messages on this channel
+          example: ["https://example.com/webhook"]
+        enabled:
+          type: boolean
+          description: Whether the channel is currently active
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the channel was created
+          example: "2024-01-15T10:30:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the channel was last updated
+          example: "2024-01-15T10:30:00Z"
+
+    CreateChannelRequest:
+      type: object
+      required:
+        - pattern
+      properties:
+        pattern:
+          type: string
+          minLength: 1
+          description: Channel pattern for subscription matching
+          example: "order:*"
+        description:
+          type: string
+          description: Human-readable description of the channel
+          example: "Order updates channel"
+        webhookUrls:
+          type: array
+          items:
+            type: string
+            format: uri
+          description: URLs to receive webhook notifications
+          example: ["https://example.com/webhook"]
+        enabled:
+          type: boolean
+          default: true
+          description: Whether the channel should be active upon creation
+          example: true
+
+    UpdateChannelRequest:
+      type: object
+      properties:
+        pattern:
+          type: string
+          minLength: 1
+          description: Updated channel pattern
+          example: "order:*"
+        description:
+          type: string
+          description: Updated description
+          example: "Updated order channel"
+        webhookUrls:
+          type: array
+          items:
+            type: string
+            format: uri
+          description: Updated webhook URLs
+          example: ["https://example.com/webhook"]
+        enabled:
+          type: boolean
+          description: Updated enabled status
+          example: false
+
+    Message:
+      type: object
+      required:
+        - id
+        - eventName
+        - channelName
+        - payload
+        - senderType
+        - wsAudienceCount
+        - whAudienceCount
+        - whDeliveredCount
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the message
+          example: "660e8400-e29b-41d4-a716-446655440000"
+        eventName:
+          type: string
+          minLength: 1
+          description: Name of the event
+          example: "order.created"
+        channelId:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID of the channel this message belongs to
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        channelName:
+          type: string
+          minLength: 1
+          description: Resolved channel name (instance of the pattern)
+          example: "order:123"
+        payload:
+          type: object
+          additionalProperties: true
+          description: Message payload data
+          example:
+            orderId: "123"
+            status: "pending"
+        senderType:
+          type: string
+          enum: [system, user]
+          description: Type of sender that published the message
+          example: "user"
+        senderId:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID of the user who sent the message (null for system messages)
+          example: "770e8400-e29b-41d4-a716-446655440000"
+        wsAudienceCount:
+          type: integer
+          minimum: 0
+          description: Number of WebSocket clients who received the message
+          example: 5
+        whAudienceCount:
+          type: integer
+          minimum: 0
+          description: Number of webhooks that should receive the message
+          example: 1
+        whDeliveredCount:
+          type: integer
+          minimum: 0
+          description: Number of webhooks that successfully received the message
+          example: 1
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the message was created
+          example: "2024-01-15T10:30:00Z"
+
+    MessageStats:
+      type: object
+      required:
+        - totalMessages
+        - whDeliveryRate
+        - topEvents
+      properties:
+        totalMessages:
+          type: integer
+          minimum: 0
+          description: Total number of messages
+          example: 1250
+        whDeliveryRate:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Webhook delivery success rate (0-1)
+          example: 0.98
+        topEvents:
+          type: array
+          description: Most frequent event types
+          items:
+            type: object
+            required:
+              - eventName
+              - count
+            properties:
+              eventName:
+                type: string
+                description: Name of the event
+                example: "order.created"
+              count:
+                type: integer
+                minimum: 0
+                description: Number of occurrences
+                example: 450
+
+    RlsPolicy:
+      type: object
+      required:
+        - policyName
+        - tableName
+        - command
+        - roles
+      properties:
+        policyName:
+          type: string
+          description: Name of the RLS policy
+          example: "allow_authenticated_subscribe"
+        tableName:
+          type: string
+          description: Table the policy applies to
+          example: "realtime_channels"
+        command:
+          type: string
+          description: SQL command the policy applies to (SELECT, INSERT, UPDATE, DELETE)
+          example: "SELECT"
+        roles:
+          type: array
+          items:
+            type: string
+          description: Database roles the policy applies to
+          example: ["authenticated"]
+        using:
+          type: string
+          nullable: true
+          description: USING clause for row-level filtering
+          example: "enabled = true"
+        withCheck:
+          type: string
+          nullable: true
+          description: WITH CHECK clause for row-level validation
+          example: null
+
+    RealtimePermissions:
+      type: object
+      required:
+        - subscribe
+        - publish
+      properties:
+        subscribe:
+          type: object
+          required:
+            - policies
+          properties:
+            policies:
+              type: array
+              description: RLS policies for channel subscriptions
+              items:
+                $ref: '#/components/schemas/RlsPolicy'
+        publish:
+          type: object
+          required:
+            - policies
+          properties:
+            policies:
+              type: array
+              description: RLS policies for message publishing
+              items:
+                $ref: '#/components/schemas/RlsPolicy'
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - statusCode
+      properties:
+        error:
+          type: string
+          description: Error code for programmatic handling
+          example: "INVALID_INPUT"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Invalid request"
+        statusCode:
+          type: integer
+          description: HTTP status code
+          example: 400
+        nextActions:
+          type: string
+          description: Suggested action to resolve the error
+          example: "Check your request parameters"
