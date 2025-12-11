@@ -127,8 +127,7 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response, next
       { resource: DataUpdateResourceType.DATABASE },
       'system',
       JSON.stringify({ data: { changes: analyzeQuery(query) } })
-    );  
-
+    );
 
     successResponse(res, response);
   } catch (error: unknown) {

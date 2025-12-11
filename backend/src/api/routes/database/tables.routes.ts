@@ -59,20 +59,6 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
   }
 });
 
-// Get all table schemas
-router.get(
-  '/schemas',
-  verifyAdmin,
-  async (_req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const schemas = await tableService.getAllTableSchemas();
-      successResponse(res, schemas);
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
 // Get table schema
 router.get(
   '/:tableName/schema',

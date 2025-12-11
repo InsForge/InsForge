@@ -7,71 +7,111 @@ describe('analyzeQuery', () => {
   // ===================
   describe('records - INSERT', () => {
     it('simple insert', () => {
-      expect(analyzeQuery('INSERT INTO users (name) VALUES ("john")')).toEqual([{ type: 'records', name: 'users' }]);
+      expect(analyzeQuery('INSERT INTO users (name) VALUES ("john")')).toEqual([
+        { type: 'records', name: 'users' },
+      ]);
     });
 
     it('insert with schema', () => {
-      expect(analyzeQuery('INSERT INTO public.users (name) VALUES ("john")')).toEqual([{ type: 'records', name: 'users' }]);
+      expect(analyzeQuery('INSERT INTO public.users (name) VALUES ("john")')).toEqual([
+        { type: 'records', name: 'users' },
+      ]);
     });
 
     it('insert multiple rows', () => {
-      expect(analyzeQuery("INSERT INTO products (name) VALUES ('a'), ('b'), ('c')")).toEqual([{ type: 'records', name: 'products' }]);
+      expect(analyzeQuery("INSERT INTO products (name) VALUES ('a'), ('b'), ('c')")).toEqual([
+        { type: 'records', name: 'products' },
+      ]);
     });
 
     it('insert with returning', () => {
-      expect(analyzeQuery('INSERT INTO orders (total) VALUES (100) RETURNING id')).toEqual([{ type: 'records', name: 'orders' }]);
+      expect(analyzeQuery('INSERT INTO orders (total) VALUES (100) RETURNING id')).toEqual([
+        { type: 'records', name: 'orders' },
+      ]);
     });
 
     it('insert with on conflict', () => {
-      expect(analyzeQuery('INSERT INTO users (id, name) VALUES (1, "john") ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name')).toEqual([{ type: 'records', name: 'users' }]);
+      expect(
+        analyzeQuery(
+          'INSERT INTO users (id, name) VALUES (1, "john") ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name'
+        )
+      ).toEqual([{ type: 'records', name: 'users' }]);
     });
 
     it('insert from select', () => {
-      expect(analyzeQuery('INSERT INTO archive SELECT * FROM logs WHERE created_at < NOW()')).toEqual([{ type: 'records', name: 'archive' }]);
+      expect(
+        analyzeQuery('INSERT INTO archive SELECT * FROM logs WHERE created_at < NOW()')
+      ).toEqual([{ type: 'records', name: 'archive' }]);
     });
   });
 
   describe('records - UPDATE', () => {
     it('simple update', () => {
-      expect(analyzeQuery('UPDATE users SET name = "jane" WHERE id = 1')).toEqual([{ type: 'records', name: 'users' }]);
+      expect(analyzeQuery('UPDATE users SET name = "jane" WHERE id = 1')).toEqual([
+        { type: 'records', name: 'users' },
+      ]);
     });
 
     it('update with schema', () => {
-      expect(analyzeQuery('UPDATE public.posts SET title = "new" WHERE id = 1')).toEqual([{ type: 'records', name: 'posts' }]);
+      expect(analyzeQuery('UPDATE public.posts SET title = "new" WHERE id = 1')).toEqual([
+        { type: 'records', name: 'posts' },
+      ]);
     });
 
     it('update multiple columns', () => {
-      expect(analyzeQuery('UPDATE users SET name = "jane", email = "jane@test.com", updated_at = NOW() WHERE id = 1')).toEqual([{ type: 'records', name: 'users' }]);
+      expect(
+        analyzeQuery(
+          'UPDATE users SET name = "jane", email = "jane@test.com", updated_at = NOW() WHERE id = 1'
+        )
+      ).toEqual([{ type: 'records', name: 'users' }]);
     });
 
     it('update with subquery', () => {
-      expect(analyzeQuery('UPDATE orders SET status = "shipped" WHERE id IN (SELECT order_id FROM shipments)')).toEqual([{ type: 'records', name: 'orders' }]);
+      expect(
+        analyzeQuery(
+          'UPDATE orders SET status = "shipped" WHERE id IN (SELECT order_id FROM shipments)'
+        )
+      ).toEqual([{ type: 'records', name: 'orders' }]);
     });
 
     it('update with returning', () => {
-      expect(analyzeQuery('UPDATE products SET price = price * 1.1 RETURNING id, price')).toEqual([{ type: 'records', name: 'products' }]);
+      expect(analyzeQuery('UPDATE products SET price = price * 1.1 RETURNING id, price')).toEqual([
+        { type: 'records', name: 'products' },
+      ]);
     });
   });
 
   describe('records - DELETE', () => {
     it('simple delete', () => {
-      expect(analyzeQuery('DELETE FROM users WHERE id = 1')).toEqual([{ type: 'records', name: 'users' }]);
+      expect(analyzeQuery('DELETE FROM users WHERE id = 1')).toEqual([
+        { type: 'records', name: 'users' },
+      ]);
     });
 
     it('delete with schema', () => {
-      expect(analyzeQuery('DELETE FROM public.logs WHERE created_at < NOW()')).toEqual([{ type: 'records', name: 'logs' }]);
+      expect(analyzeQuery('DELETE FROM public.logs WHERE created_at < NOW()')).toEqual([
+        { type: 'records', name: 'logs' },
+      ]);
     });
 
     it('delete all', () => {
-      expect(analyzeQuery('DELETE FROM temp_table')).toEqual([{ type: 'records', name: 'temp_table' }]);
+      expect(analyzeQuery('DELETE FROM temp_table')).toEqual([
+        { type: 'records', name: 'temp_table' },
+      ]);
     });
 
     it('delete with subquery', () => {
-      expect(analyzeQuery('DELETE FROM orders WHERE user_id IN (SELECT id FROM users WHERE banned = true)')).toEqual([{ type: 'records', name: 'orders' }]);
+      expect(
+        analyzeQuery(
+          'DELETE FROM orders WHERE user_id IN (SELECT id FROM users WHERE banned = true)'
+        )
+      ).toEqual([{ type: 'records', name: 'orders' }]);
     });
 
     it('delete with returning', () => {
-      expect(analyzeQuery('DELETE FROM sessions WHERE expired = true RETURNING id')).toEqual([{ type: 'records', name: 'sessions' }]);
+      expect(analyzeQuery('DELETE FROM sessions WHERE expired = true RETURNING id')).toEqual([
+        { type: 'records', name: 'sessions' },
+      ]);
     });
   });
 
@@ -84,15 +124,23 @@ describe('analyzeQuery', () => {
     });
 
     it('create table if not exists', () => {
-      expect(analyzeQuery('CREATE TABLE IF NOT EXISTS posts (id UUID PRIMARY KEY)')).toEqual([{ type: 'tables' }]);
+      expect(analyzeQuery('CREATE TABLE IF NOT EXISTS posts (id UUID PRIMARY KEY)')).toEqual([
+        { type: 'tables' },
+      ]);
     });
 
     it('create table with schema', () => {
-      expect(analyzeQuery('CREATE TABLE public.comments (id SERIAL PRIMARY KEY)')).toEqual([{ type: 'tables' }]);
+      expect(analyzeQuery('CREATE TABLE public.comments (id SERIAL PRIMARY KEY)')).toEqual([
+        { type: 'tables' },
+      ]);
     });
 
     it('create table with constraints', () => {
-      expect(analyzeQuery('CREATE TABLE orders (id UUID PRIMARY KEY, user_id UUID REFERENCES users(id), total DECIMAL NOT NULL)')).toEqual([{ type: 'tables' }]);
+      expect(
+        analyzeQuery(
+          'CREATE TABLE orders (id UUID PRIMARY KEY, user_id UUID REFERENCES users(id), total DECIMAL NOT NULL)'
+        )
+      ).toEqual([{ type: 'tables' }]);
     });
 
     it('drop table', () => {
@@ -113,43 +161,65 @@ describe('analyzeQuery', () => {
   // ===================
   describe('table - ALTER TABLE', () => {
     it('add column', () => {
-      expect(analyzeQuery('ALTER TABLE users ADD COLUMN email VARCHAR(255)')).toEqual([{ type: 'table', name: 'users' }]);
+      expect(analyzeQuery('ALTER TABLE users ADD COLUMN email VARCHAR(255)')).toEqual([
+        { type: 'table', name: 'users' },
+      ]);
     });
 
     it('drop column', () => {
-      expect(analyzeQuery('ALTER TABLE posts DROP COLUMN temp_field')).toEqual([{ type: 'table', name: 'posts' }]);
+      expect(analyzeQuery('ALTER TABLE posts DROP COLUMN temp_field')).toEqual([
+        { type: 'table', name: 'posts' },
+      ]);
     });
 
     it('rename column', () => {
-      expect(analyzeQuery('ALTER TABLE users RENAME COLUMN name TO full_name')).toEqual([{ type: 'table', name: 'users' }]);
+      expect(analyzeQuery('ALTER TABLE users RENAME COLUMN name TO full_name')).toEqual([
+        { type: 'table', name: 'users' },
+      ]);
     });
 
     it('alter column type', () => {
-      expect(analyzeQuery('ALTER TABLE products ALTER COLUMN price TYPE NUMERIC(10,2)')).toEqual([{ type: 'table', name: 'products' }]);
+      expect(analyzeQuery('ALTER TABLE products ALTER COLUMN price TYPE NUMERIC(10,2)')).toEqual([
+        { type: 'table', name: 'products' },
+      ]);
     });
 
     it('add constraint', () => {
-      expect(analyzeQuery('ALTER TABLE orders ADD CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id)')).toEqual([{ type: 'table', name: 'orders' }]);
+      expect(
+        analyzeQuery(
+          'ALTER TABLE orders ADD CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id)'
+        )
+      ).toEqual([{ type: 'table', name: 'orders' }]);
     });
 
     it('enable RLS', () => {
-      expect(analyzeQuery('ALTER TABLE users ENABLE ROW LEVEL SECURITY')).toEqual([{ type: 'table', name: 'users' }]);
+      expect(analyzeQuery('ALTER TABLE users ENABLE ROW LEVEL SECURITY')).toEqual([
+        { type: 'table', name: 'users' },
+      ]);
     });
 
     it('disable RLS', () => {
-      expect(analyzeQuery('ALTER TABLE users DISABLE ROW LEVEL SECURITY')).toEqual([{ type: 'table', name: 'users' }]);
+      expect(analyzeQuery('ALTER TABLE users DISABLE ROW LEVEL SECURITY')).toEqual([
+        { type: 'table', name: 'users' },
+      ]);
     });
 
     it('force RLS', () => {
-      expect(analyzeQuery('ALTER TABLE users FORCE ROW LEVEL SECURITY')).toEqual([{ type: 'table', name: 'users' }]);
+      expect(analyzeQuery('ALTER TABLE users FORCE ROW LEVEL SECURITY')).toEqual([
+        { type: 'table', name: 'users' },
+      ]);
     });
 
     it('set not null', () => {
-      expect(analyzeQuery('ALTER TABLE users ALTER COLUMN email SET NOT NULL')).toEqual([{ type: 'table', name: 'users' }]);
+      expect(analyzeQuery('ALTER TABLE users ALTER COLUMN email SET NOT NULL')).toEqual([
+        { type: 'table', name: 'users' },
+      ]);
     });
 
     it('set default', () => {
-      expect(analyzeQuery('ALTER TABLE users ALTER COLUMN created_at SET DEFAULT NOW()')).toEqual([{ type: 'table', name: 'users' }]);
+      expect(analyzeQuery('ALTER TABLE users ALTER COLUMN created_at SET DEFAULT NOW()')).toEqual([
+        { type: 'table', name: 'users' },
+      ]);
     });
   });
 
@@ -158,23 +228,33 @@ describe('analyzeQuery', () => {
   // ===================
   describe('index', () => {
     it('create index', () => {
-      expect(analyzeQuery('CREATE INDEX idx_users_email ON users (email)')).toEqual([{ type: 'index' }]);
+      expect(analyzeQuery('CREATE INDEX idx_users_email ON users (email)')).toEqual([
+        { type: 'index' },
+      ]);
     });
 
     it('create unique index', () => {
-      expect(analyzeQuery('CREATE UNIQUE INDEX idx_users_email ON users (email)')).toEqual([{ type: 'index' }]);
+      expect(analyzeQuery('CREATE UNIQUE INDEX idx_users_email ON users (email)')).toEqual([
+        { type: 'index' },
+      ]);
     });
 
     it('create index concurrently', () => {
-      expect(analyzeQuery('CREATE INDEX CONCURRENTLY idx_orders_date ON orders (created_at)')).toEqual([{ type: 'index' }]);
+      expect(
+        analyzeQuery('CREATE INDEX CONCURRENTLY idx_orders_date ON orders (created_at)')
+      ).toEqual([{ type: 'index' }]);
     });
 
     it('create partial index', () => {
-      expect(analyzeQuery('CREATE INDEX idx_active_users ON users (id) WHERE active = true')).toEqual([{ type: 'index' }]);
+      expect(
+        analyzeQuery('CREATE INDEX idx_active_users ON users (id) WHERE active = true')
+      ).toEqual([{ type: 'index' }]);
     });
 
     it('create index with expression', () => {
-      expect(analyzeQuery('CREATE INDEX idx_users_lower_email ON users (LOWER(email))')).toEqual([{ type: 'index' }]);
+      expect(analyzeQuery('CREATE INDEX idx_users_lower_email ON users (LOWER(email))')).toEqual([
+        { type: 'index' },
+      ]);
     });
 
     it('drop index', () => {
@@ -191,19 +271,35 @@ describe('analyzeQuery', () => {
   // ===================
   describe('trigger', () => {
     it('create trigger before insert', () => {
-      expect(analyzeQuery('CREATE TRIGGER set_timestamp BEFORE INSERT ON users FOR EACH ROW EXECUTE FUNCTION update_modified()')).toEqual([{ type: 'trigger' }]);
+      expect(
+        analyzeQuery(
+          'CREATE TRIGGER set_timestamp BEFORE INSERT ON users FOR EACH ROW EXECUTE FUNCTION update_modified()'
+        )
+      ).toEqual([{ type: 'trigger' }]);
     });
 
     it('create trigger after update', () => {
-      expect(analyzeQuery('CREATE TRIGGER audit_log AFTER UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION log_changes()')).toEqual([{ type: 'trigger' }]);
+      expect(
+        analyzeQuery(
+          'CREATE TRIGGER audit_log AFTER UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION log_changes()'
+        )
+      ).toEqual([{ type: 'trigger' }]);
     });
 
     it('create trigger before delete', () => {
-      expect(analyzeQuery('CREATE TRIGGER prevent_delete BEFORE DELETE ON users FOR EACH ROW EXECUTE FUNCTION check_delete()')).toEqual([{ type: 'trigger' }]);
+      expect(
+        analyzeQuery(
+          'CREATE TRIGGER prevent_delete BEFORE DELETE ON users FOR EACH ROW EXECUTE FUNCTION check_delete()'
+        )
+      ).toEqual([{ type: 'trigger' }]);
     });
 
     it('create or replace trigger', () => {
-      expect(analyzeQuery('CREATE OR REPLACE TRIGGER update_ts BEFORE UPDATE ON posts FOR EACH ROW EXECUTE FUNCTION update_modified()')).toEqual([{ type: 'trigger' }]);
+      expect(
+        analyzeQuery(
+          'CREATE OR REPLACE TRIGGER update_ts BEFORE UPDATE ON posts FOR EACH ROW EXECUTE FUNCTION update_modified()'
+        )
+      ).toEqual([{ type: 'trigger' }]);
     });
 
     it('drop trigger', () => {
@@ -211,7 +307,9 @@ describe('analyzeQuery', () => {
     });
 
     it('drop trigger if exists', () => {
-      expect(analyzeQuery('DROP TRIGGER IF EXISTS old_trigger ON users')).toEqual([{ type: 'trigger' }]);
+      expect(analyzeQuery('DROP TRIGGER IF EXISTS old_trigger ON users')).toEqual([
+        { type: 'trigger' },
+      ]);
     });
   });
 
@@ -220,35 +318,61 @@ describe('analyzeQuery', () => {
   // ===================
   describe('policy', () => {
     it('create policy for select', () => {
-      expect(analyzeQuery('CREATE POLICY user_select ON users FOR SELECT USING (id = current_user_id())')).toEqual([{ type: 'policy' }]);
+      expect(
+        analyzeQuery('CREATE POLICY user_select ON users FOR SELECT USING (id = current_user_id())')
+      ).toEqual([{ type: 'policy' }]);
     });
 
     it('create policy for insert', () => {
-      expect(analyzeQuery('CREATE POLICY user_insert ON users FOR INSERT WITH CHECK (true)')).toEqual([{ type: 'policy' }]);
+      expect(
+        analyzeQuery('CREATE POLICY user_insert ON users FOR INSERT WITH CHECK (true)')
+      ).toEqual([{ type: 'policy' }]);
     });
 
     it('create policy for update', () => {
-      expect(analyzeQuery('CREATE POLICY user_update ON users FOR UPDATE USING (id = current_user_id()) WITH CHECK (id = current_user_id())')).toEqual([{ type: 'policy' }]);
+      expect(
+        analyzeQuery(
+          'CREATE POLICY user_update ON users FOR UPDATE USING (id = current_user_id()) WITH CHECK (id = current_user_id())'
+        )
+      ).toEqual([{ type: 'policy' }]);
     });
 
     it('create policy for delete', () => {
-      expect(analyzeQuery('CREATE POLICY user_delete ON users FOR DELETE USING (id = current_user_id())')).toEqual([{ type: 'policy' }]);
+      expect(
+        analyzeQuery('CREATE POLICY user_delete ON users FOR DELETE USING (id = current_user_id())')
+      ).toEqual([{ type: 'policy' }]);
     });
 
     it('create policy for all', () => {
-      expect(analyzeQuery('CREATE POLICY full_access ON orders FOR ALL USING (user_id = current_user_id())')).toEqual([{ type: 'policy' }]);
+      expect(
+        analyzeQuery(
+          'CREATE POLICY full_access ON orders FOR ALL USING (user_id = current_user_id())'
+        )
+      ).toEqual([{ type: 'policy' }]);
     });
 
     it('create permissive policy', () => {
-      expect(analyzeQuery('CREATE POLICY admin_access ON users AS PERMISSIVE FOR ALL TO admin USING (true)')).toEqual([{ type: 'policy' }]);
+      expect(
+        analyzeQuery(
+          'CREATE POLICY admin_access ON users AS PERMISSIVE FOR ALL TO admin USING (true)'
+        )
+      ).toEqual([{ type: 'policy' }]);
     });
 
     it('create restrictive policy', () => {
-      expect(analyzeQuery('CREATE POLICY tenant_isolation ON orders AS RESTRICTIVE FOR ALL USING (tenant_id = current_tenant())')).toEqual([{ type: 'policy' }]);
+      expect(
+        analyzeQuery(
+          'CREATE POLICY tenant_isolation ON orders AS RESTRICTIVE FOR ALL USING (tenant_id = current_tenant())'
+        )
+      ).toEqual([{ type: 'policy' }]);
     });
 
     it('alter policy', () => {
-      expect(analyzeQuery('ALTER POLICY user_select ON users USING (id = current_user_id() OR is_admin())')).toEqual([{ type: 'policy' }]);
+      expect(
+        analyzeQuery(
+          'ALTER POLICY user_select ON users USING (id = current_user_id() OR is_admin())'
+        )
+      ).toEqual([{ type: 'policy' }]);
     });
 
     it('drop policy', () => {
@@ -256,7 +380,9 @@ describe('analyzeQuery', () => {
     });
 
     it('drop policy if exists', () => {
-      expect(analyzeQuery('DROP POLICY IF EXISTS old_policy ON users')).toEqual([{ type: 'policy' }]);
+      expect(analyzeQuery('DROP POLICY IF EXISTS old_policy ON users')).toEqual([
+        { type: 'policy' },
+      ]);
     });
   });
 
@@ -265,19 +391,35 @@ describe('analyzeQuery', () => {
   // ===================
   describe('function', () => {
     it('create function sql', () => {
-      expect(analyzeQuery('CREATE FUNCTION get_user(id INT) RETURNS TEXT AS $$ SELECT name FROM users WHERE id = $1 $$ LANGUAGE sql')).toEqual([{ type: 'function' }]);
+      expect(
+        analyzeQuery(
+          'CREATE FUNCTION get_user(id INT) RETURNS TEXT AS $$ SELECT name FROM users WHERE id = $1 $$ LANGUAGE sql'
+        )
+      ).toEqual([{ type: 'function' }]);
     });
 
     it('create function plpgsql', () => {
-      expect(analyzeQuery('CREATE FUNCTION update_modified() RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql')).toEqual([{ type: 'function' }]);
+      expect(
+        analyzeQuery(
+          'CREATE FUNCTION update_modified() RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql'
+        )
+      ).toEqual([{ type: 'function' }]);
     });
 
     it('create or replace function', () => {
-      expect(analyzeQuery('CREATE OR REPLACE FUNCTION current_user_id() RETURNS UUID AS $$ SELECT auth.uid() $$ LANGUAGE sql')).toEqual([{ type: 'function' }]);
+      expect(
+        analyzeQuery(
+          'CREATE OR REPLACE FUNCTION current_user_id() RETURNS UUID AS $$ SELECT auth.uid() $$ LANGUAGE sql'
+        )
+      ).toEqual([{ type: 'function' }]);
     });
 
     it('create function with security definer', () => {
-      expect(analyzeQuery('CREATE FUNCTION admin_action() RETURNS VOID AS $$ UPDATE users SET role = "admin" $$ LANGUAGE sql SECURITY DEFINER')).toEqual([{ type: 'function' }]);
+      expect(
+        analyzeQuery(
+          'CREATE FUNCTION admin_action() RETURNS VOID AS $$ UPDATE users SET role = "admin" $$ LANGUAGE sql SECURITY DEFINER'
+        )
+      ).toEqual([{ type: 'function' }]);
     });
 
     it('drop function', () => {
@@ -302,11 +444,15 @@ describe('analyzeQuery', () => {
     });
 
     it('create extension if not exists', () => {
-      expect(analyzeQuery('CREATE EXTENSION IF NOT EXISTS pgcrypto')).toEqual([{ type: 'extension' }]);
+      expect(analyzeQuery('CREATE EXTENSION IF NOT EXISTS pgcrypto')).toEqual([
+        { type: 'extension' },
+      ]);
     });
 
     it('create extension with schema', () => {
-      expect(analyzeQuery('CREATE EXTENSION hstore WITH SCHEMA public')).toEqual([{ type: 'extension' }]);
+      expect(analyzeQuery('CREATE EXTENSION hstore WITH SCHEMA public')).toEqual([
+        { type: 'extension' },
+      ]);
     });
 
     it('drop extension', () => {
@@ -327,15 +473,23 @@ describe('analyzeQuery', () => {
     });
 
     it('select with joins', () => {
-      expect(analyzeQuery('SELECT u.*, p.title FROM users u JOIN posts p ON u.id = p.user_id')).toEqual([]);
+      expect(
+        analyzeQuery('SELECT u.*, p.title FROM users u JOIN posts p ON u.id = p.user_id')
+      ).toEqual([]);
     });
 
     it('select with subquery', () => {
-      expect(analyzeQuery('SELECT * FROM users WHERE id IN (SELECT user_id FROM orders)')).toEqual([]);
+      expect(analyzeQuery('SELECT * FROM users WHERE id IN (SELECT user_id FROM orders)')).toEqual(
+        []
+      );
     });
 
     it('select with cte', () => {
-      expect(analyzeQuery('WITH active_users AS (SELECT * FROM users WHERE active) SELECT * FROM active_users')).toEqual([]);
+      expect(
+        analyzeQuery(
+          'WITH active_users AS (SELECT * FROM users WHERE active) SELECT * FROM active_users'
+        )
+      ).toEqual([]);
     });
 
     it('select for update (still ignored)', () => {
@@ -348,7 +502,9 @@ describe('analyzeQuery', () => {
   // ===================
   describe('multi-statement', () => {
     it('multiple inserts', () => {
-      const result = analyzeQuery("INSERT INTO users (name) VALUES ('a'); INSERT INTO posts (title) VALUES ('b');");
+      const result = analyzeQuery(
+        "INSERT INTO users (name) VALUES ('a'); INSERT INTO posts (title) VALUES ('b');"
+      );
       expect(result).toEqual([
         { type: 'records', name: 'users' },
         { type: 'records', name: 'posts' },
@@ -357,10 +513,7 @@ describe('analyzeQuery', () => {
 
     it('create table + insert', () => {
       const result = analyzeQuery('CREATE TABLE temp (id INT); INSERT INTO temp VALUES (1);');
-      expect(result).toEqual([
-        { type: 'tables' },
-        { type: 'records', name: 'temp' },
-      ]);
+      expect(result).toEqual([{ type: 'tables' }, { type: 'records', name: 'temp' }]);
     });
 
     it('full table setup with RLS', () => {
@@ -461,19 +614,27 @@ describe('analyzeQuery', () => {
     });
 
     it('table name with underscore', () => {
-      expect(analyzeQuery('INSERT INTO user_profiles (name) VALUES ("test")')).toEqual([{ type: 'records', name: 'user_profiles' }]);
+      expect(analyzeQuery('INSERT INTO user_profiles (name) VALUES ("test")')).toEqual([
+        { type: 'records', name: 'user_profiles' },
+      ]);
     });
 
     it('table name with quotes', () => {
-      expect(analyzeQuery('INSERT INTO "user-data" (name) VALUES ("test")')).toEqual([{ type: 'records', name: 'user-data' }]);
+      expect(analyzeQuery('INSERT INTO "user-data" (name) VALUES ("test")')).toEqual([
+        { type: 'records', name: 'user-data' },
+      ]);
     });
 
     it('schema qualified table', () => {
-      expect(analyzeQuery('UPDATE myschema.mytable SET x = 1')).toEqual([{ type: 'records', name: 'mytable' }]);
+      expect(analyzeQuery('UPDATE myschema.mytable SET x = 1')).toEqual([
+        { type: 'records', name: 'mytable' },
+      ]);
     });
 
     it('semicolon in string literal', () => {
-      expect(analyzeQuery("INSERT INTO logs (msg) VALUES ('hello; world')")).toEqual([{ type: 'records', name: 'logs' }]);
+      expect(analyzeQuery("INSERT INTO logs (msg) VALUES ('hello; world')")).toEqual([
+        { type: 'records', name: 'logs' },
+      ]);
     });
   });
 });
