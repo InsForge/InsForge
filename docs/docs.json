@@ -145,6 +145,10 @@
             "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/functions.yaml"
           },
           {
+            "group": "Realtime",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/realtime.yaml"
+          },
+          {
             "group": "Secrets",
             "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/secrets.yaml"
           },
