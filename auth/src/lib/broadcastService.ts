@@ -8,7 +8,7 @@ export interface BroadcastEvent {
   timestamp: number;
   data?: {
     accessToken?: string;
-    code?: string; // New backend returns code instead of accessToken
+    authorizationCode?: string; // PKCE: authorization code for secure token exchange
     user?: { id: string; email: string; name: string };
     csrfToken?: string;
   };

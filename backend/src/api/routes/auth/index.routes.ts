@@ -47,6 +47,7 @@ import {
   updateAuthConfigRequestSchema,
 } from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
+import { storeAuthorizationCode, consumeAuthorizationCode, verifyPkce } from '@/infra/security/pkce.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import logger from '@/utils/logger.js';
 
@@ -58,6 +59,67 @@ const auditService = AuditService.getInstance();
 
 // Mount OAuth routes
 router.use('/oauth', oauthRouter);
+
+/**
+ * POST /api/auth/exchange - Exchange authorization code for access token
+ * 
+ * This endpoint is used to securely exchange an authorization code for an access token.
+ * If PKCE was used during OAuth initiation, code_verifier must be provided.
+ * 
+ * Request body:
+ * - code: string (required) - The authorization code from OAuth callback
+ * - code_verifier: string (optional) - PKCE code verifier for verification
+ * 
+ * Response:
+ * - accessToken: string
+ * - user: object
+ * - csrfToken: string (optional)
+ */
+router.post('/exchange', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { code, code_verifier } = req.body;
+
+    if (!code || typeof code !== 'string') {
+      throw new AppError('code is required', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
+    // Consume authorization code (one-time use)
+    const sessionData = consumeAuthorizationCode(code);
+    if (!sessionData) {
+      throw new AppError('Invalid or expired authorization code', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+
+    // Verify PKCE if code_challenge was stored
+    if (sessionData.codeChallenge) {
+      if (!code_verifier || typeof code_verifier !== 'string') {
+        throw new AppError('code_verifier is required for this authorization', 400, ERROR_CODES.INVALID_INPUT);
+      }
+
+      const isValid = await verifyPkce(code_verifier, sessionData.codeChallenge);
+      if (!isValid) {
+        logger.warn('PKCE verification failed');
+        throw new AppError('PKCE verification failed', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      }
+    }
+
+    // Issue refresh token cookie
+    const csrfToken = issueRefreshTokenCookie(res, sessionData.user);
+
+    // Return access token and user data
+    const response: CreateSessionResponse & { csrfToken?: string } = {
+      accessToken: sessionData.accessToken,
+      user: sessionData.user,
+      csrfToken: csrfToken ?? undefined,
+    };
+
+    successResponse(res, response);
+  } catch (error) {
+    logger.error('Exchange endpoint error', {
+      error: error instanceof Error ? error.message : error,
+    });
+    next(error);
+  }
+});
 
 // Public Authentication Configuration Routes
 // GET /api/auth/public-config - Get all public authentication configuration (public endpoint)
@@ -122,6 +184,7 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
 });
 
 // POST /api/auth/users - Create a new user (registration)
+// Supports PKCE: if code_challenge is provided, returns authorization code instead of access_token
 router.post('/users', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validationResult = createUserRequestSchema.safeParse(req.body);
@@ -135,20 +198,39 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
 
     const { email, password, name } = validationResult.data;
     const supportCode = req.body.support_code === true;
+    const codeChallenge = req.body.code_challenge as string | undefined;
+    
     const result: CreateUserResponse = await authService.register(email, password, name, {
       supportCode,
     });
-
-    // Set refresh token in httpOnly cookie and get CSRF token
-    let csrfToken: string | null = null;
-    if (result.accessToken && result.user) {
-      csrfToken = issueRefreshTokenCookie(res, result.user);
-    }
 
     const socket = SocketManager.getInstance();
     socket.broadcastToRoom('role:project_admin', ServerEvents.DATA_UPDATE, {
       resource: DataUpdateResourceType.USERS,
     });
+
+    // If code_challenge is provided, return authorization code for PKCE flow
+    if (codeChallenge && result.accessToken && result.user) {
+      const authorizationCode = storeAuthorizationCode({
+        accessToken: result.accessToken,
+        user: result.user,
+        codeChallenge,
+      });
+
+      // Return authorization code instead of access_token
+      successResponse(res, {
+        code: authorizationCode,
+        user: result.user,
+      });
+      return;
+    }
+
+    // Regular flow (direct SDK usage, no PKCE)
+    // Set refresh token in httpOnly cookie and get CSRF token
+    let csrfToken: string | null = null;
+    if (result.accessToken && result.user) {
+      csrfToken = issueRefreshTokenCookie(res, result.user);
+    }
 
     successResponse(res, { ...result, csrfToken });
   } catch (error) {
@@ -157,6 +239,7 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
 });
 
 // POST /api/auth/sessions - Create a new session (login)
+// Supports PKCE: if code_challenge is provided, returns authorization code instead of access_token
 router.post('/sessions', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validationResult = createSessionRequestSchema.safeParse(req.body);
@@ -170,8 +253,27 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
 
     const { email, password } = validationResult.data;
     const supportCode = req.body.support_code === true;
+    const codeChallenge = req.body.code_challenge as string | undefined;
+    
     const result: CreateSessionResponse = await authService.login(email, password, { supportCode });
 
+    // If code_challenge is provided, return authorization code for PKCE flow
+    if (codeChallenge && result.accessToken && result.user) {
+      const authorizationCode = storeAuthorizationCode({
+        accessToken: result.accessToken,
+        user: result.user,
+        codeChallenge,
+      });
+
+      // Return authorization code instead of access_token
+      successResponse(res, {
+        code: authorizationCode,
+        user: result.user,
+      });
+      return;
+    }
+
+    // Regular flow (direct SDK usage, no PKCE)
     // Set refresh token in httpOnly cookie and get CSRF token
     let csrfToken: string | null = null;
     if (result.accessToken && result.user) {
@@ -578,6 +680,7 @@ router.post(
 // Uses verifyEmailMethod from auth config to determine verification type:
 // - 'code': expects email + 6-digit numeric code
 // - 'link': expects 64-char hex token only
+// Supports PKCE: if code_challenge is provided, returns authorization code instead of access_token
 router.post(
   '/email/verify',
   verifyOTPLimiter,
@@ -594,6 +697,7 @@ router.post(
 
       const { email, otp } = validationResult.data;
       const supportCode = req.body.support_code === true;
+      const codeChallenge = req.body.code_challenge as string | undefined;
 
       // Get auth config to determine verification method
       const authConfig = await authConfigService.getAuthConfig();
@@ -616,6 +720,24 @@ router.post(
         result = await authService.verifyEmailWithCode(email, otp, { supportCode });
       }
 
+      // If code_challenge is provided, return authorization code for PKCE flow
+      if (codeChallenge && result.accessToken && result.user) {
+        const authorizationCode = storeAuthorizationCode({
+          accessToken: result.accessToken,
+          user: result.user,
+          codeChallenge,
+        });
+
+        // Return authorization code instead of access_token
+        successResponse(res, {
+          code: authorizationCode,
+          user: result.user,
+          redirectTo: result.redirectTo,
+        });
+        return;
+      }
+
+      // Regular flow (direct SDK usage, no PKCE)
       // Set refresh token in httpOnly cookie and get CSRF token
       let csrfToken: string | null = null;
       if (result.accessToken && result.user) {
