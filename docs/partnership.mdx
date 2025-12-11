@@ -129,8 +129,8 @@ Partner platforms can:
     ```json
     {
       "project_name": "my-project",  // required
-      "region": "us-east",         // optional
-      "instance_type": "nano"      // optional
+      "region": "us-east",         // optional, "us-east", "us-west", "ap-southeast", "eu-central", default: "us-east"
+      "instance_type": "nano"      // optional, "nano", "micro", "small", "medium", "large", "xl", "2xl", "4xl", "8xl", "16xl", default: "nano"
     }
     ```
 
@@ -200,8 +200,8 @@ Partner platforms can:
     ```json
     {
       "project_name": "embedded-project",  // required
-      "region": "us-east",               // optional
-      "instance_type": "nano"            // optional
+      "region": "us-east",               // optional, "us-east", "us-west", "ap-southeast", "eu-central", default: "us-east"
+      "instance_type": "nano"            // optional, "nano", "micro", "small", "medium", "large", "xl", "2xl", "4xl", "8xl", "16xl", default: "nano"
     }
     ```
 
@@ -232,6 +232,9 @@ Partner platforms can:
         "id": "uuid-string",
         "access_host": "https://project.us-east.insforge.app",
         "api_key": "project-api-key",
+        "region": "us-east",
+        "instance_type": "nano",
+        "last_activity_at": "2025-01-21T10:30:00Z",
         "status": "active"
       }
     }
@@ -333,7 +336,8 @@ Partner platforms can:
       "project": {
         "id": "uuid-string",
         "name": "project-name",
-        "status": "active"
+        "status": "active",
+        "last_activity_at": "2025-11-18T10:30:00Z"
       },
       "period": {
         "start": "2025-11-10T00:00:00Z",
