@@ -75,16 +75,18 @@ export default function SecretsPage() {
           className="max-w-70 dark:bg-neutral-900 dark:border-neutral-700"
         />
 
-        {/* Secrets Table */}
-        <div className="flex flex-col gap-2">
-          {/* Table Header */}
-          <div className="grid grid-cols-12 px-3 text-sm text-muted-foreground dark:text-neutral-400">
-            <div className="col-span-8 py-1 px-3">Name</div>
-            {/* <div className="col-span-5 py-1 px-3">Digest</div> */}
-            <div className="col-span-3 py-1 px-3">Updated at</div>
-            <div className="col-span-1 py-1 px-3" />
-          </div>
+        {/* Secrets Table Header */}
+        <div className="grid grid-cols-12 px-3 text-sm text-muted-foreground dark:text-neutral-400">
+          <div className="col-span-8 py-1 px-3">Name</div>
+          {/* <div className="col-span-5 py-1 px-3">Digest</div> */}
+          <div className="col-span-3 py-1 px-3">Updated at</div>
+          <div className="col-span-1 py-1 px-3" />
+        </div>
+      </div>
 
+      {/* Scrollable Table Body */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4">
+        <div className="flex flex-col gap-2">
           {loading ? (
             <>
               {[...Array(4)].map((_, i) => (
