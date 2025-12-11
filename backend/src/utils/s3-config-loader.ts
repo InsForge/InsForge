@@ -1,8 +1,9 @@
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import logger from '@/utils/logger.js';
 
-const CONFIG_BUCKET = 'insforge-config';
-const CONFIG_REGION = 'us-east-2';
+// TODO: make these configurable in env variables in cloud backend
+const CONFIG_BUCKET = process.env.AWS_CONFIG_BUCKET || 'insforge-config';
+const CONFIG_REGION = process.env.AWS_CONFIG_REGION || 'us-east-2';
 
 let s3Client: S3Client | null = null;
 
