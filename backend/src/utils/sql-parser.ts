@@ -3,10 +3,22 @@ import sql from '@databases/sql';
 import { parseSync, loadModule } from 'libpg-query';
 import logger from './logger.js';
 
-// Load WASM module at startup
-void loadModule();
 
-// Represents the type of database resource/object that was changed by a SQL query
+let initialized = false;
+
+/**
+ * Initialize the SQL parser WASM module.
+ * Must be called and awaited before using analyzeQuery().
+ */
+export async function initSqlParser(): Promise<void> {
+  if (initialized) {
+    return;
+  }
+  await loadModule();
+  initialized = true;
+  logger.info('SQL parser initialized');
+}
+
 export interface DatabaseResourceUpdate {
   type: 'tables' | 'table' | 'records' | 'index' | 'trigger' | 'policy' | 'function' | 'extension';
   name?: string;

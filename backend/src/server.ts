@@ -26,6 +26,7 @@ import { StorageService } from '@/services/storage/storage.service.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { seedBackend } from '@/utils/seed.js';
 import logger from '@/utils/logger.js';
+import { initSqlParser } from '@/utils/sql-parser.js';
 import { isProduction } from './utils/environment.js';
 import packageJson from '../../package.json';
 
@@ -53,6 +54,9 @@ export async function createApp() {
   // Initialize logs service
   const logService = LogService.getInstance();
   await logService.initialize(); // connect to CloudWatch
+
+  // Initialize SQL parser WASM module
+  await initSqlParser();
 
   const app = express();
 

@@ -1,5 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import { analyzeQuery } from '../../src/utils/sql-parser.js';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { analyzeQuery, initSqlParser } from '../../src/utils/sql-parser.js';
+
+beforeAll(async () => {
+  await initSqlParser();
+});
 
 describe('analyzeQuery', () => {
   // ===================
