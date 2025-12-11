@@ -1,6 +1,71 @@
 import splitSqlQuery from '@databases/split-sql-query';
 import sql from '@databases/sql';
+import { parseSync, loadModule } from 'libpg-query';
 import logger from './logger.js';
+
+// Load WASM module at startup
+loadModule();
+
+export interface QueryChange {
+  type: 'tables' | 'table' | 'records' | 'index' | 'trigger' | 'policy' | 'function' | 'extension';
+  name?: string;
+}
+
+const STMT_TYPES: Record<string, QueryChange['type']> = {
+  InsertStmt: 'records',
+  UpdateStmt: 'records',
+  DeleteStmt: 'records',
+  CreateStmt: 'tables',
+  AlterTableStmt: 'table',
+  RenameStmt: 'table',
+  IndexStmt: 'index',
+  CreateTrigStmt: 'trigger',
+  CreatePolicyStmt: 'policy',
+  AlterPolicyStmt: 'policy',
+  CreateFunctionStmt: 'function',
+  CreateExtensionStmt: 'extension',
+};
+
+const DROP_TYPES: Record<string, QueryChange['type']> = {
+  OBJECT_TABLE: 'tables',
+  OBJECT_INDEX: 'index',
+  OBJECT_TRIGGER: 'trigger',
+  OBJECT_POLICY: 'policy',
+  OBJECT_FUNCTION: 'function',
+  OBJECT_EXTENSION: 'extension',
+};
+
+export function analyzeQuery(query: string): QueryChange[] {
+  try {
+    const { stmts } = parseSync(query);
+    return stmts
+      .map((s: { stmt: Record<string, unknown> }) => extractChange(s.stmt))
+      .filter((c: QueryChange | null): c is QueryChange => c !== null);
+  } catch (e) {
+    logger.warn('SQL parse error:', e);
+    return [];
+  }
+}
+
+function extractChange(stmt: Record<string, unknown>): QueryChange | null {
+  const [stmtType, data] = Object.entries(stmt)[0] as [string, Record<string, unknown>];
+
+  if (stmtType === 'DropStmt') {
+    const type = DROP_TYPES[data.removeType as string];
+    return type ? { type } : null;
+  }
+
+  const type = STMT_TYPES[stmtType];
+  if (!type) return null;
+
+  // Only include name for 'table' (ALTER) and 'records' (DML)
+  if (type === 'table' || type === 'records') {
+    const name = (data.relation as Record<string, unknown>)?.relname as string;
+    return { type, name };
+  }
+
+  return { type };
+}
 
 /**
  * Parse a SQL string into individual statements, properly handling:

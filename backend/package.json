@@ -49,6 +49,7 @@
     "google-auth-library": "^10.1.0",
     "jose": "^6.1.0",
     "jsonwebtoken": "^9.0.2",
+    "libpg-query": "^17.6.0",
     "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
     "node-pg-migrate": "^8.0.3",

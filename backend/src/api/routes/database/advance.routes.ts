@@ -15,6 +15,7 @@ import logger from '@/utils/logger.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { successResponse } from '@/utils/response.js';
+import { analyzeQuery } from '@/utils/sql-parser.js';
 
 const router = Router();
 const dbAdvanceService = DatabaseAdvanceService.getInstance();
@@ -69,7 +70,8 @@ router.post(
         'role:project_admin',
         ServerEvents.DATA_UPDATE,
         { resource: DataUpdateResourceType.DATABASE },
-        'system'
+        'system',
+        JSON.stringify({ data: { changes: analyzeQuery(query) } })
       );
 
       successResponse(res, response);
@@ -123,8 +125,10 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response, next
       'role:project_admin',
       ServerEvents.DATA_UPDATE,
       { resource: DataUpdateResourceType.DATABASE },
-      'system'
-    );
+      'system',
+      JSON.stringify({ data: { changes: analyzeQuery(query) } })
+    );  
+
 
     successResponse(res, response);
   } catch (error: unknown) {

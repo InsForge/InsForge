@@ -270,10 +270,19 @@ export class DatabaseTableService {
 
   /**
    * Get all table schemas
+   * Uses batched execution to avoid memory spikes on low-memory instances
    */
   async getAllTableSchemas(): Promise<GetTableSchemaResponse[]> {
     const tables = await this.listTables();
-    const schemas = await Promise.all(tables.map((table) => this.getTableSchema(table)));
+    const schemas: GetTableSchemaResponse[] = [];
+    const BATCH_SIZE = 3; // Process 3 tables at a time, this number is hardcoded for the time being, this can be read from config or can load together if needed
+
+    for (let i = 0; i < tables.length; i += BATCH_SIZE) {
+      const batch = tables.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.all(batch.map((table) => this.getTableSchema(table)));
+      schemas.push(...batchResults);
+    }
+
     return schemas;
   }
 
