@@ -97,14 +97,18 @@ export default function FunctionsPage() {
             </Tooltip>
           </TooltipProvider>
         </div>
-        <div className="flex flex-col gap-2 relative">
-          {/* Table Header */}
-          <div className="grid grid-cols-12 px-3 text-sm text-muted-foreground dark:text-neutral-400">
-            <div className="col-span-2 py-1 px-3">Name</div>
-            <div className="col-span-6 py-1 px-3">URL</div>
-            <div className="col-span-2 py-1 px-3">Created</div>
-            <div className="col-span-2 py-1 px-3">Last Update</div>
-          </div>
+        {/* Table Header */}
+        <div className="grid grid-cols-12 px-3 text-sm text-muted-foreground dark:text-neutral-400">
+          <div className="col-span-2 py-1 px-3">Name</div>
+          <div className="col-span-6 py-1 px-3">URL</div>
+          <div className="col-span-2 py-1 px-3">Created</div>
+          <div className="col-span-2 py-1 px-3">Last Update</div>
+        </div>
+      </div>
+
+      {/* Scrollable Table Body */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 relative">
+        <div className="flex flex-col gap-2">
           {loading ? (
             <>
               {[...Array(4)].map((_, i) => (
@@ -127,17 +131,17 @@ export default function FunctionsPage() {
               <FunctionEmptyState />
             </div>
           )}
-
-          {/* Loading mask overlay */}
-          {isRefreshing && (
-            <div className="absolute inset-0 bg-white dark:bg-neutral-800 flex items-center justify-center z-50">
-              <div className="flex items-center gap-1">
-                <div className="w-5 h-5 border-2 border-zinc-500 dark:border-neutral-700 border-t-transparent rounded-full animate-spin" />
-                <span className="text-sm text-zinc-500 dark:text-zinc-400">Loading</span>
-              </div>
-            </div>
-          )}
         </div>
+
+        {/* Loading mask overlay */}
+        {isRefreshing && (
+          <div className="absolute inset-0 bg-white dark:bg-neutral-800 flex items-center justify-center z-50">
+            <div className="flex items-center gap-1">
+              <div className="w-5 h-5 border-2 border-zinc-500 dark:border-neutral-700 border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm text-zinc-500 dark:text-zinc-400">Loading</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
