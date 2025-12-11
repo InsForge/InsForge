@@ -5,7 +5,8 @@ import { isCloudEnvironment } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
-import { OAuthProvidersSchema, AIConfigurationInputSchema } from '@insforge/shared-schemas';
+import { OAuthProvidersSchema, aiConfigurationInputSchema } from '@insforge/shared-schemas';
+import { z } from 'zod';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { fetchS3Config } from '@/utils/s3-config-loader.js';
 
@@ -32,14 +33,25 @@ async function seedDefaultAIConfigs(): Promise<void> {
     return;
   }
 
-  const defaultModels = await fetchS3Config<AIConfigurationInputSchema[]>('default-ai-models.json');
+  const defaultModels = await fetchS3Config<z.infer<typeof aiConfigurationInputSchema>[]>(
+    'default-ai-models.json'
+  );
 
   if (!defaultModels || defaultModels.length === 0) {
     logger.warn('⚠️ No default AI models configured - add via dashboard or check S3 config');
     return;
   }
 
-  for (const model of defaultModels) {
+  const parsed = aiConfigurationInputSchema.array().safeParse(defaultModels);
+  if (!parsed.success) {
+    logger.error('❌ Invalid AI models configuration from S3', {
+      error: parsed.error.message,
+    });
+    return;
+  }
+
+  const validatedModels = parsed.data;
+  for (const model of validatedModels) {
     await aiConfigService.create(
       model.inputModality,
       model.outputModality,
@@ -49,7 +61,7 @@ async function seedDefaultAIConfigs(): Promise<void> {
     );
   }
 
-  logger.info(`✅ Default AI models configured (${defaultModels.length} models)`);
+  logger.info(`✅ Default AI models configured (${validatedModels.length} models)`);
 }
 
 /**
