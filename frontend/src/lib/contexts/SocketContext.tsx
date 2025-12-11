@@ -35,10 +35,14 @@ export enum ServerEvents {
 export enum DataUpdateResourceType {
   DATABASE = 'database',
   USERS = 'users',
-  RECORDS = 'records',
   BUCKETS = 'buckets',
   FUNCTIONS = 'functions',
   REALTIME = 'realtime',
+}
+
+export interface DatabaseResourceUpdate {
+  type: 'tables' | 'table' | 'records' | 'index' | 'trigger' | 'policy' | 'function' | 'extension';
+  name?: string;
 }
 
 export interface DataUpdatePayload {
@@ -226,13 +230,51 @@ export function SocketProvider({ children }: SocketProviderProps) {
       const resource = message.resource as DataUpdateResourceType;
 
       switch (resource) {
-        case DataUpdateResourceType.DATABASE:
-          void queryClient.invalidateQueries({ queryKey: ['tables'] });
-          void queryClient.invalidateQueries({ queryKey: ['metadata', 'full'] });
-          break;
-        case DataUpdateResourceType.RECORDS: {
-          const { tableName } = (message.data ?? {}) as { tableName?: string };
-          void queryClient.invalidateQueries({ queryKey: ['records', tableName] });
+        case DataUpdateResourceType.DATABASE: {
+          const { changes } = (message.data ?? {}) as { changes?: DatabaseResourceUpdate[] };
+
+          if (!changes || changes.length === 0) {
+            break;
+          }
+
+          // Invalidate specific queries based on resource types changed
+          for (const change of changes) {
+            switch (change.type) {
+              case 'tables':
+                // CREATE TABLE / DROP TABLE - affects table list
+                void queryClient.invalidateQueries({ queryKey: ['tables'] });
+                void queryClient.invalidateQueries({ queryKey: ['metadata', 'full'] });
+                break;
+              case 'table':
+                // ALTER TABLE / RENAME - affects specific table and list
+                void queryClient.invalidateQueries({ queryKey: ['tables'] });
+                if (change.name) {
+                  void queryClient.invalidateQueries({ queryKey: ['table', change.name] });
+                }
+                break;
+              case 'records':
+                // INSERT / UPDATE / DELETE - affects records for specific table
+                if (change.name) {
+                  void queryClient.invalidateQueries({ queryKey: ['records', change.name] });
+                }
+                break;
+              case 'index':
+                void queryClient.invalidateQueries({ queryKey: ['database', 'indexes'] });
+                break;
+              case 'trigger':
+                void queryClient.invalidateQueries({ queryKey: ['database', 'triggers'] });
+                break;
+              case 'policy':
+                void queryClient.invalidateQueries({ queryKey: ['database', 'policies'] });
+                break;
+              case 'function':
+                void queryClient.invalidateQueries({ queryKey: ['database', 'functions'] });
+                break;
+              case 'extension':
+                // Extensions are not supported yet
+                break;
+            }
+          }
           break;
         }
         case DataUpdateResourceType.BUCKETS:

@@ -6,12 +6,13 @@ import logger from './logger.js';
 // Load WASM module at startup
 void loadModule();
 
-export interface QueryChange {
+// Represents the type of database resource/object that was changed by a SQL query
+export interface DatabaseResourceUpdate {
   type: 'tables' | 'table' | 'records' | 'index' | 'trigger' | 'policy' | 'function' | 'extension';
   name?: string;
 }
 
-const STMT_TYPES: Record<string, QueryChange['type']> = {
+const STMT_TYPES: Record<string, DatabaseResourceUpdate['type']> = {
   InsertStmt: 'records',
   UpdateStmt: 'records',
   DeleteStmt: 'records',
@@ -26,7 +27,7 @@ const STMT_TYPES: Record<string, QueryChange['type']> = {
   CreateExtensionStmt: 'extension',
 };
 
-const DROP_TYPES: Record<string, QueryChange['type']> = {
+const DROP_TYPES: Record<string, DatabaseResourceUpdate['type']> = {
   OBJECT_TABLE: 'tables',
   OBJECT_INDEX: 'index',
   OBJECT_TRIGGER: 'trigger',
@@ -35,19 +36,19 @@ const DROP_TYPES: Record<string, QueryChange['type']> = {
   OBJECT_EXTENSION: 'extension',
 };
 
-export function analyzeQuery(query: string): QueryChange[] {
+export function analyzeQuery(query: string): DatabaseResourceUpdate[] {
   try {
     const { stmts } = parseSync(query);
     return stmts
       .map((s: { stmt: Record<string, unknown> }) => extractChange(s.stmt))
-      .filter((c: QueryChange | null): c is QueryChange => c !== null);
+      .filter((c: DatabaseResourceUpdate | null): c is DatabaseResourceUpdate => c !== null);
   } catch (e) {
     logger.warn('SQL parse error:', e);
     return [];
   }
 }
 
-function extractChange(stmt: Record<string, unknown>): QueryChange | null {
+function extractChange(stmt: Record<string, unknown>): DatabaseResourceUpdate | null {
   const [stmtType, data] = Object.entries(stmt)[0] as [string, Record<string, unknown>];
 
   if (stmtType === 'DropStmt') {

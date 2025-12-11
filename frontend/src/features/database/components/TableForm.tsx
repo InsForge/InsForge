@@ -360,9 +360,6 @@ export function TableForm({
       // Invalidate all table data queries for this table (with all parameter combinations)
       void queryClient.invalidateQueries({ queryKey: ['table', editTable?.tableName] });
 
-      // Invalidate the separate table schema query used by AddRecordSheet
-      void queryClient.invalidateQueries({ queryKey: ['table-schema', editTable?.tableName] });
-
       showToast(`Table "${data.tableName}" updated successfully!`, 'success');
 
       form.reset();
@@ -373,7 +370,6 @@ export function TableForm({
     onError: (err) => {
       // Invalidate queries to ensure we have fresh data after failed request
       void queryClient.invalidateQueries({ queryKey: ['table', editTable?.tableName] });
-      void queryClient.invalidateQueries({ queryKey: ['table-schema', editTable?.tableName] });
 
       const errorMessage = err.message || 'Failed to update table';
       setError(errorMessage);

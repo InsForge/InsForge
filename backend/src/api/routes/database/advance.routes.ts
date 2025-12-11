@@ -15,7 +15,7 @@ import logger from '@/utils/logger.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { successResponse } from '@/utils/response.js';
-import { analyzeQuery } from '@/utils/sql-parser.js';
+import { analyzeQuery, DatabaseResourceUpdate } from '@/utils/sql-parser.js';
 
 const router = Router();
 const dbAdvanceService = DatabaseAdvanceService.getInstance();
@@ -253,7 +253,10 @@ router.post(
       socket.broadcastToRoom(
         'role:project_admin',
         ServerEvents.DATA_UPDATE,
-        { resource: DataUpdateResourceType.RECORDS, data: { tableName: table } },
+        {
+          resource: DataUpdateResourceType.DATABASE,
+          data: { changes: [{ type: 'records', name: table }] as DatabaseResourceUpdate[] },
+        },
         'system'
       );
 

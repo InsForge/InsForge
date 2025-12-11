@@ -37,9 +37,9 @@ export interface NotificationPayload {
 export enum DataUpdateResourceType {
   DATABASE = 'database',
   USERS = 'users',
-  RECORDS = 'records',
   BUCKETS = 'buckets',
   FUNCTIONS = 'functions',
+  REALTIME = 'realtime',
 }
 
 export interface DataUpdatePayload {
