@@ -2,13 +2,11 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { AuthService } from '@/services/auth/auth.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { TokenManager } from '@/infra/security/token.manager.js';
+import { storeAuthorizationCode } from '@/infra/security/pkce.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
-import { setRefreshTokenCookie } from '@/utils/cookies.js';
-import { CsrfManager } from '@/infra/security/csrf.manager.js';
 import logger from '@/utils/logger.js';
 import jwt from 'jsonwebtoken';
 import {
@@ -231,10 +229,11 @@ router.delete(
 
 // OAuth Flow Routes
 // GET /api/auth/oauth/:provider - Initialize OAuth flow for any supported provider
+// Supports PKCE: pass code_challenge and code_challenge_method for secure token exchange
 router.get('/:provider', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { provider } = req.params;
-    const { redirect_uri } = req.query;
+    const { redirect_uri, code_challenge, code_challenge_method } = req.query;
 
     // Validate provider using OAuthProvidersSchema
     const providerValidation = oAuthProvidersSchema.safeParse(provider);
@@ -252,9 +251,15 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
       throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
+    // Validate PKCE parameters if provided
+    if (code_challenge && code_challenge_method !== 'S256') {
+      throw new AppError('Only S256 code_challenge_method is supported', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
     const jwtPayload = {
       provider: validatedProvider,
       redirectUri: redirect_uri ? (redirect_uri as string) : undefined,
+      codeChallenge: code_challenge ? (code_challenge as string) : undefined, // Store PKCE challenge
       createdAt: Date.now(),
     };
     const jwtSecret = validateJwtSecret();
@@ -287,6 +292,7 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
 });
 
 // GET /api/auth/oauth/shared/callback/:state - Shared callback for OAuth providers
+// Now uses authorization code for secure token exchange (PKCE flow)
 router.get('/shared/callback/:state', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { state } = req.params;
@@ -299,14 +305,17 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
 
     let redirectUri: string;
     let provider: string;
+    let codeChallenge: string | undefined;
     try {
       const jwtSecret = validateJwtSecret();
       const decodedState = jwt.verify(state, jwtSecret) as {
         provider: string;
         redirectUri: string;
+        codeChallenge?: string;
       };
       redirectUri = decodedState.redirectUri || '';
       provider = decodedState.provider || '';
+      codeChallenge = decodedState.codeChallenge;
     } catch {
       logger.warn('Invalid state parameter', { state });
       throw new AppError('Invalid state parameter', 400, ERROR_CODES.INVALID_INPUT);
@@ -344,25 +353,20 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     // Handle shared callback - transforms payload and creates/finds user
     const result = await authService.handleSharedCallback(validatedProvider, payloadData);
 
-    // Set refresh token in httpOnly cookie before redirect and generate CSRF token
-    let csrfToken = '';
-    if (result?.accessToken && result?.user) {
-      const tokenManager = TokenManager.getInstance();
-      const refreshToken = tokenManager.generateRefreshToken({
-        sub: result.user.id,
-        email: result.user.email,
-        role: 'authenticated',
-      });
-      setRefreshTokenCookie(res, refreshToken);
-      csrfToken = CsrfManager.generate(refreshToken);
+    if (!result?.accessToken || !result?.user) {
+      throw new Error('Shared OAuth callback did not return valid session data');
     }
 
+    // Store session data and generate authorization code for later exchange
+    const authorizationCode = storeAuthorizationCode({
+      accessToken: result.accessToken,
+      user: result.user,
+      codeChallenge, // Will be verified during /exchange
+    });
+
+    // Redirect with authorization code only (no access_token in URL!)
     const params = new URLSearchParams();
-    params.set('access_token', result?.accessToken ?? '');
-    params.set('user_id', result?.user?.id ?? '');
-    params.set('email', result?.user?.email ?? '');
-    params.set('name', result?.user?.name ?? '');
-    params.set('csrf_token', csrfToken);
+    params.set('code', authorizationCode);
 
     res.redirect(`${redirectUri}?${params.toString()}`);
   } catch (error) {
@@ -372,6 +376,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
 });
 
 // GET /api/auth/oauth/:provider/callback - OAuth provider callback
+// Now uses authorization code for secure token exchange (PKCE flow)
 router.get('/:provider/callback', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { provider } = req.params;
@@ -382,16 +387,19 @@ router.get('/:provider/callback', async (req: Request, res: Response, next: Next
       throw new AppError('State parameter is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    // Decode redirectUri from state (needed for both success and error paths)
+    // Decode redirectUri and codeChallenge from state
     let redirectUri: string;
+    let codeChallenge: string | undefined;
 
     try {
       const jwtSecret = validateJwtSecret();
       const stateData = jwt.verify(state as string, jwtSecret) as {
         provider: string;
         redirectUri: string;
+        codeChallenge?: string;
       };
       redirectUri = stateData.redirectUri || '';
+      codeChallenge = stateData.codeChallenge;
     } catch {
       // Invalid state
       logger.warn('Invalid state in provider callback', { state });
@@ -421,29 +429,23 @@ router.get('/:provider/callback', async (req: Request, res: Response, next: Next
         state: state as string | undefined,
       });
 
-      // Set refresh token in httpOnly cookie before redirect and generate CSRF token
-      let csrfToken = '';
-      if (result?.accessToken && result?.user) {
-        const tokenManager = TokenManager.getInstance();
-        const refreshToken = tokenManager.generateRefreshToken({
-          sub: result.user.id,
-          email: result.user.email,
-          role: 'authenticated',
-        });
-        setRefreshTokenCookie(res, refreshToken);
-        csrfToken = CsrfManager.generate(refreshToken);
+      if (!result?.accessToken || !result?.user) {
+        throw new Error('OAuth callback did not return valid session data');
       }
 
-      // Construct redirect URL with query parameters
+      // Store session data and generate authorization code for later exchange
+      // Include codeChallenge if PKCE was used
+      const authorizationCode = storeAuthorizationCode({
+        accessToken: result.accessToken,
+        user: result.user,
+        codeChallenge, // Will be verified during /exchange
+      });
+
+      // Redirect with authorization code only (no access_token in URL!)
       const params = new URLSearchParams();
-      params.set('access_token', result?.accessToken ?? '');
-      params.set('user_id', result?.user?.id ?? '');
-      params.set('email', result?.user?.email ?? '');
-      params.set('name', result?.user?.name ?? '');
-      params.set('csrf_token', csrfToken);
+      params.set('code', authorizationCode);
 
       const finalRedirectUri = `${redirectUri}?${params.toString()}`;
-
       return res.redirect(finalRedirectUri);
     } catch (error) {
       logger.error('OAuth callback error', {

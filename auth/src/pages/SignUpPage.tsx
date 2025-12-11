@@ -17,7 +17,21 @@ export function SignUpPage() {
     const unsubscribeVerified = broadcastService.subscribe(
       BroadcastEventType.EMAIL_VERIFIED_SUCCESS,
       (event: BroadcastEvent) => {
-        const { accessToken, user, csrfToken } = event.data || {};
+        const { accessToken, authorizationCode, user, csrfToken } = event.data || {};
+        
+        // PKCE flow: use authorization code if available
+        if (authorizationCode) {
+          try {
+            const finalUrl = new URL(redirectUrl, window.location.origin);
+            finalUrl.searchParams.set('code', authorizationCode);
+            window.location.href = finalUrl.toString();
+          } catch {
+            console.error('Failed to redirect to final URL');
+          }
+          return;
+        }
+
+        // Legacy flow: use access_token
         if (accessToken && user) {
           // Email verified in another tab, redirect with token
           try {

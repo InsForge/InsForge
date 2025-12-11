@@ -8,6 +8,7 @@ export interface BroadcastEvent {
   timestamp: number;
   data?: {
     accessToken?: string;
+    authorizationCode?: string; // PKCE: authorization code for secure token exchange
     user?: { id: string; email: string; name: string };
     csrfToken?: string;
   };
