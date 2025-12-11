@@ -5,8 +5,9 @@ import { isCloudEnvironment } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
-import { OAuthProvidersSchema } from '@insforge/shared-schemas';
+import { OAuthProvidersSchema, AIConfigurationInputSchema } from '@insforge/shared-schemas';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
+import { fetchS3Config } from '@/utils/s3-config-loader.js';
 
 /**
  * Validates admin credentials are configured
@@ -21,39 +22,32 @@ function ensureFirstAdmin(adminEmail: string, adminPassword: string): void {
 }
 
 /**
- * Seeds default AI configurations for cloud environments
+ * Seeds default AI configurations from S3 config
  */
 async function seedDefaultAIConfigs(): Promise<void> {
-  // Only seed default AI configs in cloud environment
-  if (!isCloudEnvironment()) {
-    return;
-  }
-
   const aiConfigService = AIConfigService.getInstance();
 
-  // Check if AI configs already exist
   const existingConfigs = await aiConfigService.findAll();
+  if (existingConfigs.length) return;
 
-  if (existingConfigs.length) {
+  const defaultModels = await fetchS3Config<AIConfigurationInputSchema[]>('default-ai-models.json');
+
+  if (!defaultModels || defaultModels.length === 0) {
+    logger.warn('⚠️ No default AI models configured - add via dashboard or check S3 config');
     return;
   }
 
-  await aiConfigService.create(
-    ['text', 'image'],
-    ['text'],
-    'openrouter',
-    'openai/gpt-4o',
-    'You are a helpful assistant.'
-  );
+  for (const model of defaultModels) {
+    await aiConfigService.create(
+      model.inputModality,
+      model.outputModality,
+      model.provider,
+      model.modelId,
+      model.systemPrompt
+    );
+  }
 
-  await aiConfigService.create(
-    ['text', 'image'],
-    ['text', 'image'],
-    'openrouter',
-    'google/gemini-3-pro-image-preview'
-  );
-
-  logger.info('✅ Default AI models configured (cloud environment)');
+  logger.info(`✅ Default AI models configured (${defaultModels.length} models)`);
 }
 
 /**
@@ -242,15 +236,11 @@ export async function seedBackend(): Promise<void> {
       logger.info(`✅ Found ${tables.length} user tables`);
     }
 
-    // seed AI configs for cloud environment
-    await seedDefaultAIConfigs();
-
-    // Enable email verification in cloud environment
-    await seedDefaultAuthConfig();
-
     // add default OAuth configs in Cloud hosting
     if (isCloudEnvironment()) {
       await seedDefaultOAuthConfigs();
+      await seedDefaultAIConfigs();
+      await seedDefaultAuthConfig();
     } else {
       await seedLocalOAuthConfigs();
     }

@@ -53,6 +53,7 @@ export const aiUsageSummarySchema = z.object({
 // Export types
 export type ModalitySchema = z.infer<typeof modalitySchema>;
 export type AIConfigurationSchema = z.infer<typeof aiConfigurationSchema>;
+export type AIConfigurationInputSchema = Omit<AIConfigurationSchema, 'id'>;
 export type AIConfigurationWithUsageSchema = z.infer<typeof aiConfigurationWithUsageSchema>;
 export type AIUsageDataSchema = z.infer<typeof aiUsageDataSchema>;
 export type AIUsageRecordSchema = z.infer<typeof aiUsageRecordSchema>;
