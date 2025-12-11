@@ -12,6 +12,7 @@ paths:
       tags:
         - Channels
       security:
+        - bearerAuth: []
         - apiKey: []
       responses:
         '200':
@@ -44,6 +45,7 @@ paths:
       tags:
         - Channels
       security:
+        - bearerAuth: []
         - apiKey: []
       requestBody:
         required: true
@@ -89,6 +91,7 @@ paths:
       tags:
         - Channels
       security:
+        - bearerAuth: []
         - apiKey: []
       parameters:
         - name: id
@@ -130,6 +133,7 @@ paths:
       tags:
         - Channels
       security:
+        - bearerAuth: []
         - apiKey: []
       parameters:
         - name: id
@@ -190,6 +194,7 @@ paths:
       tags:
         - Channels
       security:
+        - bearerAuth: []
         - apiKey: []
       parameters:
         - name: id
@@ -229,6 +234,7 @@ paths:
       tags:
         - Messages
       security:
+        - bearerAuth: []
         - apiKey: []
       parameters:
         - name: channelId
@@ -304,6 +310,7 @@ paths:
       tags:
         - Messages
       security:
+        - bearerAuth: []
         - apiKey: []
       parameters:
         - name: channelId
@@ -357,6 +364,7 @@ paths:
       tags:
         - Permissions
       security:
+        - bearerAuth: []
         - apiKey: []
       responses:
         '200':
@@ -385,11 +393,13 @@ paths:
 
 components:
   securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
     apiKey:
       type: apiKey
       in: header
-      name: x-api-key
-      description: Admin API key for authentication
+      name: X-API-Key
 
   schemas:
     Channel:
