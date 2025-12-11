@@ -1,9 +1,9 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import {
   Button,
-  ConvertedValue,
   DataGrid,
+  type ConvertedValue,
   type DataGridColumn,
   type DataGridRowType,
   EmptyState,
@@ -13,94 +13,68 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components';
-import { useFullMetadata } from '../hooks/useFullMetadata';
+import { usePolicies } from '../hooks/useDatabase';
 import { SQLModal, SQLCellButton } from '../components/SQLModal';
-import type {
-  ExportDatabaseResponse,
-  ExportDatabaseJsonData,
-  SocketMessage,
-} from '@insforge/shared-schemas';
+import type { DatabasePoliciesResponse } from '@insforge/shared-schemas';
 import { isSystemTable } from '../constants';
-import { DataUpdateResourceType, ServerEvents, useSocket } from '@/lib/contexts/SocketContext';
 
-interface TriggerRow extends DataGridRowType {
+interface PolicyRow extends DataGridRowType {
   id: string;
   tableName: string;
-  triggerName: string;
-  actionTiming: string;
-  eventManipulation: string;
-  actionStatement: string;
+  policyName: string;
+  cmd: string;
+  roles: string;
+  qual: string | null;
+  withCheck: string | null;
   [key: string]: ConvertedValue | { [key: string]: string }[];
 }
 
-function parseTriggersFromMetadata(metadata: ExportDatabaseResponse | undefined): TriggerRow[] {
-  if (!metadata || metadata.format !== 'json' || typeof metadata.data === 'string') {
+function parsePoliciesFromResponse(response: DatabasePoliciesResponse | undefined): PolicyRow[] {
+  if (!response?.policies) {
     return [];
   }
 
-  const data = metadata.data as ExportDatabaseJsonData;
-  const triggers: TriggerRow[] = [];
+  const policies: PolicyRow[] = [];
 
-  Object.entries(data.tables).forEach(([tableName, tableData]) => {
-    if (isSystemTable(tableName)) {
+  response.policies.forEach((policy) => {
+    if (isSystemTable(policy.tableName)) {
       return;
     }
 
-    tableData.triggers.forEach((trigger) => {
-      triggers.push({
-        id: `${tableName}_${trigger.triggerName}`,
-        tableName,
-        triggerName: trigger.triggerName,
-        actionTiming: trigger.actionTiming,
-        eventManipulation: trigger.eventManipulation,
-        actionStatement: trigger.actionStatement,
-      });
+    policies.push({
+      id: `${policy.tableName}_${policy.policyName}`,
+      tableName: policy.tableName,
+      policyName: policy.policyName,
+      cmd: policy.cmd,
+      roles: Array.isArray(policy.roles) ? policy.roles.join(', ') : String(policy.roles),
+      qual: policy.qual,
+      withCheck: policy.withCheck,
     });
   });
 
-  return triggers;
+  return policies;
 }
 
-export default function TriggersPage() {
+export default function PoliciesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { data: metadata, isLoading, error, refetch } = useFullMetadata(true);
+  const { data, isLoading, error, refetch } = usePolicies(true);
   const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
 
-  const { socket, isConnected } = useSocket();
+  const allPolicies = useMemo(() => parsePoliciesFromResponse(data), [data]);
 
-  const allTriggers = useMemo(() => parseTriggersFromMetadata(metadata), [metadata]);
-
-  useEffect(() => {
-    if (!socket || !isConnected) {
-      return;
-    }
-
-    const handleDataUpdate = (message: SocketMessage) => {
-      if (message.resource === DataUpdateResourceType.DATABASE) {
-        void refetch();
-      }
-    };
-
-    socket.on(ServerEvents.DATA_UPDATE, handleDataUpdate);
-
-    return () => {
-      socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
-    };
-  }, [socket, isConnected, refetch]);
-
-  const filteredTriggers = useMemo(() => {
+  const filteredPolicies = useMemo(() => {
     if (!searchQuery.trim()) {
-      return allTriggers;
+      return allPolicies;
     }
 
     const query = searchQuery.toLowerCase();
-    return allTriggers.filter(
-      (trigger) =>
-        trigger.triggerName.toLowerCase().includes(query) ||
-        trigger.tableName.toLowerCase().includes(query)
+    return allPolicies.filter(
+      (policy) =>
+        policy.policyName.toLowerCase().includes(query) ||
+        policy.tableName.toLowerCase().includes(query)
     );
-  }, [allTriggers, searchQuery]);
+  }, [allPolicies, searchQuery]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -112,7 +86,7 @@ export default function TriggersPage() {
     }
   };
 
-  const columns: DataGridColumn<TriggerRow>[] = useMemo(
+  const columns: DataGridColumn<PolicyRow>[] = useMemo(
     () => [
       {
         key: 'tableName',
@@ -122,52 +96,57 @@ export default function TriggersPage() {
         sortable: true,
       },
       {
-        key: 'triggerName',
+        key: 'policyName',
         name: 'Name',
         width: 'minmax(200px, 2fr)',
         resizable: true,
         sortable: true,
       },
       {
-        key: 'actionTiming',
-        name: 'Timing',
+        key: 'cmd',
+        name: 'Command',
         width: 'minmax(100px, 1fr)',
         resizable: true,
         sortable: true,
         renderCell: ({ row }) => {
-          const timing = row.actionTiming.toUpperCase();
+          const cmd = row.cmd;
+          const cmdLabel = cmd === '*' ? 'ALL' : cmd;
           return (
             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-              {timing}
+              {cmdLabel}
             </span>
           );
         },
       },
       {
-        key: 'eventManipulation',
-        name: 'Event',
-        width: 'minmax(100px, 1fr)',
+        key: 'roles',
+        name: 'Roles',
+        width: 'minmax(150px, 1.5fr)',
         resizable: true,
-        sortable: true,
-        renderCell: ({ row }) => {
-          const event = row.eventManipulation.toUpperCase();
-          return (
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-              {event}
-            </span>
-          );
-        },
       },
       {
-        key: 'actionStatement',
-        name: 'Statement',
-        width: 'minmax(300px, 3fr)',
+        key: 'qual',
+        name: 'Using',
+        width: 'minmax(200px, 2fr)',
         resizable: true,
         renderCell: ({ row }) => (
           <SQLCellButton
-            value={row.actionStatement}
+            value={row.qual}
+            onClick={() => row.qual && setSqlModal({ open: true, title: 'Using', value: row.qual })}
+          />
+        ),
+      },
+      {
+        key: 'withCheck',
+        name: 'With Check',
+        width: 'minmax(200px, 2fr)',
+        resizable: true,
+        renderCell: ({ row }) => (
+          <SQLCellButton
+            value={row.withCheck}
             onClick={() =>
-              setSqlModal({ open: true, title: 'Trigger Statement', value: row.actionStatement })
+              row.withCheck &&
+              setSqlModal({ open: true, title: 'With Check', value: row.withCheck })
             }
           />
         ),
@@ -180,7 +159,7 @@ export default function TriggersPage() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <EmptyState
-          title="Failed to load triggers"
+          title="Failed to load policies"
           description={error instanceof Error ? error.message : 'An error occurred'}
         />
       </div>
@@ -190,7 +169,7 @@ export default function TriggersPage() {
   return (
     <div className="flex flex-col gap-4 h-full p-4 bg-bg-gray dark:bg-neutral-800">
       <div className="flex items-center gap-3">
-        <h1 className="text-xl font-normal text-zinc-950 dark:text-white">Database Triggers</h1>
+        <h1 className="text-xl font-normal text-zinc-950 dark:text-white">RLS Policies</h1>
 
         {/* Separator */}
         <div className="h-6 w-px bg-gray-200 dark:bg-neutral-700" />
@@ -219,18 +198,18 @@ export default function TriggersPage() {
       <SearchInput
         value={searchQuery}
         onChange={setSearchQuery}
-        placeholder="Search for a trigger"
+        placeholder="Search for a policy"
         className="w-64"
       />
 
       {isLoading ? (
         <div className="flex-1 flex items-center justify-center">
-          <EmptyState title="Loading triggers..." description="Please wait" />
+          <EmptyState title="Loading policies..." description="Please wait" />
         </div>
       ) : (
         <div className="flex-1 overflow-hidden">
           <DataGrid
-            data={filteredTriggers}
+            data={filteredPolicies}
             columns={columns}
             showSelection={false}
             showPagination={false}
@@ -239,7 +218,7 @@ export default function TriggersPage() {
             isRefreshing={isRefreshing}
             emptyState={
               <div className="text-sm text-zinc-500 dark:text-zinc-400">
-                {searchQuery ? 'No triggers match your search criteria' : 'No triggers found'}
+                {searchQuery ? 'No policies match your search criteria' : 'No policies found'}
               </div>
             }
           />

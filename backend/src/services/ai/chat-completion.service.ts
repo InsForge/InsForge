@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { AIUsageService } from './ai-usage.service.js';
 import { AIConfigService } from './ai-config.service.js';
-import { AIClientService } from '@/providers/ai/openrouter.provider.js';
+import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import type {
   AIConfigurationSchema,
   ChatCompletionResponse,
@@ -14,7 +14,7 @@ export class ChatCompletionService {
   private static instance: ChatCompletionService;
   private aiUsageService = AIUsageService.getInstance();
   private aiConfigService = AIConfigService.getInstance();
-  private aiClientService = AIClientService.getInstance();
+  private openRouterProvider = OpenRouterProvider.getInstance();
 
   private constructor() {}
 
@@ -106,7 +106,7 @@ export class ChatCompletionService {
       };
 
       // Send request with automatic renewal and retry logic
-      const response = await this.aiClientService.sendRequest((client) =>
+      const response = await this.openRouterProvider.sendRequest((client) =>
         client.chat.completions.create(request)
       );
 
@@ -173,7 +173,7 @@ export class ChatCompletionService {
       };
 
       // Send request with automatic renewal and retry logic
-      const stream = await this.aiClientService.sendRequest((client) =>
+      const stream = await this.openRouterProvider.sendRequest((client) =>
         client.chat.completions.create(request)
       );
 

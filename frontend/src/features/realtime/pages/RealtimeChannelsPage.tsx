@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import {
   Button,
@@ -9,8 +9,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components';
-import type { SocketMessage } from '@insforge/shared-schemas';
-import { useSocket, ServerEvents } from '@/lib/contexts/SocketContext';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useRealtime } from '../hooks/useRealtime';
 import { ChannelRow } from '../components/ChannelRow';
@@ -33,7 +31,6 @@ export default function RealtimeChannelsPage() {
     isDeleting,
   } = useRealtime();
 
-  const { socket, isConnected } = useSocket();
   const { confirm, confirmDialogProps } = useConfirm();
 
   const handleRefresh = async () => {
@@ -44,25 +41,6 @@ export default function RealtimeChannelsPage() {
       setIsRefreshing(false);
     }
   };
-
-  // Listen for real-time updates
-  useEffect(() => {
-    if (!socket || !isConnected) {
-      return;
-    }
-
-    const handleDataUpdate = (message: SocketMessage) => {
-      if (message.resource === 'realtime') {
-        void refetchChannels();
-      }
-    };
-
-    socket.on(ServerEvents.DATA_UPDATE, handleDataUpdate);
-
-    return () => {
-      socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
-    };
-  }, [socket, isConnected, refetchChannels]);
 
   const handleRowClick = (channel: RealtimeChannel) => {
     setSelectedChannel(channel);

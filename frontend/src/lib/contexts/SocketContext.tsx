@@ -9,8 +9,11 @@ import {
   useMemo,
 } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { postMessageToParent } from '@/lib/utils/cloudMessaging';
+import type { SocketMessage } from '@insforge/shared-schemas';
 
 // ============================================================================
 // Types & Enums
@@ -23,29 +26,11 @@ export enum ServerEvents {
   NOTIFICATION = 'notification',
   DATA_UPDATE = 'data:update',
   MCP_CONNECTED = 'mcp:connected',
-  // Realtime events
-  REALTIME_ERROR = 'realtime:error',
-}
-
-/**
- * Client-to-server event types
- */
-export enum ClientEvents {
-  // Realtime events
-  REALTIME_SUBSCRIBE = 'realtime:subscribe',
-  REALTIME_UNSUBSCRIBE = 'realtime:unsubscribe',
-  REALTIME_PUBLISH = 'realtime:publish',
 }
 
 // ============================================================================
 // Payload Types
 // ============================================================================
-
-export interface NotificationPayload {
-  level: 'info' | 'warning' | 'error' | 'success';
-  title: string;
-  message: string;
-}
 
 export enum DataUpdateResourceType {
   DATABASE = 'database',
@@ -53,6 +38,7 @@ export enum DataUpdateResourceType {
   RECORDS = 'records',
   BUCKETS = 'buckets',
   FUNCTIONS = 'functions',
+  REALTIME = 'realtime',
 }
 
 export interface DataUpdatePayload {
@@ -74,7 +60,6 @@ interface SocketState {
 interface SocketActions {
   connect: (token: string | null) => void;
   disconnect: () => void;
-  emit: (event: ClientEvents, data?: unknown) => void;
 }
 
 interface SocketContextValue extends SocketState, SocketActions {
@@ -97,6 +82,8 @@ interface SocketProviderProps {
 export function SocketProvider({ children }: SocketProviderProps) {
   // Get authentication state
   const { isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
+
   // State
   const [state, setState] = useState<SocketState>({
     isConnected: false,
@@ -207,13 +194,6 @@ export function SocketProvider({ children }: SocketProviderProps) {
     });
   }, [updateState]);
 
-  /**
-   * Emit event to server
-   */
-  const emit = useCallback((event: ClientEvents, data?: unknown) => {
-    socketRef.current?.emit(event, data);
-  }, []);
-
   // Monitor authentication state and token changes
   useEffect(() => {
     const token = apiClient.getToken();
@@ -234,6 +214,71 @@ export function SocketProvider({ children }: SocketProviderProps) {
     };
   }, [disconnect]);
 
+  // Register business event handlers when socket is connected
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket || !state.isConnected) {
+      return;
+    }
+
+    // Handle DATA_UPDATE events - invalidate relevant queries
+    const handleDataUpdate = (message: SocketMessage) => {
+      const resource = message.resource as DataUpdateResourceType;
+
+      switch (resource) {
+        case DataUpdateResourceType.DATABASE:
+          void queryClient.invalidateQueries({ queryKey: ['tables'] });
+          void queryClient.invalidateQueries({ queryKey: ['metadata', 'full'] });
+          break;
+        case DataUpdateResourceType.RECORDS: {
+          const { tableName } = (message.data ?? {}) as { tableName?: string };
+          void queryClient.invalidateQueries({ queryKey: ['records', tableName] });
+          break;
+        }
+        case DataUpdateResourceType.BUCKETS:
+          void queryClient.invalidateQueries({ queryKey: ['storage', 'buckets'] });
+          void queryClient.invalidateQueries({ queryKey: ['metadata', 'full'] });
+          break;
+        case DataUpdateResourceType.USERS:
+          void queryClient.invalidateQueries({ queryKey: ['users'] });
+          break;
+        case DataUpdateResourceType.FUNCTIONS:
+          void queryClient.invalidateQueries({ queryKey: ['functions'] });
+          break;
+        case DataUpdateResourceType.REALTIME:
+          void queryClient.invalidateQueries({ queryKey: ['realtime'] });
+          break;
+      }
+    };
+
+    // Handle MCP_CONNECTED events
+    const handleMcpConnected = (message: SocketMessage) => {
+      void queryClient.invalidateQueries({ queryKey: ['mcp-usage'] });
+
+      // Notify parent window (for cloud onboarding)
+      if (window.parent !== window) {
+        window.parent.postMessage(
+          {
+            type: 'MCP_CONNECTION_STATUS',
+            connected: true,
+            tool_name: message.tool_name,
+            timestamp: message.created_at,
+          },
+          '*'
+        );
+        postMessageToParent({ type: 'ONBOARDING_SUCCESS' });
+      }
+    };
+
+    socket.on(ServerEvents.DATA_UPDATE, handleDataUpdate);
+    socket.on(ServerEvents.MCP_CONNECTED, handleMcpConnected);
+
+    return () => {
+      socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
+      socket.off(ServerEvents.MCP_CONNECTED, handleMcpConnected);
+    };
+  }, [state.isConnected, queryClient]);
+
   // Context value
   const contextValue = useMemo<SocketContextValue>(
     () => ({
@@ -243,9 +288,8 @@ export function SocketProvider({ children }: SocketProviderProps) {
       // Actions
       connect,
       disconnect,
-      emit,
     }),
-    [state, connect, disconnect, emit]
+    [state, connect, disconnect]
   );
 
   return <SocketContext.Provider value={contextValue}>{children}</SocketContext.Provider>;

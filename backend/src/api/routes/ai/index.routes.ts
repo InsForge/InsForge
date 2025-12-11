@@ -8,7 +8,7 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
 import { AIConfigService } from '@/services/ai/ai-config.service.js';
 import { AIUsageService } from '@/services/ai/ai-usage.service.js';
-import { AIClientService } from '@/providers/ai/openrouter.provider.js';
+import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import {
   createAIConfigurationRequestSchema,
@@ -456,8 +456,8 @@ router.get(
  */
 router.get('/credits', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const aiClientService = AIClientService.getInstance();
-    const credits = await aiClientService.getRemainingCredits();
+    const openRouterProvider = OpenRouterProvider.getInstance();
+    const credits = await openRouterProvider.getRemainingCredits();
 
     successResponse(res, credits);
   } catch (error) {

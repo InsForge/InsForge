@@ -1,5 +1,4 @@
 import { apiClient } from '@/lib/api/client';
-import type { ExportDatabaseRequest, ExportDatabaseResponse } from '@insforge/shared-schemas';
 
 export interface RawSQLRequest {
   query: string;
@@ -29,31 +28,6 @@ export class AdvanceService {
     const body: RawSQLRequest = { query, params };
 
     return apiClient.request('/database/advance/rawsql', {
-      method: 'POST',
-      headers: apiClient.withAccessToken({
-        'Content-Type': 'application/json',
-      }),
-      body: JSON.stringify(body),
-    });
-  }
-
-  /**
-   * Get full database metadata including schema, functions, triggers, etc.
-   * Requires admin privileges.
-   *
-   * @returns Response with complete database metadata in JSON format
-   */
-  async getDatabaseFullMetadata(): Promise<ExportDatabaseResponse> {
-    const body: ExportDatabaseRequest = {
-      format: 'json',
-      includeData: false,
-      includeFunctions: true,
-      includeSequences: false,
-      includeViews: false,
-      rowLimit: 1000,
-    };
-
-    return apiClient.request('/database/advance/export', {
       method: 'POST',
       headers: apiClient.withAccessToken({
         'Content-Type': 'application/json',

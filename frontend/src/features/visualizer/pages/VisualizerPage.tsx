@@ -1,17 +1,11 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { useMetadata } from '@/lib/hooks/useMetadata';
 import { useUsers } from '@/features/auth/hooks/useUsers';
 import { SchemaVisualizer, VisualizerSkeleton } from '../components';
 import { Alert, AlertDescription, Button } from '@/components';
-import type { SocketMessage } from '@insforge/shared-schemas';
-import { useSocket, ServerEvents, DataUpdateResourceType } from '@/lib/contexts/SocketContext';
 
 const VisualizerPage = () => {
-  const { socket, isConnected } = useSocket();
-  const queryClient = useQueryClient();
-
   const {
     metadata,
     isLoading: metadataLoading,
@@ -32,29 +26,6 @@ const VisualizerPage = () => {
     void refetchMetadata();
     void refetchUserStats();
   }, [refetchMetadata, refetchUserStats]);
-
-  // Listen for schema change events
-  useEffect(() => {
-    if (!socket || !isConnected) {
-      return;
-    }
-
-    const handleDataUpdate = (message: SocketMessage) => {
-      if (
-        message.resource === DataUpdateResourceType.DATABASE ||
-        message.resource === DataUpdateResourceType.BUCKETS
-      ) {
-        // Invalidate all metadata-related queries
-        void queryClient.invalidateQueries({ queryKey: ['metadata'] });
-      }
-    };
-
-    socket.on(ServerEvents.DATA_UPDATE, handleDataUpdate);
-
-    return () => {
-      socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
-    };
-  }, [socket, isConnected, queryClient]);
 
   if (isLoading) {
     return <VisualizerSkeleton />;

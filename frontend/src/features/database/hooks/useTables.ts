@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tableService } from '../services/table.service';
 import { useToast } from '@/lib/hooks/useToast';
 import {
@@ -6,7 +6,6 @@ import {
   GetTableSchemaResponse,
   UpdateTableSchemaRequest,
 } from '@insforge/shared-schemas';
-import { useMemo } from 'react';
 
 export function useTables() {
   const queryClient = useQueryClient();
@@ -24,19 +23,7 @@ export function useTables() {
     staleTime: 2 * 60 * 1000, // Cache for 2 minutes
   });
 
-  // Query to fetch all table schemas
-  const {
-    data: allSchemas,
-    isLoading: isLoadingSchemas,
-    error: schemasError,
-    refetch: refetchAllSchemas,
-  } = useQuery({
-    queryKey: ['tables', 'schemas'],
-    queryFn: () => tableService.getAllTableSchemas(),
-    staleTime: 2 * 60 * 1000,
-  });
-
-  // Query to fetch a specific table schema
+  // Query to fetch a specific table schema (cached per table)
   const useTableSchema = (tableName: string, enabled = true) => {
     return useQuery({
       queryKey: ['tables', tableName, 'schema'],
@@ -52,7 +39,6 @@ export function useTables() {
       tableService.createTable(tableName, columns),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['tables'] });
-      void queryClient.invalidateQueries({ queryKey: ['tables', 'schemas'] });
       showToast('Table created successfully', 'success');
     },
     onError: (error: Error) => {
@@ -66,7 +52,6 @@ export function useTables() {
     mutationFn: (tableName: string) => tableService.deleteTable(tableName),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['tables'] });
-      void queryClient.invalidateQueries({ queryKey: ['tables', 'schemas'] });
       showToast('Table deleted successfully', 'success');
     },
     onError: (error: Error) => {
@@ -85,7 +70,6 @@ export function useTables() {
       operations: UpdateTableSchemaRequest;
     }) => tableService.updateTableSchema(tableName, operations),
     onSuccess: (_, { tableName }) => {
-      void queryClient.invalidateQueries({ queryKey: ['tables', 'schemas'] });
       void queryClient.invalidateQueries({ queryKey: ['tables', tableName, 'schema'] });
       showToast('Table schema updated successfully', 'success');
     },
@@ -98,34 +82,54 @@ export function useTables() {
   return {
     // Data
     tables: tables || [],
-    allSchemas: useMemo(
-      () => allSchemas?.filter((schema) => schema.tableName !== 'users') || [],
-      [allSchemas]
-    ),
     tablesCount: tables?.length || 0,
 
     // Loading states
     isLoadingTables,
-    isLoadingSchemas,
     isCreating: createTableMutation.isPending,
     isDeleting: deleteTableMutation.isPending,
     isUpdating: updateTableSchemaMutation.isPending,
 
     // Errors
     tablesError,
-    schemasError,
 
     // Actions
     createTable: createTableMutation.mutate,
     deleteTable: deleteTableMutation.mutate,
     updateTableSchema: updateTableSchemaMutation.mutate,
     refetchTables,
-    refetchAllSchemas,
 
     // Helpers
     useTableSchema,
-    getSchemaByTableName: (tableName: string): GetTableSchemaResponse | undefined => {
-      return allSchemas?.find((schema) => schema.tableName === tableName);
-    },
+  };
+}
+
+/**
+ * Hook to fetch all table schemas on demand.
+ * Use this only when you need ALL schemas (e.g., for visualizations).
+ * For individual tables, use useTables().useTableSchema() instead.
+ */
+export function useAllTableSchemas(enabled = true) {
+  const { tables, isLoadingTables } = useTables();
+
+  const { allSchemas, isLoadingSchemas } = useQueries({
+    queries: enabled
+      ? tables
+          .filter((name) => name !== 'users')
+          .map((tableName) => ({
+            queryKey: ['tables', tableName, 'schema'],
+            queryFn: () => tableService.getTableSchema(tableName),
+            staleTime: 2 * 60 * 1000,
+          }))
+      : [],
+    combine: (results) => ({
+      allSchemas: results.filter((r) => r.data).map((r) => r.data as GetTableSchemaResponse),
+      isLoadingSchemas: results.some((r) => r.isLoading),
+    }),
+  });
+
+  return {
+    allSchemas,
+    isLoading: isLoadingTables || isLoadingSchemas,
   };
 }
