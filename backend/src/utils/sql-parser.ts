@@ -4,7 +4,7 @@ import { parseSync, loadModule } from 'libpg-query';
 import logger from './logger.js';
 
 // Load WASM module at startup
-loadModule();
+void loadModule();
 
 export interface QueryChange {
   type: 'tables' | 'table' | 'records' | 'index' | 'trigger' | 'policy' | 'function' | 'extension';
@@ -56,7 +56,9 @@ function extractChange(stmt: Record<string, unknown>): QueryChange | null {
   }
 
   const type = STMT_TYPES[stmtType];
-  if (!type) return null;
+  if (!type) {
+    return null;
+  }
 
   // Only include name for 'table' (ALTER) and 'records' (DML)
   if (type === 'table' || type === 'records') {
