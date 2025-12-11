@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 
 import { AIUsageService } from './ai-usage.service.js';
 import { AIConfigService } from './ai-config.service.js';
-import { AIClientService } from '@/providers/ai/openrouter.provider.js';
+import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import type {
   AIConfigurationSchema,
   ImageGenerationRequest,
@@ -14,7 +14,7 @@ import { OpenRouterImageMessage } from '@/types/ai.js';
 export class ImageGenerationService {
   private static aiUsageService = AIUsageService.getInstance();
   private static aiConfigService = AIConfigService.getInstance();
-  private static aiClientService = AIClientService.getInstance();
+  private static openRouterProvider = OpenRouterProvider.getInstance();
 
   /**
    * Validate model and get config
@@ -75,7 +75,7 @@ export class ImageGenerationService {
       };
 
       // Send request with automatic renewal and retry logic
-      const response = (await this.aiClientService.sendRequest((client) =>
+      const response = (await this.openRouterProvider.sendRequest((client) =>
         client.chat.completions.create(
           request as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming
         )

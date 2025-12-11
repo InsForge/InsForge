@@ -1,5 +1,5 @@
 import { isCloudEnvironment } from '@/utils/environment.js';
-import { AIClientService } from '@/providers/ai/openrouter.provider.js';
+import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import type { RawOpenRouterModel } from '@/types/ai.js';
 import type { AIModelSchema } from '@insforge/shared-schemas';
 import { calculatePriceLevel, filterAndSortModalities, getProviderOrder } from './helpers.js';
@@ -10,15 +10,15 @@ export class AIModelService {
    * Fetches from cloud API if in cloud environment, otherwise from OpenRouter directly
    */
   static async getModels(): Promise<AIModelSchema[]> {
-    const credentialsService = AIClientService.getInstance();
-    const configured = credentialsService.isConfigured();
+    const openRouterProvider = OpenRouterProvider.getInstance();
+    const configured = openRouterProvider.isConfigured();
 
     if (!configured) {
       return [];
     }
 
-    // Get API key from credentials service
-    const apiKey = await credentialsService.getApiKey();
+    // Get API key from OpenRouter provider
+    const apiKey = await openRouterProvider.getApiKey();
 
     // Determine the API endpoint based on environment
     const apiUrl = isCloudEnvironment()
