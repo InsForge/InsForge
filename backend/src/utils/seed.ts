@@ -238,7 +238,7 @@ export async function seedBackend(): Promise<void> {
       logger.info(`✅ Found ${tables.length} user tables`);
     }
 
-    // add default OAuth configs in Cloud hosting
+    // seed default configs for cloud environment
     if (isCloudEnvironment()) {
       await seedDefaultOAuthConfigs();
       await seedDefaultAIConfigs();
