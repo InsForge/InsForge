@@ -3,7 +3,6 @@ import sql from '@databases/sql';
 import { parseSync, loadModule } from 'libpg-query';
 import logger from './logger.js';
 
-
 let initialized = false;
 
 /**
