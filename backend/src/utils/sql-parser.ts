@@ -41,11 +41,11 @@ export function analyzeQuery(query: string): DatabaseResourceUpdate[] {
     const { stmts } = parseSync(query);
     const changes = stmts
       .map((s: { stmt: Record<string, unknown> }) => extractChange(s.stmt))
-      .filter((c: QueryChange | null): c is QueryChange => c !== null);
+      .filter((c: DatabaseResourceUpdate | null): c is DatabaseResourceUpdate => c !== null);
 
     // Deduplicate by type+name
     const seen = new Set<string>();
-    return changes.filter((c: QueryChange) => {
+    return changes.filter((c: DatabaseResourceUpdate) => {
       const key = `${c.type}:${c.name ?? ''}`;
       if (seen.has(key)) {
         return false;
