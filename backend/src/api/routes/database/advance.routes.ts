@@ -65,14 +65,17 @@ router.post(
         ip_address: req.ip,
       });
 
-      const socket = SocketManager.getInstance();
-      socket.broadcastToRoom(
-        'role:project_admin',
-        ServerEvents.DATA_UPDATE,
-        { resource: DataUpdateResourceType.DATABASE },
-        'system',
-        JSON.stringify({ data: { changes: analyzeQuery(query) } })
-      );
+      // Broadcast changes if any modifying statements detected
+      const changes = analyzeQuery(query);
+      if (changes.length > 0) {
+        const socket = SocketManager.getInstance();
+        socket.broadcastToRoom(
+          'role:project_admin',
+          ServerEvents.DATA_UPDATE,
+          { resource: DataUpdateResourceType.DATABASE, data: { changes } },
+          'system'
+        );
+      }
 
       successResponse(res, response);
     } catch (error: unknown) {
@@ -120,14 +123,17 @@ router.post('/rawsql', verifyAdmin, async (req: AuthRequest, res: Response, next
       ip_address: req.ip,
     });
 
-    const socket = SocketManager.getInstance();
-    socket.broadcastToRoom(
-      'role:project_admin',
-      ServerEvents.DATA_UPDATE,
-      { resource: DataUpdateResourceType.DATABASE },
-      'system',
-      JSON.stringify({ data: { changes: analyzeQuery(query) } })
-    );
+    // Broadcast changes if any modifying statements detected
+    const changes = analyzeQuery(query);
+    if (changes.length > 0) {
+      const socket = SocketManager.getInstance();
+      socket.broadcastToRoom(
+        'role:project_admin',
+        ServerEvents.DATA_UPDATE,
+        { resource: DataUpdateResourceType.DATABASE, data: { changes } },
+        'system'
+      );
+    }
 
     successResponse(res, response);
   } catch (error: unknown) {
