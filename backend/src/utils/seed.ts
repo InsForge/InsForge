@@ -33,9 +33,8 @@ async function seedDefaultAIConfigs(): Promise<void> {
     return;
   }
 
-  const defaultModels = await fetchS3Config<z.infer<typeof aiConfigurationInputSchema>[]>(
-    'default-ai-models.json'
-  );
+  const defaultModels =
+    await fetchS3Config<z.infer<typeof aiConfigurationInputSchema>[]>('default-ai-models.json');
 
   if (!defaultModels || defaultModels.length === 0) {
     logger.warn('⚠️ No default AI models configured - add via dashboard or check S3 config');
