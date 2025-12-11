@@ -1,6 +1,6 @@
 import { cloudEventSchema, CloudEvent } from '@insforge/shared-schemas';
 
-export function postMessageToParent(evt: CloudEvent, targetOrigin: string = '*') {
+export function postMessageToParent(evt: Record<string, unknown>, targetOrigin: string = '*') {
   if (typeof window === 'undefined') {
     return;
   }

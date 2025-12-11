@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { usageService, McpUsageRecord } from '@/features/logs/services/usage.service';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
+import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 import { LOGS_PAGE_SIZE } from '../helpers';
 
 // ============================================================================
@@ -18,7 +19,6 @@ import { LOGS_PAGE_SIZE } from '../helpers';
  * - Handles initial parent window notification for onboarding (if in iframe)
  * - Supports search and pagination
  *
- * Note: Real-time socket updates are handled centrally in SocketContext
  */
 export function useMcpUsage() {
   // Hooks
@@ -87,15 +87,12 @@ export function useMcpUsage() {
     hasNotifiedInitialStatus.current = true;
 
     const latestRecord = records[0];
-    window.parent.postMessage(
-      {
-        type: 'MCP_CONNECTION_STATUS',
-        connected: true,
-        tool_name: latestRecord.tool_name,
-        timestamp: latestRecord.created_at,
-      },
-      '*'
-    );
+    postMessageToParent({
+      type: 'MCP_CONNECTION_STATUS',
+      connected: true,
+      tool_name: latestRecord.tool_name,
+      timestamp: latestRecord.created_at,
+    });
   }, [isLoading, records]);
 
   // Computed values

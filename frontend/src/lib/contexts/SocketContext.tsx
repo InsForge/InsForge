@@ -298,18 +298,13 @@ export function SocketProvider({ children }: SocketProviderProps) {
       void queryClient.invalidateQueries({ queryKey: ['mcp-usage'] });
 
       // Notify parent window (for cloud onboarding)
-      if (window.parent !== window) {
-        window.parent.postMessage(
-          {
-            type: 'MCP_CONNECTION_STATUS',
-            connected: true,
-            tool_name: message.tool_name,
-            timestamp: message.created_at,
-          },
-          '*'
-        );
-        postMessageToParent({ type: 'ONBOARDING_SUCCESS' });
-      }
+      postMessageToParent({
+        type: 'MCP_CONNECTION_STATUS',
+        connected: true,
+        tool_name: message.tool_name as string,
+        timestamp: message.created_at as string,
+      });
+      postMessageToParent({ type: 'ONBOARDING_SUCCESS' });
     };
 
     socket.on(ServerEvents.DATA_UPDATE, handleDataUpdate);

@@ -349,6 +349,9 @@ export class OpenRouterProvider {
         logger.info(`Received ${error.status} insufficient credits, renewing API key...`);
         await this.renewCloudApiKey();
 
+        // Get fresh client with renewed API key
+        const renewedClient = await this.getClient();
+
         // Retry with exponential backoff (3 attempts)
         const maxRetries = 3;
 
@@ -360,7 +363,7 @@ export class OpenRouterProvider {
             );
             await new Promise((resolve) => setTimeout(resolve, backoffMs));
 
-            const result = await request(client);
+            const result = await request(renewedClient);
             logger.info('Request succeeded after API key renewal');
             return result;
           } catch (retryError) {

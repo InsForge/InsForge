@@ -14,7 +14,7 @@ import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
-import { DatabaseResourceUpdate } from '@/utils/sql-parser';
+import { DatabaseResourceUpdate } from '@/utils/sql-parser.js';
 
 const router = Router();
 const secretService = SecretService.getInstance();
