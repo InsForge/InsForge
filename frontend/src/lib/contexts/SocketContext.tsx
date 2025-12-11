@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useEffectEvent,
   useRef,
   useState,
   useCallback,
@@ -14,6 +15,7 @@ import { apiClient } from '@/lib/api/client';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 import type { SocketMessage } from '@insforge/shared-schemas';
+import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 
 // ============================================================================
 // Types & Enums
@@ -43,12 +45,6 @@ export enum DataUpdateResourceType {
 export interface DatabaseResourceUpdate {
   type: 'tables' | 'table' | 'records' | 'index' | 'trigger' | 'policy' | 'function' | 'extension';
   name?: string;
-}
-
-export interface DataUpdatePayload {
-  resource: DataUpdateResourceType;
-  action: 'created' | 'updated' | 'deleted';
-  data: unknown;
 }
 
 // ============================================================================
@@ -87,6 +83,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
   // Get authentication state
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
+  const { recordsCount: mcpUsageCount } = useMcpUsage();
 
   // State
   const [state, setState] = useState<SocketState>({
@@ -218,6 +215,13 @@ export function SocketProvider({ children }: SocketProviderProps) {
     };
   }, [disconnect]);
 
+  // Send onboarding success only on first MCP connection
+  const onMcpConnectedSuccess = useEffectEvent(() => {
+    if (mcpUsageCount === 0) {
+      postMessageToParent({ type: 'ONBOARDING_SUCCESS' });
+    }
+  });
+
   // Register business event handlers when socket is connected
   useEffect(() => {
     const socket = socketRef.current;
@@ -304,7 +308,8 @@ export function SocketProvider({ children }: SocketProviderProps) {
         tool_name: message.tool_name as string,
         timestamp: message.created_at as string,
       });
-      postMessageToParent({ type: 'ONBOARDING_SUCCESS' });
+
+      onMcpConnectedSuccess();
     };
 
     socket.on(ServerEvents.DATA_UPDATE, handleDataUpdate);

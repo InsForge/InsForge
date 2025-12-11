@@ -42,12 +42,6 @@ export enum DataUpdateResourceType {
   REALTIME = 'realtime',
 }
 
-export interface DataUpdatePayload {
-  resource: DataUpdateResourceType;
-  action: 'created' | 'updated' | 'deleted';
-  data: unknown;
-}
-
 /**
  * Socket metadata attached to each socket instance
  */
