@@ -66,22 +66,16 @@ export class DatabaseAdvanceService {
   /**
    * Sanitize query with strict or relaxed mode
    *
-   * BOTH MODES block:
+   * Blocks:
    * - DROP DATABASE, CREATE DATABASE, ALTER DATABASE
    * - pg_catalog and information_schema access
    *
-   * STRICT MODE blocks:
-   * - ALL operations on system tables (tables starting with _)
-   * - DROP or RENAME operations on users table
-   *
-   * RELAXED MODE allows:
-   * - SELECT and INSERT into system tables and users table
-   * RELAXED MODE blocks:
-   * - UPDATE/DELETE/DROP/CREATE/ALTER system tables
-   * - UPDATE/DELETE/DROP/RENAME users table
+   * Note: System tables are now in separate schemas (system.*, auth.*, etc.)
+   * so underscore prefix checks and public.users checks are no longer needed.
+   * The API only accesses public schema through PostgREST.
    */
-  sanitizeQuery(query: string, mode: 'strict' | 'relaxed' = 'strict'): string {
-    // Both modes: Block database-level operations
+  sanitizeQuery(query: string, _mode: 'strict' | 'relaxed' = 'strict'): string {
+    // Block database-level operations
     const dangerousPatterns = [
       /DROP\s+DATABASE/i,
       /CREATE\s+DATABASE/i,
@@ -93,49 +87,6 @@ export class DatabaseAdvanceService {
     for (const pattern of dangerousPatterns) {
       if (pattern.test(query)) {
         throw new AppError('Query contains restricted operations', 403, ERROR_CODES.FORBIDDEN);
-      }
-    }
-
-    // Check for RENAME TO system table
-    const renameToSystemTablePattern = /RENAME\s+TO\s+(?:\w+\.)?["']?_\w+/im;
-    if (renameToSystemTablePattern.test(query)) {
-      throw new AppError(
-        'Cannot rename tables to system table names (tables starting with underscore)',
-        403,
-        ERROR_CODES.FORBIDDEN
-      );
-    }
-
-    // Check for DROP or RENAME operations on 'users' table
-    const usersTablePattern =
-      /(?:^|\n|;)\s*(?:DROP\s+(?:TABLE\s+)?(?:IF\s+EXISTS\s+)?(?:\w+\.)?["']?users["']?|ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:\w+\.)?["']?users["']?\s+RENAME\s+TO)/im;
-    if (usersTablePattern.test(query)) {
-      throw new AppError('Cannot drop or rename the users table', 403, ERROR_CODES.FORBIDDEN);
-    }
-
-    if (mode === 'strict') {
-      // Check for system table operations (tables starting with underscore)
-      // This pattern checks each statement in multi-statement queries, including schema-qualified names
-      const systemTablePattern =
-        /(?:^|\n|;)\s*(?:CREATE|ALTER|DROP|INSERT\s+INTO|UPDATE|DELETE\s+FROM|TRUNCATE)\s+(?:TABLE\s+)?(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(?:\w+\.)?["']?_\w+/im;
-      if (systemTablePattern.test(query)) {
-        throw new AppError(
-          'Cannot modify or create system tables (tables starting with underscore)',
-          403,
-          ERROR_CODES.FORBIDDEN
-        );
-      }
-    } else {
-      // Relaxed mode: Allow only SELECT and INSERT into system tables and users table
-      // Block UPDATE, DELETE, DROP, CREATE, ALTER, TRUNCATE
-      const systemTableDestructivePattern =
-        /(?:^|\n|;)\s*(?:CREATE|ALTER|DROP|TRUNCATE|UPDATE|DELETE\s+FROM)\s+(?:TABLE\s+)?(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(?:\w+\.)?["']?_\w+/im;
-      if (systemTableDestructivePattern.test(query)) {
-        throw new AppError(
-          'Cannot UPDATE/DELETE/DROP/CREATE/ALTER system tables (tables starting with underscore)',
-          403,
-          ERROR_CODES.FORBIDDEN
-        );
       }
     }
 

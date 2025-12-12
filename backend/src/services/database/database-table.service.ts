@@ -30,7 +30,7 @@ const reservedColumns = {
   updated_at: ColumnType.DATETIME,
 };
 
-const userTableFrozenColumns = ['nickname', 'avatar_url'];
+// Note: userTableFrozenColumns removed - public.users no longer exists (moved to auth.users)
 
 const SAFE_FUNCS = new Set(['now()', 'gen_random_uuid()']);
 
@@ -99,13 +99,13 @@ export class DatabaseTableService {
    * List all tables
    */
   async listTables(): Promise<string[]> {
+    // Note: System tables are now in separate schemas, so no underscore filter needed
     const result = await this.getPool().query(
       `
         SELECT table_name as name
         FROM information_schema.tables
         WHERE table_schema = 'public'
         AND table_type = 'BASE TABLE'
-        AND table_name NOT LIKE '\\_%'
       `
     );
 
@@ -122,15 +122,7 @@ export class DatabaseTableService {
   ): Promise<CreateTableResponse> {
     // Validate table name
     validateIdentifier(table_name, 'table');
-    // Prevent creation of system tables
-    if (table_name.startsWith('_')) {
-      throw new AppError(
-        'Cannot create system tables',
-        403,
-        ERROR_CODES.FORBIDDEN,
-        'Table names starting with underscore are reserved for system tables'
-      );
-    }
+    // Note: System tables are now in separate schemas, no underscore check needed
 
     // Filter out reserved fields with matching types, throw error for mismatched types
     const validatedColumns = this.validateReservedFields(columns);
@@ -401,16 +393,7 @@ export class DatabaseTableService {
   ): Promise<UpdateTableSchemaResponse> {
     const { addColumns, dropColumns, updateColumns, addForeignKeys, dropForeignKeys, renameTable } =
       operations;
-
-    // Prevent modification of system tables
-    if (tableName.startsWith('_')) {
-      throw new AppError(
-        'System tables cannot be modified',
-        403,
-        ERROR_CODES.DATABASE_FORBIDDEN,
-        'System tables cannot be modified. System tables are prefixed with underscore.'
-      );
-    }
+    // Note: System tables are now in separate schemas, no underscore check needed
 
     const client = await this.getPool().connect();
     try {
@@ -492,14 +475,7 @@ export class DatabaseTableService {
               `You cannot drop the system column '${col}'`
             );
           }
-          if (tableName === 'users' && userTableFrozenColumns.includes(col)) {
-            throw new AppError(
-              'cannot drop frozen users columns',
-              403,
-              ERROR_CODES.FORBIDDEN,
-              `You cannot drop the frozen users column '${col}'`
-            );
-          }
+          // Note: public.users frozen columns check removed - table moved to auth.users
           await client.query(
             `
               ALTER TABLE ${safeTableName}
@@ -522,14 +498,7 @@ export class DatabaseTableService {
               `You cannot update the system column '${column.columnName}'`
             );
           }
-          if (tableName === 'users' && userTableFrozenColumns.includes(column.columnName)) {
-            throw new AppError(
-              'cannot update frozen user columns',
-              403,
-              ERROR_CODES.FORBIDDEN,
-              `You cannot update the frozen users column '${column.columnName}'`
-            );
-          }
+          // Note: public.users frozen columns check removed - table moved to auth.users
 
           // Handle default value changes
           if (column.defaultValue !== undefined) {
@@ -620,19 +589,7 @@ export class DatabaseTableService {
       }
 
       if (renameTable && renameTable.newTableName) {
-        if (tableName === 'users') {
-          throw new AppError('Cannot rename users table', 403, ERROR_CODES.FORBIDDEN);
-        }
-        // Prevent renaming to system tables
-        if (renameTable.newTableName.startsWith('_')) {
-          throw new AppError(
-            'Cannot rename to system table',
-            403,
-            ERROR_CODES.FORBIDDEN,
-            'Table names starting with underscore are reserved for system tables'
-          );
-        }
-
+        // Note: public.users no longer exists, system tables are in separate schemas
         const safeNewTableName = this.quoteIdentifier(renameTable.newTableName);
         // Rename the table
         await client.query(
@@ -669,18 +626,8 @@ export class DatabaseTableService {
    * Delete a table
    */
   async deleteTable(table: string): Promise<DeleteTableResponse> {
-    // Prevent deletion of system tables
-    if (table.startsWith('_')) {
-      throw new AppError(
-        'System tables cannot be deleted',
-        403,
-        ERROR_CODES.DATABASE_FORBIDDEN,
-        'System tables cannot be deleted. System tables are prefixed with underscore.'
-      );
-    }
-    if (table === 'users') {
-      throw new AppError('Cannot delete users table', 403, ERROR_CODES.DATABASE_FORBIDDEN);
-    }
+    // Note: System tables are now in separate schemas (system.*, auth.*, etc.)
+    // API only accesses public schema, so no underscore or users check needed
 
     const client = await this.getPool().connect();
     try {
@@ -785,10 +732,7 @@ export class DatabaseTableService {
     // Create a map of column names to their foreign key info
     const foreignKeyMap = new Map<string, ForeignKeyInfo>();
     foreignKeys.forEach((fk: ForeignKeyRow) => {
-      if (fk.foreign_table.startsWith('_')) {
-        // hiden internal table.
-        return;
-      }
+      // Note: System tables are now in separate schemas, no need to hide underscore-prefixed FKs
       foreignKeyMap.set(fk.from_column, {
         constraint_name: fk.constraint_name,
         referenceTable: fk.foreign_table,
