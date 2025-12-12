@@ -80,6 +80,9 @@ export class TokenManager {
    * Refresh tokens are stored in httpOnly cookies and used to obtain new access tokens
    */
   generateRefreshToken(payload: TokenPayloadSchema): string {
+    if (payload.role === 'anon') {
+      return '';
+    }
     const refreshPayload: RefreshTokenPayload = {
       sub: payload.sub,
       email: payload.email,
