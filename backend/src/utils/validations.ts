@@ -100,8 +100,6 @@ export function isValidIdentifier(identifier: string): boolean {
  */
 export function validateTableName(tableName: string): boolean {
   validateIdentifier(tableName, 'table');
-  // Note: System tables are now in separate schemas (system.*, auth.*, ai.*, storage.*, functions.*)
-  // so underscore prefix check is no longer needed - API only accesses public schema
   return true;
 }
 
