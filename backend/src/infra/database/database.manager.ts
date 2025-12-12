@@ -66,6 +66,7 @@ export class DatabaseManager {
   }
 
   async getUserTables(): Promise<string[]> {
+    // Note: System tables are now in separate schemas, so no underscore filter needed
     const client = await this.pool.connect();
     try {
       const result = await client.query(
@@ -74,7 +75,6 @@ export class DatabaseManager {
           FROM information_schema.tables
           WHERE table_schema = 'public'
           AND table_type = 'BASE TABLE'
-          AND (table_name NOT LIKE '\\_%')
           ORDER BY table_name
         `
       );
@@ -100,7 +100,6 @@ export class DatabaseManager {
               FROM information_schema.tables
               WHERE table_schema = 'public'
               AND table_type = 'BASE TABLE'
-              AND (table_name NOT LIKE '\\_%')
               ORDER BY table_name
             `
             );
