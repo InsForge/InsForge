@@ -17,6 +17,12 @@ import { TableFormSchema, TableFormForeignKeySchema } from '../schema';
 import { ColumnSchema, OnDeleteActionSchema, OnUpdateActionSchema } from '@insforge/shared-schemas';
 import { cn } from '@/lib/utils/utils';
 
+// Special auth.users table schema (only id column available for FK)
+const AUTH_USERS_TABLE = 'auth.users';
+const authUsersSchema = {
+  columns: [{ columnName: 'id', type: 'uuid', isUnique: true, isNullable: false }],
+};
+
 interface ForeignKeyPopoverProps {
   form: UseFormReturn<TableFormSchema>;
   mode: 'create' | 'edit';
@@ -69,16 +75,21 @@ export function ForeignKeyPopover({
     }
   }, [open, initialValue]);
 
-  // Get available tables
-  const availableTables = tables.filter(
-    (tableName) => mode === 'create' || tableName !== editTableName
+  // Get available tables (include auth.users as a special option)
+  const availableTables = [
+    AUTH_USERS_TABLE,
+    ...tables.filter((tableName) => mode === 'create' || tableName !== editTableName),
+  ];
+
+  // Get columns for selected reference table (skip fetch for auth.users)
+  const isAuthUsers = newForeignKey.referenceTable === AUTH_USERS_TABLE;
+  const { data: fetchedTableSchema } = useTableSchema(
+    newForeignKey.referenceTable || '',
+    !!newForeignKey.referenceTable && !isAuthUsers && open
   );
 
-  // Get columns for selected reference table
-  const { data: referenceTableSchema } = useTableSchema(
-    newForeignKey.referenceTable || '',
-    !!newForeignKey.referenceTable && open
-  );
+  // Use hardcoded schema for auth.users, otherwise use fetched schema
+  const referenceTableSchema = isAuthUsers ? authUsersSchema : fetchedTableSchema;
 
   // Get the type of the selected source column
   const getSourceFieldType = useMemo(() => {

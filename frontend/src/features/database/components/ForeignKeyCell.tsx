@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Link2, AlertCircle, X } from 'lucide-react';
 import {
   Button,
@@ -17,6 +18,25 @@ import { useTables } from '@/features/database/hooks/useTables';
 import { useRecords } from '@/features/database/hooks/useRecords';
 import { convertSchemaToColumns } from '@/features/database/components/DatabaseDataGrid';
 import { formatValueForDisplay } from '@/lib/utils/utils';
+import { useQuery } from '@tanstack/react-query';
+import { useUsers } from '@/features/auth/hooks/useUsers';
+
+// Special handling for auth.users foreign key references
+// Schema matches UserSchema from @insforge/shared-schemas
+const AUTH_USERS_TABLE = 'auth.users';
+const authUsersSchema = {
+  tableName: 'auth.users',
+  columns: [
+    { columnName: 'id', type: 'uuid', isUnique: true, isNullable: false },
+    { columnName: 'email', type: 'string', isUnique: true, isNullable: false },
+    { columnName: 'name', type: 'string', isUnique: false, isNullable: true },
+    { columnName: 'identities', type: 'json', isUnique: false, isNullable: true },
+    { columnName: 'providerType', type: 'string', isUnique: false, isNullable: true },
+    { columnName: 'emailVerified', type: 'boolean', isUnique: false, isNullable: false },
+    { columnName: 'createdAt', type: 'timestamp', isUnique: false, isNullable: false },
+    { columnName: 'updatedAt', type: 'timestamp', isUnique: false, isNullable: false },
+  ],
+};
 
 interface ForeignKeyCellProps {
   value: string;
@@ -29,8 +49,15 @@ interface ForeignKeyCellProps {
 
 export function ForeignKeyCell({ value, foreignKey, onJumpToTable }: ForeignKeyCellProps) {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const { useTableSchema } = useTables();
-  const recordsHook = useRecords(foreignKey.table);
+  const isAuthUsers = foreignKey.table === AUTH_USERS_TABLE;
+
+  // Regular table records hook (disabled for auth.users)
+  const recordsHook = useRecords(isAuthUsers ? '' : foreignKey.table);
+
+  // Auth users hook
+  const { getUser } = useUsers({ enabled: false });
 
   // Helper function to safely render any value type (including JSON objects)
   const renderValue = (val: ConvertedValue): string => {
@@ -39,16 +66,28 @@ export function ForeignKeyCell({ value, foreignKey, onJumpToTable }: ForeignKeyC
 
   // Fetch the referenced record when popover opens
   const searchValue = value ? renderValue(value) : '';
-  const {
-    data: recordData,
-    isLoading: _isLoading,
-    error,
-  } = recordsHook.useRecordByForeignKey(foreignKey.column, searchValue, open && !!value);
 
-  const record = recordData;
+  // For auth.users, fetch user by ID
+  const { data: authUserData, error: authUserError } = useQuery({
+    queryKey: ['users', searchValue],
+    queryFn: () => getUser(searchValue),
+    enabled: isAuthUsers && open && !!value,
+  });
 
-  // Fetch schema for the referenced table
-  const { data: schema } = useTableSchema(foreignKey.table, open && !!value);
+  // For regular tables, fetch by foreign key
+  const { data: recordData, error: recordError } = recordsHook.useRecordByForeignKey(
+    foreignKey.column,
+    searchValue,
+    !isAuthUsers && open && !!value
+  );
+
+  // Use appropriate data source based on table type
+  const record = isAuthUsers ? authUserData : recordData;
+  const error = isAuthUsers ? authUserError : recordError;
+
+  // Fetch schema for the referenced table (skip for auth.users)
+  const { data: fetchedSchema } = useTableSchema(foreignKey.table, !isAuthUsers && open && !!value);
+  const schema = isAuthUsers ? authUsersSchema : fetchedSchema;
 
   // Convert schema to columns for the mini DataGrid
   const columns = useMemo(() => {
@@ -142,18 +181,22 @@ export function ForeignKeyCell({ value, foreignKey, onJumpToTable }: ForeignKeyC
                   </div>
 
                   {/* Jump to Table Button */}
-                  {onJumpToTable && (
+                  {(onJumpToTable || isAuthUsers) && (
                     <div className="flex justify-end p-6 border-t border-border-gray dark:border-neutral-700">
                       <Button
                         variant="outline"
                         size="sm"
                         className="h-9 px-3 py-2 text-sm font-medium dark:text-white bg-bg-gray dark:bg-neutral-600"
                         onClick={() => {
-                          onJumpToTable(foreignKey.table);
+                          if (isAuthUsers) {
+                            void navigate('/dashboard/users');
+                          } else if (onJumpToTable) {
+                            onJumpToTable(foreignKey.table);
+                          }
                           setOpen(false);
                         }}
                       >
-                        Open Table
+                        {isAuthUsers ? 'Open Users' : 'Open Table'}
                       </Button>
                     </div>
                   )}
