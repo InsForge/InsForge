@@ -25,8 +25,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                description: Empty object on success - extend with optional fields later if needed
+                $ref: '#/components/schemas/SendEmailResponse'
         '400':
           description: Invalid request
           content:
@@ -129,6 +128,10 @@ components:
           format: email
           description: Reply-to email address
           example: "support@example.com"
+
+    SendEmailResponse:
+      type: object
+      description: Empty object on success - extend with optional fields later if needed
 
     ErrorResponse:
       type: object
