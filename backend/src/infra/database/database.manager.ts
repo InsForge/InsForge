@@ -37,14 +37,6 @@ export class DatabaseManager {
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
     });
-
-    const client = await this.pool.connect();
-    await client.query('BEGIN');
-
-    // Note: Schema migrations are now handled by node-pg-migrate
-    // Run: npm run migrate:up
-
-    await client.query('COMMIT');
   }
 
   static async getColumnTypeMap(tableName: string): Promise<Record<string, string>> {
@@ -66,7 +58,6 @@ export class DatabaseManager {
   }
 
   async getUserTables(): Promise<string[]> {
-    // Note: System tables are now in separate schemas, so no underscore filter needed
     const client = await this.pool.connect();
     try {
       const result = await client.query(

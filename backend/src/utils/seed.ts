@@ -88,8 +88,6 @@ async function seedDefaultAuthConfig(): Promise<void> {
     }
 
     // Table is empty - this is first startup, insert default cloud configuration
-    // Note: Migration 016 will add verify_email_method, reset_password_method, sign_in_redirect_to
-    // so we only insert fields that exist in migration 015
     await client.query(
       `INSERT INTO auth.configs (
         require_email_verification,

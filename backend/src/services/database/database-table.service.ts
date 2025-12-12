@@ -30,8 +30,6 @@ const reservedColumns = {
   updated_at: ColumnType.DATETIME,
 };
 
-// Note: userTableFrozenColumns removed - public.users no longer exists (moved to auth.users)
-
 const SAFE_FUNCS = new Set(['now()', 'gen_random_uuid()']);
 
 function getSafeDollarQuotedLiteral(s: string) {
@@ -99,7 +97,6 @@ export class DatabaseTableService {
    * List all tables
    */
   async listTables(): Promise<string[]> {
-    // Note: System tables are now in separate schemas, so no underscore filter needed
     const result = await this.getPool().query(
       `
         SELECT table_name as name
@@ -122,7 +119,6 @@ export class DatabaseTableService {
   ): Promise<CreateTableResponse> {
     // Validate table name
     validateIdentifier(table_name, 'table');
-    // Note: System tables are now in separate schemas, no underscore check needed
 
     // Filter out reserved fields with matching types, throw error for mismatched types
     const validatedColumns = this.validateReservedFields(columns);
@@ -393,7 +389,6 @@ export class DatabaseTableService {
   ): Promise<UpdateTableSchemaResponse> {
     const { addColumns, dropColumns, updateColumns, addForeignKeys, dropForeignKeys, renameTable } =
       operations;
-    // Note: System tables are now in separate schemas, no underscore check needed
 
     const client = await this.getPool().connect();
     try {
@@ -475,7 +470,6 @@ export class DatabaseTableService {
               `You cannot drop the system column '${col}'`
             );
           }
-          // Note: public.users frozen columns check removed - table moved to auth.users
           await client.query(
             `
               ALTER TABLE ${safeTableName}
@@ -498,7 +492,6 @@ export class DatabaseTableService {
               `You cannot update the system column '${column.columnName}'`
             );
           }
-          // Note: public.users frozen columns check removed - table moved to auth.users
 
           // Handle default value changes
           if (column.defaultValue !== undefined) {
@@ -589,7 +582,6 @@ export class DatabaseTableService {
       }
 
       if (renameTable && renameTable.newTableName) {
-        // Note: public.users no longer exists, system tables are in separate schemas
         const safeNewTableName = this.quoteIdentifier(renameTable.newTableName);
         // Rename the table
         await client.query(
@@ -626,9 +618,6 @@ export class DatabaseTableService {
    * Delete a table
    */
   async deleteTable(table: string): Promise<DeleteTableResponse> {
-    // Note: System tables are now in separate schemas (system.*, auth.*, etc.)
-    // API only accesses public schema, so no underscore or users check needed
-
     const client = await this.getPool().connect();
     try {
       await client.query(`DROP TABLE IF EXISTS ${this.quoteIdentifier(table)} CASCADE`);
