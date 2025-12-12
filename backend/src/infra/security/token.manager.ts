@@ -81,7 +81,11 @@ export class TokenManager {
    */
   generateRefreshToken(payload: TokenPayloadSchema): string {
     if (payload.role === 'anon') {
-      return '';
+      throw new AppError(
+        'Cannot generate refresh token for anonymous users',
+        401,
+        ERROR_CODES.AUTH_UNAUTHORIZED
+      );
     }
     const refreshPayload: RefreshTokenPayload = {
       sub: payload.sub,
@@ -101,10 +105,18 @@ export class TokenManager {
    */
   verifyRefreshToken(token: string): RefreshTokenPayload {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET) as RefreshTokenPayload;
+      const decoded = jwt.verify(token, JWT_SECRET, {
+        algorithms: ['HS256'],
+      }) as Partial<RefreshTokenPayload>;
+
 
       // Ensure this is a refresh token, not an access token
-      if (decoded.type !== 'refresh') {
+      if (
+        decoded.type !== 'refresh' ||
+        !decoded.sub ||
+        !decoded.email ||
+        (decoded.role !== 'authenticated' && decoded.role !== 'project_admin')
+      ) {
         throw new AppError('Invalid refresh token type', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
       }
 
