@@ -20,3 +20,6 @@ export const sendRawEmailRequestSchema = z.object({
 });
 
 export type SendRawEmailRequest = z.infer<typeof sendRawEmailRequestSchema>;
+
+export const sendEmailResponseSchema = z.object({});
+export type SendEmailResponse = z.infer<typeof sendEmailResponseSchema>;
