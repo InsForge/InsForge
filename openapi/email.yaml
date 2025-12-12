@@ -25,17 +25,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  message:
-                    type: string
-                    example: "Email sent successfully"
-                  messageId:
-                    type: string
-                    description: Unique identifier for the sent email (if available from provider)
+                $ref: '#/components/schemas/SendEmailResponse'
         '400':
           description: Invalid request
           content:
@@ -138,6 +128,10 @@ components:
           format: email
           description: Reply-to email address
           example: "support@example.com"
+
+    SendEmailResponse:
+      type: object
+      description: Empty object on success - extend with optional fields later if needed
 
     ErrorResponse:
       type: object
