@@ -1,14 +1,9 @@
 // Type definitions for database user records
-export interface UserMetadata {
-  name?: string;
-  avatar_url?: string;
-  [key: string]: unknown;
-}
 
 export interface UserRecord {
   id: string;
   email: string;
-  metadata: UserMetadata | null;
+  metadata: Record<string, unknown> | null;
   email_verified: boolean;
   is_project_admin: boolean;
   is_anonymous: boolean;

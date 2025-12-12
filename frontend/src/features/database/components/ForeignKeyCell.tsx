@@ -29,10 +29,9 @@ const authUsersSchema = {
   columns: [
     { columnName: 'id', type: 'uuid', isUnique: true, isNullable: false },
     { columnName: 'email', type: 'string', isUnique: true, isNullable: false },
-    { columnName: 'name', type: 'string', isUnique: false, isNullable: true },
-    { columnName: 'identities', type: 'json', isUnique: false, isNullable: true },
-    { columnName: 'providerType', type: 'string', isUnique: false, isNullable: true },
     { columnName: 'emailVerified', type: 'boolean', isUnique: false, isNullable: false },
+    { columnName: 'providers', type: 'json', isUnique: false, isNullable: true },
+    { columnName: 'metadata', type: 'json', isUnique: false, isNullable: true },
     { columnName: 'createdAt', type: 'timestamp', isUnique: false, isNullable: false },
     { columnName: 'updatedAt', type: 'timestamp', isUnique: false, isNullable: false },
   ],
