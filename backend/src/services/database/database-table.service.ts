@@ -659,6 +659,15 @@ export class DatabaseTableService {
     return `"${identifier.replace(/"/g, '""')}"`;
   }
 
+  // Quote a table reference, with special handling for auth.users
+  private quoteTableReference(tableRef: string): string {
+    // Only allow auth.users as a cross-schema reference
+    if (tableRef === 'auth.users') {
+      return '"auth"."users"';
+    }
+    return this.quoteIdentifier(tableRef);
+  }
+
   private validateReservedFields(columns: ColumnSchema[]): ColumnSchema[] {
     return columns.filter((col: ColumnSchema) => {
       const reservedType = reservedColumns[col.columnName as keyof typeof reservedColumns];
@@ -690,14 +699,16 @@ export class DatabaseTableService {
     }
     // Store foreign_key in a const to avoid repeated non-null assertions
     const fk = col.foreignKey;
-    const constraintName = `fk_${col.columnName}_${fk.referenceTable}_${fk.referenceColumn}`;
+    // Use "auth_users" in constraint name for auth.users references
+    const safeTableName = fk.referenceTable === 'auth.users' ? 'auth_users' : fk.referenceTable;
+    const constraintName = `fk_${col.columnName}_${safeTableName}_${fk.referenceColumn}`;
     const onDelete = fk.onDelete || 'RESTRICT';
     const onUpdate = fk.onUpdate || 'RESTRICT';
 
     if (include_source_column) {
-      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} FOREIGN KEY (${this.quoteIdentifier(col.columnName)}) REFERENCES ${this.quoteIdentifier(fk.referenceTable)}(${this.quoteIdentifier(fk.referenceColumn)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
+      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} FOREIGN KEY (${this.quoteIdentifier(col.columnName)}) REFERENCES ${this.quoteTableReference(fk.referenceTable)}(${this.quoteIdentifier(fk.referenceColumn)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
     } else {
-      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} REFERENCES ${this.quoteIdentifier(fk.referenceTable)}(${this.quoteIdentifier(fk.referenceColumn)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
+      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} REFERENCES ${this.quoteTableReference(fk.referenceTable)}(${this.quoteIdentifier(fk.referenceColumn)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
     }
   }
 
@@ -707,6 +718,7 @@ export class DatabaseTableService {
         SELECT
           tc.constraint_name,
           kcu.column_name as from_column,
+          ccu.table_schema AS foreign_schema,
           ccu.table_name AS foreign_table,
           ccu.column_name AS foreign_column,
           rc.delete_rule as on_delete,
@@ -717,7 +729,6 @@ export class DatabaseTableService {
           AND tc.table_schema = kcu.table_schema
         JOIN information_schema.constraint_column_usage AS ccu
           ON ccu.constraint_name = tc.constraint_name
-          AND ccu.table_schema = tc.table_schema
         JOIN information_schema.referential_constraints AS rc
           ON rc.constraint_name = tc.constraint_name
           AND rc.constraint_schema = tc.table_schema
@@ -732,10 +743,14 @@ export class DatabaseTableService {
     // Create a map of column names to their foreign key info
     const foreignKeyMap = new Map<string, ForeignKeyInfo>();
     foreignKeys.forEach((fk: ForeignKeyRow) => {
-      // Note: System tables are now in separate schemas, no need to hide underscore-prefixed FKs
+      // Prefix table name with schema if not public (e.g., "auth.users")
+      const referenceTable =
+        fk.foreign_schema !== 'public'
+          ? `${fk.foreign_schema}.${fk.foreign_table}`
+          : fk.foreign_table;
       foreignKeyMap.set(fk.from_column, {
         constraint_name: fk.constraint_name,
-        referenceTable: fk.foreign_table,
+        referenceTable,
         referenceColumn: fk.foreign_column,
         onDelete: fk.on_delete as OnDeleteActionSchema,
         onUpdate: fk.on_update as OnUpdateActionSchema,
