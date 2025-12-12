@@ -74,7 +74,7 @@ async function seedDefaultAuthConfig(): Promise<void> {
   const client = await pool.connect();
 
   try {
-    const result = await client.query('SELECT COUNT(*) as count FROM _auth_configs');
+    const result = await client.query('SELECT COUNT(*) as count FROM auth.configs');
     const hasConfig = result.rows.length > 0 && Number(result.rows[0].count) > 0;
 
     if (hasConfig) {
@@ -91,7 +91,7 @@ async function seedDefaultAuthConfig(): Promise<void> {
     // Note: Migration 016 will add verify_email_method, reset_password_method, sign_in_redirect_to
     // so we only insert fields that exist in migration 015
     await client.query(
-      `INSERT INTO _auth_configs (
+      `INSERT INTO auth.configs (
         require_email_verification,
         password_min_length,
         require_number,
