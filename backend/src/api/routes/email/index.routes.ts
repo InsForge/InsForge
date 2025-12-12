@@ -25,7 +25,7 @@ router.post(
 
       await emailService.sendRaw(validation.data);
 
-      successResponse(res, { success: true });
+      successResponse(res, {});
     } catch (error) {
       next(error);
     }
