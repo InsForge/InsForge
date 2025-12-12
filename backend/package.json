@@ -16,12 +16,13 @@
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "test:e2e": "./tests/run-all-tests.sh",
-    "migrate:up": "node-pg-migrate up --migrations-dir src/infra/database/migrations --migrations-table _migrations",
-    "migrate:down": "node-pg-migrate down --migrations-dir src/infra/database/migrations --migrations-table _migrations",
-    "migrate:create": "node-pg-migrate create --migrations-dir src/infra/database/migrations --migrations-table _migrations",
-    "migrate:redo": "node-pg-migrate redo --migrations-dir src/infra/database/migrations --migrations-table _migrations",
-    "migrate:up:local": "dotenv -e ../.env -- node-pg-migrate up --migrations-dir src/infra/database/migrations --migrations-table _migrations",
-    "migrate:down:local": "dotenv -e ../.env -- node-pg-migrate down --migrations-dir src/infra/database/migrations --migrations-table _migrations"
+    "migrate:bootstrap": "node src/infra/database/migrations/bootstrap/bootstrap-migrations.js",
+    "migrate:up": "npm run migrate:bootstrap && node-pg-migrate up --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
+    "migrate:down": "node-pg-migrate down --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
+    "migrate:create": "node-pg-migrate create --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
+    "migrate:redo": "npm run migrate:bootstrap && node-pg-migrate redo --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
+    "migrate:up:local": "dotenv -e ../.env -- npm run migrate:bootstrap && dotenv -e ../.env -- node-pg-migrate up --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
+    "migrate:down:local": "dotenv -e ../.env -- node-pg-migrate down --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations"
   },
   "keywords": [
     "backend-as-a-service",

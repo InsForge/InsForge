@@ -109,7 +109,7 @@ export class StorageService {
     // This query finds all files matching the pattern and extracts the counter number
     const result = await this.getPool().query(
       `
-        SELECT key FROM _storage
+        SELECT key FROM storage.objects
         WHERE bucket = $1
         AND (key = $2 OR key LIKE $3)
       `,
@@ -169,7 +169,7 @@ export class StorageService {
       // Save metadata to database and return the timestamp in one operation
       const result = await client.query(
         `
-        INSERT INTO _storage (bucket, key, size, mime_type, uploaded_by)
+        INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by)
         VALUES ($1, $2, $3, $4, $5)
         RETURNING uploaded_at as "uploadedAt"
       `,
@@ -207,7 +207,7 @@ export class StorageService {
     this.validateKey(key);
 
     const result = await this.getPool().query(
-      'SELECT * FROM _storage WHERE bucket = $1 AND key = $2',
+      'SELECT * FROM storage.objects WHERE bucket = $1 AND key = $2',
       [bucket, key]
     );
 
@@ -249,7 +249,7 @@ export class StorageService {
       // Check permissions
       if (!isAdmin) {
         const fileResult = await client.query(
-          'SELECT uploaded_by FROM _storage WHERE bucket = $1 AND key = $2',
+          'SELECT uploaded_by FROM storage.objects WHERE bucket = $1 AND key = $2',
           [bucket, key]
         );
 
@@ -273,7 +273,7 @@ export class StorageService {
       await this.provider.deleteObject(bucket, key);
 
       // Delete from database
-      const result = await client.query('DELETE FROM _storage WHERE bucket = $1 AND key = $2', [
+      const result = await client.query('DELETE FROM storage.objects WHERE bucket = $1 AND key = $2', [
         bucket,
         key,
       ]);
@@ -295,8 +295,8 @@ export class StorageService {
 
     const client = await this.getPool().connect();
     try {
-      let query = 'SELECT * FROM _storage WHERE bucket = $1';
-      let countQuery = 'SELECT COUNT(*) as count FROM _storage WHERE bucket = $1';
+      let query = 'SELECT * FROM storage.objects WHERE bucket = $1';
+      let countQuery = 'SELECT COUNT(*) as count FROM storage.objects WHERE bucket = $1';
       const params: (string | number)[] = [bucket];
       let paramIndex = 2;
 
@@ -338,7 +338,7 @@ export class StorageService {
 
   async isBucketPublic(bucket: string): Promise<boolean> {
     const result = await this.getPool().query(
-      'SELECT public FROM _storage_buckets WHERE name = $1',
+      'SELECT public FROM storage.buckets WHERE name = $1',
       [bucket]
     );
     return result.rows[0]?.public || false;
@@ -348,7 +348,7 @@ export class StorageService {
     const client = await this.getPool().connect();
     try {
       // Check if bucket exists
-      const bucketResult = await client.query('SELECT name FROM _storage_buckets WHERE name = $1', [
+      const bucketResult = await client.query('SELECT name FROM storage.buckets WHERE name = $1', [
         bucket,
       ]);
 
@@ -356,9 +356,9 @@ export class StorageService {
         throw new Error(`Bucket "${bucket}" does not exist`);
       }
 
-      // Update bucket visibility in _storage_buckets table
+      // Update bucket visibility in storage.buckets table
       await client.query(
-        'UPDATE _storage_buckets SET public = $1, updated_at = CURRENT_TIMESTAMP WHERE name = $2',
+        'UPDATE storage.buckets SET public = $1, updated_at = CURRENT_TIMESTAMP WHERE name = $2',
         [isPublic, bucket]
       );
 
@@ -370,9 +370,9 @@ export class StorageService {
   }
 
   async listBuckets(): Promise<StorageBucketSchema[]> {
-    // Get all buckets with their metadata from _storage_buckets table
+    // Get all buckets with their metadata from storage.buckets table
     const result = await this.getPool().query(
-      'SELECT name, public, created_at as "createdAt" FROM _storage_buckets ORDER BY name'
+      'SELECT name, public, created_at as "createdAt" FROM storage.buckets ORDER BY name'
     );
 
     return result.rows as StorageBucketSchema[];
@@ -384,7 +384,7 @@ export class StorageService {
     const client = await this.getPool().connect();
     try {
       // Check if bucket already exists
-      const existing = await client.query('SELECT name FROM _storage_buckets WHERE name = $1', [
+      const existing = await client.query('SELECT name FROM storage.buckets WHERE name = $1', [
         bucket,
       ]);
 
@@ -392,8 +392,8 @@ export class StorageService {
         throw new Error(`Bucket "${bucket}" already exists`);
       }
 
-      // Insert bucket into _storage_buckets table
-      await client.query('INSERT INTO _storage_buckets (name, public) VALUES ($1, $2)', [
+      // Insert bucket into storage.buckets table
+      await client.query('INSERT INTO storage.buckets (name, public) VALUES ($1, $2)', [
         bucket,
         isPublic,
       ]);
@@ -414,7 +414,7 @@ export class StorageService {
     const client = await this.getPool().connect();
     try {
       // Check if bucket exists
-      const bucketResult = await client.query('SELECT name FROM _storage_buckets WHERE name = $1', [
+      const bucketResult = await client.query('SELECT name FROM storage.buckets WHERE name = $1', [
         bucket,
       ]);
 
@@ -425,8 +425,8 @@ export class StorageService {
       // Delete bucket using backend (handles all files)
       await this.provider.deleteBucket(bucket);
 
-      // Delete from storage table (cascade will handle _storage entries)
-      await client.query('DELETE FROM _storage_buckets WHERE name = $1', [bucket]);
+      // Delete from storage table (cascade will handle storage.objects entries)
+      await client.query('DELETE FROM storage.buckets WHERE name = $1', [bucket]);
 
       // Update storage metadata
       // Metadata is now updated on-demand
@@ -451,7 +451,7 @@ export class StorageService {
     const client = await this.getPool().connect();
     try {
       // Check if bucket exists
-      const bucketResult = await client.query('SELECT name FROM _storage_buckets WHERE name = $1', [
+      const bucketResult = await client.query('SELECT name FROM storage.buckets WHERE name = $1', [
         bucket,
       ]);
 
@@ -503,7 +503,7 @@ export class StorageService {
     try {
       // Check if already confirmed
       const existingResult = await client.query(
-        'SELECT key FROM _storage WHERE bucket = $1 AND key = $2',
+        'SELECT key FROM storage.objects WHERE bucket = $1 AND key = $2',
         [bucket, key]
       );
 
@@ -514,7 +514,7 @@ export class StorageService {
       // Save metadata to database and return the timestamp in one operation
       const result = await client.query(
         `
-        INSERT INTO _storage (bucket, key, size, mime_type, uploaded_by)
+        INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by)
         VALUES ($1, $2, $3, $4, $5)
         RETURNING uploaded_at as "uploadedAt"
       `,
@@ -548,9 +548,9 @@ export class StorageService {
    * Get storage metadata
    */
   async getMetadata(): Promise<StorageMetadataSchema> {
-    // Get storage buckets from _storage_buckets table
+    // Get storage buckets from storage.buckets table
     const result = await this.getPool().query(
-      'SELECT name, public, created_at as "createdAt" FROM _storage_buckets ORDER BY name'
+      'SELECT name, public, created_at as "createdAt" FROM storage.buckets ORDER BY name'
     );
 
     const storageBuckets = result.rows as StorageBucketSchema[];
@@ -572,7 +572,7 @@ export class StorageService {
     try {
       // Query to get object count for each bucket
       const result = await this.getPool().query(
-        'SELECT bucket, COUNT(*) as count FROM _storage GROUP BY bucket'
+        'SELECT bucket, COUNT(*) as count FROM storage.objects GROUP BY bucket'
       );
 
       const bucketCounts = result.rows as { bucket: string; count: string }[];
@@ -595,11 +595,11 @@ export class StorageService {
 
   private async getStorageSizeInGB(): Promise<number> {
     try {
-      // Query the _storage table to sum all file sizes
+      // Query the storage.objects table to sum all file sizes
       const result = await this.getPool().query(
         `
         SELECT COALESCE(SUM(size), 0) as total_size
-        FROM _storage
+        FROM storage.objects
       `
       );
 

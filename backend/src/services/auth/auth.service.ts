@@ -130,16 +130,11 @@ export class AuthService {
     try {
       await client.query('BEGIN');
 
+      const metadata = name ? JSON.stringify({ name }) : '{}';
       await client.query(
-        `INSERT INTO _accounts (id, email, password, name, email_verified, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
-        [userId, email, hashedPassword, name || null, false]
-      );
-
-      await client.query(
-        `INSERT INTO users (id, nickname, created_at, updated_at)
-         VALUES ($1, $2, NOW(), NOW())`,
-        [userId, name || null]
+        `INSERT INTO auth.users (id, email, password, metadata, email_verified, created_at, updated_at)
+         VALUES ($1, $2, $3, $4::jsonb, $5, NOW(), NOW())`,
+        [userId, email, hashedPassword, metadata, false]
       );
 
       await client.query('COMMIT');
@@ -243,7 +238,7 @@ export class AuthService {
   async sendVerificationEmailWithCode(email: string): Promise<void> {
     // Check if user exists
     const pool = this.getPool();
-    const result = await pool.query('SELECT * FROM _accounts WHERE email = $1', [email]);
+    const result = await pool.query('SELECT * FROM auth.users WHERE email = $1', [email]);
     const dbUser = result.rows[0];
     if (!dbUser) {
       // Silently succeed to prevent user enumeration
@@ -261,7 +256,8 @@ export class AuthService {
 
     // Send email with verification code
     const emailService = EmailService.getInstance();
-    await emailService.sendWithTemplate(email, dbUser.name || 'User', 'email-verification-code', {
+    const userName = dbUser.metadata?.name || 'User';
+    await emailService.sendWithTemplate(email, userName, 'email-verification-code', {
       token: code,
     });
   }
@@ -274,7 +270,7 @@ export class AuthService {
   async sendVerificationEmailWithLink(email: string): Promise<void> {
     // Check if user exists
     const pool = this.getPool();
-    const result = await pool.query('SELECT * FROM _accounts WHERE email = $1', [email]);
+    const result = await pool.query('SELECT * FROM auth.users WHERE email = $1', [email]);
     const dbUser = result.rows[0];
     if (!dbUser) {
       // Silently succeed to prevent user enumeration
@@ -295,7 +291,8 @@ export class AuthService {
 
     // Send email with verification link
     const emailService = EmailService.getInstance();
-    await emailService.sendWithTemplate(email, dbUser.name || 'User', 'email-verification-link', {
+    const userName = dbUser.metadata?.name || 'User';
+    await emailService.sendWithTemplate(email, userName, 'email-verification-link', {
       link: linkUrl,
     });
   }
@@ -323,7 +320,7 @@ export class AuthService {
 
       // Update account email verification status
       const result = await client.query(
-        `UPDATE _accounts
+        `UPDATE auth.users
          SET email_verified = true, updated_at = NOW()
          WHERE email = $1
          RETURNING id`,
@@ -389,7 +386,7 @@ export class AuthService {
 
       // Update account email verification status
       const result = await client.query(
-        `UPDATE _accounts
+        `UPDATE auth.users
          SET email_verified = true, updated_at = NOW()
          WHERE email = $1
          RETURNING id`,
@@ -439,7 +436,7 @@ export class AuthService {
   async sendResetPasswordEmailWithCode(email: string): Promise<void> {
     // Check if user exists
     const pool = this.getPool();
-    const result = await pool.query('SELECT * FROM _accounts WHERE email = $1', [email]);
+    const result = await pool.query('SELECT * FROM auth.users WHERE email = $1', [email]);
     const dbUser = result.rows[0];
     if (!dbUser) {
       // Silently succeed to prevent user enumeration
@@ -457,7 +454,8 @@ export class AuthService {
 
     // Send email with reset password code
     const emailService = EmailService.getInstance();
-    await emailService.sendWithTemplate(email, dbUser.name || 'User', 'reset-password-code', {
+    const userName = dbUser.metadata?.name || 'User';
+    await emailService.sendWithTemplate(email, userName, 'reset-password-code', {
       token: code,
     });
   }
@@ -470,7 +468,7 @@ export class AuthService {
   async sendResetPasswordEmailWithLink(email: string): Promise<void> {
     // Check if user exists
     const pool = this.getPool();
-    const result = await pool.query('SELECT * FROM _accounts WHERE email = $1', [email]);
+    const result = await pool.query('SELECT * FROM auth.users WHERE email = $1', [email]);
     const dbUser = result.rows[0];
     if (!dbUser) {
       // Silently succeed to prevent user enumeration
@@ -491,7 +489,8 @@ export class AuthService {
 
     // Send email with password reset link
     const emailService = EmailService.getInstance();
-    await emailService.sendWithTemplate(email, dbUser.name || 'User', 'reset-password-link', {
+    const userName = dbUser.metadata?.name || 'User';
+    await emailService.sendWithTemplate(email, userName, 'reset-password-link', {
       link: linkUrl,
     });
   }
@@ -562,7 +561,7 @@ export class AuthService {
 
       // Update password in the database
       const result = await client.query(
-        `UPDATE _accounts
+        `UPDATE auth.users
          SET password = $1, updated_at = NOW()
          WHERE email = $2
          RETURNING id`,
@@ -679,9 +678,9 @@ export class AuthService {
   ): Promise<CreateSessionResponse> {
     const pool = this.getPool();
 
-    // First, try to find existing user by provider ID in _account_providers table
+    // First, try to find existing user by provider ID in auth.user_providers table
     const accountResult = await pool.query(
-      'SELECT * FROM _account_providers WHERE provider = $1 AND provider_account_id = $2',
+      'SELECT * FROM auth.user_providers WHERE provider = $1 AND provider_account_id = $2',
       [provider, providerId]
     );
     const account = accountResult.rows[0];
@@ -689,13 +688,13 @@ export class AuthService {
     if (account) {
       // Found existing OAuth user, update last login time
       await pool.query(
-        'UPDATE _account_providers SET updated_at = CURRENT_TIMESTAMP WHERE provider = $1 AND provider_account_id = $2',
+        'UPDATE auth.user_providers SET updated_at = CURRENT_TIMESTAMP WHERE provider = $1 AND provider_account_id = $2',
         [provider, providerId]
       );
 
       // Update email_verified to true if not already verified (OAuth login means email is trusted)
       await pool.query(
-        'UPDATE _accounts SET email_verified = true WHERE id = $1 AND email_verified = false',
+        'UPDATE auth.users SET email_verified = true WHERE id = $1 AND email_verified = false',
         [account.user_id]
       );
 
@@ -715,16 +714,16 @@ export class AuthService {
     }
 
     // If not found by provider_id, try to find by email in _user table
-    const existingUserResult = await pool.query('SELECT * FROM _accounts WHERE email = $1', [
+    const existingUserResult = await pool.query('SELECT * FROM auth.users WHERE email = $1', [
       email,
     ]);
     const existingUser = existingUserResult.rows[0];
 
     if (existingUser) {
-      // Found existing user by email, create _account_providers record to link OAuth
+      // Found existing user by email, create auth.user_providers record to link OAuth
       await pool.query(
         `
-        INSERT INTO _account_providers (
+        INSERT INTO auth.user_providers (
           user_id, provider, provider_account_id,
           provider_data, created_at, updated_at
         )
@@ -735,7 +734,7 @@ export class AuthService {
 
       // Update email_verified to true (OAuth login means email is trusted)
       await pool.query(
-        'UPDATE _accounts SET email_verified = true WHERE id = $1 AND email_verified = false',
+        'UPDATE auth.users SET email_verified = true WHERE id = $1 AND email_verified = false',
         [existingUser.id]
       );
 
@@ -795,26 +794,19 @@ export class AuthService {
       await client.query('BEGIN');
 
       // Create user record (without password for OAuth users)
+      const metadata = JSON.stringify({ name: userName, avatar_url: avatarUrl });
       await client.query(
         `
-        INSERT INTO _accounts (id, email, name, email_verified, created_at, updated_at)
-        VALUES ($1, $2, $3, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        INSERT INTO auth.users (id, email, metadata, email_verified, created_at, updated_at)
+        VALUES ($1, $2, $3::jsonb, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
-        [userId, email, userName]
+        [userId, email, metadata]
       );
 
+      // Create auth.user_providers record
       await client.query(
         `
-        INSERT INTO users (id, nickname, avatar_url, created_at, updated_at)
-        VALUES ($1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `,
-        [userId, userName, avatarUrl]
-      );
-
-      // Create _account_providers record
-      await client.query(
-        `
-        INSERT INTO _account_providers (
+        INSERT INTO auth.user_providers (
           user_id, provider, provider_account_id,
           provider_data, created_at, updated_at
         )
@@ -989,14 +981,16 @@ export class AuthService {
       SELECT
         u.id,
         u.email,
-        u.name,
+        u.metadata,
         u.email_verified,
+        u.is_project_admin,
+        u.is_anonymous,
         u.created_at,
         u.updated_at,
         u.password,
         STRING_AGG(a.provider, ',') as providers
-      FROM _accounts u
-      LEFT JOIN _account_providers a ON u.id = a.user_id
+      FROM auth.users u
+      LEFT JOIN auth.user_providers a ON u.id = a.user_id
       WHERE u.email = $1
       GROUP BY u.id
     `,
@@ -1017,14 +1011,16 @@ export class AuthService {
       SELECT
         u.id,
         u.email,
-        u.name,
+        u.metadata,
         u.email_verified,
+        u.is_project_admin,
+        u.is_anonymous,
         u.created_at,
         u.updated_at,
         u.password,
         STRING_AGG(a.provider, ',') as providers
-      FROM _accounts u
-      LEFT JOIN _account_providers a ON u.id = a.user_id
+      FROM auth.users u
+      LEFT JOIN auth.user_providers a ON u.id = a.user_id
       WHERE u.id = $1
       GROUP BY u.id
     `,
@@ -1063,7 +1059,7 @@ export class AuthService {
     return {
       id: dbUser.id,
       email: dbUser.email,
-      name: dbUser.name,
+      name: dbUser.metadata?.name,
       emailVerified: dbUser.email_verified,
       createdAt: dbUser.created_at,
       updatedAt: dbUser.updated_at,
@@ -1085,19 +1081,21 @@ export class AuthService {
       SELECT
         u.id,
         u.email,
-        u.name,
+        u.metadata,
         u.email_verified,
+        u.is_project_admin,
+        u.is_anonymous,
         u.created_at,
         u.updated_at,
         u.password,
         STRING_AGG(a.provider, ',') as providers
-      FROM _accounts u
-      LEFT JOIN _account_providers a ON u.id = a.user_id
+      FROM auth.users u
+      LEFT JOIN auth.user_providers a ON u.id = a.user_id
     `;
     const params: (string | number)[] = [];
 
     if (search) {
-      query += ' WHERE u.email LIKE $1 OR u.name LIKE $2';
+      query += ` WHERE u.email LIKE $1 OR u.metadata->>'name' LIKE $2`;
       params.push(`%${search}%`, `%${search}%`);
     }
 
@@ -1111,10 +1109,10 @@ export class AuthService {
     const users = dbUsers.map((dbUser) => this.transformUserRecordToSchema(dbUser));
 
     // Get total count
-    let countQuery = 'SELECT COUNT(*) as count FROM _accounts';
+    let countQuery = 'SELECT COUNT(*) as count FROM auth.users';
     const countParams: string[] = [];
     if (search) {
-      countQuery += ' WHERE email LIKE $1 OR name LIKE $2';
+      countQuery += ` WHERE email LIKE $1 OR metadata->>'name' LIKE $2`;
       countParams.push(`%${search}%`, `%${search}%`);
     }
     const countResult = await pool.query(countQuery, countParams);
@@ -1143,7 +1141,7 @@ export class AuthService {
   async deleteUsers(userIds: string[]): Promise<number> {
     const pool = this.getPool();
     const placeholders = userIds.map((_, i) => `$${i + 1}`).join(',');
-    const result = await pool.query(`DELETE FROM _accounts WHERE id IN (${placeholders})`, userIds);
+    const result = await pool.query(`DELETE FROM auth.users WHERE id IN (${placeholders})`, userIds);
 
     return result.rowCount || 0;
   }
