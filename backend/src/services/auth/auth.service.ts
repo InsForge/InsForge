@@ -1059,7 +1059,7 @@ export class AuthService {
     return {
       id: dbUser.id,
       email: dbUser.email,
-      name: dbUser.metadata?.name,
+      name: dbUser.metadata?.name ?? '',
       emailVerified: dbUser.email_verified,
       createdAt: dbUser.created_at,
       updatedAt: dbUser.updated_at,
@@ -1141,7 +1141,10 @@ export class AuthService {
   async deleteUsers(userIds: string[]): Promise<number> {
     const pool = this.getPool();
     const placeholders = userIds.map((_, i) => `$${i + 1}`).join(',');
-    const result = await pool.query(`DELETE FROM auth.users WHERE id IN (${placeholders})`, userIds);
+    const result = await pool.query(
+      `DELETE FROM auth.users WHERE id IN (${placeholders})`,
+      userIds
+    );
 
     return result.rowCount || 0;
   }

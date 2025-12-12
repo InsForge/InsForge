@@ -273,10 +273,10 @@ export class StorageService {
       await this.provider.deleteObject(bucket, key);
 
       // Delete from database
-      const result = await client.query('DELETE FROM storage.objects WHERE bucket = $1 AND key = $2', [
-        bucket,
-        key,
-      ]);
+      const result = await client.query(
+        'DELETE FROM storage.objects WHERE bucket = $1 AND key = $2',
+        [bucket, key]
+      );
 
       return result.rowCount !== null && result.rowCount > 0;
     } finally {

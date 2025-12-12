@@ -132,9 +132,10 @@ export class FunctionService {
 
       // If status is active, update deployed_at
       if (status === 'active') {
-        await client.query(`UPDATE functions.definitions SET deployed_at = CURRENT_TIMESTAMP WHERE id = $1`, [
-          id,
-        ]);
+        await client.query(
+          `UPDATE functions.definitions SET deployed_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          [id]
+        );
       }
 
       // Fetch the created function
@@ -181,9 +182,10 @@ export class FunctionService {
     const client = await this.getPool().connect();
     try {
       // Check if function exists
-      const existingResult = await client.query('SELECT id FROM functions.definitions WHERE slug = $1', [
-        slug,
-      ]);
+      const existingResult = await client.query(
+        'SELECT id FROM functions.definitions WHERE slug = $1',
+        [slug]
+      );
       if (existingResult.rows.length === 0) {
         return null;
       }
@@ -195,7 +197,10 @@ export class FunctionService {
 
       // Update fields
       if (updates.name !== undefined) {
-        await client.query('UPDATE functions.definitions SET name = $1 WHERE slug = $2', [updates.name, slug]);
+        await client.query('UPDATE functions.definitions SET name = $1 WHERE slug = $2', [
+          updates.name,
+          slug,
+        ]);
       }
 
       if (updates.description !== undefined) {
@@ -206,7 +211,10 @@ export class FunctionService {
       }
 
       if (updates.code !== undefined) {
-        await client.query('UPDATE functions.definitions SET code = $1 WHERE slug = $2', [updates.code, slug]);
+        await client.query('UPDATE functions.definitions SET code = $1 WHERE slug = $2', [
+          updates.code,
+          slug,
+        ]);
       }
 
       if (updates.status !== undefined) {
@@ -225,9 +233,10 @@ export class FunctionService {
       }
 
       // Update updated_at
-      await client.query('UPDATE functions.definitions SET updated_at = CURRENT_TIMESTAMP WHERE slug = $1', [
-        slug,
-      ]);
+      await client.query(
+        'UPDATE functions.definitions SET updated_at = CURRENT_TIMESTAMP WHERE slug = $1',
+        [slug]
+      );
 
       // Fetch updated function
       const result = await client.query(
@@ -254,7 +263,10 @@ export class FunctionService {
    */
   async deleteFunction(slug: string): Promise<boolean> {
     try {
-      const result = await this.getPool().query('DELETE FROM functions.definitions WHERE slug = $1', [slug]);
+      const result = await this.getPool().query(
+        'DELETE FROM functions.definitions WHERE slug = $1',
+        [slug]
+      );
 
       if (result.rowCount === 0) {
         return false;
