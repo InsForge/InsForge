@@ -1123,19 +1123,15 @@ components:
         email:
           type: string
           format: email
-        name:
-          type: string
+        metadata:
+          type: object
+          additionalProperties: true
         emailVerified:
           type: boolean
-        identities:
+        providers:
           type: array
           items:
-            type: object
-            properties:
-              provider:
-                type: string
-        providerType:
-          type: string
+            type: string
         createdAt:
           type: string
           format: date-time

@@ -16,6 +16,14 @@ import { useTheme } from '@/lib/contexts/ThemeContext';
 import type { DataGridColumn, DataGridRow, DataGridRowType } from './datagridTypes';
 import SortableHeaderRenderer from './SortableHeader';
 
+// Custom selection cell renderer props
+export interface SelectionCellProps<TRow extends DataGridRowType = DataGridRow> {
+  row: TRow;
+  isSelected: boolean;
+  onToggle: (checked: boolean) => void;
+  tabIndex: number;
+}
+
 // Generic DataGrid props
 export interface DataGridProps<TRow extends DataGridRowType = DataGridRow> {
   data: TRow[];
@@ -40,6 +48,8 @@ export interface DataGridProps<TRow extends DataGridRowType = DataGridRow> {
   showPagination?: boolean;
   showTypeBadge?: boolean;
   noPadding?: boolean;
+  selectionColumnWidth?: number;
+  renderSelectionCell?: (props: SelectionCellProps<TRow>) => React.ReactNode;
 }
 
 // Main DataGrid component
@@ -66,6 +76,8 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
   showPagination = true,
   showTypeBadge = true,
   noPadding = false,
+  selectionColumnWidth,
+  renderSelectionCell,
 }: DataGridProps<TRow>) {
   const { resolvedTheme } = useTheme();
 
@@ -77,29 +89,33 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
 
     // Add selection column if enabled and not hidden
     if (showSelection && selectedRows !== undefined && onSelectedRowsChange) {
+      const colWidth = selectionColumnWidth ?? 45;
       cols.push({
         ...SelectColumn,
         key: SELECT_COLUMN_KEY,
         frozen: true,
-        width: 45,
-        minWidth: 45,
-        maxWidth: 45,
-        resizable: false,
-        renderCell: ({ row, tabIndex }) => (
-          <Checkbox
-            checked={selectedRows.has(keyGetter(row))}
-            onChange={(checked) => {
-              const newSelectedRows = new Set(selectedRows);
-              if (checked) {
-                newSelectedRows.add(String(keyGetter(row)));
-              } else {
-                newSelectedRows.delete(String(keyGetter(row)));
-              }
-              onSelectedRowsChange(newSelectedRows);
-            }}
-            tabIndex={tabIndex}
-          />
-        ),
+        width: colWidth,
+        minWidth: colWidth,
+        maxWidth: renderSelectionCell ? undefined : colWidth,
+        resizable: !!renderSelectionCell,
+        renderCell: ({ row, tabIndex }) => {
+          const isSelected = selectedRows.has(keyGetter(row));
+          const handleToggle = (checked: boolean) => {
+            const newSelectedRows = new Set(selectedRows);
+            if (checked) {
+              newSelectedRows.add(String(keyGetter(row)));
+            } else {
+              newSelectedRows.delete(String(keyGetter(row)));
+            }
+            onSelectedRowsChange(newSelectedRows);
+          };
+
+          if (renderSelectionCell) {
+            return renderSelectionCell({ row, isSelected, onToggle: handleToggle, tabIndex });
+          }
+
+          return <Checkbox checked={isSelected} onChange={handleToggle} tabIndex={tabIndex} />;
+        },
         renderHeaderCell: () => {
           const selectedCount = data.filter((row) => selectedRows.has(String(row.id))).length;
           const totalCount = data.length;
@@ -182,6 +198,8 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
     showSelection,
     showTypeBadge,
     keyGetter,
+    selectionColumnWidth,
+    renderSelectionCell,
   ]);
 
   // Loading state - only show full loading screen if not sorting

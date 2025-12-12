@@ -611,10 +611,10 @@ export class AuthService {
       user: {
         id: ADMIN_ID,
         email: email,
-        name: 'Administrator',
         emailVerified: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        metadata: { name: 'Administrator' },
       },
       accessToken,
     };
@@ -642,10 +642,10 @@ export class AuthService {
         user: {
           id: ADMIN_ID,
           email: email as string,
-          name: 'Administrator',
           emailVerified: true,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
+          metadata: { name: 'Administrator' },
         },
         accessToken,
       };
@@ -820,10 +820,10 @@ export class AuthService {
       const user: UserSchema = {
         id: userId,
         email,
-        name: userName,
         emailVerified: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        metadata: { name: userName, avatar_url: avatarUrl },
       };
 
       const accessToken = this.tokenManager.generateToken({
@@ -1035,36 +1035,28 @@ export class AuthService {
    * @private
    */
   private transformUserRecordToSchema(dbUser: UserRecord): UserSchema {
-    const identities = [];
     const providers: string[] = [];
 
     // Add social providers if any
     if (dbUser.providers) {
       dbUser.providers.split(',').forEach((provider: string) => {
-        identities.push({ provider });
         providers.push(provider);
       });
     }
 
     // Add email provider if password exists
     if (dbUser.password) {
-      identities.push({ provider: 'email' });
       providers.push('email');
     }
-
-    // Use first provider to determine type: 'email' or 'social'
-    const firstProvider = providers[0];
-    const providerType = firstProvider === 'email' ? 'email' : 'social';
 
     return {
       id: dbUser.id,
       email: dbUser.email,
-      name: dbUser.metadata?.name ?? '',
       emailVerified: dbUser.email_verified,
       createdAt: dbUser.created_at,
       updatedAt: dbUser.updated_at,
-      identities: identities,
-      providerType: providerType,
+      providers: providers,
+      metadata: dbUser.metadata,
     };
   }
 
@@ -1091,11 +1083,12 @@ export class AuthService {
         STRING_AGG(a.provider, ',') as providers
       FROM auth.users u
       LEFT JOIN auth.user_providers a ON u.id = a.user_id
+      WHERE u.is_project_admin = false AND u.is_anonymous = false
     `;
     const params: (string | number)[] = [];
 
     if (search) {
-      query += ` WHERE u.email LIKE $1 OR u.metadata->>'name' LIKE $2`;
+      query += ` AND (u.email LIKE $1 OR u.metadata->>'name' LIKE $2)`;
       params.push(`%${search}%`, `%${search}%`);
     }
 
@@ -1108,11 +1101,12 @@ export class AuthService {
     // Transform users
     const users = dbUsers.map((dbUser) => this.transformUserRecordToSchema(dbUser));
 
-    // Get total count
-    let countQuery = 'SELECT COUNT(*) as count FROM auth.users';
+    // Get total count (exclude admins and anonymous users)
+    let countQuery =
+      'SELECT COUNT(*) as count FROM auth.users WHERE is_project_admin = false AND is_anonymous = false';
     const countParams: string[] = [];
     if (search) {
-      countQuery += ` WHERE email LIKE $1 OR metadata->>'name' LIKE $2`;
+      countQuery += ` AND (email LIKE $1 OR metadata->>'name' LIKE $2)`;
       countParams.push(`%${search}%`, `%${search}%`);
     }
     const countResult = await pool.query(countQuery, countParams);
