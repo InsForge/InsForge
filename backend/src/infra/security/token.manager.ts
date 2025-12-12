@@ -109,7 +109,6 @@ export class TokenManager {
         algorithms: ['HS256'],
       }) as Partial<RefreshTokenPayload>;
 
-
       // Ensure this is a refresh token, not an access token
       if (
         decoded.type !== 'refresh' ||
