@@ -279,7 +279,9 @@ export class SecretService {
     try {
       await client.query('BEGIN');
 
-      const oldSecretResult = await client.query(`SELECT key FROM system.secrets WHERE id = $1`, [id]);
+      const oldSecretResult = await client.query(`SELECT key FROM system.secrets WHERE id = $1`, [
+        id,
+      ]);
 
       if (!oldSecretResult.rows.length) {
         throw new Error('Secret not found');
