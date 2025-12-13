@@ -63,8 +63,10 @@ async function bootstrapMigrations() {
         // Already migrated, nothing to do
         console.log('Bootstrap: system.migrations already exists, skipping');
       } else if (!oldTableExists.rows[0].exists && !newTableExists.rows[0].exists) {
-        // Fresh install - node-pg-migrate will create the table
+        // Fresh install - create system schema so node-pg-migrate can create its table there
         console.log('Bootstrap: No existing migrations table, fresh install');
+        await client.query('CREATE SCHEMA IF NOT EXISTS system');
+        console.log('Bootstrap: Created system schema for migrations');
       }
     } finally {
       client.release();
