@@ -11,6 +11,16 @@ import { AuthRequest, verifyAdmin, verifyToken } from '@/api/middlewares/auth.js
 import oauthRouter from './oauth.routes.js';
 import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-limiters.js';
 import {
+  REFRESH_TOKEN_COOKIE_NAME,
+  CSRF_TOKEN_COOKIE_NAME,
+  setRefreshTokenCookie,
+  setCsrfTokenCookie,
+  clearRefreshTokenCookie,
+  clearCsrfTokenCookie,
+  issueRefreshTokenCookie,
+} from '@/utils/cookies.js';
+import { CsrfManager } from '@/infra/security/csrf.manager.js';
+import {
   userIdSchema,
   createUserRequestSchema,
   createSessionRequestSchema,
@@ -38,6 +48,7 @@ import {
 } from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
+import logger from '@/utils/logger.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -125,6 +136,12 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
     const { email, password, name } = validationResult.data;
     const result: CreateUserResponse = await authService.register(email, password, name);
 
+    // Set refresh token in httpOnly cookie and get CSRF token
+    let csrfToken: string | null = null;
+    if (result.accessToken && result.user) {
+      csrfToken = issueRefreshTokenCookie(res, result.user);
+    }
+
     const socket = SocketManager.getInstance();
     socket.broadcastToRoom(
       'role:project_admin',
@@ -133,7 +150,7 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
       'system'
     );
 
-    successResponse(res, result);
+    successResponse(res, { ...result, csrfToken });
   } catch (error) {
     next(error);
   }
@@ -154,7 +171,96 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
     const { email, password } = validationResult.data;
     const result: CreateSessionResponse = await authService.login(email, password);
 
-    successResponse(res, result);
+    // Set refresh token in httpOnly cookie and get CSRF token
+    let csrfToken: string | null = null;
+    if (result.accessToken && result.user) {
+      csrfToken = issueRefreshTokenCookie(res, result.user);
+    }
+
+    successResponse(res, { ...result, csrfToken });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/auth/refresh - Refresh access token using httpOnly cookie
+// Requires X-CSRF-Token header for CSRF protection
+router.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
+
+    if (!refreshToken) {
+      throw new AppError('No refresh token provided', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+
+    // Verify CSRF token to prevent CSRF attacks
+    const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
+    const csrfCookie = req.cookies?.[CSRF_TOKEN_COOKIE_NAME];
+    if (!CsrfManager.verify(csrfHeader, csrfCookie)) {
+      logger.warn('[Auth:Refresh] CSRF token validation failed');
+      throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+
+    const tokenManager = TokenManager.getInstance();
+
+    // Verify the refresh token
+    const payload = tokenManager.verifyRefreshToken(refreshToken);
+
+    // Generate new access token
+    const newAccessToken = tokenManager.generateToken({
+      sub: payload.sub,
+      email: payload.email,
+      role: payload.role,
+    });
+
+    // Generate new refresh token (token rotation for security)
+    const newRefreshToken = tokenManager.generateRefreshToken({
+      sub: payload.sub,
+      email: payload.email,
+      role: payload.role,
+    });
+
+    // Set new refresh token cookie
+    setRefreshTokenCookie(res, newRefreshToken);
+
+    // Generate new CSRF token for the new refresh token
+    const newCsrfToken = CsrfManager.generate(newRefreshToken);
+    setCsrfTokenCookie(res, newCsrfToken);
+
+    // Fetch user data for response
+    const user = await authService.getUserSchemaById(payload.sub);
+
+    if (!user) {
+      logger.warn('[Auth:Refresh] User not found for valid refresh token', { userId: payload.sub });
+      clearRefreshTokenCookie(res);
+      clearCsrfTokenCookie(res);
+      throw new AppError('User not found', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
+
+    successResponse(res, {
+      accessToken: newAccessToken,
+      user: user,
+      csrfToken: newCsrfToken,
+    });
+  } catch (error) {
+    // Clear invalid cookie on error
+    clearRefreshTokenCookie(res);
+    clearCsrfTokenCookie(res);
+    next(error);
+  }
+});
+
+// POST /api/auth/logout - Logout and clear refresh token cookie
+router.post('/logout', (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Clear refresh token cookie
+    clearRefreshTokenCookie(res);
+    clearCsrfTokenCookie(res);
+
+    successResponse(res, {
+      success: true,
+      message: 'Logged out successfully',
+    });
   } catch (error) {
     next(error);
   }
@@ -444,7 +550,14 @@ router.post(
         result = await authService.verifyEmailWithCode(email, otp);
       }
 
-      successResponse(res, result); // Return session info with optional redirectTo upon successful verification
+      // Set refresh token in httpOnly cookie and get CSRF token
+      let csrfToken: string | null = null;
+      if (result.accessToken && result.user) {
+        csrfToken = issueRefreshTokenCookie(res, result.user);
+      }
+
+      // Include csrfToken in response for CSRF protection
+      successResponse(res, { ...result, csrfToken });
     } catch (error) {
       next(error);
     }

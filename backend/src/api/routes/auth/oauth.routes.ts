@@ -2,10 +2,13 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { AuthService } from '@/services/auth/auth.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
+import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
+import { setRefreshTokenCookie } from '@/utils/cookies.js';
+import { CsrfManager } from '@/infra/security/csrf.manager.js';
 import logger from '@/utils/logger.js';
 import jwt from 'jsonwebtoken';
 import {
@@ -341,11 +344,25 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     // Handle shared callback - transforms payload and creates/finds user
     const result = await authService.handleSharedCallback(validatedProvider, payloadData);
 
+    // Set refresh token in httpOnly cookie before redirect and generate CSRF token
+    let csrfToken = '';
+    if (result?.accessToken && result?.user) {
+      const tokenManager = TokenManager.getInstance();
+      const refreshToken = tokenManager.generateRefreshToken({
+        sub: result.user.id,
+        email: result.user.email,
+        role: 'authenticated',
+      });
+      setRefreshTokenCookie(res, refreshToken);
+      csrfToken = CsrfManager.generate(refreshToken);
+    }
+
     const params = new URLSearchParams();
     params.set('access_token', result?.accessToken ?? '');
     params.set('user_id', result?.user?.id ?? '');
     params.set('email', result?.user?.email ?? '');
     params.set('name', result?.user?.name ?? '');
+    params.set('csrf_token', csrfToken);
 
     res.redirect(`${redirectUri}?${params.toString()}`);
   } catch (error) {
@@ -412,21 +429,28 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
         state: state || undefined,
       });
 
+      // Set refresh token in httpOnly cookie before redirect and generate CSRF token
+      let csrfToken = '';
+      if (result?.accessToken && result?.user) {
+        const tokenManager = TokenManager.getInstance();
+        const refreshToken = tokenManager.generateRefreshToken({
+          sub: result.user.id,
+          email: result.user.email,
+          role: 'authenticated',
+        });
+        setRefreshTokenCookie(res, refreshToken);
+        csrfToken = CsrfManager.generate(refreshToken);
+      }
+
       // Construct redirect URL with query parameters
       const params = new URLSearchParams();
       params.set('access_token', result?.accessToken ?? '');
       params.set('user_id', result?.user?.id ?? '');
       params.set('email', result?.user?.email ?? '');
       params.set('name', result?.user?.name ?? '');
+      params.set('csrf_token', csrfToken);
 
       const finalRedirectUri = `${redirectUri}?${params.toString()}`;
-
-      logger.info('OAuth callback successful, redirecting with token', {
-        redirectUri: finalRedirectUri,
-        hasAccessToken: !!result?.accessToken,
-        hasUserId: !!result?.user?.id,
-        provider: validatedProvider,
-      });
 
       return res.redirect(finalRedirectUri);
     } catch (error) {
