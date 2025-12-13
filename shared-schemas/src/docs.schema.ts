@@ -8,6 +8,7 @@ export const docTypeSchema = z
     'functions-sdk',
     'ai-integration-sdk',
     'auth-components-react',
+    'auth-components-nextjs',
     'real-time',
   ])
   .describe(
@@ -18,6 +19,7 @@ export const docTypeSchema = z
       "storage-sdk" (file storage),
       "functions-sdk" (edge functions),
       "auth-components-react" (authentication components for React+Vite applications),
+      "auth-components-nextjs" (authentication components for Next.js applications),
       "ai-integration-sdk" (AI features),
       "real-time" (real-time pub/sub through WebSockets)
     `

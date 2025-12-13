@@ -55,6 +55,7 @@ Available documentation types:
 - **Authentication** - Choose based on implementation:
   - `"auth-components-react"` - Frontend auth for React+Vite (singlepage App)
   - `"auth-components-react-router"` - Frontend auth for React(Vite+React Router) (Multipage App)
+  - `"auth-components-nextjs"` - Frontend auth for Nextjs (SSR App)
 - `"storage-sdk"` - File storage operations
 - `"functions-sdk"` - Serverless functions invocation
 - `"ai-integration-sdk"` - AI chat and image generation

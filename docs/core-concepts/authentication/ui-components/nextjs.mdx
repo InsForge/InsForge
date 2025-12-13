@@ -182,10 +182,10 @@ export async function POST(request: NextRequest) {
     // Parse request body to get the prompt
     const { prompt } = await request.json();
 
-    // Create InsForge SDK
+    // Create InsForge SDK client with user's token for authenticated access
     const insforge = createClient({
       baseUrl: process.env.NEXT_PUBLIC_INSFORGE_BASE_URL || "https://your-app.region.insforge.app",
-      anonKey: token
+      edgeFunctionToken: token
     });
 
     // Request for AI response
