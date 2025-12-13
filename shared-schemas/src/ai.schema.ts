@@ -3,13 +3,16 @@ import { z } from 'zod';
 // Core schemas - only text and image supported currently
 export const modalitySchema = z.enum(['text', 'image']);
 
-export const aiConfigurationSchema = z.object({
-  id: z.string().uuid(),
+export const aiConfigurationInputSchema = z.object({
   inputModality: z.array(modalitySchema).min(1),
   outputModality: z.array(modalitySchema).min(1),
   provider: z.string(),
   modelId: z.string(),
   systemPrompt: z.string().optional(),
+});
+
+export const aiConfigurationSchema = aiConfigurationInputSchema.extend({
+  id: z.string().uuid(),
 });
 
 export const aiConfigurationWithUsageSchema = aiConfigurationSchema.extend({
@@ -52,6 +55,7 @@ export const aiUsageSummarySchema = z.object({
 
 // Export types
 export type ModalitySchema = z.infer<typeof modalitySchema>;
+export type AIConfigurationInputSchema = z.infer<typeof aiConfigurationInputSchema>;
 export type AIConfigurationSchema = z.infer<typeof aiConfigurationSchema>;
 export type AIConfigurationWithUsageSchema = z.infer<typeof aiConfigurationWithUsageSchema>;
 export type AIUsageDataSchema = z.infer<typeof aiUsageDataSchema>;
