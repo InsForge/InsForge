@@ -21,7 +21,7 @@ paths:
           schema:
             type: string
           description: Name of the table to query
-          example: users
+          example: posts
         - name: limit
           in: query
           schema:
@@ -48,7 +48,7 @@ paths:
           schema:
             type: string
           description: Comma-separated list of columns to return
-          example: id,name,email
+          example: id,title,content
         # PostgREST-style filters
         - name: field
           in: query
@@ -77,13 +77,13 @@ paths:
                   additionalProperties: true
               example:
                 - id: "248373e1-0aea-45ce-8844-5ef259203749"
-                  name: "John Doe"
-                  email: "john@example.com"
+                  title: "Getting Started with InsForge"
+                  content: "This is a guide to help you get started..."
                   createdAt: "2025-07-18T05:37:24.338Z"
                   updatedAt: "2025-07-18T05:37:24.338Z"
                 - id: "348373e1-0aea-45ce-8844-5ef259203750"
-                  name: "Jane Smith"
-                  email: "jane@example.com"
+                  title: "Advanced Database Queries"
+                  content: "Learn how to write complex queries..."
                   createdAt: "2025-07-19T08:15:10.123Z"
                   updatedAt: "2025-07-19T08:15:10.123Z"
         '404':
@@ -124,7 +124,7 @@ paths:
           schema:
             type: string
           description: Name of the table
-          example: users
+          example: posts
         - name: Prefer
           in: header
           schema:
@@ -142,9 +142,9 @@ paths:
                 additionalProperties: true
               minItems: 1
             example:
-              - name: "John Doe"
-                email: "john@example.com"
-                age: 30
+              - title: "My First Post"
+                content: "Hello world! This is my first post."
+                published: true
       responses:
         '201':
           description: Records created
@@ -163,9 +163,9 @@ paths:
                   summary: "Response with Prefer: return=representation"
                   value:
                     - id: "248373e1-0aea-45ce-8844-5ef259203749"
-                      name: "John Doe"
-                      email: "john@example.com"
-                      age: 30
+                      title: "My First Post"
+                      content: "Hello world! This is my first post."
+                      published: true
                       createdAt: "2025-07-18T05:37:24.338Z"
                       updatedAt: "2025-07-18T05:37:24.338Z"
         '400':
@@ -176,7 +176,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 error: "VALIDATION_ERROR"
-                message: "Invalid field type: expected integer for 'age'"
+                message: "Invalid field type: expected boolean for 'published'"
                 statusCode: 400
                 nextActions: "Ensure field types match the table schema"
         '404':
@@ -206,7 +206,7 @@ paths:
           schema:
             type: string
           description: Name of the table
-          example: users
+          example: posts
         - name: id
           in: query
           schema:
@@ -227,8 +227,8 @@ paths:
               type: object
               additionalProperties: true
             example:
-              name: "Jane Doe"
-              email: "jane.doe@example.com"
+              title: "Updated Post Title"
+              content: "This content has been updated."
       responses:
         '200':
           description: Records updated
@@ -247,8 +247,8 @@ paths:
                   summary: "Response with Prefer: return=representation"
                   value:
                     - id: "123e4567-e89b-12d3-a456-426614174000"
-                      name: "Jane Doe"
-                      email: "jane.doe@example.com"
+                      title: "Updated Post Title"
+                      content: "This content has been updated."
                       createdAt: "2025-01-01T00:00:00Z"
                       updatedAt: "2025-01-21T11:00:00Z"
         '404':
@@ -287,7 +287,7 @@ paths:
           schema:
             type: string
           description: Name of the table
-          example: users
+          example: posts
         - name: id
           in: query
           schema:
@@ -317,7 +317,7 @@ paths:
                   summary: Records were deleted
                   value:
                     - id: "123e4567-e89b-12d3-a456-426614174000"
-                      name: "Deleted User"
+                      title: "Deleted Post"
                       createdAt: "2025-01-01T00:00:00Z"
                       updatedAt: "2025-01-21T11:00:00Z"
                 no_records:

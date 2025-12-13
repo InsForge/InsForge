@@ -35,17 +35,17 @@ Chain `.select()` after `.insert()` to return the inserted data
 <CodeGroup>
 ```javascript Single insert
 const { data, error } = await insforge.database
-  .from('users')
-  .insert({ name: 'John', email: 'john@example.com' })
+  .from('posts')
+  .insert({ title: 'Hello World', content: 'My first post!' })
   .select()
 ```
 
 ```javascript Bulk insert
 const { data, error } = await insforge.database
-  .from('users')
+  .from('posts')
   .insert([
-    { name: 'Alice', email: 'alice@example.com' },
-    { name: 'Bob', email: 'bob@example.com' }
+    { title: 'First Post', content: 'Hello everyone!' },
+    { title: 'Second Post', content: 'Another update.' }
   ])
   .select()
 ```
@@ -56,7 +56,7 @@ const { data, error } = await insforge.database
 ```json
 {
   "data": [
-    { "id": "789", "name": "John", "email": "john@example.com", "created_at": "2024-01-15T10:30:00Z" }
+    { "id": "789", "title": "Hello World", "content": "My first post!", "created_at": "2024-01-15T10:30:00Z" }
   ],
   "error": null
 }
@@ -92,9 +92,9 @@ Always use filters like `.eq()` or `.in()` to specify which rows to update
 <CodeGroup>
 ```javascript Update by ID
 const { data, error } = await insforge.database
-  .from('users')
-  .update({ name: 'Jane Doe' })
-  .eq('id', userId)
+  .from('posts')
+  .update({ title: 'Updated Title' })
+  .eq('id', postId)
   .select()
 ```
 
@@ -112,7 +112,7 @@ const { data, error } = await insforge.database
 ```json
 {
   "data": [
-    { "id": "123", "name": "Jane Doe", "email": "john@example.com", "updated_at": "2024-01-15T11:00:00Z" }
+    { "id": "123", "title": "Updated Title", "content": "My first post!", "updated_at": "2024-01-15T11:00:00Z" }
   ],
   "error": null
 }
@@ -196,20 +196,20 @@ Query records from a table or view.
 <CodeGroup>
 ```javascript Get all
 const { data, error } = await insforge.database
-  .from('users')
+  .from('posts')
   .select()
 ```
 
 ```javascript Specific columns
 const { data, error } = await insforge.database
-  .from('users')
-  .select('id, name, email')
+  .from('posts')
+  .select('id, title, content')
 ```
 
 ```javascript With relationships
 const { data, error } = await insforge.database
   .from('posts')
-  .select('*, users(nickname, avatar_url)')
+  .select('*, comments(id, content)')
 ```
 </CodeGroup>
 
@@ -218,8 +218,8 @@ const { data, error } = await insforge.database
 ```json
 {
   "data": [
-    { "id": "123", "name": "John", "email": "john@example.com" },
-    { "id": "456", "name": "Jane", "email": "jane@example.com" }
+    { "id": "123", "title": "Hello World", "content": "My first post!" },
+    { "id": "456", "title": "Second Post", "content": "Another update." }
   ],
   "error": null
 }

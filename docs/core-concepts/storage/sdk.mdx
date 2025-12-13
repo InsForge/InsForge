@@ -24,7 +24,7 @@ StorageBucket // Instance with upload, uploadAuto, download, remove methods
 ### Example
 
 ```javascript
-const bucket = insforge.storage.from('avatars')
+const bucket = insforge.storage.from('images')
 ```
 
 ---
@@ -62,17 +62,17 @@ If a file with the same key exists, backend auto-renames it. Always use the retu
 
 ```javascript
 const { data, error } = await insforge.storage
-  .from('avatars')
-  .upload('user-123/avatar.jpg', fileObject)
+  .from('images')
+  .upload('posts/post-123/cover.jpg', fileObject)
 
 // Save BOTH url and key to database
 await insforge.database
-  .from('users')
+  .from('posts')
   .update({
-    avatar_url: data.url,
-    avatar_key: data.key  // Save key for download/delete operations
+    image_url: data.url,
+    image_key: data.key  // Save key for download/delete operations
   })
-  .eq('id', 'user-123')
+  .eq('id', 'post-123')
 ```
 
 ### Output
@@ -80,12 +80,12 @@ await insforge.database
 ```json
 {
   "data": {
-    "bucket": "avatars",
-    "key": "user-123/avatar.jpg",
+    "bucket": "images",
+    "key": "posts/post-123/cover.jpg",
     "size": 45678,
     "mimeType": "image/jpeg",
     "uploadedAt": "2024-01-15T10:30:00Z",
-    "url": "https://your-app.region.insforge.app/api/storage/buckets/avatars/objects/user-123%2Favatar.jpg"
+    "url": "https://your-app.region.insforge.app/api/storage/buckets/images/objects/posts%2Fpost-123%2Fcover.jpg"
   },
   "error": null
 }
@@ -173,16 +173,16 @@ Download a file as Blob.
 
 ```javascript
 // 1. Get the file key from your database
-const { data: user, error: dbError } = await insforge.database
-  .from('users')
-  .select('avatar_key')
-  .eq('id', 'user-123')
+const { data: post, error: dbError } = await insforge.database
+  .from('posts')
+  .select('image_key')
+  .eq('id', 'post-123')
   .single()
 
 // 2. Download the file using the key
 const { data: blob, error } = await insforge.storage
-  .from('avatars')
-  .download(user.avatar_key)
+  .from('images')
+  .download(post.image_key)
 
 // 3. Create download link or display image
 const url = URL.createObjectURL(blob)
@@ -222,22 +222,22 @@ Delete a file from storage.
 
 ```javascript
 // 1. Get the file key from your database
-const { data: user, error: dbError } = await insforge.database
-  .from('users')
-  .select('avatar_key')
-  .eq('id', 'user-123')
+const { data: post, error: dbError } = await insforge.database
+  .from('posts')
+  .select('image_key')
+  .eq('id', 'post-123')
   .single()
 
 // 2. Delete the file from storage
 const { data, error } = await insforge.storage
-  .from('avatars')
-  .remove(user.avatar_key)
+  .from('images')
+  .remove(post.image_key)
 
 // 3. Clear the database reference
 await insforge.database
-  .from('users')
-  .update({ avatar_url: null, avatar_key: null })
-  .eq('id', 'user-123')
+  .from('posts')
+  .update({ image_url: null, image_key: null })
+  .eq('id', 'post-123')
 ```
 
 ### Output
