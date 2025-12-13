@@ -22,24 +22,3 @@ export const columnTypeDescriptions: Record<ColumnType, string> = {
   [ColumnType.UUID]: 'Unique identifiers (auto-generated)',
   [ColumnType.JSON]: 'Complex structured data',
 };
-
-/**
- * System tables that should be filtered out from user-facing database views
- */
-
-export const SYSTEM_FUNCTIONS = [
-  'create_default_policies',
-  'create_policies_after_rls',
-  'email',
-  'reload_postgrest_schema',
-  'role',
-  'uid',
-  'update_updated_at_column',
-];
-
-/**
- * Check if a function name is a system function
- */
-export function isSystemFunction(functionName: string): boolean {
-  return SYSTEM_FUNCTIONS.includes(functionName);
-}

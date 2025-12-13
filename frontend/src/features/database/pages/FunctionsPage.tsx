@@ -16,7 +16,6 @@ import {
 import { useFunctions } from '../hooks/useDatabase';
 import { SQLModal, SQLCellButton } from '../components/SQLModal';
 import type { DatabaseFunctionsResponse } from '@insforge/shared-schemas';
-import { isSystemFunction } from '../constants';
 
 interface FunctionRow extends DataGridRowType {
   id: string;
@@ -36,10 +35,6 @@ function parseFunctionsFromResponse(
   const functions: FunctionRow[] = [];
 
   response.functions.forEach((func) => {
-    if (isSystemFunction(func.functionName)) {
-      return;
-    }
-
     functions.push({
       id: func.functionName,
       functionName: func.functionName,
