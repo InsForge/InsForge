@@ -469,7 +469,7 @@ const useProject = async (project: any) => {
   });
 
   // Now you can use all InsForge features
-  await insForgeClient.database.query('SELECT * FROM users');
+  await insForgeClient.database.from('auth.users').select();
 };
 ```
 

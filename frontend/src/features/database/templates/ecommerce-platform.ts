@@ -94,7 +94,7 @@ export const ecommercePlatformTemplate: DatabaseTemplate = {
           isNullable: false,
           isUnique: true,
           foreignKey: {
-            referenceTable: 'users',
+            referenceTable: 'auth.users',
             referenceColumn: 'id',
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
@@ -340,7 +340,7 @@ CREATE TABLE products (
 -- Customers table (extends users with customer-specific data)
 CREATE TABLE customers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  user_id UUID UNIQUE NOT NULL REFERENCES auth.users(id) ON UPDATE CASCADE ON DELETE CASCADE,
   first_name VARCHAR(100) NOT NULL,
   last_name VARCHAR(100) NOT NULL,
   phone VARCHAR(50),

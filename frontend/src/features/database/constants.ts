@@ -26,7 +26,7 @@ export const columnTypeDescriptions: Record<ColumnType, string> = {
 /**
  * System tables that should be filtered out from user-facing database views
  */
-export const SYSTEM_TABLES = ['users'];
+
 export const SYSTEM_FUNCTIONS = [
   'create_default_policies',
   'create_policies_after_rls',
@@ -36,13 +36,6 @@ export const SYSTEM_FUNCTIONS = [
   'uid',
   'update_updated_at_column',
 ];
-
-/**
- * Check if a table name is a system table
- */
-export function isSystemTable(tableName: string): boolean {
-  return tableName.startsWith('_') || SYSTEM_TABLES.includes(tableName);
-}
 
 /**
  * Check if a function name is a system function

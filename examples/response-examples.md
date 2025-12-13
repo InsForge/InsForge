@@ -156,7 +156,7 @@ All API responses now follow a consistent format with `success` field and proper
 ```json
 {
   "success": true,
-  "data": ["users", "posts", "comments"],
+  "data": ["posts", "comments"],
   "meta": {
     "timestamp": "2024-01-01T00:00:00.000Z"
   }

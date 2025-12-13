@@ -114,13 +114,11 @@ export function useAllTableSchemas(enabled = true) {
 
   const { allSchemas, isLoadingSchemas } = useQueries({
     queries: enabled
-      ? tables
-          .filter((name) => name !== 'users')
-          .map((tableName) => ({
-            queryKey: ['tables', tableName, 'schema'],
-            queryFn: () => tableService.getTableSchema(tableName),
-            staleTime: 2 * 60 * 1000,
-          }))
+      ? tables.map((tableName) => ({
+          queryKey: ['tables', tableName, 'schema'],
+          queryFn: () => tableService.getTableSchema(tableName),
+          staleTime: 2 * 60 * 1000,
+        }))
       : [],
     combine: (results) => ({
       allSchemas: results.filter((r) => r.data).map((r) => r.data as GetTableSchemaResponse),

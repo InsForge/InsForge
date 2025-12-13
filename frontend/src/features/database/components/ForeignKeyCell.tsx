@@ -68,7 +68,7 @@ export function ForeignKeyCell({ value, foreignKey, onJumpToTable }: ForeignKeyC
 
   // For auth.users, fetch user by ID
   const { data: authUserData, error: authUserError } = useQuery({
-    queryKey: ['users', searchValue],
+    queryKey: ['user', searchValue],
     queryFn: () => getUser(searchValue),
     enabled: isAuthUsers && open && !!value,
   });
