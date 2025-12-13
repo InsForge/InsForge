@@ -207,6 +207,11 @@ CREATE POLICY "Users can update own profile" ON auth.users
   USING (id = auth.uid())
   WITH CHECK (id = auth.uid());
 
+-- 2.19 Drop obsolete public schema helper functions (duplicates of auth.* from migration 013)
+DROP FUNCTION IF EXISTS public.uid();
+DROP FUNCTION IF EXISTS public.role();
+DROP FUNCTION IF EXISTS public.email();
+
 -- ============================================================================
 -- PART 3: AI SCHEMA (configs, usage)
 -- ============================================================================
@@ -282,3 +287,149 @@ ALTER TABLE functions._functions RENAME TO definitions;
 
 -- Note: functions schema is internal and should NOT be exposed to PUBLIC.
 -- Access is controlled through the application's database connection.
+
+-- ============================================================================
+-- PART 6: UTILITY FUNCTIONS CLEANUP
+-- ============================================================================
+
+-- 6.1 Create system.update_updated_at() function (replaces public.update_updated_at_column)
+CREATE OR REPLACE FUNCTION system.update_updated_at()
+RETURNS trigger AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 6.2 Update all triggers to use system.update_updated_at() and rename (remove double underscore)
+
+-- system.secrets: update__secrets_updated_at -> update_secrets_updated_at
+DROP TRIGGER IF EXISTS update__secrets_updated_at ON system.secrets;
+CREATE TRIGGER update_secrets_updated_at
+  BEFORE UPDATE ON system.secrets
+  FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
+
+-- system.audit_logs: update__audit_logs_updated_at -> update_audit_logs_updated_at
+DROP TRIGGER IF EXISTS update__audit_logs_updated_at ON system.audit_logs;
+CREATE TRIGGER update_audit_logs_updated_at
+  BEFORE UPDATE ON system.audit_logs
+  FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
+
+-- auth.configs: update__auth_configs_updated_at -> update_configs_updated_at
+DROP TRIGGER IF EXISTS update__auth_configs_updated_at ON auth.configs;
+CREATE TRIGGER update_configs_updated_at
+  BEFORE UPDATE ON auth.configs
+  FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
+
+-- auth.oauth_configs: update__oauth_configs_updated_at -> update_oauth_configs_updated_at
+DROP TRIGGER IF EXISTS update__oauth_configs_updated_at ON auth.oauth_configs;
+CREATE TRIGGER update_oauth_configs_updated_at
+  BEFORE UPDATE ON auth.oauth_configs
+  FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
+
+-- auth.email_otps: update__email_otps_updated_at -> update_email_otps_updated_at
+DROP TRIGGER IF EXISTS update__email_otps_updated_at ON auth.email_otps;
+CREATE TRIGGER update_email_otps_updated_at
+  BEFORE UPDATE ON auth.email_otps
+  FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
+
+-- functions.definitions: update__edge_functions_updated_at -> update_definitions_updated_at
+DROP TRIGGER IF EXISTS update__edge_functions_updated_at ON functions.definitions;
+CREATE TRIGGER update_definitions_updated_at
+  BEFORE UPDATE ON functions.definitions
+  FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
+
+-- realtime.channels: trg_channels_updated_at -> update_channels_updated_at
+DROP TRIGGER IF EXISTS trg_channels_updated_at ON realtime.channels;
+CREATE TRIGGER update_channels_updated_at
+  BEFORE UPDATE ON realtime.channels
+  FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
+
+-- 6.3 Move reload_postgrest_schema to system schema
+-- Recreate in system schema (ALTER FUNCTION SET SCHEMA doesn't work well with search_path)
+CREATE OR REPLACE FUNCTION system.reload_postgrest_schema()
+RETURNS void AS $$
+BEGIN
+    NOTIFY pgrst, 'reload schema';
+    RAISE NOTICE 'PostgREST schema reload notification sent';
+END
+$$ LANGUAGE plpgsql;
+
+-- 6.4 Move event trigger functions to system schema
+-- These functions auto-create project_admin_policy when RLS is enabled on tables
+
+-- First, drop the event triggers (they reference the old functions)
+DROP EVENT TRIGGER IF EXISTS create_policies_on_table_create;
+DROP EVENT TRIGGER IF EXISTS create_policies_on_rls_enable;
+
+-- Recreate functions in system schema
+CREATE OR REPLACE FUNCTION system.create_default_policies()
+RETURNS event_trigger AS $$
+DECLARE
+  obj record;
+  table_schema text;
+  table_name text;
+  has_rls boolean;
+BEGIN
+  FOR obj IN SELECT * FROM pg_event_trigger_ddl_commands() WHERE command_tag = 'CREATE TABLE'
+  LOOP
+    SELECT INTO table_schema, table_name
+      split_part(obj.object_identity, '.', 1),
+      trim(both '"' from split_part(obj.object_identity, '.', 2));
+    SELECT INTO has_rls
+      rowsecurity
+    FROM pg_tables
+    WHERE schemaname = table_schema
+      AND tablename = table_name;
+    IF has_rls THEN
+      EXECUTE format('CREATE POLICY "project_admin_policy" ON %s FOR ALL TO project_admin USING (true) WITH CHECK (true)', obj.object_identity);
+    END IF;
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION system.create_policies_after_rls()
+RETURNS event_trigger AS $$
+DECLARE
+  obj record;
+  table_schema text;
+  table_name text;
+BEGIN
+  FOR obj IN SELECT * FROM pg_event_trigger_ddl_commands() WHERE command_tag = 'ALTER TABLE'
+  LOOP
+    SELECT INTO table_schema, table_name
+      split_part(obj.object_identity, '.', 1),
+      trim(both '"' from split_part(obj.object_identity, '.', 2));
+    IF EXISTS (
+      SELECT 1 FROM pg_tables
+      WHERE schemaname = table_schema
+        AND tablename = table_name
+        AND rowsecurity = true
+    ) AND NOT EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = table_schema
+        AND tablename = table_name
+    ) THEN
+      EXECUTE format('CREATE POLICY "project_admin_policy" ON %s FOR ALL TO project_admin USING (true) WITH CHECK (true)', obj.object_identity);
+    END IF;
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Recreate event triggers pointing to system schema functions
+CREATE EVENT TRIGGER create_policies_on_table_create
+  ON ddl_command_end
+  WHEN TAG IN ('CREATE TABLE')
+  EXECUTE FUNCTION system.create_default_policies();
+
+CREATE EVENT TRIGGER create_policies_on_rls_enable
+  ON ddl_command_end
+  WHEN TAG IN ('ALTER TABLE')
+  EXECUTE FUNCTION system.create_policies_after_rls();
+
+-- 6.5 Drop obsolete functions
+DROP FUNCTION IF EXISTS public.create_default_policies();
+DROP FUNCTION IF EXISTS public.create_policies_after_rls();
+DROP FUNCTION IF EXISTS public.reload_postgrest_schema();
+DROP FUNCTION IF EXISTS public.update_updated_at_column();
+DROP FUNCTION IF EXISTS realtime.update_updated_at();
