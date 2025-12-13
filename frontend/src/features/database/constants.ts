@@ -1,6 +1,22 @@
 import { Type, Clock, Calendar, Hash, Percent, ToggleLeft, Fingerprint, Code } from 'lucide-react';
 import { ColumnType } from '@insforge/shared-schemas';
 
+// Special handling for auth.users foreign key references
+export const AUTH_USERS_TABLE = 'auth.users';
+
+// schema for auth.users - used for displaying user records
+export const authUsersSchema = {
+  tableName: 'auth.users',
+  columns: [
+    { columnName: 'id', type: 'uuid', isUnique: true, isNullable: false },
+    { columnName: 'email', type: 'string', isUnique: true, isNullable: false },
+    { columnName: 'emailVerified', type: 'boolean', isUnique: false, isNullable: false },
+    { columnName: 'providers', type: 'json', isUnique: false, isNullable: true },
+    { columnName: 'createdAt', type: 'timestamp', isUnique: false, isNullable: false },
+    { columnName: 'updatedAt', type: 'timestamp', isUnique: false, isNullable: false },
+  ],
+};
+
 export const columnTypeIcons: Record<ColumnType, React.ComponentType<{ className?: string }>> = {
   [ColumnType.STRING]: Type,
   [ColumnType.DATE]: Calendar,
@@ -22,31 +38,3 @@ export const columnTypeDescriptions: Record<ColumnType, string> = {
   [ColumnType.UUID]: 'Unique identifiers (auto-generated)',
   [ColumnType.JSON]: 'Complex structured data',
 };
-
-/**
- * System tables that should be filtered out from user-facing database views
- */
-export const SYSTEM_TABLES = ['users'];
-export const SYSTEM_FUNCTIONS = [
-  'create_default_policies',
-  'create_policies_after_rls',
-  'email',
-  'reload_postgrest_schema',
-  'role',
-  'uid',
-  'update_updated_at_column',
-];
-
-/**
- * Check if a table name is a system table
- */
-export function isSystemTable(tableName: string): boolean {
-  return tableName.startsWith('_') || SYSTEM_TABLES.includes(tableName);
-}
-
-/**
- * Check if a function name is a system function
- */
-export function isSystemFunction(functionName: string): boolean {
-  return SYSTEM_FUNCTIONS.includes(functionName);
-}

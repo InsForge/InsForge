@@ -189,8 +189,6 @@ paths:
                 tableStats:
                   - table_name: "posts"
                     count: 156
-                  - table_name: "users"
-                    count: 89
                   - table_name: "comments"
                     count: 223
                 recentActivity: 47

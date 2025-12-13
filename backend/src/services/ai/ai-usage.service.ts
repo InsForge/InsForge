@@ -31,7 +31,7 @@ export class AIUsageService {
   async trackUsage(data: AIUsageDataSchema): Promise<{ id: string }> {
     try {
       const result = await this.getPool().query(
-        `INSERT INTO _ai_usage (config_id, input_tokens, output_tokens, image_count, image_resolution)
+        `INSERT INTO ai.usage (config_id, input_tokens, output_tokens, image_count, image_resolution)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
         [
@@ -68,7 +68,7 @@ export class AIUsageService {
 
     try {
       const usageResult = await this.getPool().query(
-        `INSERT INTO _ai_usage (config_id, input_tokens, output_tokens, model_id)
+        `INSERT INTO ai.usage (config_id, input_tokens, output_tokens, model_id)
          VALUES ($1, $2, $3, $4)
          RETURNING id`,
         [configId, inputTokens || null, outputTokens || null, modelId || null]
@@ -100,7 +100,7 @@ export class AIUsageService {
   ): Promise<{ id: string }> {
     try {
       const usageResult = await this.getPool().query(
-        `INSERT INTO _ai_usage (config_id, image_count, image_resolution, input_tokens, output_tokens, model_id)
+        `INSERT INTO ai.usage (config_id, image_count, image_resolution, input_tokens, output_tokens, model_id)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id`,
         [
@@ -140,7 +140,7 @@ export class AIUsageService {
         SELECT id, config_id as "configId", input_tokens as "inputTokens",
                output_tokens as "outputTokens", image_count as "imageCount",
                image_resolution as "imageResolution", created_at as "createdAt"
-        FROM _ai_usage
+        FROM ai.usage
         WHERE config_id = $1
       `;
 
@@ -180,7 +180,7 @@ export class AIUsageService {
           COALESCE(SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0) as "totalTokens",
           COALESCE(SUM(image_count), 0) as "totalImageCount",
           COUNT(*) as "totalRequests"
-        FROM _ai_usage
+        FROM ai.usage
         WHERE 1=1
       `;
 
@@ -237,8 +237,8 @@ export class AIUsageService {
           c.provider,
           c.input_modality as "inputModality",
           c.output_modality as "outputModality"
-        FROM _ai_usage u
-        LEFT JOIN _ai_configs c ON u.config_id = c.id
+        FROM ai.usage u
+        LEFT JOIN ai.configs c ON u.config_id = c.id
         WHERE 1=1
       `;
 

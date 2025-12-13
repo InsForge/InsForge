@@ -92,8 +92,6 @@ paths:
                     format: date-time
               example:
                 tables:
-                  - name: "users"
-                    recordCount: 1234
                   - name: "posts"
                     recordCount: 5678
                   - name: "comments"

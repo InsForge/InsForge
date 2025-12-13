@@ -304,7 +304,7 @@ export default function SQLEditorPage() {
               language="sql"
               value={activeTab?.query || ''}
               onChange={handleQueryChange}
-              placeholder="SELECT * FROM users WHERE email = 'user@example.com';"
+              placeholder="SELECT * from products LIMIT 10;"
             />
           </div>
         </div>

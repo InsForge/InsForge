@@ -54,7 +54,7 @@ export class UsageService {
   async recordMCPUsage(toolName: string, success: boolean = true): Promise<{ created_at: string }> {
     try {
       const result = await this.getPool().query(
-        `INSERT INTO _mcp_usage (tool_name, success)
+        `INSERT INTO system.mcp_usage (tool_name, success)
          VALUES ($1, $2)
          RETURNING created_at`,
         [toolName, success]
@@ -75,7 +75,7 @@ export class UsageService {
     try {
       const result = await this.getPool().query(
         `SELECT tool_name, success, created_at
-         FROM _mcp_usage
+         FROM system.mcp_usage
          WHERE success = $1
          ORDER BY created_at DESC
          LIMIT $2`,
@@ -98,7 +98,7 @@ export class UsageService {
       // Get MCP tool usage count
       const mcpResult = await this.getPool().query(
         `SELECT COUNT(*) as count
-         FROM _mcp_usage
+         FROM system.mcp_usage
          WHERE success = true
            AND created_at >= $1
            AND created_at < $2`,
@@ -112,7 +112,7 @@ export class UsageService {
 
       // Get total storage size
       const storageResult = await this.getPool().query(
-        `SELECT COALESCE(SUM(size), 0) as total_size FROM _storage`
+        `SELECT COALESCE(SUM(size), 0) as total_size FROM storage.objects`
       );
 
       // Get AI usage breakdown by model (only billable metrics)
@@ -122,8 +122,8 @@ export class UsageService {
           COALESCE(SUM(u.input_tokens), 0) as total_input_tokens,
           COALESCE(SUM(u.output_tokens), 0) as total_output_tokens,
           COALESCE(SUM(u.image_count), 0) as total_images
-        FROM _ai_usage u
-        LEFT JOIN _ai_configs c ON u.config_id = c.id
+        FROM ai.usage u
+        LEFT JOIN ai.configs c ON u.config_id = c.id
         WHERE u.created_at >= $1 AND u.created_at < $2
         GROUP BY COALESCE(u.model_id, c.model_id)
         ORDER BY (COALESCE(SUM(u.input_tokens), 0) + COALESCE(SUM(u.output_tokens), 0)) DESC`,

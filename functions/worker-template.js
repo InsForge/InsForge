@@ -26,7 +26,7 @@ self.onmessage = async (e) => {
      * - We need to provide Deno.env functionality so functions can access secrets
      *
      * How it works:
-     * 1. The main server (server.ts) fetches all active secrets from the _secrets table
+     * 1. The main server (server.ts) fetches all active secrets from the system.secrets table
      * 2. Only active (is_active=true) and non-expired secrets are included
      * 3. Secrets are decrypted and passed to this worker via the 'secrets' object
      * 4. We create a mock Deno object that provides Deno.env.get()

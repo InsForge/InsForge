@@ -3,7 +3,7 @@ export * from './cell-editors';
 
 // datagrid types
 export type * from './datagridTypes';
-export type { DataGridProps } from './DataGrid';
+export type { DataGridProps, SelectionCellProps } from './DataGrid';
 export type {
   Column,
   SortColumn,

@@ -24,9 +24,8 @@ graph TB
     JWT --> Secret[Shared Secret]
     JWT --> Validation[Token Validation]
     
-    DB --> Accounts[_accounts Table]
-    DB --> Users[users Table]
-    DB --> OAuth[_account_providers]
+    DB --> Users[auth.users Table]
+    DB --> Providers[auth.user_providers]
     
     style Client fill:#1e293b,stroke:#475569,color:#e2e8f0
     style SDK fill:#1e40af,stroke:#3b82f6,color:#dbeafe
@@ -38,9 +37,8 @@ graph TB
     style Google fill:#4c1d95,stroke:#8b5cf6,color:#ede9fe
     style GitHub fill:#1e293b,stroke:#64748b,color:#f1f5f9
     style Validation fill:#991b1b,stroke:#ef4444,color:#fee2e2
-    style Accounts fill:#0e7490,stroke:#22d3ee,color:#cffafe
     style Users fill:#0e7490,stroke:#22d3ee,color:#cffafe
-    style OAuth fill:#0e7490,stroke:#22d3ee,color:#cffafe
+    style Providers fill:#0e7490,stroke:#22d3ee,color:#cffafe
 ```
 
 ## Core Components
@@ -207,7 +205,7 @@ InsForge supports multiple OAuth providers including Google, GitHub, Microsoft, 
 2. **Signature Verification**: Validate with RSA public key
 3. **Expiry Check**: Ensure token hasn't expired
 4. **Issuer/Audience**: Verify iss and aud claims
-5. **User Lookup**: Check user exists in _accounts table
+5. **User Lookup**: Check user exists in auth.users table
 6. **User Status**: Ensure user account is active
 
 ### Middleware Flow
@@ -224,7 +222,7 @@ async function validateToken(token) {
   
   // 2. Check user exists (optional)
   const user = await db.query(
-    'SELECT * FROM _accounts WHERE id = $1',
+    'SELECT * FROM auth.users WHERE id = $1',
     [decoded.sub]
   );
   

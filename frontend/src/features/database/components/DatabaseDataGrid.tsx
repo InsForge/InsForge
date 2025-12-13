@@ -225,10 +225,8 @@ export function convertSchemaToColumns(
           onJumpToTable={onJumpToTable}
         />
       );
-      // Note: editable is set in the column definition above
     } else if (col.columnName === primaryKeyColumn) {
       column.renderCell = cellRenderers.id;
-      // Note: editable is set in the column definition above
     } else if (col.type === ColumnType.BOOLEAN) {
       column.renderCell = cellRenderers.boolean;
       column.renderEditCell = (props: RenderEditCellProps<DatabaseDataGridRow>) => (

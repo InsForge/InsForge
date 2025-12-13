@@ -102,6 +102,7 @@ export type ForeignKeyInfo = ForeignKeySchema & {
 export interface ForeignKeyRow {
   constraint_name: string;
   from_column: string;
+  foreign_schema: string;
   foreign_table: string;
   foreign_column: string;
   on_delete: string;

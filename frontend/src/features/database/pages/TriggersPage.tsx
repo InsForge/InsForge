@@ -16,7 +16,6 @@ import {
 import { useTriggers } from '../hooks/useDatabase';
 import { SQLModal, SQLCellButton } from '../components/SQLModal';
 import type { DatabaseTriggersResponse } from '@insforge/shared-schemas';
-import { isSystemTable } from '../constants';
 
 interface TriggerRow extends DataGridRowType {
   id: string;
@@ -36,10 +35,6 @@ function parseTriggersFromResponse(response: DatabaseTriggersResponse | undefine
   const triggers: TriggerRow[] = [];
 
   response.triggers.forEach((trigger) => {
-    if (isSystemTable(trigger.tableName)) {
-      return;
-    }
-
     triggers.push({
       id: `${trigger.tableName}_${trigger.triggerName}`,
       tableName: trigger.tableName,

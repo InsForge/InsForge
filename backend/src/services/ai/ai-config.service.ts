@@ -32,7 +32,7 @@ export class AIConfigService {
   ): Promise<{ id: string }> {
     try {
       const result = await this.getPool().query(
-        `INSERT INTO _ai_configs (input_modality, output_modality, provider, model_id, system_prompt)
+        `INSERT INTO ai.configs (input_modality, output_modality, provider, model_id, system_prompt)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
         [inputModality, outputModality, provider, modelId, systemPrompt || null]
@@ -62,8 +62,8 @@ export class AIConfigService {
           COALESCE(SUM(u.input_tokens + u.output_tokens), 0)::INTEGER as "totalTokens",
           COALESCE(SUM(u.image_count), 0)::INTEGER as "totalImageCount",
           COALESCE(COUNT(u.id), 0)::INTEGER as "totalRequests"
-         FROM _ai_configs c
-         LEFT JOIN _ai_usage u ON c.id = u.config_id
+         FROM ai.configs c
+         LEFT JOIN ai.usage u ON c.id = u.config_id
          GROUP BY c.id, c.input_modality, c.output_modality, c.provider, c.model_id, c.system_prompt, c.created_at
          ORDER BY c.created_at DESC`
       );
@@ -92,7 +92,7 @@ export class AIConfigService {
   async update(id: string, systemPrompt: string | null): Promise<boolean> {
     try {
       const result = await this.getPool().query(
-        `UPDATE _ai_configs
+        `UPDATE ai.configs
          SET system_prompt = $1, updated_at = NOW()
          WHERE id = $2`,
         [systemPrompt, id]
@@ -111,7 +111,7 @@ export class AIConfigService {
 
   async delete(id: string): Promise<boolean> {
     try {
-      const result = await this.getPool().query('DELETE FROM _ai_configs WHERE id = $1', [id]);
+      const result = await this.getPool().query('DELETE FROM ai.configs WHERE id = $1', [id]);
 
       const success = (result.rowCount ?? 0) > 0;
       if (success) {
@@ -128,7 +128,7 @@ export class AIConfigService {
     try {
       const result = await this.getPool().query(
         `SELECT id, input_modality as "inputModality", output_modality as "outputModality", provider, model_id as "modelId", system_prompt as "systemPrompt", created_at, updated_at
-         FROM _ai_configs
+         FROM ai.configs
          WHERE model_id = $1`,
         [modelId]
       );

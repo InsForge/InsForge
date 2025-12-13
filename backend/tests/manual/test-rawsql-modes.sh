@@ -74,7 +74,7 @@ test_endpoint \
     "STRICT" \
     "rawsql" \
     "Allow SELECT from system table" \
-    "SELECT * FROM _secrets LIMIT 1;" \
+    "SELECT * FROM system.secrets LIMIT 1;" \
     "pass"
 
 # Test 2: Strict mode blocks system table INSERT
@@ -82,7 +82,7 @@ test_endpoint \
     "STRICT" \
     "rawsql" \
     "Block INSERT into system table" \
-    "INSERT INTO _secrets (name, value_ciphertext) VALUES ('test', 'value');" \
+    "INSERT INTO system.secrets (name, value_ciphertext) VALUES ('test', 'value');" \
     "fail"
 
 # Test 3: Strict mode blocks pg_catalog
@@ -101,20 +101,20 @@ test_endpoint \
     "SELECT * FROM information_schema.tables LIMIT 1;" \
     "fail"
 
-# Test 5: Strict mode blocks INSERT into users
+# Test 5: Strict mode blocks INSERT into auth.users
 test_endpoint \
     "STRICT" \
     "rawsql" \
-    "Block INSERT into users table" \
-    "INSERT INTO users (id, nickname) VALUES (gen_random_uuid(), 'testuser');" \
+    "Block INSERT into auth.users table" \
+    "INSERT INTO auth.users (id, email, metadata) VALUES (gen_random_uuid(), 'test@example.com', '{}');" \
     "fail"
 
 # Test 6: Strict mode allows regular table operations
 test_endpoint \
     "STRICT" \
     "rawsql" \
-    "Allow SELECT from regular table" \
-    "SELECT COUNT(*) FROM users;" \
+    "Allow SELECT from auth.users table" \
+    "SELECT COUNT(*) FROM auth.users;" \
     "pass"
 
 echo -e "${BLUE}=== RELAXED MODE TESTS (/rawsql/unrestricted) ===${NC}"
@@ -125,7 +125,7 @@ test_endpoint \
     "RELAXED" \
     "rawsql/unrestricted" \
     "Allow SELECT from system table" \
-    "SELECT * FROM _secrets LIMIT 1;" \
+    "SELECT * FROM system.secrets LIMIT 1;" \
     "pass"
 
 # Test 8: Relaxed mode allows INSERT into system table
@@ -133,7 +133,7 @@ test_endpoint \
     "RELAXED" \
     "rawsql/unrestricted" \
     "Allow INSERT into system table" \
-    "INSERT INTO _audit_logs (actor, action, module) VALUES ('test_actor', 'TEST_ACTION', 'TEST_MODULE');" \
+    "INSERT INTO system.audit_logs (actor, action, module) VALUES ('test_actor', 'TEST_ACTION', 'TEST_MODULE');" \
     "pass"
 
 # Test 9: Relaxed mode blocks UPDATE system table
@@ -141,7 +141,7 @@ test_endpoint \
     "RELAXED" \
     "rawsql/unrestricted" \
     "Block UPDATE system table" \
-    "UPDATE _audit_logs SET actor = 'updated' WHERE action = 'TEST_ACTION';" \
+    "UPDATE system.audit_logs SET actor = 'updated' WHERE action = 'TEST_ACTION';" \
     "fail"
 
 # Test 10: Relaxed mode blocks DELETE FROM system table
@@ -149,7 +149,7 @@ test_endpoint \
     "RELAXED" \
     "rawsql/unrestricted" \
     "Block DELETE FROM system table" \
-    "DELETE FROM _audit_logs WHERE action = 'TEST_ACTION';" \
+    "DELETE FROM system.audit_logs WHERE action = 'TEST_ACTION';" \
     "fail"
 
 # Test 11: Relaxed mode blocks DROP system table
@@ -157,31 +157,31 @@ test_endpoint \
     "RELAXED" \
     "rawsql/unrestricted" \
     "Block DROP system table" \
-    "DROP TABLE _secrets;" \
+    "DROP TABLE system.secrets;" \
     "fail"
 
-# Test 12: Relaxed mode allows SELECT from users (INSERT requires foreign key to _accounts, so skip)
+# Test 12: Relaxed mode allows SELECT from auth.users
 test_endpoint \
     "RELAXED" \
     "rawsql/unrestricted" \
-    "Allow SELECT from users table" \
-    "SELECT COUNT(*) FROM users;" \
+    "Allow SELECT from auth.users table" \
+    "SELECT COUNT(*) FROM auth.users;" \
     "pass"
 
-# Test 13: Relaxed mode blocks DROP users table
+# Test 13: Relaxed mode blocks DROP auth.users table
 test_endpoint \
     "RELAXED" \
     "rawsql/unrestricted" \
-    "Block DROP users table" \
-    "DROP TABLE users;" \
+    "Block DROP auth.users table" \
+    "DROP TABLE auth.users;" \
     "fail"
 
-# Test 14: Relaxed mode blocks RENAME users table
+# Test 14: Relaxed mode blocks RENAME auth.users table
 test_endpoint \
     "RELAXED" \
     "rawsql/unrestricted" \
-    "Block RENAME users table" \
-    "ALTER TABLE users RENAME TO users_backup;" \
+    "Block RENAME auth.users table" \
+    "ALTER TABLE auth.users RENAME TO users_backup;" \
     "fail"
 
 echo -e "${BLUE}=== BOTH MODES - DATABASE LEVEL BLOCKS ===${NC}"
@@ -226,18 +226,18 @@ echo ""
 echo -e "${GREEN}STRICT MODE (/rawsql):${NC}"
 echo "  - ✅ Allows SELECT from system tables (read-only)"
 echo "  - ❌ Blocks INSERT/UPDATE/DELETE/DROP/ALTER on system tables"
-echo "  - ❌ Blocks ALL operations on users table"
+echo "  - ❌ Blocks ALL operations on auth.users table"
 echo "  - ❌ Blocks pg_catalog and information_schema"
 echo "  - ❌ Blocks database-level operations"
 echo ""
 echo -e "${GREEN}RELAXED MODE (/rawsql/unrestricted):${NC}"
 echo "  - ✅ Allows SELECT from system tables"
 echo "  - ✅ Allows INSERT into system tables"
-echo "  - ✅ Allows SELECT from users table"
+echo "  - ✅ Allows SELECT from auth.users table"
 echo "  - ❌ Blocks UPDATE of system tables"
 echo "  - ❌ Blocks DELETE FROM system tables"
 echo "  - ❌ Blocks DROP/ALTER/TRUNCATE system tables"
-echo "  - ❌ Blocks DROP/RENAME users table"
+echo "  - ❌ Blocks DROP/RENAME auth.users table"
 echo "  - ❌ Blocks pg_catalog and information_schema"
 echo "  - ❌ Blocks database-level operations"
 echo ""

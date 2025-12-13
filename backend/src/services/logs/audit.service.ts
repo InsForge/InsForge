@@ -35,7 +35,7 @@ export class AuditService {
     try {
       const pool = this.getPool();
       const result = await pool.query(
-        `INSERT INTO _audit_logs (actor, action, module, details, ip_address)
+        `INSERT INTO system.audit_logs (actor, action, module, details, ip_address)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
         [
@@ -109,12 +109,12 @@ export class AuditService {
       }
 
       // Get total count first
-      const countSql = `SELECT COUNT(*) as count FROM _audit_logs ${whereClause}`;
+      const countSql = `SELECT COUNT(*) as count FROM system.audit_logs ${whereClause}`;
       const countResult = await pool.query(countSql, params);
       const total = parseInt(countResult.rows[0].count, 10);
 
       // Get paginated records
-      let dataSql = `SELECT * FROM _audit_logs ${whereClause} ORDER BY created_at DESC`;
+      let dataSql = `SELECT * FROM system.audit_logs ${whereClause} ORDER BY created_at DESC`;
       const dataParams = [...params];
 
       if (query.limit) {
@@ -154,7 +154,7 @@ export class AuditService {
   async getById(id: string): Promise<AuditLogSchema | null> {
     try {
       const pool = this.getPool();
-      const result = await pool.query('SELECT * FROM _audit_logs WHERE id = $1', [id]);
+      const result = await pool.query('SELECT * FROM system.audit_logs WHERE id = $1', [id]);
 
       const row = result.rows[0];
 
@@ -186,30 +186,30 @@ export class AuditService {
       startDate.setDate(startDate.getDate() - days);
 
       const totalLogsResult = await pool.query(
-        'SELECT COUNT(*) as count FROM _audit_logs WHERE created_at >= $1',
+        'SELECT COUNT(*) as count FROM system.audit_logs WHERE created_at >= $1',
         [startDate.toISOString()]
       );
 
       const uniqueActorsResult = await pool.query(
-        'SELECT COUNT(DISTINCT actor) as count FROM _audit_logs WHERE created_at >= $1',
+        'SELECT COUNT(DISTINCT actor) as count FROM system.audit_logs WHERE created_at >= $1',
         [startDate.toISOString()]
       );
 
       const uniqueModulesResult = await pool.query(
-        'SELECT COUNT(DISTINCT module) as count FROM _audit_logs WHERE created_at >= $1',
+        'SELECT COUNT(DISTINCT module) as count FROM system.audit_logs WHERE created_at >= $1',
         [startDate.toISOString()]
       );
 
       const actionsByModuleResult = await pool.query(
         `SELECT module, COUNT(*) as count
-         FROM _audit_logs
+         FROM system.audit_logs
          WHERE created_at >= $1
          GROUP BY module`,
         [startDate.toISOString()]
       );
 
       const recentActivityResult = await pool.query(
-        `SELECT * FROM _audit_logs
+        `SELECT * FROM system.audit_logs
          WHERE created_at >= $1
          ORDER BY created_at DESC
          LIMIT 10`,
@@ -253,7 +253,7 @@ export class AuditService {
       cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
 
       const result = await pool.query(
-        'DELETE FROM _audit_logs WHERE created_at < $1 RETURNING id',
+        'DELETE FROM system.audit_logs WHERE created_at < $1 RETURNING id',
         [cutoffDate.toISOString()]
       );
 

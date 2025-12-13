@@ -126,7 +126,7 @@ export class AuthOTPService {
       // Upsert token record - insert or update if email+purpose combination already exists
       // This ensures only one active token per email/purpose (replaces any existing token)
       await this.getPool().query(
-        `INSERT INTO _email_otps (email, purpose, otp_hash, expires_at, consumed_at)
+        `INSERT INTO auth.email_otps (email, purpose, otp_hash, expires_at, consumed_at)
          VALUES ($1, $2, $3, $4, NULL)
          ON CONFLICT (email, purpose)
          DO UPDATE SET
@@ -184,7 +184,7 @@ export class AuthOTPService {
       // Lookup by email and lock the row
       const result = await client.query(
         `SELECT id, email, purpose, otp_hash, expires_at, consumed_at
-         FROM _email_otps
+         FROM auth.email_otps
          WHERE email = $1 AND purpose = $2
          FOR UPDATE`,
         [email, purpose]
@@ -211,7 +211,7 @@ export class AuthOTPService {
 
       // Mark OTP as consumed atomically
       const consume = await client.query(
-        `UPDATE _email_otps
+        `UPDATE auth.email_otps
          SET consumed_at = NOW(), updated_at = NOW()
          WHERE id = $1 AND consumed_at IS NULL`,
         [otpRecord.id]
@@ -279,7 +279,7 @@ export class AuthOTPService {
       // Direct lookup by hash - O(1) with index on otp_hash
       const result = await client.query(
         `SELECT id, email, purpose, otp_hash, expires_at, consumed_at
-         FROM _email_otps
+         FROM auth.email_otps
          WHERE purpose = $1
            AND otp_hash = $2
            AND expires_at > NOW()
@@ -297,7 +297,7 @@ export class AuthOTPService {
 
       // Mark OTP as consumed atomically
       const consume = await client.query(
-        `UPDATE _email_otps
+        `UPDATE auth.email_otps
          SET consumed_at = NOW(), updated_at = NOW()
          WHERE id = $1 AND consumed_at IS NULL`,
         [otpRecord.id]
@@ -385,7 +385,7 @@ export class AuthOTPService {
       // Step 3: Insert the new token (replaces the consumed numeric code)
       // Uses upsert to overwrite the consumed code record with the new token
       await client.query(
-        `INSERT INTO _email_otps (email, purpose, otp_hash, expires_at, consumed_at)
+        `INSERT INTO auth.email_otps (email, purpose, otp_hash, expires_at, consumed_at)
          VALUES ($1, $2, $3, $4, NULL)
          ON CONFLICT (email, purpose)
          DO UPDATE SET

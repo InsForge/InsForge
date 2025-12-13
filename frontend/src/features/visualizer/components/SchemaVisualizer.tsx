@@ -251,7 +251,7 @@ export function SchemaVisualizer({
       table.columns.some(
         (column) =>
           column.foreignKey &&
-          column.foreignKey.referenceTable === 'users' &&
+          column.foreignKey.referenceTable === 'auth.users' &&
           column.foreignKey.referenceColumn === 'id'
       )
     );
@@ -280,7 +280,7 @@ export function SchemaVisualizer({
         if (column.foreignKey) {
           // Check if this is a reference to users.id
           const isAuthReference =
-            column.foreignKey.referenceTable === 'users' &&
+            column.foreignKey.referenceTable === 'auth.users' &&
             column.foreignKey.referenceColumn === 'id';
 
           const edgeId = `${table.tableName}-${column.columnName}-${column.foreignKey.referenceTable}`;

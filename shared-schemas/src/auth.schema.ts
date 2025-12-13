@@ -35,18 +35,11 @@ export const verificationMethodSchema = z.enum(['code', 'link']);
 export const userSchema = z.object({
   id: userIdSchema,
   email: emailSchema,
-  name: nameSchema,
   emailVerified: z.boolean(),
-  identities: z
-    .array(
-      z.object({
-        provider: z.string(),
-      })
-    )
-    .optional(),
-  providerType: z.string().optional(),
+  providers: z.array(z.string()).optional(),
   createdAt: z.string(), // PostgreSQL timestamp
   updatedAt: z.string(), // PostgreSQL timestamp
+  metadata: z.record(z.unknown()).nullable(),
 });
 
 /**

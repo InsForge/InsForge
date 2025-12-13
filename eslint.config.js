@@ -319,6 +319,7 @@ export default defineConfig(
       'examples/**',
       'openapi/**',
       'functions/',
+      'backend/src/infra/database/migrations/bootstrap/**', // Bootstrap scripts run before build
     ],
   }
 );

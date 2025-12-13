@@ -16,7 +16,6 @@ import {
 import { usePolicies } from '../hooks/useDatabase';
 import { SQLModal, SQLCellButton } from '../components/SQLModal';
 import type { DatabasePoliciesResponse } from '@insforge/shared-schemas';
-import { isSystemTable } from '../constants';
 
 interface PolicyRow extends DataGridRowType {
   id: string;
@@ -37,10 +36,6 @@ function parsePoliciesFromResponse(response: DatabasePoliciesResponse | undefine
   const policies: PolicyRow[] = [];
 
   response.policies.forEach((policy) => {
-    if (isSystemTable(policy.tableName)) {
-      return;
-    }
-
     policies.push({
       id: `${policy.tableName}_${policy.policyName}`,
       tableName: policy.tableName,

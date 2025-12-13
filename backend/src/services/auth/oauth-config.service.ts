@@ -62,7 +62,7 @@ export class OAuthConfigService {
           use_shared_key as "useSharedKey",
           created_at as "createdAt",
           updated_at as "updatedAt"
-         FROM _oauth_configs
+         FROM auth.oauth_configs
          ORDER BY provider ASC`
       );
 
@@ -82,7 +82,7 @@ export class OAuthConfigService {
       const result = await this.getPool().query(
         `SELECT
           provider
-         FROM _oauth_configs
+         FROM auth.oauth_configs
          ORDER BY provider ASC`
       );
 
@@ -108,7 +108,7 @@ export class OAuthConfigService {
           use_shared_key as "useSharedKey",
           created_at as "createdAt",
           updated_at as "updatedAt"
-         FROM _oauth_configs
+         FROM auth.oauth_configs
          WHERE LOWER(provider) = LOWER($1)
          LIMIT 1`,
         [provider]
@@ -133,7 +133,7 @@ export class OAuthConfigService {
       const result = await this.getPool().query(
         `SELECT
           secret_id as "secretId"
-         FROM _oauth_configs
+         FROM auth.oauth_configs
          WHERE LOWER(provider) = LOWER($1)
          LIMIT 1`,
         [provider]
@@ -167,7 +167,7 @@ export class OAuthConfigService {
 
       // Check if config already exists for this provider
       const existingConfig = await client.query(
-        'SELECT id FROM _oauth_configs WHERE LOWER(provider) = LOWER($1)',
+        'SELECT id FROM auth.oauth_configs WHERE LOWER(provider) = LOWER($1)',
         [input.provider]
       );
 
@@ -235,7 +235,7 @@ export class OAuthConfigService {
 
       // Create new OAuth config
       const result = await client.query(
-        `INSERT INTO _oauth_configs (provider, client_id, secret_id, redirect_uri, scopes, use_shared_key)
+        `INSERT INTO auth.oauth_configs (provider, client_id, secret_id, redirect_uri, scopes, use_shared_key)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING
            id,
@@ -282,7 +282,7 @@ export class OAuthConfigService {
 
       // Get existing config with secret_id
       const existingResult = await client.query(
-        `SELECT id, secret_id as "secretId" FROM _oauth_configs WHERE LOWER(provider) = LOWER($1)`,
+        `SELECT id, secret_id as "secretId" FROM auth.oauth_configs WHERE LOWER(provider) = LOWER($1)`,
         [provider]
       );
 
@@ -306,7 +306,7 @@ export class OAuthConfigService {
             value: input.clientSecret,
           });
           // Add secret_id to the update query
-          await client.query(`UPDATE _oauth_configs SET secret_id = $1 WHERE id = $2`, [
+          await client.query(`UPDATE auth.oauth_configs SET secret_id = $1 WHERE id = $2`, [
             secret.id,
             existingConfig.id,
           ]);
@@ -353,7 +353,7 @@ export class OAuthConfigService {
         values.push(provider.toLowerCase());
 
         const result = await client.query(
-          `UPDATE _oauth_configs
+          `UPDATE auth.oauth_configs
            SET ${updates.join(', ')}
            WHERE LOWER(provider) = $${paramCount}
            RETURNING
@@ -406,7 +406,7 @@ export class OAuthConfigService {
 
       // Get existing config with secret_id
       const existingResult = await client.query(
-        `SELECT id, secret_id as "secretId" FROM _oauth_configs WHERE LOWER(provider) = LOWER($1)`,
+        `SELECT id, secret_id as "secretId" FROM auth.oauth_configs WHERE LOWER(provider) = LOWER($1)`,
         [provider]
       );
 
@@ -419,13 +419,13 @@ export class OAuthConfigService {
 
       // Delete OAuth config (secret will be restricted due to foreign key)
       const result = await client.query(
-        'DELETE FROM _oauth_configs WHERE LOWER(provider) = LOWER($1)',
+        'DELETE FROM auth.oauth_configs WHERE LOWER(provider) = LOWER($1)',
         [provider]
       );
 
       // Try to delete the associated secret (will fail if still referenced)
       try {
-        await client.query('DELETE FROM _secrets WHERE id = $1', [existingConfig.secretId]);
+        await client.query('DELETE FROM system.secrets WHERE id = $1', [existingConfig.secretId]);
         logger.info('Associated secret deleted', { secretId: existingConfig.secretId });
       } catch {
         logger.warn('Could not delete associated secret, it may be in use elsewhere', {

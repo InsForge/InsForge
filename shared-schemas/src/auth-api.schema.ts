@@ -4,7 +4,6 @@ import {
   passwordSchema,
   nameSchema,
   userIdSchema,
-  roleSchema,
   userSchema,
   oAuthConfigSchema,
   oAuthProvidersSchema,
@@ -176,11 +175,7 @@ export const createAdminSessionResponseSchema = createUserResponseSchema;
  * Response for GET /api/auth/sessions/current
  */
 export const getCurrentSessionResponseSchema = z.object({
-  user: z.object({
-    id: userIdSchema,
-    email: emailSchema,
-    role: roleSchema,
-  }),
+  user: userSchema,
 });
 
 /**

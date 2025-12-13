@@ -1,9 +1,12 @@
 // Type definitions for database user records
+
 export interface UserRecord {
   id: string;
   email: string;
-  name: string;
+  metadata: Record<string, unknown> | null;
   email_verified: boolean;
+  is_project_admin: boolean;
+  is_anonymous: boolean;
   created_at: string;
   updated_at: string;
   password?: string;

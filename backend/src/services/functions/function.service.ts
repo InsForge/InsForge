@@ -47,7 +47,7 @@ export class FunctionService {
         `SELECT
           id, slug, name, description, status,
           created_at, updated_at, deployed_at
-        FROM _functions
+        FROM functions.definitions
         ORDER BY created_at DESC`
       );
 
@@ -92,7 +92,7 @@ export class FunctionService {
         `SELECT
           id, slug, name, description, code, status,
           created_at, updated_at, deployed_at
-        FROM _functions
+        FROM functions.definitions
         WHERE slug = $1`,
         [slug]
       );
@@ -125,22 +125,23 @@ export class FunctionService {
 
       // Insert function
       await client.query(
-        `INSERT INTO _functions (id, slug, name, description, code, status)
+        `INSERT INTO functions.definitions (id, slug, name, description, code, status)
         VALUES ($1, $2, $3, $4, $5, $6)`,
         [id, slug, name, description || null, code, status]
       );
 
       // If status is active, update deployed_at
       if (status === 'active') {
-        await client.query(`UPDATE _functions SET deployed_at = CURRENT_TIMESTAMP WHERE id = $1`, [
-          id,
-        ]);
+        await client.query(
+          `UPDATE functions.definitions SET deployed_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          [id]
+        );
       }
 
       // Fetch the created function
       const result = await client.query(
         `SELECT id, slug, name, description, status, created_at
-        FROM _functions WHERE id = $1`,
+        FROM functions.definitions WHERE id = $1`,
         [id]
       );
 
@@ -181,9 +182,10 @@ export class FunctionService {
     const client = await this.getPool().connect();
     try {
       // Check if function exists
-      const existingResult = await client.query('SELECT id FROM _functions WHERE slug = $1', [
-        slug,
-      ]);
+      const existingResult = await client.query(
+        'SELECT id FROM functions.definitions WHERE slug = $1',
+        [slug]
+      );
       if (existingResult.rows.length === 0) {
         return null;
       }
@@ -195,22 +197,28 @@ export class FunctionService {
 
       // Update fields
       if (updates.name !== undefined) {
-        await client.query('UPDATE _functions SET name = $1 WHERE slug = $2', [updates.name, slug]);
+        await client.query('UPDATE functions.definitions SET name = $1 WHERE slug = $2', [
+          updates.name,
+          slug,
+        ]);
       }
 
       if (updates.description !== undefined) {
-        await client.query('UPDATE _functions SET description = $1 WHERE slug = $2', [
+        await client.query('UPDATE functions.definitions SET description = $1 WHERE slug = $2', [
           updates.description,
           slug,
         ]);
       }
 
       if (updates.code !== undefined) {
-        await client.query('UPDATE _functions SET code = $1 WHERE slug = $2', [updates.code, slug]);
+        await client.query('UPDATE functions.definitions SET code = $1 WHERE slug = $2', [
+          updates.code,
+          slug,
+        ]);
       }
 
       if (updates.status !== undefined) {
-        await client.query('UPDATE _functions SET status = $1 WHERE slug = $2', [
+        await client.query('UPDATE functions.definitions SET status = $1 WHERE slug = $2', [
           updates.status,
           slug,
         ]);
@@ -218,21 +226,22 @@ export class FunctionService {
         // Update deployed_at if status changes to active
         if (updates.status === 'active') {
           await client.query(
-            'UPDATE _functions SET deployed_at = CURRENT_TIMESTAMP WHERE slug = $1',
+            'UPDATE functions.definitions SET deployed_at = CURRENT_TIMESTAMP WHERE slug = $1',
             [slug]
           );
         }
       }
 
       // Update updated_at
-      await client.query('UPDATE _functions SET updated_at = CURRENT_TIMESTAMP WHERE slug = $1', [
-        slug,
-      ]);
+      await client.query(
+        'UPDATE functions.definitions SET updated_at = CURRENT_TIMESTAMP WHERE slug = $1',
+        [slug]
+      );
 
       // Fetch updated function
       const result = await client.query(
         `SELECT id, slug, name, description, status, updated_at
-        FROM _functions WHERE slug = $1`,
+        FROM functions.definitions WHERE slug = $1`,
         [slug]
       );
 
@@ -254,7 +263,10 @@ export class FunctionService {
    */
   async deleteFunction(slug: string): Promise<boolean> {
     try {
-      const result = await this.getPool().query('DELETE FROM _functions WHERE slug = $1', [slug]);
+      const result = await this.getPool().query(
+        'DELETE FROM functions.definitions WHERE slug = $1',
+        [slug]
+      );
 
       if (result.rowCount === 0) {
         return false;
@@ -278,7 +290,7 @@ export class FunctionService {
     try {
       const result = await this.getPool().query(
         `SELECT slug, name, description, status
-        FROM _functions
+        FROM functions.definitions
         ORDER BY created_at DESC`
       );
 

@@ -22,7 +22,7 @@ export function useMetadata(options?: UseMetadataOptions) {
   return {
     metadata,
     auth: metadata?.auth,
-    tables: metadata?.database.tables?.filter((table) => table.tableName !== 'users') ?? [],
+    tables: metadata?.database.tables,
     storage: metadata?.storage,
     version: metadata?.version || 'Unknown',
     isLoading,

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Test secrets API endpoints (refactored to use _secrets table)
+# Test secrets API endpoints (uses system.secrets table)
 # Tests CRUD operations for secrets and edge function integration
 
 # Get the directory where this script is located

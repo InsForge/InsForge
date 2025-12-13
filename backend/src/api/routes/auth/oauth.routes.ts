@@ -345,7 +345,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     params.set('access_token', result?.accessToken ?? '');
     params.set('user_id', result?.user?.id ?? '');
     params.set('email', result?.user?.email ?? '');
-    params.set('name', result?.user?.name ?? '');
+    params.set('name', String(result?.user?.metadata?.name));
 
     res.redirect(`${redirectUri}?${params.toString()}`);
   } catch (error) {
@@ -417,7 +417,7 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
       params.set('access_token', result?.accessToken ?? '');
       params.set('user_id', result?.user?.id ?? '');
       params.set('email', result?.user?.email ?? '');
-      params.set('name', result?.user?.name ?? '');
+      params.set('name', String(result?.user?.metadata?.name));
 
       const finalRedirectUri = `${redirectUri}?${params.toString()}`;
 

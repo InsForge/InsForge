@@ -16,7 +16,6 @@ import {
 import { useIndexes } from '../hooks/useDatabase';
 import { SQLModal, SQLCellButton } from '../components/SQLModal';
 import type { DatabaseIndexesResponse } from '@insforge/shared-schemas';
-import { isSystemTable } from '../constants';
 
 interface IndexRow extends DataGridRowType {
   id: string;
@@ -36,10 +35,6 @@ function parseIndexesFromResponse(response: DatabaseIndexesResponse | undefined)
   const indexes: IndexRow[] = [];
 
   response.indexes.forEach((index) => {
-    if (isSystemTable(index.tableName)) {
-      return;
-    }
-
     indexes.push({
       id: `${index.tableName}_${index.indexName}`,
       tableName: index.tableName,

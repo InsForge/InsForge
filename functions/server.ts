@@ -76,7 +76,7 @@ async function getFunctionCode(slug: string): Promise<string | null> {
     await client.connect();
 
     const result = await client.queryObject<{ code: string }>`
-      SELECT code FROM _functions 
+      SELECT code FROM functions.definitions
       WHERE slug = ${slug} AND status = 'active'
     `;
 
@@ -107,14 +107,14 @@ async function getFunctionSecrets(): Promise<Record<string, string>> {
       return {};
     }
 
-    // Fetch all active secrets from _secrets table
+    // Fetch all active secrets from system.secrets table
     const result = await client.queryObject<{
       key: string;
       value_ciphertext: string;
     }>`
-      SELECT key, value_ciphertext 
-      FROM _secrets
-      WHERE is_active = true 
+      SELECT key, value_ciphertext
+      FROM system.secrets
+      WHERE is_active = true
         AND (expires_at IS NULL OR expires_at > NOW())
     `;
 
