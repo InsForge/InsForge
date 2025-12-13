@@ -233,7 +233,7 @@ export class DatabaseTableService {
         `
           CREATE TRIGGER ${this.quoteIdentifier(table_name + '_update_timestamp')}
           BEFORE UPDATE ON ${this.quoteIdentifier(table_name)}
-          FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+          FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
         `
       );
 
