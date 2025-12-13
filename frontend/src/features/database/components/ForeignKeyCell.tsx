@@ -20,22 +20,7 @@ import { convertSchemaToColumns } from '@/features/database/components/DatabaseD
 import { formatValueForDisplay } from '@/lib/utils/utils';
 import { useQuery } from '@tanstack/react-query';
 import { useUsers } from '@/features/auth/hooks/useUsers';
-
-// Special handling for auth.users foreign key references
-// Schema matches UserSchema from @insforge/shared-schemas
-const AUTH_USERS_TABLE = 'auth.users';
-const authUsersSchema = {
-  tableName: 'auth.users',
-  columns: [
-    { columnName: 'id', type: 'uuid', isUnique: true, isNullable: false },
-    { columnName: 'email', type: 'string', isUnique: true, isNullable: false },
-    { columnName: 'emailVerified', type: 'boolean', isUnique: false, isNullable: false },
-    { columnName: 'providers', type: 'json', isUnique: false, isNullable: true },
-    { columnName: 'metadata', type: 'json', isUnique: false, isNullable: true },
-    { columnName: 'createdAt', type: 'timestamp', isUnique: false, isNullable: false },
-    { columnName: 'updatedAt', type: 'timestamp', isUnique: false, isNullable: false },
-  ],
-};
+import { AUTH_USERS_TABLE, authUsersSchema } from '../constants';
 
 interface ForeignKeyCellProps {
   value: string;

@@ -16,12 +16,7 @@ import { UseFormReturn } from 'react-hook-form';
 import { TableFormSchema, TableFormForeignKeySchema } from '../schema';
 import { ColumnSchema, OnDeleteActionSchema, OnUpdateActionSchema } from '@insforge/shared-schemas';
 import { cn } from '@/lib/utils/utils';
-
-// Special auth.users table schema (only id column available for FK)
-const AUTH_USERS_TABLE = 'auth.users';
-const authUsersSchema = {
-  columns: [{ columnName: 'id', type: 'uuid', isUnique: true, isNullable: false }],
-};
+import { AUTH_USERS_TABLE } from '../constants';
 
 interface ForeignKeyPopoverProps {
   form: UseFormReturn<TableFormSchema>;
@@ -89,7 +84,11 @@ export function ForeignKeyPopover({
   );
 
   // Use hardcoded schema for auth.users, otherwise use fetched schema
-  const referenceTableSchema = isAuthUsers ? authUsersSchema : fetchedTableSchema;
+  const referenceTableSchema = isAuthUsers
+    ? {
+        columns: [{ columnName: 'id', type: 'uuid', isUnique: true, isNullable: false }],
+      }
+    : fetchedTableSchema;
 
   // Get the type of the selected source column
   const getSourceFieldType = useMemo(() => {

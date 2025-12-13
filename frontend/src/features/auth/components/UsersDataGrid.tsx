@@ -163,14 +163,6 @@ export function createUsersColumns(): DataGridColumn<UserDataGridRow>[] {
       renderCell: cellRenderers.boolean,
     },
     {
-      key: 'metadata',
-      name: 'Metadata',
-      width: '1fr',
-      resizable: true,
-      sortable: true,
-      renderCell: cellRenderers.json,
-    },
-    {
       key: 'createdAt',
       name: 'Created',
       width: '1fr',
