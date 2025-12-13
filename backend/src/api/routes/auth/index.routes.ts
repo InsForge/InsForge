@@ -302,18 +302,19 @@ router.post('/admin/sessions', (req: Request, res: Response, next: NextFunction)
 router.get(
   '/sessions/current',
   verifyToken,
-  (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
         throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
       }
 
+      const user = await authService.getUserSchemaById(req.user.id);
+      if (!user) {
+        throw new AppError('User not found', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
+      }
+
       const response: GetCurrentSessionResponse = {
-        user: {
-          id: req.user.id,
-          email: req.user.email,
-          role: req.user.role as 'authenticated' | 'project_admin',
-        },
+        user,
       };
 
       successResponse(res, response);
@@ -370,7 +371,7 @@ router.get(
       const user = await authService.getUserSchemaById(userId);
 
       if (!user) {
-        throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('User does not exist', 404, ERROR_CODES.NOT_FOUND);
       }
 
       successResponse(res, user);
