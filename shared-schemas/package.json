@@ -1,6 +1,6 @@
 {
   "name": "@insforge/shared-schemas",
-  "version": "1.1.28",
+  "version": "1.1.29",
   "author": "Insforge",
   "description": "Shared TypeScript schemas for InsForge frontend and backend",
   "license": "Apache-2.0",
