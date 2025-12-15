@@ -89,6 +89,7 @@
               {
                 "group": "Email (Private Preview)",
                 "pages": [
+                  "core-concepts/email/architecture",
                   "core-concepts/email/sdk"
                 ]
               }

@@ -1,0 +1,101 @@
+---
+title: Architecture
+description: Transactional email delivery powered by AWS SES
+---
+
+<Note>**Private Preview** - This feature is currently in private preview.</Note>
+
+## Overview
+
+InsForge provides a managed email service for sending transactional emails. Built on AWS SES, it offers high deliverability and scalability without requiring you to configure email infrastructure.
+
+## Technology Stack
+
+```mermaid
+graph TB
+    Client[Client Application] --> SDK[InsForge SDK]
+    SDK --> API[Email API]
+    API --> Cloud[InsForge Cloud]
+    Cloud --> SES[AWS SES]
+    SES --> Inbox[Recipient Inbox]
+
+    style Client fill:#1e293b,stroke:#475569,color:#e2e8f0
+    style SDK fill:#1e40af,stroke:#3b82f6,color:#dbeafe
+    style API fill:#166534,stroke:#22c55e,color:#dcfce7
+    style Cloud fill:#7c3aed,stroke:#a78bfa,color:#ede9fe
+    style SES fill:#ea580c,stroke:#f97316,color:#fed7aa
+    style Inbox fill:#0e7490,stroke:#06b6d4,color:#cffafe
+```
+
+## How It Works
+
+1. **SDK Call** - Your application calls `emails.send()` with recipients and HTML content
+2. **API Processing** - Request is validated and authenticated
+3. **Cloud Delivery** - InsForge Cloud queues and sends via AWS SES
+4. **Delivery** - Email is delivered to recipient inboxes
+
+```mermaid
+sequenceDiagram
+    participant App as Your App
+    participant SDK as InsForge SDK
+    participant API as Email API
+    participant SES as AWS SES
+
+    App->>SDK: emails.send({to, subject, html})
+    SDK->>API: POST /api/email/send-raw
+    API->>SES: Queue for delivery
+    SES-->>API: Accepted
+    API-->>SDK: Success
+    SDK-->>App: {data, error}
+```
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="High Deliverability" icon="inbox">
+    AWS SES infrastructure with optimized sending reputation
+  </Card>
+
+  <Card title="Multiple Recipients" icon="users">
+    Send to up to 50 recipients per request with CC/BCC support
+  </Card>
+
+  <Card title="Custom Sender" icon="signature">
+    Customize the sender display name for your brand
+  </Card>
+
+  <Card title="HTML Content" icon="code">
+    Full HTML email support for rich formatting
+  </Card>
+</CardGroup>
+
+## Rate Limits
+
+| Plan | Limit |
+|------|-------|
+| **Starter** | 10 emails per hour |
+| **Pro** | 50 emails per hour |
+
+<Note>
+Custom transactional emails require a paid plan. Authentication emails (verification, password reset) are included in all plans.
+</Note>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Validate Recipients" icon="at">
+    Verify email addresses before sending to maintain deliverability
+  </Card>
+
+  <Card title="Meaningful Content" icon="envelope-open-text">
+    Send relevant, expected emails to avoid spam reports
+  </Card>
+
+  <Card title="Handle Errors" icon="triangle-exclamation">
+    Always check the error response and handle failures gracefully
+  </Card>
+
+  <Card title="Respect Limits" icon="gauge">
+    Implement queuing for bulk sends to stay within rate limits
+  </Card>
+</CardGroup>
