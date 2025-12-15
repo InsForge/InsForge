@@ -1,0 +1,51 @@
+---
+title: Email SDK Reference
+description: Send custom transactional emails with the InsForge SDK
+---
+
+import Installation from '/snippets/sdk-installation.mdx';
+
+<Installation />
+
+## emails.send()
+
+Send custom HTML emails to one or more recipients.
+
+### Parameters
+
+- `to` (string | string[], required) - Recipient email(s), max 50 recipients
+- `subject` (string, required) - Email subject line, max 500 characters
+- `html` (string, required) - HTML content of the email
+- `cc` (string | string[], optional) - CC recipient(s)
+- `bcc` (string | string[], optional) - BCC recipient(s)
+- `from` (string, optional) - Custom sender name, max 100 characters
+- `replyTo` (string, optional) - Reply-to email address
+
+### Returns
+
+```typescript
+{
+  data: {} | null,  // Empty object on success
+  error: Error | null
+}
+```
+
+### Example
+
+```javascript
+const { data, error } = await insforge.emails.send({
+  to: ['user1@example.com', 'user2@example.com'],
+  cc: 'manager@example.com',
+  from: 'Acme Support Team',
+  subject: 'Team Update',
+  html: '<h1>Weekly Update</h1><p>Here are this week\'s highlights...</p>',
+  replyTo: 'support@example.com'
+});
+
+if (error) {
+  console.error('Failed to send email:', error.message);
+  return;
+}
+
+console.log('Email sent successfully');
+```

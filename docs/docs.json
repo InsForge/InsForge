@@ -85,6 +85,12 @@
                   "core-concepts/realtime/architecture",
                   "core-concepts/realtime/sdk"
                 ]
+              },
+              {
+                "group": "Email",
+                "pages": [
+                  "core-concepts/email/sdk"
+                ]
               }
             ]
           },
@@ -147,6 +153,10 @@
           {
             "group": "Realtime",
             "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/realtime.yaml"
+          },
+          {
+            "group": "Email",
+            "openapi": "https://raw.githubusercontent.com/InsForge/InsForge/main/openapi/email.yaml"
           },
           {
             "group": "Secrets",
