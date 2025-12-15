@@ -18,10 +18,10 @@ Send custom HTML emails to one or more recipients.
 - `to` (string | string[], required) - Recipient email(s), max 50 recipients
 - `subject` (string, required) - Email subject line, max 500 characters
 - `html` (string, required) - HTML content of the email
-- `cc` (string | string[], optional) - CC recipient(s)
-- `bcc` (string | string[], optional) - BCC recipient(s)
+- `cc` (string | string[], optional) - CC recipient(s), max 50 recipients
+- `bcc` (string | string[], optional) - BCC recipient(s), max 50 recipients
 - `from` (string, optional) - Custom sender name, max 100 characters
-- `replyTo` (string, optional) - Reply-to email address
+- `replyTo` (string, optional) - Reply-to email address, must be a valid email address
 
 ### Returns
 
