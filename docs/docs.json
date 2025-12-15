@@ -87,7 +87,7 @@
                 ]
               },
               {
-                "group": "Email",
+                "group": "Email (Private Preview)",
                 "pages": [
                   "core-concepts/email/sdk"
                 ]
