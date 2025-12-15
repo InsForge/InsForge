@@ -65,14 +65,17 @@ ALTER TABLE auth.user_providers
 ADD CONSTRAINT user_providers_user_id_fkey
 FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
--- 2.6 Add metadata JSONB column to auth.users BEFORE migrating data
+-- 2.6 Add profile and metadata JSONB columns to auth.users BEFORE migrating data
+-- profile: stores user profile data (name, avatar_url, bio, etc.)
+-- metadata: reserved for system use (device ID, login IP, etc.)
+ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS profile JSONB DEFAULT '{}'::jsonb;
 ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
 
--- 2.7 Migrate data from public.users into auth.users.metadata
+-- 2.7 Migrate data from public.users into auth.users.profile
 -- Priority for name: public.users.nickname first, then auth.users.name as fallback
 -- Also migrate: avatar_url, bio, birthday from public.users
 UPDATE auth.users AS au
-SET metadata = jsonb_strip_nulls(jsonb_build_object(
+SET profile = jsonb_strip_nulls(jsonb_build_object(
   'name', COALESCE(pu.nickname, au.name),
   'avatar_url', pu.avatar_url,
   'bio', pu.bio,
@@ -81,11 +84,11 @@ SET metadata = jsonb_strip_nulls(jsonb_build_object(
 FROM public.users AS pu
 WHERE au.id = pu.id;
 
--- 2.8 For users without a public.users row, migrate auth.users.name to metadata
+-- 2.8 For users without a public.users row, migrate auth.users.name to profile
 UPDATE auth.users
-SET metadata = jsonb_build_object('name', name)
+SET profile = jsonb_build_object('name', name)
 WHERE name IS NOT NULL
-  AND (metadata IS NULL OR metadata = '{}'::jsonb)
+  AND (profile IS NULL OR profile = '{}'::jsonb)
   AND id NOT IN (SELECT id FROM public.users);
 
 -- 2.9 Update all foreign key constraints that reference public.users to use auth.users instead
@@ -145,7 +148,7 @@ BEGIN
   END LOOP;
 END $$;
 
--- 2.10 Drop public.users table (profile data now stored in auth.users.metadata)
+-- 2.10 Drop public.users table (profile data now stored in auth.users.profile)
 -- First drop RLS policies
 DROP POLICY IF EXISTS "Enable read access for all users" ON public.users;
 DROP POLICY IF EXISTS "Disable delete for users" ON public.users;
@@ -153,7 +156,7 @@ DROP POLICY IF EXISTS "Enable update for users based on user_id" ON public.users
 -- Drop the table (CASCADE will handle any remaining dependencies)
 DROP TABLE IF EXISTS public.users CASCADE;
 
--- 2.11 Drop the name column from auth.users (data already migrated to metadata)
+-- 2.11 Drop the name column from auth.users (data already migrated to profile)
 ALTER TABLE auth.users DROP COLUMN IF EXISTS name;
 
 -- Note: _storage.uploaded_by FK is handled in Part 4 when moving to storage schema
@@ -186,16 +189,16 @@ ALTER TABLE auth._email_otps RENAME TO email_otps;
 GRANT USAGE ON SCHEMA auth TO PUBLIC;
 
 -- Grant SELECT on specific columns only (public profile info)
-GRANT SELECT (id, metadata, created_at) ON auth.users TO PUBLIC;
+GRANT SELECT (id, profile, created_at) ON auth.users TO PUBLIC;
 
--- Grant UPDATE on metadata column only
-GRANT UPDATE (metadata) ON auth.users TO PUBLIC;
+-- Grant UPDATE on profile column only (users can update their own profile)
+GRANT UPDATE (profile) ON auth.users TO PUBLIC;
 
 -- 2.18 Enable RLS on auth.users for row-level access control
 -- Note: auth.uid() function already exists from migration 013
 ALTER TABLE auth.users ENABLE ROW LEVEL SECURITY;
 
--- Policy: Everyone can SELECT public columns (id, metadata, created_at)
+-- Policy: Everyone can SELECT public columns (id, profile, created_at)
 -- Column-level GRANT above already restricts which columns can be read
 CREATE POLICY "Public can view user profiles" ON auth.users
   FOR SELECT

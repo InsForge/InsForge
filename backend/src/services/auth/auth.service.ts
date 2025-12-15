@@ -130,11 +130,11 @@ export class AuthService {
     try {
       await client.query('BEGIN');
 
-      const metadata = name ? JSON.stringify({ name }) : '{}';
+      const profile = name ? JSON.stringify({ name }) : '{}';
       await client.query(
-        `INSERT INTO auth.users (id, email, password, metadata, email_verified, created_at, updated_at)
+        `INSERT INTO auth.users (id, email, password, profile, email_verified, created_at, updated_at)
          VALUES ($1, $2, $3, $4::jsonb, $5, NOW(), NOW())`,
-        [userId, email, hashedPassword, metadata, false]
+        [userId, email, hashedPassword, profile, false]
       );
 
       await client.query('COMMIT');
@@ -614,7 +614,8 @@ export class AuthService {
         emailVerified: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        metadata: { name: 'Administrator' },
+        profile: { name: 'Administrator' },
+        metadata: null,
       },
       accessToken,
     };
@@ -645,7 +646,8 @@ export class AuthService {
           emailVerified: true,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          metadata: { name: 'Administrator' },
+          profile: { name: 'Administrator' },
+          metadata: null,
         },
         accessToken,
       };
@@ -794,13 +796,13 @@ export class AuthService {
       await client.query('BEGIN');
 
       // Create user record (without password for OAuth users)
-      const metadata = JSON.stringify({ name: userName, avatar_url: avatarUrl });
+      const profile = JSON.stringify({ name: userName, avatar_url: avatarUrl });
       await client.query(
         `
-        INSERT INTO auth.users (id, email, metadata, email_verified, created_at, updated_at)
+        INSERT INTO auth.users (id, email, profile, email_verified, created_at, updated_at)
         VALUES ($1, $2, $3::jsonb, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `,
-        [userId, email, metadata]
+        [userId, email, profile]
       );
 
       // Create auth.user_providers record
@@ -823,7 +825,8 @@ export class AuthService {
         emailVerified: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        metadata: { name: userName, avatar_url: avatarUrl },
+        profile: { name: userName, avatar_url: avatarUrl },
+        metadata: null,
       };
 
       const accessToken = this.tokenManager.generateToken({
@@ -1056,6 +1059,7 @@ export class AuthService {
       createdAt: dbUser.created_at,
       updatedAt: dbUser.updated_at,
       providers: providers,
+      profile: dbUser.profile,
       metadata: dbUser.metadata,
     };
   }
@@ -1127,6 +1131,51 @@ export class AuthService {
       return null;
     }
     return this.transformUserRecordToSchema(dbUser);
+  }
+
+  /**
+   * Get user profile by ID (public endpoint - returns id and profile)
+   */
+  async getProfileById(
+    userId: string
+  ): Promise<{ id: string; profile: Record<string, unknown> | null } | null> {
+    const pool = this.getPool();
+    const result = await pool.query(`SELECT id, profile FROM auth.users WHERE id = $1`, [userId]);
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    return {
+      id: result.rows[0].id,
+      profile: result.rows[0].profile,
+    };
+  }
+
+  /**
+   * Update user profile (for authenticated user updating their own profile)
+   */
+  async updateProfile(
+    userId: string,
+    profile: Record<string, unknown>
+  ): Promise<{ id: string; profile: Record<string, unknown> | null }> {
+    const pool = this.getPool();
+    const result = await pool.query(
+      `UPDATE auth.users
+       SET profile = COALESCE(profile, '{}'::jsonb) || $1::jsonb, updated_at = NOW()
+       WHERE id = $2
+       RETURNING id, profile`,
+      [profile, userId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
+    }
+
+    return {
+      id: result.rows[0].id,
+      profile: result.rows[0].profile,
+    };
   }
 
   /**
