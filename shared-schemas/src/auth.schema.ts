@@ -30,7 +30,7 @@ export const verificationMethodSchema = z.enum(['code', 'link']);
 // ============================================================================
 
 /**
- * User entity schema - represents the _user table in PostgreSQL
+ * User entity schema - represents the auth.users table in PostgreSQL
  */
 export const userSchema = z.object({
   id: userIdSchema,
@@ -39,7 +39,8 @@ export const userSchema = z.object({
   providers: z.array(z.string()).optional(),
   createdAt: z.string(), // PostgreSQL timestamp
   updatedAt: z.string(), // PostgreSQL timestamp
-  metadata: z.record(z.unknown()).nullable(),
+  profile: z.record(z.unknown()).nullable(), // User profile data (name, avatar_url, bio, etc.)
+  metadata: z.record(z.unknown()).nullable(), // System metadata (device ID, login IP, etc.)
 });
 
 /**

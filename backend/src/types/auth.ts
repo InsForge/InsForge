@@ -3,6 +3,7 @@
 export interface UserRecord {
   id: string;
   email: string;
+  profile: Record<string, unknown> | null;
   metadata: Record<string, unknown> | null;
   email_verified: boolean;
   is_project_admin: boolean;

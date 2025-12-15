@@ -23,6 +23,7 @@ import {
   sendResetPasswordEmailRequestSchema,
   exchangeResetPasswordTokenRequestSchema,
   resetPasswordRequestSchema,
+  updateProfileRequestSchema,
   type CreateUserResponse,
   type CreateSessionResponse,
   type VerifyEmailResponse,
@@ -30,6 +31,7 @@ import {
   type ResetPasswordResponse,
   type CreateAdminSessionResponse,
   type GetCurrentSessionResponse,
+  type GetProfileResponse,
   type ListUsersResponse,
   type DeleteUsersResponse,
   type GetPublicAuthConfigResponse,
@@ -63,6 +65,60 @@ router.get('/public-config', async (req: Request, res: Response, next: NextFunct
       oAuthProviders,
       ...authConfigs,
     };
+
+    successResponse(res, response);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/auth/profiles/current - Update current user's profile (authenticated)
+router.patch(
+  '/profiles/current',
+  verifyToken,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user) {
+        throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
+      }
+
+      const validationResult = updateProfileRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const { profile } = validationResult.data;
+      const result = await authService.updateProfile(req.user.id, profile);
+
+      const response: GetProfileResponse = result;
+
+      successResponse(res, response);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /api/auth/profiles/:userId - Get user profile by ID (public endpoint)
+router.get('/profiles/:userId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userIdValidation = userIdSchema.safeParse(req.params.userId);
+    if (!userIdValidation.success) {
+      throw new AppError('Invalid user ID format', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
+    const userId = userIdValidation.data;
+    const userProfile = await authService.getProfileById(userId);
+
+    if (!userProfile) {
+      throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
+    }
+
+    const response: GetProfileResponse = userProfile;
 
     successResponse(res, response);
   } catch (error) {
@@ -355,7 +411,7 @@ router.get('/users', verifyAdmin, async (req: Request, res: Response, next: Next
   }
 });
 
-// GET /api/auth/users/:id - Get specific user (admin only)
+// GET /api/auth/users/:userId - Get specific user (admin only)
 router.get(
   '/users/:userId',
   verifyAdmin,
