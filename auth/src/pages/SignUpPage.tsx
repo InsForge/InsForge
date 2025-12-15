@@ -26,7 +26,7 @@ export function SignUpPage() {
             params.set('access_token', accessToken);
             params.set('user_id', user.id);
             params.set('email', user.email);
-            params.set('name', user.name);
+            params.set('name', String(user.profile?.name));
             finalUrl.search = params.toString();
             window.location.href = finalUrl.toString();
           } catch {

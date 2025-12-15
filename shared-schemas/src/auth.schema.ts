@@ -25,6 +25,18 @@ export const roleSchema = z.enum(['anon', 'authenticated', 'project_admin']);
 
 export const verificationMethodSchema = z.enum(['code', 'link']);
 
+/**
+ * User profile schema with default fields and passthrough for custom fields
+ * Note: Using snake_case for fields as they are stored directly in PostgreSQL JSONB
+ */
+export const profileSchema = z
+  .object({
+    name: z.string().optional(),
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    avatar_url: z.string().url().optional(),
+  })
+  .passthrough();
+
 // ============================================================================
 // Core entity schemas
 // ============================================================================
@@ -39,7 +51,7 @@ export const userSchema = z.object({
   providers: z.array(z.string()).optional(),
   createdAt: z.string(), // PostgreSQL timestamp
   updatedAt: z.string(), // PostgreSQL timestamp
-  profile: z.record(z.unknown()).nullable(), // User profile data (name, avatar_url, bio, etc.)
+  profile: profileSchema.nullable(), // User profile data (name, avatar_url, bio, etc.)
   metadata: z.record(z.unknown()).nullable(), // System metadata (device ID, login IP, etc.)
 });
 
@@ -117,6 +129,7 @@ export type EmailSchema = z.infer<typeof emailSchema>;
 export type PasswordSchema = z.infer<typeof passwordSchema>;
 export type RoleSchema = z.infer<typeof roleSchema>;
 export type VerificationMethodSchema = z.infer<typeof verificationMethodSchema>;
+export type ProfileSchema = z.infer<typeof profileSchema>;
 export type UserSchema = z.infer<typeof userSchema>;
 export type TokenPayloadSchema = z.infer<typeof tokenPayloadSchema>;
 export type OAuthConfigSchema = z.infer<typeof oAuthConfigSchema>;
