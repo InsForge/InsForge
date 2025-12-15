@@ -256,7 +256,7 @@ export class AuthService {
 
     // Send email with verification code
     const emailService = EmailService.getInstance();
-    const userName = dbUser.metadata?.name || 'User';
+    const userName = dbUser.profile?.name || 'User';
     await emailService.sendWithTemplate(email, userName, 'email-verification-code', {
       token: code,
     });
@@ -291,7 +291,7 @@ export class AuthService {
 
     // Send email with verification link
     const emailService = EmailService.getInstance();
-    const userName = dbUser.metadata?.name || 'User';
+    const userName = dbUser.profile?.name || 'User';
     await emailService.sendWithTemplate(email, userName, 'email-verification-link', {
       link: linkUrl,
     });
@@ -454,7 +454,7 @@ export class AuthService {
 
     // Send email with reset password code
     const emailService = EmailService.getInstance();
-    const userName = dbUser.metadata?.name || 'User';
+    const userName = dbUser.profile?.name || 'User';
     await emailService.sendWithTemplate(email, userName, 'reset-password-code', {
       token: code,
     });
@@ -489,7 +489,7 @@ export class AuthService {
 
     // Send email with password reset link
     const emailService = EmailService.getInstance();
-    const userName = dbUser.metadata?.name || 'User';
+    const userName = dbUser.profile?.name || 'User';
     await emailService.sendWithTemplate(email, userName, 'reset-password-link', {
       link: linkUrl,
     });
@@ -984,6 +984,7 @@ export class AuthService {
       SELECT
         u.id,
         u.email,
+        u.profile,
         u.metadata,
         u.email_verified,
         u.is_project_admin,
@@ -1014,6 +1015,7 @@ export class AuthService {
       SELECT
         u.id,
         u.email,
+        u.profile,
         u.metadata,
         u.email_verified,
         u.is_project_admin,
@@ -1077,6 +1079,7 @@ export class AuthService {
       SELECT
         u.id,
         u.email,
+        u.profile,
         u.metadata,
         u.email_verified,
         u.is_project_admin,
@@ -1092,7 +1095,7 @@ export class AuthService {
     const params: (string | number)[] = [];
 
     if (search) {
-      query += ` AND (u.email LIKE $1 OR u.metadata->>'name' LIKE $2)`;
+      query += ` AND (u.email LIKE $1 OR u.profile->>'name' LIKE $2)`;
       params.push(`%${search}%`, `%${search}%`);
     }
 
@@ -1110,7 +1113,7 @@ export class AuthService {
       'SELECT COUNT(*) as count FROM auth.users WHERE is_project_admin = false AND is_anonymous = false';
     const countParams: string[] = [];
     if (search) {
-      countQuery += ` AND (email LIKE $1 OR metadata->>'name' LIKE $2)`;
+      countQuery += ` AND (email LIKE $1 OR profile->>'name' LIKE $2)`;
       countParams.push(`%${search}%`, `%${search}%`);
     }
     const countResult = await pool.query(countQuery, countParams);
