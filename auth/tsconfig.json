@@ -23,7 +23,8 @@
     /* Path mapping */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@insforge/shared-schemas": ["../shared-schemas/src/index.ts"],
     }
   },
   "include": ["src"],
