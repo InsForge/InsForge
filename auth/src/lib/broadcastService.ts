@@ -1,3 +1,5 @@
+import { UserSchema } from '@insforge/shared-schemas';
+
 export enum BroadcastEventType {
   EMAIL_VERIFIED_SUCCESS = 'EMAIL_VERIFIED_SUCCESS',
   PASSWORD_RESET_SUCCESS = 'PASSWORD_RESET_SUCCESS',
@@ -8,7 +10,7 @@ export interface BroadcastEvent {
   timestamp: number;
   data?: {
     accessToken?: string;
-    user?: { id: string; email: string; name: string };
+    user?: UserSchema;
   };
 }
 

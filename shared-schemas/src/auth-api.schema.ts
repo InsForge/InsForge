@@ -5,6 +5,7 @@ import {
   nameSchema,
   userIdSchema,
   userSchema,
+  profileSchema,
   oAuthConfigSchema,
   oAuthProvidersSchema,
   authConfigSchema,
@@ -190,7 +191,7 @@ export const getCurrentSessionResponseSchema = z.object({
  */
 export const getProfileResponseSchema = z.object({
   id: userIdSchema,
-  profile: z.record(z.unknown()).nullable(),
+  profile: profileSchema.nullable(),
 });
 
 /**
