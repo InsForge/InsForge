@@ -194,9 +194,9 @@ const UserSelectionCell = ({
   onToggle,
   tabIndex,
 }: SelectionCellProps<UserDataGridRow>) => {
-  const metadata = row.metadata as Record<string, unknown> | null;
-  const avatarUrl = metadata?.avatar_url as string | undefined;
-  const name = metadata?.name as string | undefined;
+  const profile = row.profile as Record<string, unknown> | null;
+  const avatarUrl = profile?.avatar_url as string | undefined;
+  const name = profile?.name as string | undefined;
 
   return (
     <div className="flex items-center gap-2 w-full h-full">
