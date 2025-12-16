@@ -54,9 +54,16 @@ async function bootstrapMigrations() {
         // Create system schema if it doesn't exist
         await client.query('CREATE SCHEMA IF NOT EXISTS system');
 
-        // Move the table
-        await client.query('ALTER TABLE public._migrations SET SCHEMA system');
-        await client.query('ALTER TABLE system._migrations RENAME TO migrations');
+        // Move the table in a transaction to avoid partial state
+        await client.query('BEGIN');
+        try {
+          await client.query('ALTER TABLE public._migrations SET SCHEMA system');
+          await client.query('ALTER TABLE system._migrations RENAME TO migrations');
+          await client.query('COMMIT');
+        } catch (error) {
+          await client.query('ROLLBACK');
+          throw error;
+        }
 
         console.log('Bootstrap: Successfully moved _migrations to system.migrations');
       } else if (newTableExists.rows[0].exists) {
@@ -73,10 +80,14 @@ async function bootstrapMigrations() {
     }
   } catch (error) {
     console.error('Bootstrap migration failed:', error.message);
-    process.exit(1);
+    process.exitCode = 1;
   } finally {
     await pool.end();
   }
 }
 
-bootstrapMigrations();
+bootstrapMigrations().catch((error) => {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error('Bootstrap migration failed:', message);
+  process.exitCode = 1;
+});

@@ -183,6 +183,10 @@ export class SecretService {
         values.push(input.expiresAt);
       }
 
+      if (updates.length === 0) {
+        return false;
+      }
+
       values.push(id);
 
       const result = await this.getPool().query(
@@ -225,7 +229,12 @@ export class SecretService {
       }
 
       const decryptedValue = EncryptionManager.decrypt(result.rows[0].value_ciphertext);
-      const matches = decryptedValue === value;
+      // Use constant-time comparison to prevent timing attacks
+      const decryptedBuffer = Buffer.from(decryptedValue);
+      const valueBuffer = Buffer.from(value);
+      const matches =
+        decryptedBuffer.length === valueBuffer.length &&
+        crypto.timingSafeEqual(decryptedBuffer, valueBuffer);
 
       if (matches) {
         logger.info('Secret check successful', { key });

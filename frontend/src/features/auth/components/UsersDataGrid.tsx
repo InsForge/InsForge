@@ -1,6 +1,9 @@
 import { useMemo } from 'react';
 import { User } from 'lucide-react';
 import {
+  Avatar,
+  AvatarImage,
+  AvatarFallback,
   Badge,
   Checkbox,
   DataGrid,
@@ -202,17 +205,12 @@ const UserSelectionCell = ({
     <div className="flex items-center gap-2 w-full h-full">
       <Checkbox checked={isSelected} onChange={onToggle} tabIndex={tabIndex} />
       <div className="flex items-center gap-2 min-w-0 flex-1">
-        {avatarUrl ? (
-          <img
-            src={avatarUrl}
-            alt={name || 'User avatar'}
-            className="w-6 h-6 rounded-full object-cover flex-shrink-0"
-          />
-        ) : (
-          <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-neutral-700 flex items-center justify-center flex-shrink-0">
+        <Avatar className="w-6 h-6 rounded-full flex-shrink-0">
+          <AvatarImage src={avatarUrl} alt={name || 'User avatar'} className="object-cover" />
+          <AvatarFallback className="bg-gray-200 dark:bg-neutral-700 rounded-full">
             <User className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
-          </div>
-        )}
+          </AvatarFallback>
+        </Avatar>
         <span
           className={cn(
             'text-sm truncate',

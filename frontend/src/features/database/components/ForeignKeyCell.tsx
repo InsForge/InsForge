@@ -38,7 +38,7 @@ export function ForeignKeyCell({ value, foreignKey, onJumpToTable }: ForeignKeyC
   const isAuthUsers = foreignKey.table === AUTH_USERS_TABLE;
 
   // Regular table records hook (disabled for auth.users)
-  const recordsHook = useRecords(isAuthUsers ? '' : foreignKey.table);
+  const recordsHook = useRecords(foreignKey.table);
 
   // Auth users hook
   const { getUser } = useUsers({ enabled: false });

@@ -15,7 +15,6 @@ export type ConvertedValue =
   | number // INTEGER, FLOAT
   | boolean // BOOLEAN
   | null // NULL values for any nullable column
-  | JSON // JSON (as parsed object or string)
   | Record<string, unknown> // JSON objects (e.g., metadata fields)
   | string[]; // Array of strings (e.g., providers)
 
