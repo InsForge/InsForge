@@ -1,11 +1,23 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { createRemoteJWKSet, JWTPayload, jwtVerify } from 'jose';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 import type { TokenPayloadSchema } from '@insforge/shared-schemas';
 
 const JWT_SECRET = process.env.JWT_SECRET ?? '';
+// TODO: Change access token expiration time to 15 min
 const JWT_EXPIRES_IN = '7d';
+const REFRESH_TOKEN_EXPIRES_IN = '7d';
+
+/**
+ * Refresh token payload interface
+ */
+export interface RefreshTokenPayload {
+  sub: string;
+  type: 'refresh';
+  iss: string;
+}
 
 /**
  * Create JWKS instance with caching and timeout configuration
@@ -39,7 +51,7 @@ export class TokenManager {
   }
 
   /**
-   * Generate JWT token for users and admins
+   * Generate JWT access token for users and admins
    */
   generateToken(payload: TokenPayloadSchema): string {
     return jwt.sign(payload, JWT_SECRET, {
@@ -62,6 +74,46 @@ export class TokenManager {
       algorithm: 'HS256',
       // No expiresIn means token never expires
     });
+  }
+
+  /**
+   * Generate refresh token for secure session management
+   */
+  generateRefreshToken(userId: string): string {
+    const refreshPayload: RefreshTokenPayload = {
+      sub: userId,
+      type: 'refresh',
+      iss: 'insforge',
+    };
+    return jwt.sign(refreshPayload, JWT_SECRET, {
+      algorithm: 'HS256',
+      expiresIn: REFRESH_TOKEN_EXPIRES_IN,
+    });
+  }
+
+  /**
+   * Verify refresh token and return payload
+   * Ensures the token is a valid refresh token (not an access token)
+   */
+  verifyRefreshToken(token: string): RefreshTokenPayload {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET, {
+        algorithms: ['HS256'],
+        issuer: 'insforge',
+      }) as RefreshTokenPayload;
+
+      // Ensure this is a refresh token, not an access token
+      if (decoded.type !== 'refresh' || !decoded.sub) {
+        throw new AppError('Invalid refresh token type', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      }
+
+      return decoded;
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new AppError('Invalid or expired refresh token', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+    }
   }
 
   /**
@@ -136,6 +188,29 @@ export class TokenManager {
         ERROR_CODES.AUTH_INVALID_CREDENTIALS,
         NEXT_ACTION.CHECK_TOKEN
       );
+    }
+  }
+
+  /**
+   * Generate CSRF token derived from refresh token using HMAC
+   */
+  generateCsrfToken(refreshToken: string): string {
+    return crypto.createHmac('sha256', JWT_SECRET).update(refreshToken).digest('hex');
+  }
+
+  /**
+   * Verify CSRF token by re-computing from refresh token
+   * Uses timing-safe comparison to prevent timing attacks
+   */
+  verifyCsrfToken(csrfHeader: string | undefined, refreshToken: string): boolean {
+    if (!csrfHeader || !refreshToken) {
+      return false;
+    }
+    const expectedCsrf = this.generateCsrfToken(refreshToken);
+    try {
+      return crypto.timingSafeEqual(Buffer.from(csrfHeader), Buffer.from(expectedCsrf));
+    } catch {
+      return false;
     }
   }
 }

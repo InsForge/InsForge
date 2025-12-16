@@ -128,6 +128,7 @@ export const createUserResponseSchema = z.object({
   accessToken: z.string().nullable(),
   requireEmailVerification: z.boolean().optional(),
   redirectTo: z.string().url().optional(),
+  csrfToken: z.string().nullable().optional(),
 });
 
 /**
@@ -138,6 +139,7 @@ export const createSessionResponseSchema = z.object({
   user: userSchema,
   accessToken: z.string(),
   redirectTo: z.string().url().optional(),
+  csrfToken: z.string().nullable().optional(),
 });
 
 /**
@@ -148,6 +150,17 @@ export const verifyEmailResponseSchema = z.object({
   user: userSchema,
   accessToken: z.string(),
   redirectTo: z.string().url().optional(),
+  csrfToken: z.string().nullable().optional(),
+});
+
+/**
+ * Response for POST /api/auth/refresh
+ * Returns new access token and CSRF token after token refresh
+ */
+export const refreshSessionResponseSchema = z.object({
+  accessToken: z.string(),
+  user: userSchema,
+  csrfToken: z.string(),
 });
 
 /**
@@ -326,6 +339,7 @@ export type VerifyEmailResponse = z.infer<typeof verifyEmailResponseSchema>;
 export type ExchangeResetPasswordTokenResponse = z.infer<
   typeof exchangeResetPasswordTokenResponseSchema
 >;
+export type RefreshSessionResponse = z.infer<typeof refreshSessionResponseSchema>;
 export type ResetPasswordResponse = z.infer<typeof resetPasswordResponseSchema>;
 export type CreateAdminSessionResponse = z.infer<typeof createAdminSessionResponseSchema>;
 export type GetCurrentSessionResponse = z.infer<typeof getCurrentSessionResponseSchema>;

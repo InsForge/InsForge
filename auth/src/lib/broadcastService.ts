@@ -1,3 +1,4 @@
+// TODO: Rewrite this broadcast service file to implement PKCE in future
 export enum BroadcastEventType {
   EMAIL_VERIFIED_SUCCESS = 'EMAIL_VERIFIED_SUCCESS',
   PASSWORD_RESET_SUCCESS = 'PASSWORD_RESET_SUCCESS',
