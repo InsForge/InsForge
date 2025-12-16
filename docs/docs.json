@@ -15,7 +15,8 @@
   },
   "seo": {
     "metatags": {
-      "og:site_name": "InsForge Docs"
+      "og:site_name": "InsForge Docs",
+      "google-site-verification": "2dSsr0kxw61j9-qSOR0a1dq1PT6U1-2o3kiZMdsIf9g"
     },
     "indexing": "navigable"
   },

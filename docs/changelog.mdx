@@ -1,119 +1,151 @@
 ---
 title: "Changelog"
-description: "Latest updates and improvements to InsForge"
+description: "New features, improvements, and fixes shipped to InsForge."
 ---
 
-## December 2025
+<Update label="Dec 12, 2025" tags={["Payments", "AI"]}>
+  ## Alipay Payment Support
+  Added **Alipay** as an alternative payment method. Users can now pay for InsForge subscriptions without a credit card.
 
-<AccordionGroup>
-  <Accordion title="Dec 12 - Alipay & New AI Models" icon="rocket">
-    ### Alipay Payment Support
-    Added **Alipay** as an alternative payment method. Users can now pay for InsForge subscriptions without a credit card.
+  <Frame>
+    <img src="/images/changelog/dec-2025/alipay-payment.webp" alt="Alipay payment method option" />
+  </Frame>
 
-    <img src="/images/changelog/dec-2025/alipay-payment.webp" alt="Alipay payment method option" style={{maxWidth: '90%'}} />
+  ## New AI Models
+  Expanded AI model support:
+  - **GPT 5.2** - OpenAI's latest flagship model with enhanced reasoning, longer context windows, and improved instruction following
+  - **DeepSeek V3** - Open-weight model offering strong performance at lower cost, ideal for high-volume workloads
 
-    ### New AI Models
-    Expanded AI model support:
-    - **GPT 5.2** - OpenAI's latest flagship model with enhanced reasoning, longer context windows, and improved instruction following
-    - **DeepSeek V3** - Open-weight model offering strong performance at lower cost, ideal for high-volume workloads
+  [View AI SDK documentation →](/core-concepts/ai/sdk)
 
-    <img src="/images/changelog/dec-2025/ai-models.webp" alt="AI Integration with new models" style={{maxWidth: '90%'}} />
-  </Accordion>
-  <Accordion title="Dec 11 - Apple Login & Realtime Module" icon="rocket">
-    ### Apple Login
-    **Sign in with Apple** is now available as an OAuth provider. Enable it in your project settings and let users authenticate with their Apple ID. Like other social providers, InsForge Cloud offers shared credentials for quick testing.
+  <Frame>
+    <img src="/images/changelog/dec-2025/ai-models.webp" alt="AI Integration with new models" />
+  </Frame>
+</Update>
 
-    <img src="/images/changelog/dec-2025/apple-login.jpg" alt="Sign in with Apple authentication" style={{maxWidth: '90%'}} />
+<Update label="Dec 11, 2025" tags={["Auth", "Realtime"]}>
+  ## Apple Login
+  **Sign in with Apple** is now available as an OAuth provider. Enable it in your project settings and let users authenticate with their Apple ID. Like other social providers, InsForge Cloud offers shared credentials for quick testing.
 
-    ### Realtime Module
-    Build apps with **realtime pub/sub messaging**. Whether you're creating a chat room, multiplayer game, or collaborative document editor, the new Realtime module handles WebSocket connections, channel subscriptions, and message delivery out of the box.
+  [View Authentication docs →](/core-concepts/authentication/sdk)
 
-    Key features include:
-    - **Channel patterns** with wildcard support (e.g., `chat:*`, `game:lobby`)
-    - **Webhook integrations** for server-side event processing
-    - **Message history** and delivery analytics
-    - **RLS-based permissions** for secure subscribe and publish operations
+  <Frame>
+    <img src="/images/changelog/dec-2025/apple-login.jpg" alt="Sign in with Apple authentication" />
+  </Frame>
 
-    <img src="/images/changelog/dec-2025/realtime-module.jpg" alt="Realtime multiplayer chess game demo" style={{maxWidth: '90%'}} />
-  </Accordion>
-  <Accordion title="Dec 7 - AI Models, MCP Installer & Security Updates" icon="rocket">
-    ### AI Integration
-    Expanded model support with smarter defaults for different use cases.
+  ## Realtime Module
+  Build apps with **realtime pub/sub messaging**. Whether you're creating a chat room, multiplayer game, or collaborative document editor, the new Realtime module handles WebSocket connections, channel subscriptions, and message delivery out of the box.
 
-    - **Gemini 3 Pro** is now the default image generation model.
-    - **Grok 4.1 Fast** added to model selection for quicker, lightweight inference.
+  Key features include:
+  - **Channel patterns** with wildcard support (e.g., `chat:*`, `game:lobby`)
+  - **Webhook integrations** for server-side event processing
+  - **Message history** and delivery analytics
+  - **RLS-based permissions** for secure subscribe and publish operations
 
-    <img src="/images/changelog/dec-2025/ai-integration.png" alt="AI Integration with new models" style={{maxWidth: '90%'}} />
+  [View Realtime SDK documentation →](/core-concepts/realtime/sdk)
 
-    ### MCP Installer
-    Updated installer experience with a new InsForge-branded startup screen and clearer next-step instructions.
+  <Frame>
+    <img src="/images/changelog/dec-2025/realtime-module.jpg" alt="Realtime multiplayer chess game demo" />
+  </Frame>
+</Update>
 
-    <img src="/images/changelog/dec-2025/mcp-installer.png" alt="MCP Installer with InsForge branding" style={{maxWidth: '90%'}} />
+<Update label="Dec 7, 2025" tags={["AI", "Security"]}>
+  ## AI Integration
+  Expanded model support with smarter defaults for different use cases.
 
-    ### Security & Framework Updates
-    Updated Next.js version in response to a [security incident](https://nextjs.org/blog/CVE-2025-66478).
-  </Accordion>
-</AccordionGroup>
+  - **Gemini 3 Pro** is now the default image generation model.
+  - **Grok 4.1 Fast** added to model selection for quicker, lightweight inference.
 
-## November 2025
+  [View AI SDK documentation →](/core-concepts/ai/sdk)
 
-<AccordionGroup>
-  <Accordion title="Nov 30 - QuickStart, Auth Components & Dashboard Tools" icon="rocket">
-    ### QuickStart Prompts & Templates
-    Get started faster with our new quickstart prompts and templates for common apps. Builders can now start with one click and get a fullstack app running in **5 minutes**.
+  <Frame>
+    <img src="/images/changelog/dec-2025/ai-integration.png" alt="AI Integration with new models" />
+  </Frame>
 
+  ## MCP Installer
+  Updated installer experience with a new InsForge-branded startup screen and clearer next-step instructions.
+
+  <Frame>
+    <img src="/images/changelog/dec-2025/mcp-installer.png" alt="MCP Installer with InsForge branding" />
+  </Frame>
+
+  ## Security & Framework Updates
+  Updated Next.js version in response to a [security incident](https://nextjs.org/blog/CVE-2025-66478).
+</Update>
+
+<Update label="Nov 30, 2025" tags={["Dashboard", "Auth"]}>
+  ## QuickStart Prompts & Templates
+  Get started faster with our new quickstart prompts and templates for common apps. Builders can now start with one click and get a fullstack app running in **5 minutes**.
+
+  [Try the quickstart →](/quickstart)
+
+  <Frame>
     <img src="/images/changelog/nov-2025/quickstart-prompts.webp" alt="QuickStart Prompts and Templates" />
+  </Frame>
 
-    ### Auth Components
-    Drop-in prebuilt React auth components for your app. Get a working auth flow right away with social sign-on support built in by default.
+  ## Auth Components
+  Drop-in prebuilt React auth components for your app. Get a working auth flow right away with social sign-on support built in by default.
 
+  [View Auth Components docs →](/core-concepts/authentication/ui-components/react)
+
+  <Frame>
     <img src="/images/changelog/nov-2025/auth-components.webp" alt="Auth Components with Social Sign-on" />
+  </Frame>
 
-    ### Database Metadata Dashboard
-    View your RLS policies, triggers, functions, and indexes all in one place. This makes debugging and understanding your project security much easier.
+  ## Database Metadata Dashboard
+  View your RLS policies, triggers, functions, and indexes all in one place. This makes debugging and understanding your project security much easier.
 
+  <Frame>
     <img src="/images/changelog/nov-2025/database-metadata.webp" alt="Database Metadata Dashboard" />
+  </Frame>
 
-    ### SQL Editor
-    Run SQL queries directly in the InsForge dashboard. No external tools required.
+  ## SQL Editor
+  Run SQL queries directly in the InsForge dashboard. No external tools required.
 
+  <Frame>
     <img src="/images/changelog/nov-2025/sql-editor.webp" alt="SQL Editor in Dashboard" />
+  </Frame>
 
-    ### Usage Page
-    A new dashboard section that displays a clear breakdown of your resource usage and what your plan includes.
+  ## Usage Page
+  A new dashboard section that displays a clear breakdown of your resource usage and what your plan includes.
 
+  <Frame>
     <img src="/images/changelog/nov-2025/usage-page.webp" alt="Usage Page Dashboard" />
-  </Accordion>
-</AccordionGroup>
+  </Frame>
+</Update>
 
-## October 2025
+<Update label="Oct 30, 2025" tags={["Auth", "SDK"]}>
+  ## OAuth: 4 New Third-Party Providers
+  You can now enable third-party logins with **LinkedIn, Microsoft, Facebook, and Discord**. On InsForge Cloud, we provide shared credentials for developers who want to quickly test these login flows.
 
-<AccordionGroup>
-  <Accordion title="Oct 30 - OAuth Providers, SDK & Logs" icon="rocket">
-    ### OAuth: 4 New Third-Party Providers
-    You can now enable third-party logins with **LinkedIn, Microsoft, Facebook, and Discord**. On InsForge Cloud, we provide shared credentials for developers who want to quickly test these login flows.
+  After enabling, you can implement these logins directly through your agent by sending a simple prompt:
 
-    After enabling, you can implement these logins directly through your agent by sending a simple prompt:
+  ```text
+  implement Discord login
+  ```
 
-    ```text
-    implement Discord login
-    ```
+  [View Authentication docs →](/core-concepts/authentication/sdk)
 
+  <Frame>
     <img src="/images/changelog/october-2025/oauth-providers.webp" alt="OAuth Providers - LinkedIn, Microsoft, Facebook, and Discord" />
+  </Frame>
 
-    ### Import CSV to Your Table
-    You can now upload `.csv` files directly into any table from the dashboard. Perfect for bringing in sample data or migrating from other tools.
+  ## Import CSV to Your Table
+  You can now upload `.csv` files directly into any table from the dashboard. Perfect for bringing in sample data or migrating from other tools.
 
+  <Frame>
     <img src="/images/changelog/october-2025/csv-upload.webp" alt="CSV Upload to Tables Feature" />
+  </Frame>
 
-    ### InsForge.js SDK
-    We've released our **insforge-js SDK** to make it easier for developers to integrate InsForge into their workflows. Manage auth, query databases, and control your backend programmatically with a few lines of code.
+  ## InsForge.js SDK
+  We've released our **insforge-js SDK** to make it easier for developers to integrate InsForge into their workflows. Manage auth, query databases, and control your backend programmatically with a few lines of code.
 
-    **Repository:** [GitHub](https://github.com/InsForge/InsForge-sdk-js)
+  [GitHub](https://github.com/InsForge/InsForge-sdk-js) · [Database SDK →](/core-concepts/database/sdk)
 
-    ### Logs
-    The new logs page lets you monitor container logs in real time. You can watch your backend activity directly in the dashboard, or let AI coding agents query logs through the InsForge MCP to automatically debug and search for errors.
+  ## Logs
+  The new logs page lets you monitor container logs in real time. You can watch your backend activity directly in the dashboard, or let AI coding agents query logs through the InsForge MCP to automatically debug and search for errors.
 
+  <Frame>
     <img src="/images/changelog/october-2025/logs-feature.webp" alt="Real-time Logs Monitoring Feature" />
-  </Accordion>
-</AccordionGroup>
+  </Frame>
+</Update>

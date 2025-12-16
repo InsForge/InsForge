@@ -1,5 +1,5 @@
 ---
-title: Architecture
+title: AI Architecture
 description: OpenRouter integration for chat completions and image generation
 ---
 
@@ -77,28 +77,6 @@ sequenceDiagram
     InsForge->>InsForge: Track usage
     InsForge-->>Client: Formatted response
 ```
-
-## Available Models
-
-### Chat Models
-
-| Provider | Model | ID | Best For |
-|----------|-------|----|---------| 
-| **Anthropic** | Claude Sonnet 4 | `anthropic/claude-sonnet-4` | Complex reasoning |
-| **Anthropic** | Claude 3.5 Haiku | `anthropic/claude-3.5-haiku` | Fast responses |
-| **Anthropic** | Claude Opus 4.1 | `anthropic/claude-opus-4.1` | Highest quality |
-| **OpenAI** | GPT-5 | `openai/gpt-5` | Most advanced |
-| **OpenAI** | GPT-5 Mini | `openai/gpt-5-mini` | Fast & efficient |
-| **OpenAI** | GPT-4o | `openai/gpt-4o` | General purpose |
-| **Google** | Gemini 2.5 Pro | `google/gemini-2.5-pro` | Advanced reasoning |
-| **xAI** | Grok 4 | `x-ai/grok-4` | Advanced reasoning |
-
-### Image Models
-
-| Provider | Model | ID | Capabilities |
-|----------|-------|----|--------------| 
-| **Google** | Gemini 2.5 Flash Image | `google/gemini-2.5-flash-image-preview` | Text-to-image generation |
-| **Google** | Gemini 3 Pro Image | `google/gemini-3-pro-image-preview` | Advanced text-to-image generation |
 
 ## Chat Completions
 
