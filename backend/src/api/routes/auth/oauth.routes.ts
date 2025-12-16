@@ -7,11 +7,7 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
-import {
-  setAuthCookie,
-  REFRESH_TOKEN_COOKIE_NAME,
-  CSRF_TOKEN_COOKIE_NAME,
-} from '@/utils/cookies.js';
+import { setAuthCookie, REFRESH_TOKEN_COOKIE_NAME } from '@/utils/cookies.js';
 import logger from '@/utils/logger.js';
 import jwt from 'jsonwebtoken';
 import {
@@ -347,14 +343,14 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     // Handle shared callback - transforms payload and creates/finds user
     const result = await authService.handleSharedCallback(validatedProvider, payloadData);
 
-    // Set refresh token in httpOnly cookie before redirect and generate CSRF token
+    // Set refresh token in httpOnly cookie and generate CSRF token
     const tokenManager = TokenManager.getInstance();
     const refreshToken = tokenManager.generateRefreshToken(result.user.id);
     setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
     const csrfToken = tokenManager.generateCsrfToken(refreshToken);
-    setAuthCookie(res, CSRF_TOKEN_COOKIE_NAME, csrfToken);
 
     const params = new URLSearchParams();
+    // TODO: Remove all the parameters, will use PKCE in future
     params.set('access_token', result.accessToken);
     params.set('user_id', result.user.id);
     params.set('email', result.user.email);
@@ -426,15 +422,15 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
         state: state || undefined,
       });
 
-      // Set refresh token in httpOnly cookie before redirect and generate CSRF token
+      // Set refresh token in httpOnly cookie and generate CSRF token
       const tokenManager = TokenManager.getInstance();
       const refreshToken = tokenManager.generateRefreshToken(result.user.id);
       setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
       const csrfToken = tokenManager.generateCsrfToken(refreshToken);
-      setAuthCookie(res, CSRF_TOKEN_COOKIE_NAME, csrfToken);
 
       // Construct redirect URL with query parameters
       const params = new URLSearchParams();
+      // TODO: Remove all the parameters, will use PKCE in future
       params.set('access_token', result.accessToken);
       params.set('user_id', result.user.id);
       params.set('email', result.user.email);

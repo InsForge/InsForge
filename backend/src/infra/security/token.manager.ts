@@ -6,6 +6,7 @@ import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 import type { TokenPayloadSchema } from '@insforge/shared-schemas';
 
 const JWT_SECRET = process.env.JWT_SECRET ?? '';
+// TODO: Change access token expiration time to 15 min
 const JWT_EXPIRES_IN = '7d';
 const REFRESH_TOKEN_EXPIRES_IN = '7d';
 
@@ -197,19 +198,20 @@ export class TokenManager {
     return crypto
       .createHmac('sha256', JWT_SECRET)
       .update(refreshToken)
-      .digest('hex')
-      .substring(0, 32);
+      .digest('hex');
   }
 
   /**
-   * Verify CSRF token using timing-safe comparison
+   * Verify CSRF token by re-computing from refresh token
+   * Uses timing-safe comparison to prevent timing attacks
    */
-  verifyCsrfToken(csrfHeader: string | undefined, csrfCookie: string | undefined): boolean {
-    if (!csrfHeader || !csrfCookie) {
+  verifyCsrfToken(csrfHeader: string | undefined, refreshToken: string): boolean {
+    if (!csrfHeader || !refreshToken) {
       return false;
     }
+    const expectedCsrf = this.generateCsrfToken(refreshToken);
     try {
-      return crypto.timingSafeEqual(Buffer.from(csrfHeader), Buffer.from(csrfCookie));
+      return crypto.timingSafeEqual(Buffer.from(csrfHeader), Buffer.from(expectedCsrf));
     } catch {
       return false;
     }
