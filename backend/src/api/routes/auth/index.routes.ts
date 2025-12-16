@@ -132,12 +132,11 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
     const result: CreateUserResponse = await authService.register(email, password, name);
 
     // Set refresh token in httpOnly cookie and generate CSRF token
-    let csrfToken: string | null = null;
     if (result.accessToken && result.user) {
       const tokenManager = TokenManager.getInstance();
       const refreshToken = tokenManager.generateRefreshToken(result.user.id);
       setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
-      csrfToken = tokenManager.generateCsrfToken(refreshToken);
+      result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
     }
 
     const socket = SocketManager.getInstance();
@@ -148,7 +147,7 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
       'system'
     );
 
-    successResponse(res, { ...result, csrfToken });
+    successResponse(res, result);
   } catch (error) {
     next(error);
   }
@@ -173,9 +172,9 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
     const tokenManager = TokenManager.getInstance();
     const refreshToken = tokenManager.generateRefreshToken(result.user.id);
     setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
-    const csrfToken = tokenManager.generateCsrfToken(refreshToken);
+    result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
 
-    successResponse(res, { ...result, csrfToken });
+    successResponse(res, result);
   } catch (error) {
     next(error);
   }
@@ -537,8 +536,8 @@ router.post(
       const tokenManager = TokenManager.getInstance();
       const refreshToken = tokenManager.generateRefreshToken(result.user.id);
       setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
-      const csrfToken = tokenManager.generateCsrfToken(refreshToken);
-      successResponse(res, { ...result, csrfToken });
+      result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
+      successResponse(res, result);
     } catch (error) {
       next(error);
     }
