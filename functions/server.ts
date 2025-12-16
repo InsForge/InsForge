@@ -7,7 +7,7 @@ const port = parseInt(Deno.env.get('PORT') ?? '7133');
 console.log(`Deno serverless runtime running on port ${port}`);
 
 // Configuration
-const WORKER_TIMEOUT_MS = parseInt(Deno.env.get('WORKER_TIMEOUT_MS') ?? '30000');
+const WORKER_TIMEOUT_MS = parseInt(Deno.env.get('WORKER_TIMEOUT_MS') ?? '60000');
 
 // Worker template code - loaded on first use
 let workerTemplateCode: string | null = null;
