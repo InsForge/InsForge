@@ -195,10 +195,7 @@ export class TokenManager {
    * Generate CSRF token derived from refresh token using HMAC
    */
   generateCsrfToken(refreshToken: string): string {
-    return crypto
-      .createHmac('sha256', JWT_SECRET)
-      .update(refreshToken)
-      .digest('hex');
+    return crypto.createHmac('sha256', JWT_SECRET).update(refreshToken).digest('hex');
   }
 
   /**

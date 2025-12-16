@@ -10,11 +10,7 @@ import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin, verifyToken } from '@/api/middlewares/auth.js';
 import oauthRouter from './oauth.routes.js';
 import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-limiters.js';
-import {
-  REFRESH_TOKEN_COOKIE_NAME,
-  setAuthCookie,
-  clearAuthCookie,
-} from '@/utils/cookies.js';
+import { REFRESH_TOKEN_COOKIE_NAME, setAuthCookie, clearAuthCookie } from '@/utils/cookies.js';
 import {
   userIdSchema,
   createUserRequestSchema,
