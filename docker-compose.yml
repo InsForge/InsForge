@@ -155,8 +155,8 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGREST_BASE_URL=http://postgrest:3000
-      # Worker timeout (30 seconds default)
-      - WORKER_TIMEOUT_MS=${WORKER_TIMEOUT_MS:-30000}
+      # Worker timeout (60 seconds default)
+      - WORKER_TIMEOUT_MS=${WORKER_TIMEOUT_MS:-60000}
       # Encryption keys for decrypting function secrets
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - JWT_SECRET=${JWT_SECRET:-dev-secret-please-change-in-production}
