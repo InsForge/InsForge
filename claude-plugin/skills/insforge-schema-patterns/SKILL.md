@@ -178,17 +178,20 @@ CREATE POLICY "Users can delete their comments" ON comments
 **Query with InsForge SDK:**
 ```javascript
 // Get top-level comments with author info
+// Note: profile is a JSONB column containing { name, avatar_url, bio, birthday }
 const { data: comments } = await client.database
   .from('comments')
-  .select('*, author:user_id(nickname, avatar_url)')
+  .select('*, author:user_id(id, profile)')
   .eq('post_id', postId)
   .is('parent_comment_id', null)
   .order('created_at', { ascending: false });
 
+// Access author info: comment.author.profile.name, comment.author.profile.avatar_url
+
 // Get replies to a comment
 const { data: replies } = await client.database
   .from('comments')
-  .select('*, author:user_id(nickname, avatar_url)')
+  .select('*, author:user_id(id, profile)')
   .eq('parent_comment_id', commentId)
   .order('created_at', { ascending: true });
 ```

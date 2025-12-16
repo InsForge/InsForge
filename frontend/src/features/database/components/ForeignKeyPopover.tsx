@@ -262,7 +262,7 @@ export function ForeignKeyPopover({
                           if (!col.isUnique) {
                             rightText = 'Not unique';
                           } else if (!typesMatch) {
-                            rightText = 'Columntype not match';
+                            rightText = 'Column types mismatch';
                           }
 
                           return (

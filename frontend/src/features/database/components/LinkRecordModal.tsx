@@ -91,7 +91,7 @@ export function LinkRecordModal({
       return users.length > 0 || open
         ? {
             schema: authUsersSchema,
-            records: users as unknown as DatabaseRecord[],
+            records: users as DatabaseRecord[],
             totalRecords: totalUsers,
           }
         : undefined;
@@ -101,7 +101,7 @@ export function LinkRecordModal({
           schema,
           records: recordsResponse.records,
           totalRecords:
-            recordsResponse.pagination.total ||
+            recordsResponse.pagination.total ??
             ('recordCount' in schema ? (schema.recordCount as number) : 0),
         }
       : undefined;
@@ -162,15 +162,23 @@ export function LinkRecordModal({
       };
 
       // Helper function to render cell value properly based on type
-      const renderCellValue = (value: ConvertedValue, type: ColumnType | undefined) => {
-        return formatValueForDisplay(value, type);
+      // Accepts DatabaseRecord value type and converts to display string
+      const renderCellValue = (
+        value: ConvertedValue | { [key: string]: string }[],
+        type: ColumnType | undefined
+      ): string => {
+        // For JSON type, if value is already an object/array, stringify it for formatValueForDisplay
+        if (type === ColumnType.JSON && value !== null && typeof value === 'object') {
+          return formatValueForDisplay(JSON.stringify(value), type);
+        }
+        return formatValueForDisplay(value as ConvertedValue, type);
       };
 
       if (col.key === referenceColumn) {
         return {
           ...baseCol,
           renderCell: (props: RenderCellProps<DataGridRowType>) => {
-            const displayValue = renderCellValue(String(props.row[col.key]), col.type);
+            const displayValue = renderCellValue(props.row[col.key], col.type);
             return (
               <div className="w-full h-full flex items-center cursor-pointer">
                 <span className="truncate font-medium" title={displayValue}>
@@ -195,7 +203,7 @@ export function LinkRecordModal({
         ...baseCol,
         cellClass: 'link-modal-disabled-cell',
         renderCell: (props: RenderCellProps<DataGridRowType>) => {
-          const displayValue = renderCellValue(String(props.row[col.key]), col.type);
+          const displayValue = renderCellValue(props.row[col.key], col.type);
           return (
             <div className="w-full h-full flex items-center cursor-not-allowed relative">
               <div className="absolute inset-0 pointer-events-none opacity-0 hover:opacity-10 bg-gray-200 dark:bg-gray-600 transition-opacity z-5" />

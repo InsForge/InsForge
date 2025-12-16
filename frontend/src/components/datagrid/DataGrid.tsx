@@ -117,7 +117,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
           return <Checkbox checked={isSelected} onChange={handleToggle} tabIndex={tabIndex} />;
         },
         renderHeaderCell: () => {
-          const selectedCount = data.filter((row) => selectedRows.has(String(row.id))).length;
+          const selectedCount = data.filter((row) => selectedRows.has(keyGetter(row))).length;
           const totalCount = data.length;
           const isAllSelected = totalCount > 0 && selectedCount === totalCount;
           const isPartiallySelected = selectedCount > 0 && selectedCount < totalCount;
@@ -130,10 +130,10 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
                 const newSelectedRows = new Set(selectedRows);
                 if (checked) {
                   // Select all
-                  data.forEach((row) => newSelectedRows.add(String(row.id)));
+                  data.forEach((row) => newSelectedRows.add(keyGetter(row)));
                 } else {
                   // Unselect all
-                  data.forEach((row) => newSelectedRows.delete(String(row.id)));
+                  data.forEach((row) => newSelectedRows.delete(keyGetter(row)));
                 }
                 onSelectedRowsChange(newSelectedRows);
               }}

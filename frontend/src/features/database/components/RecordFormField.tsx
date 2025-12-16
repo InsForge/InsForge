@@ -495,7 +495,7 @@ export function RecordFormField({ field, form, tableName }: RecordFormFieldProps
                         onChange={(newValue) => {
                           const result = convertValueForColumn(ColumnType.JSON, newValue as string);
                           if (result.success) {
-                            formField.onChange(result.value as JSON);
+                            formField.onChange(result.value);
                           } else {
                             // If parsing fails, keep the string value
                             formField.onChange(newValue);

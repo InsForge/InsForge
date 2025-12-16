@@ -365,7 +365,7 @@ function MyProfile() {
 
   return (
     <div>
-      <h1>{user.name}</h1>
+      <h1>{user.profile?.name}</h1>
       <p>{user.email}</p>
       <h2>My Posts: {posts.length}</h2>
       {posts.map(post => (
