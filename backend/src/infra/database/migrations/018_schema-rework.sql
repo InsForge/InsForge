@@ -210,10 +210,13 @@ CREATE POLICY "Users can update own profile" ON auth.users
   USING (id = auth.uid())
   WITH CHECK (id = auth.uid());
 
--- 2.19 Drop obsolete public schema helper functions (duplicates of auth.* from migration 013)
-DROP FUNCTION IF EXISTS public.uid();
-DROP FUNCTION IF EXISTS public.role();
-DROP FUNCTION IF EXISTS public.email();
+-- 2.19 Drop obsolete public schema helper functions (migrated to auth schema)
+-- NOTE: CASCADE intentionally used to force migration from public.uid() to auth.uid()
+-- Any dependent objects (policies, views, functions, defaults) will be dropped.
+-- Users must recreate them using auth.uid(), auth.role(), auth.email() instead.
+DROP FUNCTION IF EXISTS public.uid() CASCADE;
+DROP FUNCTION IF EXISTS public.role() CASCADE;
+DROP FUNCTION IF EXISTS public.email() CASCADE;
 
 -- ============================================================================
 -- PART 3: AI SCHEMA (configs, usage)
