@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { createRemoteJWKSet, JWTPayload, jwtVerify } from 'jose';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
@@ -13,9 +14,8 @@ const REFRESH_TOKEN_EXPIRES_IN = '7d';
  */
 export interface RefreshTokenPayload {
   sub: string;
-  email: string;
-  role: 'authenticated' | 'project_admin';
   type: 'refresh';
+  iss: string;
 }
 
 /**
@@ -77,21 +77,12 @@ export class TokenManager {
 
   /**
    * Generate refresh token for secure session management
-   * Refresh tokens are stored in httpOnly cookies and used to obtain new access tokens
    */
-  generateRefreshToken(payload: TokenPayloadSchema): string {
-    if (payload.role === 'anon') {
-      throw new AppError(
-        'Cannot generate refresh token for anonymous users',
-        401,
-        ERROR_CODES.AUTH_UNAUTHORIZED
-      );
-    }
+  generateRefreshToken(userId: string): string {
     const refreshPayload: RefreshTokenPayload = {
-      sub: payload.sub,
-      email: payload.email,
-      role: payload.role,
+      sub: userId,
       type: 'refresh',
+      iss: 'insforge',
     };
     return jwt.sign(refreshPayload, JWT_SECRET, {
       algorithm: 'HS256',
@@ -107,24 +98,15 @@ export class TokenManager {
     try {
       const decoded = jwt.verify(token, JWT_SECRET, {
         algorithms: ['HS256'],
-      }) as Partial<RefreshTokenPayload>;
+        issuer: 'insforge',
+      }) as RefreshTokenPayload;
 
       // Ensure this is a refresh token, not an access token
-      if (
-        decoded.type !== 'refresh' ||
-        !decoded.sub ||
-        !decoded.email ||
-        (decoded.role !== 'authenticated' && decoded.role !== 'project_admin')
-      ) {
+      if (decoded.type !== 'refresh' || !decoded.sub) {
         throw new AppError('Invalid refresh token type', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
       }
 
-      return {
-        sub: decoded.sub,
-        email: decoded.email,
-        role: decoded.role,
-        type: 'refresh',
-      };
+      return decoded;
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
@@ -205,6 +187,31 @@ export class TokenManager {
         ERROR_CODES.AUTH_INVALID_CREDENTIALS,
         NEXT_ACTION.CHECK_TOKEN
       );
+    }
+  }
+
+  /**
+   * Generate CSRF token derived from refresh token using HMAC
+   */
+  generateCsrfToken(refreshToken: string): string {
+    return crypto
+      .createHmac('sha256', JWT_SECRET)
+      .update(refreshToken)
+      .digest('hex')
+      .substring(0, 32);
+  }
+
+  /**
+   * Verify CSRF token using timing-safe comparison
+   */
+  verifyCsrfToken(csrfHeader: string | undefined, csrfCookie: string | undefined): boolean {
+    if (!csrfHeader || !csrfCookie) {
+      return false;
+    }
+    try {
+      return crypto.timingSafeEqual(Buffer.from(csrfHeader), Buffer.from(csrfCookie));
+    } catch {
+      return false;
     }
   }
 }

@@ -13,13 +13,9 @@ import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-li
 import {
   REFRESH_TOKEN_COOKIE_NAME,
   CSRF_TOKEN_COOKIE_NAME,
-  setRefreshTokenCookie,
-  setCsrfTokenCookie,
-  clearRefreshTokenCookie,
-  clearCsrfTokenCookie,
-  issueRefreshTokenCookie,
+  setAuthCookie,
+  clearAuthCookie,
 } from '@/utils/cookies.js';
-import { CsrfManager } from '@/infra/security/csrf.manager.js';
 import {
   userIdSchema,
   createUserRequestSchema,
@@ -139,7 +135,11 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
     // Set refresh token in httpOnly cookie and get CSRF token
     let csrfToken: string | null = null;
     if (result.accessToken && result.user) {
-      csrfToken = issueRefreshTokenCookie(res, result.user);
+      const tokenManager = TokenManager.getInstance();
+      const refreshToken = tokenManager.generateRefreshToken(result.user.id);
+      setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+      csrfToken = tokenManager.generateCsrfToken(refreshToken);
+      setAuthCookie(res, CSRF_TOKEN_COOKIE_NAME, csrfToken);
     }
 
     const socket = SocketManager.getInstance();
@@ -172,10 +172,11 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
     const result: CreateSessionResponse = await authService.login(email, password);
 
     // Set refresh token in httpOnly cookie and get CSRF token
-    let csrfToken: string | null = null;
-    if (result.accessToken && result.user) {
-      csrfToken = issueRefreshTokenCookie(res, result.user);
-    }
+    const tokenManager = TokenManager.getInstance();
+    const refreshToken = tokenManager.generateRefreshToken(result.user.id);
+    setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+    const csrfToken = tokenManager.generateCsrfToken(refreshToken);
+    setAuthCookie(res, CSRF_TOKEN_COOKIE_NAME, csrfToken);
 
     successResponse(res, { ...result, csrfToken });
   } catch (error) {
@@ -193,49 +194,40 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       throw new AppError('No refresh token provided', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
+    const tokenManager = TokenManager.getInstance();
+
     // Verify CSRF token to prevent CSRF attacks
     const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
     const csrfCookie = req.cookies?.[CSRF_TOKEN_COOKIE_NAME];
-    if (!CsrfManager.verify(csrfHeader, csrfCookie)) {
+    if (!tokenManager.verifyCsrfToken(csrfHeader, csrfCookie)) {
       logger.warn('[Auth:Refresh] CSRF token validation failed');
       throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
-
-    const tokenManager = TokenManager.getInstance();
-
-    // Verify the refresh token
     const payload = tokenManager.verifyRefreshToken(refreshToken);
 
-    // Generate new access token
-    const newAccessToken = tokenManager.generateToken({
-      sub: payload.sub,
-      email: payload.email,
-      role: payload.role,
-    });
-
-    // Generate new refresh token (token rotation for security)
-    const newRefreshToken = tokenManager.generateRefreshToken({
-      sub: payload.sub,
-      email: payload.email,
-      role: payload.role,
-    });
-
-    // Set new refresh token cookie
-    setRefreshTokenCookie(res, newRefreshToken);
-
-    // Generate new CSRF token for the new refresh token
-    const newCsrfToken = CsrfManager.generate(newRefreshToken);
-    setCsrfTokenCookie(res, newCsrfToken);
-
-    // Fetch user data for response
+    // Fetch CURRENT user data from DB (email/role may have changed)
     const user = await authService.getUserSchemaById(payload.sub);
 
     if (!user) {
       logger.warn('[Auth:Refresh] User not found for valid refresh token', { userId: payload.sub });
-      clearRefreshTokenCookie(res);
-      clearCsrfTokenCookie(res);
+      clearAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME);
+      clearAuthCookie(res, CSRF_TOKEN_COOKIE_NAME);
       throw new AppError('User not found', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
+
+    // Generate new access token
+    const newAccessToken = tokenManager.generateToken({
+      sub: user.id,
+      email: user.email,
+      role: 'authenticated',
+    });
+
+    // Generate new refresh token (token rotation for security)
+    const newRefreshToken = tokenManager.generateRefreshToken(user.id);
+
+    setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, newRefreshToken);
+    const newCsrfToken = tokenManager.generateCsrfToken(newRefreshToken);
+    setAuthCookie(res, CSRF_TOKEN_COOKIE_NAME, newCsrfToken);
 
     successResponse(res, {
       accessToken: newAccessToken,
@@ -244,8 +236,8 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     });
   } catch (error) {
     // Clear invalid cookie on error
-    clearRefreshTokenCookie(res);
-    clearCsrfTokenCookie(res);
+    clearAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME);
+    clearAuthCookie(res, CSRF_TOKEN_COOKIE_NAME);
     next(error);
   }
 });
@@ -254,8 +246,8 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
 router.post('/logout', (_req: Request, res: Response, next: NextFunction) => {
   try {
     // Clear refresh token cookie
-    clearRefreshTokenCookie(res);
-    clearCsrfTokenCookie(res);
+    clearAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME);
+    clearAuthCookie(res, CSRF_TOKEN_COOKIE_NAME);
 
     successResponse(res, {
       success: true,
@@ -551,12 +543,11 @@ router.post(
       }
 
       // Set refresh token in httpOnly cookie and get CSRF token
-      let csrfToken: string | null = null;
-      if (result.accessToken && result.user) {
-        csrfToken = issueRefreshTokenCookie(res, result.user);
-      }
-
-      // Include csrfToken in response for CSRF protection
+      const tokenManager = TokenManager.getInstance();
+      const refreshToken = tokenManager.generateRefreshToken(result.user.id);
+      setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+      const csrfToken = tokenManager.generateCsrfToken(refreshToken);
+      setAuthCookie(res, CSRF_TOKEN_COOKIE_NAME, csrfToken);
       successResponse(res, { ...result, csrfToken });
     } catch (error) {
       next(error);
