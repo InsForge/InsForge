@@ -377,8 +377,7 @@ export class DatabaseTableService {
         tableName: table,
         columns: columns.map((col: ColumnInfo) => {
           // For USER-DEFINED types (extensions like pgvector), use udt_name
-          const effectiveType =
-            col.data_type === 'USER-DEFINED' ? col.udt_name : col.data_type;
+          const effectiveType = col.data_type === 'USER-DEFINED' ? col.udt_name : col.data_type;
           return {
             columnName: col.column_name,
             type: convertSqlTypeToColumnType(effectiveType),
