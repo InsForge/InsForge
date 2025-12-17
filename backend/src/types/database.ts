@@ -112,6 +112,7 @@ export interface ForeignKeyRow {
 export interface ColumnInfo {
   column_name: string;
   data_type: string;
+  udt_name: string;
   is_nullable: string;
   column_default: string | null;
   character_maximum_length: number | null;
