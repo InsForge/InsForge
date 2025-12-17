@@ -74,7 +74,7 @@ export const convertSqlTypeToColumnType = (sqlType: string): ColumnType | string
     case 'character':
       return ColumnType.STRING;
     default:
-      return sqlType;
+      return sqlType.slice(0,8);
   }
 };
 
