@@ -434,8 +434,8 @@ CREATE EVENT TRIGGER create_policies_on_rls_enable
   EXECUTE FUNCTION system.create_policies_after_rls();
 
 -- 6.5 Drop obsolete functions
-DROP FUNCTION IF EXISTS public.create_default_policies();
-DROP FUNCTION IF EXISTS public.create_policies_after_rls();
-DROP FUNCTION IF EXISTS public.reload_postgrest_schema();
-DROP FUNCTION IF EXISTS public.update_updated_at_column();
-DROP FUNCTION IF EXISTS realtime.update_updated_at();
+DROP FUNCTION IF EXISTS public.create_default_policies() CASCADE;
+DROP FUNCTION IF EXISTS public.create_policies_after_rls() CASCADE;
+DROP FUNCTION IF EXISTS public.reload_postgrest_schema() CASCADE;
+DROP FUNCTION IF EXISTS public.update_updated_at_column() CASCADE;
+DROP FUNCTION IF EXISTS realtime.update_updated_at() CASCADE;
