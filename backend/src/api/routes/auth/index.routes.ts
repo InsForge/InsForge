@@ -12,16 +12,6 @@ import oauthRouter from './oauth.routes.js';
 import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-limiters.js';
 import { REFRESH_TOKEN_COOKIE_NAME, setAuthCookie, clearAuthCookie } from '@/utils/cookies.js';
 import {
-  REFRESH_TOKEN_COOKIE_NAME,
-  CSRF_TOKEN_COOKIE_NAME,
-  setRefreshTokenCookie,
-  setCsrfTokenCookie,
-  clearRefreshTokenCookie,
-  clearCsrfTokenCookie,
-  issueRefreshTokenCookie,
-} from '@/utils/cookies.js';
-import { CsrfManager } from '@/infra/security/csrf.manager.js';
-import {
   userIdSchema,
   createUserRequestSchema,
   createSessionRequestSchema,
@@ -153,7 +143,7 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
       'system'
     );
 
-    successResponse(res, { ...result, csrfToken });
+    successResponse(res, result);
   } catch (error) {
     next(error);
   }
@@ -180,7 +170,7 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
     setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
     result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
 
-    successResponse(res, { ...result, csrfToken });
+    successResponse(res, result);
   } catch (error) {
     next(error);
   }
@@ -194,14 +184,6 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
 
     if (!refreshToken) {
       throw new AppError('No refresh token provided', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
-    }
-
-    // Verify CSRF token to prevent CSRF attacks
-    const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
-    const csrfCookie = req.cookies?.[CSRF_TOKEN_COOKIE_NAME];
-    if (!CsrfManager.verify(csrfHeader, csrfCookie)) {
-      logger.warn('[Auth:Refresh] CSRF token validation failed');
-      throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
     const tokenManager = TokenManager.getInstance();
@@ -238,8 +220,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
 
     if (!user) {
       logger.warn('[Auth:Refresh] User not found for valid refresh token', { userId: payload.sub });
-      clearRefreshTokenCookie(res);
-      clearCsrfTokenCookie(res);
+      clearAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME);
       throw new AppError('User not found', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 

@@ -5,7 +5,6 @@ import { isProduction } from './environment';
  * Cookie names
  */
 export const REFRESH_TOKEN_COOKIE_NAME = 'insforge_refresh_token';
-export const CSRF_TOKEN_COOKIE_NAME = 'insforge_csrf_token';
 
 /**
  * Set an auth cookie on response
