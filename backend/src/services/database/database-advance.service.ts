@@ -81,7 +81,6 @@ export class DatabaseAdvanceService {
       /CREATE\s+DATABASE/i,
       /ALTER\s+DATABASE/i,
       /pg_catalog/i,
-      /information_schema/i,
     ];
 
     for (const pattern of dangerousPatterns) {
