@@ -218,12 +218,6 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, newRefreshToken);
     const newCsrfToken = tokenManager.generateCsrfToken(newRefreshToken);
 
-    if (!user) {
-      logger.warn('[Auth:Refresh] User not found for valid refresh token', { userId: payload.sub });
-      clearAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME);
-      throw new AppError('User not found', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
-    }
-
     successResponse(res, {
       accessToken: newAccessToken,
       user: user,
