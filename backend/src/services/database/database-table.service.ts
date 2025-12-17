@@ -292,6 +292,7 @@ export class DatabaseTableService {
           SELECT
             column_name,
             data_type,
+            udt_name,
             is_nullable,
             column_default,
             character_maximum_length
@@ -362,17 +363,22 @@ export class DatabaseTableService {
 
       return {
         tableName: table,
-        columns: columns.map((col: ColumnInfo) => ({
-          columnName: col.column_name,
-          type: convertSqlTypeToColumnType(col.data_type),
-          isNullable: col.is_nullable === 'YES',
-          isPrimaryKey: pkSet.has(col.column_name),
-          isUnique: pkSet.has(col.column_name) || uniqueSet.has(col.column_name),
-          defaultValue: this.parseDefaultValue(col.column_default),
-          ...(foreignKeyMap.has(col.column_name) && {
-            foreignKey: foreignKeyMap.get(col.column_name),
-          }),
-        })),
+        columns: columns.map((col: ColumnInfo) => {
+          // For USER-DEFINED types (extensions like pgvector), use udt_name
+          const effectiveType =
+            col.data_type === 'USER-DEFINED' ? col.udt_name : col.data_type;
+          return {
+            columnName: col.column_name,
+            type: convertSqlTypeToColumnType(effectiveType),
+            isNullable: col.is_nullable === 'YES',
+            isPrimaryKey: pkSet.has(col.column_name),
+            isUnique: pkSet.has(col.column_name) || uniqueSet.has(col.column_name),
+            defaultValue: this.parseDefaultValue(col.column_default),
+            ...(foreignKeyMap.has(col.column_name) && {
+              foreignKey: foreignKeyMap.get(col.column_name),
+            }),
+          };
+        }),
         recordCount: row_count,
       };
     } finally {
