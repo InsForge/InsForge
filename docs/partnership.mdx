@@ -88,6 +88,7 @@ Partner platforms can:
 - ✅ Delete projects
 - ✅ Get project's authorization token for access
 - ✅ Get project's usage
+- ✅ Get aggregated usage across all partnership projects (for billing)
 
 ## API Reference
 
@@ -371,6 +372,60 @@ Partner platforms can:
     }
     ```
 
+    ### Get Partnership Total Usage
+    Retrieve aggregated usage metrics across all projects under your partnership for a date range. This endpoint is designed for billing and reporting purposes, providing a consolidated view of resource consumption.
+
+    ```bash
+    GET /partnership/v1/:partnerId/usage?start_date=2025-11-01&end_date=2025-11-30
+    ```
+
+    **Query Parameters:**
+    - `start_date` (optional): Start date in YYYY-MM-DD format (defaults to 7 days ago)
+    - `end_date` (optional): End date in YYYY-MM-DD format (defaults to today)
+
+    **Response:**
+    ```json
+    {
+      "partnership": {
+        "id": "ps_abc123xyz",
+        "name": "Partner Name"
+      },
+      "period": {
+        "start": "2025-11-01T00:00:00Z",
+        "end": "2025-11-30T23:59:59Z"
+      },
+      "summary": {
+        "database_bytes": 10485760,
+        "storage_bytes": 52428800,
+        "ai_tokens": 150000,
+        "mcp_calls": 1200,
+        "egress_bytes": 20971520,
+        "ai_credits": 15.5,
+        "email_requests": 500,
+        "function_calls": 3000,
+        "ec2_compute": 36000
+      }
+    }
+    ```
+
+    **Usage Metric Types:**
+
+    | Metric | Type | Description |
+    |--------|------|-------------|
+    | `database_bytes` | Peak | Peak total database footprint (sum per day, max across days) |
+    | `storage_bytes` | Peak | Peak total storage footprint (sum per day, max across days) |
+    | `ai_tokens` | Cumulative | Total AI tokens consumed |
+    | `mcp_calls` | Cumulative | Total MCP/tool calls made |
+    | `egress_bytes` | Cumulative | Total data transfer (origin + CDN) |
+    | `ai_credits` | Cumulative | Total AI credits consumed |
+    | `email_requests` | Cumulative | Total emails sent |
+    | `function_calls` | Cumulative | Total serverless function invocations |
+    | `ec2_compute` | Cumulative | Total compute seconds used |
+
+    <Note>
+    This endpoint includes usage from deleted projects within the specified date range, ensuring complete billing accuracy.
+    </Note>
+
   </Tab>
 </Tabs>
 
@@ -596,6 +651,28 @@ const deleteProject = async (projectId: string) => {
   } else {
     throw new Error(`Failed to delete project: ${response.status}`);
   }
+};
+
+// 4. Get partnership total usage (for billing)
+const getPartnershipUsage = async (startDate: string, endDate: string) => {
+  const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
+  const response = await fetch(
+    `https://api.insforge.dev/partnership/v1/${PARTNER_ID}/usage?${params}`,
+    {
+      method: 'GET',
+      headers: {
+        'X-Partnership-Secret': `${SECRET_KEY}`
+      }
+    }
+  );
+
+  const data = await response.json();
+  console.log(`Period: ${data.period.start} to ${data.period.end}`);
+  console.log(`Database: ${data.summary.database_bytes} bytes (peak)`);
+  console.log(`Storage: ${data.summary.storage_bytes} bytes (peak)`);
+  console.log(`AI Credits: ${data.summary.ai_credits}`);
+  console.log(`Egress: ${data.summary.egress_bytes} bytes`);
+  return data;
 };
 ```
 
