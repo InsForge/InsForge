@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { isProduction } from './environment';
+import { isCloudEnvironment } from './environment';
 
 /**
  * Cookie names
@@ -14,7 +14,7 @@ export const REFRESH_TOKEN_COOKIE_NAME = 'insforge_refresh_token';
 export function setAuthCookie(res: Response, name: string, value: string): void {
   res.cookie(name, value, {
     httpOnly: true,
-    secure: isProduction(),
+    secure: isCloudEnvironment(),
     sameSite: 'none',
     path: '/api/auth',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
@@ -28,7 +28,7 @@ export function setAuthCookie(res: Response, name: string, value: string): void 
 export function clearAuthCookie(res: Response, name: string): void {
   res.clearCookie(name, {
     httpOnly: true,
-    secure: isProduction(),
+    secure: isCloudEnvironment(),
     sameSite: 'none',
     path: '/api/auth',
   });

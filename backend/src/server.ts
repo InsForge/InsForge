@@ -28,7 +28,7 @@ import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { seedBackend } from '@/utils/seed.js';
 import logger from '@/utils/logger.js';
 import { initSqlParser } from '@/utils/sql-parser.js';
-import { isProduction } from './utils/environment.js';
+import { isCloudEnvironment } from './utils/environment.js';
 import packageJson from '../../package.json';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -78,7 +78,7 @@ export async function createApp() {
     })
   );
   app.use(cookieParser()); // Parse cookies for refresh token handling
-  if (isProduction()) {
+  if (isCloudEnvironment()) {
     app.use(limiter);
   }
   app.use((req: Request, res: Response, next: NextFunction) => {
@@ -230,7 +230,7 @@ export async function createApp() {
     app.get('/auth*', (_req: Request, res: Response) => {
       res.sendFile(path.join(authAppPath, 'index.html'));
     });
-  } else if (!isProduction()) {
+  } else if (!isCloudEnvironment()) {
     const authAppUrl = process.env.AUTH_APP_URL || 'http://localhost:7132';
     logger.info('Auth app not built, proxying to development server', { authAppUrl });
   }
