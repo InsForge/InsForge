@@ -187,7 +187,7 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
     if (result.accessToken && result.user) {
       const tokenManager = TokenManager.getInstance();
       const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-      setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+      setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
       result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
     }
 
@@ -223,7 +223,7 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
     // Set refresh token in httpOnly cookie and generate CSRF token
     const tokenManager = TokenManager.getInstance();
     const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-    setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+    setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
     result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
 
     successResponse(res, result);
@@ -257,7 +257,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
 
     if (!user) {
       logger.warn('[Auth:Refresh] User not found for valid refresh token', { userId: payload.sub });
-      clearAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME);
+      clearAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME);
       throw new AppError('User not found', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
@@ -271,7 +271,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     // Generate new refresh token (token rotation for security)
     const newRefreshToken = tokenManager.generateRefreshToken(user.id);
 
-    setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, newRefreshToken);
+    setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, newRefreshToken);
     const newCsrfToken = tokenManager.generateCsrfToken(newRefreshToken);
 
     successResponse(res, {
@@ -281,15 +281,15 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     });
   } catch (error) {
     // Clear invalid cookie on error
-    clearAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME);
+    clearAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME);
     next(error);
   }
 });
 
 // POST /api/auth/logout - Logout and clear refresh token cookie
-router.post('/logout', (_req: Request, res: Response, next: NextFunction) => {
+router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
   try {
-    clearAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME);
+    clearAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME);
 
     successResponse(res, {
       success: true,
@@ -588,7 +588,7 @@ router.post(
       // Set refresh token in httpOnly cookie and generate CSRF token
       const tokenManager = TokenManager.getInstance();
       const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-      setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+      setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
       result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
       successResponse(res, result);
     } catch (error) {
