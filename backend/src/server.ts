@@ -1,7 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-// import rateLimit from 'express-rate-limit';
+import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -63,11 +63,11 @@ export async function createApp() {
   // Enable trust proxy setting for rate limiting behind proxies/load balancers
   app.set('trust proxy', true);
 
-  // const limiter = rateLimit({
-  //   windowMs: 15 * 60 * 1000,
-  //   max: 1000,
-  //   message: 'Too many requests from this IP',
-  // });
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 1000,
+    message: 'Too many requests from this IP',
+  });
 
   // Basic middleware
   app.use(
@@ -77,7 +77,7 @@ export async function createApp() {
     })
   );
   app.use(cookieParser()); // Parse cookies for refresh token handling
-  // app.use(limiter);
+  app.use(limiter);
   app.use((req: Request, res: Response, next: NextFunction) => {
     const startTime = Date.now();
     const originalSend = res.send;
