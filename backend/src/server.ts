@@ -1,7 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import rateLimit from 'express-rate-limit';
+// import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -28,7 +28,6 @@ import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { seedBackend } from '@/utils/seed.js';
 import logger from '@/utils/logger.js';
 import { initSqlParser } from '@/utils/sql-parser.js';
-import { isCloudEnvironment } from './utils/environment.js';
 import packageJson from '../../package.json';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -64,11 +63,11 @@ export async function createApp() {
   // Enable trust proxy setting for rate limiting behind proxies/load balancers
   app.set('trust proxy', true);
 
-  const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 1000,
-    message: 'Too many requests from this IP',
-  });
+  // const limiter = rateLimit({
+  //   windowMs: 15 * 60 * 1000,
+  //   max: 1000,
+  //   message: 'Too many requests from this IP',
+  // });
 
   // Basic middleware
   app.use(
@@ -78,9 +77,7 @@ export async function createApp() {
     })
   );
   app.use(cookieParser()); // Parse cookies for refresh token handling
-  if (isCloudEnvironment()) {
-    app.use(limiter);
-  }
+  // app.use(limiter);
   app.use((req: Request, res: Response, next: NextFunction) => {
     const startTime = Date.now();
     const originalSend = res.send;
@@ -230,7 +227,7 @@ export async function createApp() {
     app.get('/auth*', (_req: Request, res: Response) => {
       res.sendFile(path.join(authAppPath, 'index.html'));
     });
-  } else if (!isCloudEnvironment()) {
+  } else {
     const authAppUrl = process.env.AUTH_APP_URL || 'http://localhost:7132';
     logger.info('Auth app not built, proxying to development server', { authAppUrl });
   }
