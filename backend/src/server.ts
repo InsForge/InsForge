@@ -158,6 +158,11 @@ export async function createApp() {
   const apiRouter = express.Router();
 
   apiRouter.get('/health', (_req: Request, res: Response) => {
+    console.log({
+      secure: _req.secure,
+      protocol: _req.protocol,
+      xfp: _req.get('x-forwarded-proto'),
+    });
     const version = packageJson.version;
     res.json({
       status: 'ok',
