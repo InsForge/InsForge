@@ -19,20 +19,6 @@ export function isOAuthSharedKeysAvailable(): boolean {
 }
 
 /**
- * Check if running in development mode
- */
-export function isDevelopment(): boolean {
-  return process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
-}
-
-/**
- * Check if running in production mode
- */
-export function isProduction(): boolean {
-  return process.env.NODE_ENV === 'production';
-}
-
-/**
  * Get the API base URL from environment variable or default to localhost
  * @returns The API base URL
  */

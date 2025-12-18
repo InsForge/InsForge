@@ -346,7 +346,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     // Set refresh token in httpOnly cookie and generate CSRF token
     const tokenManager = TokenManager.getInstance();
     const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-    setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+    setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
     const csrfToken = tokenManager.generateCsrfToken(refreshToken);
 
     const params = new URLSearchParams();
@@ -425,7 +425,7 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
       // Set refresh token in httpOnly cookie and generate CSRF token
       const tokenManager = TokenManager.getInstance();
       const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-      setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+      setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
       const csrfToken = tokenManager.generateCsrfToken(refreshToken);
 
       // Construct redirect URL with query parameters
