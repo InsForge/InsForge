@@ -26,7 +26,7 @@ paths:
                       properties:
                         provider:
                           type: string
-                          enum: [google, github, discord, linkedin, facebook, microsoft]
+                          enum: [google, github, discord, linkedin, facebook, instagram, tiktok, apple, x, spotify, microsoft]
                         useSharedKey:
                           type: boolean
                   requireEmailVerification:
@@ -59,6 +59,71 @@ paths:
                     type: string
                     enum: [code, link]
                     description: Method for password reset (code = 6-digit OTP + exchange flow, link = magic link)
+
+  /api/auth/profiles/current:
+    patch:
+      summary: Update current user's profile
+      description: Update the profile of the currently authenticated user
+      tags:
+        - Client
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - profile
+              properties:
+                profile:
+                  type: object
+                  additionalProperties: true
+                  description: Profile data (name, avatar_url, and any custom fields)
+                  properties:
+                    name:
+                      type: string
+                    avatar_url:
+                      type: string
+                      format: uri
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileResponse'
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized - authentication required
+
+  /api/auth/profiles/{userId}:
+    get:
+      summary: Get user profile by ID
+      description: Get public profile information for a user by their ID (public endpoint)
+      tags:
+        - Client
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: User ID
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileResponse'
+        '400':
+          description: Invalid user ID format
+        '404':
+          description: User not found
 
   /api/auth/config:
     get:
@@ -847,7 +912,7 @@ paths:
               properties:
                 provider:
                   type: string
-                  enum: [google, github, discord, linkedin, facebook, microsoft]
+                  enum: [google, github, discord, linkedin, facebook, instagram, tiktok, apple, x, spotify, microsoft]
                 clientId:
                   type: string
                 clientSecret:
@@ -888,7 +953,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [google, github, discord, linkedin, facebook, microsoft]
+            enum: [google, github, discord, linkedin, facebook, instagram, tiktok, apple, x, spotify, microsoft]
       responses:
         '200':
           description: OAuth configuration
@@ -921,7 +986,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [google, github, discord, linkedin, facebook, microsoft]
+            enum: [google, github, discord, linkedin, facebook, instagram, tiktok, apple, x, spotify, microsoft]
       requestBody:
         required: true
         content:
@@ -970,7 +1035,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [google, github, discord, linkedin, facebook, microsoft]
+            enum: [google, github, discord, linkedin, facebook, instagram, tiktok, apple, x, spotify, microsoft]
       responses:
         '200':
           description: Configuration deleted
@@ -1002,7 +1067,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [google, github, discord, linkedin, facebook, microsoft]
+            enum: [google, github, discord, linkedin, facebook, instagram, tiktok, apple, x, spotify, microsoft]
         - name: redirect_uri
           in: query
           required: true
@@ -1075,7 +1140,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [google, github, discord, linkedin, facebook, microsoft]
+            enum: [google, github, discord, linkedin, facebook, instagram, tiktok, apple, x, spotify, microsoft]
         - name: code
           in: query
           schema:
@@ -1123,25 +1188,40 @@ components:
         email:
           type: string
           format: email
-        name:
-          type: string
+        metadata:
+          type: object
+          additionalProperties: true
         emailVerified:
           type: boolean
-        identities:
+        providers:
           type: array
           items:
-            type: object
-            properties:
-              provider:
-                type: string
-        providerType:
-          type: string
+            type: string
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
+
+    ProfileResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: User ID
+        profile:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: User profile data (can contain custom fields)
+          properties:
+            name:
+              type: string
+            avatar_url:
+              type: string
+              format: uri
 
     OAuthConfig:
       type: object
@@ -1151,7 +1231,7 @@ components:
           format: uuid
         provider:
           type: string
-          enum: [google, github, discord, linkedin, facebook, microsoft]
+          enum: [google, github, discord, linkedin, facebook, instagram, tiktok, apple, x, spotify, microsoft]
         clientId:
           type: string
           nullable: true

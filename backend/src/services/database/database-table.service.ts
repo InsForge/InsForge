@@ -30,8 +30,6 @@ const reservedColumns = {
   updated_at: ColumnType.DATETIME,
 };
 
-const userTableFrozenColumns = ['nickname', 'avatar_url'];
-
 const SAFE_FUNCS = new Set(['now()', 'gen_random_uuid()']);
 
 function getSafeDollarQuotedLiteral(s: string) {
@@ -105,7 +103,6 @@ export class DatabaseTableService {
         FROM information_schema.tables
         WHERE table_schema = 'public'
         AND table_type = 'BASE TABLE'
-        AND table_name NOT LIKE '\\_%'
       `
     );
 
@@ -122,15 +119,6 @@ export class DatabaseTableService {
   ): Promise<CreateTableResponse> {
     // Validate table name
     validateIdentifier(table_name, 'table');
-    // Prevent creation of system tables
-    if (table_name.startsWith('_')) {
-      throw new AppError(
-        'Cannot create system tables',
-        403,
-        ERROR_CODES.FORBIDDEN,
-        'Table names starting with underscore are reserved for system tables'
-      );
-    }
 
     // Filter out reserved fields with matching types, throw error for mismatched types
     const validatedColumns = this.validateReservedFields(columns);
@@ -245,7 +233,7 @@ export class DatabaseTableService {
         `
           CREATE TRIGGER ${this.quoteIdentifier(table_name + '_update_timestamp')}
           BEFORE UPDATE ON ${this.quoteIdentifier(table_name)}
-          FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+          FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
         `
       );
 
@@ -407,16 +395,6 @@ export class DatabaseTableService {
     const { addColumns, dropColumns, updateColumns, addForeignKeys, dropForeignKeys, renameTable } =
       operations;
 
-    // Prevent modification of system tables
-    if (tableName.startsWith('_')) {
-      throw new AppError(
-        'System tables cannot be modified',
-        403,
-        ERROR_CODES.DATABASE_FORBIDDEN,
-        'System tables cannot be modified. System tables are prefixed with underscore.'
-      );
-    }
-
     const client = await this.getPool().connect();
     try {
       // Check if table exists
@@ -497,14 +475,6 @@ export class DatabaseTableService {
               `You cannot drop the system column '${col}'`
             );
           }
-          if (tableName === 'users' && userTableFrozenColumns.includes(col)) {
-            throw new AppError(
-              'cannot drop frozen users columns',
-              403,
-              ERROR_CODES.FORBIDDEN,
-              `You cannot drop the frozen users column '${col}'`
-            );
-          }
           await client.query(
             `
               ALTER TABLE ${safeTableName}
@@ -525,14 +495,6 @@ export class DatabaseTableService {
               404,
               ERROR_CODES.DATABASE_FORBIDDEN,
               `You cannot update the system column '${column.columnName}'`
-            );
-          }
-          if (tableName === 'users' && userTableFrozenColumns.includes(column.columnName)) {
-            throw new AppError(
-              'cannot update frozen user columns',
-              403,
-              ERROR_CODES.FORBIDDEN,
-              `You cannot update the frozen users column '${column.columnName}'`
             );
           }
 
@@ -625,19 +587,6 @@ export class DatabaseTableService {
       }
 
       if (renameTable && renameTable.newTableName) {
-        if (tableName === 'users') {
-          throw new AppError('Cannot rename users table', 403, ERROR_CODES.FORBIDDEN);
-        }
-        // Prevent renaming to system tables
-        if (renameTable.newTableName.startsWith('_')) {
-          throw new AppError(
-            'Cannot rename to system table',
-            403,
-            ERROR_CODES.FORBIDDEN,
-            'Table names starting with underscore are reserved for system tables'
-          );
-        }
-
         const safeNewTableName = this.quoteIdentifier(renameTable.newTableName);
         // Rename the table
         await client.query(
@@ -674,19 +623,6 @@ export class DatabaseTableService {
    * Delete a table
    */
   async deleteTable(table: string): Promise<DeleteTableResponse> {
-    // Prevent deletion of system tables
-    if (table.startsWith('_')) {
-      throw new AppError(
-        'System tables cannot be deleted',
-        403,
-        ERROR_CODES.DATABASE_FORBIDDEN,
-        'System tables cannot be deleted. System tables are prefixed with underscore.'
-      );
-    }
-    if (table === 'users') {
-      throw new AppError('Cannot delete users table', 403, ERROR_CODES.DATABASE_FORBIDDEN);
-    }
-
     const client = await this.getPool().connect();
     try {
       await client.query(`DROP TABLE IF EXISTS ${this.quoteIdentifier(table)} CASCADE`);
@@ -715,6 +651,15 @@ export class DatabaseTableService {
   // Helper methods
   private quoteIdentifier(identifier: string): string {
     return `"${identifier.replace(/"/g, '""')}"`;
+  }
+
+  // Quote a table reference, with special handling for auth.users
+  private quoteTableReference(tableRef: string): string {
+    // Only allow auth.users as a cross-schema reference
+    if (tableRef === 'auth.users') {
+      return '"auth"."users"';
+    }
+    return this.quoteIdentifier(tableRef);
   }
 
   private validateReservedFields(columns: ColumnSchema[]): ColumnSchema[] {
@@ -748,14 +693,16 @@ export class DatabaseTableService {
     }
     // Store foreign_key in a const to avoid repeated non-null assertions
     const fk = col.foreignKey;
-    const constraintName = `fk_${col.columnName}_${fk.referenceTable}_${fk.referenceColumn}`;
+    // Use "auth_users" in constraint name for auth.users references
+    const safeTableName = fk.referenceTable === 'auth.users' ? 'auth_users' : fk.referenceTable;
+    const constraintName = `fk_${col.columnName}_${safeTableName}_${fk.referenceColumn}`;
     const onDelete = fk.onDelete || 'RESTRICT';
     const onUpdate = fk.onUpdate || 'RESTRICT';
 
     if (include_source_column) {
-      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} FOREIGN KEY (${this.quoteIdentifier(col.columnName)}) REFERENCES ${this.quoteIdentifier(fk.referenceTable)}(${this.quoteIdentifier(fk.referenceColumn)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
+      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} FOREIGN KEY (${this.quoteIdentifier(col.columnName)}) REFERENCES ${this.quoteTableReference(fk.referenceTable)}(${this.quoteIdentifier(fk.referenceColumn)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
     } else {
-      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} REFERENCES ${this.quoteIdentifier(fk.referenceTable)}(${this.quoteIdentifier(fk.referenceColumn)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
+      return `CONSTRAINT ${this.quoteIdentifier(constraintName)} REFERENCES ${this.quoteTableReference(fk.referenceTable)}(${this.quoteIdentifier(fk.referenceColumn)}) ON DELETE ${onDelete} ON UPDATE ${onUpdate}`;
     }
   }
 
@@ -765,6 +712,7 @@ export class DatabaseTableService {
         SELECT
           tc.constraint_name,
           kcu.column_name as from_column,
+          ccu.table_schema AS foreign_schema,
           ccu.table_name AS foreign_table,
           ccu.column_name AS foreign_column,
           rc.delete_rule as on_delete,
@@ -775,7 +723,6 @@ export class DatabaseTableService {
           AND tc.table_schema = kcu.table_schema
         JOIN information_schema.constraint_column_usage AS ccu
           ON ccu.constraint_name = tc.constraint_name
-          AND ccu.table_schema = tc.table_schema
         JOIN information_schema.referential_constraints AS rc
           ON rc.constraint_name = tc.constraint_name
           AND rc.constraint_schema = tc.table_schema
@@ -790,13 +737,14 @@ export class DatabaseTableService {
     // Create a map of column names to their foreign key info
     const foreignKeyMap = new Map<string, ForeignKeyInfo>();
     foreignKeys.forEach((fk: ForeignKeyRow) => {
-      if (fk.foreign_table.startsWith('_')) {
-        // hiden internal table.
-        return;
-      }
+      // Prefix table name with schema if not public (e.g., "auth.users")
+      const referenceTable =
+        fk.foreign_schema !== 'public'
+          ? `${fk.foreign_schema}.${fk.foreign_table}`
+          : fk.foreign_table;
       foreignKeyMap.set(fk.from_column, {
         constraint_name: fk.constraint_name,
-        referenceTable: fk.foreign_table,
+        referenceTable,
         referenceColumn: fk.foreign_column,
         onDelete: fk.on_delete as OnDeleteActionSchema,
         onUpdate: fk.on_update as OnUpdateActionSchema,

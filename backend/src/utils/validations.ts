@@ -100,17 +100,6 @@ export function isValidIdentifier(identifier: string): boolean {
  */
 export function validateTableName(tableName: string): boolean {
   validateIdentifier(tableName, 'table');
-
-  // Prevent access to all other system tables (starting with _)
-  if (tableName.startsWith('_')) {
-    throw new AppError(
-      'Access to system tables is not allowed',
-      403,
-      ERROR_CODES.FORBIDDEN,
-      'System tables (starting with _) cannot be accessed directly'
-    );
-  }
-
   return true;
 }
 

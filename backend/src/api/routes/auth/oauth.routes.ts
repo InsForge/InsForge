@@ -346,7 +346,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     // Set refresh token in httpOnly cookie and generate CSRF token
     const tokenManager = TokenManager.getInstance();
     const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-    setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+    setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
     const csrfToken = tokenManager.generateCsrfToken(refreshToken);
 
     const params = new URLSearchParams();
@@ -354,7 +354,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     params.set('access_token', result.accessToken);
     params.set('user_id', result.user.id);
     params.set('email', result.user.email);
-    params.set('name', result.user.name);
+    params.set('name', String(result?.user?.profile?.name));
     params.set('csrf_token', csrfToken);
 
     res.redirect(`${redirectUri}?${params.toString()}`);
@@ -425,7 +425,7 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
       // Set refresh token in httpOnly cookie and generate CSRF token
       const tokenManager = TokenManager.getInstance();
       const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-      setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+      setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
       const csrfToken = tokenManager.generateCsrfToken(refreshToken);
 
       // Construct redirect URL with query parameters
@@ -434,7 +434,7 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
       params.set('access_token', result.accessToken);
       params.set('user_id', result.user.id);
       params.set('email', result.user.email);
-      params.set('name', result.user.name);
+      params.set('name', String(result?.user?.profile?.name));
       params.set('csrf_token', csrfToken);
 
       const finalRedirectUri = `${redirectUri}?${params.toString()}`;

@@ -1,18 +1,23 @@
 import { useMemo } from 'react';
+import { User } from 'lucide-react';
 import {
+  Avatar,
+  AvatarImage,
+  AvatarFallback,
   Badge,
+  Checkbox,
   DataGrid,
   createDefaultCellRenderer,
   type DataGridProps,
   type DataGridColumn,
   type RenderCellProps,
+  type SelectionCellProps,
   ConvertedValue,
 } from '@/components';
 import { cn } from '@/lib/utils/utils';
 import type { UserSchema } from '@insforge/shared-schemas';
 
 // Create a type that makes UserSchema compatible with DataGrid requirements
-// We bypass the strict DatabaseRecord constraint since UserSchema has its own structure
 type UserDataGridRow = UserSchema & {
   [key: string]: ConvertedValue | { [key: string]: string }[];
 };
@@ -96,23 +101,18 @@ const ProviderIcon = ({ provider }: { provider: string }) => {
   );
 };
 
-const IdentitiesCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
-  const identities = row.identities;
+const ProvidersCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
+  const providers = row.providers;
 
-  if (!identities || !Array.isArray(identities) || !identities.length) {
+  if (!providers || !Array.isArray(providers) || !providers.length) {
     return <span className="text-sm text-black dark:text-zinc-300">null</span>;
   }
 
   // Get unique providers to avoid duplicates
-  const uniqueProviders = [
-    ...new Set(identities.map((identity: { provider: string }) => identity.provider)),
-  ];
+  const uniqueProviders = [...new Set(providers)];
 
   return (
-    <div
-      className="flex flex-wrap gap-1"
-      title={identities.map((identity: { provider: string }) => identity.provider).join(', ')}
-    >
+    <div className="flex flex-wrap gap-1" title={providers.join(', ')}>
       {uniqueProviders.slice(0, 2).map((provider: string, index: number) => (
         <ProviderIcon key={index} provider={provider} />
       ))}
@@ -150,28 +150,12 @@ export function createUsersColumns(): DataGridColumn<UserDataGridRow>[] {
       renderCell: cellRenderers.email,
     },
     {
-      key: 'name',
-      name: 'Name',
+      key: 'providers',
+      name: 'Providers',
       width: '1fr',
       resizable: true,
       sortable: true,
-      renderCell: cellRenderers.text,
-    },
-    {
-      key: 'identities',
-      name: 'Identities',
-      width: '1.5fr',
-      resizable: true,
-      sortable: true,
-      renderCell: IdentitiesCellRenderer,
-    },
-    {
-      key: 'providerType',
-      name: 'Provider Type',
-      width: '1fr',
-      resizable: true,
-      sortable: true,
-      renderCell: cellRenderers.text,
+      renderCell: ProvidersCellRenderer,
     },
     {
       key: 'emailVerified',
@@ -201,7 +185,45 @@ export function createUsersColumns(): DataGridColumn<UserDataGridRow>[] {
 }
 
 // Users-specific DataGrid props
-export type UsersDataGridProps = Omit<DataGridProps<UserDataGridRow>, 'columns'>;
+export type UsersDataGridProps = Omit<
+  DataGridProps<UserDataGridRow>,
+  'columns' | 'selectionColumnWidth' | 'renderSelectionCell'
+>;
+
+// Custom selection cell with avatar and name
+const UserSelectionCell = ({
+  row,
+  isSelected,
+  onToggle,
+  tabIndex,
+}: SelectionCellProps<UserDataGridRow>) => {
+  const profile = row.profile as Record<string, unknown> | null;
+  const avatarUrl = profile?.avatar_url as string | undefined;
+  const name = profile?.name as string | undefined;
+
+  return (
+    <div className="flex items-center gap-2 w-full h-full">
+      <Checkbox checked={isSelected} onChange={onToggle} tabIndex={tabIndex} />
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        <Avatar className="w-6 h-6 rounded-full flex-shrink-0">
+          <AvatarImage src={avatarUrl} alt={name || 'User avatar'} className="object-cover" />
+          <AvatarFallback className="bg-gray-200 dark:bg-neutral-700 rounded-full">
+            <User className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
+          </AvatarFallback>
+        </Avatar>
+        <span
+          className={cn(
+            'text-sm truncate',
+            name ? 'text-black dark:text-zinc-300' : 'text-gray-400 dark:text-neutral-500'
+          )}
+          title={name || 'null'}
+        >
+          {name || 'null'}
+        </span>
+      </div>
+    </div>
+  );
+};
 
 // Specialized DataGrid for users
 export function UsersDataGrid(props: UsersDataGridProps) {
@@ -214,6 +236,8 @@ export function UsersDataGrid(props: UsersDataGridProps) {
       showSelection={true}
       showPagination={true}
       showTypeBadge={false}
+      selectionColumnWidth={180}
+      renderSelectionCell={UserSelectionCell}
     />
   );
 }

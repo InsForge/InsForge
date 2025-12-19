@@ -22,7 +22,6 @@ paths:
                 items:
                   type: string
               example:
-                - "users"
                 - "posts"
                 - "comments"
                 - "categories"
@@ -191,7 +190,7 @@ paths:
                     default: null
                     isPrimaryKey: false
                     foreignKey:
-                      table: "users"
+                      table: "auth.users"
                       column: "id"
                       on_delete: "CASCADE"
         '404':

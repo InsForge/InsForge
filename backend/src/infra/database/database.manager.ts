@@ -37,14 +37,6 @@ export class DatabaseManager {
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
     });
-
-    const client = await this.pool.connect();
-    await client.query('BEGIN');
-
-    // Note: Schema migrations are now handled by node-pg-migrate
-    // Run: npm run migrate:up
-
-    await client.query('COMMIT');
   }
 
   static async getColumnTypeMap(tableName: string): Promise<Record<string, string>> {
@@ -74,7 +66,6 @@ export class DatabaseManager {
           FROM information_schema.tables
           WHERE table_schema = 'public'
           AND table_type = 'BASE TABLE'
-          AND (table_name NOT LIKE '\\_%')
           ORDER BY table_name
         `
       );
@@ -100,7 +91,6 @@ export class DatabaseManager {
               FROM information_schema.tables
               WHERE table_schema = 'public'
               AND table_type = 'BASE TABLE'
-              AND (table_name NOT LIKE '\\_%')
               ORDER BY table_name
             `
             );

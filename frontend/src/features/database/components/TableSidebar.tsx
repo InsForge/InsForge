@@ -37,9 +37,6 @@ export function TableSidebar({
       editLabel="Edit Table"
       deleteLabel="Delete Table"
       icon={Table}
-      filterItems={(tableNames) =>
-        tableNames.filter((name) => name !== 'auth' && name !== 'profiles' && name !== 'identifies')
-      }
       renderSkeleton={() => <TableListSkeleton />}
       renderEmptyState={(searchTerm) => <TableEmptyState searchTerm={searchTerm} />}
     />

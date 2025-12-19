@@ -15,7 +15,8 @@ export type ConvertedValue =
   | number // INTEGER, FLOAT
   | boolean // BOOLEAN
   | null // NULL values for any nullable column
-  | JSON; // JSON (as parsed object or string)
+  | Record<string, unknown> // JSON objects (e.g., metadata fields)
+  | string[]; // Array of strings (e.g., providers)
 
 /**
  * User input values - these are the types of values users enter in forms and cell editors

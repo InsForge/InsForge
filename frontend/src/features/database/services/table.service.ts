@@ -9,12 +9,9 @@ import {
 
 export class TableService {
   async listTables(): Promise<string[]> {
-    const data = await apiClient.request('/database/tables', {
+    return await apiClient.request('/database/tables', {
       headers: apiClient.withAccessToken(),
     });
-    // data is already unwrapped by request method and should be an array
-    // Filter out the 'users' table
-    return Array.isArray(data) ? data.filter((table) => table !== 'users') : [];
   }
 
   getTableSchema(tableName: string): Promise<GetTableSchemaResponse> {

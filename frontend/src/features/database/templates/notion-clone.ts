@@ -24,7 +24,7 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isNullable: false,
           isUnique: false,
           foreignKey: {
-            referenceTable: 'users',
+            referenceTable: 'auth.users',
             referenceColumn: 'id',
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
@@ -90,7 +90,7 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isNullable: false,
           isUnique: false,
           foreignKey: {
-            referenceTable: 'users',
+            referenceTable: 'auth.users',
             referenceColumn: 'id',
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
@@ -178,7 +178,7 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isNullable: false,
           isUnique: false,
           foreignKey: {
-            referenceTable: 'users',
+            referenceTable: 'auth.users',
             referenceColumn: 'id',
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
@@ -224,7 +224,7 @@ export const notionCloneTemplate: DatabaseTemplate = {
           isNullable: false,
           isUnique: false,
           foreignKey: {
-            referenceTable: 'users',
+            referenceTable: 'auth.users',
             referenceColumn: 'id',
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
@@ -275,7 +275,7 @@ export const notionCloneTemplate: DatabaseTemplate = {
 CREATE TABLE workspaces (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(200) NOT NULL,
-  owner_id UUID NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  owner_id UUID NOT NULL REFERENCES auth.users(id) ON UPDATE CASCADE ON DELETE CASCADE,
   icon VARCHAR(100),
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
@@ -286,7 +286,7 @@ CREATE TABLE pages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   workspace_id UUID NOT NULL REFERENCES workspaces(id) ON UPDATE CASCADE ON DELETE CASCADE,
   parent_page_id UUID REFERENCES pages(id) ON UPDATE CASCADE ON DELETE CASCADE,
-  creator_id UUID NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  creator_id UUID NOT NULL REFERENCES auth.users(id) ON UPDATE CASCADE ON DELETE CASCADE,
   title VARCHAR(500) NOT NULL CHECK (LENGTH(TRIM(title)) > 0),
   content TEXT,
   icon VARCHAR(100),
@@ -301,7 +301,7 @@ CREATE TABLE pages (
 CREATE TABLE page_shares (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   page_id UUID NOT NULL REFERENCES pages(id) ON UPDATE CASCADE ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON UPDATE CASCADE ON DELETE CASCADE,
   permission VARCHAR(20) NOT NULL CHECK (permission IN ('view', 'edit', 'admin')),
   created_at TIMESTAMP DEFAULT NOW(),
   UNIQUE(page_id, user_id)
@@ -311,7 +311,7 @@ CREATE TABLE page_shares (
 CREATE TABLE attachments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   page_id UUID NOT NULL REFERENCES pages(id) ON UPDATE CASCADE ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON UPDATE CASCADE ON DELETE CASCADE,
   file_name VARCHAR(255) NOT NULL,
   file_url VARCHAR(500) NOT NULL,
   file_size INTEGER,

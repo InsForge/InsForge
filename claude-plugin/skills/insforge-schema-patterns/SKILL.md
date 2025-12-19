@@ -15,8 +15,8 @@ Expert patterns for designing PostgreSQL schemas optimized for InsForge's PostgR
 ```sql
 CREATE TABLE follows (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  follower_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  following_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  follower_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  following_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(follower_id, following_id)
 );
@@ -44,16 +44,16 @@ CREATE POLICY "Users can unfollow" ON follows
 
 **Query with InsForge SDK:**
 ```javascript
-// Get users I follow with their profiles
+// Get users I follow
 const { data: following } = await client.database
   .from('follows')
-  .select('*, following:following_id(id, nickname, avatar_url, bio)')
+  .select()
   .eq('follower_id', currentUserId);
 
 // Get my followers
 const { data: followers } = await client.database
   .from('follows')
-  .select('*, follower:follower_id(id, nickname, avatar_url, bio)')
+  .select()
   .eq('following_id', currentUserId);
 
 // Check if user1 follows user2
@@ -80,7 +80,7 @@ await client.database
 ```sql
 CREATE TABLE likes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, post_id)  -- Prevent duplicate likes
@@ -143,7 +143,7 @@ await client.database
 CREATE TABLE comments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   parent_comment_id UUID REFERENCES comments(id) ON DELETE CASCADE,
   content TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -178,17 +178,20 @@ CREATE POLICY "Users can delete their comments" ON comments
 **Query with InsForge SDK:**
 ```javascript
 // Get top-level comments with author info
+// Note: profile is a JSONB column containing { name, avatar_url, bio, birthday }
 const { data: comments } = await client.database
   .from('comments')
-  .select('*, author:user_id(nickname, avatar_url)')
+  .select('*, author:user_id(id, profile)')
   .eq('post_id', postId)
   .is('parent_comment_id', null)
   .order('created_at', { ascending: false });
 
+// Access author info: comment.author.profile.name, comment.author.profile.avatar_url
+
 // Get replies to a comment
 const { data: replies } = await client.database
   .from('comments')
-  .select('*, author:user_id(nickname, avatar_url)')
+  .select('*, author:user_id(id, profile)')
   .eq('parent_comment_id', commentId)
   .order('created_at', { ascending: true });
 ```
@@ -209,7 +212,7 @@ CREATE TABLE organizations (
 
 CREATE TABLE organization_members (
   organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'member')),
   joined_at TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY (organization_id, user_id)

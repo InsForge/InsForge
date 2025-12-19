@@ -20,9 +20,11 @@ import {
 } from '@/components';
 import { useTables } from '@/features/database/hooks/useTables';
 import { useRecords } from '@/features/database/hooks/useRecords';
+import { useUsers } from '@/features/auth/hooks/useUsers';
 import { convertSchemaToColumns } from '@/features/database/components/DatabaseDataGrid';
 import { formatValueForDisplay } from '@/lib/utils/utils';
 import { ColumnType } from '@insforge/shared-schemas';
+import { AUTH_USERS_TABLE, authUsersSchema } from '../constants';
 
 const PAGE_SIZE = 50;
 
@@ -45,29 +47,67 @@ export function LinkRecordModal({
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const { useTableSchema } = useTables();
-  const recordsHook = useRecords(referenceTable);
+  const isAuthUsers = referenceTable === AUTH_USERS_TABLE;
 
-  // Fetch table schema
-  const { data: schema } = useTableSchema(referenceTable, open);
+  // Regular table records hook (disabled for auth.users)
+  const recordsHook = useRecords(isAuthUsers ? '' : referenceTable);
 
-  // Fetch records from the reference table
+  // Auth users hook
+  const {
+    users,
+    totalUsers,
+    isLoading: isLoadingUsers,
+    setCurrentPage: setUsersCurrentPage,
+  } = useUsers({
+    pageSize: PAGE_SIZE,
+    enabled: isAuthUsers && open,
+    searchQuery: isAuthUsers ? searchQuery : '',
+  });
+
+  // Sync current page with users hook
+  useEffect(() => {
+    if (isAuthUsers) {
+      setUsersCurrentPage(currentPage);
+    }
+  }, [currentPage, isAuthUsers, setUsersCurrentPage]);
+
+  // Fetch table schema (skip for auth.users)
+  const { data: fetchedSchema } = useTableSchema(referenceTable, !isAuthUsers && open);
+  const schema = isAuthUsers ? authUsersSchema : fetchedSchema;
+
+  // Fetch records from the reference table (skip for auth.users)
   const offset = (currentPage - 1) * PAGE_SIZE;
-  const { data: recordsResponse, isLoading } = recordsHook.useTableRecords(
+  const { data: recordsResponse, isLoading: isLoadingRecords } = recordsHook.useTableRecords(
     PAGE_SIZE,
     offset,
     searchQuery || undefined,
     sortColumns,
-    open
+    !isAuthUsers && open
   );
 
-  const recordsData =
-    schema && recordsResponse
+  // Combine data from either source
+  const recordsData = useMemo(() => {
+    if (isAuthUsers) {
+      return users.length > 0 || open
+        ? {
+            schema: authUsersSchema,
+            records: users as DatabaseRecord[],
+            totalRecords: totalUsers,
+          }
+        : undefined;
+    }
+    return schema && recordsResponse
       ? {
           schema,
           records: recordsResponse.records,
-          totalRecords: recordsResponse.pagination.total || schema.recordCount,
+          totalRecords:
+            recordsResponse.pagination.total ??
+            ('recordCount' in schema ? (schema.recordCount as number) : 0),
         }
       : undefined;
+  }, [isAuthUsers, users, totalUsers, open, schema, recordsResponse]);
+
+  const isLoading = isAuthUsers ? isLoadingUsers : isLoadingRecords;
 
   // Reset page when search query changes
   useEffect(() => {
@@ -122,15 +162,23 @@ export function LinkRecordModal({
       };
 
       // Helper function to render cell value properly based on type
-      const renderCellValue = (value: ConvertedValue, type: ColumnType | undefined) => {
-        return formatValueForDisplay(value, type);
+      // Accepts DatabaseRecord value type and converts to display string
+      const renderCellValue = (
+        value: ConvertedValue | { [key: string]: string }[],
+        type: ColumnType | undefined
+      ): string => {
+        // For JSON type, if value is already an object/array, stringify it for formatValueForDisplay
+        if (type === ColumnType.JSON && value !== null && typeof value === 'object') {
+          return formatValueForDisplay(JSON.stringify(value), type);
+        }
+        return formatValueForDisplay(value as ConvertedValue, type);
       };
 
       if (col.key === referenceColumn) {
         return {
           ...baseCol,
           renderCell: (props: RenderCellProps<DataGridRowType>) => {
-            const displayValue = renderCellValue(String(props.row[col.key]), col.type);
+            const displayValue = renderCellValue(props.row[col.key], col.type);
             return (
               <div className="w-full h-full flex items-center cursor-pointer">
                 <span className="truncate font-medium" title={displayValue}>
@@ -155,7 +203,7 @@ export function LinkRecordModal({
         ...baseCol,
         cellClass: 'link-modal-disabled-cell',
         renderCell: (props: RenderCellProps<DataGridRowType>) => {
-          const displayValue = renderCellValue(String(props.row[col.key]), col.type);
+          const displayValue = renderCellValue(props.row[col.key], col.type);
           return (
             <div className="w-full h-full flex items-center cursor-not-allowed relative">
               <div className="absolute inset-0 pointer-events-none opacity-0 hover:opacity-10 bg-gray-200 dark:bg-gray-600 transition-opacity z-5" />

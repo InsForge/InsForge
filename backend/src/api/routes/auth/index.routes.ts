@@ -23,6 +23,7 @@ import {
   sendResetPasswordEmailRequestSchema,
   exchangeResetPasswordTokenRequestSchema,
   resetPasswordRequestSchema,
+  updateProfileRequestSchema,
   type CreateUserResponse,
   type CreateSessionResponse,
   type VerifyEmailResponse,
@@ -30,6 +31,7 @@ import {
   type ResetPasswordResponse,
   type CreateAdminSessionResponse,
   type GetCurrentSessionResponse,
+  type GetProfileResponse,
   type ListUsersResponse,
   type DeleteUsersResponse,
   type GetPublicAuthConfigResponse,
@@ -63,6 +65,60 @@ router.get('/public-config', async (req: Request, res: Response, next: NextFunct
       oAuthProviders,
       ...authConfigs,
     };
+
+    successResponse(res, response);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PATCH /api/auth/profiles/current - Update current user's profile (authenticated)
+router.patch(
+  '/profiles/current',
+  verifyToken,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user) {
+        throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
+      }
+
+      const validationResult = updateProfileRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const { profile } = validationResult.data;
+      const result = await authService.updateProfile(req.user.id, profile);
+
+      const response: GetProfileResponse = result;
+
+      successResponse(res, response);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// GET /api/auth/profiles/:userId - Get user profile by ID (public endpoint)
+router.get('/profiles/:userId', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userIdValidation = userIdSchema.safeParse(req.params.userId);
+    if (!userIdValidation.success) {
+      throw new AppError('Invalid user ID format', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
+    const userId = userIdValidation.data;
+    const userProfile = await authService.getProfileById(userId);
+
+    if (!userProfile) {
+      throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
+    }
+
+    const response: GetProfileResponse = userProfile;
 
     successResponse(res, response);
   } catch (error) {
@@ -131,7 +187,7 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
     if (result.accessToken && result.user) {
       const tokenManager = TokenManager.getInstance();
       const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-      setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+      setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
       result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
     }
 
@@ -167,7 +223,7 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
     // Set refresh token in httpOnly cookie and generate CSRF token
     const tokenManager = TokenManager.getInstance();
     const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-    setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+    setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
     result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
 
     successResponse(res, result);
@@ -201,7 +257,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
 
     if (!user) {
       logger.warn('[Auth:Refresh] User not found for valid refresh token', { userId: payload.sub });
-      clearAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME);
+      clearAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME);
       throw new AppError('User not found', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
@@ -215,7 +271,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     // Generate new refresh token (token rotation for security)
     const newRefreshToken = tokenManager.generateRefreshToken(user.id);
 
-    setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, newRefreshToken);
+    setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, newRefreshToken);
     const newCsrfToken = tokenManager.generateCsrfToken(newRefreshToken);
 
     successResponse(res, {
@@ -225,15 +281,15 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     });
   } catch (error) {
     // Clear invalid cookie on error
-    clearAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME);
+    clearAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME);
     next(error);
   }
 });
 
 // POST /api/auth/logout - Logout and clear refresh token cookie
-router.post('/logout', (_req: Request, res: Response, next: NextFunction) => {
+router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
   try {
-    clearAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME);
+    clearAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME);
 
     successResponse(res, {
       success: true,
@@ -302,18 +358,19 @@ router.post('/admin/sessions', (req: Request, res: Response, next: NextFunction)
 router.get(
   '/sessions/current',
   verifyToken,
-  (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
         throw new AppError('User not authenticated', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
       }
 
+      const user = await authService.getUserSchemaById(req.user.id);
+      if (!user) {
+        throw new AppError('User not found', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
+      }
+
       const response: GetCurrentSessionResponse = {
-        user: {
-          id: req.user.id,
-          email: req.user.email,
-          role: req.user.role as 'authenticated' | 'project_admin',
-        },
+        user,
       };
 
       successResponse(res, response);
@@ -354,7 +411,7 @@ router.get('/users', verifyAdmin, async (req: Request, res: Response, next: Next
   }
 });
 
-// GET /api/auth/users/:id - Get specific user (admin only)
+// GET /api/auth/users/:userId - Get specific user (admin only)
 router.get(
   '/users/:userId',
   verifyAdmin,
@@ -370,7 +427,7 @@ router.get(
       const user = await authService.getUserSchemaById(userId);
 
       if (!user) {
-        throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
+        throw new AppError('User does not exist', 404, ERROR_CODES.NOT_FOUND);
       }
 
       successResponse(res, user);
@@ -531,7 +588,7 @@ router.post(
       // Set refresh token in httpOnly cookie and generate CSRF token
       const tokenManager = TokenManager.getInstance();
       const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-      setAuthCookie(res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+      setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
       result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
       successResponse(res, result);
     } catch (error) {

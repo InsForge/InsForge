@@ -59,7 +59,7 @@ export class SecretService {
       const encryptedValue = EncryptionManager.encrypt(input.value);
 
       const result = await this.getPool().query(
-        `INSERT INTO _secrets (key, value_ciphertext, is_reserved, expires_at)
+        `INSERT INTO system.secrets (key, value_ciphertext, is_reserved, expires_at)
          VALUES ($1, $2, $3, $4)
          RETURNING id`,
         [input.key, encryptedValue, input.isReserved || false, input.expiresAt || null]
@@ -79,7 +79,7 @@ export class SecretService {
   async getSecretById(id: string): Promise<string | null> {
     try {
       const result = await this.getPool().query(
-        `UPDATE _secrets
+        `UPDATE system.secrets
          SET last_used_at = NOW()
          WHERE id = $1 AND is_active = true
          AND (expires_at IS NULL OR expires_at > NOW())
@@ -106,7 +106,7 @@ export class SecretService {
   async getSecretByKey(key: string): Promise<string | null> {
     try {
       const result = await this.getPool().query(
-        `UPDATE _secrets
+        `UPDATE system.secrets
          SET last_used_at = NOW()
          WHERE key = $1 AND is_active = true
          AND (expires_at IS NULL OR expires_at > NOW())
@@ -142,7 +142,7 @@ export class SecretService {
           expires_at as "expiresAt",
           created_at as "createdAt",
           updated_at as "updatedAt"
-         FROM _secrets
+         FROM system.secrets
          ORDER BY created_at DESC`
       );
 
@@ -183,10 +183,14 @@ export class SecretService {
         values.push(input.expiresAt);
       }
 
+      if (updates.length === 0) {
+        return false;
+      }
+
       values.push(id);
 
       const result = await this.getPool().query(
-        `UPDATE _secrets
+        `UPDATE system.secrets
          SET ${updates.join(', ')}
          WHERE id = $${paramCount}`,
         values
@@ -210,7 +214,7 @@ export class SecretService {
     try {
       // Optimized: Single query that retrieves and updates in one operation
       const result = await this.getPool().query(
-        `UPDATE _secrets
+        `UPDATE system.secrets
          SET last_used_at = NOW()
          WHERE key = $1
          AND is_active = true
@@ -225,7 +229,12 @@ export class SecretService {
       }
 
       const decryptedValue = EncryptionManager.decrypt(result.rows[0].value_ciphertext);
-      const matches = decryptedValue === value;
+      // Use constant-time comparison to prevent timing attacks
+      const decryptedBuffer = Buffer.from(decryptedValue);
+      const valueBuffer = Buffer.from(value);
+      const matches =
+        decryptedBuffer.length === valueBuffer.length &&
+        crypto.timingSafeEqual(decryptedBuffer, valueBuffer);
 
       if (matches) {
         logger.info('Secret check successful', { key });
@@ -247,7 +256,7 @@ export class SecretService {
     try {
       // Optimized: Single query with WHERE clause to prevent deleting reserved secrets
       const result = await this.getPool().query(
-        'DELETE FROM _secrets WHERE id = $1 AND is_reserved = false',
+        'DELETE FROM system.secrets WHERE id = $1 AND is_reserved = false',
         [id]
       );
 
@@ -257,7 +266,7 @@ export class SecretService {
       } else {
         // Check if it exists but is reserved
         const checkResult = await this.getPool().query(
-          'SELECT is_reserved FROM _secrets WHERE id = $1',
+          'SELECT is_reserved FROM system.secrets WHERE id = $1',
           [id]
         );
         if (checkResult.rows.length && checkResult.rows[0].is_reserved) {
@@ -279,7 +288,9 @@ export class SecretService {
     try {
       await client.query('BEGIN');
 
-      const oldSecretResult = await client.query(`SELECT key FROM _secrets WHERE id = $1`, [id]);
+      const oldSecretResult = await client.query(`SELECT key FROM system.secrets WHERE id = $1`, [
+        id,
+      ]);
 
       if (!oldSecretResult.rows.length) {
         throw new Error('Secret not found');
@@ -288,7 +299,7 @@ export class SecretService {
       const secretKey = oldSecretResult.rows[0].key;
 
       await client.query(
-        `UPDATE _secrets
+        `UPDATE system.secrets
          SET is_active = false,
              expires_at = NOW() + INTERVAL '24 hours'
          WHERE id = $1`,
@@ -297,7 +308,7 @@ export class SecretService {
 
       const encryptedValue = EncryptionManager.encrypt(newValue);
       const newSecretResult = await client.query(
-        `INSERT INTO _secrets (key, value_ciphertext)
+        `INSERT INTO system.secrets (key, value_ciphertext)
          VALUES ($1, $2)
          RETURNING id`,
         [secretKey, encryptedValue]
@@ -327,7 +338,7 @@ export class SecretService {
   async cleanupExpiredSecrets(): Promise<number> {
     try {
       const result = await this.getPool().query(
-        `DELETE FROM _secrets
+        `DELETE FROM system.secrets
          WHERE expires_at IS NOT NULL
          AND expires_at < NOW()
          RETURNING id`

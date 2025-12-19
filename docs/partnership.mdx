@@ -516,16 +516,8 @@ const createProject = async (userId: string, projectName: string) => {
 };
 
 // 3. Use project credentials
-const useProject = async (project: any) => {
-  // Connect to InsForge project using returned credentials
-  const insForgeClient = new InsForgeClient({
-    baseUrl: project.access_host,
-    apiKey: project.api_key
-  });
-
-  // Now you can use all InsForge features
-  await insForgeClient.database.query('SELECT * FROM users');
-};
+console.log(project.access_host);
+console.log(project.api_key);
 ```
 
 ### White-Label Integration Flow

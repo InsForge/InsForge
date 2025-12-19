@@ -10,7 +10,7 @@ export interface StorageRecord {
   uploaded_at: string;
 }
 
-// Bucket record from _storage_buckets table
+// Bucket record from storage.buckets table
 export type BucketRecord = Omit<StorageBucketSchema, 'created_at'>;
 
 // Form field types for file uploads

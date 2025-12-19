@@ -43,7 +43,7 @@ export class AuthConfigService {
           require_special_char as "requireSpecialChar",
           verify_email_method as "verifyEmailMethod",
           reset_password_method as "resetPasswordMethod"
-         FROM _auth_configs
+         FROM auth.configs
          LIMIT 1`
       );
 
@@ -93,7 +93,7 @@ export class AuthConfigService {
           sign_in_redirect_to as "signInRedirectTo",
           created_at as "createdAt",
           updated_at as "updatedAt"
-         FROM _auth_configs
+         FROM auth.configs
          LIMIT 1`
       );
 
@@ -138,7 +138,7 @@ export class AuthConfigService {
       await client.query('BEGIN');
 
       // Ensure config exists and lock row to prevent concurrent modifications
-      const existingResult = await client.query('SELECT id FROM _auth_configs LIMIT 1 FOR UPDATE');
+      const existingResult = await client.query('SELECT id FROM auth.configs LIMIT 1 FOR UPDATE');
 
       if (!existingResult.rows.length) {
         // Config doesn't exist, rollback and throw error
@@ -211,7 +211,7 @@ export class AuthConfigService {
       updates.push('updated_at = NOW()');
 
       const result = await client.query(
-        `UPDATE _auth_configs
+        `UPDATE auth.configs
          SET ${updates.join(', ')}
          RETURNING
            id,

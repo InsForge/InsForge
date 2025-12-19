@@ -17,7 +17,7 @@ export const instagramCloneTemplate: DatabaseTemplate = {
           isNullable: false,
           isUnique: false,
           foreignKey: {
-            referenceTable: 'users',
+            referenceTable: 'auth.users',
             referenceColumn: 'id',
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
@@ -70,7 +70,7 @@ export const instagramCloneTemplate: DatabaseTemplate = {
           isNullable: false,
           isUnique: false,
           foreignKey: {
-            referenceTable: 'users',
+            referenceTable: 'auth.users',
             referenceColumn: 'id',
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
@@ -103,7 +103,7 @@ export const instagramCloneTemplate: DatabaseTemplate = {
           isNullable: false,
           isUnique: false,
           foreignKey: {
-            referenceTable: 'users',
+            referenceTable: 'auth.users',
             referenceColumn: 'id',
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
@@ -142,7 +142,7 @@ export const instagramCloneTemplate: DatabaseTemplate = {
           isNullable: false,
           isUnique: false,
           foreignKey: {
-            referenceTable: 'users',
+            referenceTable: 'auth.users',
             referenceColumn: 'id',
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
@@ -155,7 +155,7 @@ export const instagramCloneTemplate: DatabaseTemplate = {
           isNullable: false,
           isUnique: false,
           foreignKey: {
-            referenceTable: 'users',
+            referenceTable: 'auth.users',
             referenceColumn: 'id',
             onDelete: 'CASCADE',
             onUpdate: 'CASCADE',
@@ -176,7 +176,7 @@ export const instagramCloneTemplate: DatabaseTemplate = {
 -- Posts table
 CREATE TABLE posts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON UPDATE CASCADE ON DELETE CASCADE,
   image_url VARCHAR(500) NOT NULL,
   caption TEXT,
   created_at TIMESTAMP DEFAULT NOW()
@@ -186,7 +186,7 @@ CREATE TABLE posts (
 CREATE TABLE comments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id UUID NOT NULL REFERENCES posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON UPDATE CASCADE ON DELETE CASCADE,
   content TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT NOW()
 );
@@ -194,7 +194,7 @@ CREATE TABLE comments (
 -- Likes table
 CREATE TABLE likes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON UPDATE CASCADE ON DELETE CASCADE,
   post_id UUID NOT NULL REFERENCES posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
   created_at TIMESTAMP DEFAULT NOW(),
   UNIQUE(user_id, post_id)
@@ -203,8 +203,8 @@ CREATE TABLE likes (
 -- Follows table
 CREATE TABLE follows (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  follower_id UUID NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
-  following_id UUID NOT NULL REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  follower_id UUID NOT NULL REFERENCES auth.users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+  following_id UUID NOT NULL REFERENCES auth.users(id) ON UPDATE CASCADE ON DELETE CASCADE,
   created_at TIMESTAMP DEFAULT NOW(),
   UNIQUE(follower_id, following_id),
   CHECK (follower_id != following_id)

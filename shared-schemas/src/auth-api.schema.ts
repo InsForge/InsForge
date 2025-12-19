@@ -4,8 +4,8 @@ import {
   passwordSchema,
   nameSchema,
   userIdSchema,
-  roleSchema,
   userSchema,
+  profileSchema,
   oAuthConfigSchema,
   oAuthProvidersSchema,
   authConfigSchema,
@@ -63,6 +63,13 @@ export const listUsersRequestSchema = paginationSchema
  */
 export const deleteUsersRequestSchema = z.object({
   userIds: z.array(userIdSchema).min(1, 'At least one user ID is required'),
+});
+
+/**
+ * PATCH /api/auth/profiles/current - Update current user's profile
+ */
+export const updateProfileRequestSchema = z.object({
+  profile: z.record(z.unknown()),
 });
 
 /**
@@ -189,11 +196,15 @@ export const createAdminSessionResponseSchema = createUserResponseSchema;
  * Response for GET /api/auth/sessions/current
  */
 export const getCurrentSessionResponseSchema = z.object({
-  user: z.object({
-    id: userIdSchema,
-    email: emailSchema,
-    role: roleSchema,
-  }),
+  user: userSchema,
+});
+
+/**
+ * Response for GET /api/auth/profiles/:userId - Get user profile
+ */
+export const getProfileResponseSchema = z.object({
+  id: userIdSchema,
+  profile: profileSchema.nullable(),
 });
 
 /**
@@ -321,6 +332,7 @@ export type CreateSessionRequest = z.infer<typeof createSessionRequestSchema>;
 export type CreateAdminSessionRequest = z.infer<typeof createAdminSessionRequestSchema>;
 export type ListUsersRequest = z.infer<typeof listUsersRequestSchema>;
 export type DeleteUsersRequest = z.infer<typeof deleteUsersRequestSchema>;
+export type UpdateProfileRequest = z.infer<typeof updateProfileRequestSchema>;
 export type CreateOAuthConfigRequest = z.infer<typeof createOAuthConfigRequestSchema>;
 export type UpdateOAuthConfigRequest = z.infer<typeof updateOAuthConfigRequestSchema>;
 export type UpdateAuthConfigRequest = z.infer<typeof updateAuthConfigRequestSchema>;
@@ -343,6 +355,7 @@ export type RefreshSessionResponse = z.infer<typeof refreshSessionResponseSchema
 export type ResetPasswordResponse = z.infer<typeof resetPasswordResponseSchema>;
 export type CreateAdminSessionResponse = z.infer<typeof createAdminSessionResponseSchema>;
 export type GetCurrentSessionResponse = z.infer<typeof getCurrentSessionResponseSchema>;
+export type GetProfileResponse = z.infer<typeof getProfileResponseSchema>;
 export type ListUsersResponse = z.infer<typeof listUsersResponseSchema>;
 export type DeleteUsersResponse = z.infer<typeof deleteUsersResponseSchema>;
 export type GetOauthUrlResponse = z.infer<typeof getOauthUrlResponseSchema>;

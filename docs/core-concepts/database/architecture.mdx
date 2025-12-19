@@ -113,32 +113,69 @@ AND category = 'electronics'
 InsForge uses two PostgreSQL databases:
 
 ### Main Database (`insforge`)
-All application and system tables reside in the `public` schema:
+Tables are organized into dedicated schemas for better organization and security:
 
-| Table Type | Purpose | Examples |
-|------------|---------|----------|
-| **User Tables** | Created by developers | Any table you create |
-| **System Tables** | Internal InsForge tables | Prefixed with `_` |
+| Schema | Purpose | Access |
+|--------|---------|--------|
+| **public** | User-created tables | PostgREST (auto-generated APIs) |
+| **auth** | Authentication & user data | Internal APIs only |
+| **storage** | File storage metadata | Internal APIs only |
+| **ai** | AI configuration & usage | Internal APIs only |
+| **functions** | Edge function definitions | Internal APIs only |
+| **realtime** | Real-time pub/sub channels | Internal APIs only |
+| **system** | Core system data | Internal APIs only |
 
-### Analytics Database (`_insforge`)
-Separate database for analytics with `_analytics` schema for Logflare integration.
+### Schema Details
 
-### System Tables (in `public` schema)
+#### `auth` Schema (Authentication)
 
 | Table | Purpose |
 |-------|---------|
-| `_accounts` | Core user authentication records |
-| `users` | User profile data (references _accounts) |
-| `_account_providers` | OAuth provider connections |
-| `_storage_buckets` | Storage bucket configuration |
-| `_storage` | File metadata and references |
-| `_ai_configs` | AI model configurations per project |
-| `_ai_usage` | AI token usage tracking |
-| `_config` | System configuration key-value store |
-| `_metadata` | Application metadata |
-| `_mcp_usage` | MCP tool usage tracking |
-| `_edge_functions` | Serverless function definitions |
-| `logs` | Activity and audit logs |
+| `users` | Core user records with metadata |
+| `user_providers` | OAuth provider connections |
+| `configs` | Authentication settings |
+| `oauth_configs` | OAuth provider configurations |
+| `email_otps` | Email verification codes |
+
+#### `storage` Schema (File Storage)
+
+| Table | Purpose |
+|-------|---------|
+| `buckets` | Storage bucket configuration |
+| `objects` | File metadata and references |
+
+#### `ai` Schema (AI Integration)
+
+| Table | Purpose |
+|-------|---------|
+| `configs` | AI model configurations per project |
+| `usage` | AI token usage tracking |
+
+#### `functions` Schema (Edge Functions)
+
+| Table | Purpose |
+|-------|---------|
+| `definitions` | Serverless function definitions |
+
+#### `realtime` Schema (Real-time Pub/Sub)
+
+| Table | Purpose |
+|-------|---------|
+| `channels` | Channel metadata and subscription configuration for real-time Pub/Sub |
+| `messages` | Real-time message queue |
+
+#### `system` Schema (Core System)
+
+| Table | Purpose |
+|-------|---------|
+| `secrets` | Encrypted system secrets |
+| `audit_logs` | Activity and audit logs |
+| `mcp_usage` | MCP tool usage tracking |
+| `migrations` | Database migration history |
+
+<Note>
+Only tables in the `public` schema are exposed via PostgREST auto-generated APIs. System schemas are accessible only through internal InsForge APIs.
+</Note>
 
 ## Query Syntax
 
