@@ -1,5 +1,5 @@
 // TODO: Rewrite this broadcast service file to implement PKCE in future
-import { UserSchema } from '@insforge/shared-schemas';
+import { VerifyEmailResponse } from '@insforge/shared-schemas';
 
 export enum BroadcastEventType {
   EMAIL_VERIFIED_SUCCESS = 'EMAIL_VERIFIED_SUCCESS',
@@ -9,10 +9,7 @@ export enum BroadcastEventType {
 export interface BroadcastEvent {
   type: BroadcastEventType;
   timestamp: number;
-  data?: {
-    accessToken?: string;
-    user?: UserSchema;
-  };
+  data?: VerifyEmailResponse;
 }
 
 export type BroadcastEventHandler = (event: BroadcastEvent) => void;
