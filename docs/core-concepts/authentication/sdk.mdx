@@ -22,8 +22,10 @@ Create a new user account with email and password.
 ```typescript
 {
   data: {
-    user: { id, email, name, emailVerified, createdAt, updatedAt },
-    accessToken: string
+    user: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata },
+    accessToken: string,
+    requireEmailVerification: boolean,
+    csrfToken: string
   } | null,
   error: Error | null
 }
@@ -47,12 +49,17 @@ const { data, error } = await insforge.auth.signUp({
     "user": {
       "id": "usr_abc123",
       "email": "user@example.com",
-      "name": "John Doe",
-      "emailVerified": false,
+      "emailVerified": true,
+      "providers": [ "google", "github" ],
       "createdAt": "2024-01-15T10:00:00Z",
-      "updatedAt": "2024-01-15T10:00:00Z"
+      "updatedAt": "2024-01-15T10:00:00Z",
+      "profile": {
+        "name": "John Doe",
+        "avatar_url": "....",
+      }
     },
-    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "csrfToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
   },
   "error": null
 }
@@ -74,8 +81,9 @@ Sign in an existing user with email and password.
 ```typescript
 {
   data: {
-    user: { id, email, name, emailVerified, createdAt, updatedAt },
-    accessToken: string
+    user: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata },
+    accessToken: string,
+    csrfToken: string
   } | null,
   error: Error | null
 }
@@ -98,12 +106,17 @@ const { data, error } = await insforge.auth.signInWithPassword({
     "user": {
       "id": "usr_abc123",
       "email": "user@example.com",
-      "name": "John Doe",
       "emailVerified": true,
+      "providers": [ "google", "github" ],
       "createdAt": "2024-01-15T10:00:00Z",
-      "updatedAt": "2024-01-15T10:00:00Z"
+      "updatedAt": "2024-01-15T10:00:00Z",
+      "profile": {
+        "name": "John Doe",
+        "avatar_url": "https://example.com/avatar.jpg",
+      }
     },
-    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "csrfToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   },
   "error": null
 }
@@ -212,8 +225,7 @@ None
 ```typescript
 {
   data: {
-    user: { id, email, role },
-    profile: { id, nickname, avatar_url, bio, birthday, ... }
+    user: { id, email, emailVerified, providers, profile, metadata, createdAt, updatedAt }
   } | null,
   error: Error | null
 }
@@ -238,15 +250,15 @@ if (data) {
     "user": {
       "id": "usr_abc123",
       "email": "user@example.com",
-      "role": "authenticated"
+      "emailVerified": true,
+      "providers": [ "google", "github" ],
+      "createdAt": "2024-01-15T10:00:00Z",
+      "updatedAt": "2024-01-15T10:00:00Z",
+      "profile": {
+        "name": "John Doe",
+        "avatar_url": "https://example.com/avatar.jpg",
+      }
     },
-    "profile": {
-      "id": "usr_abc123",
-      "nickname": "JohnDoe",
-      "avatar_url": "https://example.com/avatar.jpg",
-      "bio": "Full-stack developer",
-      "birthday": "1990-01-01"
-    }
   },
   "error": null
 }
@@ -269,7 +281,7 @@ None
   data: {
     session: {
       accessToken: string,
-      user: { id, email, name, ... }
+      user: { id, email, profile, ... }
     } | null
   },
   error: Error | null
@@ -296,7 +308,10 @@ if (data.session) {
       "user": {
         "id": "usr_abc123",
         "email": "user@example.com",
-        "name": "John Doe"
+        "profile": {
+          "name": "John Doe",
+          "avatar_url": "https://example.com/avatar.jpg"
+        },
       }
     }
   },
@@ -318,7 +333,7 @@ Get any user's public profile by ID.
 
 ```typescript
 {
-  data: { id, nickname, avatar_url, bio, birthday, ... } | null,
+  data: { id, profile: { name, avatar_url, ... } } | null,
   error: Error | null
 }
 ```
@@ -337,10 +352,12 @@ console.log(profile.nickname)
 {
   "data": {
     "id": "usr_xyz789",
-    "nickname": "JaneDoe",
-    "avatar_url": "https://example.com/jane.jpg",
-    "bio": "Designer and developer",
-    "birthday": "1992-05-15"
+    "profile": {
+      "name": "John Doe",
+      "avatar_url": "https://example.com/jane.jpg",
+      "bio": "Designer and developer",
+      "birthday": "1992-05-15"
+    }
   },
   "error": null
 }
@@ -350,20 +367,23 @@ console.log(profile.nickname)
 
 ## setProfile()
 
-Update current user's profile in users table.
+Update current user's profile in users table (supports any dynamic fields).
 
 ### Parameters
 
-- `nickname` (string, optional) - User's display name
-- `avatar_url` (string, optional) - Profile picture URL
-- `bio` (string, optional) - User biography
-- `birthday` (string, optional) - Birth date (YYYY-MM-DD format)
+- `profile` (object) - A key-value map of profile fields to update. Any fields are accepted.
+
+**Common fields:**
+- `name` (predefined, string) - User's display name
+- `avatar_url` (predefined, string) - Profile picture URL
+- `bio` (custom, string) - User biography
+- `birthday` (custom, string) - Birth date (YYYY-MM-DD format)
 
 ### Returns
 
 ```typescript
 {
-  data: { id, nickname, avatar_url, bio, birthday, ... } | null,
+  data: { id, ...profile_fields } | null,
   error: Error | null
 }
 ```
@@ -372,9 +392,10 @@ Update current user's profile in users table.
 
 ```javascript
 const { data: profile, error } = await insforge.auth.setProfile({
-  nickname: 'JohnDev',
+  name: 'JohnDev',
   bio: 'Full-stack developer',
-  avatar_url: 'https://example.com/avatar.jpg'
+  avatar_url: 'https://example.com/avatar.jpg',
+  custom_field: 'any value'  // Any custom fields are supported
 })
 ```
 
@@ -384,10 +405,10 @@ const { data: profile, error } = await insforge.auth.setProfile({
 {
   "data": {
     "id": "usr_abc123",
-    "nickname": "JohnDev",
+    "name": "JohnDev",
     "avatar_url": "https://example.com/avatar.jpg",
     "bio": "Full-stack developer",
-    "birthday": null
+    "custom_field": "any value"
   },
   "error": null
 }

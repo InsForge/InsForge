@@ -1,15 +1,13 @@
 ---
-title: InsForge Auth Components
-description: Framework-agnostic authentication components guidance for customization
+title: Custom Auth Pages
+description: Build your own authentication UI using InsForge components
 ---
 
-## Custom Authentication system
+## Custom Auth Pages Setup
 
-Use this approach when you need custom authentication pages in your application instead of redirecting to hosted pages.
+We are using react-router package as an example.
 
-### Step-by-Step: Custom Auth Pages Setup
-
-#### Step 1: Setup Provider (Same as Quick Start)
+### Step 1: Setup Provider (Same as Quick Start)
 
 The provider setup is identical:
 
@@ -33,7 +31,7 @@ createRoot(document.getElementById('root')!).render(
 );
 ```
 
-#### Step 2: Configure Router with Custom Pages
+### Step 2: Configure Router with Custom Pages
 
 Set `builtInAuth: false` and provide your page components:
 
@@ -76,7 +74,7 @@ export default function App() {
 }
 ```
 
-#### Step 3: Create Auth Page Components
+### Step 3: Create Auth Page Components
 
 Use our complete authentication components directly. These components are **full-featured page-level components** with all business logic included:
 
