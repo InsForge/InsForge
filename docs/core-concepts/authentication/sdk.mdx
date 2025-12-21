@@ -49,17 +49,16 @@ const { data, error } = await insforge.auth.signUp({
     "user": {
       "id": "usr_abc123",
       "email": "user@example.com",
-      "emailVerified": true,
       "providers": [ "google", "github" ],
       "createdAt": "2024-01-15T10:00:00Z",
       "updatedAt": "2024-01-15T10:00:00Z",
       "profile": {
         "name": "John Doe",
-        "avatar_url": "....",
+        "avatar_url": "https://example.com/jane.jpg",
       }
     },
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "csrfToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    "csrfToken": "5758d38259fb..."
   },
   "error": null
 }
@@ -106,7 +105,6 @@ const { data, error } = await insforge.auth.signInWithPassword({
     "user": {
       "id": "usr_abc123",
       "email": "user@example.com",
-      "emailVerified": true,
       "providers": [ "google", "github" ],
       "createdAt": "2024-01-15T10:00:00Z",
       "updatedAt": "2024-01-15T10:00:00Z",
@@ -116,7 +114,7 @@ const { data, error } = await insforge.auth.signInWithPassword({
       }
     },
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "csrfToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "csrfToken": "5758d38259fb...",
   },
   "error": null
 }
