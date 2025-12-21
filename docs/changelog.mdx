@@ -3,6 +3,44 @@ title: "Changelog"
 description: "New features, improvements, and fixes shipped to InsForge."
 ---
 
+<Update label="Dec 21, 2025" tags={["Realtime", "Auth", "Payments", "AI"]}>
+  ## Realtime Module
+
+  We launched a new Realtime module built on WebSockets with a pub/sub architecture. It supports channels for live updates, message history for state syncing, and RLS-based permissions out of the box—making it well suited for real-time apps, games, chat, and collaborative experiences.
+
+  <Frame>
+    <img src="/images/changelog/dec-2025/realtime2.png" alt="Realtime module with collaborative cursors and messaging" />
+  </Frame>
+
+  ### Apple OAuth
+
+  Apple OAuth is now available in InsForge Auth, as requested by the community. You can enable Sign in with Apple in a few clicks and ship apps with Apple login without manual OAuth setup.
+
+  <Frame>
+    <video autoPlay muted loop playsInline src="/images/changelog/dec-2025/apple-oauth.mp4" />
+  </Frame>
+
+  ### Alipay Payments
+
+  Alipay is now supported for InsForge subscriptions, so you can subscribe without a credit card. This removes a major payment barrier for users in the APAC region.
+
+  ### More Models in the Model Gateway
+
+  We have added more popular and state-of-the-art models to the InsForge Model Gateway so you can choose the right model for each use case:
+
+  - **GPT 5.2** - Stronger reasoning and longer context
+  - **DeepSeek V3** - High performance at a lower cost
+  - **Gemini 3 Flash** - Low latency real-time inference
+
+  More models are coming soon.
+
+  <Frame>
+    <img src="/images/changelog/dec-2025/moreModels.png" alt="AI Integration dashboard with new models" />
+  </Frame>
+
+  [View AI SDK documentation →](/core-concepts/ai/sdk)
+</Update>
+
 <Update label="Dec 19, 2025" tags={["Multi Region", "Postgres Connection"]}>
   ## Multi-Region Deployments
   Deploy your project to the appropriate region for improved latency and compliance. We currently support `us-east`, `us-west`, `eu-central` and `ap-southeast` regions. More regions will be added based on demand.
@@ -36,7 +74,7 @@ description: "New features, improvements, and fixes shipped to InsForge."
 
   ## New AI Models
   Expanded AI model support:
-  - **GPT 5.2** - OpenAI's latest flagship model with enhanced reasoning, longer context windows, and improved instruction following
+  - **GPT-5.2** - OpenAI's latest flagship model with enhanced reasoning, longer context windows, and improved instruction following
   - **DeepSeek V3** - Open-weight model offering strong performance at lower cost, ideal for high-volume workloads
 
   [View AI SDK documentation →](/core-concepts/ai/sdk)
