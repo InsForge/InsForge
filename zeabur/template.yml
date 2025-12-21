@@ -924,13 +924,6 @@ spec:
                     default: ""
                 OPENROUTER_API_KEY:
                     default: ${OPENROUTER_API_KEY}
-            instructions:
-                - title: Dashboard Login
-                  content: https://${PUBLIC_DOMAIN}/dashboard/login
-                - title: Admin Email
-                  content: ${ADMIN_EMAIL}
-                - title: Admin Password
-                  content: ${ADMIN_PASSWORD}
             healthCheck:
                 type: HTTP
                 port: web
