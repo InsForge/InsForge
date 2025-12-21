@@ -233,6 +233,13 @@ export async function createApp() {
     logger.info('Auth app not built, proxying to development server', { authAppUrl });
   }
 
+  // Redirect root to dashboard login (only for non-insforge cloud environments)
+  if (!isCloudEnvironment()) {
+    app.get('/', (_req: Request, res: Response) => {
+      res.redirect('/dashboard/login');
+    });
+  }
+
   // Serve main frontend if it exists
   const frontendPath = path.join(__dirname, 'frontend');
   if (fs.existsSync(frontendPath)) {
@@ -252,13 +259,6 @@ export async function createApp() {
       });
     });
   }
-    // Redirect root to dashboard login (only for non-insforge cloud environments)
-    if (!isCloudEnvironment()) {
-      app.get('/', (_req: Request, res: Response) => {
-        res.redirect('/dashboard/login');
-      });
-    }
-  
 
   app.use(errorMiddleware);
   await seedBackend();
