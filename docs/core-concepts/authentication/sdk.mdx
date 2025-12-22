@@ -242,7 +242,7 @@ const { data, error } = await insforge.auth.getCurrentUser();
 
 if (data) {
   console.log(data.user.email); // Auth info
-  console.log(data.profile.nickname); // Profile from users table
+  console.log(data.user.profile.name); // Profile from users table
 }
 ```
 
