@@ -1,23 +1,30 @@
 ---
 title: Next.js
-description: Zero-configuration authentication for Next.js with built-in UI components
+description: Quick authentication setup for Next.js apps using hosted auth pages
 ---
 
-The `@insforge/nextjs` package provides **zero-configuration authentication** for Next.js applications. Authentication pages are hosted on your backend by default—no UI code needed.
+The `@insforge/nextjs` package provides authentication for Next.js applications using **hosted auth pages**.
+
+When users sign in, they're redirected to your InsForge backend's login page, then returned to your app after authentication—no UI code required.
+
+<Tip>Want to build custom login pages instead? See [Custom Auth Pages](/core-concepts/authentication/ui-components/customization).</Tip>
 
 ## Quick Start
 
-### Step 1: Install Package and Set Environment Variables
+### Step 1: Create New Next.js Project (Required)
 
 ```bash
 npm install @insforge/nextjs@latest
 ```
 
+### Step 2: Set Environment Variables
+
 ```bash .env.local
 NEXT_PUBLIC_INSFORGE_BASE_URL=https://your-app.region.insforge.app
+NEXT_PUBLIC_INSFORGE_ANON_KEY=your-anon-key-here
 ```
 
-### Step 2: Add Middleware
+### Step 3: Add Middleware
 
 Create middleware to protect routes:
 
@@ -36,7 +43,7 @@ export const config = {
 };
 ```
 
-### Step 3: Create API Route
+### Step 4: Create API Route
 
 Create an API route to enable server-side rendering (SSR) and cookie-based authentication:
 
@@ -54,7 +61,7 @@ export const DELETE = handlers.DELETE;
 
 <Info>**Why?** This route syncs auth tokens to HTTP-only cookies for server-side middleware.</Info>
 
-### Step 4: Add InsforgeProvider
+### Step 5: Add InsforgeProvider
 
 Wrap your application with the `InsforgeProvider` in your root layout:
 
