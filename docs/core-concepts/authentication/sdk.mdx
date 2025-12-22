@@ -37,8 +37,8 @@ Create a new user account with email and password.
 const { data, error } = await insforge.auth.signUp({
   email: 'user@example.com',
   password: 'secure_password123',
-  name: 'John Doe'
-})
+  name: 'John Doe',
+});
 ```
 
 ### Output
@@ -49,14 +49,17 @@ const { data, error } = await insforge.auth.signUp({
     "user": {
       "id": "usr_abc123",
       "email": "user@example.com",
-      "providers": [ "google", "github" ],
+      "emailVerified": true,
+      "providers": ["google"],
       "createdAt": "2024-01-15T10:00:00Z",
       "updatedAt": "2024-01-15T10:00:00Z",
       "profile": {
         "name": "John Doe",
-        "avatar_url": "https://example.com/jane.jpg",
-      }
+        "avatar_url": "https://example.com/jane.jpg"
+      },
+      "metadata": {}
     },
+    "requireEmailVerification": true,
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "csrfToken": "5758d38259fb..."
   },
@@ -93,8 +96,8 @@ Sign in an existing user with email and password.
 ```javascript
 const { data, error } = await insforge.auth.signInWithPassword({
   email: 'user@example.com',
-  password: 'secure_password123'
-})
+  password: 'secure_password123',
+});
 ```
 
 ### Output
@@ -105,16 +108,18 @@ const { data, error } = await insforge.auth.signInWithPassword({
     "user": {
       "id": "usr_abc123",
       "email": "user@example.com",
-      "providers": [ "google", "github" ],
+      "emailVerified": true,
+      "providers": ["google"],
       "createdAt": "2024-01-15T10:00:00Z",
       "updatedAt": "2024-01-15T10:00:00Z",
       "profile": {
         "name": "John Doe",
-        "avatar_url": "https://example.com/avatar.jpg",
-      }
+        "avatar_url": "https://example.com/avatar.jpg"
+      },
+      "metadata": {}
     },
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "csrfToken": "5758d38259fb...",
+    "csrfToken": "5758d38259fb..."
   },
   "error": null
 }
@@ -142,7 +147,8 @@ Start OAuth authentication flow with supported providers (Google, GitHub, Micros
 ```
 
 <Note>
-After OAuth redirect, SDK automatically detects callback parameters and saves session. No manual handling needed.
+  After OAuth redirect, SDK automatically detects callback parameters and saves session. No manual
+  handling needed.
 </Note>
 
 ### Example
@@ -151,17 +157,17 @@ After OAuth redirect, SDK automatically detects callback parameters and saves se
 // Default: auto-redirect
 await insforge.auth.signInWithOAuth({
   provider: 'google',
-  redirectTo: 'http://localhost:3000/dashboard'
-})
+  redirectTo: 'http://localhost:3000/dashboard',
+});
 // Browser immediately redirects to Google
 
 // skipBrowserRedirect: get URL for manual handling
 const { data } = await insforge.auth.signInWithOAuth({
   provider: 'google',
-  skipBrowserRedirect: true
-})
+  skipBrowserRedirect: true,
+});
 
-window.location.href = data.url // Redirect when ready
+window.location.href = data.url; // Redirect when ready
 ```
 
 ### Output
@@ -190,14 +196,14 @@ None
 
 ```typescript
 {
-  error: Error | null
+  error: Error | null;
 }
 ```
 
 ### Example
 
 ```javascript
-const { error } = await insforge.auth.signOut()
+const { error } = await insforge.auth.signOut();
 ```
 
 ### Output
@@ -232,11 +238,11 @@ None
 ### Example
 
 ```javascript
-const { data, error } = await insforge.auth.getCurrentUser()
+const { data, error } = await insforge.auth.getCurrentUser();
 
 if (data) {
-  console.log(data.user.email)        // Auth info
-  console.log(data.profile.nickname)  // Profile from users table
+  console.log(data.user.email); // Auth info
+  console.log(data.profile.nickname); // Profile from users table
 }
 ```
 
@@ -249,14 +255,15 @@ if (data) {
       "id": "usr_abc123",
       "email": "user@example.com",
       "emailVerified": true,
-      "providers": [ "google", "github" ],
+      "providers": ["google"],
       "createdAt": "2024-01-15T10:00:00Z",
       "updatedAt": "2024-01-15T10:00:00Z",
       "profile": {
         "name": "John Doe",
-        "avatar_url": "https://example.com/avatar.jpg",
-      }
-    },
+        "avatar_url": "https://example.com/avatar.jpg"
+      },
+      "metadata": {}
+    }
   },
   "error": null
 }
@@ -289,10 +296,10 @@ None
 ### Example
 
 ```javascript
-const { data, error } = await insforge.auth.getCurrentSession()
+const { data, error } = await insforge.auth.getCurrentSession();
 
 if (data.session) {
-  console.log('Token:', data.session.accessToken)
+  console.log('Token:', data.session.accessToken);
 }
 ```
 
@@ -306,10 +313,15 @@ if (data.session) {
       "user": {
         "id": "usr_abc123",
         "email": "user@example.com",
+        "emailVerified": true,
+        "createdAt": "2025-12-22T19:13:08.586Z",
+        "updatedAt": "2025-12-22T19:13:08.586Z",
+        "providers": ["google"],
         "profile": {
           "name": "John Doe",
           "avatar_url": "https://example.com/avatar.jpg"
         },
+        "metadata": {}
       }
     }
   },
@@ -339,9 +351,9 @@ Get any user's public profile by ID.
 ### Example
 
 ```javascript
-const { data: profile, error } = await insforge.auth.getProfile('usr_xyz789')
+const { data, error } = await insforge.auth.getProfile('usr_xyz789');
 
-console.log(profile.nickname)
+console.log(data.profile.name);
 ```
 
 ### Output
@@ -353,8 +365,7 @@ console.log(profile.nickname)
     "profile": {
       "name": "John Doe",
       "avatar_url": "https://example.com/jane.jpg",
-      "bio": "Designer and developer",
-      "birthday": "1992-05-15"
+      ... // Custom fields you added
     }
   },
   "error": null
@@ -372,6 +383,7 @@ Update current user's profile in users table (supports any dynamic fields).
 - `profile` (object) - A key-value map of profile fields to update. Any fields are accepted.
 
 **Common fields:**
+
 - `name` (predefined, string) - User's display name
 - `avatar_url` (predefined, string) - Profile picture URL
 - `bio` (custom, string) - User biography
@@ -389,12 +401,12 @@ Update current user's profile in users table (supports any dynamic fields).
 ### Example
 
 ```javascript
-const { data: profile, error } = await insforge.auth.setProfile({
+const { data, error } = await insforge.auth.setProfile({
   name: 'JohnDev',
   bio: 'Full-stack developer',
   avatar_url: 'https://example.com/avatar.jpg',
-  custom_field: 'any value'  // Any custom fields are supported
-})
+  custom_field: 'any value', // Any custom fields are supported
+});
 ```
 
 ### Output
@@ -403,10 +415,12 @@ const { data: profile, error } = await insforge.auth.setProfile({
 {
   "data": {
     "id": "usr_abc123",
-    "name": "JohnDev",
-    "avatar_url": "https://example.com/avatar.jpg",
-    "bio": "Full-stack developer",
-    "custom_field": "any value"
+    "profile": {
+      "name": "JohnDev",
+      "avatar_url": "https://example.com/avatar.jpg",
+      "bio": "Full-stack developer",
+      "custom_field": "any value"
+    }
   },
   "error": null
 }
@@ -421,13 +435,13 @@ All auth methods return structured errors:
 ```javascript
 const { data, error } = await insforge.auth.signInWithPassword({
   email: 'user@example.com',
-  password: 'wrong_password'
-})
+  password: 'wrong_password',
+});
 
 if (error) {
-  console.error(error.statusCode)    // 401
-  console.error(error.error)         // 'INVALID_CREDENTIALS'
-  console.error(error.message)       // 'Invalid login credentials'
-  console.error(error.nextActions)   // 'Check email and password'
+  console.error(error.statusCode); // 401
+  console.error(error.error); // 'INVALID_CREDENTIALS'
+  console.error(error.message); // 'Invalid login credentials'
+  console.error(error.nextActions); // 'Check email and password'
 }
 ```
