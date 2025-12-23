@@ -83,20 +83,18 @@ export function OnboardingModal({ open, onOpenChange }: OnboardingModalProps) {
               <h3 className="text-gray-900 dark:text-white text-2xl font-semibold leading-8 tracking-[-0.144px]">
                 Connect Project
               </h3>
-              <div className="flex items-center gap-1">
-                <p className="text-gray-500 dark:text-neutral-400 text-base leading-7">
-                  Connect your AI agent by installing the MCP server. The installation completes
-                  automatically when we receive the first MCP call.
-                </p>
+              <p className="text-gray-500 dark:text-neutral-400 text-base leading-7">
+                Connect your AI agent by installing the MCP server. The installation completes
+                automatically when we receive the first MCP call.
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div
+                    <span
                       onMouseEnter={() => setIsVideoTooltipOpen(true)}
                       onMouseLeave={() => setIsVideoTooltipOpen(false)}
-                      className="cursor-help"
+                      className="inline-flex items-center align-middle ml-2 cursor-help"
                     >
                       <HelpCircle className="w-5 h-5 text-gray-400 dark:text-neutral-400 shrink-0" />
-                    </div>
+                    </span>
                   </TooltipTrigger>
                   <TooltipContent
                     portal
@@ -107,7 +105,7 @@ export function OnboardingModal({ open, onOpenChange }: OnboardingModalProps) {
                     <VideoDemoModal open={isVideoTooltipOpen} className="w-[580px]" />
                   </TooltipContent>
                 </Tooltip>
-              </div>
+              </p>
             </div>
 
             {/* Agent Selector Dropdown */}
