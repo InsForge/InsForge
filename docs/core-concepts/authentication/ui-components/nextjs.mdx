@@ -64,20 +64,36 @@ export const DELETE = handlers.DELETE;
 
 <Info>**Why?** This route syncs auth tokens to HTTP-only cookies for server-side middleware.</Info>
 
-### Step 5: Add InsforgeProvider
+### Step 5: Create InsforgeProvider Component
+
+```tsx
+// app/providers.tsx
+'use client';
+import { InsforgeBrowserProvider, type InitialAuthState } from '@insforge/nextjs';
+import { insforge } from '@/lib/insforge';
+
+export function InsforgeProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <InsforgeBrowserProvider client={insforge} afterSignInUrl="/dashboard">
+      {children}
+    </InsforgeBrowserProvider>
+  );
+}
+```
+
+### Step 6: Add InsforgeProvider to Root Layout
 
 Wrap your application with the `InsforgeProvider` in your root layout:
 
 ```tsx app/layout.tsx
 import {
-  InsforgeProvider,
   SignedIn,
   SignedOut,
   SignInButton,
   SignUpButton,
   UserButton,
 } from '@insforge/nextjs';
-import { insforge } from './lib/insforge';
+import { InsforgeProvider } from './providers';
 
 export const metadata: Metadata = {
   title: 'InsForge Next.js Quickstart',
@@ -88,7 +104,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <InsforgeProvider client={insforge}>
+        <InsforgeProvider>
           <nav>
             <SignedOut>
               <SignInButton />
