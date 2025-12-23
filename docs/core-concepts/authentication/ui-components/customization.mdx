@@ -455,8 +455,8 @@ function UserProfile() {
   return (
     <div>
       <p>Email: {user.email}</p>
-      <p>Name: {user.name}</p>
-      <img src={user.avatarUrl} alt="Avatar" />
+      <p>Name: {user.profile.name}</p>
+      <img src={user.profile.avatar_url} alt="Avatar" />
       <button onClick={handleUpdate}>Update Name</button>
     </div>
   );
@@ -465,7 +465,8 @@ function UserProfile() {
 
 **Returns:**
 
-- `user` - User object with id, email, name, avatarUrl
+- `user` - User object with id, email, profile
+- `user.profile` - User profile object with name, avatar_url, and other custom fields
 - `isLoaded` - Boolean loading state
 - `updateUser(data)` - Update user profile
 
