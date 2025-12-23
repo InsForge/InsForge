@@ -859,7 +859,7 @@ spec:
           template: PREBUILT
           spec:
             source:
-                image: ghcr.io/insforge/insforge-oss:v1.4.1
+                image: ghcr.io/insforge/insforge-oss:v1.4.2
             ports:
                 - id: web
                   port: 7130
