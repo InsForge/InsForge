@@ -7,7 +7,10 @@ The `@insforge/nextjs` package provides authentication for Next.js applications 
 
 When users sign in, they're redirected to your InsForge backend's login page, then returned to your app after authentication—no UI code required.
 
-<Tip>Want to build custom login pages instead? See [Custom Auth Pages](/core-concepts/authentication/ui-components/customization).</Tip>
+<Tip>
+  Want to build custom login pages instead? See [Custom Auth
+  Pages](/core-concepts/authentication/ui-components/customization).
+</Tip>
 
 ## Quick Start
 
@@ -74,6 +77,7 @@ import {
   SignUpButton,
   UserButton,
 } from '@insforge/nextjs';
+import { insforge } from './lib/insforge';
 
 export const metadata: Metadata = {
   title: 'InsForge Next.js Quickstart',
@@ -84,11 +88,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <InsforgeProvider
-          baseUrl={
-            process.env.NEXT_PUBLIC_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app' // Replace with your InsForge backend URL
-          }
-        >
+        <InsforgeProvider client={insforge}>
           <nav>
             <SignedOut>
               <SignInButton />
@@ -191,8 +191,8 @@ export async function POST(request: NextRequest) {
 
     // Create InsForge SDK client with user's token for authenticated access
     const insforge = createClient({
-      baseUrl: process.env.NEXT_PUBLIC_INSFORGE_BASE_URL || "https://your-app.region.insforge.app",
-      edgeFunctionToken: token
+      baseUrl: process.env.NEXT_PUBLIC_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app',
+      edgeFunctionToken: token,
     });
 
     // Request for AI response
@@ -216,13 +216,9 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 }
     );
-
   } catch (error) {
     console.error(error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 ```
