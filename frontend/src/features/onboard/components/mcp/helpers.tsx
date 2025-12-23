@@ -11,6 +11,8 @@ import ClaudeLogo from '@/assets/logos/claude_code.svg?react';
 import WindsurfLogo from '@/assets/logos/windsurf.svg?react';
 import ClineLogo from '@/assets/logos/cline.svg?react';
 import RooCodeLogo from '@/assets/logos/roo_code.svg';
+import QoderLogo from '@/assets/logos/qoder.svg?react';
+import CopilotLogo from '@/assets/logos/copilot.svg?react';
 import { getBackendUrl } from '@/lib/utils/utils';
 // import CodexLogo from '@/assets/logos/openai.svg?react';
 
@@ -50,6 +52,16 @@ export const MCP_AGENTS: MCPAgent[] = [
     id: 'roocode',
     displayName: 'Roo Code',
     logo: <img src={RooCodeLogo} alt="" className="dark:invert" />,
+  },
+  {
+    id: 'qoder',
+    displayName: 'Qoder',
+    logo: <QoderLogo className="w-5 h-5 dark:text-white" />,
+  },
+  {
+    id: 'copilot',
+    displayName: 'Copilot',
+    logo: <CopilotLogo className="w-5 h-5 dark:text-white" />,
   },
   // {
   //   id: 'codex',
