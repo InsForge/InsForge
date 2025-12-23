@@ -7,7 +7,10 @@ The `@insforge/react` package provides authentication for React+Vite application
 
 When users sign in, they're redirected to your InsForge backend's login page, then returned to your app after authentication—no UI code required.
 
-<Tip>Want to build custom login pages instead? See [Custom Auth Pages](/core-concepts/authentication/ui-components/customization).</Tip>
+<Tip>
+  Want to build custom login pages instead? See [Custom Auth
+  Pages](/core-concepts/authentication/ui-components/customization).
+</Tip>
 
 ## Quick Start
 
@@ -32,15 +35,12 @@ Wrap your app with `InsforgeProvider` in the root:
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { InsforgeProvider } from '@insforge/react';
+import { insforge } from './lib/insforge';
 import App from './App';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <InsforgeProvider
-      baseUrl={
-        import.meta.env.VITE_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app' // Replace with your InsForge backend URL
-      }
-    >
+    <InsforgeProvider client={insforge}>
       <App />
     </InsforgeProvider>
   </StrictMode>
@@ -50,7 +50,14 @@ createRoot(document.getElementById('root')!).render(
 ### Step 4: Use Hooks & Components
 
 ```tsx src/pages/Home.tsx
-import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton, useUser } from '@insforge/react';
+import {
+  SignInButton,
+  SignUpButton,
+  SignedIn,
+  SignedOut,
+  UserButton,
+  useUser,
+} from '@insforge/react';
 
 export default function Home() {
   const { user } = useUser();
@@ -86,14 +93,10 @@ import { useAuth } from '@insforge/react';
 
 function LoginButton() {
   const { isSignedIn, isLoaded } = useAuth();
-  
+
   if (!isLoaded) return <div>Loading...</div>;
 
-  return (
-    <div>
-      {isSignedIn ? 'Welcome!' : 'Sign In'}
-    </div>
-  );
+  return <div>{isSignedIn ? 'Welcome!' : 'Sign In'}</div>;
 }
 ```
 
@@ -115,13 +118,12 @@ function UserProfile() {
   if (!isLoaded) return <div>Loading...</div>;
   if (!user) return <div>Not signed in</div>;
 
-
   return (
     <div>
       <p>Id: {user.id}</p>
       <p>Email: {user.email}</p>
-      <p>Name: {user.name}</p>
-      <img src={user.avatarUrl} alt="Avatar" />
+      <p>Name: {user.profile.name}</p>
+      <img src={user.profile.avatar_url} alt="Avatar" />
     </div>
   );
 }
@@ -129,5 +131,6 @@ function UserProfile() {
 
 **Returns:**
 
-- `user` - User object with id, email, name, avatarUrl
+- `user` - User object with id, email, profile
+- `user.profile` - User profile object with name, avatar_url, and other custom fields
 - `isLoaded` - Boolean loading state
