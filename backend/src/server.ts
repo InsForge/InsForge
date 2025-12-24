@@ -19,6 +19,7 @@ import { aiRouter } from '@/api/routes/ai/index.routes.js';
 import { realtimeRouter } from '@/api/routes/realtime/index.routes.js';
 import { emailRouter } from '@/api/routes/email/index.routes.js';
 import { errorMiddleware } from '@/api/middlewares/error.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 import { RealtimeManager } from '@/infra/realtime/realtime.manager.js';
 import fetch, { HeadersInit } from 'node-fetch';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
@@ -61,7 +62,7 @@ export async function createApp() {
   const app = express();
 
   // Enable trust proxy setting for rate limiting behind proxies/load balancers
-  app.set('trust proxy', true);
+  app.set('trust proxy', 2);
 
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -230,6 +231,13 @@ export async function createApp() {
   } else {
     const authAppUrl = process.env.AUTH_APP_URL || 'http://localhost:7132';
     logger.info('Auth app not built, proxying to development server', { authAppUrl });
+  }
+
+  // Redirect root to dashboard login (only for non-insforge cloud environments)
+  if (!isCloudEnvironment()) {
+    app.get('/', (_req: Request, res: Response) => {
+      res.redirect('/dashboard/login');
+    });
   }
 
   // Serve main frontend if it exists
