@@ -24,6 +24,8 @@ import GeminiIcon from '@/assets/logos/gemini.svg?react';
 import ClaudeIcon from '@/assets/logos/claude_code.svg?react';
 import OpenAIIcon from '@/assets/logos/openai.svg?react';
 import AmazonIcon from '@/assets/logos/amazon.svg?react';
+import DeepseekIcon from '@/assets/logos/deepseek.svg?react';
+import QwenIcon from '@/assets/logos/qwen.svg?react';
 
 export const getModalityIcon = (
   modality: ModalitySchema
@@ -63,6 +65,8 @@ export const getProviderDisplayName = (providerId: string): string => {
     amazon: 'Amazon',
     'x-ai': 'xAI',
     huggingface: 'HuggingFace',
+    deepseek: 'DeepSeek',
+    qwen: 'Qwen',
   };
 
   return (
@@ -80,6 +84,8 @@ export const getProviderLogo = (
     google: GeminiIcon,
     'x-ai': GrokIcon,
     amazon: AmazonIcon,
+    deepseek: DeepseekIcon,
+    qwen: QwenIcon,
   };
   return logoMap[providerId];
 };
