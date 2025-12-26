@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const docTypeSchema = z
   .enum([
     'instructions',
+    'auth-sdk',
     'db-sdk',
     'storage-sdk',
     'functions-sdk',
