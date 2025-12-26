@@ -22,14 +22,19 @@ Create a new user account with email and password.
 ```typescript
 {
   data: {
-    user: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata },
-    accessToken: string,
-    requireEmailVerification: boolean,
-    csrfToken: string
+    user?: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata },
+    accessToken: string | null,
+    requireEmailVerification?: boolean,
+    redirectTo?: string,
+    csrfToken?: string | null
   } | null,
   error: Error | null
 }
 ```
+
+<Note>
+  When `requireEmailVerification` is true, `accessToken` will be null until the user verifies their email.
+</Note>
 
 ### Example
 
@@ -39,6 +44,14 @@ const { data, error } = await insforge.auth.signUp({
   password: 'secure_password123',
   name: 'John Doe',
 });
+
+if (data?.requireEmailVerification) {
+  // Redirect to email verification page
+  console.log('Please verify your email');
+} else if (data?.accessToken) {
+  // User is signed in
+  console.log('Welcome!', data.user.email);
+}
 ```
 
 ### Output
@@ -49,19 +62,20 @@ const { data, error } = await insforge.auth.signUp({
     "user": {
       "id": "usr_abc123",
       "email": "user@example.com",
-      "emailVerified": true,
-      "providers": ["google"],
+      "emailVerified": false,
+      "providers": ["email"],
       "createdAt": "2024-01-15T10:00:00Z",
       "updatedAt": "2024-01-15T10:00:00Z",
       "profile": {
         "name": "John Doe",
-        "avatar_url": "https://example.com/jane.jpg"
+        "avatar_url": null
       },
       "metadata": {}
     },
     "requireEmailVerification": true,
-    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "csrfToken": "5758d38259fb..."
+    "accessToken": null,
+    "redirectTo": "https://app.example.com/verify-email",
+    "csrfToken": null
   },
   "error": null
 }
@@ -85,7 +99,8 @@ Sign in an existing user with email and password.
   data: {
     user: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata },
     accessToken: string,
-    csrfToken: string
+    redirectTo?: string,
+    csrfToken?: string | null
   } | null,
   error: Error | null
 }
@@ -98,6 +113,14 @@ const { data, error } = await insforge.auth.signInWithPassword({
   email: 'user@example.com',
   password: 'secure_password123',
 });
+
+if (data) {
+  console.log('Signed in as:', data.user.email);
+  // Optional: redirect to configured URL
+  if (data.redirectTo) {
+    window.location.href = data.redirectTo;
+  }
+}
 ```
 
 ### Output
@@ -109,7 +132,7 @@ const { data, error } = await insforge.auth.signInWithPassword({
       "id": "usr_abc123",
       "email": "user@example.com",
       "emailVerified": true,
-      "providers": ["google"],
+      "providers": ["email"],
       "createdAt": "2024-01-15T10:00:00Z",
       "updatedAt": "2024-01-15T10:00:00Z",
       "profile": {
@@ -119,6 +142,7 @@ const { data, error } = await insforge.auth.signInWithPassword({
       "metadata": {}
     },
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "redirectTo": "https://app.example.com/dashboard",
     "csrfToken": "5758d38259fb..."
   },
   "error": null
@@ -218,7 +242,7 @@ const { error } = await insforge.auth.signOut();
 
 ## getCurrentUser()
 
-Get authenticated user with profile data from users table.
+Get authenticated user with profile data from users table. Returns auth info and profile as separate objects.
 
 ### Parameters
 
@@ -229,7 +253,8 @@ None
 ```typescript
 {
   data: {
-    user: { id, email, emailVerified, providers, profile, metadata, createdAt, updatedAt }
+    user: { id: string, email: string, role: string },
+    profile: { id, name, avatar_url, createdAt, updatedAt, ...customFields } | null
   } | null,
   error: Error | null
 }
@@ -242,7 +267,8 @@ const { data, error } = await insforge.auth.getCurrentUser();
 
 if (data) {
   console.log(data.user.email); // Auth info
-  console.log(data.user.profile.name); // Profile from users table
+  console.log(data.user.role); // 'authenticated' or 'project_admin'
+  console.log(data.profile?.name); // Profile from users table
 }
 ```
 
@@ -254,15 +280,14 @@ if (data) {
     "user": {
       "id": "usr_abc123",
       "email": "user@example.com",
-      "emailVerified": true,
-      "providers": ["google"],
+      "role": "authenticated"
+    },
+    "profile": {
+      "id": "usr_abc123",
+      "name": "John Doe",
+      "avatar_url": "https://example.com/avatar.jpg",
       "createdAt": "2024-01-15T10:00:00Z",
-      "updatedAt": "2024-01-15T10:00:00Z",
-      "profile": {
-        "name": "John Doe",
-        "avatar_url": "https://example.com/avatar.jpg"
-      },
-      "metadata": {}
+      "updatedAt": "2024-01-15T10:00:00Z"
     }
   },
   "error": null
@@ -273,7 +298,7 @@ if (data) {
 
 ## getCurrentSession()
 
-Get current session from local storage (no API call).
+Get current session from local storage (no API call). This is a synchronous method.
 
 ### Parameters
 
@@ -286,7 +311,8 @@ None
   data: {
     session: {
       accessToken: string,
-      user: { id, email, profile, ... }
+      user: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata },
+      expiresAt?: Date
     } | null
   },
   error: Error | null
@@ -296,10 +322,16 @@ None
 ### Example
 
 ```javascript
-const { data, error } = await insforge.auth.getCurrentSession();
+const { data, error } = insforge.auth.getCurrentSession();
 
 if (data.session) {
   console.log('Token:', data.session.accessToken);
+  console.log('User:', data.session.user.email);
+
+  // Check if session is expired
+  if (data.session.expiresAt && new Date() > data.session.expiresAt) {
+    console.log('Session expired');
+  }
 }
 ```
 
@@ -310,13 +342,14 @@ if (data.session) {
   "data": {
     "session": {
       "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "expiresAt": "2024-01-22T10:00:00.000Z",
       "user": {
         "id": "usr_abc123",
         "email": "user@example.com",
         "emailVerified": true,
-        "createdAt": "2025-12-22T19:13:08.586Z",
-        "updatedAt": "2025-12-22T19:13:08.586Z",
-        "providers": ["google"],
+        "createdAt": "2024-01-15T10:00:00Z",
+        "updatedAt": "2024-01-15T10:00:00Z",
+        "providers": ["email"],
         "profile": {
           "name": "John Doe",
           "avatar_url": "https://example.com/avatar.jpg"
@@ -333,7 +366,7 @@ if (data.session) {
 
 ## getProfile()
 
-Get any user's public profile by ID.
+Get any user's public profile by ID. Returns a flat profile object with all fields at the top level.
 
 ### Parameters
 
@@ -343,7 +376,14 @@ Get any user's public profile by ID.
 
 ```typescript
 {
-  data: { id, profile: { name, avatar_url, ... } } | null,
+  data: {
+    id: string,
+    name?: string,
+    avatar_url?: string,
+    createdAt?: string,
+    updatedAt?: string,
+    ...customFields
+  } | null,
   error: Error | null
 }
 ```
@@ -353,7 +393,10 @@ Get any user's public profile by ID.
 ```javascript
 const { data, error } = await insforge.auth.getProfile('usr_xyz789');
 
-console.log(data.profile.name);
+if (data) {
+  console.log(data.name);
+  console.log(data.avatar_url);
+}
 ```
 
 ### Output
@@ -362,11 +405,71 @@ console.log(data.profile.name);
 {
   "data": {
     "id": "usr_xyz789",
-    "profile": {
-      "name": "John Doe",
-      "avatar_url": "https://example.com/jane.jpg",
-      ... // Custom fields you added
-    }
+    "name": "John Doe",
+    "avatar_url": "https://example.com/avatar.jpg",
+    "bio": "Full-stack developer",
+    "createdAt": "2024-01-15T10:00:00Z",
+    "updatedAt": "2024-01-15T10:00:00Z"
+  },
+  "error": null
+}
+```
+
+---
+
+## getPublicAuthConfig()
+
+Get all public authentication configuration including OAuth providers and email auth settings. This is a public endpoint that doesn't require authentication.
+
+### Parameters
+
+None
+
+### Returns
+
+```typescript
+{
+  data: {
+    oAuthProviders: string[],
+    requireEmailVerification: boolean,
+    passwordMinLength: number,
+    requireNumber: boolean,
+    requireLowercase: boolean,
+    requireUppercase: boolean,
+    requireSpecialChar: boolean,
+    verifyEmailMethod: 'code' | 'link',
+    resetPasswordMethod: 'code' | 'link'
+  } | null,
+  error: Error | null
+}
+```
+
+### Example
+
+```javascript
+const { data, error } = await insforge.auth.getPublicAuthConfig();
+
+if (data) {
+  console.log(`OAuth providers: ${data.oAuthProviders.length}`);
+  console.log(`Password min length: ${data.passwordMinLength}`);
+  console.log(`Email verification required: ${data.requireEmailVerification}`);
+}
+```
+
+### Output
+
+```json
+{
+  "data": {
+    "oAuthProviders": ["google", "github", "discord"],
+    "requireEmailVerification": true,
+    "passwordMinLength": 8,
+    "requireNumber": true,
+    "requireLowercase": true,
+    "requireUppercase": true,
+    "requireSpecialChar": false,
+    "verifyEmailMethod": "code",
+    "resetPasswordMethod": "link"
   },
   "error": null
 }
@@ -376,7 +479,7 @@ console.log(data.profile.name);
 
 ## setProfile()
 
-Update current user's profile in users table (supports any dynamic fields).
+Update current user's profile in users table. Supports any dynamic fields and returns the updated profile as a flat object.
 
 ### Parameters
 
@@ -393,7 +496,14 @@ Update current user's profile in users table (supports any dynamic fields).
 
 ```typescript
 {
-  data: { id, ...profile_fields } | null,
+  data: {
+    id: string,
+    name?: string,
+    avatar_url?: string,
+    createdAt?: string,
+    updatedAt?: string,
+    ...customFields
+  } | null,
   error: Error | null
 }
 ```
@@ -415,12 +525,278 @@ const { data, error } = await insforge.auth.setProfile({
 {
   "data": {
     "id": "usr_abc123",
-    "profile": {
-      "name": "JohnDev",
-      "avatar_url": "https://example.com/avatar.jpg",
-      "bio": "Full-stack developer",
-      "custom_field": "any value"
-    }
+    "name": "JohnDev",
+    "avatar_url": "https://example.com/avatar.jpg",
+    "bio": "Full-stack developer",
+    "custom_field": "any value",
+    "createdAt": "2024-01-15T10:00:00Z",
+    "updatedAt": "2024-01-15T12:30:00Z"
+  },
+  "error": null
+}
+```
+
+---
+
+## sendVerificationEmail()
+
+Send email verification using the method configured in auth settings (`verifyEmailMethod`). When method is `code`, sends a 6-digit numeric code. When method is `link`, sends a magic link.
+
+<Note>
+  This endpoint prevents user enumeration by returning success even if the email doesn't exist.
+</Note>
+
+### Parameters
+
+- `email` (string, required) - User's email address
+
+### Returns
+
+```typescript
+{
+  data: { success: boolean, message: string } | null,
+  error: Error | null
+}
+```
+
+### Example
+
+```javascript
+const { data, error } = await insforge.auth.sendVerificationEmail({
+  email: 'user@example.com',
+});
+
+if (data?.success) {
+  console.log('Verification email sent!');
+}
+```
+
+### Output
+
+```json
+{
+  "data": {
+    "success": true,
+    "message": "Verification email sent"
+  },
+  "error": null
+}
+```
+
+---
+
+## verifyEmail()
+
+Verify email address using the method configured in auth settings (`verifyEmailMethod`):
+- **Code verification**: Provide both `email` and `otp` (6-digit numeric code)
+- **Link verification**: Provide only `otp` (64-character hex token from magic link)
+
+Successfully verified users will receive a session token.
+
+### Parameters
+
+- `email` (string, optional) - User's email address (required for code verification)
+- `otp` (string, required) - 6-digit code or 64-character token from magic link
+
+### Returns
+
+```typescript
+{
+  data: {
+    accessToken: string,
+    user: { id, email, emailVerified, ... },
+    redirectTo?: string
+  } | null,
+  error: Error | null
+}
+```
+
+### Example
+
+```javascript
+// Code verification (when verifyEmailMethod is 'code')
+const { data, error } = await insforge.auth.verifyEmail({
+  email: 'user@example.com',
+  otp: '123456',
+});
+
+// Link verification (when verifyEmailMethod is 'link')
+// Token is extracted from the magic link URL
+const { data, error } = await insforge.auth.verifyEmail({
+  otp: 'a1b2c3d4e5f6...', // 64-character token from URL
+});
+
+if (data) {
+  console.log('Email verified!', data.accessToken);
+}
+```
+
+### Output
+
+```json
+{
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "user": {
+      "id": "usr_abc123",
+      "email": "user@example.com",
+      "emailVerified": true
+    },
+    "redirectTo": "https://app.example.com/dashboard"
+  },
+  "error": null
+}
+```
+
+---
+
+## sendResetPasswordEmail()
+
+Send password reset email using the method configured in auth settings (`resetPasswordMethod`). When method is `code`, sends a 6-digit numeric code for two-step flow. When method is `link`, sends a magic link.
+
+<Note>
+  This endpoint prevents user enumeration by returning success even if the email doesn't exist.
+</Note>
+
+### Parameters
+
+- `email` (string, required) - User's email address
+
+### Returns
+
+```typescript
+{
+  data: { success: boolean, message: string } | null,
+  error: Error | null
+}
+```
+
+### Example
+
+```javascript
+const { data, error } = await insforge.auth.sendResetPasswordEmail({
+  email: 'user@example.com',
+});
+
+if (data?.success) {
+  console.log('Password reset email sent!');
+}
+```
+
+### Output
+
+```json
+{
+  "data": {
+    "success": true,
+    "message": "Password reset email sent"
+  },
+  "error": null
+}
+```
+
+---
+
+## exchangeResetPasswordToken()
+
+Exchange a 6-digit reset password code for a reset token. This is step 1 of the two-step password reset flow (only used when `resetPasswordMethod` is `code`).
+
+<Note>
+  This endpoint is not used when `resetPasswordMethod` is `link` (magic link flow is direct).
+</Note>
+
+### Parameters
+
+- `email` (string, required) - User's email address
+- `code` (string, required) - 6-digit code from the email
+
+### Returns
+
+```typescript
+{
+  data: { token: string, expiresAt: string } | null,
+  error: Error | null
+}
+```
+
+### Example
+
+```javascript
+const { data, error } = await insforge.auth.exchangeResetPasswordToken({
+  email: 'user@example.com',
+  code: '123456',
+});
+
+if (data) {
+  // Use token to reset password
+  await insforge.auth.resetPassword({
+    newPassword: 'newSecurePassword123',
+    otp: data.token,
+  });
+}
+```
+
+### Output
+
+```json
+{
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expiresAt": "2024-01-15T11:00:00Z"
+  },
+  "error": null
+}
+```
+
+---
+
+## resetPassword()
+
+Reset user password with a token. The token can be:
+- **Magic link token**: 64-character hex token from `sendResetPasswordEmail` when method is `link`
+- **Reset token**: From `exchangeResetPasswordToken` after code verification when method is `code`
+
+### Parameters
+
+- `newPassword` (string, required) - New password for the user
+- `otp` (string, required) - Reset token or magic link token
+
+### Returns
+
+```typescript
+{
+  data: { message: string, redirectTo?: string } | null,
+  error: Error | null
+}
+```
+
+### Example
+
+```javascript
+// Code method flow: after exchangeResetPasswordToken
+const { data, error } = await insforge.auth.resetPassword({
+  newPassword: 'newSecurePassword123',
+  otp: resetToken, // Token from exchangeResetPasswordToken
+});
+
+// Link method flow: token from URL params
+const { data, error } = await insforge.auth.resetPassword({
+  newPassword: 'newSecurePassword123',
+  otp: 'a1b2c3d4e5f6...', // 64-character token from magic link URL
+});
+
+if (data) {
+  console.log('Password reset successful!');
+}
+```
+
+### Output
+
+```json
+{
+  "data": {
+    "message": "Password reset successfully",
+    "redirectTo": "https://app.example.com/login"
   },
   "error": null
 }
