@@ -50,6 +50,8 @@ export interface DataGridProps<TRow extends DataGridRowType = DataGridRow> {
   noPadding?: boolean;
   selectionColumnWidth?: number;
   renderSelectionCell?: (props: SelectionCellProps<TRow>) => React.ReactNode;
+  rowClass?: (row: TRow) => string | undefined;
+  rightPanel?: React.ReactNode;
 }
 
 // Main DataGrid component
@@ -78,6 +80,8 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
   noPadding = false,
   selectionColumnWidth,
   renderSelectionCell,
+  rowClass,
+  rightPanel,
 }: DataGridProps<TRow>) {
   const { resolvedTheme } = useTheme();
 
@@ -218,48 +222,54 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
         className
       )}
     >
-      <div
-        className={cn(
-          'flex-1 overflow-hidden relative border border-border-gray dark:border-neutral-700 rounded-sm',
-          !noPadding && 'mx-3'
-        )}
-      >
-        <ReactDataGrid
-          columns={gridColumns}
-          rows={isRefreshing ? [] : data}
-          rowKeyGetter={keyGetter}
-          onRowsChange={() => {}}
-          selectedRows={selectedRows}
-          onSelectedRowsChange={onSelectedRowsChange}
-          sortColumns={sortColumns || []}
-          onSortColumnsChange={onSortColumnsChange}
-          onCellClick={onCellClick}
-          className={`h-full fill-grid ${resolvedTheme === 'dark' ? 'rdg-dark' : 'rdg-light'}`}
-          headerRowHeight={36}
-          rowHeight={36}
-          enableVirtualization={true}
-          renderers={{
-            noRowsFallback: emptyState ? (
-              <div className="absolute inset-x-0 top-0 mt-13 py-8 flex items-center justify-center bg-white dark:bg-neutral-800">
-                {emptyState}
-              </div>
-            ) : (
-              <div className="absolute inset-x-0 top-0 mt-13 py-8 flex items-center justify-center bg-white dark:bg-neutral-800">
-                <div className="text-sm text-zinc-500 dark:text-zinc-400">No data to display</div>
-              </div>
-            ),
-          }}
-        />
+      <div className={cn('flex-1 overflow-hidden flex min-h-0', !noPadding && 'mx-3')}>
+        <div
+          className={cn(
+            'overflow-hidden relative border border-border-gray dark:border-neutral-700 rounded-sm',
+            rightPanel ? 'rounded-r-none border-r-0' : 'flex-1'
+          )}
+          style={rightPanel ? { width: 'calc(100% - 400px)' } : undefined}
+        >
+          <ReactDataGrid
+            key={rightPanel ? 'with-panel' : 'no-panel'}
+            columns={gridColumns}
+            rows={isRefreshing ? [] : data}
+            rowKeyGetter={keyGetter}
+            onRowsChange={() => {}}
+            selectedRows={selectedRows}
+            onSelectedRowsChange={onSelectedRowsChange}
+            sortColumns={sortColumns || []}
+            onSortColumnsChange={onSortColumnsChange}
+            onCellClick={onCellClick}
+            rowClass={rowClass}
+            className={`h-full fill-grid ${resolvedTheme === 'dark' ? 'rdg-dark' : 'rdg-light'}`}
+            headerRowHeight={36}
+            rowHeight={36}
+            enableVirtualization={true}
+            renderers={{
+              noRowsFallback: emptyState ? (
+                <div className="absolute inset-x-0 top-0 mt-13 py-8 flex items-center justify-center bg-white dark:bg-neutral-800">
+                  {emptyState}
+                </div>
+              ) : (
+                <div className="absolute inset-x-0 top-0 mt-13 py-8 flex items-center justify-center bg-white dark:bg-neutral-800">
+                  <div className="text-sm text-zinc-500 dark:text-zinc-400">No data to display</div>
+                </div>
+              ),
+            }}
+          />
 
-        {/* Loading mask overlay */}
-        {isRefreshing && (
-          <div className="absolute inset-0 bg-white dark:bg-neutral-800 flex items-center justify-center z-50 mt-9">
-            <div className="flex items-center gap-1">
-              <div className="w-5 h-5 border-2 border-zinc-500 dark:border-neutral-700 border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-zinc-500 dark:text-zinc-400">Loading</span>
+          {/* Loading mask overlay */}
+          {isRefreshing && (
+            <div className="absolute inset-0 bg-white dark:bg-neutral-800 flex items-center justify-center z-50 mt-9">
+              <div className="flex items-center gap-1">
+                <div className="w-5 h-5 border-2 border-zinc-500 dark:border-neutral-700 border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm text-zinc-500 dark:text-zinc-400">Loading</span>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
+        {rightPanel}
       </div>
       {showPagination && onPageChange && (
         <PaginationControls
