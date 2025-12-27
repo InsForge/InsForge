@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import {
   DataGrid,
   type DataGridProps,
@@ -6,6 +6,7 @@ import {
   type DataGridColumn,
   type DataGridRowType,
 } from '@/components/datagrid';
+import type { CellClickArgs, CellMouseEvent } from 'react-data-grid';
 
 // Column definition type for LogsDataGrid
 export interface LogsColumnDef {
@@ -52,6 +53,9 @@ export interface LogsDataGridProps<T = Record<string, unknown>>
   columnDefs: LogsColumnDef[];
   data: T[];
   noPadding?: boolean;
+  selectedRowId?: string | null;
+  onRowClick?: (row: T) => void;
+  rightPanel?: React.ReactNode;
 }
 
 // Specialized DataGrid for logs
@@ -59,6 +63,9 @@ export function LogsDataGrid<T = Record<string, unknown>>({
   columnDefs,
   data,
   noPadding,
+  selectedRowId,
+  onRowClick,
+  rightPanel,
   ...restProps
 }: LogsDataGridProps<T>) {
   const columns = useMemo(() => {
@@ -72,9 +79,31 @@ export function LogsDataGrid<T = Record<string, unknown>>({
       return {
         ...record,
         id: String(record.id ?? index),
+        _originalData: log, // Store original data for click handler
       };
     }) as DataGridRowType[];
   }, [data]);
+
+  // Handle cell click to trigger row click
+  const handleCellClick = useCallback(
+    (args: CellClickArgs<DataGridRowType>, _event: CellMouseEvent) => {
+      if (onRowClick && args.row._originalData) {
+        onRowClick(args.row._originalData as T);
+      }
+    },
+    [onRowClick]
+  );
+
+  // Row class for highlighting selected row
+  const rowClass = useCallback(
+    (row: DataGridRowType) => {
+      if (selectedRowId && row.id === selectedRowId) {
+        return 'bg-gray-200 dark:bg-neutral-700';
+      }
+      return '';
+    },
+    [selectedRowId]
+  );
 
   return (
     <DataGrid<DataGridRowType>
@@ -84,6 +113,9 @@ export function LogsDataGrid<T = Record<string, unknown>>({
       showSelection={false}
       showPagination={true}
       noPadding={noPadding}
+      onCellClick={handleCellClick}
+      rowClass={rowClass}
+      rightPanel={rightPanel}
     />
   );
 }

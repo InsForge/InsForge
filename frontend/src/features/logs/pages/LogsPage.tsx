@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
 import { useLogs } from '../hooks/useLogs';
@@ -13,6 +13,7 @@ import {
 } from '@/components';
 import { LogsDataGrid, type LogsColumnDef } from '../components/LogsDataGrid';
 import { SeverityBadge } from '../components/SeverityBadge';
+import { LogDetailPanel } from '../components/LogDetailPanel';
 import { SEVERITY_OPTIONS, LOGS_PAGE_SIZE } from '../helpers';
 import { formatTime } from '@/lib/utils/utils';
 import { LogSchema } from '@insforge/shared-schemas';
@@ -20,6 +21,14 @@ import { LogSchema } from '@insforge/shared-schemas';
 export default function LogsPage() {
   // Get the source from the URL params
   const { source = 'insforge.logs' } = useParams<{ source?: string }>();
+
+  // Selected log state for detail panel
+  const [selectedLog, setSelectedLog] = useState<LogSchema | null>(null);
+
+  // Close detail panel when switching log sources
+  useEffect(() => {
+    setSelectedLog(null);
+  }, [source]);
 
   const {
     logs: paginatedLogs,
@@ -36,12 +45,24 @@ export default function LogsPage() {
     getSeverity,
   } = useLogs(source);
 
+  // Handle row click to show log details
+  const handleRowClick = useCallback((log: LogSchema) => {
+    setSelectedLog(log);
+  }, []);
+
+  // Handle closing the detail panel
+  const handleClosePanel = useCallback(() => {
+    setSelectedLog(null);
+  }, []);
+
+  // Adjust column widths based on panel state
   const logsColumns: LogsColumnDef[] = useMemo(
     () => [
       {
         key: 'event_message',
         name: 'Logs',
-        width: '10fr',
+        width: selectedLog ? '1fr' : '5fr',
+        minWidth: selectedLog ? 50 : 200,
         renderCell: ({ row }) => (
           <p className="text-sm text-gray-900 dark:text-white font-normal leading-6 truncate">
             {String(row.eventMessage ?? '')}
@@ -51,7 +72,7 @@ export default function LogsPage() {
       {
         key: 'severity',
         name: 'Severity',
-        width: '120px',
+        width: '100px',
         renderCell: ({ row }) => (
           <SeverityBadge severity={getSeverity(row as unknown as LogSchema)} />
         ),
@@ -59,7 +80,7 @@ export default function LogsPage() {
       {
         key: 'timestamp',
         name: 'Time',
-        width: 'minmax(200px, 1fr)',
+        width: '200px',
         renderCell: ({ row }) => (
           <p className="text-sm text-gray-900 dark:text-white font-normal leading-6 flex-1">
             {formatTime(String(row.timestamp ?? ''))}
@@ -67,7 +88,7 @@ export default function LogsPage() {
         ),
       },
     ],
-    [getSeverity]
+    [getSeverity, selectedLog]
   );
 
   return (
@@ -121,7 +142,7 @@ export default function LogsPage() {
         </div>
       </div>
 
-      {/* Table with Pagination */}
+      {/* Table with Detail Panel */}
       <div className="flex-1 overflow-hidden">
         {logsError ? (
           <div className="flex items-center justify-center h-full">
@@ -137,6 +158,15 @@ export default function LogsPage() {
             pageSize={LOGS_PAGE_SIZE}
             totalRecords={filteredLogs.length}
             onPageChange={setCurrentPage}
+            selectedRowId={selectedLog?.id ?? null}
+            onRowClick={handleRowClick}
+            rightPanel={
+              selectedLog && (
+                <div className="w-[400px] h-full shrink-0">
+                  <LogDetailPanel log={selectedLog} onClose={handleClosePanel} />
+                </div>
+              )
+            }
             emptyState={
               <div className="text-sm text-zinc-500 dark:text-zinc-400">
                 {logsSearchQuery || severityFilter.length < 3
