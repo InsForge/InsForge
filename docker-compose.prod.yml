@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:15.13
+    image: ghcr.io/insforge/postgres:v15.13.1
     container_name: insforge-postgres
     command: postgres -c config_file=/etc/postgresql/postgresql.conf
     environment:
