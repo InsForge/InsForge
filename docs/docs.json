@@ -40,7 +40,8 @@
                 "group": "Database",
                 "pages": [
                   "core-concepts/database/architecture",
-                  "core-concepts/database/sdk"
+                  "core-concepts/database/sdk",
+                  "core-concepts/database/pgvector"
                 ]
               },
               {
