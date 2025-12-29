@@ -1,0 +1,138 @@
+---
+title: PGVector
+description: Store embeddings and perform similarity search with pgvector
+---
+
+## Overview
+
+InsForge supports **pgvector**, a PostgreSQL extension for vector similarity search. Use it to build semantic search, recommendations, RAG pipelines, or anything that needs "find similar items" functionality.
+
+## Enabling the Extension
+
+Enable pgvector via SQL:
+
+```sql
+create extension if not exists vector;
+```
+
+<Note>
+The extension is named `vector` in PostgreSQL, though the package is commonly called "pgvector".
+</Note>
+
+## Creating Vector Columns
+
+Create a table with a vector column. The dimension must match your embedding model:
+
+```sql
+create table documents (
+  id bigserial primary key,
+  content text,
+  embedding vector(1536)  -- matches OpenAI ada-002
+);
+```
+
+Common embedding dimensions:
+
+| Model | Dimensions |
+|-------|------------|
+| OpenAI text-embedding-ada-002 | 1536 |
+| OpenAI text-embedding-3-small | 1536 |
+| OpenAI text-embedding-3-large | 3072 |
+| Cohere embed-english-v3.0 | 1024 |
+| all-MiniLM-L6-v2 | 384 |
+
+## Storing Embeddings
+
+Generate embeddings using any provider (OpenAI, Cohere, Hugging Face, etc.), then store them in InsForge.
+
+Example using OpenAI:
+
+```javascript
+import OpenAI from 'openai';
+import { insforge } from './lib/insforge';
+
+const openai = new OpenAI();
+
+async function storeDocument(content) {
+  const response = await openai.embeddings.create({
+    model: 'text-embedding-ada-002',
+    input: content
+  });
+
+  const { data, error } = await insforge.database
+    .from('documents')
+    .insert({
+      content,
+      embedding: response.data[0].embedding
+    })
+    .select();
+
+  return { data, error };
+}
+```
+
+## Querying Vectors
+
+Use distance operators to find similar vectors:
+
+```sql
+select * from documents
+order by embedding <-> '[0.1, 0.2, ...]'  -- your query embedding
+limit 5;
+```
+
+## Distance Operators
+
+| Operator | Description |
+|----------|-------------|
+| `<->` | L2 distance |
+| `<#>` | Inner product (negative) |
+| `<=>` | Cosine distance |
+
+<Tip>
+For normalized embeddings (like OpenAI's), use cosine distance `<=>`. Similarity = `1 - distance`.
+</Tip>
+
+## Indexing
+
+Without an index, pgvector does exact nearest neighbor search - accurate but slow on large datasets. Add an index for faster approximate search.
+
+### HNSW (Recommended)
+
+Faster queries, uses more memory:
+
+```sql
+create index on documents
+using hnsw (embedding vector_cosine_ops);
+```
+
+### IVFFlat
+
+Lower memory, but create it after inserting data:
+
+```sql
+create index on documents
+using ivfflat (embedding vector_cosine_ops)
+with (lists = 100);
+```
+
+### Operator Classes
+
+Match your distance operator:
+
+| Distance | Operator Class |
+|----------|---------------|
+| L2 | `vector_l2_ops` |
+| Inner product | `vector_ip_ops` |
+| Cosine | `vector_cosine_ops` |
+
+<Warning>
+Create indexes **after** inserting initial data. IVFFlat needs representative data to build effective clusters.
+</Warning>
+
+## Best Practices
+
+- **Match dimensions** - Vector dimensions must match your embedding model
+- **Normalize embeddings** - Use cosine distance for scores between 0 and 1
+- **Index at scale** - Add indexes when you have ~10k+ vectors
+- **Batch inserts** - Generate and insert embeddings in batches
