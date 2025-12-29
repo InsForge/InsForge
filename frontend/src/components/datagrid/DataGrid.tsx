@@ -228,7 +228,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
             'overflow-hidden relative border border-border-gray dark:border-neutral-700 rounded-sm',
             rightPanel ? 'rounded-r-none border-r-0' : 'flex-1'
           )}
-          style={rightPanel ? { width: 'calc(100% - 400px)' } : undefined}
+          style={rightPanel ? { width: 'calc(100% - 480px)' } : undefined}
         >
           <ReactDataGrid
             key={rightPanel ? 'with-panel' : 'no-panel'}

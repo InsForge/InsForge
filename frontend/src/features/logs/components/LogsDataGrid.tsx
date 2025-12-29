@@ -79,7 +79,6 @@ export function LogsDataGrid<T = Record<string, unknown>>({
       return {
         ...record,
         id: String(record.id ?? index),
-        _originalData: log, // Store original data for click handler
       };
     }) as DataGridRowType[];
   }, [data]);
@@ -87,8 +86,8 @@ export function LogsDataGrid<T = Record<string, unknown>>({
   // Handle cell click to trigger row click
   const handleCellClick = useCallback(
     (args: CellClickArgs<DataGridRowType>, _event: CellMouseEvent) => {
-      if (onRowClick && args.row._originalData) {
-        onRowClick(args.row._originalData as T);
+      if (onRowClick) {
+        onRowClick(args.row as T);
       }
     },
     [onRowClick]

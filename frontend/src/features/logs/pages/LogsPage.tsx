@@ -25,11 +25,6 @@ export default function LogsPage() {
   // Selected log state for detail panel
   const [selectedLog, setSelectedLog] = useState<LogSchema | null>(null);
 
-  // Close detail panel when switching log sources
-  useEffect(() => {
-    setSelectedLog(null);
-  }, [source]);
-
   const {
     logs: paginatedLogs,
     filteredLogs,
@@ -44,6 +39,11 @@ export default function LogsPage() {
     error: logsError,
     getSeverity,
   } = useLogs(source);
+
+  // Close detail panel when switching log sources or changing filters
+  useEffect(() => {
+    setSelectedLog(null);
+  }, [source, severityFilter]);
 
   // Handle row click to show log details
   const handleRowClick = useCallback((log: LogSchema) => {
@@ -62,7 +62,7 @@ export default function LogsPage() {
         key: 'event_message',
         name: 'Logs',
         width: selectedLog ? '1fr' : '5fr',
-        minWidth: selectedLog ? 50 : 200,
+        minWidth: 200,
         renderCell: ({ row }) => (
           <p className="text-sm text-gray-900 dark:text-white font-normal leading-6 truncate">
             {String(row.eventMessage ?? '')}
@@ -162,7 +162,7 @@ export default function LogsPage() {
             onRowClick={handleRowClick}
             rightPanel={
               selectedLog && (
-                <div className="w-[400px] h-full shrink-0">
+                <div className="w-[480px] h-full shrink-0">
                   <LogDetailPanel log={selectedLog} onClose={handleClosePanel} />
                 </div>
               )
