@@ -10,7 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@insforge/react": "^1.0.4",
+    "@insforge/react": "^1.0.7",
+    "@insforge/sdk": "^1.0.5",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "react-router-dom": "^7.7.0"
