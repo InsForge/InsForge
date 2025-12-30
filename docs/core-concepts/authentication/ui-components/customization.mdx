@@ -637,13 +637,11 @@ Get your authentication configuration from InsForge backend:
 import { usePublicAuthConfig } from '@insforge/react';
 
 function CustomSignIn() {
-  const { authConfig, isLoaded } = usePublicAuthConfig();
-
-  if (!isLoaded) return <div>Loading...</div>;
+  const { authConfig } = usePublicAuthConfig();
 
   return (
     <div>
-      <p>Available OAuth: {authConfig?.oauthProviders?.join(', ')}</p>
+      <p>Available OAuth: {authConfig?.oAuthProviders?.join(', ')}</p>
       <p>Password min length: {authConfig?.passwordMinLength}</p>
       <p>Require uppercase: {authConfig?.requireUppercase ? 'Yes' : 'No'}</p>
     </div>
@@ -656,13 +654,12 @@ function CustomSignIn() {
 | Property | Type | Description |
 |----------|------|-------------|
 | `authConfig` | `object \| null` | Auth configuration from dashboard |
-| `authConfig.oauthProviders` | `string[]` | Enabled OAuth providers |
+| `authConfig.oAuthProviders` | `["google", "github", "discord", "linkedin", "facebook", "instagram", "tiktok", "apple", "x", "spotify", "microsoft"]` | Enabled OAuth providers |
 | `authConfig.passwordMinLength` | `number` | Minimum password length |
 | `authConfig.requireUppercase` | `boolean` | Require uppercase letter |
 | `authConfig.requireLowercase` | `boolean` | Require lowercase letter |
 | `authConfig.requireNumber` | `boolean` | Require number |
 | `authConfig.requireSpecialChar` | `boolean` | Require special character |
-| `isLoaded` | `boolean` | Whether config has been fetched |
 
 <Warning>
   **Performance**: Only use this hook in SignIn/SignUp components. Using it elsewhere causes unnecessary API calls on every page load.
@@ -734,51 +731,3 @@ All complete components support full text customization:
   dividerText="or continue with"
 />
 ```
-
-### Building Fully Custom UIs
-
-If you need even more control, you can use the SDK methods directly from `useInsforge()`:
-
-```tsx
-import { useInsforge, AuthContainer, AuthHeader } from '@insforge/react';
-
-function CompletelyCustomAuth() {
-  const { signIn, loginWithOAuth, isLoaded } = useInsforge();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    const result = await signIn(email, password);
-    if ('error' in result) {
-      setError(result.error);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit}>
-      {/* Your completely custom UI */}
-      <input 
-        type="email" 
-        value={email} 
-        onChange={(e) => setEmail(e.target.value)} 
-      />
-      <input 
-        type="password" 
-        value={password} 
-        onChange={(e) => setPassword(e.target.value)} 
-      />
-      {error && <p className="error">{error}</p>}
-      <button type="submit">Sign In</button>
-      <button type="button" onClick={() => loginWithOAuth('google', '/dashboard')}>
-        Sign in with Google
-      </button>
-    </form>
-  );
-}
-```
-
-<Tip>
-  For the highest level of control, see the [SDK Reference](/core-concepts/authentication/sdk) to build authentication flows entirely with SDK methods.
-</Tip>
