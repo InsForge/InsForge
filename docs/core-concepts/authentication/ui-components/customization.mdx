@@ -3,193 +3,35 @@ title: Custom Auth Pages
 description: Build your own authentication UI using InsForge components
 ---
 
-By default, InsForge redirects users to hosted login pages on your backend. If you prefer the entire authentication flow to stay **within your app** without redirects, you can build custom auth pages using our pre-built components.
+InsForge provides three levels of flexibility for implementing authentication in your app:
 
-This guide uses `@insforge/react-router` as an example. The same components are available in all InsForge packages.
-
-## Setup
-
-### Step 1: Setup Provider
-
-Wrap your app with `InsforgeProvider`:
-
-```tsx src/main.tsx
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
-import { InsforgeProvider } from '@insforge/react-router';
-import { insforge } from './lib/insforge';
-import App from './App';
-
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <InsforgeProvider client={insforge} afterSignInUrl="/dashboard">
-      <App />
-    </InsforgeProvider>
-  </StrictMode>
-);
-```
-
-### Step 2: Configure Router with Custom Pages
-
-Set `builtInAuth: false` and provide your page components:
-
-```tsx src/App.tsx
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-import { getInsforgeRoutes } from '@insforge/react-router/router';
-import Layout from './components/Layout';
-import Home from './pages/Home';
-import Dashboard from './pages/Dashboard';
-// Import your custom auth pages
-import SignInPage from './pages/auth/SignInPage';
-import SignUpPage from './pages/auth/SignUpPage';
-import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
-
-const router = createBrowserRouter([
-  {
-    path: '/',
-    element: <Layout />,
-    children: [
-      { index: true, element: <Home /> },
-      { path: 'dashboard', element: <Dashboard /> },
-    ],
-  },
-
-  // Custom auth routes
-  ...getInsforgeRoutes({
-    baseUrl: import.meta.env.VITE_INSFORGE_BASE_URL || 'https://your-app.region.insforge.app', // Replace with your InsForge backend URL
-    afterSignInUrl: '/dashboard',
-    builtInAuth: false, // Render custom components instead of redirecting
-    pages: {
-      signIn: <SignInPage />,
-      signUp: <SignUpPage />,
-      forgotPassword: <ForgotPasswordPage />,
-    },
-  }),
-]);
-
-export default function App() {
-  return <RouterProvider router={router} />;
-}
-```
-
-### Step 3: Create Auth Page Components
-
-Use our complete authentication components directly. These components are **full-featured page-level components** with all business logic included:
-
-```tsx src/pages/auth/SignInPage.tsx
-import { SignIn } from '@insforge/react-router';
-
-export default function SignInPage() {
-  return (
-    <div className="h-screen flex items-center justify-center">
-      <SignIn
-        title="Welcome Back"
-        subtitle="Sign in to your account"
-        onError={(error) => {
-          console.error('Sign in error:', error);
-        }}
-      />
-    </div>
-  );
-}
-```
-
-```tsx src/pages/auth/SignUpPage.tsx
-import { SignUp } from '@insforge/react-router';
-
-export default function SignUpPage() {
-  return (
-    <div className="h-screen flex items-center justify-center">
-      <SignUp
-        title="Create Account"
-        subtitle="Get started for free"
-        onError={(error) => {
-          console.error('Sign up error:', error);
-        }}
-      />
-    </div>
-  );
-}
-```
-
-```tsx src/pages/auth/ForgotPasswordPage.tsx
-import { ForgotPassword } from '@insforge/react-router';
-
-export default function ForgotPasswordPage() {
-  return (
-    <div className="h-screen flex items-center justify-center">
-      <ForgotPassword
-        onError={(error) => {
-          console.error('Password reset error:', error);
-        }}
-      />
-    </div>
-  );
-}
-```
-
-**That's it!** The `<SignIn>`, `<SignUp>`, and `<ForgotPassword>` components are complete page-level components that include:
-
-- Form UI with validation
-- OAuth provider buttons (auto-detected)
-- Error handling
-- Loading states
-- Password strength indicators (SignUp)
-- All authentication logic
-
-You only need to wrap them in your page components for layout/styling purposes.
-
-### Key Difference from Built-in Auth
-
-**Built-in Auth:**
-
-- `/sign-in` → Redirects to `https://your-app.region.insforge.app/auth/sign-in`
-- Authentication happens on hosted page
-- Returns to your app with token
-
-**Custom Components:**
-
-- `/sign-in` → Renders your `<SignInPage>` component
-- Authentication happens in your app
-- SDK handles token management automatically
+<CardGroup cols={3}>
+  <Card title="Hosted Auth" icon="bolt" href="/core-concepts/authentication/ui-components/react">
+    **Fastest setup** - Redirect to hosted login pages. Zero UI code required.
+  </Card>
+  
+  <Card title="Custom Components" icon="puzzle-piece">
+    **This page** - Use pre-built components with full business logic in your app.
+  </Card>
+  
+  <Card title="SDK Only" icon="code" href="/core-concepts/authentication/sdk">
+    **Maximum control** - Build 100% custom UI using SDK methods directly.
+  </Card>
+</CardGroup>
 
 ---
 
-## Features
+## Key Difference from Hosted Auth
 
-- **Built-in Auth**: React Router integration with deployed auth pages
-- **Complete Components**: Pre-built `<SignIn>`, `<SignUp>`, `<UserButton>` with business logic
-- **OAuth Support**: Google, GitHub, Discord, Facebook, LinkedIn, Microsoft, Apple, X, Instagram, TikTok, Spotify
-- **React Hooks**: `useAuth()`, `useUser()`, `usePublicAuthConfig()`
-- **Control Components**: `<SignedIn>`, `<SignedOut>`, `<Protect>`
-- **Form Components**: Pure UI forms for custom logic
-- **TypeScript**: Full type safety
+| Aspect | Hosted Auth | Custom Components |
+|--------|-------------|-------------------|
+| **Sign-in route** | Redirects to `https://your-app.region.insforge.app/auth/sign-in` | Renders your `<SignIn />` component |
+| **Where auth happens** | On hosted page | In your app |
+| **Token management** | Returns to your app with token | SDK handles automatically |
 
 ---
 
 ## How It Works
-
-### Built-in Auth Flow
-
-```
-1. User clicks "Sign In" → Visits /sign-in route
-   ↓
-2. getInsforgeRoutes() redirects → https://your-app.region.insforge.app/auth/sign-in?redirect=yourapp.com/you-defined-destination-after-sign-in
-   ↓
-3. User signs in on deployed page → Backend processes authentication
-   ↓
-4. Backend redirects → yourapp.com/you-defined-destination-after-sign-in?access_token=xxx&user_id=xxx
-   ↓
-5. InsForge SDK will:
-   - Extracts token from URL
-   - Saves to localStorage
-   - Verifies with getCurrentUser()
-   - Updates Provider state
-   ↓
-6. User sees the destination page (e.g /dashboard)
-```
-
-### Custom UI Flow
 
 ```
 1. User visits /sign-in route → Renders <SignIn> component
@@ -205,15 +47,34 @@ You only need to wrap them in your page components for layout/styling purposes.
 6. User sees authenticated UI at destination
 ```
 
-**Architecture:**
-
-- **InsforgeProvider**: Manages authentication state globally using React Context
-- **getInsforgeRoutes()**: Creates redirect routes for built-in auth
-- **SDK Integration**: All auth operations go through `@insforge/sdk`, which auto-detects tokens from URL
-- **React Context**: Provides auth state to all child components
-- **Hooks**: Easy access to auth methods and user data
-
 ---
+
+## Before You Start
+
+Make sure to create an InsForge SDK client and wrap your app in the `InsforgeProvider`:
+
+```tsx src/lib/insforge.ts
+import { createClient } from '@insforge/sdk';
+
+export const insforge = createClient({
+  baseUrl: import.meta.env.VITE_INSFORGE_BASE_URL,
+  anonKey: import.meta.env.VITE_INSFORGE_ANON_KEY,
+});
+```
+
+```tsx src/main.tsx
+import { InsforgeProvider } from '@insforge/react';
+import { insforge } from './lib/insforge';
+import App from './App';
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <InsforgeProvider client={insforge}>
+      <App />
+    </InsforgeProvider>
+  </StrictMode>
+);
+```
 
 ## Complete Components (with Business Logic)
 
@@ -224,16 +85,14 @@ These components include full authentication logic and work out of the box.
 Complete sign-in component with email/password and OAuth:
 
 ```tsx
-import { SignIn } from '@insforge/react-router';
+import { SignIn } from '@insforge/react';
 
 function SignInPage() {
   return (
     <SignIn
       title="Welcome Back"
       subtitle="Sign in to continue"
-      onError={(error) => {
-        console.error('Error:', error);
-      }}
+      onError={(error) => console.error('Error:', error)}
     />
   );
 }
@@ -243,31 +102,43 @@ function SignInPage() {
 
 - Email/password authentication
 - OAuth provider buttons (auto-detected from backend)
+- Email verification flow (when required)
 - Password visibility toggle
-- Error handling
-- Loading states
-- Customizable text
+- Error handling & loading states
 
 **Props:**
 
-- `onError` - Callback on error
-- `title` / `subtitle` - Custom heading text
+| Prop | Type | Description |
+|------|------|-------------|
+| `title` | `string` | Custom title text |
+| `subtitle` | `string` | Custom subtitle text |
+| `emailLabel` | `string` | Label for email input |
+| `emailPlaceholder` | `string` | Placeholder for email input |
+| `passwordLabel` | `string` | Label for password input |
+| `passwordPlaceholder` | `string` | Placeholder for password input |
+| `forgotPasswordText` | `string` | Text for forgot password link |
+| `forgotPasswordUrl` | `string` | URL for forgot password page |
+| `submitButtonText` | `string` | Text for submit button |
+| `loadingButtonText` | `string` | Text while loading |
+| `signUpText` | `string` | Text before sign up link |
+| `signUpLinkText` | `string` | Text for sign up link |
+| `signUpUrl` | `string` | URL for sign up page |
+| `dividerText` | `string` | Text in OAuth divider |
+| `onError` | `(error: Error) => void` | Callback on error |
 
 ### `<SignUp />`
 
 Complete sign-up component with password strength validation:
 
 ```tsx
-import { SignUp } from '@insforge/react-router';
+import { SignUp } from '@insforge/react';
 
 function SignUpPage() {
   return (
     <SignUp
       title="Create Account"
       subtitle="Get started with your free account"
-      onError={(error) => {
-        console.error('Error:', error);
-      }}
+      onError={(error) => console.error('Error:', error)}
     />
   );
 }
@@ -277,52 +148,172 @@ function SignUpPage() {
 
 - Email/password registration
 - Real-time password strength indicator
+- Email verification flow (when required)
 - OAuth provider buttons
-- Form validation
-- Customizable text
+- Form validation based on backend config
 
-**Props:** Same as `<SignIn>`.
+**Props:**
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `title` | `string` | Custom title text |
+| `subtitle` | `string` | Custom subtitle text |
+| `emailLabel` | `string` | Label for email input |
+| `emailPlaceholder` | `string` | Placeholder for email input |
+| `passwordLabel` | `string` | Label for password input |
+| `passwordPlaceholder` | `string` | Placeholder for password input |
+| `submitButtonText` | `string` | Text for submit button |
+| `loadingButtonText` | `string` | Text while loading |
+| `signInText` | `string` | Text before sign in link |
+| `signInLinkText` | `string` | Text for sign in link |
+| `signInUrl` | `string` | URL for sign in page |
+| `dividerText` | `string` | Text in OAuth divider |
+| `onError` | `(error: Error) => void` | Callback on error |
 
 ### `<UserButton />`
 
-User profile dropdown with sign-out:
+User profile dropdown with sign-out and profile management:
 
 ```tsx
-import { UserButton } from '@insforge/react-router';
+import { UserButton } from '@insforge/react';
 
 function Header() {
   return (
     <header>
       <nav>{/* Your navigation */}</nav>
-      <UserButton afterSignOutUrl="/" mode="detailed" />
+      <UserButton 
+        mode="detailed" 
+        afterSignOutUrl="/" 
+        showProfile={true}
+        onProfileError={(error) => console.error('Profile error:', error)}
+      />
     </header>
   );
 }
 ```
 
-**Modes:**
+**Key Features:**
 
-- `detailed` (default): Shows avatar + name + email
-- `simple`: Shows avatar only
+- Avatar with fallback to initials
+- Dropdown menu with Profile and Sign Out options
+- Built-in `UserProfileModal` integration
+- Auto-positioning (opens upward/downward based on viewport)
 
 **Props:**
 
-- `mode` - Display mode: `"detailed"` or `"simple"`
-- `afterSignOutUrl` - Redirect URL after sign out
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `mode` | `"detailed"` \| `"simple"` | `"simple"` | `detailed`: avatar + name + email, `simple`: avatar only |
+| `afterSignOutUrl` | `string` | `"/"` | Redirect URL after sign out |
+| `showProfile` | `boolean` | `true` | Show the Profile menu item |
+| `onProfileError` | `(error: string) => void` | - | Callback when profile update fails |
+
+### `<UserProfileModal />`
+
+Modal for viewing and editing user profile information:
+
+```tsx
+import { useState } from 'react';
+import { UserProfileModal } from '@insforge/react';
+
+function ProfileButton() {
+  const [showModal, setShowModal] = useState(false);
+
+  return (
+    <>
+      <button onClick={() => setShowModal(true)}>Edit Profile</button>
+      
+      {showModal && (
+        <UserProfileModal
+          onClose={() => setShowModal(false)}
+          onError={(error) => console.error('Profile error:', error)}
+        />
+      )}
+    </>
+  );
+}
+```
+
+**Key Features:**
+
+- Displays user avatar, email, and name
+- Edit mode for updating name
+- Avatar fallback to initials
+- Keyboard support (Escape to close)
+- Portal rendering for proper z-index handling
+
+**Props:**
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `onClose` | `() => void` | Called when modal is closed |
+| `onError` | `(error: string) => void` | Called when an error occurs |
+
+### `<SignInButton />` / `<SignUpButton />`
+
+Simple buttons that redirect to hosted auth pages:
+
+```tsx
+import { SignInButton, SignUpButton } from '@insforge/react';
+
+function LandingPage() {
+  return (
+    <div>
+      {/* Default button */}
+      <SignInButton />
+      <SignUpButton />
+
+      {/* Custom styled button */}
+      <SignInButton>
+        <button className="my-custom-button">Login</button>
+      </SignInButton>
+    </div>
+  );
+}
+```
+
+**Props:**
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `children` | `ReactNode` | Custom button element (wraps with click handler) |
+| `className` | `string` | CSS class for default button |
+
+### `<SignOutButton />`
+
+Simple button that signs out the current user:
+
+```tsx
+import { SignOutButton } from '@insforge/react';
+
+function Header() {
+  return (
+    <SignOutButton afterSignOutUrl="/goodbye">
+      <button className="logout-btn">Logout</button>
+    </SignOutButton>
+  );
+}
+```
+
+**Props:**
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `ReactNode` | - | Custom button element |
+| `className` | `string` | - | CSS class for default button |
+| `afterSignOutUrl` | `string` | `"/"` | Redirect URL after sign out |
 
 ### `<ForgotPassword />`
 
 Complete password reset flow with automatic method detection:
 
 ```tsx
-import { ForgotPassword } from '@insforge/react-router';
+import { ForgotPassword } from '@insforge/react';
 
 function ForgotPasswordPage() {
   return (
     <ForgotPassword
-      onError={(error) => {
-        console.error('Error:', error);
-      }}
+      onError={(error) => console.error('Error:', error)}
     />
   );
 }
@@ -335,18 +326,99 @@ function ForgotPasswordPage() {
 - **Code method**: Three-step flow (email → verify code → reset password)
 - 60-second countdown timer for resend
 - Built-in form validation
-- Customizable text
 
 **Props:**
 
-- `onError` - Callback on error
+| Prop | Type | Description |
+|------|------|-------------|
+| `onError` | `(error: Error) => void` | Callback on error |
+
+### `<ResetPassword />`
+
+Password reset form that reads the token from URL automatically:
+
+```tsx
+import { ResetPassword } from '@insforge/react';
+
+// Used at /reset-password?token=xxxxx
+function ResetPasswordPage() {
+  return (
+    <ResetPassword
+      onError={(error) => console.error('Error:', error)}
+    />
+  );
+}
+```
+
+**Key Features:**
+
+- Automatically reads reset token from URL (`?token=xxx`)
+- Password confirmation validation
+- Password strength validation based on backend config
+- Success state with completion message
+- Error handling for invalid/missing tokens
+
+**Props:**
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `title` | `string` | Custom title text |
+| `subtitle` | `string` | Custom subtitle text |
+| `newPasswordLabel` | `string` | Label for new password input |
+| `newPasswordPlaceholder` | `string` | Placeholder for new password |
+| `confirmPasswordLabel` | `string` | Label for confirm password input |
+| `confirmPasswordPlaceholder` | `string` | Placeholder for confirm password |
+| `submitButtonText` | `string` | Text for submit button |
+| `loadingButtonText` | `string` | Text while loading |
+| `onError` | `(error: Error) => void` | Callback on error |
+
+### `<VerifyEmail />`
+
+Email verification component with automatic token handling:
+
+```tsx
+import { VerifyEmail } from '@insforge/react';
+
+function VerifyEmailPage() {
+  const token = new URLSearchParams(window.location.search).get('token');
+
+  return (
+    <VerifyEmail
+      token={token || ''}
+      onSuccess={(data) => {
+        console.log('Email verified!', data);
+        // Navigate to dashboard or close window
+      }}
+      onError={(error) => console.error('Verification failed:', error)}
+    />
+  );
+}
+```
+
+**Key Features:**
+
+- Automatic verification on mount
+- Loading, success, and error states
+- Customizable status messages
+
+**Props:**
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `token` | `string` | Verification token from URL |
+| `verifyingTitle` | `string` | Title shown while verifying |
+| `successTitle` | `string` | Title shown on success |
+| `successMessage` | `string` | Message shown on success |
+| `errorTitle` | `string` | Title shown on error |
+| `onSuccess` | `(data) => void` | Callback on successful verification |
+| `onError` | `(error: Error) => void` | Callback on error |
 
 ### `<Protect />`
 
 Protected content with conditional rendering:
 
 ```tsx
-import { Protect } from '@insforge/react-router';
+import { Protect } from '@insforge/react';
 
 function Dashboard() {
   return (
@@ -376,7 +448,7 @@ function Dashboard() {
 Conditional rendering based on auth state:
 
 ```tsx
-import { SignedIn, SignedOut } from '@insforge/react-router';
+import { SignedIn, SignedOut } from '@insforge/react';
 
 function NavBar() {
   return (
@@ -401,19 +473,18 @@ function NavBar() {
 
 ### `useAuth()`
 
-Access authentication methods and state:
+Access authentication methods and state. This is an alias for `useInsforge()`.
 
 ```tsx
-import { useAuth } from '@insforge/react-router';
+import { useAuth } from '@insforge/react';
 
 function LoginButton() {
   const { signIn, signUp, signOut, isSignedIn, isLoaded } = useAuth();
 
   const handleSignIn = async () => {
-    try {
-      await signIn('user@example.com', 'password');
-    } catch (error) {
-      console.error('Sign in failed:', error);
+    const result = await signIn('user@example.com', 'password');
+    if ('error' in result) {
+      console.error('Sign in failed:', result.error);
     }
   };
 
@@ -429,18 +500,101 @@ function LoginButton() {
 
 **Returns:**
 
-- `signIn(email, password)` - Sign in with email/password
-- `signUp(email, password)` - Sign up new user
-- `signOut()` - Sign out current user
-- `isSignedIn` - Boolean auth state
-- `isLoaded` - Boolean loading state
+| Property/Method | Type | Description |
+|-----------------|------|-------------|
+| `isLoaded` | `boolean` | Whether auth state has been initialized |
+| `isSignedIn` | `boolean` | Whether user is currently signed in |
+| `signIn(email, password)` | `Promise` | Sign in with email/password |
+| `signUp(email, password)` | `Promise` | Register new user |
+| `signOut()` | `Promise<void>` | Sign out current user |
+
+### `useInsforge()`
+
+Full access to all authentication methods and context. Use this when you need advanced features like OAuth or email verification.
+
+```tsx
+import { useInsforge } from '@insforge/react';
+
+function CustomAuthFlow() {
+  const {
+    // State
+    user,
+    isLoaded,
+    isSignedIn,
+    
+    // Core auth
+    signIn,
+    signUp,
+    signOut,
+    
+    // User management
+    updateUser,
+    reloadAuth,
+    
+    // Email verification
+    sendVerificationEmail,
+    verifyEmail,
+    
+    // Password reset
+    sendResetPasswordEmail,
+    resetPassword,
+    exchangeResetPasswordToken,
+    
+    // OAuth
+    loginWithOAuth,
+    
+    // Config
+    getPublicAuthConfig,
+    baseUrl,
+    afterSignInUrl,
+  } = useInsforge();
+
+  // Example: OAuth login
+  const handleGoogleLogin = () => {
+    loginWithOAuth('google', '/dashboard');
+  };
+
+  // Example: Send password reset email
+  const handleForgotPassword = async (email: string) => {
+    const result = await sendResetPasswordEmail(email);
+    if (result?.message) {
+      console.log('Reset email sent!');
+    }
+  };
+
+  return <div>...</div>;
+}
+```
+
+**Full API Reference:**
+
+| Property/Method | Type | Description |
+|-----------------|------|-------------|
+| `user` | `InsforgeUser \| null` | Current user object |
+| `userId` | `string \| null` | Current user ID |
+| `isLoaded` | `boolean` | Auth state initialized |
+| `isSignedIn` | `boolean` | User is signed in |
+| `signIn(email, password)` | `Promise` | Sign in with credentials |
+| `signUp(email, password)` | `Promise` | Register new user |
+| `signOut()` | `Promise<void>` | Sign out user |
+| `updateUser(profile)` | `Promise` | Update user profile |
+| `reloadAuth()` | `Promise` | Refresh auth state from backend |
+| `sendVerificationEmail(email)` | `Promise` | Send email verification code |
+| `verifyEmail(otp, email?)` | `Promise` | Verify email with OTP code |
+| `sendResetPasswordEmail(email)` | `Promise` | Send password reset email |
+| `resetPassword(token, newPassword)` | `Promise` | Reset password with token |
+| `exchangeResetPasswordToken(email, code)` | `Promise` | Exchange reset code for token |
+| `loginWithOAuth(provider, redirectTo)` | `Promise<void>` | Start OAuth flow |
+| `getPublicAuthConfig()` | `Promise` | Get auth configuration |
+| `baseUrl` | `string` | InsForge backend URL |
+| `afterSignInUrl` | `string` | Default redirect after sign in |
 
 ### `useUser()`
 
-Access current user data:
+Access current user data and update profile:
 
 ```tsx
-import { useUser } from '@insforge/react-router';
+import { useUser } from '@insforge/react';
 
 function UserProfile() {
   const { user, isLoaded, updateUser } = useUser();
@@ -449,7 +603,10 @@ function UserProfile() {
   if (!user) return <div>Not signed in</div>;
 
   const handleUpdate = async () => {
-    await updateUser({ name: 'New Name' });
+    const result = await updateUser({ name: 'New Name' });
+    if (result?.error) {
+      console.error('Update failed:', result.error);
+    }
   };
 
   return (
@@ -465,27 +622,30 @@ function UserProfile() {
 
 **Returns:**
 
-- `user` - User object with id, email, profile
-- `user.profile` - User profile object with name, avatar_url, and other custom fields
-- `isLoaded` - Boolean loading state
-- `updateUser(data)` - Update user profile
+| Property/Method | Type | Description |
+|-----------------|------|-------------|
+| `user` | `InsforgeUser \| null` | User object with id, email, profile |
+| `user.profile` | `object` | Profile with name, avatar_url, and custom fields |
+| `isLoaded` | `boolean` | Whether auth state is loaded |
+| `updateUser(profile)` | `Promise` | Update user profile data |
 
 ### `usePublicAuthConfig()`
 
-Get your authentication config in InsForge:
+Get your authentication configuration from InsForge backend:
 
 ```tsx
-import { usePublicAuthConfig } from '@insforge/react-router';
+import { usePublicAuthConfig } from '@insforge/react';
 
-function SignInPage() {
+function CustomSignIn() {
   const { authConfig, isLoaded } = usePublicAuthConfig();
 
   if (!isLoaded) return <div>Loading...</div>;
 
   return (
     <div>
-      <p>Available OAuth: {authConfig.oAuthProviders.join(', ')}</p>
+      <p>Available OAuth: {authConfig?.oauthProviders?.join(', ')}</p>
       <p>Password min length: {authConfig?.passwordMinLength}</p>
+      <p>Require uppercase: {authConfig?.requireUppercase ? 'Yes' : 'No'}</p>
     </div>
   );
 }
@@ -493,24 +653,33 @@ function SignInPage() {
 
 **Returns:**
 
-- `authConfig` - Authentication Configuration you set in InsForge dashboard.
-- `isLoaded` - Boolean loading state
+| Property | Type | Description |
+|----------|------|-------------|
+| `authConfig` | `object \| null` | Auth configuration from dashboard |
+| `authConfig.oauthProviders` | `string[]` | Enabled OAuth providers |
+| `authConfig.passwordMinLength` | `number` | Minimum password length |
+| `authConfig.requireUppercase` | `boolean` | Require uppercase letter |
+| `authConfig.requireLowercase` | `boolean` | Require lowercase letter |
+| `authConfig.requireNumber` | `boolean` | Require number |
+| `authConfig.requireSpecialChar` | `boolean` | Require special character |
+| `isLoaded` | `boolean` | Whether config has been fetched |
 
 <Warning>
-  **Performance**: Only use this hook in SignIn/SignUp components to avoid unnecessary API calls.
+  **Performance**: Only use this hook in SignIn/SignUp components. Using it elsewhere causes unnecessary API calls on every page load.
 </Warning>
 
 ---
 
 ## Advanced Features
 
-### Auth Change Callback
+### InsforgeProvider Props
 
-Track authentication state changes:
+The provider accepts several optional props for advanced use cases:
 
 ```tsx
 <InsforgeProvider
-  baseUrl={baseUrl}
+  client={insforge}
+  afterSignInUrl="/dashboard"
   onAuthChange={(user) => {
     if (user) {
       console.log('User signed in:', user.email);
@@ -520,7 +689,96 @@ Track authentication state changes:
       analytics.reset();
     }
   }}
+  onSignIn={async (authToken, user) => {
+    // Sync token to cookies for SSR (Next.js)
+    await fetch('/api/auth/sync', {
+      method: 'POST',
+      body: JSON.stringify({ token: authToken }),
+    });
+  }}
+  onSignOut={async () => {
+    // Clear server-side session
+    await fetch('/api/auth/logout', { method: 'POST' });
+  }}
 >
   {children}
 </InsforgeProvider>
 ```
+
+**Props:**
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `client` | `InsForgeClient` | **required** | SDK client instance |
+| `afterSignInUrl` | `string` | `"/"` | Default redirect URL after sign in |
+| `onAuthChange` | `(user: InsforgeUser \| null) => void` | - | Callback when auth state changes |
+| `onSignIn` | `(authToken: string, user: InsforgeUser) => Promise<void>` | - | Custom handler after sign-in (e.g., cookie sync) |
+| `onSignOut` | `() => Promise<void>` | - | Custom handler after sign-out |
+| `onRefresh` | `(authToken: string, user: InsforgeUser) => Promise<void>` | - | Custom handler after token refresh |
+
+### Text Customization
+
+All complete components support full text customization:
+
+```tsx
+<SignIn
+  title="Welcome Back!"
+  subtitle="We're happy to see you again"
+  emailLabel="Your Email Address"
+  emailPlaceholder="you@company.com"
+  passwordLabel="Your Password"
+  submitButtonText="Login Now"
+  loadingButtonText="Signing you in..."
+  signUpText="New to our platform?"
+  signUpLinkText="Create an account"
+  dividerText="or continue with"
+/>
+```
+
+### Building Fully Custom UIs
+
+If you need even more control, you can use the SDK methods directly from `useInsforge()`:
+
+```tsx
+import { useInsforge, AuthContainer, AuthHeader } from '@insforge/react';
+
+function CompletelyCustomAuth() {
+  const { signIn, loginWithOAuth, isLoaded } = useInsforge();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const result = await signIn(email, password);
+    if ('error' in result) {
+      setError(result.error);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      {/* Your completely custom UI */}
+      <input 
+        type="email" 
+        value={email} 
+        onChange={(e) => setEmail(e.target.value)} 
+      />
+      <input 
+        type="password" 
+        value={password} 
+        onChange={(e) => setPassword(e.target.value)} 
+      />
+      {error && <p className="error">{error}</p>}
+      <button type="submit">Sign In</button>
+      <button type="button" onClick={() => loginWithOAuth('google', '/dashboard')}>
+        Sign in with Google
+      </button>
+    </form>
+  );
+}
+```
+
+<Tip>
+  For the highest level of control, see the [SDK Reference](/core-concepts/authentication/sdk) to build authentication flows entirely with SDK methods.
+</Tip>
