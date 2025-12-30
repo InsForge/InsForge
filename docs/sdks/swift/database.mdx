@@ -1,0 +1,229 @@
+---
+title: Database SDK Reference
+description: Type-safe database operations using the InsForge Swift SDK
+---
+
+<Info>
+  **Coming Soon** - The Swift SDK is currently in development. This documentation serves as a preview of the planned API.
+</Info>
+
+## Installation
+
+Add InsForge to your Swift Package Manager dependencies:
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/insforge/insforge-swift.git", from: "1.0.0")
+]
+```
+
+```swift
+import InsForge
+
+let insforge = InsForgeClient(
+    baseUrl: "https://your-app.us-east.insforge.app",
+    anonKey: "your-anon-key"
+)
+```
+
+## insert()
+
+Insert new records into a table.
+
+### Parameters
+
+- `values` - Single Codable object or array of objects to insert
+
+### Returns
+
+```swift
+Result<[T], InsForgeError>
+```
+
+### Examples
+
+```swift
+// Define your model
+struct Post: Codable {
+    let id: String?
+    let title: String
+    let content: String
+    let createdAt: Date?
+}
+
+// Single insert
+let post = Post(id: nil, title: "Hello World", content: "My first post!", createdAt: nil)
+let result = try await insforge.database
+    .from("posts")
+    .insert(post)
+    .select()
+
+// Bulk insert
+let posts = [
+    Post(id: nil, title: "First Post", content: "Hello everyone!", createdAt: nil),
+    Post(id: nil, title: "Second Post", content: "Another update.", createdAt: nil)
+]
+let result = try await insforge.database
+    .from("posts")
+    .insert(posts)
+    .select()
+```
+
+---
+
+## update()
+
+Update existing records in a table.
+
+### Examples
+
+```swift
+// Update by ID
+let result = try await insforge.database
+    .from("posts")
+    .update(["title": "Updated Title"])
+    .eq("id", postId)
+    .select()
+
+// Update multiple
+let result = try await insforge.database
+    .from("tasks")
+    .update(["status": "completed"])
+    .in("id", ["task-1", "task-2"])
+    .select()
+```
+
+---
+
+## delete()
+
+Delete records from a table.
+
+### Examples
+
+```swift
+// Delete by ID
+try await insforge.database
+    .from("posts")
+    .delete()
+    .eq("id", postId)
+
+// Delete with filter
+try await insforge.database
+    .from("sessions")
+    .delete()
+    .lt("expires_at", Date())
+```
+
+---
+
+## select()
+
+Query records from a table.
+
+### Examples
+
+```swift
+// Get all posts
+let posts: [Post] = try await insforge.database
+    .from("posts")
+    .select()
+
+// Specific columns
+let posts = try await insforge.database
+    .from("posts")
+    .select("id, title, content")
+
+// With relationships
+let posts = try await insforge.database
+    .from("posts")
+    .select("*, comments(id, content)")
+```
+
+---
+
+## Filters
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| `.eq(column, value)` | Equals | `.eq("status", "active")` |
+| `.neq(column, value)` | Not equals | `.neq("status", "banned")` |
+| `.gt(column, value)` | Greater than | `.gt("age", 18)` |
+| `.gte(column, value)` | Greater than or equal | `.gte("price", 100)` |
+| `.lt(column, value)` | Less than | `.lt("stock", 10)` |
+| `.lte(column, value)` | Less than or equal | `.lte("priority", 3)` |
+| `.like(column, pattern)` | Case-sensitive pattern | `.like("name", "%Widget%")` |
+| `.ilike(column, pattern)` | Case-insensitive pattern | `.ilike("email", "%@gmail.com")` |
+| `.in(column, array)` | Value in array | `.in("status", ["pending", "active"])` |
+| `.is(column, value)` | Exactly equals (for nil) | `.is("deleted_at", nil)` |
+
+```swift
+// Chain multiple filters
+let products = try await insforge.database
+    .from("products")
+    .select()
+    .eq("category", "electronics")
+    .gte("price", 50)
+    .lte("price", 500)
+```
+
+---
+
+## Modifiers
+
+| Modifier | Description | Example |
+|----------|-------------|---------|
+| `.order(column, ascending:)` | Sort results | `.order("created_at", ascending: false)` |
+| `.limit(count)` | Limit rows | `.limit(10)` |
+| `.range(from, to)` | Pagination | `.range(0, 9)` |
+| `.single()` | Return single object | `.single()` |
+
+```swift
+// Pagination with sorting
+let posts = try await insforge.database
+    .from("posts")
+    .select()
+    .order("created_at", ascending: false)
+    .range(0, 9)
+    .limit(10)
+```
+
+---
+
+## SwiftUI Integration
+
+```swift
+import SwiftUI
+import InsForge
+
+struct PostListView: View {
+    @State private var posts: [Post] = []
+    @State private var isLoading = true
+
+    var body: some View {
+        List(posts) { post in
+            VStack(alignment: .leading) {
+                Text(post.title)
+                    .font(.headline)
+                Text(post.content)
+                    .font(.subheadline)
+            }
+        }
+        .task {
+            await loadPosts()
+        }
+    }
+
+    func loadPosts() async {
+        do {
+            posts = try await insforge.database
+                .from("posts")
+                .select()
+                .order("created_at", ascending: false)
+            isLoading = false
+        } catch {
+            print("Error loading posts: \(error)")
+        }
+    }
+}
+```

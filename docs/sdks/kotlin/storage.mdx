@@ -1,0 +1,292 @@
+---
+title: Storage SDK Reference
+description: File upload, download, and management with the InsForge Kotlin SDK
+---
+
+<Info>
+  **Coming Soon** - The Kotlin SDK is currently in development. This documentation serves as a preview of the planned API.
+</Info>
+
+## Installation
+
+```kotlin
+import dev.insforge.InsForgeClient
+
+val insforge = InsForgeClient(
+    baseUrl = "https://your-app.us-east.insforge.app",
+    anonKey = "your-anon-key"
+)
+```
+
+## from()
+
+Get a bucket instance for file operations.
+
+### Example
+
+```kotlin
+val bucket = insforge.storage.from("images")
+```
+
+---
+
+## upload()
+
+Upload a file with a specific path/key.
+
+### Example
+
+```kotlin
+// Upload from ByteArray
+val imageData = bitmap.toByteArray()
+val result = insforge.storage
+    .from("images")
+    .upload(
+        path = "posts/post-123/cover.jpg",
+        data = imageData,
+        contentType = "image/jpeg"
+    )
+
+Log.d("Storage", "Uploaded: ${result.url}")
+
+// Upload from File
+val file = File(context.cacheDir, "photo.jpg")
+val result = insforge.storage
+    .from("documents")
+    .upload(
+        path = "reports/annual-2024.pdf",
+        file = file
+    )
+
+// Upload from Uri (Android)
+val result = insforge.storage
+    .from("images")
+    .upload(
+        path = "avatars/user-123.jpg",
+        uri = selectedImageUri,
+        context = context
+    )
+```
+
+---
+
+## uploadAuto()
+
+Upload a file with auto-generated unique key.
+
+### Example
+
+```kotlin
+val imageData = bitmap.toByteArray()
+val result = insforge.storage
+    .from("uploads")
+    .uploadAuto(
+        data = imageData,
+        contentType = "image/jpeg",
+        fileExtension = "jpg"
+    )
+
+// Save to database
+insforge.database
+    .from("posts")
+    .insert(
+        mapOf(
+            "image_url" to result.url,
+            "image_key" to result.key,
+            "user_id" to userId
+        )
+    )
+```
+
+---
+
+## download()
+
+Download a file as ByteArray.
+
+### Example
+
+```kotlin
+// Download file
+val data = insforge.storage
+    .from("images")
+    .download(path = "posts/post-123/cover.jpg")
+
+// Convert to Bitmap
+val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
+imageView.setImageBitmap(bitmap)
+```
+
+---
+
+## remove()
+
+Delete a file from storage.
+
+### Example
+
+```kotlin
+// Get the file key from database
+val post = insforge.database
+    .from("posts")
+    .select("image_key")
+    .eq("id", "post-123")
+    .single()
+    .execute<Post>()
+
+// Delete from storage
+insforge.storage
+    .from("images")
+    .remove(path = post.imageKey)
+
+// Clear database reference
+insforge.database
+    .from("posts")
+    .update(mapOf("image_url" to null, "image_key" to null))
+    .eq("id", "post-123")
+```
+
+---
+
+## getPublicUrl()
+
+Get a public URL for a file.
+
+### Example
+
+```kotlin
+val url = insforge.storage
+    .from("images")
+    .getPublicUrl(path = "posts/post-123/cover.jpg")
+
+Log.d("Storage", "Public URL: $url")
+```
+
+---
+
+## Jetpack Compose Integration
+
+### Image Picker with Upload
+
+```kotlin
+@Composable
+fun ImageUploadScreen() {
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var uploadedUrl by remember { mutableStateOf<String?>(null) }
+    var isUploading by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            selectedImageUri = it
+            scope.launch {
+                isUploading = true
+                try {
+                    val result = insforge.storage
+                        .from("photos")
+                        .uploadAuto(
+                            uri = it,
+                            context = context
+                        )
+                    uploadedUrl = result.url
+                } catch (e: Exception) {
+                    Log.e("Upload", "Failed: ${e.message}")
+                } finally {
+                    isUploading = false
+                }
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Button(onClick = { imagePickerLauncher.launch("image/*") }) {
+            Text("Select Photo")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (isUploading) {
+            CircularProgressIndicator()
+            Text("Uploading...")
+        }
+
+        uploadedUrl?.let { url ->
+            AsyncImage(
+                model = url,
+                contentDescription = "Uploaded image",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+            )
+        }
+    }
+}
+```
+
+### Async Image with InsForge
+
+```kotlin
+@Composable
+fun InsForgeImage(
+    bucket: String,
+    path: String,
+    modifier: Modifier = Modifier
+) {
+    var imageData by remember { mutableStateOf<ByteArray?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(bucket, path) {
+        try {
+            imageData = insforge.storage
+                .from(bucket)
+                .download(path)
+        } catch (e: Exception) {
+            Log.e("InsForgeImage", "Failed to load: ${e.message}")
+        } finally {
+            isLoading = false
+        }
+    }
+
+    if (isLoading) {
+        CircularProgressIndicator(modifier = modifier)
+    } else {
+        imageData?.let { data ->
+            val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = null,
+                modifier = modifier
+            )
+        }
+    }
+}
+```
+
+---
+
+## Upload Progress
+
+Track upload progress for large files:
+
+```kotlin
+val result = insforge.storage
+    .from("videos")
+    .upload(
+        path = "videos/clip.mp4",
+        file = videoFile,
+        onProgress = { progress ->
+            Log.d("Upload", "Progress: ${(progress * 100).toInt()}%")
+            runOnUiThread {
+                progressBar.progress = (progress * 100).toInt()
+            }
+        }
+    )
+```

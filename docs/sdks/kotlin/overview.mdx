@@ -1,0 +1,79 @@
+---
+title: Kotlin SDK
+description: Official Kotlin SDK for InsForge - Android and Kotlin Multiplatform
+---
+
+<Info>
+  **Coming Soon** - The Kotlin SDK is currently in development. This documentation serves as a preview of the planned API.
+</Info>
+
+The InsForge Kotlin SDK provides a native Kotlin client for interacting with InsForge services from Android applications and Kotlin Multiplatform projects.
+
+## Installation
+
+### Gradle (Kotlin DSL)
+
+```kotlin
+// build.gradle.kts
+dependencies {
+    implementation("dev.insforge:insforge-kotlin:1.0.0")
+}
+```
+
+### Gradle (Groovy)
+
+```groovy
+// build.gradle
+dependencies {
+    implementation 'dev.insforge:insforge-kotlin:1.0.0'
+}
+```
+
+## Quick Start
+
+```kotlin
+import dev.insforge.InsForgeClient
+
+val insforge = InsForgeClient(
+    baseUrl = "https://your-app.us-east.insforge.app",
+    anonKey = "your-anon-key"
+)
+```
+
+## Features
+
+- **Database** - Type-safe CRUD operations with Kotlin Serialization
+- **Authentication** - Email/password and OAuth authentication
+- **Storage** - File upload, download, and management
+- **AI** - Chat completions and image generation
+- **Realtime** - WebSocket-based pub/sub messaging
+- **Coroutines** - Full Kotlin Coroutines support
+- **Jetpack Compose** - Composable functions and state management
+
+## Platform Support
+
+| Platform | Support |
+|----------|---------|
+| Android | 5.0+ (API 21+) |
+| JVM | Java 11+ |
+| Kotlin Multiplatform | iOS, macOS, JS (experimental) |
+
+## SDK Reference
+
+<CardGroup cols={2}>
+  <Card title="Database" icon="database" href="/sdks/kotlin/database">
+    CRUD operations with Kotlin data classes
+  </Card>
+  <Card title="Authentication" icon="lock" href="/sdks/kotlin/auth">
+    Sign up, sign in, OAuth, and user management
+  </Card>
+  <Card title="Storage" icon="cloud-arrow-up" href="/sdks/kotlin/storage">
+    File upload, download, and management
+  </Card>
+  <Card title="AI" icon="brain" href="/sdks/kotlin/ai">
+    Chat completions and image generation
+  </Card>
+  <Card title="Realtime" icon="signal-stream" href="/sdks/kotlin/realtime">
+    WebSocket pub/sub messaging
+  </Card>
+</CardGroup>

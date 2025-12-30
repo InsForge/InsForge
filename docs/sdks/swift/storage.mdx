@@ -1,0 +1,279 @@
+---
+title: Storage SDK Reference
+description: File upload, download, and management with the InsForge Swift SDK
+---
+
+<Info>
+  **Coming Soon** - The Swift SDK is currently in development. This documentation serves as a preview of the planned API.
+</Info>
+
+## Installation
+
+```swift
+import InsForge
+
+let insforge = InsForgeClient(
+    baseUrl: "https://your-app.us-east.insforge.app",
+    anonKey: "your-anon-key"
+)
+```
+
+## from()
+
+Get a bucket instance for file operations.
+
+### Example
+
+```swift
+let bucket = insforge.storage.from("images")
+```
+
+---
+
+## upload()
+
+Upload a file with a specific path/key.
+
+### Parameters
+
+- `path` (String) - The object key/path for the file
+- `data` (Data) - File data to upload
+- `contentType` (String, optional) - MIME type of the file
+
+### Example
+
+```swift
+// Upload from Data
+let imageData = UIImage(named: "photo")?.jpegData(compressionQuality: 0.8)
+let result = try await insforge.storage
+    .from("images")
+    .upload(
+        path: "posts/post-123/cover.jpg",
+        data: imageData!,
+        contentType: "image/jpeg"
+    )
+
+print("Uploaded: \(result.url)")
+
+// Upload from file URL
+let fileUrl = URL(fileURLWithPath: "/path/to/file.pdf")
+let result = try await insforge.storage
+    .from("documents")
+    .upload(
+        path: "reports/annual-2024.pdf",
+        fileUrl: fileUrl
+    )
+```
+
+---
+
+## uploadAuto()
+
+Upload a file with auto-generated unique key.
+
+### Example
+
+```swift
+let imageData = selectedImage.jpegData(compressionQuality: 0.8)!
+let result = try await insforge.storage
+    .from("uploads")
+    .uploadAuto(
+        data: imageData,
+        contentType: "image/jpeg",
+        fileExtension: "jpg"
+    )
+
+// Save to database
+try await insforge.database
+    .from("posts")
+    .insert([
+        "image_url": result.url,
+        "image_key": result.key,
+        "user_id": userId
+    ])
+```
+
+---
+
+## download()
+
+Download a file as Data.
+
+### Example
+
+```swift
+// Download file
+let data = try await insforge.storage
+    .from("images")
+    .download(path: "posts/post-123/cover.jpg")
+
+// Convert to UIImage
+if let image = UIImage(data: data) {
+    imageView.image = image
+}
+```
+
+---
+
+## remove()
+
+Delete a file from storage.
+
+### Example
+
+```swift
+// Get the file key from database
+let post = try await insforge.database
+    .from("posts")
+    .select("image_key")
+    .eq("id", "post-123")
+    .single()
+
+// Delete from storage
+try await insforge.storage
+    .from("images")
+    .remove(path: post.imageKey)
+
+// Clear database reference
+try await insforge.database
+    .from("posts")
+    .update(["image_url": NSNull(), "image_key": NSNull()])
+    .eq("id", "post-123")
+```
+
+---
+
+## getPublicUrl()
+
+Get a public URL for a file.
+
+### Example
+
+```swift
+let url = insforge.storage
+    .from("images")
+    .getPublicUrl(path: "posts/post-123/cover.jpg")
+
+print("Public URL: \(url)")
+```
+
+---
+
+## SwiftUI Integration
+
+### Image Picker with Upload
+
+```swift
+import SwiftUI
+import PhotosUI
+
+struct ImageUploadView: View {
+    @State private var selectedItem: PhotosPickerItem?
+    @State private var uploadedUrl: String?
+    @State private var isUploading = false
+
+    var body: some View {
+        VStack {
+            PhotosPicker(selection: $selectedItem, matching: .images) {
+                Label("Select Photo", systemImage: "photo")
+            }
+
+            if isUploading {
+                ProgressView("Uploading...")
+            }
+
+            if let url = uploadedUrl {
+                AsyncImage(url: URL(string: url)) { image in
+                    image.resizable().scaledToFit()
+                } placeholder: {
+                    ProgressView()
+                }
+                .frame(height: 200)
+            }
+        }
+        .onChange(of: selectedItem) { newItem in
+            Task {
+                await uploadPhoto(item: newItem)
+            }
+        }
+    }
+
+    func uploadPhoto(item: PhotosPickerItem?) async {
+        guard let item = item,
+              let data = try? await item.loadTransferable(type: Data.self) else {
+            return
+        }
+
+        isUploading = true
+
+        do {
+            let result = try await insforge.storage
+                .from("photos")
+                .uploadAuto(data: data, contentType: "image/jpeg")
+
+            uploadedUrl = result.url
+        } catch {
+            print("Upload failed: \(error)")
+        }
+
+        isUploading = false
+    }
+}
+```
+
+### Async Image with InsForge
+
+```swift
+struct InsForgeImage: View {
+    let bucket: String
+    let path: String
+
+    @State private var imageData: Data?
+
+    var body: some View {
+        Group {
+            if let data = imageData, let uiImage = UIImage(data: data) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                ProgressView()
+            }
+        }
+        .task {
+            await loadImage()
+        }
+    }
+
+    func loadImage() async {
+        do {
+            imageData = try await insforge.storage
+                .from(bucket)
+                .download(path: path)
+        } catch {
+            print("Failed to load image: \(error)")
+        }
+    }
+}
+```
+
+---
+
+## Upload Progress
+
+Track upload progress for large files:
+
+```swift
+let result = try await insforge.storage
+    .from("videos")
+    .upload(
+        path: "videos/clip.mp4",
+        fileUrl: videoUrl,
+        progressHandler: { progress in
+            print("Upload progress: \(Int(progress * 100))%")
+            DispatchQueue.main.async {
+                self.uploadProgress = progress
+            }
+        }
+    )
+```

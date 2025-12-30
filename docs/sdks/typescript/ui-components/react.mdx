@@ -1,0 +1,136 @@
+---
+title: React
+description: Quick authentication setup for React+Vite apps using hosted auth pages
+---
+
+The `@insforge/react` package provides authentication for React+Vite applications using **hosted auth pages**.
+
+When users sign in, they're redirected to your InsForge backend's login page, then returned to your app after authentication—no UI code required.
+
+<Tip>
+  Want to build custom login pages instead? See [Custom Auth
+  Pages](/sdks/typescript/ui-components/customization).
+</Tip>
+
+## Quick Start
+
+### Step 1: Create New React Project (Required)
+
+```bash
+npm install @insforge/react@latest
+```
+
+### Step 2: Set Environment Variables
+
+```bash .env
+VITE_INSFORGE_BASE_URL=https://your-app.region.insforge.app
+VITE_INSFORGE_ANON_KEY=your-anon-key-here
+```
+
+### Step 3: Setup Provider
+
+Wrap your app with `InsforgeProvider` in the root:
+
+```tsx src/main.tsx
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { InsforgeProvider } from '@insforge/react';
+import { insforge } from './lib/insforge';
+import App from './App';
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <InsforgeProvider client={insforge}>
+      <App />
+    </InsforgeProvider>
+  </StrictMode>
+);
+```
+
+### Step 4: Use Hooks & Components
+
+```tsx src/pages/Home.tsx
+import {
+  SignInButton,
+  SignUpButton,
+  SignedIn,
+  SignedOut,
+  UserButton,
+  useUser,
+} from '@insforge/react';
+
+export default function Home() {
+  const { user } = useUser();
+
+  return (
+    <div>
+      <SignedOut>
+        <SignInButton />
+        <SignUpButton />
+      </SignedOut>
+
+      <SignedIn>
+        <UserButton />
+        <h1>Welcome, {user?.email}!</h1>
+      </SignedIn>
+    </div>
+  );
+}
+```
+
+**That's it!** Your React app now has production-ready authentication with built-in auth pages.
+
+## Next Steps
+
+### Hooks
+
+#### `useAuth()`
+
+Access authentication state:
+
+```tsx
+import { useAuth } from '@insforge/react';
+
+function LoginButton() {
+  const { isSignedIn, isLoaded } = useAuth();
+
+  if (!isLoaded) return <div>Loading...</div>;
+
+  return <div>{isSignedIn ? 'Welcome!' : 'Sign In'}</div>;
+}
+```
+
+**Returns:**
+
+- `isSignedIn` - Boolean auth state
+- `isLoaded` - Boolean loading state
+
+#### `useUser()`
+
+Access current user data:
+
+```tsx
+import { useUser } from '@insforge/react';
+
+function UserProfile() {
+  const { user, isLoaded } = useUser();
+
+  if (!isLoaded) return <div>Loading...</div>;
+  if (!user) return <div>Not signed in</div>;
+
+  return (
+    <div>
+      <p>Id: {user.id}</p>
+      <p>Email: {user.email}</p>
+      <p>Name: {user.profile.name}</p>
+      <img src={user.profile.avatar_url} alt="Avatar" />
+    </div>
+  );
+}
+```
+
+**Returns:**
+
+- `user` - User object with id, email, profile
+- `user.profile` - User profile object with name, avatar_url, and other custom fields
+- `isLoaded` - Boolean loading state

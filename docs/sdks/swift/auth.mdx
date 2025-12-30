@@ -1,0 +1,303 @@
+---
+title: Authentication SDK Reference
+description: User authentication and profile management with the InsForge Swift SDK
+---
+
+<Info>
+  **Coming Soon** - The Swift SDK is currently in development. This documentation serves as a preview of the planned API.
+</Info>
+
+## Installation
+
+```swift
+import InsForge
+
+let insforge = InsForgeClient(
+    baseUrl: "https://your-app.us-east.insforge.app",
+    anonKey: "your-anon-key"
+)
+```
+
+## signUp()
+
+Create a new user account with email and password.
+
+### Parameters
+
+- `email` (String) - User's email address
+- `password` (String) - User's password
+- `name` (String, optional) - User's display name
+
+### Example
+
+```swift
+do {
+    let result = try await insforge.auth.signUp(
+        email: "user@example.com",
+        password: "secure_password123",
+        name: "John Doe"
+    )
+
+    if let user = result.user {
+        print("User created: \(user.email)")
+    }
+} catch {
+    print("Sign up failed: \(error)")
+}
+```
+
+---
+
+## signIn()
+
+Sign in an existing user with email and password.
+
+### Parameters
+
+- `email` (String) - User's email address
+- `password` (String) - User's password
+
+### Example
+
+```swift
+do {
+    let result = try await insforge.auth.signIn(
+        email: "user@example.com",
+        password: "secure_password123"
+    )
+
+    if let user = result.user {
+        print("Welcome back, \(user.profile?.name ?? user.email)")
+    }
+} catch {
+    print("Sign in failed: \(error)")
+}
+```
+
+---
+
+## signInWithOAuth()
+
+Start OAuth authentication flow.
+
+### Parameters
+
+- `provider` (OAuthProvider) - OAuth provider (.google, .github, .apple, etc.)
+- `presentingViewController` (UIViewController) - View controller to present the OAuth flow
+
+### Example
+
+```swift
+// iOS with ASWebAuthenticationSession
+do {
+    let result = try await insforge.auth.signInWithOAuth(
+        provider: .google,
+        presentingViewController: self
+    )
+
+    if let user = result.user {
+        print("OAuth sign in successful: \(user.email)")
+    }
+} catch {
+    print("OAuth failed: \(error)")
+}
+```
+
+### Sign in with Apple
+
+```swift
+import AuthenticationServices
+
+// Use Apple's native Sign in with Apple
+let result = try await insforge.auth.signInWithApple(
+    presentingViewController: self
+)
+```
+
+---
+
+## signOut()
+
+Sign out the current user.
+
+### Example
+
+```swift
+do {
+    try await insforge.auth.signOut()
+    print("User signed out")
+} catch {
+    print("Sign out failed: \(error)")
+}
+```
+
+---
+
+## getCurrentUser()
+
+Get authenticated user with profile data.
+
+### Example
+
+```swift
+do {
+    if let user = try await insforge.auth.getCurrentUser() {
+        print("Email: \(user.email)")
+        print("Name: \(user.profile?.name ?? "N/A")")
+    } else {
+        print("No user signed in")
+    }
+} catch {
+    print("Error: \(error)")
+}
+```
+
+---
+
+## getCurrentSession()
+
+Get current session from local storage.
+
+### Example
+
+```swift
+if let session = insforge.auth.getCurrentSession() {
+    print("Access token: \(session.accessToken)")
+    print("User: \(session.user.email)")
+}
+```
+
+---
+
+## setProfile()
+
+Update current user's profile.
+
+### Example
+
+```swift
+do {
+    let result = try await insforge.auth.setProfile([
+        "name": "JohnDev",
+        "bio": "iOS Developer",
+        "avatar_url": "https://example.com/avatar.jpg"
+    ])
+    print("Profile updated")
+} catch {
+    print("Update failed: \(error)")
+}
+```
+
+---
+
+## Auth State Observer
+
+Listen for authentication state changes:
+
+```swift
+// Combine publisher
+insforge.auth.authStatePublisher
+    .sink { user in
+        if let user = user {
+            print("User signed in: \(user.email)")
+        } else {
+            print("User signed out")
+        }
+    }
+    .store(in: &cancellables)
+
+// Async stream
+for await user in insforge.auth.authStateStream {
+    if let user = user {
+        print("User signed in: \(user.email)")
+    } else {
+        print("User signed out")
+    }
+}
+```
+
+---
+
+## SwiftUI Integration
+
+```swift
+import SwiftUI
+import InsForge
+
+struct ContentView: View {
+    @StateObject private var authState = InsForgeAuthState()
+
+    var body: some View {
+        Group {
+            if authState.isLoading {
+                ProgressView()
+            } else if let user = authState.user {
+                DashboardView(user: user)
+            } else {
+                LoginView()
+            }
+        }
+        .environmentObject(authState)
+    }
+}
+
+struct LoginView: View {
+    @EnvironmentObject var authState: InsForgeAuthState
+    @State private var email = ""
+    @State private var password = ""
+
+    var body: some View {
+        VStack(spacing: 20) {
+            TextField("Email", text: $email)
+                .textFieldStyle(.roundedBorder)
+                .autocapitalization(.none)
+
+            SecureField("Password", text: $password)
+                .textFieldStyle(.roundedBorder)
+
+            Button("Sign In") {
+                Task {
+                    try await authState.signIn(email: email, password: password)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+
+            // OAuth buttons
+            SignInWithAppleButton { request in
+                request.requestedScopes = [.email, .fullName]
+            } onCompletion: { result in
+                Task {
+                    try await authState.signInWithApple(result: result)
+                }
+            }
+        }
+        .padding()
+    }
+}
+```
+
+---
+
+## Error Handling
+
+```swift
+do {
+    let result = try await insforge.auth.signIn(
+        email: email,
+        password: password
+    )
+} catch let error as InsForgeAuthError {
+    switch error {
+    case .invalidCredentials:
+        print("Invalid email or password")
+    case .userNotFound:
+        print("User not found")
+    case .emailNotVerified:
+        print("Please verify your email")
+    case .networkError(let underlying):
+        print("Network error: \(underlying)")
+    default:
+        print("Auth error: \(error.localizedDescription)")
+    }
+}
+```

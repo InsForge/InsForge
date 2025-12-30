@@ -1,0 +1,385 @@
+---
+title: Authentication SDK Reference
+description: User authentication and profile management with the InsForge Flutter SDK
+---
+
+<Info>
+  **Coming Soon** - The Flutter SDK is currently in development. This documentation serves as a preview of the planned API.
+</Info>
+
+## Installation
+
+```dart
+import 'package:insforge/insforge.dart';
+
+final insforge = InsForgeClient(
+  baseUrl: 'https://your-app.us-east.insforge.app',
+  anonKey: 'your-anon-key',
+);
+```
+
+## signUp()
+
+Create a new user account with email and password.
+
+### Example
+
+```dart
+try {
+  final result = await insforge.auth.signUp(
+    email: 'user@example.com',
+    password: 'secure_password123',
+    data: {'name': 'John Doe'},
+  );
+
+  if (result.user != null) {
+    print('User created: ${result.user!.email}');
+  }
+} on InsForgeAuthException catch (e) {
+  print('Sign up failed: ${e.message}');
+}
+```
+
+---
+
+## signIn()
+
+Sign in an existing user with email and password.
+
+### Example
+
+```dart
+try {
+  final result = await insforge.auth.signInWithPassword(
+    email: 'user@example.com',
+    password: 'secure_password123',
+  );
+
+  if (result.user != null) {
+    print('Welcome back, ${result.user!.profile?['name'] ?? result.user!.email}');
+  }
+} on InsForgeAuthException catch (e) {
+  print('Sign in failed: ${e.message}');
+}
+```
+
+---
+
+## signInWithOAuth()
+
+Start OAuth authentication flow.
+
+### Example
+
+```dart
+// Google Sign In
+final result = await insforge.auth.signInWithOAuth(
+  provider: OAuthProvider.google,
+  redirectTo: 'your-app://auth-callback',
+);
+
+// Apple Sign In (iOS)
+final result = await insforge.auth.signInWithOAuth(
+  provider: OAuthProvider.apple,
+);
+
+// GitHub Sign In
+final result = await insforge.auth.signInWithOAuth(
+  provider: OAuthProvider.github,
+  redirectTo: 'your-app://auth-callback',
+);
+```
+
+---
+
+## signOut()
+
+Sign out the current user.
+
+### Example
+
+```dart
+try {
+  await insforge.auth.signOut();
+  print('User signed out');
+} on InsForgeAuthException catch (e) {
+  print('Sign out failed: ${e.message}');
+}
+```
+
+---
+
+## getCurrentUser()
+
+Get authenticated user with profile data.
+
+### Example
+
+```dart
+final user = await insforge.auth.getCurrentUser();
+if (user != null) {
+  print('Email: ${user.email}');
+  print('Name: ${user.profile?['name'] ?? 'N/A'}');
+} else {
+  print('No user signed in');
+}
+```
+
+---
+
+## getCurrentSession()
+
+Get current session from local storage.
+
+### Example
+
+```dart
+final session = insforge.auth.currentSession;
+if (session != null) {
+  print('Access token: ${session.accessToken}');
+  print('User: ${session.user.email}');
+}
+```
+
+---
+
+## setProfile()
+
+Update current user's profile.
+
+### Example
+
+```dart
+try {
+  final result = await insforge.auth.setProfile({
+    'name': 'JohnDev',
+    'bio': 'Flutter Developer',
+    'avatar_url': 'https://example.com/avatar.jpg',
+  });
+  print('Profile updated');
+} on InsForgeAuthException catch (e) {
+  print('Update failed: ${e.message}');
+}
+```
+
+---
+
+## Auth State Stream
+
+```dart
+// Listen to auth state changes
+insforge.auth.onAuthStateChange.listen((event) {
+  final session = event.session;
+  if (session != null) {
+    print('User signed in: ${session.user.email}');
+  } else {
+    print('User signed out');
+  }
+});
+```
+
+---
+
+## Flutter Widget Integration
+
+### Auth State Widget
+
+```dart
+class AuthGate extends StatelessWidget {
+  final Widget signedIn;
+  final Widget signedOut;
+
+  const AuthGate({
+    required this.signedIn,
+    required this.signedOut,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<AuthState>(
+      stream: insforge.auth.onAuthStateChange,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        }
+
+        final session = snapshot.data?.session;
+        if (session != null) {
+          return signedIn;
+        }
+        return signedOut;
+      },
+    );
+  }
+}
+
+// Usage
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: AuthGate(
+        signedIn: HomePage(),
+        signedOut: LoginPage(),
+      ),
+    );
+  }
+}
+```
+
+### Login Page
+
+```dart
+class LoginPage extends StatefulWidget {
+  @override
+  _LoginPageState createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _isLoading = false;
+  String? _error;
+
+  Future<void> _signIn() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      await insforge.auth.signInWithPassword(
+        email: _emailController.text,
+        password: _passwordController.text,
+      );
+    } on InsForgeAuthException catch (e) {
+      setState(() {
+        _error = e.message;
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Sign In')),
+      body: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextField(
+              controller: _emailController,
+              decoration: InputDecoration(
+                labelText: 'Email',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+            SizedBox(height: 16),
+            TextField(
+              controller: _passwordController,
+              decoration: InputDecoration(
+                labelText: 'Password',
+                border: OutlineInputBorder(),
+              ),
+              obscureText: true,
+            ),
+            if (_error != null) ...[
+              SizedBox(height: 16),
+              Text(_error!, style: TextStyle(color: Colors.red)),
+            ],
+            SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _signIn,
+                child: _isLoading
+                    ? CircularProgressIndicator(color: Colors.white)
+                    : Text('Sign In'),
+              ),
+            ),
+            SizedBox(height: 16),
+            // OAuth buttons
+            OutlinedButton.icon(
+              onPressed: () => insforge.auth.signInWithOAuth(
+                provider: OAuthProvider.google,
+              ),
+              icon: Image.asset('assets/google_logo.png', height: 24),
+              label: Text('Continue with Google'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+### User Profile Widget
+
+```dart
+class UserProfileWidget extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<AuthState>(
+      stream: insforge.auth.onAuthStateChange,
+      builder: (context, snapshot) {
+        final user = snapshot.data?.session?.user;
+
+        if (user == null) {
+          return SizedBox.shrink();
+        }
+
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundImage: user.profile?['avatar_url'] != null
+                ? NetworkImage(user.profile!['avatar_url'])
+                : null,
+            child: user.profile?['avatar_url'] == null
+                ? Icon(Icons.person)
+                : null,
+          ),
+          title: Text(user.profile?['name'] ?? user.email ?? 'User'),
+          subtitle: Text(user.email ?? ''),
+          trailing: IconButton(
+            icon: Icon(Icons.logout),
+            onPressed: () => insforge.auth.signOut(),
+          ),
+        );
+      },
+    );
+  }
+}
+```
+
+---
+
+## Error Handling
+
+```dart
+try {
+  final result = await insforge.auth.signInWithPassword(
+    email: email,
+    password: password,
+  );
+} on InsForgeAuthException catch (e) {
+  switch (e.code) {
+    case 'invalid_credentials':
+      showError('Invalid email or password');
+      break;
+    case 'user_not_found':
+      showError('User not found');
+      break;
+    case 'email_not_verified':
+      showError('Please verify your email');
+      break;
+    default:
+      showError('Auth error: ${e.message}');
+  }
+}
+```

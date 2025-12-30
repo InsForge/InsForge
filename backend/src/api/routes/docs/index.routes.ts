@@ -14,17 +14,46 @@ const router = Router();
 
 // Define available documentation files
 const DOCS_MAP: Record<DocTypeSchema, string> = {
+  // General
   instructions: 'insforge-instructions-sdk.md',
-  'db-sdk': 'core-concepts/database/sdk.mdx',
-  // 'auth-sdk': 'core-concepts/authentication/sdk.mdx',
-  // UI Components - Framework-specific
-  'auth-components-react': 'core-concepts/authentication/ui-components/react.mdx',
-  'auth-components-nextjs': 'core-concepts/authentication/ui-components/nextjs.mdx',
-  // 'auth-components-react-router': 'core-concepts/authentication/ui-components/react-router.mdx',
-  'storage-sdk': 'core-concepts/storage/sdk.mdx',
-  'functions-sdk': 'core-concepts/functions/sdk.mdx',
-  'ai-integration-sdk': 'core-concepts/ai/sdk.mdx',
-  'real-time': 'agent-docs/real-time.md',
+
+  // TypeScript SDK
+  'db-sdk-typescript': 'sdks/typescript/database.mdx',
+  'storage-sdk-typescript': 'sdks/typescript/storage.mdx',
+  'functions-sdk-typescript': 'sdks/typescript/functions.mdx',
+  'ai-sdk-typescript': 'sdks/typescript/ai.mdx',
+  'auth-sdk-typescript': 'sdks/typescript/auth.mdx',
+  'realtime-sdk-typescript': 'sdks/typescript/realtime.mdx',
+  'auth-components-react': 'sdks/typescript/ui-components/react.mdx',
+  'auth-components-nextjs': 'sdks/typescript/ui-components/nextjs.mdx',
+
+  // Swift SDK
+  'db-sdk-swift': 'sdks/swift/database.mdx',
+  'storage-sdk-swift': 'sdks/swift/storage.mdx',
+  'auth-sdk-swift': 'sdks/swift/auth.mdx',
+  'ai-sdk-swift': 'sdks/swift/ai.mdx',
+  'realtime-sdk-swift': 'sdks/swift/realtime.mdx',
+
+  // Kotlin SDK
+  'db-sdk-kotlin': 'sdks/kotlin/database.mdx',
+  'storage-sdk-kotlin': 'sdks/kotlin/storage.mdx',
+  'auth-sdk-kotlin': 'sdks/kotlin/auth.mdx',
+  'ai-sdk-kotlin': 'sdks/kotlin/ai.mdx',
+  'realtime-sdk-kotlin': 'sdks/kotlin/realtime.mdx',
+
+  // Flutter SDK
+  'db-sdk-flutter': 'sdks/flutter/database.mdx',
+  'storage-sdk-flutter': 'sdks/flutter/storage.mdx',
+  'auth-sdk-flutter': 'sdks/flutter/auth.mdx',
+  'ai-sdk-flutter': 'sdks/flutter/ai.mdx',
+  'realtime-sdk-flutter': 'sdks/flutter/realtime.mdx',
+
+  // Legacy aliases (for backward compatibility) - map to TypeScript SDK
+  'db-sdk': 'sdks/typescript/database.mdx',
+  'storage-sdk': 'sdks/typescript/storage.mdx',
+  'functions-sdk': 'sdks/typescript/functions.mdx',
+  'ai-integration-sdk': 'sdks/typescript/ai.mdx',
+  'real-time': 'sdks/typescript/realtime.mdx',
 };
 
 // GET /api/docs/:docType - Get specific documentation

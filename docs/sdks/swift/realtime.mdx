@@ -1,0 +1,362 @@
+---
+title: Realtime SDK Reference
+description: Real-time subscriptions and messaging with the InsForge Swift SDK
+---
+
+<Info>
+  **Coming Soon** - The Swift SDK is currently in development. This documentation serves as a preview of the planned API.
+</Info>
+
+## Installation
+
+```swift
+import InsForge
+
+let insforge = InsForgeClient(
+    baseUrl: "https://your-app.us-east.insforge.app",
+    anonKey: "your-anon-key"
+)
+```
+
+## connect()
+
+Establish a WebSocket connection to the realtime server.
+
+### Example
+
+```swift
+do {
+    try await insforge.realtime.connect()
+    print("Connected: \(insforge.realtime.isConnected)")
+} catch {
+    print("Connection failed: \(error)")
+}
+```
+
+---
+
+## subscribe()
+
+Subscribe to a channel to receive events.
+
+### Parameters
+
+- `channel` (String) - Channel name (e.g., "orders:123", "chat:room-1")
+
+### Example
+
+```swift
+let result = try await insforge.realtime.subscribe("orders:123")
+
+if result.ok {
+    print("Subscribed to: \(result.channel)")
+} else {
+    print("Failed: \(result.error?.message ?? "Unknown error")")
+}
+```
+
+---
+
+## unsubscribe()
+
+Unsubscribe from a channel.
+
+### Example
+
+```swift
+insforge.realtime.unsubscribe("orders:123")
+```
+
+---
+
+## publish()
+
+Publish a message to a channel.
+
+### Parameters
+
+- `channel` (String) - Channel name
+- `event` (String) - Event name
+- `payload` (Codable) - Message payload
+
+### Example
+
+```swift
+struct StatusUpdate: Codable {
+    let status: String
+    let trackingNumber: String
+}
+
+try await insforge.realtime.publish(
+    channel: "orders:123",
+    event: "status_changed",
+    payload: StatusUpdate(
+        status: "shipped",
+        trackingNumber: "ABC123"
+    )
+)
+```
+
+---
+
+## on()
+
+Listen for events.
+
+### Example
+
+```swift
+// Listen for custom events
+insforge.realtime.on("order_updated") { (payload: OrderPayload) in
+    print("Order updated: \(payload)")
+}
+
+// Connection events
+insforge.realtime.onConnect {
+    print("Connected! Socket ID: \(insforge.realtime.socketId ?? "")")
+}
+
+insforge.realtime.onDisconnect { reason in
+    print("Disconnected: \(reason)")
+}
+
+insforge.realtime.onError { error in
+    print("Error: \(error.code) - \(error.message)")
+}
+```
+
+---
+
+## off()
+
+Remove an event listener.
+
+### Example
+
+```swift
+let handler = insforge.realtime.on("order_updated") { (payload: OrderPayload) in
+    print("Order updated: \(payload)")
+}
+
+// Remove listener later
+insforge.realtime.off(handler)
+```
+
+---
+
+## once()
+
+Listen for an event only once.
+
+### Example
+
+```swift
+insforge.realtime.once("order_completed") { (payload: OrderPayload) in
+    print("Order completed: \(payload)")
+    // Listener is automatically removed
+}
+```
+
+---
+
+## disconnect()
+
+Disconnect from the realtime server.
+
+### Example
+
+```swift
+insforge.realtime.disconnect()
+```
+
+---
+
+## Properties
+
+```swift
+// Check connection status
+if insforge.realtime.isConnected {
+    print("Connected")
+}
+
+// Get connection state
+print(insforge.realtime.connectionState) // .connected, .connecting, .disconnected
+
+// Get socket ID
+if let socketId = insforge.realtime.socketId {
+    print("Socket ID: \(socketId)")
+}
+
+// Get subscribed channels
+let channels = insforge.realtime.subscribedChannels
+print(channels) // ["orders:123", "chat:room-1"]
+```
+
+---
+
+## Combine Integration
+
+```swift
+import Combine
+
+var cancellables = Set<AnyCancellable>()
+
+// Subscribe to events as a publisher
+insforge.realtime.publisher(for: "order_updated", type: OrderPayload.self)
+    .receive(on: DispatchQueue.main)
+    .sink { payload in
+        updateUI(with: payload)
+    }
+    .store(in: &cancellables)
+
+// Connection state publisher
+insforge.realtime.connectionStatePublisher
+    .sink { state in
+        switch state {
+        case .connected:
+            print("Connected")
+        case .connecting:
+            print("Connecting...")
+        case .disconnected:
+            print("Disconnected")
+        }
+    }
+    .store(in: &cancellables)
+```
+
+---
+
+## SwiftUI Integration
+
+### Chat Room View
+
+```swift
+import SwiftUI
+
+struct ChatRoomView: View {
+    @StateObject private var viewModel = ChatViewModel()
+    @State private var messageText = ""
+
+    var body: some View {
+        VStack {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 8) {
+                    ForEach(viewModel.messages, id: \.id) { message in
+                        ChatMessageView(message: message)
+                    }
+                }
+                .padding()
+            }
+
+            HStack {
+                TextField("Message", text: $messageText)
+                    .textFieldStyle(.roundedBorder)
+
+                Button("Send") {
+                    viewModel.sendMessage(messageText)
+                    messageText = ""
+                }
+            }
+            .padding()
+        }
+        .task {
+            await viewModel.connect()
+        }
+        .onDisappear {
+            viewModel.disconnect()
+        }
+    }
+}
+
+@MainActor
+class ChatViewModel: ObservableObject {
+    @Published var messages: [ChatMessage] = []
+    @Published var isConnected = false
+
+    private let roomId = "room-1"
+
+    func connect() async {
+        do {
+            try await insforge.realtime.connect()
+
+            let result = try await insforge.realtime.subscribe("chat:\(roomId)")
+            if result.ok {
+                isConnected = true
+
+                // Listen for new messages
+                insforge.realtime.on("new_message") { [weak self] (payload: ChatMessage) in
+                    Task { @MainActor in
+                        self?.messages.append(payload)
+                    }
+                }
+            }
+        } catch {
+            print("Connection error: \(error)")
+        }
+    }
+
+    func sendMessage(_ text: String) {
+        Task {
+            try await insforge.realtime.publish(
+                channel: "chat:\(roomId)",
+                event: "new_message",
+                payload: ChatMessage(
+                    sender: currentUser.name,
+                    text: text,
+                    timestamp: Date()
+                )
+            )
+        }
+    }
+
+    func disconnect() {
+        insforge.realtime.unsubscribe("chat:\(roomId)")
+        insforge.realtime.disconnect()
+    }
+}
+```
+
+### Order Tracking View
+
+```swift
+struct OrderTrackingView: View {
+    let orderId: String
+    @State private var status: String = "pending"
+    @State private var updates: [StatusUpdate] = []
+
+    var body: some View {
+        VStack {
+            Text("Order Status: \(status)")
+                .font(.headline)
+
+            List(updates, id: \.timestamp) { update in
+                VStack(alignment: .leading) {
+                    Text(update.status)
+                        .font(.subheadline)
+                    Text(update.timestamp, style: .time)
+                        .font(.caption)
+                }
+            }
+        }
+        .task {
+            await subscribeToUpdates()
+        }
+    }
+
+    func subscribeToUpdates() async {
+        do {
+            try await insforge.realtime.connect()
+            try await insforge.realtime.subscribe("order:\(orderId)")
+
+            insforge.realtime.on("status_changed") { (payload: StatusUpdate) in
+                Task { @MainActor in
+                    status = payload.status
+                    updates.append(payload)
+                }
+            }
+        } catch {
+            print("Error: \(error)")
+        }
+    }
+}
+```

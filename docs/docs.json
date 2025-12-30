@@ -40,59 +40,43 @@
                 "group": "Database",
                 "pages": [
                   "core-concepts/database/architecture",
-                  "core-concepts/database/sdk",
                   "core-concepts/database/pgvector"
                 ]
               },
               {
                 "group": "Authentication",
                 "pages": [
-                  "core-concepts/authentication/architecture",
-                  "core-concepts/authentication/sdk",
-                  {
-                    "group": "UI Components",
-                    "pages": [
-                      "core-concepts/authentication/ui-components/react",
-                      "core-concepts/authentication/ui-components/nextjs",
-                      "core-concepts/authentication/ui-components/react-router",
-                      "core-concepts/authentication/ui-components/customization"
-                    ]
-                  }
+                  "core-concepts/authentication/architecture"
                 ]
               },
               {
                 "group": "Storage",
                 "pages": [
-                  "core-concepts/storage/architecture",
-                  "core-concepts/storage/sdk"
+                  "core-concepts/storage/architecture"
                 ]
               },
               {
                 "group": "AI Integration",
                 "pages": [
-                  "core-concepts/ai/architecture",
-                  "core-concepts/ai/sdk"
+                  "core-concepts/ai/architecture"
                 ]
               },
               {
                 "group": "Functions",
                 "pages": [
-                  "core-concepts/functions/architecture",
-                  "core-concepts/functions/sdk"
+                  "core-concepts/functions/architecture"
                 ]
               },
               {
                 "group": "Realtime",
                 "pages": [
-                  "core-concepts/realtime/architecture",
-                  "core-concepts/realtime/sdk"
+                  "core-concepts/realtime/architecture"
                 ]
               },
               {
                 "group": "Email (Private Preview)",
                 "pages": [
-                  "core-concepts/email/architecture",
-                  "core-concepts/email/sdk"
+                  "core-concepts/email/architecture"
                 ]
               }
             ]
@@ -100,6 +84,68 @@
           {
             "group": "Changelog",
             "pages": ["changelog"]
+          }
+        ]
+      },
+      {
+        "tab": "SDKs",
+        "groups": [
+          {
+            "group": "TypeScript",
+            "icon": "js",
+            "pages": [
+              "sdks/typescript/overview",
+              "sdks/typescript/database",
+              "sdks/typescript/auth",
+              "sdks/typescript/storage",
+              "sdks/typescript/functions",
+              "sdks/typescript/ai",
+              "sdks/typescript/realtime",
+              {
+                "group": "UI Components",
+                "pages": [
+                  "sdks/typescript/ui-components/react",
+                  "sdks/typescript/ui-components/nextjs",
+                  "sdks/typescript/ui-components/customization"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Swift",
+            "icon": "swift",
+            "pages": [
+              "sdks/swift/overview",
+              "sdks/swift/database",
+              "sdks/swift/auth",
+              "sdks/swift/storage",
+              "sdks/swift/ai",
+              "sdks/swift/realtime"
+            ]
+          },
+          {
+            "group": "Kotlin",
+            "icon": "android",
+            "pages": [
+              "sdks/kotlin/overview",
+              "sdks/kotlin/database",
+              "sdks/kotlin/auth",
+              "sdks/kotlin/storage",
+              "sdks/kotlin/ai",
+              "sdks/kotlin/realtime"
+            ]
+          },
+          {
+            "group": "Flutter",
+            "icon": "mobile",
+            "pages": [
+              "sdks/flutter/overview",
+              "sdks/flutter/database",
+              "sdks/flutter/auth",
+              "sdks/flutter/storage",
+              "sdks/flutter/ai",
+              "sdks/flutter/realtime"
+            ]
           }
         ]
       },
