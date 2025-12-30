@@ -4,16 +4,14 @@ import { BrowserRouter } from 'react-router-dom';
 import { InsforgeProvider } from '@insforge/react';
 import './index.css';
 import App from './App';
-import { getBackendUrl } from './lib/utils';
-
-const backendUrl = getBackendUrl();
+import { insforge } from './lib/insforge';
 
 const rootElement = document.getElementById('root');
 if (rootElement) {
   createRoot(rootElement).render(
     <StrictMode>
       <BrowserRouter>
-        <InsforgeProvider baseUrl={backendUrl}>
+        <InsforgeProvider client={insforge}>
           <App />
         </InsforgeProvider>
       </BrowserRouter>
