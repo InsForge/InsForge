@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { LogOut, ChevronDown } from 'lucide-react';
 import {
   Avatar,
@@ -17,9 +17,10 @@ import {
   setOnboardingSkipped,
 } from '@/features/onboard';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
-import { cn } from '@/lib/utils/utils';
+import { cn, isIframe } from '@/lib/utils/utils';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { parseCloudEvent } from '@/lib/utils/cloudMessaging';
 
 // Import SVG icons
 import DiscordIcon from '@/assets/logos/discord.svg?react';
@@ -62,6 +63,35 @@ export default function AppHeader() {
       setOnboardingSkipped(false);
     }
   }, [hasCompletedOnboarding]);
+
+  // Handle messages from parent window (for cloud iframe integration)
+  const handleParentMessage = useCallback((event: MessageEvent) => {
+    // Only process messages when running in an iframe
+    if (!isIframe()) {
+      return;
+    }
+
+    const result = parseCloudEvent(event.data);
+    if (!result.ok) {
+      return;
+    }
+
+    const cloudEvent = result.data;
+
+    switch (cloudEvent.type) {
+      case 'SHOW_ONBOARDING_OVERLAY':
+        setIsOnboardingModalOpen(true);
+        break;
+    }
+  }, []);
+
+  // Listen for messages from parent window
+  useEffect(() => {
+    window.addEventListener('message', handleParentMessage);
+    return () => {
+      window.removeEventListener('message', handleParentMessage);
+    };
+  }, [handleParentMessage]);
 
   const formatStars = (count: number): string => {
     if (count >= 1000) {
