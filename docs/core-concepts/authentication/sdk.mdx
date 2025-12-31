@@ -33,7 +33,7 @@ Create a new user account with email and password.
 ```
 
 <Note>
-  When `requireEmailVerification` is true, `accessToken` will be null until the user verifies their email.
+  When `requireEmailVerification` is true, `accessToken` will be null until the user verifies their email. InsForge sends a verification email with either a link or a 6-digit code, based on your dashboard configuration (`verifyEmailMethod`). For code verification, implement a page that prompts the user to enter the code (see [verifyEmail()](#verifyemail)). For link verification, redirect users to the sign-in page—the insforge backend handles verification automatically when the link is clicked.
 </Note>
 
 ### Example
@@ -46,10 +46,11 @@ const { data, error } = await insforge.auth.signUp({
 });
 
 if (data?.requireEmailVerification) {
-  // Redirect to email verification page
+  // For code verification: redirect to page where user enters the 6-digit code
+  // For link verification: redirect to sign-in page to await email link click
   console.log('Please verify your email');
 } else if (data?.accessToken) {
-  // User is signed in
+  // User is signed in (email verification disabled)
   console.log('Welcome!', data.user.email);
 }
 ```
@@ -240,65 +241,9 @@ const { error } = await insforge.auth.signOut();
 
 ---
 
-## getCurrentUser()
-
-Get authenticated user with profile data from users table. Returns auth info and profile as separate objects.
-
-### Parameters
-
-None
-
-### Returns
-
-```typescript
-{
-  data: {
-    user: { id: string, email: string, role: string },
-    profile: { id, name, avatar_url, createdAt, updatedAt, ...customFields } | null
-  } | null,
-  error: Error | null
-}
-```
-
-### Example
-
-```javascript
-const { data, error } = await insforge.auth.getCurrentUser();
-
-if (data) {
-  console.log(data.user.email); // Auth info
-  console.log(data.user.role); // 'authenticated' or 'project_admin'
-  console.log(data.profile?.name); // Profile from users table
-}
-```
-
-### Output
-
-```json
-{
-  "data": {
-    "user": {
-      "id": "usr_abc123",
-      "email": "user@example.com",
-      "role": "authenticated"
-    },
-    "profile": {
-      "id": "usr_abc123",
-      "name": "John Doe",
-      "avatar_url": "https://example.com/avatar.jpg",
-      "createdAt": "2024-01-15T10:00:00Z",
-      "updatedAt": "2024-01-15T10:00:00Z"
-    }
-  },
-  "error": null
-}
-```
-
----
-
 ## getCurrentSession()
 
-Get current session from local storage (no API call). This is a synchronous method.
+Get the current session. If no active session exists, attempts to refresh using the httpOnly cookie. Call this on app initialization to restore user sessions automatically.
 
 ### Parameters
 
@@ -322,7 +267,7 @@ None
 ### Example
 
 ```javascript
-const { data, error } = insforge.auth.getCurrentSession();
+const { data, error } = await insforge.auth.getCurrentSession();
 
 if (data.session) {
   console.log('Token:', data.session.accessToken);
@@ -489,8 +434,6 @@ Update current user's profile in users table. Supports any dynamic fields and re
 
 - `name` (predefined, string) - User's display name
 - `avatar_url` (predefined, string) - Profile picture URL
-- `bio` (custom, string) - User biography
-- `birthday` (custom, string) - Birth date (YYYY-MM-DD format)
 
 ### Returns
 

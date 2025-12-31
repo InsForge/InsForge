@@ -1,12 +1,10 @@
 import { z } from 'zod';
 import { storageBucketSchema } from './storage.schema';
-import { oAuthConfigSchema } from './auth.schema';
 import { realtimeChannelSchema } from './realtime.schema';
 import { realtimePermissionsResponseSchema } from './realtime-api.schema';
+import { getPublicAuthConfigResponseSchema } from './auth-api.schema';
 
-export const authMetadataSchema = z.object({
-  oauths: z.array(oAuthConfigSchema),
-});
+export const authMetadataSchema = getPublicAuthConfigResponseSchema;
 
 export const databaseMetadataSchema = z.object({
   tables: z.array(

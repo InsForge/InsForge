@@ -845,10 +845,15 @@ export class AuthService {
   }
 
   async getMetadata(): Promise<AuthMetadataSchema> {
+    const authConfigService = AuthConfigService.getInstance();
     const oAuthConfigService = OAuthConfigService.getInstance();
-    const oAuthConfigs = await oAuthConfigService.getAllConfigs();
+    const [oAuthProviders, authConfigs] = await Promise.all([
+      oAuthConfigService.getConfiguredProviders(),
+      authConfigService.getPublicAuthConfig(),
+    ]);
     return {
-      oauths: oAuthConfigs,
+      oAuthProviders,
+      ...authConfigs,
     };
   }
 
