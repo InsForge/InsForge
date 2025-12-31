@@ -1,0 +1,229 @@
+---
+title: Expo
+description: Authentication setup for Expo apps (Web and Native)
+---
+
+The `@insforge/expo` package provides authentication for Expo applications with **platform-aware features**:
+
+- **Expo Web**: Full UI components (same as `@insforge/react`)
+- **Expo Native (iOS/Android)**: Hooks only—build custom UI with React Native components
+
+<Warning>
+  Pre-built UI components like `<SignIn />` only work on **Expo Web**.
+  On native platforms, use hooks (`useInsforge`, `useSSO`) to build custom UI.
+</Warning>
+
+## Quick Start (Expo Web)
+
+### Step 1: Install Package
+
+```bash
+npm install @insforge/expo@latest @insforge/sdk@latest
+npx expo install expo-auth-session expo-web-browser expo-linking
+```
+
+### Step 2: Set Environment Variables
+
+```bash .env
+EXPO_PUBLIC_INSFORGE_BASE_URL=https://your-app.region.insforge.app
+EXPO_PUBLIC_INSFORGE_ANON_KEY=your-anon-key-here
+```
+
+### Step 3: Setup Provider
+
+```tsx app/_layout.tsx
+import { Slot } from 'expo-router';
+import { InsforgeProvider } from '@insforge/expo';
+import { insforge } from '../lib/insforge';
+
+export default function RootLayout() {
+  return (
+    <InsforgeProvider client={insforge} afterSignInUrl="/dashboard">
+      <Slot />
+    </InsforgeProvider>
+  );
+}
+```
+
+### Step 4: Use Hooks & Components
+
+```tsx app/index.tsx
+import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton, useUser } from '@insforge/expo';
+
+export default function Home() {
+  const { user } = useUser();
+
+  return (
+    <View>
+      <SignedOut>
+        <SignInButton />
+        <SignUpButton />
+      </SignedOut>
+
+      <SignedIn>
+        <UserButton />
+        <Text>Welcome, {user?.email}!</Text>
+      </SignedIn>
+    </View>
+  );
+}
+```
+
+**That's it!** Your Expo Web app now has production-ready authentication.
+
+---
+
+## Native (iOS/Android)
+
+For native platforms, install additional packages for secure storage:
+
+```bash
+npx expo install expo-secure-store
+```
+
+Then build your own UI using hooks:
+
+```tsx app/sign-in.tsx
+import { View, TextInput, Button, Text } from 'react-native';
+import { useInsforge, SignedOut } from '@insforge/expo';
+import { useState } from 'react';
+
+export default function SignInScreen() {
+  const { signIn } = useInsforge();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSignIn = async () => {
+    const result = await signIn(email, password);
+    if (result.error) setError(result.error);
+  };
+
+  return (
+    <SignedOut>
+      <View>
+        <TextInput placeholder="Email" value={email} onChangeText={setEmail} />
+        <TextInput placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry />
+        {error && <Text>{error}</Text>}
+        <Button title="Sign In" onPress={handleSignIn} />
+      </View>
+    </SignedOut>
+  );
+}
+```
+
+### OAuth on Native
+
+Use `useSSO` hook for social login:
+
+```tsx
+import { useSSO } from '@insforge/expo';
+
+function SocialLogin() {
+  const { startSSOFlow, isLoading } = useSSO();
+
+  const handleGoogle = () => startSSOFlow({ strategy: 'oauth_google' });
+  const handleGitHub = () => startSSOFlow({ strategy: 'oauth_github' });
+
+  return (
+    <View>
+      <Button title="Google" onPress={handleGoogle} disabled={isLoading} />
+      <Button title="GitHub" onPress={handleGitHub} disabled={isLoading} />
+    </View>
+  );
+}
+```
+
+<Info>
+  Configure deep links in `app.json` with `"scheme": "your-app-scheme"` for OAuth callbacks.
+</Info>
+
+---
+
+## Hooks
+
+### `useAuth()`
+
+```tsx
+import { useAuth } from '@insforge/expo';
+
+const { isSignedIn, isLoaded } = useAuth();
+```
+
+### `useUser()`
+
+```tsx
+import { useUser } from '@insforge/expo';
+
+const { user, isLoaded } = useUser();
+// user.email, user.profile.name, user.profile.avatar_url
+```
+
+### `useInsforge()`
+
+```tsx
+import { useInsforge } from '@insforge/expo';
+
+const { signIn, signUp, signOut, isSignedIn, user } = useInsforge();
+
+await signIn(email, password);
+await signUp(email, password);
+await signOut();
+```
+
+### `useSSO()`
+
+```tsx
+import { useSSO } from '@insforge/expo';
+
+const { startSSOFlow, isLoading, error } = useSSO();
+
+await startSSOFlow({ strategy: 'oauth_google' });
+// Supported: oauth_google, oauth_github, oauth_apple, oauth_discord, oauth_microsoft, oauth_facebook, oauth_x
+```
+
+---
+
+## Control Components
+
+These work on **all platforms**:
+
+```tsx
+import { SignedIn, SignedOut, Protect } from '@insforge/expo';
+
+<SignedOut>
+  <Text>Please sign in</Text>
+</SignedOut>
+
+<SignedIn>
+  <Text>Welcome back!</Text>
+</SignedIn>
+
+<Protect fallback={<Text>Access denied</Text>}>
+  <ProtectedContent />
+</Protect>
+```
+
+---
+
+## Platform Comparison
+
+| Feature | Web | Native |
+|---------|-----|--------|
+| `<SignIn />`, `<SignUp />`, `<UserButton />` | ✅ | ❌ |
+| `<SignedIn />`, `<SignedOut />`, `<Protect />` | ✅ | ✅ |
+| `useAuth()`, `useUser()`, `useInsforge()` | ✅ | ✅ |
+| `useSSO()` | ✅ | ✅ |
+| Token Storage | Memory | SecureStore |
+
+---
+
+## Platform Utilities
+
+```tsx
+import { isWeb, isNative, isIOS, isAndroid } from '@insforge/expo';
+
+if (isNative()) {
+  // Build custom UI
+}
+```
