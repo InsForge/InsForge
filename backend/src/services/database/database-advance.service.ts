@@ -69,6 +69,7 @@ export class DatabaseAdvanceService {
    * Blocks:
    * - DROP DATABASE, CREATE DATABASE, ALTER DATABASE
    * - pg_catalog and information_schema access
+   * - Any operations (SELECT, INSERT, UPDATE, DELETE, TRUNCATE, DROP, ALTER) on auth schema
    *
    * Note: System tables are now in separate schemas (system.*, auth.*, etc.)
    * so underscore prefix checks and public.users checks are no longer needed.
@@ -87,6 +88,17 @@ export class DatabaseAdvanceService {
       if (pattern.test(query)) {
         throw new AppError('Query contains restricted operations', 403, ERROR_CODES.FORBIDDEN);
       }
+    }
+
+    // Block any operations on auth schema
+    // Check for references to auth schema (handles both "auth" and "auth")
+    const authSchemaPattern = /(?:"auth"|auth)\./i;
+    if (authSchemaPattern.test(query)) {
+      throw new AppError(
+        'Operations on the auth schema are not allowed. The auth schema is protected and can only be modified through dedicated authentication APIs.',
+        403,
+        ERROR_CODES.FORBIDDEN
+      );
     }
 
     return query;
