@@ -86,7 +86,7 @@ export class DatabaseAdvanceService {
       }
     }
 
-    // Block any operations on auth schema (handles quoted/unquoted identifiers and whitespace)
+    // Block any operations on auth schema (handles double-quoted/unquoted identifiers and whitespace)
     const authSchemaPattern = /(?:"auth"|auth)\s*\./i;
     if (authSchemaPattern.test(query)) {
       throw new AppError(
