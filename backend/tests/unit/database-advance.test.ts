@@ -63,6 +63,19 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
       expect(() => service.sanitizeQuery(query)).toThrow(AppError);
     });
 
+    test('blocks auth schema with whitespace before dot', () => {
+      const queries = [
+        'DELETE FROM auth . users WHERE id = $1', 
+        'DELETE FROM auth  .users WHERE id = $1', 
+        'DELETE FROM auth\t.users WHERE id = $1',
+        'UPDATE auth .users SET email = $1', 
+      ];
+
+      queries.forEach((query) => {
+        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+      });
+    });
+
     test('blocks other auth schema tables', () => {
       const queries = [
         'DELETE FROM auth.user_providers WHERE id = $1',
