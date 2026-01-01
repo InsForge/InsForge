@@ -38,9 +38,9 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
       expect(() => service.sanitizeQuery(query)).toThrow(AppError);
     });
 
-    test('blocks SELECT FROM auth.users', () => {
+    test('allows SELECT FROM auth.users (read-only)', () => {
       const query = 'SELECT * FROM auth.users LIMIT 1';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+      expect(() => service.sanitizeQuery(query)).not.toThrow();
     });
 
     test('blocks ALTER TABLE auth.users', () => {
@@ -76,16 +76,27 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
       });
     });
 
-    test('blocks other auth schema tables', () => {
+    test('blocks modifying operations on other auth schema tables', () => {
       const queries = [
         'DELETE FROM auth.user_providers WHERE id = $1',
         'UPDATE auth.configs SET value = $1',
         'INSERT INTO auth.oauth_configs (provider) VALUES ($1)',
-        'SELECT * FROM auth.email_otps',
       ];
 
       queries.forEach((query) => {
         expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+      });
+    });
+
+    test('allows SELECT on other auth schema tables', () => {
+      const queries = [
+        'SELECT * FROM auth.email_otps',
+        'SELECT * FROM auth.user_providers',
+        'SELECT * FROM auth.configs',
+      ];
+
+      queries.forEach((query) => {
+        expect(() => service.sanitizeQuery(query)).not.toThrow();
       });
     });
 
@@ -109,6 +120,30 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
     test('allows SELECT from public schema', () => {
       const query = 'SELECT 1 as test';
       expect(() => service.sanitizeQuery(query)).not.toThrow();
+    });
+
+    test('allows auth.uid() function calls', () => {
+      const queries = [
+        'SELECT auth.uid()',
+        'SELECT * FROM users WHERE id = auth.uid()',
+        'CREATE POLICY test ON users FOR SELECT USING (id = auth.uid())',
+      ];
+
+      queries.forEach((query) => {
+        expect(() => service.sanitizeQuery(query)).not.toThrow();
+      });
+    });
+
+    test('allows auth.role() and auth.email() function calls', () => {
+      const queries = [
+        'SELECT auth.role()',
+        'SELECT auth.email()',
+        'SELECT * FROM users WHERE email = auth.email()',
+      ];
+
+      queries.forEach((query) => {
+        expect(() => service.sanitizeQuery(query)).not.toThrow();
+      });
     });
 
     test('allows DELETE from public schema tables', () => {

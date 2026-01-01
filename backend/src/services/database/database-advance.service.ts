@@ -64,7 +64,7 @@ export class DatabaseAdvanceService {
   }
 
   /**
-   * Sanitize query with strict or relaxed mode
+   * Sanitize query with strict or relaxed mode. Blocks database-level operations, pg_catalog access, and modifying operations on auth schema. Allows SELECT queries and function calls on auth schema.
    *
    * Blocks:
    * - DROP DATABASE, CREATE DATABASE, ALTER DATABASE
@@ -86,11 +86,11 @@ export class DatabaseAdvanceService {
       }
     }
 
-    // Block any operations on auth schema (handles double-quoted/unquoted identifiers and whitespace)
-    const authSchemaPattern = /(?:"auth"|auth)\s*\./i;
-    if (authSchemaPattern.test(query)) {
+    // Block modifying operations on auth schema, allow SELECT and function calls
+    const modifyingKeywords = /(?:INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER)\s+.*?(?:"auth"|auth)\s*\./i;
+    if (modifyingKeywords.test(query)) {
       throw new AppError(
-        'Operations on the auth schema are not allowed. The auth schema is protected and can only be modified through dedicated authentication APIs.',
+        'Modifying operations on the auth schema are not allowed. The auth schema is protected and can only be modified through dedicated authentication APIs.',
         403,
         ERROR_CODES.FORBIDDEN
       );
