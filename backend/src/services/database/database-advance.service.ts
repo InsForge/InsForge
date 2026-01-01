@@ -67,9 +67,9 @@ export class DatabaseAdvanceService {
    * Sanitize query with strict or relaxed mode. Blocks database-level operations, pg_catalog access, and modifying operations on auth schema. Allows SELECT queries and function calls on auth schema.
    *
    * Blocks:
-   * - DROP DATABASE, CREATE DATABASE, ALTER DATABASE
-   * - pg_catalog and information_schema access
-   * - Any operations on auth schema
+   * DROP DATABASE, CREATE DATABASE, ALTER DATABASE
+   * pg_catalog and information_schema access
+   * Any operations on auth schema
    */
   sanitizeQuery(query: string, _mode: 'strict' | 'relaxed' = 'strict'): string {
     // Block database-level operations
