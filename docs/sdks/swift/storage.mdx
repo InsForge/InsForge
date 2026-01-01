@@ -20,7 +20,7 @@ let insforge = InsForgeClient(
 
 ## from()
 
-Get a bucket instance for file operations.
+Get a file API reference for a bucket.
 
 ### Example
 
@@ -30,67 +30,96 @@ let bucket = insforge.storage.from("images")
 
 ---
 
+## Bucket Operations
+
+### createBucket()
+
+Creates a new storage bucket.
+
+```swift
+// Create a public bucket
+try await insforge.storage.createBucket("avatars")
+
+// Create a private bucket
+try await insforge.storage.createBucket(
+    "documents",
+    options: BucketOptions(isPublic: false)
+)
+```
+
+### listBuckets()
+
+List all bucket names.
+
+```swift
+let buckets = try await insforge.storage.listBuckets()
+// ["avatars", "documents", "uploads"]
+```
+
+### updateBucket()
+
+Update a bucket's visibility.
+
+```swift
+try await insforge.storage.updateBucket(
+    "documents",
+    options: BucketOptions(isPublic: true)
+)
+```
+
+### deleteBucket()
+
+Delete a bucket.
+
+```swift
+try await insforge.storage.deleteBucket("old-bucket")
+```
+
+---
+
 ## upload()
 
-Upload a file with a specific path/key.
+Upload a file to the bucket.
 
 ### Parameters
 
 - `path` (String) - The object key/path for the file
 - `data` (Data) - File data to upload
-- `contentType` (String, optional) - MIME type of the file
+- `options` (FileOptions, optional) - Upload options including contentType
 
-### Example
+### Examples
 
 ```swift
-// Upload from Data
+// Upload with specific path
 let imageData = UIImage(named: "photo")?.jpegData(compressionQuality: 0.8)
-let result = try await insforge.storage
+let file = try await insforge.storage
     .from("images")
     .upload(
         path: "posts/post-123/cover.jpg",
         data: imageData!,
-        contentType: "image/jpeg"
+        options: FileOptions(contentType: "image/jpeg")
     )
 
-print("Uploaded: \(result.url)")
+print("Uploaded: \(file.url)")
+print("Key: \(file.key)")
 
 // Upload from file URL
-let fileUrl = URL(fileURLWithPath: "/path/to/file.pdf")
-let result = try await insforge.storage
+let fileURL = URL(fileURLWithPath: "/path/to/document.pdf")
+let file = try await insforge.storage
     .from("documents")
     .upload(
         path: "reports/annual-2024.pdf",
-        fileUrl: fileUrl
+        fileURL: fileURL
     )
-```
 
----
-
-## uploadAuto()
-
-Upload a file with auto-generated unique key.
-
-### Example
-
-```swift
-let imageData = selectedImage.jpegData(compressionQuality: 0.8)!
-let result = try await insforge.storage
+// Upload with auto-generated key
+let file = try await insforge.storage
     .from("uploads")
-    .uploadAuto(
-        data: imageData,
-        contentType: "image/jpeg",
-        fileExtension: "jpg"
+    .upload(
+        data: imageData!,
+        fileName: "profile.jpg",
+        options: FileOptions(contentType: "image/jpeg")
     )
-
-// Save to database
-try await insforge.database
-    .from("posts")
-    .insert([
-        "image_url": result.url,
-        "image_key": result.key,
-        "user_id": userId
-    ])
 ```
 
 ---
@@ -115,46 +144,165 @@ if let image = UIImage(data: data) {
 
 ---
 
-## remove()
+## list()
+
+List files in a bucket.
+
+### Parameters
+
+- `options` (ListOptions, optional) - Options including prefix, limit, offset
+
+### Examples
+
+```swift
+// List all files
+let files = try await insforge.storage
+    .from("images")
+    .list()
+
+// List with prefix filter
+let userFiles = try await insforge.storage
+    .from("images")
+    .list(options: ListOptions(prefix: "users/", limit: 50))
+
+// Shorthand with prefix
+let files = try await insforge.storage
+    .from("images")
+    .list(prefix: "posts/", limit: 20, offset: 0)
+
+// Iterate results
+for file in files {
+    print("Key: \(file.key), Size: \(file.size)")
+}
+```
+
+---
+
+## delete()
 
 Delete a file from storage.
 
 ### Example
 
 ```swift
-// Get the file key from database
-let post = try await insforge.database
-    .from("posts")
-    .select("image_key")
-    .eq("id", "post-123")
-    .single()
-
-// Delete from storage
+// Delete a file
 try await insforge.storage
     .from("images")
-    .remove(path: post.imageKey)
+    .delete(path: "posts/post-123/cover.jpg")
 
-// Clear database reference
-try await insforge.database
+// Delete with database cleanup
+let posts: [Post] = try await insforge.database
     .from("posts")
-    .update(["image_url": NSNull(), "image_key": NSNull()])
-    .eq("id", "post-123")
+    .select("id, image_key")
+    .eq("id", value: "post-123")
+    .execute()
+
+if let post = posts.first, let imageKey = post.imageKey {
+    // Delete from storage
+    try await insforge.storage
+        .from("images")
+        .delete(path: imageKey)
+
+    // Clear database reference
+    struct PostUpdate: Codable {
+        let imageUrl: String?
+        let imageKey: String?
+    }
+
+    let _: [Post] = try await insforge.database
+        .from("posts")
+        .eq("id", value: "post-123")
+        .update(PostUpdate(imageUrl: nil, imageKey: nil))
+}
 ```
 
 ---
 
-## getPublicUrl()
+## getPublicURL()
 
-Get a public URL for a file.
+Get a public URL for a file in a public bucket.
 
 ### Example
 
 ```swift
 let url = insforge.storage
     .from("images")
-    .getPublicUrl(path: "posts/post-123/cover.jpg")
+    .getPublicURL(path: "posts/post-123/cover.jpg")
 
 print("Public URL: \(url)")
+```
+
+---
+
+## Upload Strategy
+
+Get upload strategy for large files (direct or presigned URL).
+
+### getUploadStrategy()
+
+```swift
+let strategy = try await insforge.storage
+    .from("videos")
+    .getUploadStrategy(
+        filename: "large-video.mp4",
+        contentType: "video/mp4",
+        size: 104857600  // 100MB
+    )
+
+if strategy.method == "presigned" {
+    // Upload directly to S3 using presigned URL
+    print("Upload URL: \(strategy.uploadUrl)")
+    print("Key: \(strategy.key)")
+
+    // After uploading to presigned URL, confirm the upload
+    if strategy.confirmRequired {
+        let file = try await insforge.storage
+            .from("videos")
+            .confirmUpload(
+                path: strategy.key,
+                size: 104857600,
+                contentType: "video/mp4"
+            )
+    }
+}
+```
+
+### confirmUpload()
+
+Confirm a presigned upload after uploading directly to S3.
+
+```swift
+let file = try await insforge.storage
+    .from("videos")
+    .confirmUpload(
+        path: "videos/large-video.mp4",
+        size: 104857600,
+        contentType: "video/mp4",
+        etag: "\"abc123\""  // Optional S3 ETag
+    )
+```
+
+---
+
+## Download Strategy
+
+Get download strategy for private files (direct or presigned URL).
+
+### getDownloadStrategy()
+
+```swift
+let strategy = try await insforge.storage
+    .from("documents")
+    .getDownloadStrategy(
+        path: "private/confidential.pdf",
+        expiresIn: 3600  // URL expires in 1 hour
+    )
+
+if strategy.method == "presigned" {
+    // Use presigned URL to download
+    print("Download URL: \(strategy.url)")
+    print("Expires: \(strategy.expiresAt ?? "N/A")")
+}
 ```
 
 ---
@@ -207,11 +355,15 @@ struct ImageUploadView: View {
         isUploading = true
 
         do {
-            let result = try await insforge.storage
+            let file = try await insforge.storage
                 .from("photos")
-                .uploadAuto(data: data, contentType: "image/jpeg")
+                .upload(
+                    data: data,
+                    fileName: "photo.jpg",
+                    options: FileOptions(contentType: "image/jpeg")
+                )
 
-            uploadedUrl = result.url
+            uploadedUrl = file.url
         } catch {
             print("Upload failed: \(error)")
         }
@@ -259,21 +411,63 @@ struct InsForgeImage: View {
 
 ---
 
-## Upload Progress
+## Options Reference
 
-Track upload progress for large files:
+### FileOptions
+
+Options for file upload operations.
 
 ```swift
-let result = try await insforge.storage
-    .from("videos")
-    .upload(
-        path: "videos/clip.mp4",
-        fileUrl: videoUrl,
-        progressHandler: { progress in
-            print("Upload progress: \(Int(progress * 100))%")
-            DispatchQueue.main.async {
-                self.uploadProgress = progress
-            }
-        }
-    )
+public struct FileOptions {
+    /// The Content-Type header value (auto-inferred if not specified)
+    var contentType: String?
+
+    /// Optional extra headers for the request
+    var headers: [String: String]?
+}
+```
+
+### BucketOptions
+
+Options for bucket creation/update.
+
+```swift
+public struct BucketOptions {
+    /// Whether the bucket is publicly accessible (default: true)
+    var isPublic: Bool
+}
+```
+
+### ListOptions
+
+Options for listing files.
+
+```swift
+public struct ListOptions {
+    /// Filter objects by key prefix
+    var prefix: String?
+
+    /// Maximum number of results (1-1000, default: 100)
+    var limit: Int
+
+    /// Offset for pagination (default: 0)
+    var offset: Int
+}
+```
+
+---
+
+## StoredFile Model
+
+The response model for storage operations.
+
+```swift
+public struct StoredFile {
+    let bucket: String      // Bucket name
+    let key: String         // Object key/path
+    let size: Int           // File size in bytes
+    let mimeType: String?   // MIME type
+    let uploadedAt: Date    // Upload timestamp
+    let url: String         // Public or signed URL
+}
 ```

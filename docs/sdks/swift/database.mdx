@@ -26,6 +26,22 @@ let insforge = InsForgeClient(
 )
 ```
 
+## Define Models
+
+Define your data models using Swift's `Codable` protocol:
+
+```swift
+struct Post: Codable {
+    let id: String?
+    let title: String
+    let content: String
+    let userId: String
+    let createdAt: Date?
+}
+```
+
+---
+
 ## insert()
 
 Insert new records into a table.
@@ -34,39 +50,29 @@ Insert new records into a table.
 
 - `values` - Single Codable object or array of objects to insert
 
-### Returns
-
-```swift
-Result<[T], InsForgeError>
-```
-
 ### Examples
 
 ```swift
-// Define your model
-struct Post: Codable {
-    let id: String?
-    let title: String
-    let content: String
-    let createdAt: Date?
-}
-
 // Single insert
-let post = Post(id: nil, title: "Hello World", content: "My first post!", createdAt: nil)
-let result = try await insforge.database
+let post = Post(
+    id: nil,
+    title: "Hello World",
+    content: "My first post!",
+    userId: currentUserId,
+    createdAt: nil
+)
+let inserted = try await insforge.database
     .from("posts")
     .insert(post)
-    .select()
 
 // Bulk insert
 let posts = [
-    Post(id: nil, title: "First Post", content: "Hello everyone!", createdAt: nil),
-    Post(id: nil, title: "Second Post", content: "Another update.", createdAt: nil)
+    Post(id: nil, title: "First Post", content: "Hello everyone!", userId: currentUserId, createdAt: nil),
+    Post(id: nil, title: "Second Post", content: "Another update.", userId: currentUserId, createdAt: nil)
 ]
-let result = try await insforge.database
+let inserted = try await insforge.database
     .from("posts")
     .insert(posts)
-    .select()
 ```
 
 ---
@@ -78,19 +84,26 @@ Update existing records in a table.
 ### Examples
 
 ```swift
-// Update by ID
-let result = try await insforge.database
-    .from("posts")
-    .update(["title": "Updated Title"])
-    .eq("id", postId)
-    .select()
+// Define update model
+struct PostUpdate: Codable {
+    let title: String
+}
 
-// Update multiple
-let result = try await insforge.database
+// Update by ID
+let updated: [Post] = try await insforge.database
+    .from("posts")
+    .eq("id", value: postId)
+    .update(PostUpdate(title: "Updated Title"))
+
+// Update multiple records
+struct TaskUpdate: Codable {
+    let status: String
+}
+
+let updated: [Task] = try await insforge.database
     .from("tasks")
-    .update(["status": "completed"])
-    .in("id", ["task-1", "task-2"])
-    .select()
+    .in("id", values: ["task-1", "task-2"])
+    .update(TaskUpdate(status: "completed"))
 ```
 
 ---
@@ -105,14 +118,14 @@ Delete records from a table.
 // Delete by ID
 try await insforge.database
     .from("posts")
+    .eq("id", value: postId)
     .delete()
-    .eq("id", postId)
 
 // Delete with filter
 try await insforge.database
     .from("sessions")
+    .lt("expires_at", value: Date())
     .delete()
-    .lt("expires_at", Date())
 ```
 
 ---
@@ -128,16 +141,36 @@ Query records from a table.
 let posts: [Post] = try await insforge.database
     .from("posts")
     .select()
+    .execute()
+
+// Filter and sort
+let recentPosts: [Post] = try await insforge.database
+    .from("posts")
+    .select()
+    .eq("userId", value: currentUserId)
+    .order("createdAt", ascending: false)
+    .limit(20)
+    .execute()
+
+// Multiple filters
+let activePosts: [Post] = try await insforge.database
+    .from("posts")
+    .select()
+    .eq("userId", value: currentUserId)
+    .eq("status", value: "published")
+    .execute()
 
 // Specific columns
 let posts = try await insforge.database
     .from("posts")
     .select("id, title, content")
+    .execute()
 
 // With relationships
 let posts = try await insforge.database
     .from("posts")
     .select("*, comments(id, content)")
+    .execute()
 ```
 
 ---
@@ -146,25 +179,48 @@ let posts = try await insforge.database
 
 | Filter | Description | Example |
 |--------|-------------|---------|
-| `.eq(column, value)` | Equals | `.eq("status", "active")` |
-| `.neq(column, value)` | Not equals | `.neq("status", "banned")` |
-| `.gt(column, value)` | Greater than | `.gt("age", 18)` |
-| `.gte(column, value)` | Greater than or equal | `.gte("price", 100)` |
-| `.lt(column, value)` | Less than | `.lt("stock", 10)` |
-| `.lte(column, value)` | Less than or equal | `.lte("priority", 3)` |
-| `.like(column, pattern)` | Case-sensitive pattern | `.like("name", "%Widget%")` |
-| `.ilike(column, pattern)` | Case-insensitive pattern | `.ilike("email", "%@gmail.com")` |
-| `.in(column, array)` | Value in array | `.in("status", ["pending", "active"])` |
-| `.is(column, value)` | Exactly equals (for nil) | `.is("deleted_at", nil)` |
+| `.eq(column, value:)` | Equals | `.eq("status", value: "active")` |
+| `.neq(column, value:)` | Not equals | `.neq("status", value: "banned")` |
+| `.gt(column, value:)` | Greater than | `.gt("age", value: 18)` |
+| `.gte(column, value:)` | Greater than or equal | `.gte("price", value: 100)` |
+| `.lt(column, value:)` | Less than | `.lt("stock", value: 10)` |
+| `.lte(column, value:)` | Less than or equal | `.lte("priority", value: 3)` |
+| `.like(column, pattern:)` | Case-sensitive pattern | `.like("name", pattern: "%Widget%")` |
+| `.ilike(column, pattern:)` | Case-insensitive pattern | `.ilike("email", pattern: "%@gmail.com")` |
+| `.in(column, values:)` | Value in array | `.in("status", values: ["pending", "active"])` |
+| `.is(column, value:)` | Exactly equals (for nil/bool) | `.is("deleted_at", value: nil)` |
 
 ```swift
 // Chain multiple filters
-let products = try await insforge.database
+let products: [Product] = try await insforge.database
     .from("products")
     .select()
-    .eq("category", "electronics")
-    .gte("price", 50)
-    .lte("price", 500)
+    .eq("category", value: "electronics")
+    .gte("price", value: 50)
+    .lte("price", value: 500)
+    .execute()
+
+// Pattern matching
+let posts: [Post] = try await insforge.database
+    .from("posts")
+    .select()
+    .ilike("title", pattern: "%swift%")
+    .execute()
+
+// Filter by multiple values
+let tasks: [Task] = try await insforge.database
+    .from("tasks")
+    .select()
+    .in("status", values: ["pending", "in_progress"])
+    .execute()
+
+// Check for null or boolean
+let activePosts: [Post] = try await insforge.database
+    .from("posts")
+    .select()
+    .is("deleted_at", value: nil)
+    .is("published", value: true)
+    .execute()
 ```
 
 ---
@@ -173,19 +229,27 @@ let products = try await insforge.database
 
 | Modifier | Description | Example |
 |----------|-------------|---------|
-| `.order(column, ascending:)` | Sort results | `.order("created_at", ascending: false)` |
+| `.order(column, ascending:)` | Sort results | `.order("createdAt", ascending: false)` |
 | `.limit(count)` | Limit rows | `.limit(10)` |
-| `.range(from, to)` | Pagination | `.range(0, 9)` |
-| `.single()` | Return single object | `.single()` |
+| `.offset(count)` | Skip rows | `.offset(20)` |
+| `.range(from:, to:)` | Range pagination | `.range(from: 0, to: 9)` |
 
 ```swift
 // Pagination with sorting
-let posts = try await insforge.database
+let posts: [Post] = try await insforge.database
     .from("posts")
     .select()
-    .order("created_at", ascending: false)
-    .range(0, 9)
+    .order("createdAt", ascending: false)
     .limit(10)
+    .offset(20)
+    .execute()
+
+// Range pagination (get items 10-19)
+let posts: [Post] = try await insforge.database
+    .from("posts")
+    .select()
+    .range(from: 10, to: 19)
+    .execute()
 ```
 
 ---
@@ -219,7 +283,8 @@ struct PostListView: View {
             posts = try await insforge.database
                 .from("posts")
                 .select()
-                .order("created_at", ascending: false)
+                .order("createdAt", ascending: false)
+                .execute()
             isLoading = false
         } catch {
             print("Error loading posts: \(error)")

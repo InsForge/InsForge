@@ -27,7 +27,7 @@ Establish a WebSocket connection to the realtime server.
 ```swift
 do {
     try await insforge.realtime.connect()
-    print("Connected: \(insforge.realtime.isConnected)")
+    print("Connected to realtime server")
 } catch {
     print("Connection failed: \(error)")
 }
@@ -37,21 +37,27 @@ do {
 
 ## subscribe()
 
-Subscribe to a channel to receive events.
+Subscribe to a channel to receive messages.
 
 ### Parameters
 
-- `channel` (String) - Channel name (e.g., "orders:123", "chat:room-1")
+- `to` (String) - Channel name (e.g., "orders:123", "chat:room-1")
+- `onMessage` (Closure) - Callback for receiving messages
 
 ### Example
 
 ```swift
-let result = try await insforge.realtime.subscribe("orders:123")
+await insforge.realtime.subscribe(to: "chat:lobby") { message in
+    print("Event: \(message.eventName ?? "")")
+    print("Channel: \(message.channelName ?? "")")
 
-if result.ok {
-    print("Subscribed to: \(result.channel)")
-} else {
-    print("Failed: \(result.error?.message ?? "Unknown error")")
+    if let payload = message.payload {
+        print("Data: \(payload)")
+    }
+
+    if let senderId = message.senderId {
+        print("From: \(senderId)")
+    }
 }
 ```
 
@@ -64,7 +70,7 @@ Unsubscribe from a channel.
 ### Example
 
 ```swift
-insforge.realtime.unsubscribe("orders:123")
+await insforge.realtime.unsubscribe(from: "chat:lobby")
 ```
 
 ---
@@ -75,86 +81,22 @@ Publish a message to a channel.
 
 ### Parameters
 
-- `channel` (String) - Channel name
+- `to` (String) - Channel name
 - `event` (String) - Event name
-- `payload` (Codable) - Message payload
+- `payload` ([String: Any]) - Message payload as dictionary
 
 ### Example
 
 ```swift
-struct StatusUpdate: Codable {
-    let status: String
-    let trackingNumber: String
-}
-
 try await insforge.realtime.publish(
-    channel: "orders:123",
-    event: "status_changed",
-    payload: StatusUpdate(
-        status: "shipped",
-        trackingNumber: "ABC123"
-    )
+    to: "chat:lobby",
+    event: "message.new",
+    payload: [
+        "text": "Hello everyone!",
+        "author": currentUser.name,
+        "timestamp": Date().timeIntervalSince1970
+    ]
 )
-```
-
----
-
-## on()
-
-Listen for events.
-
-### Example
-
-```swift
-// Listen for custom events
-insforge.realtime.on("order_updated") { (payload: OrderPayload) in
-    print("Order updated: \(payload)")
-}
-
-// Connection events
-insforge.realtime.onConnect {
-    print("Connected! Socket ID: \(insforge.realtime.socketId ?? "")")
-}
-
-insforge.realtime.onDisconnect { reason in
-    print("Disconnected: \(reason)")
-}
-
-insforge.realtime.onError { error in
-    print("Error: \(error.code) - \(error.message)")
-}
-```
-
----
-
-## off()
-
-Remove an event listener.
-
-### Example
-
-```swift
-let handler = insforge.realtime.on("order_updated") { (payload: OrderPayload) in
-    print("Order updated: \(payload)")
-}
-
-// Remove listener later
-insforge.realtime.off(handler)
-```
-
----
-
-## once()
-
-Listen for an event only once.
-
-### Example
-
-```swift
-insforge.realtime.once("order_completed") { (payload: OrderPayload) in
-    print("Order completed: \(payload)")
-    // Listener is automatically removed
-}
 ```
 
 ---
@@ -166,62 +108,256 @@ Disconnect from the realtime server.
 ### Example
 
 ```swift
-insforge.realtime.disconnect()
+await insforge.realtime.disconnect()
 ```
 
 ---
 
-## Properties
+## Channel API
+
+The high-level Channel API provides a more structured way to work with realtime features including broadcast messages and Postgres changes.
+
+### channel()
+
+Get or create a channel instance.
 
 ```swift
-// Check connection status
-if insforge.realtime.isConnected {
-    print("Connected")
-}
+let channel = await insforge.realtime.channel("chat:lobby")
+```
 
-// Get connection state
-print(insforge.realtime.connectionState) // .connected, .connecting, .disconnected
+### removeChannel()
 
-// Get socket ID
-if let socketId = insforge.realtime.socketId {
-    print("Socket ID: \(socketId)")
-}
+Remove a channel.
 
-// Get subscribed channels
-let channels = insforge.realtime.subscribedChannels
-print(channels) // ["orders:123", "chat:room-1"]
+```swift
+await insforge.realtime.removeChannel("chat:lobby")
 ```
 
 ---
 
-## Combine Integration
+## RealtimeChannel
+
+### subscribe()
+
+Subscribe to the channel. Must be called before receiving messages.
 
 ```swift
-import Combine
+let channel = await insforge.realtime.channel("chat:lobby")
+try await channel.subscribe()
+```
 
-var cancellables = Set<AnyCancellable>()
+### unsubscribe()
 
-// Subscribe to events as a publisher
-insforge.realtime.publisher(for: "order_updated", type: OrderPayload.self)
-    .receive(on: DispatchQueue.main)
-    .sink { payload in
-        updateUI(with: payload)
+Unsubscribe from the channel.
+
+```swift
+await channel.unsubscribe()
+```
+
+---
+
+## Broadcast Messages
+
+### Listening for Broadcasts
+
+Use `broadcast(event:)` to receive broadcast messages as an AsyncStream.
+
+```swift
+let channel = await insforge.realtime.channel("chat:lobby")
+try await channel.subscribe()
+
+// Listen for specific event
+for await message in await channel.broadcast(event: "new_message") {
+    print("Event: \(message.event)")
+    print("Payload: \(message.payload)")
+
+    // Decode to typed struct
+    if let chatMessage = try? message.decode(ChatMessage.self) {
+        print("Message: \(chatMessage.text)")
     }
-    .store(in: &cancellables)
+}
 
-// Connection state publisher
-insforge.realtime.connectionStatePublisher
-    .sink { state in
-        switch state {
-        case .connected:
-            print("Connected")
-        case .connecting:
-            print("Connecting...")
-        case .disconnected:
-            print("Disconnected")
-        }
+// Listen for all events (wildcard)
+for await message in await channel.broadcast(event: "*") {
+    print("Received: \(message.event)")
+}
+```
+
+### Sending Broadcasts
+
+Send broadcast messages with typed or dictionary payloads.
+
+```swift
+// With Encodable struct
+struct ChatMessage: Codable {
+    let text: String
+    let author: String
+}
+
+try await channel.broadcast(
+    event: "new_message",
+    message: ChatMessage(text: "Hello!", author: "John")
+)
+
+// With dictionary
+try await channel.broadcast(
+    event: "typing",
+    message: ["userId": userId, "isTyping": true]
+)
+```
+
+---
+
+## Postgres Changes
+
+Listen for real-time database changes using typed actions.
+
+### Action Types
+
+- `InsertAction<T>` - New record inserted
+- `UpdateAction<T>` - Record updated (includes `record` and `oldRecord`)
+- `DeleteAction<T>` - Record deleted (includes `oldRecord`)
+- `SelectAction<T>` - Record selected
+- `AnyAction<T>` - Any of the above
+
+### Listening for Changes
+
+```swift
+struct Todo: Codable, Sendable {
+    let id: String
+    let title: String
+    let completed: Bool
+}
+
+let channel = await insforge.realtime.channel("db-changes")
+try await channel.subscribe()
+
+// Listen for inserts only
+for await action in await channel.postgresChange(
+    InsertAction<Todo>.self,
+    schema: "public",
+    table: "todos"
+) {
+    print("New todo: \(action.record.title)")
+}
+
+// Listen for updates
+for await action in await channel.postgresChange(
+    UpdateAction<Todo>.self,
+    schema: "public",
+    table: "todos"
+) {
+    print("Updated: \(action.oldRecord.title) -> \(action.record.title)")
+}
+
+// Listen for deletes
+for await action in await channel.postgresChange(
+    DeleteAction<Todo>.self,
+    schema: "public",
+    table: "todos"
+) {
+    print("Deleted: \(action.oldRecord.title)")
+}
+
+// Listen for any change
+for await action in await channel.postgresChange(
+    AnyAction<Todo>.self,
+    schema: "public",
+    table: "todos"
+) {
+    switch action {
+    case .insert(let insert):
+        print("Inserted: \(insert.record.title)")
+    case .update(let update):
+        print("Updated: \(update.record.title)")
+    case .delete(let delete):
+        print("Deleted: \(delete.oldRecord.title)")
+    case .select(let select):
+        print("Selected: \(select.record.title)")
     }
-    .store(in: &cancellables)
+}
+```
+
+---
+
+## Models Reference
+
+### RealtimeMessage
+
+```swift
+public struct RealtimeMessage: Codable, Sendable {
+    let id: String?
+    let eventName: String?
+    let channelName: String?
+    let payload: [String: AnyCodable]?
+    let senderType: String?
+    let senderId: String?
+    let createdAt: Date?
+}
+```
+
+### BroadcastMessage
+
+```swift
+public struct BroadcastMessage: Sendable {
+    let event: String
+    let payload: [String: AnyCodable]
+    let senderId: String?
+
+    // Decode payload to typed struct
+    func decode<T: Decodable>(_ type: T.Type) throws -> T
+}
+```
+
+### InsertAction
+
+```swift
+public struct InsertAction<Record: Codable & Sendable>: Codable, Sendable {
+    let type: String           // "INSERT"
+    let schema: String
+    let table: String
+    let record: Record
+    let commitTimestamp: String?
+}
+```
+
+### UpdateAction
+
+```swift
+public struct UpdateAction<Record: Codable & Sendable>: Codable, Sendable {
+    let type: String           // "UPDATE"
+    let schema: String
+    let table: String
+    let record: Record         // New values
+    let oldRecord: Record      // Previous values
+    let commitTimestamp: String?
+}
+```
+
+### DeleteAction
+
+```swift
+public struct DeleteAction<Record: Codable & Sendable>: Codable, Sendable {
+    let type: String           // "DELETE"
+    let schema: String
+    let table: String
+    let oldRecord: Record      // Deleted record
+    let commitTimestamp: String?
+}
+```
+
+### Channel
+
+```swift
+public struct Channel: Codable, Sendable {
+    let id: String
+    let pattern: String
+    let description: String?
+    let webhookUrls: [String]?
+    let enabled: Bool
+    let createdAt: Date
+    let updatedAt: Date
+}
 ```
 
 ---
@@ -253,8 +389,10 @@ struct ChatRoomView: View {
                     .textFieldStyle(.roundedBorder)
 
                 Button("Send") {
-                    viewModel.sendMessage(messageText)
-                    messageText = ""
+                    Task {
+                        await viewModel.sendMessage(messageText)
+                        messageText = ""
+                    }
                 }
             }
             .padding()
@@ -263,7 +401,9 @@ struct ChatRoomView: View {
             await viewModel.connect()
         }
         .onDisappear {
-            viewModel.disconnect()
+            Task {
+                await viewModel.disconnect()
+            }
         }
     }
 }
@@ -271,22 +411,31 @@ struct ChatRoomView: View {
 @MainActor
 class ChatViewModel: ObservableObject {
     @Published var messages: [ChatMessage] = []
-    @Published var isConnected = false
 
     private let roomId = "room-1"
+    private var channel: RealtimeChannel?
+    private var messageTask: Task<Void, Never>?
+
+    struct ChatMessage: Codable, Identifiable {
+        let id: String
+        let sender: String
+        let text: String
+        let timestamp: Date
+    }
 
     func connect() async {
         do {
             try await insforge.realtime.connect()
 
-            let result = try await insforge.realtime.subscribe("chat:\(roomId)")
-            if result.ok {
-                isConnected = true
+            channel = await insforge.realtime.channel("chat:\(roomId)")
+            try await channel?.subscribe()
 
-                // Listen for new messages
-                insforge.realtime.on("new_message") { [weak self] (payload: ChatMessage) in
-                    Task { @MainActor in
-                        self?.messages.append(payload)
+            // Start listening for messages
+            messageTask = Task {
+                guard let channel = channel else { return }
+                for await message in await channel.broadcast(event: "new_message") {
+                    if let chatMessage = try? message.decode(ChatMessage.self) {
+                        messages.append(chatMessage)
                     }
                 }
             }
@@ -295,23 +444,27 @@ class ChatViewModel: ObservableObject {
         }
     }
 
-    func sendMessage(_ text: String) {
-        Task {
-            try await insforge.realtime.publish(
-                channel: "chat:\(roomId)",
-                event: "new_message",
-                payload: ChatMessage(
-                    sender: currentUser.name,
-                    text: text,
-                    timestamp: Date()
-                )
-            )
+    func sendMessage(_ text: String) async {
+        guard let channel = channel else { return }
+
+        let message = ChatMessage(
+            id: UUID().uuidString,
+            sender: currentUser.name,
+            text: text,
+            timestamp: Date()
+        )
+
+        do {
+            try await channel.broadcast(event: "new_message", message: message)
+        } catch {
+            print("Send error: \(error)")
         }
     }
 
-    func disconnect() {
-        insforge.realtime.unsubscribe("chat:\(roomId)")
-        insforge.realtime.disconnect()
+    func disconnect() async {
+        messageTask?.cancel()
+        await channel?.unsubscribe()
+        await insforge.realtime.disconnect()
     }
 }
 ```
@@ -324,12 +477,18 @@ struct OrderTrackingView: View {
     @State private var status: String = "pending"
     @State private var updates: [StatusUpdate] = []
 
+    struct StatusUpdate: Codable, Identifiable {
+        let id: String
+        let status: String
+        let timestamp: Date
+    }
+
     var body: some View {
         VStack {
             Text("Order Status: \(status)")
                 .font(.headline)
 
-            List(updates, id: \.timestamp) { update in
+            List(updates) { update in
                 VStack(alignment: .leading) {
                     Text(update.status)
                         .font(.subheadline)
@@ -346,16 +505,99 @@ struct OrderTrackingView: View {
     func subscribeToUpdates() async {
         do {
             try await insforge.realtime.connect()
-            try await insforge.realtime.subscribe("order:\(orderId)")
 
-            insforge.realtime.on("status_changed") { (payload: StatusUpdate) in
-                Task { @MainActor in
-                    status = payload.status
-                    updates.append(payload)
+            await insforge.realtime.subscribe(to: "order:\(orderId)") { message in
+                if message.eventName == "status_changed",
+                   let payload = message.payload,
+                   let newStatus = payload["status"]?.value as? String {
+                    Task { @MainActor in
+                        status = newStatus
+                        updates.append(StatusUpdate(
+                            id: UUID().uuidString,
+                            status: newStatus,
+                            timestamp: Date()
+                        ))
+                    }
                 }
             }
         } catch {
             print("Error: \(error)")
+        }
+    }
+}
+```
+
+### Database Sync View
+
+```swift
+struct TodoListView: View {
+    @State private var todos: [Todo] = []
+    private var changeTask: Task<Void, Never>?
+
+    struct Todo: Codable, Sendable, Identifiable {
+        let id: String
+        let title: String
+        let completed: Bool
+    }
+
+    var body: some View {
+        List(todos) { todo in
+            HStack {
+                Text(todo.title)
+                Spacer()
+                if todo.completed {
+                    Image(systemName: "checkmark.circle.fill")
+                }
+            }
+        }
+        .task {
+            await loadTodos()
+            await subscribeToChanges()
+        }
+    }
+
+    func loadTodos() async {
+        do {
+            todos = try await insforge.database
+                .from("todos")
+                .select()
+                .order("createdAt", ascending: false)
+                .execute()
+        } catch {
+            print("Load error: \(error)")
+        }
+    }
+
+    func subscribeToChanges() async {
+        do {
+            try await insforge.realtime.connect()
+
+            let channel = await insforge.realtime.channel("todos-sync")
+            try await channel.subscribe()
+
+            // Listen for any changes to todos table
+            for await action in await channel.postgresChange(
+                AnyAction<Todo>.self,
+                schema: "public",
+                table: "todos"
+            ) {
+                await MainActor.run {
+                    switch action {
+                    case .insert(let insert):
+                        todos.insert(insert.record, at: 0)
+                    case .update(let update):
+                        if let index = todos.firstIndex(where: { $0.id == update.record.id }) {
+                            todos[index] = update.record
+                        }
+                    case .delete(let delete):
+                        todos.removeAll { $0.id == delete.oldRecord.id }
+                    case .select:
+                        break
+                    }
+                }
+            }
+        } catch {
+            print("Subscription error: \(error)")
         }
     }
 }

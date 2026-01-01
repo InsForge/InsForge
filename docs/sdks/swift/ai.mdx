@@ -18,110 +18,199 @@ let insforge = InsForgeClient(
 )
 ```
 
-## chat.completions.create()
+## chatCompletion()
 
-Create AI chat completions.
+Generate AI chat completions.
 
 ### Parameters
 
 - `model` (String) - AI model (e.g., "anthropic/claude-3.5-haiku", "openai/gpt-4")
 - `messages` ([ChatMessage]) - Array of chat messages
+- `stream` (Bool, optional) - Enable streaming mode (default: false)
 - `temperature` (Double, optional) - Sampling temperature 0-2
 - `maxTokens` (Int, optional) - Max tokens to generate
-- `stream` (Bool, optional) - Enable streaming mode
+- `topP` (Double, optional) - Top-p sampling parameter
+- `systemPrompt` (String, optional) - System prompt for the conversation
 
-### Example (non-streaming)
+### Returns
 
 ```swift
-let completion = try await insforge.ai.chat.completions.create(
+ChatCompletionResponse
+```
+
+### Example
+
+```swift
+let response = try await insforge.ai.chatCompletion(
     model: "anthropic/claude-3.5-haiku",
     messages: [
         ChatMessage(role: .user, content: "What is the capital of France?")
     ]
 )
 
-print(completion.choices[0].message.content)
-```
+print(response.text)
+// "The capital of France is Paris."
 
-### Example (with image)
-
-```swift
-let imageData = selectedImage.jpegData(compressionQuality: 0.8)!
-let base64Image = imageData.base64EncodedString()
-
-let completion = try await insforge.ai.chat.completions.create(
-    model: "anthropic/claude-3.5-haiku",
-    messages: [
-        ChatMessage(
-            role: .user,
-            content: [
-                .text("What do you see in this image?"),
-                .imageUrl("data:image/jpeg;base64,\(base64Image)")
-            ]
-        )
-    ]
-)
-
-print(completion.choices[0].message.content)
-```
-
-### Example (streaming)
-
-```swift
-let stream = try await insforge.ai.chat.completions.createStream(
-    model: "openai/gpt-4",
-    messages: [
-        ChatMessage(role: .user, content: "Tell me a story")
-    ]
-)
-
-for try await chunk in stream {
-    if let content = chunk.choices[0].delta.content {
-        print(content, terminator: "")
+// Access metadata
+if let metadata = response.metadata {
+    print("Model: \(metadata.model)")
+    if let usage = metadata.usage {
+        print("Tokens used: \(usage.totalTokens)")
     }
 }
 ```
 
+### Example with System Prompt
+
+```swift
+let response = try await insforge.ai.chatCompletion(
+    model: "anthropic/claude-3.5-haiku",
+    messages: [
+        ChatMessage(role: .user, content: "Write a haiku about coding")
+    ],
+    temperature: 0.7,
+    maxTokens: 100,
+    systemPrompt: "You are a creative poet who writes in haiku format."
+)
+
+print(response.text)
+```
+
+### Example with Conversation History
+
+```swift
+let response = try await insforge.ai.chatCompletion(
+    model: "openai/gpt-4",
+    messages: [
+        ChatMessage(role: .system, content: "You are a helpful assistant."),
+        ChatMessage(role: .user, content: "What is 2 + 2?"),
+        ChatMessage(role: .assistant, content: "2 + 2 equals 4."),
+        ChatMessage(role: .user, content: "What about 3 + 3?")
+    ]
+)
+
+print(response.text)
+```
+
 ---
 
-## images.generate()
+## generateImage()
 
 Generate images using AI models.
 
 ### Parameters
 
-- `model` (String) - Image model
-- `prompt` (String) - Text description of image
-- `size` (String, optional) - Image size ("1024x1024", "512x512")
-- `numImages` (Int, optional) - Number of images to generate
+- `model` (String) - Image generation model
+- `prompt` (String) - Text description of the image to generate
+
+### Returns
+
+```swift
+ImageGenerationResponse
+```
 
 ### Example
 
 ```swift
-let response = try await insforge.ai.images.generate(
+let response = try await insforge.ai.generateImage(
     model: "google/gemini-2.5-flash-image-preview",
-    prompt: "A serene mountain landscape at sunset",
-    size: "1024x1024"
+    prompt: "A serene mountain landscape at sunset"
 )
 
-// Convert base64 to UIImage
-if let base64 = response.data[0].b64Json,
-   let imageData = Data(base64Encoded: base64),
-   let image = UIImage(data: imageData) {
-    imageView.image = image
+// Access generated images
+for image in response.images {
+    print("Image URL: \(image.imageUrl)")
+    print("Type: \(image.type)")
+}
+
+// Get image count
+print("Generated \(response.imageCount) images")
+
+// Access metadata
+if let metadata = response.metadata {
+    print("Model: \(metadata.model)")
+    if let revisedPrompt = metadata.revisedPrompt {
+        print("Revised prompt: \(revisedPrompt)")
+    }
+}
+```
+
+### Example with Storage Upload
+
+```swift
+let response = try await insforge.ai.generateImage(
+    model: "google/gemini-2.5-flash-image-preview",
+    prompt: "A futuristic city skyline"
+)
+
+// Download and upload to storage
+if let firstImage = response.images.first {
+    // Fetch image data from URL
+    let imageURL = URL(string: firstImage.imageUrl)!
+    let (imageData, _) = try await URLSession.shared.data(from: imageURL)
 
     // Upload to storage
-    let uploadResult = try await insforge.storage
+    let file = try await insforge.storage
         .from("ai-images")
-        .uploadAuto(data: imageData, contentType: "image/png")
+        .upload(
+            data: imageData,
+            fileName: "generated-image.png",
+            options: FileOptions(contentType: "image/png")
+        )
 
     // Save to database
-    try await insforge.database
+    struct GeneratedImage: Codable {
+        let prompt: String
+        let imageUrl: String
+        let model: String?
+    }
+
+    let _: [GeneratedImage] = try await insforge.database
         .from("generated_images")
-        .insert([
-            "prompt": "A serene mountain landscape",
-            "image_url": uploadResult.url
-        ])
+        .insert(GeneratedImage(
+            prompt: "A futuristic city skyline",
+            imageUrl: file.url,
+            model: response.model
+        ))
+}
+```
+
+---
+
+## listModels()
+
+List available AI models.
+
+### Returns
+
+```swift
+ListModelsResponse
+```
+
+### Example
+
+```swift
+let models = try await insforge.ai.listModels()
+
+// List text generation models
+print("Text Models:")
+for provider in models.text {
+    print("  Provider: \(provider.provider) (configured: \(provider.configured))")
+    for model in provider.models {
+        print("    - \(model.id)")
+        print("      Input: \(model.inputModality)")
+        print("      Output: \(model.outputModality)")
+        print("      Price level: \(model.priceLevel)")
+    }
+}
+
+// List image generation models
+print("\nImage Models:")
+for provider in models.image {
+    print("  Provider: \(provider.provider)")
+    for model in provider.models {
+        print("    - \(model.id)")
+    }
 }
 ```
 
@@ -138,13 +227,21 @@ struct ChatView: View {
     @State private var messages: [ChatMessage] = []
     @State private var inputText = ""
     @State private var isLoading = false
+    @State private var responseText = ""
 
     var body: some View {
         VStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
-                    ForEach(messages, id: \.id) { message in
+                    ForEach(Array(messages.enumerated()), id: \.offset) { _, message in
                         ChatBubble(message: message)
+                    }
+
+                    if !responseText.isEmpty {
+                        Text(responseText)
+                            .padding()
+                            .background(Color.gray.opacity(0.2))
+                            .cornerRadius(8)
                     }
                 }
                 .padding()
@@ -171,12 +268,12 @@ struct ChatView: View {
 
         Task {
             do {
-                let completion = try await insforge.ai.chat.completions.create(
+                let response = try await insforge.ai.chatCompletion(
                     model: "anthropic/claude-3.5-haiku",
                     messages: messages
                 )
 
-                let assistantMessage = completion.choices[0].message
+                let assistantMessage = ChatMessage(role: .assistant, content: response.text)
                 messages.append(assistantMessage)
             } catch {
                 print("Error: \(error)")
@@ -185,55 +282,26 @@ struct ChatView: View {
         }
     }
 }
-```
 
-### Streaming Chat
-
-```swift
-struct StreamingChatView: View {
-    @State private var response = ""
-    @State private var isStreaming = false
+struct ChatBubble: View {
+    let message: ChatMessage
 
     var body: some View {
-        VStack {
-            ScrollView {
-                Text(response)
-                    .padding()
+        HStack {
+            if message.role == .assistant {
+                Spacer()
             }
 
-            Button("Ask AI") {
-                Task {
-                    await streamResponse()
-                }
+            Text(message.content)
+                .padding()
+                .background(message.role == .user ? Color.blue : Color.gray.opacity(0.2))
+                .foregroundColor(message.role == .user ? .white : .primary)
+                .cornerRadius(12)
+
+            if message.role == .user {
+                Spacer()
             }
-            .disabled(isStreaming)
         }
-    }
-
-    func streamResponse() async {
-        isStreaming = true
-        response = ""
-
-        do {
-            let stream = try await insforge.ai.chat.completions.createStream(
-                model: "anthropic/claude-3.5-haiku",
-                messages: [
-                    ChatMessage(role: .user, content: "Explain quantum computing")
-                ]
-            )
-
-            for try await chunk in stream {
-                if let content = chunk.choices[0].delta.content {
-                    await MainActor.run {
-                        response += content
-                    }
-                }
-            }
-        } catch {
-            print("Stream error: \(error)")
-        }
-
-        isStreaming = false
     }
 }
 ```
@@ -243,7 +311,7 @@ struct StreamingChatView: View {
 ```swift
 struct ImageGenerationView: View {
     @State private var prompt = ""
-    @State private var generatedImage: UIImage?
+    @State private var generatedImageURL: String?
     @State private var isGenerating = false
 
     var body: some View {
@@ -262,11 +330,16 @@ struct ImageGenerationView: View {
                 ProgressView("Generating...")
             }
 
-            if let image = generatedImage {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxHeight: 300)
+            if let imageURL = generatedImageURL,
+               let url = URL(string: imageURL) {
+                AsyncImage(url: url) { image in
+                    image
+                        .resizable()
+                        .scaledToFit()
+                } placeholder: {
+                    ProgressView()
+                }
+                .frame(maxHeight: 300)
             }
         }
         .padding()
@@ -276,17 +349,14 @@ struct ImageGenerationView: View {
         isGenerating = true
 
         do {
-            let response = try await insforge.ai.images.generate(
+            let response = try await insforge.ai.generateImage(
                 model: "google/gemini-2.5-flash-image-preview",
-                prompt: prompt,
-                size: "1024x1024"
+                prompt: prompt
             )
 
-            if let base64 = response.data[0].b64Json,
-               let data = Data(base64Encoded: base64),
-               let image = UIImage(data: data) {
+            if let firstImage = response.images.first {
                 await MainActor.run {
-                    generatedImage = image
+                    generatedImageURL = firstImage.imageUrl
                 }
             }
         } catch {
@@ -294,6 +364,117 @@ struct ImageGenerationView: View {
         }
 
         isGenerating = false
+    }
+}
+```
+
+---
+
+## Models Reference
+
+### ChatMessage
+
+```swift
+public struct ChatMessage: Codable, Sendable {
+    let role: Role
+    let content: String
+
+    enum Role: String, Codable {
+        case user
+        case assistant
+        case system
+    }
+}
+```
+
+### ChatCompletionResponse
+
+```swift
+public struct ChatCompletionResponse: Codable, Sendable {
+    let text: String              // The generated response text
+    let metadata: Metadata?
+
+    // Computed properties
+    var content: String { text }  // Alias for text
+    var success: Bool             // True if text is not empty
+
+    struct Metadata: Codable {
+        let model: String
+        let usage: TokenUsage?
+    }
+}
+```
+
+### TokenUsage
+
+```swift
+public struct TokenUsage: Codable, Sendable {
+    let promptTokens: Int
+    let completionTokens: Int
+    let totalTokens: Int
+}
+```
+
+### ImageGenerationResponse
+
+```swift
+public struct ImageGenerationResponse: Codable, Sendable {
+    let model: String?
+    let images: [ImageMessage]
+    let text: String?
+    let count: Int?
+    let metadata: Metadata?
+
+    // Computed property
+    var imageCount: Int           // count ?? images.count
+
+    struct Metadata: Codable {
+        let model: String
+        let revisedPrompt: String?
+        let usage: TokenUsage?
+    }
+}
+```
+
+### ImageMessage
+
+```swift
+public struct ImageMessage: Codable, Sendable {
+    let type: String
+    let imageUrl: String
+
+    // Computed property
+    var url: String { imageUrl }  // Alias for imageUrl
+}
+```
+
+### AIModel
+
+```swift
+public struct AIModel: Codable, Sendable {
+    let id: String
+    let modelId: String
+    let provider: String
+    let inputModality: [String]   // e.g., ["text"], ["text", "image"]
+    let outputModality: [String]  // e.g., ["text"], ["image"]
+    let priceLevel: Int
+
+    // Computed properties
+    var name: String { id }
+}
+```
+
+### ListModelsResponse
+
+```swift
+public struct ListModelsResponse: Codable, Sendable {
+    let text: [ModelProvider]     // Text generation models
+    let image: [ModelProvider]    // Image generation models
+
+    struct ModelProvider: Codable {
+        let provider: String
+        let configured: Bool
+        let models: [AIModel]
     }
 }
 ```
