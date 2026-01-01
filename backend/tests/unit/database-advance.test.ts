@@ -24,7 +24,8 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
     });
 
     test('blocks INSERT INTO auth.users', () => {
-      const query = "INSERT INTO auth.users (email, \"emailVerified\") VALUES ('test@example.com', false)";
+      const query =
+        'INSERT INTO auth.users (email, "emailVerified") VALUES (\'test@example.com\', false)';
       expect(() => service.sanitizeQuery(query)).toThrow(AppError);
     });
 
@@ -49,12 +50,12 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
     });
 
     test('blocks case-insensitive AUTH.users', () => {
-      const query = "DELETE FROM AUTH.users WHERE id = $1";
+      const query = 'DELETE FROM AUTH.users WHERE id = $1';
       expect(() => service.sanitizeQuery(query)).toThrow(AppError);
     });
 
     test('blocks mixed case Auth.Users', () => {
-      const query = "DELETE FROM Auth.Users WHERE id = $1";
+      const query = 'DELETE FROM Auth.Users WHERE id = $1';
       expect(() => service.sanitizeQuery(query)).toThrow(AppError);
     });
 
@@ -65,10 +66,10 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
 
     test('blocks auth schema with whitespace before dot', () => {
       const queries = [
-        'DELETE FROM auth . users WHERE id = $1', 
-        'DELETE FROM auth  .users WHERE id = $1', 
+        'DELETE FROM auth . users WHERE id = $1',
+        'DELETE FROM auth  .users WHERE id = $1',
         'DELETE FROM auth\t.users WHERE id = $1',
-        'UPDATE auth .users SET email = $1', 
+        'UPDATE auth .users SET email = $1',
       ];
 
       queries.forEach((query) => {
@@ -147,7 +148,7 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
     });
 
     test('allows DELETE from public schema tables', () => {
-      const query = "DELETE FROM users WHERE id = $1";
+      const query = 'DELETE FROM users WHERE id = $1';
       expect(() => service.sanitizeQuery(query)).not.toThrow();
     });
 
@@ -157,7 +158,7 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
     });
 
     test('allows UPDATE public schema tables', () => {
-      const query = "UPDATE products SET price = 100 WHERE id = $1";
+      const query = 'UPDATE products SET price = 100 WHERE id = $1';
       expect(() => service.sanitizeQuery(query)).not.toThrow();
     });
 

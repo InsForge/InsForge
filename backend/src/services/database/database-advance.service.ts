@@ -87,7 +87,8 @@ export class DatabaseAdvanceService {
     }
 
     // Block modifying operations on auth schema, allow SELECT and function calls
-    const modifyingKeywords = /(?:INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER)\s+.*?(?:"auth"|auth)\s*\./i;
+    const modifyingKeywords =
+      /(?:INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER)\s+.*?(?:"auth"|auth)\s*\./i;
     if (modifyingKeywords.test(query)) {
       throw new AppError(
         'Modifying operations on the auth schema are not allowed. The auth schema is protected and can only be modified through dedicated authentication APIs.',
