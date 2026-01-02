@@ -84,7 +84,7 @@ sequenceDiagram
 Redirect users to this endpoint to initiate the OAuth flow.
 
 ```
-GET https://{your-project}.{region}.insforge.app/api/oauth/v1/authorize
+GET https://api.insforge.dev/api/oauth/v1/authorize
 ```
 
 **Query Parameters:**
@@ -102,7 +102,7 @@ GET https://{your-project}.{region}.insforge.app/api/oauth/v1/authorize
 **Example:**
 
 ```
-https://myapp.us-east.insforge.app/api/oauth/v1/authorize?
+https://api.insforge.dev/api/oauth/v1/authorize?
   client_id=clf_abc123xyz&
   redirect_uri=https://example.com/callback&
   response_type=code&
@@ -117,7 +117,7 @@ https://myapp.us-east.insforge.app/api/oauth/v1/authorize?
 Exchange the authorization code for access and refresh tokens.
 
 ```
-POST https://{your-project}.{region}.insforge.app/api/oauth/v1/token
+POST https://api.insforge.dev/api/oauth/v1/token
 ```
 
 **Request Body (JSON):**
@@ -149,7 +149,7 @@ POST https://{your-project}.{region}.insforge.app/api/oauth/v1/token
 Exchange a refresh token for a new access token.
 
 ```
-POST https://{your-project}.{region}.insforge.app/api/oauth/v1/token
+POST https://api.insforge.dev/api/oauth/v1/token
 ```
 
 **Request Body (JSON):**
@@ -168,7 +168,7 @@ POST https://{your-project}.{region}.insforge.app/api/oauth/v1/token
 Retrieve the authenticated user's profile information.
 
 ```
-GET https://{your-project}.{region}.insforge.app/auth/v1/profile
+GET https://api.insforge.dev/auth/v1/profile
 Authorization: Bearer {access_token}
 ```
 
@@ -281,7 +281,7 @@ app.use(session({ secret: 'your-session-secret', resave: false, saveUninitialize
 const config = {
   clientId: 'clf_your_client_id',
   clientSecret: 'your_client_secret',
-  insforgeUrl: 'https://yourapp.us-east.insforge.app',
+  insforgeUrl: 'https://api.insforge.dev',
   redirectUri: 'http://localhost:3000/auth/callback',
   scopes: 'user:read organizations:read'
 };
@@ -379,7 +379,7 @@ app.get('/api/organizations', async (req, res) => {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
-  const response = await fetch(`${config.insforgeUrl}/api/organizations`, {
+  const response = await fetch(`${config.insforgeUrl}/organizations/v1`, {
     headers: { 'Authorization': `Bearer ${req.session.accessToken}` }
   });
 
