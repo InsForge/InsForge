@@ -119,6 +119,7 @@
               "sdks/swift/database",
               "sdks/swift/auth",
               "sdks/swift/storage",
+              "sdks/swift/functions",
               "sdks/swift/ai",
               "sdks/swift/realtime"
             ]
