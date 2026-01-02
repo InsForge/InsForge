@@ -26,6 +26,7 @@ export const docTypeSchema = z
     // Kotlin SDK
     'db-sdk-kotlin',
     'storage-sdk-kotlin',
+    'functions-sdk-kotlin',
     'auth-sdk-kotlin',
     'ai-sdk-kotlin',
     'realtime-sdk-kotlin',
@@ -33,6 +34,7 @@ export const docTypeSchema = z
     // Flutter SDK
     'db-sdk-flutter',
     'storage-sdk-flutter',
+    'functions-sdk-flutter',
     'auth-sdk-flutter',
     'ai-sdk-flutter',
     'realtime-sdk-flutter',
@@ -69,6 +71,7 @@ export const docTypeSchema = z
     Kotlin (Android):
       "db-sdk-kotlin" - Database operations
       "storage-sdk-kotlin" - File storage
+      "functions-sdk-kotlin" - Edge functions
       "auth-sdk-kotlin" - Authentication
       "ai-sdk-kotlin" - AI features
       "realtime-sdk-kotlin" - Real-time WebSockets
@@ -76,6 +79,7 @@ export const docTypeSchema = z
     Flutter (Cross-platform mobile):
       "db-sdk-flutter" - Database operations
       "storage-sdk-flutter" - File storage
+      "functions-sdk-flutter" - Edge functions
       "auth-sdk-flutter" - Authentication
       "ai-sdk-flutter" - AI features
       "realtime-sdk-flutter" - Real-time WebSockets
