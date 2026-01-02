@@ -18,6 +18,7 @@ export const docTypeSchema = z
     // Swift SDK
     'db-sdk-swift',
     'storage-sdk-swift',
+    'functions-sdk-swift',
     'auth-sdk-swift',
     'ai-sdk-swift',
     'realtime-sdk-swift',
@@ -61,6 +62,7 @@ export const docTypeSchema = z
       "db-sdk-swift" - Database operations
       "storage-sdk-swift" - File storage
       "auth-sdk-swift" - Authentication
+      "functions-sdk-swift" - Edge functions
       "ai-sdk-swift" - AI features
       "realtime-sdk-swift" - Real-time WebSockets
 

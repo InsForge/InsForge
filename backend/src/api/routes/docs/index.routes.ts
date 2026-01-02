@@ -31,6 +31,7 @@ const DOCS_MAP: Record<DocTypeSchema, string> = {
   'db-sdk-swift': 'sdks/swift/database.mdx',
   'storage-sdk-swift': 'sdks/swift/storage.mdx',
   'auth-sdk-swift': 'sdks/swift/auth.mdx',
+  'functions-sdk-swift': 'sdks/swift/functions.mdx',
   'ai-sdk-swift': 'sdks/swift/ai.mdx',
   'realtime-sdk-swift': 'sdks/swift/realtime.mdx',
 
