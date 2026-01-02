@@ -267,22 +267,53 @@ function base64UrlEncode(buffer) {
 
 ### Complete Server-Side Example
 
-Here's a complete Express.js implementation:
+Here's a complete Express.js implementation. First, create a `.env` file with your credentials:
+
+```bash
+# .env - DO NOT commit this file to version control
+SESSION_SECRET=your-secure-random-secret-min-32-chars
+INSFORGE_CLIENT_ID=clf_your_client_id
+INSFORGE_CLIENT_SECRET=your_client_secret
+INSFORGE_URL=https://api.insforge.dev
+REDIRECT_URI=http://localhost:3000/auth/callback
+```
+
+<Note>
+Generate a secure session secret using: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+</Note>
+
+Then implement the OAuth flow:
 
 ```javascript
+require('dotenv').config();
 const express = require('express');
 const crypto = require('crypto');
 const session = require('express-session');
 
 const app = express();
+
+// Validate required environment variables
+const requiredEnvVars = ['SESSION_SECRET', 'INSFORGE_CLIENT_ID', 'INSFORGE_CLIENT_SECRET'];
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    console.error(`Missing required environment variable: ${envVar}`);
+    process.exit(1);
+  }
+}
+
 app.use(express.json());
-app.use(session({ secret: 'your-session-secret', resave: false, saveUninitialized: true }));
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: process.env.NODE_ENV === 'production' }
+}));
 
 const config = {
-  clientId: 'clf_your_client_id',
-  clientSecret: 'your_client_secret',
-  insforgeUrl: 'https://api.insforge.dev',
-  redirectUri: 'http://localhost:3000/auth/callback',
+  clientId: process.env.INSFORGE_CLIENT_ID,
+  clientSecret: process.env.INSFORGE_CLIENT_SECRET,
+  insforgeUrl: process.env.INSFORGE_URL || 'https://api.insforge.dev',
+  redirectUri: process.env.REDIRECT_URI || 'http://localhost:3000/auth/callback',
   scopes: 'user:read organizations:read'
 };
 
