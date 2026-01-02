@@ -94,37 +94,26 @@ export class DatabaseAdvanceService {
       }
     }
 
-    // Block DELETE operations on auth schema
-    const deleteFromAuth = /DELETE\s+.*?\bFROM\s+["']?auth["']?\s*\./i;
-    if (deleteFromAuth.test(query)) {
-      logger.warn('Blocked DELETE operation on auth schema', { query: query.substring(0, 100) });
-      throw new AppError(
-        'DELETE operations on auth schema are not allowed. User deletion must be done through dedicated authentication APIs.',
-        403,
-        ERROR_CODES.FORBIDDEN
-      );
-    }
-
-    // Block TRUNCATE operations on auth schema
-    const truncateAuth = /TRUNCATE\s+(?:TABLE\s+)?(?:IF\s+EXISTS\s+)?["']?auth["']?\s*\./i;
-    if (truncateAuth.test(query)) {
-      logger.warn('Blocked TRUNCATE operation on auth schema', { query: query.substring(0, 100) });
-      throw new AppError(
-        'TRUNCATE operations on auth schema are not allowed. This would delete all users and must be done through dedicated authentication APIs.',
-        403,
-        ERROR_CODES.FORBIDDEN
-      );
-    }
-
-    // Block DROP operations on auth schema
-    const dropAuth = /DROP\s+.*?["']?auth["']?\s*(\.|(?:\s|$|CASCADE))/i;
-    if (dropAuth.test(query)) {
-      logger.warn('Blocked DROP operation on auth schema', { query: query.substring(0, 100) });
-      throw new AppError(
-        'DROP operations on auth schema are not allowed. This would destroy authentication resources and break the system.',
-        403,
-        ERROR_CODES.FORBIDDEN
-      );
+    // Block DELETE, TRUNCATE, and DROP operations on auth schema
+    const authSchemaBlocked = /(?:DELETE\s+.*?\bFROM\s+["']?auth["']?\s*\.|TRUNCATE\s+(?:TABLE\s+)?(?:IF\s+EXISTS\s+)?["']?auth["']?\s*\.|DROP\s+.*?["']?auth["']?\s*(?:\.|(?:\s|$|CASCADE)))/i;
+    if (authSchemaBlocked.test(query)) {
+      // Determine operation type for logging and error message
+      let operation = 'operation';
+      let message = 'This operation on auth schema is not allowed.';
+      
+      if (/DELETE/i.test(query)) {
+        operation = 'DELETE';
+        message = 'DELETE operations on auth schema are not allowed. User deletion must be done through dedicated authentication APIs.';
+      } else if (/TRUNCATE/i.test(query)) {
+        operation = 'TRUNCATE';
+        message = 'TRUNCATE operations on auth schema are not allowed. This would delete all users and must be done through dedicated authentication APIs.';
+      } else if (/DROP/i.test(query)) {
+        operation = 'DROP';
+        message = 'DROP operations on auth schema are not allowed. This would destroy authentication resources and break the system.';
+      }
+      
+      logger.warn(`Blocked ${operation} operation on auth schema`, { query: query.substring(0, 100) });
+      throw new AppError(message, 403, ERROR_CODES.FORBIDDEN);
     }
 
     return query;
