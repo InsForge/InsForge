@@ -114,11 +114,11 @@ export class DatabaseAdvanceService {
       );
     }
 
-    // Block DROP TABLE operations on auth schema (prevents table destruction)
-    const dropTableAuth = /DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?["']?auth["']?\./i;
-    if (dropTableAuth.test(query)) {
+    // Block any DROP operations on auth schema (prevents destruction of tables, indexes, triggers, etc.)
+    const dropAuth = /DROP\s+(?:TABLE|INDEX|TRIGGER|FUNCTION|VIEW|SEQUENCE|SCHEMA|POLICY|TYPE|DOMAIN)\s+(?:IF\s+EXISTS\s+)?["']?auth["']?\./i;
+    if (dropAuth.test(query)) {
       throw new AppError(
-        'DROP TABLE operations on auth schema are not allowed. This would destroy the authentication tables and break the system.',
+        'DROP operations on auth schema are not allowed. This would destroy authentication resources and break the system.',
         403,
         ERROR_CODES.FORBIDDEN
       );
