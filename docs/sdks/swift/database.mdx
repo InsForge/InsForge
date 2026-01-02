@@ -3,28 +3,11 @@ title: Database SDK Reference
 description: Type-safe database operations using the InsForge Swift SDK
 ---
 
-<Info>
-  **Coming Soon** - The Swift SDK is currently in development. This documentation serves as a preview of the planned API.
-</Info>
+import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
 
 ## Installation
 
-Add InsForge to your Swift Package Manager dependencies:
-
-```swift
-dependencies: [
-    .package(url: "https://github.com/insforge/insforge-swift.git", from: "1.0.0")
-]
-```
-
-```swift
-import InsForge
-
-let insforge = InsForgeClient(
-    baseUrl: "https://your-app.us-east.insforge.app",
-    anonKey: "your-anon-key"
-)
-```
+<SwiftSdkInstallation />
 
 ## Define Models
 

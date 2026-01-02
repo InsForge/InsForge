@@ -3,9 +3,7 @@ title: Swift SDK
 description: Official Swift SDK for InsForge - iOS, macOS, tvOS, and watchOS
 ---
 
-<Info>
-  **Coming Soon** - The Swift SDK is currently in development. This documentation serves as a preview of the planned API.
-</Info>
+import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
 
 The InsForge Swift SDK provides a native Swift client for interacting with InsForge services from iOS, macOS, tvOS, and watchOS applications.
 
@@ -13,19 +11,13 @@ The InsForge Swift SDK provides a native Swift client for interacting with InsFo
 
 ### Swift Package Manager
 
-Add the following to your `Package.swift`:
-
-```swift
-dependencies: [
-    .package(url: "https://github.com/insforge/insforge-swift.git", from: "1.0.0")
-]
-```
+<SwiftSdkInstallation />
 
 Or add it via Xcode:
 1. File → Add Packages...
 2. Enter: `https://github.com/insforge/insforge-swift.git`
 
-### CocoaPods
+### CocoaPods(coming soon)
 
 ```ruby
 pod 'InsForge', '~> 1.0'
