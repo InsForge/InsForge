@@ -6,6 +6,10 @@ export {
   setOnboardingSkipped,
 } from './components/OnboardingModal';
 export { VideoDemoModal } from './components/VideoDemoModal';
+export { McpConnectionSection } from './components/McpConnectionSection';
+export { ApiCredentialsSection } from './components/ApiCredentialsSection';
+export { ConnectionStringSection } from './components/ConnectionStringSection';
+export { ShowPasswordButton } from './components/ShowPasswordButton';
 
 // MCP helpers
 export { CursorDeeplinkGenerator } from './components/mcp/CursorDeeplinkGenerator';
