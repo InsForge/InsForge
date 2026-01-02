@@ -107,16 +107,6 @@ export class DatabaseAdvanceService {
   }
 
   async executeRawSQL(query: string, params: unknown[] = []): Promise<RawSQLResponse> {
-    // Defense-in-depth: Block DELETE operations on auth schema even if sanitizeQuery was bypassed
-    const deleteFromAuth = /DELETE\s+.*?\bFROM\s+["']?auth["']?\./i;
-    if (deleteFromAuth.test(query)) {
-      throw new AppError(
-        'DELETE operations on auth schema are not allowed. User deletion must be done through dedicated authentication APIs.',
-        403,
-        ERROR_CODES.FORBIDDEN
-      );
-    }
-
     const pool = this.dbManager.getPool();
     const client = await pool.connect();
 
