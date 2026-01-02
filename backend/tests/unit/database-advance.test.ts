@@ -140,10 +140,7 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
     });
 
     test('blocks TRUNCATE on other auth schema tables', () => {
-      const queries = [
-        'TRUNCATE TABLE auth.user_providers',
-        'TRUNCATE auth.configs',
-      ];
+      const queries = ['TRUNCATE TABLE auth.user_providers', 'TRUNCATE auth.configs'];
 
       queries.forEach((query) => {
         expect(() => service.sanitizeQuery(query)).toThrow(AppError);
@@ -181,7 +178,7 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
 
     test('allows INSERT into auth schema (for test users)', () => {
       const queries = [
-        'INSERT INTO auth.users (email, password) VALUES (\'test@example.com\', \'hashed\')',
+        "INSERT INTO auth.users (email, password) VALUES ('test@example.com', 'hashed')",
         'INSERT INTO auth.user_providers (user_id, provider) VALUES ($1, $2)',
       ];
 
@@ -191,7 +188,8 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
     });
 
     test('allows CREATE TRIGGER on auth schema', () => {
-      const query = 'CREATE TRIGGER user_profile_trigger AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION create_user_profile()';
+      const query =
+        'CREATE TRIGGER user_profile_trigger AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION create_user_profile()';
       expect(() => service.sanitizeQuery(query)).not.toThrow();
     });
 

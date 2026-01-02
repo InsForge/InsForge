@@ -94,7 +94,7 @@ export class DatabaseAdvanceService {
       }
     }
 
-    // Block DELETE operations on auth schema 
+    // Block DELETE operations on auth schema
     const deleteFromAuth = /DELETE\s+.*?\bFROM\s+["']?auth["']?\s*\./i;
     if (deleteFromAuth.test(query)) {
       logger.warn('Blocked DELETE operation on auth schema', { query: query.substring(0, 100) });
@@ -105,7 +105,7 @@ export class DatabaseAdvanceService {
       );
     }
 
-    // Block TRUNCATE operations on auth schema 
+    // Block TRUNCATE operations on auth schema
     const truncateAuth = /TRUNCATE\s+(?:TABLE\s+)?(?:IF\s+EXISTS\s+)?["']?auth["']?\s*\./i;
     if (truncateAuth.test(query)) {
       logger.warn('Blocked TRUNCATE operation on auth schema', { query: query.substring(0, 100) });
@@ -116,7 +116,7 @@ export class DatabaseAdvanceService {
       );
     }
 
-    // Block DROP operations on auth schema 
+    // Block DROP operations on auth schema
     const dropAuth = /DROP\s+.*?["']?auth["']?\s*(\.|(?:\s|$|CASCADE))/i;
     if (dropAuth.test(query)) {
       logger.warn('Blocked DROP operation on auth schema', { query: query.substring(0, 100) });
