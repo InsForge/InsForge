@@ -70,12 +70,14 @@ export class DatabaseAdvanceService {
    * - DROP DATABASE, CREATE DATABASE, ALTER DATABASE
    * - pg_catalog and information_schema access
    * - DELETE operations on auth schema (prevents user deletion via raw SQL)
+   * - TRUNCATE operations on auth schema (prevents mass user deletion)
+   * - DROP TABLE operations on auth schema (prevents table destruction)
    *
    * Allows:
    * - SELECT queries on auth schema (for reading user data)
    * - INSERT operations on auth schema (for test users)
    * - CREATE TRIGGER on auth tables (for automatic profile creation, etc.)
-   * - Other DDL operations on auth schema
+   * - Other DDL operations on auth schema (ALTER TABLE for indexes, etc.)
    */
   sanitizeQuery(query: string, _mode: 'strict' | 'relaxed' = 'strict'): string {
     // Block database-level operations
@@ -93,11 +95,30 @@ export class DatabaseAdvanceService {
     }
 
     // Block DELETE operations on auth schema (prevents user deletion via raw SQL)
-    // This is the specific security requirement - prevent coding agents from deleting users
     const deleteFromAuth = /DELETE\s+.*?\bFROM\s+["']?auth["']?\./i;
     if (deleteFromAuth.test(query)) {
       throw new AppError(
         'DELETE operations on auth schema are not allowed. User deletion must be done through dedicated authentication APIs.',
+        403,
+        ERROR_CODES.FORBIDDEN
+      );
+    }
+
+    // Block TRUNCATE operations on auth schema (prevents mass user deletion)
+    const truncateAuth = /TRUNCATE\s+(?:TABLE\s+)?(?:IF\s+EXISTS\s+)?["']?auth["']?\./i;
+    if (truncateAuth.test(query)) {
+      throw new AppError(
+        'TRUNCATE operations on auth schema are not allowed. This would delete all users and must be done through dedicated authentication APIs.',
+        403,
+        ERROR_CODES.FORBIDDEN
+      );
+    }
+
+    // Block DROP TABLE operations on auth schema (prevents table destruction)
+    const dropTableAuth = /DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?["']?auth["']?\./i;
+    if (dropTableAuth.test(query)) {
+      throw new AppError(
+        'DROP TABLE operations on auth schema are not allowed. This would destroy the authentication tables and break the system.',
         403,
         ERROR_CODES.FORBIDDEN
       );
