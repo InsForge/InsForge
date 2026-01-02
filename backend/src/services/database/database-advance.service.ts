@@ -71,7 +71,7 @@ export class DatabaseAdvanceService {
    * - pg_catalog and information_schema access
    * - DELETE operations on auth schema (prevents user deletion via raw SQL)
    * - TRUNCATE operations on auth schema (prevents mass user deletion)
-   * - DROP TABLE operations on auth schema (prevents table destruction)
+   * - DROP operations on auth schema (prevents destruction of tables, indexes, triggers, functions, views, sequences, schemas, policies, types, domains)
    *
    * Allows:
    * - SELECT queries on auth schema (for reading user data)
@@ -94,9 +94,10 @@ export class DatabaseAdvanceService {
       }
     }
 
-    // Block DELETE operations on auth schema (prevents user deletion via raw SQL)
-    const deleteFromAuth = /DELETE\s+.*?\bFROM\s+["']?auth["']?\./i;
+    // Block DELETE operations on auth schema 
+    const deleteFromAuth = /DELETE\s+.*?\bFROM\s+["']?auth["']?\s*\./i;
     if (deleteFromAuth.test(query)) {
+      logger.warn('Blocked DELETE operation on auth schema', { query: query.substring(0, 100) });
       throw new AppError(
         'DELETE operations on auth schema are not allowed. User deletion must be done through dedicated authentication APIs.',
         403,
@@ -104,9 +105,10 @@ export class DatabaseAdvanceService {
       );
     }
 
-    // Block TRUNCATE operations on auth schema (prevents mass user deletion)
-    const truncateAuth = /TRUNCATE\s+(?:TABLE\s+)?(?:IF\s+EXISTS\s+)?["']?auth["']?\./i;
+    // Block TRUNCATE operations on auth schema 
+    const truncateAuth = /TRUNCATE\s+(?:TABLE\s+)?(?:IF\s+EXISTS\s+)?["']?auth["']?\s*\./i;
     if (truncateAuth.test(query)) {
+      logger.warn('Blocked TRUNCATE operation on auth schema', { query: query.substring(0, 100) });
       throw new AppError(
         'TRUNCATE operations on auth schema are not allowed. This would delete all users and must be done through dedicated authentication APIs.',
         403,
@@ -114,9 +116,10 @@ export class DatabaseAdvanceService {
       );
     }
 
-    // Block any DROP operations on auth schema (prevents destruction of tables, indexes, triggers, etc.)
-    const dropAuth = /DROP\s+(?:TABLE|INDEX|TRIGGER|FUNCTION|VIEW|SEQUENCE|SCHEMA|POLICY|TYPE|DOMAIN)\s+(?:IF\s+EXISTS\s+)?["']?auth["']?\./i;
+    // Block DROP operations on auth schema 
+    const dropAuth = /DROP\s+.*?["']?auth["']?\s*(\.|(?:\s|$|CASCADE))/i;
     if (dropAuth.test(query)) {
+      logger.warn('Blocked DROP operation on auth schema', { query: query.substring(0, 100) });
       throw new AppError(
         'DROP operations on auth schema are not allowed. This would destroy authentication resources and break the system.',
         403,

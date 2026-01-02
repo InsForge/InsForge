@@ -18,19 +18,18 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
       expect(() => service.sanitizeQuery(query)).toThrow(AppError);
     });
 
-    test('blocks UPDATE auth.users', () => {
-      const query = "UPDATE auth.users SET email = 'test@example.com' WHERE id = $1";
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
-    test('blocks INSERT INTO auth.users', () => {
-      const query =
-        'INSERT INTO auth.users (email, "emailVerified") VALUES (\'test@example.com\', false)';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
     test('blocks TRUNCATE auth.users', () => {
       const query = 'TRUNCATE TABLE auth.users';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks TRUNCATE with IF EXISTS', () => {
+      const query = 'TRUNCATE TABLE IF EXISTS auth.users';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks TRUNCATE without TABLE keyword', () => {
+      const query = 'TRUNCATE auth.users';
       expect(() => service.sanitizeQuery(query)).toThrow(AppError);
     });
 
@@ -39,14 +38,54 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
       expect(() => service.sanitizeQuery(query)).toThrow(AppError);
     });
 
+    test('blocks DROP TABLE with IF EXISTS', () => {
+      const query = 'DROP TABLE IF EXISTS auth.users';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks DROP INDEX on auth schema', () => {
+      const query = 'DROP INDEX auth.users_email_idx';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks DROP TRIGGER on auth schema tables', () => {
+      const queries = [
+        'DROP TRIGGER user_created_trigger ON auth.users',
+        'DROP TRIGGER IF EXISTS user_created_trigger ON auth.users',
+        'DROP TRIGGER trigger_name ON "auth"."users"',
+      ];
+
+      queries.forEach((query) => {
+        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+      });
+    });
+
+    test('blocks DROP FUNCTION on auth schema', () => {
+      const query = 'DROP FUNCTION auth.create_user_profile()';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks DROP VIEW on auth schema', () => {
+      const query = 'DROP VIEW auth.user_summary';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks DROP SCHEMA auth (no dot after auth)', () => {
+      const queries = [
+        'DROP SCHEMA auth',
+        'DROP SCHEMA auth CASCADE',
+        'DROP SCHEMA IF EXISTS auth',
+        'DROP SCHEMA "auth" CASCADE',
+      ];
+
+      queries.forEach((query) => {
+        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+      });
+    });
+
     test('allows SELECT FROM auth.users (read-only)', () => {
       const query = 'SELECT * FROM auth.users LIMIT 1';
       expect(() => service.sanitizeQuery(query)).not.toThrow();
-    });
-
-    test('blocks ALTER TABLE auth.users', () => {
-      const query = 'ALTER TABLE auth.users ADD COLUMN test_col TEXT';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
     });
 
     test('blocks case-insensitive AUTH.users', () => {
@@ -64,12 +103,11 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
       expect(() => service.sanitizeQuery(query)).toThrow(AppError);
     });
 
-    test('blocks auth schema with whitespace before dot', () => {
+    test('blocks DELETE with whitespace before dot in auth schema', () => {
       const queries = [
         'DELETE FROM auth . users WHERE id = $1',
         'DELETE FROM auth  .users WHERE id = $1',
         'DELETE FROM auth\t.users WHERE id = $1',
-        'UPDATE auth .users SET email = $1',
       ];
 
       queries.forEach((query) => {
@@ -77,11 +115,51 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
       });
     });
 
-    test('blocks modifying operations on other auth schema tables', () => {
+    test('allows UPDATE on auth schema (not blocked)', () => {
+      // UPDATE is allowed on auth schema
+      const queries = [
+        'UPDATE auth.users SET email = $1 WHERE id = $2',
+        'UPDATE auth.user_providers SET provider = $1 WHERE id = $2',
+      ];
+
+      queries.forEach((query) => {
+        expect(() => service.sanitizeQuery(query)).not.toThrow();
+      });
+    });
+
+    test('blocks DELETE on other auth schema tables', () => {
       const queries = [
         'DELETE FROM auth.user_providers WHERE id = $1',
-        'UPDATE auth.configs SET value = $1',
-        'INSERT INTO auth.oauth_configs (provider) VALUES ($1)',
+        'DELETE FROM auth.configs WHERE id = $1',
+        'DELETE FROM auth.oauth_configs WHERE id = $1',
+      ];
+
+      queries.forEach((query) => {
+        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+      });
+    });
+
+    test('blocks TRUNCATE on other auth schema tables', () => {
+      const queries = [
+        'TRUNCATE TABLE auth.user_providers',
+        'TRUNCATE auth.configs',
+      ];
+
+      queries.forEach((query) => {
+        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+      });
+    });
+
+    test('blocks DROP operations on other auth schema tables', () => {
+      const queries = [
+        'DROP TABLE auth.user_providers',
+        'DROP INDEX auth.configs_key_idx',
+        'DROP FUNCTION auth.some_function()',
+        'DROP VIEW auth.user_view',
+        'DROP SEQUENCE auth.user_id_seq',
+        'DROP POLICY auth_policy ON auth.users',
+        'DROP TYPE auth.user_type',
+        'DROP DOMAIN auth.email_domain',
       ];
 
       queries.forEach((query) => {
@@ -94,6 +172,33 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
         'SELECT * FROM auth.email_otps',
         'SELECT * FROM auth.user_providers',
         'SELECT * FROM auth.configs',
+      ];
+
+      queries.forEach((query) => {
+        expect(() => service.sanitizeQuery(query)).not.toThrow();
+      });
+    });
+
+    test('allows INSERT into auth schema (for test users)', () => {
+      const queries = [
+        'INSERT INTO auth.users (email, password) VALUES (\'test@example.com\', \'hashed\')',
+        'INSERT INTO auth.user_providers (user_id, provider) VALUES ($1, $2)',
+      ];
+
+      queries.forEach((query) => {
+        expect(() => service.sanitizeQuery(query)).not.toThrow();
+      });
+    });
+
+    test('allows CREATE TRIGGER on auth schema', () => {
+      const query = 'CREATE TRIGGER user_profile_trigger AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION create_user_profile()';
+      expect(() => service.sanitizeQuery(query)).not.toThrow();
+    });
+
+    test('allows ALTER TABLE on auth schema (for indexes, constraints)', () => {
+      const queries = [
+        'ALTER TABLE auth.users ADD CONSTRAINT email_unique UNIQUE (email)',
+        'CREATE INDEX idx_auth_users_email ON auth.users(email)',
       ];
 
       queries.forEach((query) => {
