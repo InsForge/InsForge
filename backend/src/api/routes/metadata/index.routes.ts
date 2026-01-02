@@ -144,18 +144,15 @@ router.get(
 );
 
 // Get database password from cloud backend (admin only)
-router.get(
-  '/database-password',
-  async (_req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const cloudDbProvider = CloudDatabaseProvider.getInstance();
-      const passwordInfo = await cloudDbProvider.getDatabasePassword();
-      successResponse(res, passwordInfo);
-    } catch (error) {
-      next(error);
-    }
+router.get('/database-password', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const cloudDbProvider = CloudDatabaseProvider.getInstance();
+    const passwordInfo = await cloudDbProvider.getDatabasePassword();
+    successResponse(res, passwordInfo);
+  } catch (error) {
+    next(error);
   }
-);
+});
 
 // get metadata for a table.
 // Notice: must be after endpoint /api-key in case of conflict.
