@@ -257,4 +257,135 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
 router.all('/:tableName', forwardToPostgrest);
 router.all('/:tableName/*', forwardToPostgrest);
 
-export { router as databaseRecordsRouter };
+// ============================================
+// RPC Router - Forward to PostgREST /rpc/
+// ============================================
+
+const rpcRouter = Router();
+
+/**
+ * Forward RPC calls to PostgREST
+ * POST /api/database/rpc/:functionName
+ */
+const forwardRpcToPostgrest = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  const { functionName } = req.params;
+  const targetUrl = `${postgrestUrl}/rpc/${functionName}`;
+
+  try {
+    const axiosConfig: {
+      method: string;
+      url: string;
+      params: unknown;
+      headers: Record<string, string | string[] | undefined>;
+      data?: unknown;
+    } = {
+      method: req.method,
+      url: targetUrl,
+      params: req.query,
+      headers: {
+        ...req.headers,
+        host: undefined,
+        'content-length': undefined,
+      },
+    };
+
+    // Check for API key and use admin token if valid
+    const apiKey = extractApiKey(req);
+    if (apiKey) {
+      const isValid = await secretService.verifyApiKey(apiKey);
+      if (isValid) {
+        axiosConfig.headers.authorization = `Bearer ${adminToken}`;
+      }
+    }
+
+    // Add body for POST requests (RPC params)
+    if (req.method === 'POST') {
+      axiosConfig.data = req.body;
+    }
+
+    // Retry logic
+    let response;
+    let lastError;
+    const maxRetries = 3;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        response = await postgrestAxios(axiosConfig);
+        break;
+      } catch (error) {
+        lastError = error;
+        const shouldRetry = axios.isAxiosError(error) && !error.response && attempt < maxRetries;
+
+        if (shouldRetry) {
+          logger.warn(`PostgREST RPC request failed, retrying (attempt ${attempt}/${maxRetries})`, {
+            url: targetUrl,
+            errorCode: error.code,
+            message: error.message,
+          });
+          const backoffDelay = Math.min(200 * Math.pow(2.5, attempt - 1), 1000);
+          await new Promise((resolve) => setTimeout(resolve, backoffDelay));
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    if (!response) {
+      throw lastError || new Error('Failed to get response from PostgREST');
+    }
+
+    // Forward response headers
+    Object.entries(response.headers).forEach(([key, value]) => {
+      const keyLower = key.toLowerCase();
+      if (
+        keyLower !== 'content-length' &&
+        keyLower !== 'transfer-encoding' &&
+        keyLower !== 'connection' &&
+        keyLower !== 'content-encoding'
+      ) {
+        res.setHeader(key, value);
+      }
+    });
+
+    // Handle response
+    let responseData = response.data;
+    if (response.data === undefined || (typeof response.data === 'string' && response.data.trim() === '')) {
+      responseData = null;
+    }
+
+    successResponse(res, responseData, response.status);
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      logger.error('PostgREST RPC request failed', {
+        url: targetUrl,
+        method: req.method,
+        error: {
+          code: error.code,
+          message: error.message,
+          response: error.response?.data,
+          responseStatus: error.response?.status,
+        },
+      });
+
+      if (error.response) {
+        res.status(error.response.status).json(error.response.data);
+      } else {
+        const errorMessage =
+          error.code === 'ECONNREFUSED'
+            ? 'PostgREST connection refused'
+            : error.code === 'ENOTFOUND'
+              ? 'PostgREST service not found'
+              : 'Database service unavailable';
+        next(new AppError(errorMessage, 503, ERROR_CODES.INTERNAL_ERROR));
+      }
+    } else {
+      logger.error('Unexpected error in RPC route', { error });
+      next(error);
+    }
+  }
+};
+
+// RPC supports both GET and POST (PostgREST allows both)
+rpcRouter.all('/:functionName', forwardRpcToPostgrest);
+
+export { router as databaseRecordsRouter, rpcRouter as databaseRpcRouter };
