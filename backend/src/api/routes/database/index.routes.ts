@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { databaseTablesRouter } from './tables.routes.js';
-import { databaseRecordsRouter } from './records.routes.js';
+import { databaseRecordsRouter, databaseRpcRouter } from './records.routes.js';
 import databaseAdvanceRouter from './advance.routes.js';
 import { DatabaseService } from '@/services/database/database.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
@@ -13,6 +13,7 @@ const databaseService = DatabaseService.getInstance();
 // Mount database sub-routes
 router.use('/tables', databaseTablesRouter);
 router.use('/records', databaseRecordsRouter);
+router.use('/rpc', databaseRpcRouter);
 router.use('/advance', databaseAdvanceRouter);
 
 /**
