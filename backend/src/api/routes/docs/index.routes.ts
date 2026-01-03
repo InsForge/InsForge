@@ -16,7 +16,7 @@ const router = Router();
 const DOCS_MAP: Record<DocTypeSchema, string> = {
   instructions: 'insforge-instructions-sdk.md',
   'db-sdk': 'core-concepts/database/sdk.mdx',
-  // 'auth-sdk': 'core-concepts/authentication/sdk.mdx',
+  'auth-sdk': 'core-concepts/authentication/sdk.mdx',
   // UI Components - Framework-specific
   'auth-components-react': 'core-concepts/authentication/ui-components/react.mdx',
   'auth-components-nextjs': 'core-concepts/authentication/ui-components/nextjs.mdx',

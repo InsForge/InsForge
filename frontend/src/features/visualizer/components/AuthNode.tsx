@@ -1,23 +1,23 @@
 import { Lock, FormInput, Users, Circle } from 'lucide-react';
 import { Handle, Position } from '@xyflow/react';
-import { AuthMetadataSchema } from '@insforge/shared-schemas';
+import { OAuthProvidersSchema } from '@insforge/shared-schemas';
 import { cn } from '@/lib/utils/utils';
 import { useOAuthConfig } from '@/features/auth/hooks/useOAuthConfig';
 import { oauthProviders } from '@/features/auth/helpers';
 
 interface AuthNodeProps {
   data: {
-    authMetadata: AuthMetadataSchema;
+    providers: OAuthProvidersSchema[];
     userCount?: number;
     isReferenced?: boolean; // Whether any tables have foreign keys to users.id
   };
 }
 
 export function AuthNode({ data }: AuthNodeProps) {
-  const { authMetadata, userCount, isReferenced = false } = data;
+  const { providers, userCount, isReferenced = false } = data;
   const { isProviderConfigured } = useOAuthConfig();
 
-  const enabledCount = authMetadata.oauths.length + 1;
+  const enabledCount = providers.length + 1;
 
   return (
     <div className="bg-white dark:bg-neutral-900 rounded-lg border border-gray-300 dark:border-[#363636] min-w-[280px] shadow-sm">
