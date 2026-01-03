@@ -89,7 +89,13 @@ export default function CloudLoginPage() {
       }
       void navigate('/dashboard', { replace: true });
     }
-  }, [hasCompletedOnboarding, isAuthenticated, isMcpUsageLoading, navigate]);
+  }, [
+    hasCompletedOnboarding,
+    isAuthenticated,
+    isMcpUsageLoading,
+    navigate,
+    setOnboardingModalOpen,
+  ]);
 
   // Show error state if authentication failed
   if (authError) {
