@@ -69,10 +69,15 @@ export class DatabaseAdvanceService {
    * Blocks:
    * - DROP DATABASE, CREATE DATABASE, ALTER DATABASE
    * - pg_catalog and information_schema access
+   * - DELETE operations on auth schema (prevents user deletion via raw SQL)
+   * - TRUNCATE operations on auth schema (prevents mass user deletion)
+   * - DROP operations on auth schema (prevents destruction of tables, indexes, triggers, functions, views, sequences, schemas, policies, types, domains)
    *
-   * Note: System tables are now in separate schemas (system.*, auth.*, etc.)
-   * so underscore prefix checks and public.users checks are no longer needed.
-   * The API only accesses public schema through PostgREST.
+   * Allows:
+   * - SELECT queries on auth schema (for reading user data)
+   * - INSERT operations on auth schema (for test users)
+   * - CREATE TRIGGER on auth tables (for automatic profile creation, etc.)
+   * - Other DDL operations on auth schema (ALTER TABLE for indexes, etc.)
    */
   sanitizeQuery(query: string, _mode: 'strict' | 'relaxed' = 'strict'): string {
     // Block database-level operations
@@ -86,6 +91,86 @@ export class DatabaseAdvanceService {
     for (const pattern of dangerousPatterns) {
       if (pattern.test(query)) {
         throw new AppError('Query contains restricted operations', 403, ERROR_CODES.FORBIDDEN);
+      }
+    }
+
+    const authSchemaBlocked =
+      /(?:DELETE\s+(?:FROM\s+["']?auth["']?\s*\.|(?:(?!FROM\s+[^a]).)*?\bFROM\s+["']?auth["']?\s*\.)|TRUNCATE\s+(?:TABLE\s+)?(?:IF\s+EXISTS\s+)?["']?auth["']?\s*\.|DROP\s+.*?["']?auth["']?\s*(?:\.|(?:\s|$|CASCADE)))/i;
+    
+    if (authSchemaBlocked.test(query)) {
+      let operation = 'operation';
+      let message = 'This operation on auth schema is not allowed.';
+      let match: RegExpMatchArray | null = null;
+
+      if (/DELETE/i.test(query)) {
+        match = query.match(/DELETE\s+(?:FROM\s+["']?auth["']?\s*\.|(?:(?!FROM\s+[^a]).)*?\bFROM\s+["']?auth["']?\s*\.)/i);
+        if (match) {
+          const beforeMatch = query.substring(0, match.index!);
+          const betweenDeleteAndAuth = match[0].replace(/^DELETE\s+/i, '');
+          const inString = (beforeMatch.match(/'/g) || []).length % 2 !== 0;
+          const lastBlockCommentStart = beforeMatch.lastIndexOf('/*');
+          const lastBlockCommentEnd = beforeMatch.lastIndexOf('*/');
+          const inBlockComment = lastBlockCommentStart > lastBlockCommentEnd;
+          const lineStart = beforeMatch.lastIndexOf('\n') + 1;
+          const lineBeforeMatch = beforeMatch.substring(lineStart);
+          const inLineComment = /--/.test(lineBeforeMatch);
+          const otherFromMatch = betweenDeleteAndAuth.match(/\bFROM\s+(?!["']?auth["']?\s*\.)[^a]/i);
+          
+          if (!otherFromMatch && !inString && !inBlockComment && !inLineComment) {
+            operation = 'DELETE';
+            message =
+              'DELETE operations on auth schema are not allowed. User deletion must be done through dedicated authentication APIs.';
+          } else {
+            return query;
+          }
+        }
+      } else if (/TRUNCATE/i.test(query)) {
+        match = query.match(/TRUNCATE\s+(?:TABLE\s+)?(?:IF\s+EXISTS\s+)?["']?auth["']?\s*\./i);
+        if (match) {
+          const beforeMatch = query.substring(0, match.index!);
+          const inString = (beforeMatch.match(/'/g) || []).length % 2 !== 0;
+          const lastBlockCommentStart = beforeMatch.lastIndexOf('/*');
+          const lastBlockCommentEnd = beforeMatch.lastIndexOf('*/');
+          const inBlockComment = lastBlockCommentStart > lastBlockCommentEnd;
+          const lineStart = beforeMatch.lastIndexOf('\n') + 1;
+          const lineBeforeMatch = beforeMatch.substring(lineStart);
+          const inLineComment = /--/.test(lineBeforeMatch);
+          
+          if (!inString && !inBlockComment && !inLineComment) {
+            operation = 'TRUNCATE';
+            message =
+              'TRUNCATE operations on auth schema are not allowed. This would delete all users and must be done through dedicated authentication APIs.';
+          } else {
+            return query;
+          }
+        }
+      } else if (/DROP/i.test(query)) {
+        match = query.match(/DROP\s+.*?["']?auth["']?\s*(?:\.|(?:\s|$|CASCADE))/i);
+        if (match) {
+          const beforeMatch = query.substring(0, match.index!);
+          const inString = (beforeMatch.match(/'/g) || []).length % 2 !== 0;
+          const lastBlockCommentStart = beforeMatch.lastIndexOf('/*');
+          const lastBlockCommentEnd = beforeMatch.lastIndexOf('*/');
+          const inBlockComment = lastBlockCommentStart > lastBlockCommentEnd;
+          const lineStart = beforeMatch.lastIndexOf('\n') + 1;
+          const lineBeforeMatch = beforeMatch.substring(lineStart);
+          const inLineComment = /--/.test(lineBeforeMatch);
+          
+          if (!inString && !inBlockComment && !inLineComment) {
+            operation = 'DROP';
+            message =
+              'DROP operations on auth schema are not allowed. This would destroy authentication resources and break the system.';
+          } else {
+            return query;
+          }
+        }
+      }
+
+      if (operation !== 'operation') {
+        logger.warn(`Blocked ${operation} operation on auth schema`, {
+          query: query.substring(0, 100),
+        });
+        throw new AppError(message, 403, ERROR_CODES.FORBIDDEN);
       }
     }
 
