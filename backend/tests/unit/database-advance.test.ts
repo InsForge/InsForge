@@ -221,6 +221,30 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
   });
 
   describe('allowed queries', () => {
+    test('allows DELETE from other tables even when auth is referenced in subquery', () => {
+      const queries = [
+        'DELETE FROM orders WHERE user_id NOT IN (SELECT id FROM auth.users)',
+        'DELETE FROM user_profiles WHERE id IN (SELECT user_id FROM auth.sessions WHERE expired = true)',
+        'DELETE FROM public.users WHERE email IN (SELECT email FROM auth.users WHERE verified = false)',
+      ];
+
+      queries.forEach((query) => {
+        expect(() => service.sanitizeQuery(query)).not.toThrow();
+      });
+    });
+
+    test('allows queries with auth schema in string literals or comments', () => {
+      const queries = [
+        "SELECT 'DELETE FROM auth.users' AS example_query",
+        '/* DELETE FROM auth.users */ SELECT * FROM public.users',
+        "SELECT 'DROP TABLE auth.users' AS test",
+      ];
+
+      queries.forEach((query) => {
+        expect(() => service.sanitizeQuery(query)).not.toThrow();
+      });
+    });
+
     test('allows SELECT from public schema', () => {
       const query = 'SELECT 1 as test';
       expect(() => service.sanitizeQuery(query)).not.toThrow();

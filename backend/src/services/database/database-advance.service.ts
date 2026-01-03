@@ -94,32 +94,78 @@ export class DatabaseAdvanceService {
       }
     }
 
-    // Block DELETE, TRUNCATE, and DROP operations on auth schema
     const authSchemaBlocked =
-      /(?:DELETE\s+.*?\bFROM\s+["']?auth["']?\s*\.|TRUNCATE\s+(?:TABLE\s+)?(?:IF\s+EXISTS\s+)?["']?auth["']?\s*\.|DROP\s+.*?["']?auth["']?\s*(?:\.|(?:\s|$|CASCADE)))/i;
+      /(?:DELETE\s+(?:FROM\s+["']?auth["']?\s*\.|(?:(?!FROM\s+[^a]).)*?\bFROM\s+["']?auth["']?\s*\.)|TRUNCATE\s+(?:TABLE\s+)?(?:IF\s+EXISTS\s+)?["']?auth["']?\s*\.|DROP\s+.*?["']?auth["']?\s*(?:\.|(?:\s|$|CASCADE)))/i;
+    
     if (authSchemaBlocked.test(query)) {
-      // Determine operation type for logging and error message
       let operation = 'operation';
       let message = 'This operation on auth schema is not allowed.';
+      let match: RegExpMatchArray | null = null;
 
       if (/DELETE/i.test(query)) {
-        operation = 'DELETE';
-        message =
-          'DELETE operations on auth schema are not allowed. User deletion must be done through dedicated authentication APIs.';
+        match = query.match(/DELETE\s+(?:FROM\s+["']?auth["']?\s*\.|(?:(?!FROM\s+[^a]).)*?\bFROM\s+["']?auth["']?\s*\.)/i);
+        if (match) {
+          const beforeMatch = query.substring(0, match.index!);
+          const betweenDeleteAndAuth = match[0].replace(/^DELETE\s+/i, '');
+          const inString = (beforeMatch.match(/'/g) || []).length % 2 !== 0;
+          const lastBlockCommentStart = beforeMatch.lastIndexOf('/*');
+          const lastBlockCommentEnd = beforeMatch.lastIndexOf('*/');
+          const inBlockComment = lastBlockCommentStart > lastBlockCommentEnd;
+          const inLineComment = /--[^\n]*$/m.test(beforeMatch);
+          const otherFromMatch = betweenDeleteAndAuth.match(/\bFROM\s+(?!["']?auth["']?\s*\.)[^a]/i);
+          
+          if (!otherFromMatch && !inString && !inBlockComment && !inLineComment) {
+            operation = 'DELETE';
+            message =
+              'DELETE operations on auth schema are not allowed. User deletion must be done through dedicated authentication APIs.';
+          } else {
+            return query;
+          }
+        }
       } else if (/TRUNCATE/i.test(query)) {
-        operation = 'TRUNCATE';
-        message =
-          'TRUNCATE operations on auth schema are not allowed. This would delete all users and must be done through dedicated authentication APIs.';
+        match = query.match(/TRUNCATE\s+(?:TABLE\s+)?(?:IF\s+EXISTS\s+)?["']?auth["']?\s*\./i);
+        if (match) {
+          const beforeMatch = query.substring(0, match.index!);
+          const inString = (beforeMatch.match(/'/g) || []).length % 2 !== 0;
+          const lastBlockCommentStart = beforeMatch.lastIndexOf('/*');
+          const lastBlockCommentEnd = beforeMatch.lastIndexOf('*/');
+          const inBlockComment = lastBlockCommentStart > lastBlockCommentEnd;
+          const inLineComment = /--[^\n]*$/m.test(beforeMatch);
+          
+          if (!inString && !inBlockComment && !inLineComment) {
+            operation = 'TRUNCATE';
+            message =
+              'TRUNCATE operations on auth schema are not allowed. This would delete all users and must be done through dedicated authentication APIs.';
+          } else {
+            return query;
+          }
+        }
       } else if (/DROP/i.test(query)) {
-        operation = 'DROP';
-        message =
-          'DROP operations on auth schema are not allowed. This would destroy authentication resources and break the system.';
+        match = query.match(/DROP\s+.*?["']?auth["']?\s*(?:\.|(?:\s|$|CASCADE))/i);
+        if (match) {
+          const beforeMatch = query.substring(0, match.index!);
+          const inString = (beforeMatch.match(/'/g) || []).length % 2 !== 0;
+          const lastBlockCommentStart = beforeMatch.lastIndexOf('/*');
+          const lastBlockCommentEnd = beforeMatch.lastIndexOf('*/');
+          const inBlockComment = lastBlockCommentStart > lastBlockCommentEnd;
+          const inLineComment = /--[^\n]*$/m.test(beforeMatch);
+          
+          if (!inString && !inBlockComment && !inLineComment) {
+            operation = 'DROP';
+            message =
+              'DROP operations on auth schema are not allowed. This would destroy authentication resources and break the system.';
+          } else {
+            return query;
+          }
+        }
       }
 
-      logger.warn(`Blocked ${operation} operation on auth schema`, {
-        query: query.substring(0, 100),
-      });
-      throw new AppError(message, 403, ERROR_CODES.FORBIDDEN);
+      if (operation !== 'operation') {
+        logger.warn(`Blocked ${operation} operation on auth schema`, {
+          query: query.substring(0, 100),
+        });
+        throw new AppError(message, 403, ERROR_CODES.FORBIDDEN);
+      }
     }
 
     return query;
