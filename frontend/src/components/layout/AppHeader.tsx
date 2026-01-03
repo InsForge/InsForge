@@ -10,12 +10,7 @@ import {
   Separator,
   ThemeToggle,
 } from '@/components';
-import {
-  McpConnectionStatus,
-  getOnboardingSkipped,
-  setOnboardingSkipped,
-} from '@/features/onboard';
-import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
+import { McpConnectionStatus } from '@/features/onboard';
 import { cn } from '@/lib/utils/utils';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
@@ -30,7 +25,6 @@ import InsForgeLogoDark from '@/assets/logos/insforge_dark.svg';
 export default function AppHeader() {
   const { resolvedTheme } = useTheme();
   const { user, logout } = useAuth();
-  const { hasCompletedOnboarding, isLoading: isMcpLoading } = useMcpUsage();
   const { setOnboardingModalOpen } = useModal();
   const [githubStars, setGithubStars] = useState<number | null>(null);
 
@@ -47,21 +41,6 @@ export default function AppHeader() {
         console.error('Failed to fetch GitHub stars:', err);
       });
   }, []);
-
-  // Auto-open onboarding modal if user hasn't connected and hasn't skipped
-  useEffect(() => {
-    if (!isMcpLoading && !hasCompletedOnboarding && !getOnboardingSkipped()) {
-      setOnboardingModalOpen(true);
-    }
-  }, [isMcpLoading, hasCompletedOnboarding, setOnboardingModalOpen]);
-
-  // When MCP connection is established, close onboarding modal and clear skip flag
-  useEffect(() => {
-    if (hasCompletedOnboarding) {
-      setOnboardingModalOpen(false);
-      setOnboardingSkipped(false);
-    }
-  }, [hasCompletedOnboarding, setOnboardingModalOpen]);
 
   const formatStars = (count: number): string => {
     if (count >= 1000) {
