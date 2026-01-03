@@ -82,13 +82,17 @@
             ]
           },
           {
+            "group": "Community Showcase",
+            "pages": ["showcase"]
+          },
+          {
             "group": "Changelog",
             "pages": ["changelog"]
           }
         ]
       },
       {
-        "tab": "SDKs",
+        "tab": "SDK & Samples",
         "groups": [
           {
             "group": "TypeScript",
@@ -107,6 +111,16 @@
                   "sdks/typescript/ui-components/react",
                   "sdks/typescript/ui-components/nextjs",
                   "sdks/typescript/ui-components/customization"
+                ]
+              },
+              {
+                "group": "Framework Guides",
+                "pages": [
+                  "examples/framework-guides/nextjs",
+                  "examples/framework-guides/react",
+                  "examples/framework-guides/vue",
+                  "examples/framework-guides/nuxt",
+                  "examples/framework-guides/svelte"
                 ]
               }
             ]
@@ -147,29 +161,10 @@
               "sdks/flutter/ai",
               "sdks/flutter/realtime"
             ]
-          }
-        ]
-      },
-      {
-        "tab": "Examples",
-        "groups": [
+          },
           {
-            "group": "Getting Started",
+            "group": "Samples",
             "pages": ["examples/overview"]
-          },
-          {
-            "group": "Framework Guides",
-            "pages": [
-              "examples/framework-guides/nextjs",
-              "examples/framework-guides/react",
-              "examples/framework-guides/vue",
-              "examples/framework-guides/nuxt",
-              "examples/framework-guides/svelte"
-            ]
-          },
-          {
-            "group": "Community Showcase",
-            "pages": ["showcase"]
           }
         ]
       },
