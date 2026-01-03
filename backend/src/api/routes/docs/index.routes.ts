@@ -12,6 +12,59 @@ const __dirname = path.dirname(__filename);
 
 const router = Router();
 
+/**
+ * Process MDX content to resolve snippet imports and component usage.
+ * Handles patterns like:
+ *   import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
+ *   <SwiftSdkInstallation />
+ */
+async function processSnippets(content: string, docsRoot: string): Promise<string> {
+  // Extract all import statements for snippets
+  const importRegex = /^import\s+(\w+)\s+from\s+['"]([^'"]+)['"]\s*;?\s*$/gm;
+  const imports: Map<string, string> = new Map();
+
+  let match;
+  while ((match = importRegex.exec(content)) !== null) {
+    const [, componentName, importPath] = match;
+    imports.set(componentName, importPath);
+  }
+
+  // Remove import statements from content
+  let processedContent = content.replace(importRegex, '');
+
+  // Replace component usages with actual snippet content
+  for (const [componentName, importPath] of imports) {
+    // Resolve snippet path (remove leading slash, it's relative to docs root)
+    const snippetPath = path.join(docsRoot, importPath.replace(/^\//, ''));
+
+    try {
+      let snippetContent = await readFile(snippetPath, 'utf-8');
+
+      // Remove frontmatter from snippet if present
+      snippetContent = snippetContent.replace(/^---[\s\S]*?---\s*/, '');
+
+      // Replace self-closing component tag: <ComponentName />
+      const selfClosingRegex = new RegExp(`<${componentName}\\s*/>`, 'g');
+      processedContent = processedContent.replace(selfClosingRegex, snippetContent.trim());
+
+      // Replace component with children (if any): <ComponentName>...</ComponentName>
+      const withChildrenRegex = new RegExp(
+        `<${componentName}\\s*>[\\s\\S]*?</${componentName}>`,
+        'g'
+      );
+      processedContent = processedContent.replace(withChildrenRegex, snippetContent.trim());
+    } catch {
+      // If snippet file not found, leave the component tag as-is
+      console.warn(`Snippet not found: ${snippetPath}`);
+    }
+  }
+
+  // Clean up extra blank lines
+  processedContent = processedContent.replace(/\n{3,}/g, '\n\n');
+
+  return processedContent.trim();
+}
+
 // Define available documentation files
 const DOCS_MAP: Record<DocTypeSchema, string> = {
   // General
@@ -73,8 +126,12 @@ router.get('/:docType', async (req: Request, res: Response, next: NextFunction) 
     // Read the documentation file
     // PROJECT_ROOT is set in the docker-compose.yml file to point to the InsForge directory
     const projectRoot = process.env.PROJECT_ROOT || path.resolve(__dirname, '../../../..');
-    const filePath = path.join(projectRoot, 'docs', docFileName);
-    const content = await readFile(filePath, 'utf-8');
+    const docsRoot = path.join(projectRoot, 'docs');
+    const filePath = path.join(docsRoot, docFileName);
+    const rawContent = await readFile(filePath, 'utf-8');
+
+    // Process snippet imports and replace component tags with actual content
+    const content = await processSnippets(rawContent, docsRoot);
 
     // Traditional REST: return documentation directly
     return successResponse(res, {
