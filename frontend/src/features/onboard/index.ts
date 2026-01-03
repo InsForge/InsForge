@@ -4,7 +4,9 @@ export {
   OnboardingModal,
   getOnboardingSkipped,
   setOnboardingSkipped,
+  CONNECTION_TABS,
 } from './components/OnboardingModal';
+export type { ConnectionTab, ConnectionTabConfig } from './components/OnboardingModal';
 export { VideoDemoModal } from './components/VideoDemoModal';
 export { McpConnectionSection } from './components/McpConnectionSection';
 export { ApiCredentialsSection } from './components/ApiCredentialsSection';
