@@ -1,0 +1,402 @@
+---
+title: Realtime SDK Reference
+description: Real-time subscriptions and messaging with the InsForge Kotlin SDK
+---
+
+<Info>
+  **Coming Soon** - The Kotlin SDK is currently in development. This documentation serves as a preview of the planned API.
+</Info>
+
+## Installation
+
+```kotlin
+import dev.insforge.InsForgeClient
+
+val insforge = InsForgeClient(
+    baseUrl = "https://your-app.us-east.insforge.app",
+    anonKey = "your-anon-key"
+)
+```
+
+## connect()
+
+Establish a WebSocket connection to the realtime server.
+
+### Example
+
+```kotlin
+try {
+    insforge.realtime.connect()
+    Log.d("Realtime", "Connected: ${insforge.realtime.isConnected}")
+} catch (e: Exception) {
+    Log.e("Realtime", "Connection failed: ${e.message}")
+}
+```
+
+---
+
+## subscribe()
+
+Subscribe to a channel to receive events.
+
+### Example
+
+```kotlin
+val result = insforge.realtime.subscribe("orders:123")
+
+if (result.ok) {
+    Log.d("Realtime", "Subscribed to: ${result.channel}")
+} else {
+    Log.e("Realtime", "Failed: ${result.error?.message}")
+}
+```
+
+---
+
+## unsubscribe()
+
+Unsubscribe from a channel.
+
+### Example
+
+```kotlin
+insforge.realtime.unsubscribe("orders:123")
+```
+
+---
+
+## publish()
+
+Publish a message to a channel.
+
+### Example
+
+```kotlin
+@Serializable
+data class StatusUpdate(
+    val status: String,
+    val trackingNumber: String
+)
+
+insforge.realtime.publish(
+    channel = "orders:123",
+    event = "status_changed",
+    payload = StatusUpdate(
+        status = "shipped",
+        trackingNumber = "ABC123"
+    )
+)
+```
+
+---
+
+## on()
+
+Listen for events.
+
+### Example
+
+```kotlin
+// Listen for custom events
+insforge.realtime.on<OrderPayload>("order_updated") { payload ->
+    Log.d("Realtime", "Order updated: $payload")
+}
+
+// Connection events
+insforge.realtime.onConnect {
+    Log.d("Realtime", "Connected! Socket ID: ${insforge.realtime.socketId}")
+}
+
+insforge.realtime.onDisconnect { reason ->
+    Log.d("Realtime", "Disconnected: $reason")
+}
+
+insforge.realtime.onError { error ->
+    Log.e("Realtime", "Error: ${error.code} - ${error.message}")
+}
+```
+
+---
+
+## off()
+
+Remove an event listener.
+
+### Example
+
+```kotlin
+val handler = insforge.realtime.on<OrderPayload>("order_updated") { payload ->
+    Log.d("Realtime", "Order updated: $payload")
+}
+
+// Remove listener later
+insforge.realtime.off(handler)
+```
+
+---
+
+## once()
+
+Listen for an event only once.
+
+### Example
+
+```kotlin
+insforge.realtime.once<OrderPayload>("order_completed") { payload ->
+    Log.d("Realtime", "Order completed: $payload")
+    // Listener is automatically removed
+}
+```
+
+---
+
+## disconnect()
+
+Disconnect from the realtime server.
+
+### Example
+
+```kotlin
+insforge.realtime.disconnect()
+```
+
+---
+
+## Properties
+
+```kotlin
+// Check connection status
+if (insforge.realtime.isConnected) {
+    Log.d("Realtime", "Connected")
+}
+
+// Get connection state
+Log.d("Realtime", "State: ${insforge.realtime.connectionState}")
+// ConnectionState.CONNECTED, CONNECTING, DISCONNECTED
+
+// Get socket ID
+insforge.realtime.socketId?.let { socketId ->
+    Log.d("Realtime", "Socket ID: $socketId")
+}
+
+// Get subscribed channels
+val channels = insforge.realtime.subscribedChannels
+Log.d("Realtime", "Channels: $channels")
+```
+
+---
+
+## Flow Support
+
+```kotlin
+// Observe events as Flow
+val orderUpdates: Flow<OrderPayload> = insforge.realtime
+    .eventFlow("order_updated")
+
+// Collect in ViewModel
+class OrderViewModel : ViewModel() {
+    init {
+        viewModelScope.launch {
+            insforge.realtime.connect()
+            insforge.realtime.subscribe("orders:123")
+
+            insforge.realtime
+                .eventFlow<OrderPayload>("order_updated")
+                .collect { payload ->
+                    _orderState.value = payload
+                }
+        }
+    }
+}
+
+// Connection state as Flow
+insforge.realtime.connectionStateFlow
+    .onEach { state ->
+        when (state) {
+            ConnectionState.CONNECTED -> Log.d("Realtime", "Connected")
+            ConnectionState.CONNECTING -> Log.d("Realtime", "Connecting...")
+            ConnectionState.DISCONNECTED -> Log.d("Realtime", "Disconnected")
+        }
+    }
+    .launchIn(viewModelScope)
+```
+
+---
+
+## Jetpack Compose Integration
+
+### Chat Room Screen
+
+```kotlin
+@Composable
+fun ChatRoomScreen(roomId: String) {
+    val viewModel: ChatViewModel = viewModel()
+    val messages by viewModel.messages.collectAsState()
+    val isConnected by viewModel.isConnected.collectAsState()
+    var inputText by remember { mutableStateOf("") }
+
+    DisposableEffect(roomId) {
+        viewModel.connect(roomId)
+        onDispose {
+            viewModel.disconnect()
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Connection status
+        if (!isConnected) {
+            Text(
+                "Connecting...",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.Yellow)
+                    .padding(8.dp)
+            )
+        }
+
+        // Messages list
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .padding(16.dp),
+            reverseLayout = true
+        ) {
+            items(messages.reversed()) { message ->
+                ChatMessageItem(message = message)
+            }
+        }
+
+        // Input field
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            OutlinedTextField(
+                value = inputText,
+                onValueChange = { inputText = it },
+                modifier = Modifier.weight(1f),
+                placeholder = { Text("Message") }
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            IconButton(
+                onClick = {
+                    viewModel.sendMessage(inputText)
+                    inputText = ""
+                },
+                enabled = inputText.isNotBlank() && isConnected
+            ) {
+                Icon(Icons.Default.Send, "Send")
+            }
+        }
+    }
+}
+
+class ChatViewModel : ViewModel() {
+    private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
+    val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
+
+    private val _isConnected = MutableStateFlow(false)
+    val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
+
+    private var roomId: String? = null
+
+    fun connect(roomId: String) {
+        this.roomId = roomId
+        viewModelScope.launch {
+            try {
+                insforge.realtime.connect()
+                insforge.realtime.subscribe("chat:$roomId")
+                _isConnected.value = true
+
+                // Listen for new messages
+                insforge.realtime
+                    .eventFlow<ChatMessage>("new_message")
+                    .collect { message ->
+                        _messages.value = _messages.value + message
+                    }
+            } catch (e: Exception) {
+                Log.e("Chat", "Connection error: ${e.message}")
+            }
+        }
+    }
+
+    fun sendMessage(text: String) {
+        roomId?.let { room ->
+            viewModelScope.launch {
+                insforge.realtime.publish(
+                    channel = "chat:$room",
+                    event = "new_message",
+                    payload = ChatMessage(
+                        sender = currentUser.name,
+                        text = text,
+                        timestamp = System.currentTimeMillis()
+                    )
+                )
+            }
+        }
+    }
+
+    fun disconnect() {
+        roomId?.let { room ->
+            insforge.realtime.unsubscribe("chat:$room")
+        }
+        insforge.realtime.disconnect()
+    }
+}
+```
+
+### Order Tracking Screen
+
+```kotlin
+@Composable
+fun OrderTrackingScreen(orderId: String) {
+    var status by remember { mutableStateOf("pending") }
+    var updates by remember { mutableStateOf<List<StatusUpdate>>(emptyList()) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(orderId) {
+        insforge.realtime.connect()
+        insforge.realtime.subscribe("order:$orderId")
+
+        insforge.realtime
+            .eventFlow<StatusUpdate>("status_changed")
+            .collect { update ->
+                status = update.status
+                updates = updates + update
+            }
+    }
+
+    DisposableEffect(orderId) {
+        onDispose {
+            insforge.realtime.unsubscribe("order:$orderId")
+            insforge.realtime.disconnect()
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Text(
+            text = "Order Status: $status",
+            style = MaterialTheme.typography.headlineMedium
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        LazyColumn {
+            items(updates) { update ->
+                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(update.status, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            formatTimestamp(update.timestamp),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+```

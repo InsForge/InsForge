@@ -1,0 +1,323 @@
+---
+title: Database SDK Reference
+description: Type-safe database operations using the InsForge Flutter SDK
+---
+
+<Info>
+  **Coming Soon** - The Flutter SDK is currently in development. This documentation serves as a preview of the planned API.
+</Info>
+
+## Installation
+
+```yaml
+dependencies:
+  insforge: ^1.0.0
+```
+
+```dart
+import 'package:insforge/insforge.dart';
+
+final insforge = InsForgeClient(
+  baseUrl: 'https://your-app.us-east.insforge.app',
+  anonKey: 'your-anon-key',
+);
+```
+
+## insert()
+
+Insert new records into a table.
+
+### Examples
+
+```dart
+// Define your model
+class Post {
+  final String? id;
+  final String title;
+  final String content;
+  final DateTime? createdAt;
+
+  Post({this.id, required this.title, required this.content, this.createdAt});
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'content': content,
+  };
+
+  factory Post.fromJson(Map<String, dynamic> json) => Post(
+    id: json['id'],
+    title: json['title'],
+    content: json['content'],
+    createdAt: json['created_at'] != null
+        ? DateTime.parse(json['created_at'])
+        : null,
+  );
+}
+
+// Single insert
+final result = await insforge.database
+    .from('posts')
+    .insert({'title': 'Hello World', 'content': 'My first post!'})
+    .select();
+
+// Bulk insert
+final result = await insforge.database
+    .from('posts')
+    .insert([
+      {'title': 'First Post', 'content': 'Hello everyone!'},
+      {'title': 'Second Post', 'content': 'Another update.'},
+    ])
+    .select();
+```
+
+---
+
+## update()
+
+Update existing records in a table.
+
+### Examples
+
+```dart
+// Update by ID
+final result = await insforge.database
+    .from('posts')
+    .update({'title': 'Updated Title'})
+    .eq('id', postId)
+    .select();
+
+// Update multiple
+final result = await insforge.database
+    .from('tasks')
+    .update({'status': 'completed'})
+    .inFilter('id', ['task-1', 'task-2'])
+    .select();
+```
+
+---
+
+## delete()
+
+Delete records from a table.
+
+### Examples
+
+```dart
+// Delete by ID
+await insforge.database
+    .from('posts')
+    .delete()
+    .eq('id', postId);
+
+// Delete with filter
+await insforge.database
+    .from('sessions')
+    .delete()
+    .lt('expires_at', DateTime.now().toIso8601String());
+```
+
+---
+
+## select()
+
+Query records from a table.
+
+### Examples
+
+```dart
+// Get all posts
+final response = await insforge.database
+    .from('posts')
+    .select();
+
+final posts = (response.data as List)
+    .map((json) => Post.fromJson(json))
+    .toList();
+
+// Specific columns
+final response = await insforge.database
+    .from('posts')
+    .select('id, title, content');
+
+// With relationships
+final response = await insforge.database
+    .from('posts')
+    .select('*, comments(id, content)');
+```
+
+---
+
+## Filters
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| `.eq(column, value)` | Equals | `.eq('status', 'active')` |
+| `.neq(column, value)` | Not equals | `.neq('status', 'banned')` |
+| `.gt(column, value)` | Greater than | `.gt('age', 18)` |
+| `.gte(column, value)` | Greater than or equal | `.gte('price', 100)` |
+| `.lt(column, value)` | Less than | `.lt('stock', 10)` |
+| `.lte(column, value)` | Less than or equal | `.lte('priority', 3)` |
+| `.like(column, pattern)` | Case-sensitive pattern | `.like('name', '%Widget%')` |
+| `.ilike(column, pattern)` | Case-insensitive pattern | `.ilike('email', '%@gmail.com')` |
+| `.inFilter(column, list)` | Value in list | `.inFilter('status', ['pending', 'active'])` |
+| `.isNull(column)` | Is null | `.isNull('deleted_at')` |
+
+```dart
+// Chain multiple filters
+final response = await insforge.database
+    .from('products')
+    .select()
+    .eq('category', 'electronics')
+    .gte('price', 50)
+    .lte('price', 500);
+```
+
+---
+
+## Modifiers
+
+| Modifier | Description | Example |
+|----------|-------------|---------|
+| `.order(column, ascending:)` | Sort results | `.order('created_at', ascending: false)` |
+| `.limit(count)` | Limit rows | `.limit(10)` |
+| `.range(from, to)` | Pagination | `.range(0, 9)` |
+| `.single()` | Return single object | `.single()` |
+
+```dart
+// Pagination with sorting
+final response = await insforge.database
+    .from('posts')
+    .select()
+    .order('created_at', ascending: false)
+    .range(0, 9)
+    .limit(10);
+```
+
+---
+
+## Flutter Widget Integration
+
+### FutureBuilder
+
+```dart
+class PostListPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Posts')),
+      body: FutureBuilder<PostgrestResponse>(
+        future: insforge.database
+            .from('posts')
+            .select()
+            .order('created_at', ascending: false),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          final posts = (snapshot.data?.data as List)
+              .map((json) => Post.fromJson(json))
+              .toList();
+
+          return ListView.builder(
+            itemCount: posts.length,
+            itemBuilder: (context, index) {
+              final post = posts[index];
+              return ListTile(
+                title: Text(post.title),
+                subtitle: Text(post.content),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+```
+
+### StreamBuilder with Realtime
+
+```dart
+class RealtimePostList extends StatefulWidget {
+  @override
+  _RealtimePostListState createState() => _RealtimePostListState();
+}
+
+class _RealtimePostListState extends State<RealtimePostList> {
+  List<Post> posts = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPosts();
+  }
+
+  Future<void> _loadPosts() async {
+    final response = await insforge.database
+        .from('posts')
+        .select()
+        .order('created_at', ascending: false);
+
+    setState(() {
+      posts = (response.data as List)
+          .map((json) => Post.fromJson(json))
+          .toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      itemCount: posts.length,
+      itemBuilder: (context, index) {
+        final post = posts[index];
+        return Card(
+          child: ListTile(
+            title: Text(post.title),
+            subtitle: Text(post.content),
+          ),
+        );
+      },
+    );
+  }
+}
+```
+
+### Riverpod Example
+
+```dart
+// Define provider
+final postsProvider = FutureProvider<List<Post>>((ref) async {
+  final response = await insforge.database
+      .from('posts')
+      .select()
+      .order('created_at', ascending: false);
+
+  return (response.data as List)
+      .map((json) => Post.fromJson(json))
+      .toList();
+});
+
+// Use in widget
+class PostListPage extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final postsAsync = ref.watch(postsProvider);
+
+    return postsAsync.when(
+      loading: () => CircularProgressIndicator(),
+      error: (error, stack) => Text('Error: $error'),
+      data: (posts) => ListView.builder(
+        itemCount: posts.length,
+        itemBuilder: (context, index) => PostTile(post: posts[index]),
+      ),
+    );
+  }
+}
+```

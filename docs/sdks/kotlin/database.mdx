@@ -1,0 +1,273 @@
+---
+title: Database SDK Reference
+description: Type-safe database operations using the InsForge Kotlin SDK
+---
+
+<Info>
+  **Coming Soon** - The Kotlin SDK is currently in development. This documentation serves as a preview of the planned API.
+</Info>
+
+## Installation
+
+```kotlin
+// build.gradle.kts
+dependencies {
+    implementation("dev.insforge:insforge-kotlin:1.0.0")
+}
+```
+
+```kotlin
+import dev.insforge.InsForgeClient
+
+val insforge = InsForgeClient(
+    baseUrl = "https://your-app.us-east.insforge.app",
+    anonKey = "your-anon-key"
+)
+```
+
+## insert()
+
+Insert new records into a table.
+
+### Examples
+
+```kotlin
+// Define your data class
+@Serializable
+data class Post(
+    val id: String? = null,
+    val title: String,
+    val content: String,
+    @SerialName("created_at")
+    val createdAt: String? = null
+)
+
+// Single insert
+val post = Post(title = "Hello World", content = "My first post!")
+val result = insforge.database
+    .from("posts")
+    .insert(post)
+    .select()
+    .execute<List<Post>>()
+
+// Bulk insert
+val posts = listOf(
+    Post(title = "First Post", content = "Hello everyone!"),
+    Post(title = "Second Post", content = "Another update.")
+)
+val result = insforge.database
+    .from("posts")
+    .insert(posts)
+    .select()
+    .execute<List<Post>>()
+```
+
+---
+
+## update()
+
+Update existing records in a table.
+
+### Examples
+
+```kotlin
+// Update by ID
+val result = insforge.database
+    .from("posts")
+    .update(mapOf("title" to "Updated Title"))
+    .eq("id", postId)
+    .select()
+    .execute<List<Post>>()
+
+// Update multiple
+val result = insforge.database
+    .from("tasks")
+    .update(mapOf("status" to "completed"))
+    .`in`("id", listOf("task-1", "task-2"))
+    .select()
+    .execute<List<Task>>()
+```
+
+---
+
+## delete()
+
+Delete records from a table.
+
+### Examples
+
+```kotlin
+// Delete by ID
+insforge.database
+    .from("posts")
+    .delete()
+    .eq("id", postId)
+    .execute()
+
+// Delete with filter
+insforge.database
+    .from("sessions")
+    .delete()
+    .lt("expires_at", Date())
+    .execute()
+```
+
+---
+
+## select()
+
+Query records from a table.
+
+### Examples
+
+```kotlin
+// Get all posts
+val posts = insforge.database
+    .from("posts")
+    .select()
+    .execute<List<Post>>()
+
+// Specific columns
+val posts = insforge.database
+    .from("posts")
+    .select("id, title, content")
+    .execute<List<Post>>()
+
+// With relationships
+val posts = insforge.database
+    .from("posts")
+    .select("*, comments(id, content)")
+    .execute<List<PostWithComments>>()
+```
+
+---
+
+## Filters
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| `.eq(column, value)` | Equals | `.eq("status", "active")` |
+| `.neq(column, value)` | Not equals | `.neq("status", "banned")` |
+| `.gt(column, value)` | Greater than | `.gt("age", 18)` |
+| `.gte(column, value)` | Greater than or equal | `.gte("price", 100)` |
+| `.lt(column, value)` | Less than | `.lt("stock", 10)` |
+| `.lte(column, value)` | Less than or equal | `.lte("priority", 3)` |
+| `.like(column, pattern)` | Case-sensitive pattern | `.like("name", "%Widget%")` |
+| `.ilike(column, pattern)` | Case-insensitive pattern | `.ilike("email", "%@gmail.com")` |
+| `.in(column, list)` | Value in list | `.in("status", listOf("pending", "active"))` |
+| `.isNull(column)` | Is null | `.isNull("deleted_at")` |
+
+```kotlin
+// Chain multiple filters
+val products = insforge.database
+    .from("products")
+    .select()
+    .eq("category", "electronics")
+    .gte("price", 50)
+    .lte("price", 500)
+    .execute<List<Product>>()
+```
+
+---
+
+## Modifiers
+
+| Modifier | Description | Example |
+|----------|-------------|---------|
+| `.order(column, ascending)` | Sort results | `.order("created_at", ascending = false)` |
+| `.limit(count)` | Limit rows | `.limit(10)` |
+| `.range(from, to)` | Pagination | `.range(0, 9)` |
+| `.single()` | Return single object | `.single()` |
+
+```kotlin
+// Pagination with sorting
+val posts = insforge.database
+    .from("posts")
+    .select()
+    .order("created_at", ascending = false)
+    .range(0, 9)
+    .limit(10)
+    .execute<List<Post>>()
+```
+
+---
+
+## Jetpack Compose Integration
+
+```kotlin
+@Composable
+fun PostListScreen() {
+    var posts by remember { mutableStateOf<List<Post>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        try {
+            posts = insforge.database
+                .from("posts")
+                .select()
+                .order("created_at", ascending = false)
+                .execute()
+        } catch (e: Exception) {
+            Log.e("PostList", "Error loading posts", e)
+        } finally {
+            isLoading = false
+        }
+    }
+
+    if (isLoading) {
+        CircularProgressIndicator()
+    } else {
+        LazyColumn {
+            items(posts) { post ->
+                PostItem(post = post)
+            }
+        }
+    }
+}
+
+@Composable
+fun PostItem(post: Post) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = post.title,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = post.content,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
+}
+```
+
+---
+
+## Flow Support
+
+```kotlin
+// Observe database changes as Flow
+val postsFlow: Flow<List<Post>> = insforge.database
+    .from("posts")
+    .select()
+    .asFlow()
+
+// Collect in ViewModel
+class PostViewModel : ViewModel() {
+    val posts = insforge.database
+        .from("posts")
+        .select()
+        .asFlow()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+}
+```

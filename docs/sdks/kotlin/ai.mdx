@@ -1,0 +1,326 @@
+---
+title: AI SDK Reference
+description: AI chat completions and image generation with the InsForge Kotlin SDK
+---
+
+<Info>
+  **Coming Soon** - The Kotlin SDK is currently in development. This documentation serves as a preview of the planned API.
+</Info>
+
+## Installation
+
+```kotlin
+import dev.insforge.InsForgeClient
+
+val insforge = InsForgeClient(
+    baseUrl = "https://your-app.us-east.insforge.app",
+    anonKey = "your-anon-key"
+)
+```
+
+## chat.completions.create()
+
+Create AI chat completions.
+
+### Example (non-streaming)
+
+```kotlin
+val completion = insforge.ai.chat.completions.create(
+    model = "anthropic/claude-3.5-haiku",
+    messages = listOf(
+        ChatMessage(role = Role.USER, content = "What is the capital of France?")
+    )
+)
+
+Log.d("AI", completion.choices[0].message.content)
+```
+
+### Example (with image)
+
+```kotlin
+val imageData = bitmap.toByteArray()
+val base64Image = Base64.encodeToString(imageData, Base64.NO_WRAP)
+
+val completion = insforge.ai.chat.completions.create(
+    model = "anthropic/claude-3.5-haiku",
+    messages = listOf(
+        ChatMessage(
+            role = Role.USER,
+            content = listOf(
+                ContentPart.Text("What do you see in this image?"),
+                ContentPart.ImageUrl("data:image/jpeg;base64,$base64Image")
+            )
+        )
+    )
+)
+
+Log.d("AI", completion.choices[0].message.content)
+```
+
+### Example (streaming)
+
+```kotlin
+val stream = insforge.ai.chat.completions.createStream(
+    model = "openai/gpt-4",
+    messages = listOf(
+        ChatMessage(role = Role.USER, content = "Tell me a story")
+    )
+)
+
+stream.collect { chunk ->
+    chunk.choices[0].delta.content?.let { content ->
+        print(content)
+    }
+}
+```
+
+---
+
+## images.generate()
+
+Generate images using AI models.
+
+### Example
+
+```kotlin
+val response = insforge.ai.images.generate(
+    model = "google/gemini-2.5-flash-image-preview",
+    prompt = "A serene mountain landscape at sunset",
+    size = "1024x1024"
+)
+
+// Convert base64 to Bitmap
+response.data[0].b64Json?.let { base64 ->
+    val imageData = Base64.decode(base64, Base64.DEFAULT)
+    val bitmap = BitmapFactory.decodeByteArray(imageData, 0, imageData.size)
+    imageView.setImageBitmap(bitmap)
+
+    // Upload to storage
+    val uploadResult = insforge.storage
+        .from("ai-images")
+        .uploadAuto(data = imageData, contentType = "image/png")
+
+    // Save to database
+    insforge.database
+        .from("generated_images")
+        .insert(
+            mapOf(
+                "prompt" to "A serene mountain landscape",
+                "image_url" to uploadResult.url
+            )
+        )
+}
+```
+
+---
+
+## Jetpack Compose Integration
+
+### Chat Screen
+
+```kotlin
+@Composable
+fun ChatScreen() {
+    var messages by remember { mutableStateOf<List<ChatMessage>>(emptyList()) }
+    var inputText by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .padding(16.dp),
+            reverseLayout = true
+        ) {
+            items(messages.reversed()) { message ->
+                ChatBubble(message = message)
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            OutlinedTextField(
+                value = inputText,
+                onValueChange = { inputText = it },
+                modifier = Modifier.weight(1f),
+                placeholder = { Text("Message") }
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            IconButton(
+                onClick = {
+                    if (inputText.isNotBlank() && !isLoading) {
+                        scope.launch {
+                            sendMessage(inputText, messages) { newMessages ->
+                                messages = newMessages
+                            }
+                            inputText = ""
+                        }
+                    }
+                },
+                enabled = inputText.isNotBlank() && !isLoading
+            ) {
+                Icon(Icons.Default.Send, "Send")
+            }
+        }
+    }
+}
+
+suspend fun sendMessage(
+    text: String,
+    currentMessages: List<ChatMessage>,
+    onUpdate: (List<ChatMessage>) -> Unit
+) {
+    val userMessage = ChatMessage(role = Role.USER, content = text)
+    val updatedMessages = currentMessages + userMessage
+    onUpdate(updatedMessages)
+
+    try {
+        val completion = insforge.ai.chat.completions.create(
+            model = "anthropic/claude-3.5-haiku",
+            messages = updatedMessages
+        )
+        onUpdate(updatedMessages + completion.choices[0].message)
+    } catch (e: Exception) {
+        Log.e("Chat", "Error: ${e.message}")
+    }
+}
+```
+
+### Streaming Chat
+
+```kotlin
+@Composable
+fun StreamingChatScreen() {
+    var response by remember { mutableStateOf("") }
+    var isStreaming by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        Text(
+            text = response,
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+        )
+
+        Button(
+            onClick = {
+                scope.launch {
+                    isStreaming = true
+                    response = ""
+
+                    try {
+                        val stream = insforge.ai.chat.completions.createStream(
+                            model = "anthropic/claude-3.5-haiku",
+                            messages = listOf(
+                                ChatMessage(
+                                    role = Role.USER,
+                                    content = "Explain quantum computing"
+                                )
+                            )
+                        )
+
+                        stream.collect { chunk ->
+                            chunk.choices[0].delta.content?.let { content ->
+                                response += content
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e("Stream", "Error: ${e.message}")
+                    } finally {
+                        isStreaming = false
+                    }
+                }
+            },
+            enabled = !isStreaming,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(if (isStreaming) "Streaming..." else "Ask AI")
+        }
+    }
+}
+```
+
+### Image Generation Screen
+
+```kotlin
+@Composable
+fun ImageGenerationScreen() {
+    var prompt by remember { mutableStateOf("") }
+    var generatedBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var isGenerating by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        OutlinedTextField(
+            value = prompt,
+            onValueChange = { prompt = it },
+            label = { Text("Describe your image...") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = {
+                scope.launch {
+                    isGenerating = true
+                    try {
+                        val response = insforge.ai.images.generate(
+                            model = "google/gemini-2.5-flash-image-preview",
+                            prompt = prompt,
+                            size = "1024x1024"
+                        )
+
+                        response.data[0].b64Json?.let { base64 ->
+                            val data = Base64.decode(base64, Base64.DEFAULT)
+                            generatedBitmap = BitmapFactory.decodeByteArray(
+                                data, 0, data.size
+                            )
+                        }
+                    } catch (e: Exception) {
+                        Log.e("ImageGen", "Failed: ${e.message}")
+                    } finally {
+                        isGenerating = false
+                    }
+                }
+            },
+            enabled = prompt.isNotBlank() && !isGenerating,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(if (isGenerating) "Generating..." else "Generate Image")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (isGenerating) {
+            CircularProgressIndicator()
+        }
+
+        generatedBitmap?.let { bitmap ->
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = "Generated image",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(300.dp)
+            )
+        }
+    }
+}
+```

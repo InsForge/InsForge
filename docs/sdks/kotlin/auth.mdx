@@ -1,0 +1,292 @@
+---
+title: Authentication SDK Reference
+description: User authentication and profile management with the InsForge Kotlin SDK
+---
+
+<Info>
+  **Coming Soon** - The Kotlin SDK is currently in development. This documentation serves as a preview of the planned API.
+</Info>
+
+## Installation
+
+```kotlin
+import dev.insforge.InsForgeClient
+
+val insforge = InsForgeClient(
+    baseUrl = "https://your-app.us-east.insforge.app",
+    anonKey = "your-anon-key"
+)
+```
+
+## signUp()
+
+Create a new user account with email and password.
+
+### Example
+
+```kotlin
+try {
+    val result = insforge.auth.signUp(
+        email = "user@example.com",
+        password = "secure_password123",
+        name = "John Doe"
+    )
+
+    result.user?.let { user ->
+        Log.d("Auth", "User created: ${user.email}")
+    }
+} catch (e: InsForgeAuthException) {
+    Log.e("Auth", "Sign up failed: ${e.message}")
+}
+```
+
+---
+
+## signIn()
+
+Sign in an existing user with email and password.
+
+### Example
+
+```kotlin
+try {
+    val result = insforge.auth.signIn(
+        email = "user@example.com",
+        password = "secure_password123"
+    )
+
+    result.user?.let { user ->
+        Log.d("Auth", "Welcome back, ${user.profile?.name ?: user.email}")
+    }
+} catch (e: InsForgeAuthException) {
+    Log.e("Auth", "Sign in failed: ${e.message}")
+}
+```
+
+---
+
+## signInWithOAuth()
+
+Start OAuth authentication flow.
+
+### Example
+
+```kotlin
+// Using Activity Result API
+val googleSignInLauncher = registerForActivityResult(
+    ActivityResultContracts.StartActivityForResult()
+) { result ->
+    insforge.auth.handleOAuthResult(result)
+}
+
+// Start OAuth flow
+insforge.auth.signInWithOAuth(
+    provider = OAuthProvider.GOOGLE,
+    activity = this,
+    launcher = googleSignInLauncher
+)
+```
+
+---
+
+## signOut()
+
+Sign out the current user.
+
+### Example
+
+```kotlin
+try {
+    insforge.auth.signOut()
+    Log.d("Auth", "User signed out")
+} catch (e: InsForgeAuthException) {
+    Log.e("Auth", "Sign out failed: ${e.message}")
+}
+```
+
+---
+
+## getCurrentUser()
+
+Get authenticated user with profile data.
+
+### Example
+
+```kotlin
+val user = insforge.auth.getCurrentUser()
+user?.let {
+    Log.d("Auth", "Email: ${it.email}")
+    Log.d("Auth", "Name: ${it.profile?.name ?: "N/A"}")
+} ?: Log.d("Auth", "No user signed in")
+```
+
+---
+
+## getCurrentSession()
+
+Get current session from local storage.
+
+### Example
+
+```kotlin
+insforge.auth.getCurrentSession()?.let { session ->
+    Log.d("Auth", "Access token: ${session.accessToken}")
+    Log.d("Auth", "User: ${session.user.email}")
+}
+```
+
+---
+
+## setProfile()
+
+Update current user's profile.
+
+### Example
+
+```kotlin
+try {
+    val result = insforge.auth.setProfile(
+        mapOf(
+            "name" to "JohnDev",
+            "bio" to "Android Developer",
+            "avatar_url" to "https://example.com/avatar.jpg"
+        )
+    )
+    Log.d("Auth", "Profile updated")
+} catch (e: InsForgeAuthException) {
+    Log.e("Auth", "Update failed: ${e.message}")
+}
+```
+
+---
+
+## Auth State Observer
+
+```kotlin
+// Observe auth state as Flow
+lifecycleScope.launch {
+    insforge.auth.authStateFlow.collect { user ->
+        if (user != null) {
+            Log.d("Auth", "User signed in: ${user.email}")
+        } else {
+            Log.d("Auth", "User signed out")
+        }
+    }
+}
+```
+
+---
+
+## Jetpack Compose Integration
+
+```kotlin
+@Composable
+fun AuthScreen() {
+    val authState by insforge.auth.authStateFlow.collectAsState(initial = null)
+    val isLoading by insforge.auth.isLoadingFlow.collectAsState(initial = true)
+
+    when {
+        isLoading -> LoadingScreen()
+        authState != null -> DashboardScreen(user = authState!!)
+        else -> LoginScreen()
+    }
+}
+
+@Composable
+fun LoginScreen() {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Email") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Password") },
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        error?.let {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(it, color = MaterialTheme.colorScheme.error)
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = {
+                scope.launch {
+                    isLoading = true
+                    error = null
+                    try {
+                        insforge.auth.signIn(email, password)
+                    } catch (e: InsForgeAuthException) {
+                        error = e.message
+                    } finally {
+                        isLoading = false
+                    }
+                }
+            },
+            enabled = !isLoading,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            } else {
+                Text("Sign In")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // OAuth buttons
+        GoogleSignInButton(
+            onClick = { /* Handle Google sign in */ }
+        )
+    }
+}
+```
+
+---
+
+## Error Handling
+
+```kotlin
+try {
+    val result = insforge.auth.signIn(email, password)
+} catch (e: InsForgeAuthException) {
+    when (e) {
+        is InsForgeAuthException.InvalidCredentials ->
+            showError("Invalid email or password")
+        is InsForgeAuthException.UserNotFound ->
+            showError("User not found")
+        is InsForgeAuthException.EmailNotVerified ->
+            showError("Please verify your email")
+        is InsForgeAuthException.NetworkError ->
+            showError("Network error: ${e.cause?.message}")
+        else ->
+            showError("Auth error: ${e.message}")
+    }
+}
+```
