@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
 import { ThemeProvider } from '@/lib/contexts/ThemeContext';
+import { OnboardingModal } from '@/features/onboard';
 import { isIframe } from '@/lib/utils/utils';
 
 interface LayoutProps {
@@ -27,6 +28,7 @@ export default function Layout({ children }: LayoutProps) {
           <main className="flex-1 overflow-y-auto">{children}</main>
         </div>
       </div>
+      <OnboardingModal />
     </ThemeProvider>
   );
 }
