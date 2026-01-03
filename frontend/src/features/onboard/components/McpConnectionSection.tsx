@@ -42,7 +42,7 @@ export function McpConnectionSection({
   }, [apiKey, appUrl]);
 
   const testPrompt =
-    "I'm using InsForge as my backend platform, fetch InsForge instruction doc to learn more about InsForge.";
+    "I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to learn about InsForge instructions.";
 
   return (
     <div className={cn('flex flex-col gap-6', className)}>
