@@ -1,5 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/lib/contexts/AuthContext';
+import { ModalProvider } from '@/lib/contexts/ModalContext';
+import { CloudMessageHandler } from '@/components/CloudMessageHandler';
 import { AppRoutes } from '@/lib/routing/AppRoutes';
 import { ToastProvider } from '@/lib/hooks/useToast';
 import { SocketProvider } from '@/lib/contexts/SocketContext';
@@ -23,9 +25,12 @@ function App() {
         <SocketProvider>
           <ToastProvider>
             <PostHogAnalyticsProvider>
-              <SQLEditorProvider>
-                <AppRoutes />
-              </SQLEditorProvider>
+              <ModalProvider>
+                <CloudMessageHandler />
+                <SQLEditorProvider>
+                  <AppRoutes />
+                </SQLEditorProvider>
+              </ModalProvider>
             </PostHogAnalyticsProvider>
           </ToastProvider>
         </SocketProvider>
