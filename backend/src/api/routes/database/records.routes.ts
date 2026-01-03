@@ -349,7 +349,10 @@ const forwardRpcToPostgrest = async (req: AuthRequest, res: Response, next: Next
 
     // Handle response
     let responseData = response.data;
-    if (response.data === undefined || (typeof response.data === 'string' && response.data.trim() === '')) {
+    if (
+      response.data === undefined ||
+      (typeof response.data === 'string' && response.data.trim() === '')
+    ) {
       responseData = null;
     }
 
