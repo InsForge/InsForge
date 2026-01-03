@@ -92,6 +92,7 @@ const DOCS_MAP: Record<DocTypeSchema, string> = {
   'db-sdk-kotlin': 'sdks/kotlin/database.mdx',
   'storage-sdk-kotlin': 'sdks/kotlin/storage.mdx',
   'auth-sdk-kotlin': 'sdks/kotlin/auth.mdx',
+  'functions-sdk-kotlin': 'sdks/kotlin/functions.mdx',
   'ai-sdk-kotlin': 'sdks/kotlin/ai.mdx',
   'realtime-sdk-kotlin': 'sdks/kotlin/realtime.mdx',
 
@@ -99,6 +100,7 @@ const DOCS_MAP: Record<DocTypeSchema, string> = {
   'db-sdk-flutter': 'sdks/flutter/database.mdx',
   'storage-sdk-flutter': 'sdks/flutter/storage.mdx',
   'auth-sdk-flutter': 'sdks/flutter/auth.mdx',
+  'functions-sdk-flutter': 'sdks/flutter/functions.mdx',
   'ai-sdk-flutter': 'sdks/flutter/ai.mdx',
   'realtime-sdk-flutter': 'sdks/flutter/realtime.mdx',
 
