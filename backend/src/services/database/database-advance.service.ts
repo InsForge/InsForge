@@ -98,79 +98,58 @@ export class DatabaseAdvanceService {
       /(?:DELETE\s+(?:FROM\s+["']?auth["']?\s*\.|(?:(?!FROM\s+[^a]).)*?\bFROM\s+["']?auth["']?\s*\.)|TRUNCATE\s+(?:TABLE\s+)?(?:IF\s+EXISTS\s+)?["']?auth["']?\s*\.|DROP\s+.*?["']?auth["']?\s*(?:\.|(?:\s|$|CASCADE)))/i;
     
     if (authSchemaBlocked.test(query)) {
-      let operation = 'operation';
-      let message = 'This operation on auth schema is not allowed.';
-      let match: RegExpMatchArray | null = null;
+      const checkIfInCommentOrString = (matchIndex: number, matchLength: number): boolean => {
+        const beforeMatch = query.substring(0, matchIndex);
+        const afterMatch = query.substring(matchIndex + matchLength);
+        const matchLine = query.substring(matchIndex, matchIndex + matchLength);
+        
+        const inString = (beforeMatch.match(/'/g) || []).length % 2 !== 0;
+        const lastBlockCommentStart = beforeMatch.lastIndexOf('/*');
+        const lastBlockCommentEnd = beforeMatch.lastIndexOf('*/');
+        const inBlockComment = lastBlockCommentStart > lastBlockCommentEnd;
+        
+        const lineStart = beforeMatch.lastIndexOf('\n') + 1;
+        const lineBeforeMatch = beforeMatch.substring(lineStart);
+        const lineAfterMatch = afterMatch.split('\n')[0];
+        const fullLine = lineBeforeMatch + matchLine + lineAfterMatch;
+        const inLineComment = /--/.test(fullLine);
+        
+        return inString || inBlockComment || inLineComment;
+      };
 
-      if (/DELETE/i.test(query)) {
-        match = query.match(/DELETE\s+(?:FROM\s+["']?auth["']?\s*\.|(?:(?!FROM\s+[^a]).)*?\bFROM\s+["']?auth["']?\s*\.)/i);
-        if (match) {
-          const beforeMatch = query.substring(0, match.index!);
-          const betweenDeleteAndAuth = match[0].replace(/^DELETE\s+/i, '');
-          const inString = (beforeMatch.match(/'/g) || []).length % 2 !== 0;
-          const lastBlockCommentStart = beforeMatch.lastIndexOf('/*');
-          const lastBlockCommentEnd = beforeMatch.lastIndexOf('*/');
-          const inBlockComment = lastBlockCommentStart > lastBlockCommentEnd;
-          const lineStart = beforeMatch.lastIndexOf('\n') + 1;
-          const lineBeforeMatch = beforeMatch.substring(lineStart);
-          const inLineComment = /--/.test(lineBeforeMatch);
-          const otherFromMatch = betweenDeleteAndAuth.match(/\bFROM\s+(?!["']?auth["']?\s*\.)[^a]/i);
-          
-          if (!otherFromMatch && !inString && !inBlockComment && !inLineComment) {
-            operation = 'DELETE';
-            message =
-              'DELETE operations on auth schema are not allowed. User deletion must be done through dedicated authentication APIs.';
-          } else {
-            return query;
-          }
-        }
-      } else if (/TRUNCATE/i.test(query)) {
-        match = query.match(/TRUNCATE\s+(?:TABLE\s+)?(?:IF\s+EXISTS\s+)?["']?auth["']?\s*\./i);
-        if (match) {
-          const beforeMatch = query.substring(0, match.index!);
-          const inString = (beforeMatch.match(/'/g) || []).length % 2 !== 0;
-          const lastBlockCommentStart = beforeMatch.lastIndexOf('/*');
-          const lastBlockCommentEnd = beforeMatch.lastIndexOf('*/');
-          const inBlockComment = lastBlockCommentStart > lastBlockCommentEnd;
-          const lineStart = beforeMatch.lastIndexOf('\n') + 1;
-          const lineBeforeMatch = beforeMatch.substring(lineStart);
-          const inLineComment = /--/.test(lineBeforeMatch);
-          
-          if (!inString && !inBlockComment && !inLineComment) {
-            operation = 'TRUNCATE';
-            message =
-              'TRUNCATE operations on auth schema are not allowed. This would delete all users and must be done through dedicated authentication APIs.';
-          } else {
-            return query;
-          }
-        }
-      } else if (/DROP/i.test(query)) {
-        match = query.match(/DROP\s+.*?["']?auth["']?\s*(?:\.|(?:\s|$|CASCADE))/i);
-        if (match) {
-          const beforeMatch = query.substring(0, match.index!);
-          const inString = (beforeMatch.match(/'/g) || []).length % 2 !== 0;
-          const lastBlockCommentStart = beforeMatch.lastIndexOf('/*');
-          const lastBlockCommentEnd = beforeMatch.lastIndexOf('*/');
-          const inBlockComment = lastBlockCommentStart > lastBlockCommentEnd;
-          const lineStart = beforeMatch.lastIndexOf('\n') + 1;
-          const lineBeforeMatch = beforeMatch.substring(lineStart);
-          const inLineComment = /--/.test(lineBeforeMatch);
-          
-          if (!inString && !inBlockComment && !inLineComment) {
-            operation = 'DROP';
-            message =
-              'DROP operations on auth schema are not allowed. This would destroy authentication resources and break the system.';
-          } else {
-            return query;
-          }
-        }
-      }
+      const operationConfigs = [
+        {
+          pattern: /DELETE\s+(?:FROM\s+["']?auth["']?\s*\.|(?:(?!FROM\s+[^a]).)*?\bFROM\s+["']?auth["']?\s*\.)/i,
+          name: 'DELETE',
+          message: 'DELETE operations on auth schema are not allowed. User deletion must be done through dedicated authentication APIs.',
+          validate: (match: RegExpMatchArray): boolean => {
+            const betweenDeleteAndAuth = match[0].replace(/^DELETE\s+/i, '');
+            const otherFromMatch = betweenDeleteAndAuth.match(/\bFROM\s+(?!["']?auth["']?\s*\.)[^a]/i);
+            return !otherFromMatch;
+          },
+        },
+        {
+          pattern: /TRUNCATE\s+(?:TABLE\s+)?(?:IF\s+EXISTS\s+)?["']?auth["']?\s*\./i,
+          name: 'TRUNCATE',
+          message: 'TRUNCATE operations on auth schema are not allowed. This would delete all users and must be done through dedicated authentication APIs.',
+          validate: () => true,
+        },
+        {
+          pattern: /DROP\s+.*?["']?auth["']?\s*(?:\.|(?:\s|$|CASCADE))/i,
+          name: 'DROP',
+          message: 'DROP operations on auth schema are not allowed. This would destroy authentication resources and break the system.',
+          validate: () => true,
+        },
+      ];
 
-      if (operation !== 'operation') {
-        logger.warn(`Blocked ${operation} operation on auth schema`, {
-          query: query.substring(0, 100),
-        });
-        throw new AppError(message, 403, ERROR_CODES.FORBIDDEN);
+      for (const config of operationConfigs) {
+        const match = query.match(config.pattern);
+        if (match && config.validate(match) && !checkIfInCommentOrString(match.index!, match[0].length)) {
+          logger.warn(`Blocked ${config.name} operation on auth schema`, {
+            query: query.substring(0, 100),
+          });
+          throw new AppError(config.message, 403, ERROR_CODES.FORBIDDEN);
+        }
       }
     }
 
