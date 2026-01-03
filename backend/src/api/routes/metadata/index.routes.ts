@@ -12,6 +12,7 @@ import { AppError } from '@/api/middlewares/error.js';
 import type { AppMetadataSchema } from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
+import { CloudDatabaseProvider } from '@/providers/database/cloud.provider.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -123,6 +124,31 @@ router.get('/api-key', async (req: AuthRequest, res: Response, next: NextFunctio
     const apiKey = await secretService.getSecretByKey('API_KEY');
 
     successResponse(res, { apiKey: apiKey });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get database connection string from cloud backend (admin only)
+router.get(
+  '/database-connection-string',
+  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const cloudDbProvider = CloudDatabaseProvider.getInstance();
+      const connectionInfo = await cloudDbProvider.getDatabaseConnectionString();
+      successResponse(res, connectionInfo);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Get database password from cloud backend (admin only)
+router.get('/database-password', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const cloudDbProvider = CloudDatabaseProvider.getInstance();
+    const passwordInfo = await cloudDbProvider.getDatabasePassword();
+    successResponse(res, passwordInfo);
   } catch (error) {
     next(error);
   }
