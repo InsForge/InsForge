@@ -6,6 +6,7 @@ import { ConnectionStringSection } from './ConnectionStringSection';
 import { useApiKey } from '@/lib/hooks/useMetadata';
 import { cn, getBackendUrl, isInsForgeCloudProject } from '@/lib/utils/utils';
 import DiscordIcon from '@/assets/logos/discord.svg?react';
+import { useModal } from '@/lib/contexts/ModalContext';
 
 export type ConnectionTab = 'mcp' | 'connection-string' | 'api-credentials';
 
@@ -34,13 +35,9 @@ export function setOnboardingSkipped(skipped: boolean): void {
   }
 }
 
-interface OnboardingModalProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}
-
-export function OnboardingModal({ open, onOpenChange }: OnboardingModalProps) {
+export function OnboardingModal() {
   const [activeTab, setActiveTab] = useState<ConnectionTab>('mcp');
+  const { isOnboardingModalOpen, setOnboardingModalOpen } = useModal();
 
   const { apiKey, isLoading } = useApiKey();
   const appUrl = getBackendUrl();
@@ -63,7 +60,7 @@ export function OnboardingModal({ open, onOpenChange }: OnboardingModalProps) {
 
   const handleSkipOnboarding = () => {
     setOnboardingSkipped(true);
-    onOpenChange(false);
+    setOnboardingModalOpen(false);
   };
 
   const handleModalClose = (nextOpen: boolean) => {
@@ -73,7 +70,7 @@ export function OnboardingModal({ open, onOpenChange }: OnboardingModalProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleModalClose}>
+    <Dialog open={isOnboardingModalOpen} onOpenChange={handleModalClose}>
       <TooltipProvider>
         <DialogContent className="max-w-[640px] bg-white dark:bg-neutral-800 dark:border-neutral-700 p-0 gap-6">
           <DialogTitle className="sr-only">Connect Project</DialogTitle>

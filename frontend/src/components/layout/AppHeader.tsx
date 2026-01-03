@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { LogOut, ChevronDown } from 'lucide-react';
 import {
   Avatar,
@@ -12,15 +12,14 @@ import {
 } from '@/components';
 import {
   McpConnectionStatus,
-  OnboardingModal,
   getOnboardingSkipped,
   setOnboardingSkipped,
 } from '@/features/onboard';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
-import { cn, isIframe } from '@/lib/utils/utils';
+import { cn } from '@/lib/utils/utils';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
-import { parseCloudEvent } from '@/lib/utils/cloudMessaging';
+import { useModal } from '@/lib/contexts/ModalContext';
 
 // Import SVG icons
 import DiscordIcon from '@/assets/logos/discord.svg?react';
@@ -32,8 +31,8 @@ export default function AppHeader() {
   const { resolvedTheme } = useTheme();
   const { user, logout } = useAuth();
   const { hasCompletedOnboarding, isLoading: isMcpLoading } = useMcpUsage();
+  const { setOnboardingModalOpen } = useModal();
   const [githubStars, setGithubStars] = useState<number | null>(null);
-  const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
 
   // Fetch GitHub stars
   useEffect(() => {
@@ -52,46 +51,17 @@ export default function AppHeader() {
   // Auto-open onboarding modal if user hasn't connected and hasn't skipped
   useEffect(() => {
     if (!isMcpLoading && !hasCompletedOnboarding && !getOnboardingSkipped()) {
-      setIsOnboardingModalOpen(true);
+      setOnboardingModalOpen(true);
     }
-  }, [isMcpLoading, hasCompletedOnboarding]);
+  }, [isMcpLoading, hasCompletedOnboarding, setOnboardingModalOpen]);
 
   // When MCP connection is established, close onboarding modal and clear skip flag
   useEffect(() => {
     if (hasCompletedOnboarding) {
-      setIsOnboardingModalOpen(false);
+      setOnboardingModalOpen(false);
       setOnboardingSkipped(false);
     }
-  }, [hasCompletedOnboarding]);
-
-  // Handle messages from parent window (for cloud iframe integration)
-  const handleParentMessage = useCallback((event: MessageEvent) => {
-    // Only process messages when running in an iframe
-    if (!isIframe()) {
-      return;
-    }
-
-    const result = parseCloudEvent(event.data);
-    if (!result.ok) {
-      return;
-    }
-
-    const cloudEvent = result.data;
-
-    switch (cloudEvent.type) {
-      case 'SHOW_ONBOARDING_OVERLAY':
-        setIsOnboardingModalOpen(true);
-        break;
-    }
-  }, []);
-
-  // Listen for messages from parent window
-  useEffect(() => {
-    window.addEventListener('message', handleParentMessage);
-    return () => {
-      window.removeEventListener('message', handleParentMessage);
-    };
-  }, [handleParentMessage]);
+  }, [hasCompletedOnboarding, setOnboardingModalOpen]);
 
   const formatStars = (count: number): string => {
     if (count >= 1000) {
@@ -169,7 +139,7 @@ export default function AppHeader() {
           <ThemeToggle />
           <Separator className="h-5 mx-2" orientation="vertical" />
           {/* MCP Connection Status */}
-          <McpConnectionStatus onConnectClick={() => setIsOnboardingModalOpen(true)} />
+          <McpConnectionStatus onConnectClick={() => setOnboardingModalOpen(true)} />
 
           {/* User Profile*/}
           <Separator className="h-5 mx-2" orientation="vertical" />
@@ -209,8 +179,6 @@ export default function AppHeader() {
           </DropdownMenu>
         </div>
       </div>
-      {/* Onboarding Modal */}
-      <OnboardingModal open={isOnboardingModalOpen} onOpenChange={setIsOnboardingModalOpen} />
     </>
   );
 }
