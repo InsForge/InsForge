@@ -61,7 +61,8 @@ export function useDatabaseConnectionString(options?: UseMetadataOptions) {
   } = useQuery({
     queryKey: ['metadata', 'databaseConnectionString'],
     queryFn: () => metadataService.getDatabaseConnectionString(),
-    staleTime: options?.staleTime ?? 5 * 60 * 1000,
+    staleTime: 0,
+    gcTime: 0,
     enabled: options?.enabled ?? true,
   });
 
@@ -82,7 +83,8 @@ export function useDatabasePassword(options?: UseMetadataOptions) {
   } = useQuery({
     queryKey: ['metadata', 'databasePassword'],
     queryFn: () => metadataService.getDatabasePassword(),
-    staleTime: options?.staleTime ?? 5 * 60 * 1000,
+    staleTime: 0,
+    gcTime: 0,
     enabled: options?.enabled ?? true,
   });
 
