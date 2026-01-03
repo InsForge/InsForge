@@ -1,10 +1,12 @@
 import { useState, useMemo } from 'react';
+import { Smartphone } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, Button, TooltipProvider } from '@/components';
 import { McpConnectionSection } from './McpConnectionSection';
 import { ApiCredentialsSection } from './ApiCredentialsSection';
 import { ConnectionStringSection } from './ConnectionStringSection';
 import { useApiKey } from '@/lib/hooks/useMetadata';
-import { cn, getBackendUrl, isInsForgeCloudProject } from '@/lib/utils/utils';
+import { cn, getBackendUrl, isInsForgeCloudProject, isIframe } from '@/lib/utils/utils';
+import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 import DiscordIcon from '@/assets/logos/discord.svg?react';
 import { useModal } from '@/lib/contexts/ModalContext';
 
@@ -44,6 +46,7 @@ export function OnboardingModal() {
 
   const displayApiKey = isLoading ? 'ik_' + '*'.repeat(32) : apiKey || '';
   const isCloudEnvironment = isInsForgeCloudProject();
+  const isInIframe = isIframe();
 
   const connectionTabs = useMemo<ConnectionTabConfig[]>(() => {
     const tabs: ConnectionTabConfig[] = [
@@ -122,6 +125,16 @@ export function OnboardingModal() {
                 <span className="text-gray-500 dark:text-neutral-400 text-sm leading-6">
                   Need help?
                 </span>
+                {isCloudEnvironment && isInIframe && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => postMessageToParent({ type: 'SHOW_CONTACT_MODAL' })}
+                    className="gap-1.5 px-2 py-1 h-auto text-white group hover:bg-transparent"
+                  >
+                    <Smartphone className="w-5 h-5" />
+                    <span className="text-sm font-medium group-hover:underline">Text Us</span>
+                  </Button>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-gray-500 dark:text-neutral-400 text-sm leading-6">

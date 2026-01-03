@@ -1,17 +1,13 @@
 import { useState, useMemo } from 'react';
-import { ChevronDown, HelpCircle } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import {
   CodeBlock,
   CopyButton,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components';
-import { VideoDemoModal } from './VideoDemoModal';
 import { CursorDeeplinkGenerator } from './mcp/CursorDeeplinkGenerator';
 import { MCP_AGENTS, GenerateInstallCommand, createMCPConfig, type MCPAgent } from './mcp/helpers';
 import { cn } from '@/lib/utils/utils';
@@ -30,7 +26,6 @@ export function McpConnectionSection({
   className,
 }: McpConnectionSectionProps) {
   const [selectedAgent, setSelectedAgent] = useState<MCPAgent>(MCP_AGENTS[0]);
-  const [isVideoTooltipOpen, setIsVideoTooltipOpen] = useState(false);
 
   const installCommand = useMemo(() => {
     return GenerateInstallCommand(selectedAgent, apiKey);
@@ -48,25 +43,6 @@ export function McpConnectionSection({
     <div className={cn('flex flex-col gap-6', className)}>
       <p className="text-gray-500 dark:text-neutral-400 text-base leading-7">
         Install the MCP server so your coding agent can access and build the backend.
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span
-              onMouseEnter={() => setIsVideoTooltipOpen(true)}
-              onMouseLeave={() => setIsVideoTooltipOpen(false)}
-              className="inline-flex items-center align-middle ml-2 cursor-help"
-            >
-              <HelpCircle className="w-5 h-5 text-gray-400 dark:text-neutral-400 shrink-0" />
-            </span>
-          </TooltipTrigger>
-          <TooltipContent
-            portal
-            side="bottom"
-            sideOffset={10}
-            className="p-0 bg-transparent border-0 shadow-none z-[100]"
-          >
-            <VideoDemoModal open={isVideoTooltipOpen} className="w-[580px]" />
-          </TooltipContent>
-        </Tooltip>
       </p>
 
       {/* Agent Selector Dropdown */}
