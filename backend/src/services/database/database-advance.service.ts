@@ -111,7 +111,9 @@ export class DatabaseAdvanceService {
           const lastBlockCommentStart = beforeMatch.lastIndexOf('/*');
           const lastBlockCommentEnd = beforeMatch.lastIndexOf('*/');
           const inBlockComment = lastBlockCommentStart > lastBlockCommentEnd;
-          const inLineComment = /--[^\n]*$/m.test(beforeMatch);
+          const lineStart = beforeMatch.lastIndexOf('\n') + 1;
+          const lineBeforeMatch = beforeMatch.substring(lineStart);
+          const inLineComment = /--/.test(lineBeforeMatch);
           const otherFromMatch = betweenDeleteAndAuth.match(/\bFROM\s+(?!["']?auth["']?\s*\.)[^a]/i);
           
           if (!otherFromMatch && !inString && !inBlockComment && !inLineComment) {
@@ -130,7 +132,9 @@ export class DatabaseAdvanceService {
           const lastBlockCommentStart = beforeMatch.lastIndexOf('/*');
           const lastBlockCommentEnd = beforeMatch.lastIndexOf('*/');
           const inBlockComment = lastBlockCommentStart > lastBlockCommentEnd;
-          const inLineComment = /--[^\n]*$/m.test(beforeMatch);
+          const lineStart = beforeMatch.lastIndexOf('\n') + 1;
+          const lineBeforeMatch = beforeMatch.substring(lineStart);
+          const inLineComment = /--/.test(lineBeforeMatch);
           
           if (!inString && !inBlockComment && !inLineComment) {
             operation = 'TRUNCATE';
@@ -148,7 +152,9 @@ export class DatabaseAdvanceService {
           const lastBlockCommentStart = beforeMatch.lastIndexOf('/*');
           const lastBlockCommentEnd = beforeMatch.lastIndexOf('*/');
           const inBlockComment = lastBlockCommentStart > lastBlockCommentEnd;
-          const inLineComment = /--[^\n]*$/m.test(beforeMatch);
+          const lineStart = beforeMatch.lastIndexOf('\n') + 1;
+          const lineBeforeMatch = beforeMatch.substring(lineStart);
+          const inLineComment = /--/.test(lineBeforeMatch);
           
           if (!inString && !inBlockComment && !inLineComment) {
             operation = 'DROP';

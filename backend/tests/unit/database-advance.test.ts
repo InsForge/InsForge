@@ -238,10 +238,23 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
         "SELECT 'DELETE FROM auth.users' AS example_query",
         '/* DELETE FROM auth.users */ SELECT * FROM public.users',
         "SELECT 'DROP TABLE auth.users' AS test",
+        'DELETE FROM auth.users -- this is a comment on the same line',
       ];
 
       queries.forEach((query) => {
         expect(() => service.sanitizeQuery(query)).not.toThrow();
+      });
+    });
+
+    test('blocks DELETE FROM auth even when previous line has a comment', () => {
+      const queries = [
+        'SELECT 1; -- some comment\nDELETE FROM auth.users WHERE id = 1',
+        '-- previous comment\nDELETE FROM auth.users',
+        '/* block comment */\nDELETE FROM auth.users WHERE id = 1',
+      ];
+
+      queries.forEach((query) => {
+        expect(() => service.sanitizeQuery(query)).toThrow(AppError);
       });
     });
 
