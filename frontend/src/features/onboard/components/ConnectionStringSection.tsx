@@ -1,6 +1,7 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { CopyButton, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components';
 import { ShowPasswordButton } from './ShowPasswordButton';
+import { useDatabaseConnectionString, useDatabasePassword } from '@/lib/hooks/useMetadata';
 import { cn } from '@/lib/utils/utils';
 
 interface ParameterRowProps {
@@ -86,18 +87,6 @@ function ParameterRow({ label, value, copyValue }: ParameterRowProps) {
   );
 }
 
-// Placeholder connection string data - will be replaced with actual API data
-const PLACEHOLDER_DB_PARAMS = {
-  host: 'db.placeholder.insforge.app',
-  database: 'postgres',
-  user: 'postgres',
-  port: 5432,
-  password: '********',
-  sslmode: 'require',
-};
-
-const PLACEHOLDER_CONNECTION_STRING = `postgresql://postgres:********@db.placeholder.insforge.app:5432/postgres?sslmode=require`;
-
 interface ConnectionStringSectionProps {
   className?: string;
 }
@@ -106,20 +95,32 @@ export function ConnectionStringSection({ className }: ConnectionStringSectionPr
   const [showConnectionPassword, setShowConnectionPassword] = useState(false);
   const [showParamsPassword, setShowParamsPassword] = useState(false);
 
-  // TODO: Replace with actual API hooks when connection string APIs are ready
-  const isLoading = false;
-  const dbParams = PLACEHOLDER_DB_PARAMS;
-  const dbPassword = 'your-actual-password'; // Placeholder
-  const maskedPassword = dbParams.password;
+  const { connectionData, isLoading: isConnectionLoading } = useDatabaseConnectionString();
+  const { passwordData } = useDatabasePassword();
 
-  const connectionStringDisplay = showConnectionPassword
-    ? PLACEHOLDER_CONNECTION_STRING.replace('********', dbPassword)
-    : PLACEHOLDER_CONNECTION_STRING;
+  const dbParams = connectionData?.parameters;
+  const dbPassword = passwordData?.databasePassword || '';
+  const maskedPassword = dbParams?.password || '********';
 
-  const connectionStringClipboard = PLACEHOLDER_CONNECTION_STRING.replace('********', dbPassword);
+  const connectionStringDisplay = useMemo(() => {
+    if (!connectionData?.connectionURL) {
+      return '';
+    }
+    if (showConnectionPassword && dbPassword) {
+      return connectionData.connectionURL.replace('********', dbPassword);
+    }
+    return connectionData.connectionURL;
+  }, [connectionData?.connectionURL, showConnectionPassword, dbPassword]);
+
+  const connectionStringClipboard = useMemo(() => {
+    if (!connectionData?.connectionURL || !dbPassword) {
+      return connectionData?.connectionURL || '';
+    }
+    return connectionData.connectionURL.replace('********', dbPassword);
+  }, [connectionData?.connectionURL, dbPassword]);
 
   return (
-    <div className={cn('flex flex-col gap-6', isLoading && 'animate-pulse', className)}>
+    <div className={cn('flex flex-col gap-6', isConnectionLoading && 'animate-pulse', className)}>
       <p className="text-gray-500 dark:text-neutral-400 text-base leading-7">
         Ideal for applications with persistent and long-lived connections, such as those running on
         virtual machines or long-standing containers.
@@ -144,7 +145,7 @@ export function ConnectionStringSection({ className }: ConnectionStringSectionPr
           </div>
         </div>
         <p className="text-gray-700 dark:text-neutral-300 text-sm leading-6 break-words">
-          {connectionStringDisplay}
+          {connectionStringDisplay || 'Loading...'}
         </p>
       </div>
 
@@ -162,16 +163,16 @@ export function ConnectionStringSection({ className }: ConnectionStringSectionPr
           />
         </div>
         <div className="flex flex-col gap-3">
-          <ParameterRow label="HOST" value={dbParams.host} />
-          <ParameterRow label="DATABASE" value={dbParams.database} />
-          <ParameterRow label="USER" value={dbParams.user} />
-          <ParameterRow label="PORT" value={dbParams.port} />
+          <ParameterRow label="HOST" value={dbParams?.host} />
+          <ParameterRow label="DATABASE" value={dbParams?.database} />
+          <ParameterRow label="USER" value={dbParams?.user} />
+          <ParameterRow label="PORT" value={dbParams?.port} />
           <ParameterRow
             label="PASSWORD"
-            value={showParamsPassword ? dbPassword : maskedPassword}
-            copyValue={dbPassword}
+            value={showParamsPassword ? dbPassword || maskedPassword : maskedPassword}
+            copyValue={dbPassword || maskedPassword}
           />
-          <ParameterRow label="SSL" value={dbParams.sslmode} />
+          <ParameterRow label="SSL" value={dbParams?.sslmode} />
         </div>
       </div>
     </div>
