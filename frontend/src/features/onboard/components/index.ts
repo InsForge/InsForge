@@ -6,3 +6,4 @@ export { McpConnectionSection } from './McpConnectionSection';
 export { ApiCredentialsSection } from './ApiCredentialsSection';
 export { ConnectionStringSection } from './ConnectionStringSection';
 export { ShowPasswordButton } from './ShowPasswordButton';
+export { OnboardingController } from './OnboardingController';

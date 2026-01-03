@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/lib/contexts/AuthContext';
 import { ModalProvider } from '@/lib/contexts/ModalContext';
-import { CloudMessageHandler } from '@/components/CloudMessageHandler';
+import { OnboardingController } from '@/features/onboard';
 import { AppRoutes } from '@/lib/routing/AppRoutes';
 import { ToastProvider } from '@/lib/hooks/useToast';
 import { SocketProvider } from '@/lib/contexts/SocketContext';
@@ -26,7 +26,7 @@ function App() {
           <ToastProvider>
             <PostHogAnalyticsProvider>
               <ModalProvider>
-                <CloudMessageHandler />
+                <OnboardingController />
                 <SQLEditorProvider>
                   <AppRoutes />
                 </SQLEditorProvider>
