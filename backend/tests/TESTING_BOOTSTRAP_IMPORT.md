@@ -20,7 +20,14 @@ The import works because:
 
 ```bash
 cd backend
-npm test -- bootstrap-migrations-import
+npm test tests/unit/bootstrap-migrations-import.test.ts
+```
+
+Or use the dedicated test script:
+
+```bash
+cd backend
+npm run test:bootstrap-import
 ```
 
 This runs the automated test in `tests/unit/bootstrap-migrations-import.test.ts` which:

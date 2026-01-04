@@ -44,7 +44,8 @@ describe('Bootstrap Migrations Import', () => {
     const __dirname = path.dirname(__filename);
     
     // Get the actual paths relative to the project root
-    const projectRoot = path.resolve(__dirname, '../../..');
+    // From backend/tests/unit/, go up 2 levels to reach backend/
+    const projectRoot = path.resolve(__dirname, '../..');
     const bootstrapPath = path.join(projectRoot, 'src/infra/database/migrations/bootstrap/bootstrap-migrations.js');
     const loggerPath = path.join(projectRoot, 'src/utils/logger.ts');
     
