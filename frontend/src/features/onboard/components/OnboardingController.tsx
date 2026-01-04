@@ -1,5 +1,5 @@
 import { useEffect, useCallback } from 'react';
-import { useModal } from '@/lib/contexts/ModalContext';
+import { useModal } from '@/lib/hooks/useModal';
 import { parseCloudEvent } from '@/lib/utils/cloudMessaging';
 import { isIframe } from '@/lib/utils/utils';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
