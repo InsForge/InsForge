@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { usePartnerOrigin } from '../hooks/usePartnerOrigin';
-import { useModal } from '@/lib/contexts/ModalContext';
+import { useModal } from '@/lib/hooks/useModal';
 
 export default function CloudLoginPage() {
   const navigate = useNavigate();
