@@ -86,6 +86,9 @@ services:
       - AWS_CLOUDFRONT_URL=${AWS_CLOUDFRONT_URL:-}
       - AWS_CLOUDFRONT_KEY_PAIR_ID=${AWS_CLOUDFRONT_KEY_PAIR_ID:-}
       - AWS_CLOUDFRONT_PRIVATE_KEY=${AWS_CLOUDFRONT_PRIVATE_KEY:-}
+      # S3 Config Loader Configuration
+      - AWS_CONFIG_BUCKET=${AWS_CONFIG_BUCKET:-}
+      - AWS_CONFIG_REGION=${AWS_CONFIG_REGION:-us-east-2}
       # Multi-tenant Cloud Configuration
       - DEPLOYMENT_ID=${DEPLOYMENT_ID:-}
       - PROJECT_ID=${PROJECT_ID:-}
