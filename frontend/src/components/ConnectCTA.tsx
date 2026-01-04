@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
-import { useModal } from '@/lib/contexts/ModalContext';
+import { useModal } from '@/lib/hooks/useModal';
 
 interface ConnectCTAProps {
   className?: string;

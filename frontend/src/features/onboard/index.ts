@@ -3,8 +3,7 @@ export { McpConnectionStatus } from './components/McpConnectionStatus';
 export {
   OnboardingModal,
   getOnboardingSkipped,
-  setOnboardingSkipped,
-  CONNECTION_TABS,
+  setOnboardingSkipped
 } from './components/OnboardingModal';
 export type { ConnectionTab, ConnectionTabConfig } from './components/OnboardingModal';
 export { VideoDemoModal } from './components/VideoDemoModal';

@@ -8,7 +8,7 @@ import { useApiKey } from '@/lib/hooks/useMetadata';
 import { cn, getBackendUrl, isInsForgeCloudProject, isIframe } from '@/lib/utils/utils';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 import DiscordIcon from '@/assets/logos/discord.svg?react';
-import { useModal } from '@/lib/contexts/ModalContext';
+import { useModal } from '@/lib/hooks/useModal';
 
 export type ConnectionTab = 'mcp' | 'connection-string' | 'api-credentials';
 
@@ -16,12 +16,6 @@ export interface ConnectionTabConfig {
   id: ConnectionTab;
   label: string;
 }
-
-export const CONNECTION_TABS: ConnectionTabConfig[] = [
-  { id: 'mcp', label: 'MCP' },
-  { id: 'connection-string', label: 'Connection String' },
-  { id: 'api-credentials', label: 'API Credentials' },
-];
 
 const ONBOARDING_SKIPPED_KEY = 'insforge_onboarding_skipped';
 

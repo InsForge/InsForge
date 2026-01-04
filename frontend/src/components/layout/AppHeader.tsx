@@ -14,7 +14,7 @@ import { McpConnectionStatus } from '@/features/onboard';
 import { cn } from '@/lib/utils/utils';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
-import { useModal } from '@/lib/contexts/ModalContext';
+import { useModal } from '@/lib/hooks/useModal';
 
 // Import SVG icons
 import DiscordIcon from '@/assets/logos/discord.svg?react';
