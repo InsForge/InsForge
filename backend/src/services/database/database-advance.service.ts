@@ -9,7 +9,7 @@ import {
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
-import { parseSQLStatements } from '@/utils/sql-parser.js';
+import { parseSQLStatements, checkAuthSchemaOperations } from '@/utils/sql-parser.js';
 import { validateTableName } from '@/utils/validations.js';
 import format from 'pg-format';
 import { parse } from 'csv-parse/sync';
@@ -80,7 +80,7 @@ export class DatabaseAdvanceService {
    * - Other DDL operations on auth schema (ALTER TABLE for indexes, etc.)
    */
   sanitizeQuery(query: string, _mode: 'strict' | 'relaxed' = 'strict'): string {
-    // Block database-level operations
+    // Block database-level operations (keep regex for these as they're simple patterns)
     const dangerousPatterns = [
       /DROP\s+DATABASE/i,
       /CREATE\s+DATABASE/i,
@@ -94,73 +94,13 @@ export class DatabaseAdvanceService {
       }
     }
 
-    const authSchemaBlocked =
-      /(?:DELETE\s+(?:FROM\s+["']?auth["']?\s*\.|(?:(?!FROM\s+[^a]).)*?\bFROM\s+["']?auth["']?\s*\.)|TRUNCATE\s+(?:TABLE\s+)?(?:IF\s+EXISTS\s+)?["']?auth["']?\s*\.|DROP\s+.*?["']?auth["']?\s*(?:\.|(?:\s|$|CASCADE)))/i;
-
-    if (authSchemaBlocked.test(query)) {
-      const checkIfInCommentOrString = (matchIndex: number, matchLength: number): boolean => {
-        const beforeMatch = query.substring(0, matchIndex);
-        const afterMatch = query.substring(matchIndex + matchLength);
-        const matchLine = query.substring(matchIndex, matchIndex + matchLength);
-
-        const inString = (beforeMatch.match(/'/g) || []).length % 2 !== 0;
-        const lastBlockCommentStart = beforeMatch.lastIndexOf('/*');
-        const lastBlockCommentEnd = beforeMatch.lastIndexOf('*/');
-        const inBlockComment = lastBlockCommentStart > lastBlockCommentEnd;
-
-        const lineStart = beforeMatch.lastIndexOf('\n') + 1;
-        const lineBeforeMatch = beforeMatch.substring(lineStart);
-        const lineAfterMatch = afterMatch.split('\n')[0];
-        const fullLine = lineBeforeMatch + matchLine + lineAfterMatch;
-        const inLineComment = /--/.test(fullLine);
-
-        return inString || inBlockComment || inLineComment;
-      };
-
-      const operationConfigs = [
-        {
-          pattern:
-            /DELETE\s+(?:FROM\s+["']?auth["']?\s*\.|(?:(?!FROM\s+[^a]).)*?\bFROM\s+["']?auth["']?\s*\.)/i,
-          name: 'DELETE',
-          message:
-            'DELETE operations on auth schema are not allowed. User deletion must be done through dedicated authentication APIs.',
-          validate: (match: RegExpMatchArray): boolean => {
-            const betweenDeleteAndAuth = match[0].replace(/^DELETE\s+/i, '');
-            const otherFromMatch = betweenDeleteAndAuth.match(
-              /\bFROM\s+(?!["']?auth["']?\s*\.)[^a]/i
-            );
-            return !otherFromMatch;
-          },
-        },
-        {
-          pattern: /TRUNCATE\s+(?:TABLE\s+)?(?:IF\s+EXISTS\s+)?["']?auth["']?\s*\./i,
-          name: 'TRUNCATE',
-          message:
-            'TRUNCATE operations on auth schema are not allowed. This would delete all users and must be done through dedicated authentication APIs.',
-          validate: () => true,
-        },
-        {
-          pattern: /DROP\s+.*?["']?auth["']?\s*(?:\.|(?:\s|$|CASCADE))/i,
-          name: 'DROP',
-          message:
-            'DROP operations on auth schema are not allowed. This would destroy authentication resources and break the system.',
-          validate: () => true,
-        },
-      ];
-
-      for (const config of operationConfigs) {
-        const match = query.match(config.pattern);
-        if (
-          match &&
-          config.validate(match) &&
-          !checkIfInCommentOrString(match.index!, match[0].length)
-        ) {
-          logger.warn(`Blocked ${config.name} operation on auth schema`, {
-            query: query.substring(0, 100),
-          });
-          throw new AppError(config.message, 403, ERROR_CODES.FORBIDDEN);
-        }
-      }
+    // Use parser-based check for auth schema operations
+    const authError = checkAuthSchemaOperations(query);
+    if (authError) {
+      logger.warn('Blocked operation on auth schema', {
+        query: query.substring(0, 100),
+      });
+      throw new AppError(authError, 403, ERROR_CODES.FORBIDDEN);
     }
 
     return query;

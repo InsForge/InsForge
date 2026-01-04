@@ -93,6 +93,160 @@ function extractChange(stmt: Record<string, unknown>): DatabaseResourceUpdate | 
 }
 
 /**
+ * Extract schema name from a relation/RangeVar node in the AST
+ */
+function getSchemaName(relation: Record<string, unknown> | undefined): string | null {
+  if (!relation) {
+    return null;
+  }
+
+  // Direct schemaname property (for DeleteStmt.relation)
+  if (relation.schemaname) {
+    return relation.schemaname as string;
+  }
+
+  // RangeVar structure (for TruncateStmt.relations)
+  if (relation.RangeVar) {
+    const rangeVar = relation.RangeVar as Record<string, unknown>;
+    if (rangeVar.schemaname) {
+      return rangeVar.schemaname as string;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Check if a query contains dangerous operations on the auth schema
+ * Returns an error message if blocked, null if allowed
+ */
+export function checkAuthSchemaOperations(query: string): string | null {
+  try {
+    const { stmts } = parseSync(query);
+
+    for (const stmtWrapper of stmts) {
+      const stmt = stmtWrapper.stmt as Record<string, unknown>;
+      const [stmtType, data] = Object.entries(stmt)[0] as [string, Record<string, unknown>];
+
+      // Check DELETE statements
+      if (stmtType === 'DeleteStmt') {
+        const relation = data.relation as Record<string, unknown> | undefined;
+        const schemaName = getSchemaName(relation);
+        if (schemaName?.toLowerCase() === 'auth') {
+          return 'DELETE operations on auth schema are not allowed. User deletion must be done through dedicated authentication APIs.';
+        }
+      }
+
+      // Check TRUNCATE statements
+      if (stmtType === 'TruncateStmt') {
+        const relations = (data.relations as Array<Record<string, unknown>>) || [];
+        for (const relation of relations) {
+          // TruncateStmt uses RangeVar objects
+          const rangeVar = relation.RangeVar as Record<string, unknown> | undefined;
+          if (rangeVar?.schemaname) {
+            const schemaName = rangeVar.schemaname as string;
+            if (schemaName.toLowerCase() === 'auth') {
+              return 'TRUNCATE operations on auth schema are not allowed. This would delete all users and must be done through dedicated authentication APIs.';
+            }
+          }
+        }
+      }
+
+      // Check DROP statements
+      if (stmtType === 'DropStmt') {
+        const objects = (data.objects as Array<unknown>) || [];
+        for (const obj of objects) {
+          if (typeof obj === 'object' && obj !== null) {
+            const objRecord = obj as Record<string, unknown>;
+            let schemaName: string | null = null;
+
+            // DROP SCHEMA: direct String object
+            if (objRecord.String) {
+              const stringObj = objRecord.String as Record<string, unknown>;
+              if (stringObj.sval) {
+                schemaName = stringObj.sval as string;
+              }
+            }
+            // DROP TABLE/INDEX/VIEW/etc: List with [schema, name] items
+            else if (objRecord.List) {
+              const list = objRecord.List as Record<string, unknown>;
+              const items = (list.items as Array<Record<string, unknown>>) || [];
+              // First item is typically the schema name
+              if (items.length > 0) {
+                const firstItem = items[0];
+                if (firstItem.String) {
+                  const stringObj = firstItem.String as Record<string, unknown>;
+                  schemaName = stringObj.sval as string;
+                }
+              }
+            }
+            // DROP FUNCTION/PROCEDURE: ObjectWithArgs with objname array
+            else if (objRecord.ObjectWithArgs) {
+              const objectWithArgs = objRecord.ObjectWithArgs as Record<string, unknown>;
+              const objname = (objectWithArgs.objname as Array<Record<string, unknown>>) || [];
+              // First item is typically the schema name
+              if (objname.length > 0) {
+                const firstItem = objname[0];
+                if (firstItem.String) {
+                  const stringObj = firstItem.String as Record<string, unknown>;
+                  schemaName = stringObj.sval as string;
+                }
+              }
+            }
+            // DROP TYPE/DOMAIN: TypeName with names array
+            else if (objRecord.TypeName) {
+              const typeName = objRecord.TypeName as Record<string, unknown>;
+              const names = (typeName.names as Array<Record<string, unknown>>) || [];
+              // First item is typically the schema name
+              if (names.length > 0) {
+                const firstItem = names[0];
+                if (firstItem.String) {
+                  const stringObj = firstItem.String as Record<string, unknown>;
+                  schemaName = stringObj.sval as string;
+                }
+              }
+            }
+
+            if (schemaName?.toLowerCase() === 'auth') {
+              return 'DROP operations on auth schema are not allowed. This would destroy authentication resources and break the system.';
+            }
+          }
+        }
+      }
+    }
+
+    return null; // No dangerous operations found
+  } catch (parseError) {
+    // If parsing fails, fall back to regex-based check for safety
+    // This handles edge cases where the parser might fail on complex queries
+    logger.warn('SQL parse error in checkAuthSchemaOperations, falling back to regex:', parseError);
+    return checkAuthSchemaOperationsRegex(query);
+  }
+}
+
+/**
+ * Fallback regex-based check for when parser fails
+ */
+function checkAuthSchemaOperationsRegex(query: string): string | null {
+  // Simple regex checks as fallback
+  const deletePattern = /DELETE\s+FROM\s+["']?auth["']?\s*\./i;
+  const truncatePattern = /TRUNCATE\s+(?:TABLE\s+)?(?:IF\s+EXISTS\s+)?["']?auth["']?\s*\./i;
+  const dropPattern = /DROP\s+.*?["']?auth["']?\s*(?:\.|(?:\s|$|CASCADE))/i;
+
+  if (deletePattern.test(query)) {
+    return 'DELETE operations on auth schema are not allowed. User deletion must be done through dedicated authentication APIs.';
+  }
+  if (truncatePattern.test(query)) {
+    return 'TRUNCATE operations on auth schema are not allowed. This would delete all users and must be done through dedicated authentication APIs.';
+  }
+  if (dropPattern.test(query)) {
+    return 'DROP operations on auth schema are not allowed. This would destroy authentication resources and break the system.';
+  }
+
+  return null;
+}
+
+/**
  * Parse a SQL string into individual statements, properly handling:
  * - String literals with embedded semicolons
  * - Escaped quotes

@@ -238,7 +238,6 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
         "SELECT 'DELETE FROM auth.users' AS example_query",
         '/* DELETE FROM auth.users */ SELECT * FROM public.users',
         "SELECT 'DROP TABLE auth.users' AS test",
-        'DELETE FROM auth.users -- this is a comment on the same line',
       ];
 
       queries.forEach((query) => {
