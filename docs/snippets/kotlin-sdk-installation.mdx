@@ -1,0 +1,143 @@
+1. Add InsForge dependencies to your project
+
+build.gradle.kts:
+```kotlin
+repositories {
+    mavenLocal()  // 使用本地 Maven
+    mavenCentral()
+}
+
+dependencies {
+    implementation("io.insforge:insforge-core:0.1.0-SNAPSHOT")
+    implementation("io.insforge:insforge-auth:0.1.0-SNAPSHOT")
+}
+```
+
+2. Initialize InsForge SDK
+
+```kotlin
+import io.insforge.createInsforgeClient
+import io.insforge.auth.Auth
+import io.insforge.auth.auth
+import io.insforge.database.Database
+import io.insforge.database.database
+import io.insforge.storage.Storage
+import io.insforge.storage.storage
+import io.insforge.functions.Functions
+import io.insforge.functions.functions
+import io.insforge.realtime.Realtime
+import io.insforge.realtime.realtime
+import io.insforge.ai.AI
+import io.insforge.ai.ai
+
+val client = createInsforgeClient(
+    baseUrl = "https://your-project.insforge.io",
+    anonKey = "your-api-key"
+) {
+    install(Auth)
+    install(Database)
+    install(Storage)
+    install(Functions)
+    install(Realtime) {
+        autoReconnect = true
+        reconnectDelay = 5000
+    }
+    install(AI)
+}
+```
+
+### Android Initialization
+
+1. Initialize InsForge SDK (With Local Storage and Browser Launcher for OAuth)
+
+```kotlin
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import io.insforge.createInsforgeClient
+import io.insforge.auth.Auth
+import io.insforge.auth.BrowserLauncher
+import io.insforge.auth.SessionStorage
+
+class InsforgeManager(private val context: Context) {
+    
+    val client = createInsforgeClient(
+        baseURL = "https://your-project.insforge.io",
+        anonKey = "your-anon-key"
+    ) {
+        install(Auth) {
+            // 1. config BrowserLauncher (for OAuth)
+            browserLauncher = BrowserLauncher { url ->
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+            }
+            
+            // 2. enable session persistence
+            persistSession = true
+            
+            // 3. config SessionStorage (use SharedPreferences)
+            sessionStorage = object : SessionStorage {
+                private val prefs = context.getSharedPreferences(
+                    "insforge_auth", 
+                    Context.MODE_PRIVATE
+                )
+                
+                override suspend fun save(key: String, value: String) {
+                    prefs.edit().putString(key, value).apply()
+                }
+                
+                override suspend fun get(key: String): String? {
+                    return prefs.getString(key, null)
+                }
+                
+                override suspend fun remove(key: String) {
+                    prefs.edit().remove(key).apply()
+                }
+            }
+        }
+    }
+}
+```
+
+2. Use Jetpack DataStore for Session Storage (Optional)
+
+```kotlin
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+
+val Context.authDataStore: DataStore<Preferences> by preferencesDataStore(name = "insforge_auth")
+
+class DataStoreSessionStorage(private val context: Context) : SessionStorage {
+    
+    override suspend fun save(key: String, value: String) {
+        context.authDataStore.edit { prefs ->
+            prefs[stringPreferencesKey(key)] = value
+        }
+    }
+    
+    override suspend fun get(key: String): String? {
+        return context.authDataStore.data.map { prefs ->
+            prefs[stringPreferencesKey(key)]
+        }.first()
+    }
+    
+    override suspend fun remove(key: String) {
+        context.authDataStore.edit { prefs ->
+            prefs.remove(stringPreferencesKey(key))
+        }
+    }
+}
+
+// Then use it in your InsForge client
+install(Auth) {
+    browserLauncher = ...
+    persistSession = true
+    sessionStorage = DataStoreSessionStorage(context)
+}
+```
