@@ -18,6 +18,8 @@ import { usageRouter } from '@/api/routes/usage/index.routes.js';
 import { aiRouter } from '@/api/routes/ai/index.routes.js';
 import { realtimeRouter } from '@/api/routes/realtime/index.routes.js';
 import { emailRouter } from '@/api/routes/email/index.routes.js';
+import { deploymentsRouter } from '@/api/routes/deployments/index.routes.js';
+import { webhooksRouter } from '@/api/routes/webhooks/index.routes.js';
 import { errorMiddleware } from '@/api/middlewares/error.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { RealtimeManager } from '@/infra/realtime/realtime.manager.js';
@@ -178,6 +180,8 @@ export async function createApp() {
   apiRouter.use('/ai', aiRouter);
   apiRouter.use('/realtime', realtimeRouter);
   apiRouter.use('/email', emailRouter);
+  apiRouter.use('/deployments', deploymentsRouter);
+  apiRouter.use('/webhooks', webhooksRouter);
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);

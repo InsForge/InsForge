@@ -196,6 +196,81 @@ export class SecretService {
   }
 
   /**
+   * Update a secret by key
+   */
+  async updateSecretByKey(key: string, input: UpdateSecretInput): Promise<boolean> {
+    try {
+      const updates: string[] = [];
+      const values: (string | boolean | Date | null)[] = [];
+      let paramCount = 1;
+
+      if (input.value !== undefined) {
+        const encryptedValue = EncryptionManager.encrypt(input.value);
+        updates.push(`value_ciphertext = $${paramCount++}`);
+        values.push(encryptedValue);
+      }
+
+      if (input.isActive !== undefined) {
+        updates.push(`is_active = $${paramCount++}`);
+        values.push(input.isActive);
+      }
+
+      if (input.isReserved !== undefined) {
+        updates.push(`is_reserved = $${paramCount++}`);
+        values.push(input.isReserved);
+      }
+
+      if (input.expiresAt !== undefined) {
+        updates.push(`expires_at = $${paramCount++}`);
+        values.push(input.expiresAt);
+      }
+
+      if (updates.length === 0) {
+        return false;
+      }
+
+      values.push(key);
+
+      const result = await this.getPool().query(
+        `UPDATE system.secrets
+         SET ${updates.join(', ')}
+         WHERE key = $${paramCount}`,
+        values
+      );
+
+      const success = (result.rowCount ?? 0) > 0;
+      if (success) {
+        logger.info('Secret updated by key', { key });
+      }
+      return success;
+    } catch (error) {
+      logger.error('Failed to update secret by key', { error, key });
+      throw new Error('Failed to update secret');
+    }
+  }
+
+  /**
+   * Delete a secret by key
+   */
+  async deleteSecretByKey(key: string): Promise<boolean> {
+    try {
+      const result = await this.getPool().query(
+        'DELETE FROM system.secrets WHERE key = $1 AND is_reserved = false',
+        [key]
+      );
+
+      const success = (result.rowCount ?? 0) > 0;
+      if (success) {
+        logger.info('Secret deleted by key', { key });
+      }
+      return success;
+    } catch (error) {
+      logger.error('Failed to delete secret by key', { error, key });
+      throw new Error('Failed to delete secret');
+    }
+  }
+
+  /**
    * Check if a secret value matches the stored value
    */
   async checkSecretByKey(key: string, value: string): Promise<boolean> {
