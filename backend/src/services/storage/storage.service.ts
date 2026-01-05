@@ -344,6 +344,19 @@ export class StorageService {
     return result.rows[0]?.public || false;
   }
 
+  /**
+   * Get the maximum file size allowed for a bucket
+   * Returns null if bucket doesn't have a specific limit (should use global limit)
+   */
+  async getBucketMaxFileSize(bucket: string): Promise<number | null> {
+    const result = await this.getPool().query(
+      'SELECT max_file_size FROM storage.buckets WHERE name = $1',
+      [bucket]
+    );
+    const maxFileSize = result.rows[0]?.max_file_size;
+    return maxFileSize != null ? Number(maxFileSize) : null;
+  }
+
   async updateBucketVisibility(bucket: string, isPublic: boolean): Promise<void> {
     const client = await this.getPool().connect();
     try {
@@ -369,16 +382,76 @@ export class StorageService {
     }
   }
 
+  /**
+   * Update bucket settings (visibility and/or max file size)
+   */
+  async updateBucket(
+    bucket: string,
+    updates: { isPublic?: boolean; maxFileSize?: number | null }
+  ): Promise<void> {
+    const client = await this.getPool().connect();
+    try {
+      // Check if bucket exists
+      const bucketResult = await client.query('SELECT name FROM storage.buckets WHERE name = $1', [
+        bucket,
+      ]);
+
+      if (!bucketResult.rows[0]) {
+        throw new Error(`Bucket "${bucket}" does not exist`);
+      }
+
+      const updateFields: string[] = [];
+      const values: any[] = [];
+      let paramIndex = 1;
+
+      if (updates.isPublic !== undefined) {
+        updateFields.push(`public = $${paramIndex}`);
+        values.push(updates.isPublic);
+        paramIndex++;
+      }
+
+      if (updates.maxFileSize !== undefined) {
+        updateFields.push(`max_file_size = $${paramIndex}`);
+        values.push(updates.maxFileSize);
+        paramIndex++;
+      }
+
+      if (updateFields.length === 0) {
+        return; // No updates to perform
+      }
+
+      // Always update updated_at
+      updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
+      values.push(bucket);
+
+      await client.query(
+        `UPDATE storage.buckets SET ${updateFields.join(', ')} WHERE name = $${paramIndex}`,
+        values
+      );
+    } finally {
+      client.release();
+    }
+  }
+
   async listBuckets(): Promise<StorageBucketSchema[]> {
     // Get all buckets with their metadata from storage.buckets table
     const result = await this.getPool().query(
-      'SELECT name, public, created_at as "createdAt" FROM storage.buckets ORDER BY name'
+      'SELECT name, public, max_file_size as "maxFileSize", created_at as "createdAt" FROM storage.buckets ORDER BY name'
     );
 
-    return result.rows as StorageBucketSchema[];
+    return result.rows.map((row) => ({
+      name: row.name,
+      public: row.public,
+      maxFileSize: row.maxFileSize != null ? Number(row.maxFileSize) : null,
+      createdAt: row.createdAt,
+    })) as StorageBucketSchema[];
   }
 
-  async createBucket(bucket: string, isPublic: boolean = true): Promise<void> {
+  async createBucket(
+    bucket: string,
+    isPublic: boolean = true,
+    maxFileSize?: number | null
+  ): Promise<void> {
     this.validateBucketName(bucket);
 
     const client = await this.getPool().connect();
@@ -392,11 +465,11 @@ export class StorageService {
         throw new Error(`Bucket "${bucket}" already exists`);
       }
 
-      // Insert bucket into storage.buckets table
-      await client.query('INSERT INTO storage.buckets (name, public) VALUES ($1, $2)', [
-        bucket,
-        isPublic,
-      ]);
+      // Insert bucket into storage.buckets table with max_file_size
+      await client.query(
+        'INSERT INTO storage.buckets (name, public, max_file_size) VALUES ($1, $2, $3)',
+        [bucket, isPublic, maxFileSize ?? null]
+      );
 
       // Create bucket using backend
       await this.provider.createBucket(bucket);
@@ -459,9 +532,21 @@ export class StorageService {
         throw new Error(`Bucket "${bucket}" does not exist`);
       }
 
+      // Get bucket's max file size
+      const bucketMaxSize = await this.getBucketMaxFileSize(bucket);
+      const maxFileSize = bucketMaxSize ?? (parseInt(process.env.MAX_FILE_SIZE || '') || 10 * 1024 * 1024);
+
+      // If size is provided in metadata, validate it against bucket limit
+      if (metadata.size && metadata.size > maxFileSize) {
+        throw new Error(`File size (${metadata.size} bytes) exceeds bucket limit (${maxFileSize} bytes)`);
+      }
+
       // Generate next available key using (1), (2), (3) pattern if duplicates exist
       const key = await this.generateNextAvailableKey(bucket, metadata.filename);
-      return this.provider.getUploadStrategy(bucket, key, metadata);
+      return this.provider.getUploadStrategy(bucket, key, {
+        ...metadata,
+        maxFileSize,
+      });
     } finally {
       client.release();
     }

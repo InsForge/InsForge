@@ -12,6 +12,7 @@ export const storageFileSchema = z.object({
 export const storageBucketSchema = z.object({
   name: z.string(),
   public: z.boolean(),
+  maxFileSize: z.number().nullable().optional(), // Maximum file size in bytes, null means use global limit
   createdAt: z.string(),
 });
 
