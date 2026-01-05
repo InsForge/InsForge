@@ -3,27 +3,12 @@ title: Database SDK Reference
 description: Type-safe database operations using the InsForge Kotlin SDK
 ---
 
-<Info>
-  **Coming Soon** - The Kotlin SDK is currently in development. This documentation serves as a preview of the planned API.
-</Info>
+import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
+
 
 ## Installation
 
-```kotlin
-// build.gradle.kts
-dependencies {
-    implementation("dev.insforge:insforge-kotlin:1.0.0")
-}
-```
-
-```kotlin
-import dev.insforge.InsForgeClient
-
-val insforge = InsForgeClient(
-    baseUrl = "https://your-app.us-east.insforge.app",
-    anonKey = "your-anon-key"
-)
-```
+<KotlinSdkInstallation />
 
 ## insert()
 
@@ -42,13 +27,13 @@ data class Post(
     val createdAt: String? = null
 )
 
-// Single insert
+// Single insert (must wrap in list)
 val post = Post(title = "Hello World", content = "My first post!")
 val result = insforge.database
     .from("posts")
-    .insert(post)
-    .select()
-    .execute<List<Post>>()
+    .insertTyped(listOf(post))
+    .returning()
+    .execute<Post>()  // Returns List<Post>
 
 // Bulk insert
 val posts = listOf(
@@ -57,9 +42,9 @@ val posts = listOf(
 )
 val result = insforge.database
     .from("posts")
-    .insert(posts)
-    .select()
-    .execute<List<Post>>()
+    .insertTyped(posts)
+    .returning()
+    .execute<Post>()  // Returns List<Post>
 ```
 
 ---
@@ -71,21 +56,33 @@ Update existing records in a table.
 ### Examples
 
 ```kotlin
-// Update by ID
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+
+// Update by ID (using JsonPrimitive)
 val result = insforge.database
     .from("posts")
-    .update(mapOf("title" to "Updated Title"))
+    .update(mapOf("title" to JsonPrimitive("Updated Title")))
     .eq("id", postId)
-    .select()
-    .execute<List<Post>>()
+    .returning()
+    .execute<Post>()  // Returns List<Post>
+
+// Update by ID (using buildJsonObject)
+val result = insforge.database
+    .from("posts")
+    .update(buildJsonObject { put("title", "Updated Title") })
+    .eq("id", postId)
+    .returning()
+    .execute<Post>()  // Returns List<Post>
 
 // Update multiple
 val result = insforge.database
     .from("tasks")
-    .update(mapOf("status" to "completed"))
+    .update(buildJsonObject { put("status", "completed") })
     .`in`("id", listOf("task-1", "task-2"))
-    .select()
-    .execute<List<Task>>()
+    .returning()
+    .execute<Task>()  // Returns List<Task>
 ```
 
 ---
@@ -125,19 +122,19 @@ Query records from a table.
 val posts = insforge.database
     .from("posts")
     .select()
-    .execute<List<Post>>()
+    .execute<Post>()  // Returns List<Post>
 
 // Specific columns
 val posts = insforge.database
     .from("posts")
     .select("id, title, content")
-    .execute<List<Post>>()
+    .execute<Post>()  // Returns List<Post>
 
 // With relationships
 val posts = insforge.database
     .from("posts")
     .select("*, comments(id, content)")
-    .execute<List<PostWithComments>>()
+    .execute<PostWithComments>()  // Returns List<PostWithComments>
 ```
 
 ---
@@ -165,7 +162,7 @@ val products = insforge.database
     .eq("category", "electronics")
     .gte("price", 50)
     .lte("price", 500)
-    .execute<List<Product>>()
+    .execute<Product>()  // Returns List<Product>
 ```
 
 ---
@@ -177,7 +174,6 @@ val products = insforge.database
 | `.order(column, ascending)` | Sort results | `.order("created_at", ascending = false)` |
 | `.limit(count)` | Limit rows | `.limit(10)` |
 | `.range(from, to)` | Pagination | `.range(0, 9)` |
-| `.single()` | Return single object | `.single()` |
 
 ```kotlin
 // Pagination with sorting
@@ -187,7 +183,7 @@ val posts = insforge.database
     .order("created_at", ascending = false)
     .range(0, 9)
     .limit(10)
-    .execute<List<Post>>()
+    .execute<Post>()  // Returns List<Post>
 ```
 
 ---
@@ -206,7 +202,7 @@ fun PostListScreen() {
                 .from("posts")
                 .select()
                 .order("created_at", ascending = false)
-                .execute()
+                .execute<Post>()  // Returns List<Post>
         } catch (e: Exception) {
             Log.e("PostList", "Error loading posts", e)
         } finally {
@@ -244,30 +240,5 @@ fun PostItem(post: Post) {
             )
         }
     }
-}
-```
-
----
-
-## Flow Support
-
-```kotlin
-// Observe database changes as Flow
-val postsFlow: Flow<List<Post>> = insforge.database
-    .from("posts")
-    .select()
-    .asFlow()
-
-// Collect in ViewModel
-class PostViewModel : ViewModel() {
-    val posts = insforge.database
-        .from("posts")
-        .select()
-        .asFlow()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
 }
 ```

@@ -3,20 +3,13 @@ title: Realtime SDK Reference
 description: Real-time subscriptions and messaging with the InsForge Kotlin SDK
 ---
 
-<Info>
-  **Coming Soon** - The Kotlin SDK is currently in development. This documentation serves as a preview of the planned API.
-</Info>
+import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
 
 ## Installation
 
-```kotlin
-import dev.insforge.InsForgeClient
+<KotlinSdkInstallation />
 
-val insforge = InsForgeClient(
-    baseUrl = "https://your-app.us-east.insforge.app",
-    anonKey = "your-anon-key"
-)
-```
+---
 
 ## connect()
 
@@ -25,11 +18,40 @@ Establish a WebSocket connection to the realtime server.
 ### Example
 
 ```kotlin
-try {
-    insforge.realtime.connect()
-    Log.d("Realtime", "Connected: ${insforge.realtime.isConnected}")
-} catch (e: Exception) {
-    Log.e("Realtime", "Connection failed: ${e.message}")
+// Connect to Realtime
+client.realtime.connect()
+
+// Monitor connection state
+client.realtime.connectionState.collect { state ->
+    when (state) {
+        is Realtime.ConnectionState.Connected -> println("Connected")
+        is Realtime.ConnectionState.Disconnected -> println("Disconnected")
+        is Realtime.ConnectionState.Connecting -> println("Connecting...")
+        is Realtime.ConnectionState.Error -> println("Error: ${state.message}")
+    }
+}
+```
+
+---
+
+## channel()
+
+Create or get a channel for real-time communication.
+
+### Example
+
+```kotlin
+import io.insforge.realtime.channel
+
+// Create a simple channel
+val channel = client.realtime.channel("my-channel")
+
+// Create a channel with configuration
+val configuredChannel = client.realtime.channel("my-channel") {
+    broadcast {
+        acknowledgeBroadcasts = true  // Wait for server acknowledgment
+        receiveOwnBroadcasts = false  // Don't receive own messages
+    }
 }
 ```
 
@@ -37,18 +59,18 @@ try {
 
 ## subscribe()
 
-Subscribe to a channel to receive events.
+Subscribe to a channel to start receiving events.
 
 ### Example
 
 ```kotlin
-val result = insforge.realtime.subscribe("orders:123")
+val channel = client.realtime.channel("orders:123")
 
-if (result.ok) {
-    Log.d("Realtime", "Subscribed to: ${result.channel}")
-} else {
-    Log.e("Realtime", "Failed: ${result.error?.message}")
-}
+// Subscribe and block until subscribed
+channel.subscribe(blockUntilSubscribed = true)
+
+// Or subscribe without blocking
+channel.subscribe()
 ```
 
 ---
@@ -60,92 +82,7 @@ Unsubscribe from a channel.
 ### Example
 
 ```kotlin
-insforge.realtime.unsubscribe("orders:123")
-```
-
----
-
-## publish()
-
-Publish a message to a channel.
-
-### Example
-
-```kotlin
-@Serializable
-data class StatusUpdate(
-    val status: String,
-    val trackingNumber: String
-)
-
-insforge.realtime.publish(
-    channel = "orders:123",
-    event = "status_changed",
-    payload = StatusUpdate(
-        status = "shipped",
-        trackingNumber = "ABC123"
-    )
-)
-```
-
----
-
-## on()
-
-Listen for events.
-
-### Example
-
-```kotlin
-// Listen for custom events
-insforge.realtime.on<OrderPayload>("order_updated") { payload ->
-    Log.d("Realtime", "Order updated: $payload")
-}
-
-// Connection events
-insforge.realtime.onConnect {
-    Log.d("Realtime", "Connected! Socket ID: ${insforge.realtime.socketId}")
-}
-
-insforge.realtime.onDisconnect { reason ->
-    Log.d("Realtime", "Disconnected: $reason")
-}
-
-insforge.realtime.onError { error ->
-    Log.e("Realtime", "Error: ${error.code} - ${error.message}")
-}
-```
-
----
-
-## off()
-
-Remove an event listener.
-
-### Example
-
-```kotlin
-val handler = insforge.realtime.on<OrderPayload>("order_updated") { payload ->
-    Log.d("Realtime", "Order updated: $payload")
-}
-
-// Remove listener later
-insforge.realtime.off(handler)
-```
-
----
-
-## once()
-
-Listen for an event only once.
-
-### Example
-
-```kotlin
-insforge.realtime.once<OrderPayload>("order_completed") { payload ->
-    Log.d("Realtime", "Order completed: $payload")
-    // Listener is automatically removed
-}
+channel.unsubscribe()
 ```
 
 ---
@@ -157,68 +94,364 @@ Disconnect from the realtime server.
 ### Example
 
 ```kotlin
-insforge.realtime.disconnect()
+client.realtime.disconnect()
 ```
 
 ---
 
-## Properties
+## Broadcast Messages
+
+Broadcast is used for real-time messaging between clients, suitable for chat rooms, real-time collaboration, game state sync, etc.
+
+### Receiving Broadcasts
+
+#### Receive Raw JSON
 
 ```kotlin
-// Check connection status
-if (insforge.realtime.isConnected) {
-    Log.d("Realtime", "Connected")
+import io.insforge.realtime.broadcastFlow
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.launchIn
+
+val channel = client.realtime.channel("chat-room")
+
+// Listen for "message" event, receive JsonObject
+channel.broadcastFlow("message")
+    .onEach { payload ->
+        println("Received: $payload")
+        val text = payload["text"]?.jsonPrimitive?.content
+        println("Message: $text")
+    }
+    .launchIn(coroutineScope)
+
+// Subscribe (must be called after setting up listeners)
+channel.subscribe()
+```
+
+#### Receive Typed Messages (Recommended)
+
+```kotlin
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class ChatMessage(
+    val text: String,
+    val userId: String,
+    val timestamp: Long
+)
+
+val channel = client.realtime.channel("chat-room")
+
+// Listen for "message" event, auto-deserialize to ChatMessage
+channel.broadcastFlow<ChatMessage>("message")
+    .onEach { message ->
+        println("${message.userId}: ${message.text}")
+    }
+    .launchIn(coroutineScope)
+
+channel.subscribe()
+```
+
+#### Listen to All Events
+
+```kotlin
+// Use "*" to listen to all broadcast events
+channel.broadcastFlow("*")
+    .onEach { payload ->
+        println("Received broadcast: $payload")
+    }
+    .launchIn(coroutineScope)
+```
+
+### Sending Broadcasts
+
+#### Send JsonObject
+
+```kotlin
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+
+val channel = client.realtime.channel("chat-room")
+channel.subscribe(blockUntilSubscribed = true)
+
+// Send JSON message
+channel.broadcast(
+    event = "message",
+    payload = buildJsonObject {
+        put("text", "Hello, World!")
+        put("userId", "user-123")
+        put("timestamp", System.currentTimeMillis())
+    }
+)
+```
+
+#### Send Typed Messages (Recommended)
+
+```kotlin
+import io.insforge.realtime.broadcast
+
+@Serializable
+data class ChatMessage(
+    val text: String,
+    val userId: String,
+    val timestamp: Long
+)
+
+val channel = client.realtime.channel("chat-room")
+channel.subscribe(blockUntilSubscribed = true)
+
+// Send typed message (auto-serialized)
+channel.broadcast(
+    event = "message",
+    payload = ChatMessage(
+        text = "Hello, World!",
+        userId = "user-123",
+        timestamp = System.currentTimeMillis()
+    )
+)
+```
+
+### Message Acknowledgment
+
+```kotlin
+val channel = client.realtime.channel("important-channel") {
+    broadcast {
+        acknowledgeBroadcasts = true  // Enable acknowledgment
+    }
 }
 
-// Get connection state
-Log.d("Realtime", "State: ${insforge.realtime.connectionState}")
-// ConnectionState.CONNECTED, CONNECTING, DISCONNECTED
+channel.subscribe(blockUntilSubscribed = true)
 
-// Get socket ID
-insforge.realtime.socketId?.let { socketId ->
-    Log.d("Realtime", "Socket ID: $socketId")
-}
-
-// Get subscribed channels
-val channels = insforge.realtime.subscribedChannels
-Log.d("Realtime", "Channels: $channels")
+// Sending will wait for server acknowledgment
+channel.broadcast(
+    event = "important-event",
+    payload = buildJsonObject { put("data", "critical") }
+)
+// Reaching here means server confirmed receipt
 ```
 
 ---
 
-## Flow Support
+## Postgres Changes
+
+Listen to real-time database changes (CDC mode), suitable for data sync, real-time dashboards, collaborative editing, etc.
+
+<Note>
+`postgresChangeFlow` must be set up **before** calling `subscribe()`.
+</Note>
+
+### Listen to All Changes
 
 ```kotlin
-// Observe events as Flow
-val orderUpdates: Flow<OrderPayload> = insforge.realtime
-    .eventFlow("order_updated")
+import io.insforge.realtime.PostgresAction
+import io.insforge.realtime.postgresChangeFlow
 
-// Collect in ViewModel
-class OrderViewModel : ViewModel() {
-    init {
-        viewModelScope.launch {
-            insforge.realtime.connect()
-            insforge.realtime.subscribe("orders:123")
+val channel = client.realtime.channel("db-changes")
 
-            insforge.realtime
-                .eventFlow<OrderPayload>("order_updated")
-                .collect { payload ->
-                    _orderState.value = payload
-                }
+// Listen to all changes on public schema
+channel.postgresChangeFlow<PostgresAction>(schema = "public")
+    .onEach { action ->
+        when (action) {
+            is PostgresAction.Insert -> {
+                println("Insert: ${action.record}")
+                println("Table: ${action.table}, Schema: ${action.schema}")
+            }
+            is PostgresAction.Update -> {
+                println("Update: ${action.record}")
+                println("Old: ${action.oldRecord}")
+            }
+            is PostgresAction.Delete -> {
+                println("Delete: ${action.oldRecord}")
+            }
         }
     }
+    .launchIn(coroutineScope)
+
+channel.subscribe()
+```
+
+### Listen to INSERT Events
+
+```kotlin
+import io.insforge.realtime.decodeRecord
+
+@Serializable
+data class User(
+    val id: Int,
+    val name: String,
+    val email: String
+)
+
+val channel = client.realtime.channel("user-inserts")
+
+channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+    table = "users"
+}.onEach { insert ->
+    // Method 1: Access raw JSON
+    println("New user JSON: ${insert.record}")
+
+    // Method 2: Deserialize to object (recommended)
+    val user = insert.decodeRecord<User>()
+    println("New user: ${user.name} (${user.email})")
+}.launchIn(coroutineScope)
+
+channel.subscribe()
+```
+
+### Listen to UPDATE Events
+
+```kotlin
+import io.insforge.realtime.decodeRecord
+import io.insforge.realtime.decodeOldRecord
+
+@Serializable
+data class Product(
+    val id: Int,
+    val name: String,
+    val price: Double
+)
+
+val channel = client.realtime.channel("product-updates")
+
+channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+    table = "products"
+}.onEach { update ->
+    val newProduct = update.decodeRecord<Product>()
+    val oldProduct = update.decodeOldRecord<Product>()
+
+    println("Product updated: ${oldProduct.name}")
+    println("Price change: ${oldProduct.price} -> ${newProduct.price}")
+}.launchIn(coroutineScope)
+
+channel.subscribe()
+```
+
+### Listen to DELETE Events
+
+```kotlin
+import io.insforge.realtime.decodeOldRecord
+
+@Serializable
+data class Order(
+    val id: Int,
+    val userId: Int,
+    val total: Double
+)
+
+val channel = client.realtime.channel("order-deletes")
+
+channel.postgresChangeFlow<PostgresAction.Delete>(schema = "public") {
+    table = "orders"
+}.onEach { delete ->
+    val deletedOrder = delete.decodeOldRecord<Order>()
+    println("Order deleted: #${deletedOrder.id}, Amount: ${deletedOrder.total}")
+}.launchIn(coroutineScope)
+
+channel.subscribe()
+```
+
+### Listen to Specific Table
+
+```kotlin
+val channel = client.realtime.channel("todos-changes")
+
+channel.postgresChangeFlow<PostgresAction>(schema = "public") {
+    table = "todos"  // Only listen to todos table
+}.onEach { action ->
+    println("Todos table change: $action")
+}.launchIn(coroutineScope)
+
+channel.subscribe()
+```
+
+### Listen to Multiple Changes
+
+```kotlin
+val channel = client.realtime.channel("multi-table-changes")
+
+// Listen to all changes on messages table
+val messageChanges = channel.postgresChangeFlow<PostgresAction>(schema = "public") {
+    table = "messages"
 }
 
-// Connection state as Flow
-insforge.realtime.connectionStateFlow
-    .onEach { state ->
-        when (state) {
-            ConnectionState.CONNECTED -> Log.d("Realtime", "Connected")
-            ConnectionState.CONNECTING -> Log.d("Realtime", "Connecting...")
-            ConnectionState.DISCONNECTED -> Log.d("Realtime", "Disconnected")
-        }
-    }
-    .launchIn(viewModelScope)
+// Only listen to inserts on users table
+val userInserts = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+    table = "users"
+}
+
+// Only listen to updates on products table
+val productUpdates = channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+    table = "products"
+}
+
+// Handle separately
+messageChanges.onEach { println("Message change: $it") }.launchIn(coroutineScope)
+userInserts.onEach { println("New user: ${it.record}") }.launchIn(coroutineScope)
+productUpdates.onEach { println("Product update: ${it.record}") }.launchIn(coroutineScope)
+
+// Subscribe once, all listeners take effect
+channel.subscribe()
+```
+
+### Using Filters
+
+Filters allow server-side event filtering to reduce unnecessary network traffic.
+
+#### Available Filter Operators
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `eq` | Equal | `id=eq.1` |
+| `neq` | Not equal | `status=neq.deleted` |
+| `lt` | Less than | `age=lt.18` |
+| `lte` | Less than or equal | `age=lte.65` |
+| `gt` | Greater than | `price=gt.100` |
+| `gte` | Greater than or equal | `quantity=gte.10` |
+| `in` | In list | `status=in.(active,pending)` |
+
+#### String Filter
+
+```kotlin
+// Equal
+channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+    table = "messages"
+    filter = "id=eq.123"
+}
+
+// Greater than
+channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+    table = "products"
+    filter = "price=gt.100"
+}
+
+// In list
+channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+    table = "orders"
+    filter = "status=in.(pending,processing,shipped)"
+}
+```
+
+#### Type-Safe Filter Builder
+
+```kotlin
+import io.insforge.realtime.FilterOperator
+
+// Equal
+channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+    table = "users"
+    filter("id", FilterOperator.EQ, 123)
+}
+
+// Greater than or equal
+channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+    table = "profiles"
+    filter("age", FilterOperator.GTE, 18)
+}
+
+// In list
+channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+    table = "products"
+    filterIn("category", listOf("electronics", "books", "clothing"))
+}
 ```
 
 ---
@@ -302,21 +535,36 @@ class ChatViewModel : ViewModel() {
     val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
 
     private var roomId: String? = null
+    private var channel: InsforgeChannel? = null
+
+    @Serializable
+    data class ChatMessage(
+        val sender: String,
+        val text: String,
+        val timestamp: Long
+    )
 
     fun connect(roomId: String) {
         this.roomId = roomId
         viewModelScope.launch {
             try {
                 insforge.realtime.connect()
-                insforge.realtime.subscribe("chat:$roomId")
-                _isConnected.value = true
+
+                channel = insforge.realtime.channel("chat:$roomId") {
+                    broadcast {
+                        receiveOwnBroadcasts = false
+                    }
+                }
 
                 // Listen for new messages
-                insforge.realtime
-                    .eventFlow<ChatMessage>("new_message")
-                    .collect { message ->
+                channel?.broadcastFlow<ChatMessage>("new_message")
+                    ?.onEach { message ->
                         _messages.value = _messages.value + message
                     }
+                    ?.launchIn(viewModelScope)
+
+                channel?.subscribe(blockUntilSubscribed = true)
+                _isConnected.value = true
             } catch (e: Exception) {
                 Log.e("Chat", "Connection error: ${e.message}")
             }
@@ -324,79 +572,168 @@ class ChatViewModel : ViewModel() {
     }
 
     fun sendMessage(text: String) {
-        roomId?.let { room ->
-            viewModelScope.launch {
-                insforge.realtime.publish(
-                    channel = "chat:$room",
-                    event = "new_message",
-                    payload = ChatMessage(
-                        sender = currentUser.name,
-                        text = text,
-                        timestamp = System.currentTimeMillis()
-                    )
+        viewModelScope.launch {
+            channel?.broadcast(
+                event = "new_message",
+                payload = ChatMessage(
+                    sender = currentUser.name,
+                    text = text,
+                    timestamp = System.currentTimeMillis()
                 )
-            }
+            )
         }
     }
 
     fun disconnect() {
-        roomId?.let { room ->
-            insforge.realtime.unsubscribe("chat:$room")
-        }
-        insforge.realtime.disconnect()
-    }
-}
-```
-
-### Order Tracking Screen
-
-```kotlin
-@Composable
-fun OrderTrackingScreen(orderId: String) {
-    var status by remember { mutableStateOf("pending") }
-    var updates by remember { mutableStateOf<List<StatusUpdate>>(emptyList()) }
-    val scope = rememberCoroutineScope()
-
-    LaunchedEffect(orderId) {
-        insforge.realtime.connect()
-        insforge.realtime.subscribe("order:$orderId")
-
-        insforge.realtime
-            .eventFlow<StatusUpdate>("status_changed")
-            .collect { update ->
-                status = update.status
-                updates = updates + update
-            }
-    }
-
-    DisposableEffect(orderId) {
-        onDispose {
-            insforge.realtime.unsubscribe("order:$orderId")
+        viewModelScope.launch {
+            channel?.unsubscribe()
             insforge.realtime.disconnect()
         }
     }
+}
+```
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text(
-            text = "Order Status: $status",
-            style = MaterialTheme.typography.headlineMedium
-        )
+### Real-time Data Sync
 
-        Spacer(modifier = Modifier.height(16.dp))
+```kotlin
+@Composable
+fun TodoListScreen() {
+    val viewModel: TodoViewModel = viewModel()
+    val todos by viewModel.todos.collectAsState()
 
-        LazyColumn {
-            items(updates) { update ->
-                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(update.status, style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            formatTimestamp(update.timestamp),
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
+    LaunchedEffect(Unit) {
+        viewModel.startSync()
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.stopSync()
+        }
+    }
+
+    LazyColumn {
+        items(todos) { todo ->
+            TodoItem(todo = todo)
+        }
+    }
+}
+
+class TodoViewModel : ViewModel() {
+    private val _todos = MutableStateFlow<List<Todo>>(emptyList())
+    val todos: StateFlow<List<Todo>> = _todos.asStateFlow()
+
+    private var channel: InsforgeChannel? = null
+
+    @Serializable
+    data class Todo(
+        val id: Int,
+        val title: String,
+        val completed: Boolean
+    )
+
+    fun startSync() {
+        viewModelScope.launch {
+            insforge.realtime.connect()
+
+            channel = insforge.realtime.channel("todos-sync")
+
+            // Listen for inserts
+            channel?.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+                table = "todos"
+            }?.onEach { insert ->
+                val newTodo = insert.decodeRecord<Todo>()
+                _todos.value = _todos.value + newTodo
+            }?.launchIn(viewModelScope)
+
+            // Listen for updates
+            channel?.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
+                table = "todos"
+            }?.onEach { update ->
+                val updatedTodo = update.decodeRecord<Todo>()
+                _todos.value = _todos.value.map {
+                    if (it.id == updatedTodo.id) updatedTodo else it
                 }
-            }
+            }?.launchIn(viewModelScope)
+
+            // Listen for deletes
+            channel?.postgresChangeFlow<PostgresAction.Delete>(schema = "public") {
+                table = "todos"
+            }?.onEach { delete ->
+                val deletedTodo = delete.decodeOldRecord<Todo>()
+                _todos.value = _todos.value.filter { it.id != deletedTodo.id }
+            }?.launchIn(viewModelScope)
+
+            channel?.subscribe()
+        }
+    }
+
+    fun stopSync() {
+        viewModelScope.launch {
+            channel?.unsubscribe()
+            insforge.realtime.disconnect()
         }
     }
 }
 ```
+
+---
+
+## API Reference
+
+### Realtime Class
+
+| Method | Description |
+|--------|-------------|
+| `connect()` | Connect to WebSocket |
+| `disconnect()` | Disconnect |
+| `channel(topic, configure)` | Create or get channel |
+| `removeChannel(topic)` | Remove channel |
+| `removeAllChannels()` | Remove all channels |
+| `connectionState` | Connection state Flow |
+
+### InsforgeChannel Interface
+
+| Method | Description |
+|--------|-------------|
+| `subscribe(blockUntilSubscribed)` | Subscribe to channel |
+| `unsubscribe()` | Unsubscribe |
+| `broadcast(event, payload)` | Send broadcast message |
+| `status` | Subscription status Flow |
+
+### Extension Functions
+
+| Function | Description |
+|----------|-------------|
+| `broadcastFlow(event)` | Get broadcast message Flow |
+| `broadcastFlow<T>(event)` | Get typed broadcast message Flow |
+| `postgresChangeFlow<T>(schema, filter)` | Get database change Flow |
+
+### PostgresAction Types
+
+| Type | Properties | Description |
+|------|------------|-------------|
+| `PostgresAction.Insert` | `record` | Inserted record |
+| `PostgresAction.Update` | `record`, `oldRecord` | New and old record |
+| `PostgresAction.Delete` | `oldRecord` | Deleted record |
+
+### FilterOperator Enum
+
+| Value | Description | SQL Equivalent |
+|-------|-------------|----------------|
+| `EQ` | Equal | `=` |
+| `NEQ` | Not equal | `!=` |
+| `LT` | Less than | `<` |
+| `LTE` | Less than or equal | `<=` |
+| `GT` | Greater than | `>` |
+| `GTE` | Greater than or equal | `>=` |
+
+---
+
+## Best Practices
+
+1. **Set up listeners before subscribing**: `postgresChangeFlow` must be called before `subscribe()`
+2. **Use typed APIs**: Use generic versions for type safety
+3. **Use filters wisely**: Server-side filtering reduces network traffic
+4. **Handle reconnection**: Monitor `connectionState` for reconnection logic
+5. **Clean up properly**: Call `unsubscribe()` and `removeChannel()` when done
+6. **Use `blockUntilSubscribed`**: Ensure subscription is complete before sending messages

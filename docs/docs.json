@@ -146,6 +146,7 @@
               "sdks/kotlin/database",
               "sdks/kotlin/auth",
               "sdks/kotlin/storage",
+              "sdks/kotlin/functions",
               "sdks/kotlin/ai",
               "sdks/kotlin/realtime"
             ]

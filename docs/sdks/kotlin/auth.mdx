@@ -3,20 +3,12 @@ title: Authentication SDK Reference
 description: User authentication and profile management with the InsForge Kotlin SDK
 ---
 
-<Info>
-  **Coming Soon** - The Kotlin SDK is currently in development. This documentation serves as a preview of the planned API.
-</Info>
+import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
+
 
 ## Installation
 
-```kotlin
-import dev.insforge.InsForgeClient
-
-val insforge = InsForgeClient(
-    baseUrl = "https://your-app.us-east.insforge.app",
-    anonKey = "your-anon-key"
-)
-```
+<KotlinSdkInstallation />
 
 ## signUp()
 
@@ -26,7 +18,7 @@ Create a new user account with email and password.
 
 ```kotlin
 try {
-    val result = insforge.auth.signUp(
+    val result = client.auth.signUp(
         email = "user@example.com",
         password = "secure_password123",
         name = "John Doe"
@@ -35,7 +27,7 @@ try {
     result.user?.let { user ->
         Log.d("Auth", "User created: ${user.email}")
     }
-} catch (e: InsForgeAuthException) {
+} catch (e: InsforgeHttpException) {
     Log.e("Auth", "Sign up failed: ${e.message}")
 }
 ```
@@ -50,7 +42,7 @@ Sign in an existing user with email and password.
 
 ```kotlin
 try {
-    val result = insforge.auth.signIn(
+    val result = client.auth.signIn(
         email = "user@example.com",
         password = "secure_password123"
     )
@@ -58,33 +50,9 @@ try {
     result.user?.let { user ->
         Log.d("Auth", "Welcome back, ${user.profile?.name ?: user.email}")
     }
-} catch (e: InsForgeAuthException) {
+} catch (e: InsforgeHttpException) {
     Log.e("Auth", "Sign in failed: ${e.message}")
 }
-```
-
----
-
-## signInWithOAuth()
-
-Start OAuth authentication flow.
-
-### Example
-
-```kotlin
-// Using Activity Result API
-val googleSignInLauncher = registerForActivityResult(
-    ActivityResultContracts.StartActivityForResult()
-) { result ->
-    insforge.auth.handleOAuthResult(result)
-}
-
-// Start OAuth flow
-insforge.auth.signInWithOAuth(
-    provider = OAuthProvider.GOOGLE,
-    activity = this,
-    launcher = googleSignInLauncher
-)
 ```
 
 ---
@@ -97,10 +65,112 @@ Sign out the current user.
 
 ```kotlin
 try {
-    insforge.auth.signOut()
+    client.auth.signOut()
     Log.d("Auth", "User signed out")
-} catch (e: InsForgeAuthException) {
+} catch (e: InsforgeException) {
     Log.e("Auth", "Sign out failed: ${e.message}")
+}
+```
+
+---
+
+## signInWithDefaultPage()
+
+InsForge provides a hosted authentication page that supports:
+- **OAuth Providers**: Google, GitHub, Discord, LinkedIn, Facebook, Instagram, TikTok, Apple, X (Twitter), Spotify, Microsoft
+- **Email + Password**: Traditional email/password authentication
+
+Start authentication flow with the hosted authentication page.
+
+### Example
+
+1. Configure App Link / Deep Link Callback
+
+Configure your callback Activity in AndroidManifest.xml:
+
+- Option A: Custom URL Scheme (for Development)
+
+```xml
+<activity
+    android:name=".AuthCallbackActivity"
+    android:launchMode="singleTask"
+    android:exported="true">
+    <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="yourapp" android:host="auth" android:path="/callback" />
+    </intent-filter>
+</activity>
+```
+
+- Option B: App Links (for Production)
+
+```xml
+<activity
+    android:name=".AuthCallbackActivity"
+    android:launchMode="singleTask"
+    android:exported="true">
+    <intent-filter android:autoVerify="true">
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="https" android:host="yourdomain.com" android:path="/auth/callback" />
+    </intent-filter>
+</activity>
+```
+
+2. Initiate OAuth Login
+
+```kotlin
+// Call in your login screen
+fun startLogin() {
+    // Use Custom URL Scheme
+    client.auth.signInWithDefaultPage("yourapp://auth/callback")
+
+    // Or use App Links
+    // client.auth.signInWithDefaultPage("https://yourdomain.com/auth/callback")
+}
+```
+
+3. Handle OAuth Callback
+
+```kotlin
+class AuthCallbackActivity : AppCompatActivity() {
+    
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        handleIntent(intent)
+    }
+    
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        intent?.let { handleIntent(it) }
+    }
+    
+    private fun handleIntent(intent: Intent) {
+        intent.data?.let { uri ->
+            lifecycleScope.launch {
+                try {
+                    // Callback URL handled by SDK
+                    val result = InsforgeManager.client.auth.handleAuthCallback(uri.toString())
+                    
+                    // Auth success, navigate to main screen
+                    Toast.makeText(this@AuthCallbackActivity, 
+                        "Success: ${result.email}", Toast.LENGTH_SHORT).show()
+                    
+                    startActivity(Intent(this@AuthCallbackActivity, MainActivity::class.java))
+                    finish()
+                    
+                } catch (e: Exception) {
+                    // Handle error
+                    Toast.makeText(this@AuthCallbackActivity,
+                        "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    finish()
+                }
+            }
+        }
+    }
 }
 ```
 
@@ -108,64 +178,114 @@ try {
 
 ## getCurrentUser()
 
-Get authenticated user with profile data.
+Fetch the current authenticated user from the server. This is a suspend function that makes a network request.
 
-### Example
-
-```kotlin
-val user = insforge.auth.getCurrentUser()
-user?.let {
-    Log.d("Auth", "Email: ${it.email}")
-    Log.d("Auth", "Name: ${it.profile?.name ?: "N/A"}")
-} ?: Log.d("Auth", "No user signed in")
-```
-
----
-
-## getCurrentSession()
-
-Get current session from local storage.
-
-### Example
+### Returns
 
 ```kotlin
-insforge.auth.getCurrentSession()?.let { session ->
-    Log.d("Auth", "Access token: ${session.accessToken}")
-    Log.d("Auth", "User: ${session.user.email}")
-}
+CurrentUserResponse  // Contains user data from server
 ```
-
----
-
-## setProfile()
-
-Update current user's profile.
 
 ### Example
 
 ```kotlin
 try {
-    val result = insforge.auth.setProfile(
+    val response = client.auth.getCurrentUser()
+    Log.d("Auth", "Email: ${response.email}")
+    Log.d("Auth", "Name: ${response.profile?.name ?: "N/A"}")
+} catch (e: InsforgeHttpException) {
+    Log.e("Auth", "Failed to get user: ${e.message}")
+}
+```
+
+<Note>
+This method makes a network request to fetch user data. For accessing locally cached user state, use `currentUser` StateFlow instead.
+</Note>
+
+---
+
+## currentSession
+
+A `StateFlow` property that holds the current session from local storage.
+
+### Type
+
+```kotlin
+val currentSession: StateFlow<Session?>
+```
+
+### Example
+
+```kotlin
+// Access current session value
+client.auth.currentSession.value?.let { session ->
+    Log.d("Auth", "Access token: ${session.accessToken}")
+    Log.d("Auth", "User: ${session.user.email}")
+}
+
+// Observe session changes
+lifecycleScope.launch {
+    client.auth.currentSession.collect { session ->
+        if (session != null) {
+            Log.d("Auth", "Session active: ${session.user.email}")
+        } else {
+            Log.d("Auth", "No active session")
+        }
+    }
+}
+```
+
+---
+
+## updateProfile()
+
+Update current user's profile.
+
+### Parameters
+
+- `profile` (Map<String, Any>) - Profile fields to update
+
+### Returns
+
+```kotlin
+ProfileResponse  // Updated profile data
+```
+
+### Example
+
+```kotlin
+try {
+    val result = client.auth.updateProfile(
         mapOf(
             "name" to "JohnDev",
             "bio" to "Android Developer",
             "avatar_url" to "https://example.com/avatar.jpg"
         )
     )
-    Log.d("Auth", "Profile updated")
-} catch (e: InsForgeAuthException) {
+    Log.d("Auth", "Profile updated: ${result.name}")
+} catch (e: InsforgeHttpException) {
     Log.e("Auth", "Update failed: ${e.message}")
 }
 ```
 
 ---
 
-## Auth State Observer
+## currentUser
+
+A `StateFlow` property that holds the current authenticated user state.
+
+### Type
+
+```kotlin
+val currentUser: StateFlow<User?>
+```
+
+### Example
 
 ```kotlin
 // Observe auth state as Flow
 lifecycleScope.launch {
-    insforge.auth.authStateFlow.collect { user ->
+    client.auth.currentUser.collect { user ->
         if (user != null) {
             Log.d("Auth", "User signed in: ${user.email}")
         } else {
@@ -173,6 +293,9 @@ lifecycleScope.launch {
         }
     }
 }
+
+// Access current user value directly
+val user = client.auth.currentUser.value
 ```
 
 ---
@@ -182,12 +305,10 @@ lifecycleScope.launch {
 ```kotlin
 @Composable
 fun AuthScreen() {
-    val authState by insforge.auth.authStateFlow.collectAsState(initial = null)
-    val isLoading by insforge.auth.isLoadingFlow.collectAsState(initial = true)
+    val currentUser by client.auth.currentUser.collectAsState()
 
     when {
-        isLoading -> LoadingScreen()
-        authState != null -> DashboardScreen(user = authState!!)
+        currentUser != null -> DashboardScreen(user = currentUser!!)
         else -> LoginScreen()
     }
 }
@@ -237,8 +358,8 @@ fun LoginScreen() {
                     isLoading = true
                     error = null
                     try {
-                        insforge.auth.signIn(email, password)
-                    } catch (e: InsForgeAuthException) {
+                        client.auth.signIn(email, password)
+                    } catch (e: InsforgeHttpException) {
                         error = e.message
                     } finally {
                         isLoading = false
@@ -260,10 +381,15 @@ fun LoginScreen() {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // OAuth buttons
-        GoogleSignInButton(
-            onClick = { /* Handle Google sign in */ }
-        )
+        // OAuth button
+        Button(
+            onClick = {
+                client.auth.signInWithDefaultPage("yourapp://auth/callback")
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Sign In with OAuth")
+        }
     }
 }
 ```
@@ -273,20 +399,35 @@ fun LoginScreen() {
 ## Error Handling
 
 ```kotlin
+import io.insforge.exceptions.InsforgeHttpException
+import io.insforge.exceptions.InsforgeException
+
 try {
-    val result = insforge.auth.signIn(email, password)
-} catch (e: InsForgeAuthException) {
-    when (e) {
-        is InsForgeAuthException.InvalidCredentials ->
-            showError("Invalid email or password")
-        is InsForgeAuthException.UserNotFound ->
-            showError("User not found")
-        is InsForgeAuthException.EmailNotVerified ->
-            showError("Please verify your email")
-        is InsForgeAuthException.NetworkError ->
-            showError("Network error: ${e.cause?.message}")
-        else ->
-            showError("Auth error: ${e.message}")
+    val result = client.auth.signIn(email, password)
+} catch (e: InsforgeHttpException) {
+    // HTTP errors from API with error codes
+    when (e.error) {
+        "INVALID_CREDENTIALS" -> showError("Invalid email or password")
+        "USER_NOT_FOUND" -> showError("User not found")
+        "EMAIL_NOT_VERIFIED" -> showError("Please verify your email")
+        "INVALID_EMAIL" -> showError("Invalid email format")
+        "WEAK_PASSWORD" -> showError("Password is too weak")
+        else -> showError("Error: ${e.message}")
     }
+} catch (e: InsforgeException) {
+    // Other SDK errors (network, parsing, etc.)
+    showError("Error: ${e.message}")
 }
 ```
+
+### Common Error Codes
+
+| Error Code | Description |
+|------------|-------------|
+| `INVALID_CREDENTIALS` | Email or password is incorrect |
+| `USER_NOT_FOUND` | No user with this email exists |
+| `EMAIL_NOT_VERIFIED` | Email verification required |
+| `INVALID_EMAIL` | Email format is invalid |
+| `WEAK_PASSWORD` | Password doesn't meet requirements |
+| `USER_ALREADY_EXISTS` | Email is already registered |
+| `SESSION_EXPIRED` | Session has expired, re-login required |

@@ -3,42 +3,13 @@ title: Kotlin SDK
 description: Official Kotlin SDK for InsForge - Android and Kotlin Multiplatform
 ---
 
-<Info>
-  **Coming Soon** - The Kotlin SDK is currently in development. This documentation serves as a preview of the planned API.
-</Info>
+import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
 
 The InsForge Kotlin SDK provides a native Kotlin client for interacting with InsForge services from Android applications and Kotlin Multiplatform projects.
 
 ## Installation
 
-### Gradle (Kotlin DSL)
-
-```kotlin
-// build.gradle.kts
-dependencies {
-    implementation("dev.insforge:insforge-kotlin:1.0.0")
-}
-```
-
-### Gradle (Groovy)
-
-```groovy
-// build.gradle
-dependencies {
-    implementation 'dev.insforge:insforge-kotlin:1.0.0'
-}
-```
-
-## Quick Start
-
-```kotlin
-import dev.insforge.InsForgeClient
-
-val insforge = InsForgeClient(
-    baseUrl = "https://your-app.us-east.insforge.app",
-    anonKey = "your-anon-key"
-)
-```
+<KotlinSdkInstallation />
 
 ## Features
 

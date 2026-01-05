@@ -1,0 +1,461 @@
+---
+title: Functions SDK Reference
+description: Invoke serverless functions with the InsForge Kotlin SDK
+---
+
+import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
+
+## Installation
+
+<KotlinSdkInstallation />
+
+---
+
+## invoke()
+
+Invoke a serverless function by slug.
+
+### Parameters
+
+- `slug` (String) - Function slug identifier
+- `body` (Any?, optional) - Request body (will be JSON serialized)
+
+### Returns
+
+```kotlin
+T // Typed response (reified generic)
+```
+
+### Examples
+
+```kotlin
+// Define response data class
+@Serializable
+data class HelloResponse(
+    val message: String,
+    val timestamp: String
+)
+
+// Invoke function with typed response
+val response = client.functions.invoke<HelloResponse>(
+    slug = "hello-world",
+    body = mapOf("name" to "World")
+)
+
+println(response.message)  // "Hello, World!"
+```
+
+### Example with Typed Request
+
+```kotlin
+@Serializable
+data class GreetingRequest(
+    val name: String,
+    val greeting: String
+)
+
+@Serializable
+data class GreetingResponse(
+    val message: String,
+    val timestamp: String
+)
+
+val response = client.functions.invoke<GreetingResponse>(
+    slug = "hello-world",
+    body = GreetingRequest(name = "Kotlin", greeting = "Hello")
+)
+```
+
+### Example: Fire-and-Forget
+
+```kotlin
+// Invoke without expecting a response
+client.functions.invoke<Unit>(
+    slug = "log-event",
+    body = mapOf(
+        "event" to "user_action",
+        "action" to "button_click",
+        "timestamp" to System.currentTimeMillis()
+    )
+)
+```
+
+---
+
+## invokeRaw()
+
+Invoke a function and get the raw HTTP response.
+
+### Example
+
+```kotlin
+val response = client.functions.invokeRaw(
+    slug = "generate-pdf",
+    body = mapOf("documentId" to "doc-123")
+)
+
+// Access raw response
+val bytes = response.readBytes()
+val contentType = response.contentType()
+```
+
+---
+
+## Admin Functions
+
+The following methods require admin/service role authentication.
+
+### listFunctions()
+
+List all functions.
+
+```kotlin
+val functions = client.functions.listFunctions()
+
+functions.forEach { fn ->
+    println("${fn.name} (${fn.slug}) - ${fn.status}")
+}
+```
+
+### getFunction()
+
+Get specific function details.
+
+```kotlin
+val details = client.functions.getFunction("hello-world")
+
+println("Name: ${details.name}")
+println("Slug: ${details.slug}")
+println("Status: ${details.status}")
+println("Code: ${details.code}")
+```
+
+### createFunction()
+
+Create a new function.
+
+```kotlin
+val result = client.functions.createFunction(
+    name = "Hello World",
+    code = """
+        export default async function(req) {
+            const body = await req.json()
+            return new Response(JSON.stringify({
+                message: `Hello, ${'$'}{body.name}!`,
+                timestamp: new Date().toISOString()
+            }), {
+                headers: { "Content-Type": "application/json" }
+            })
+        }
+    """.trimIndent(),
+    slug = "hello-world",  // Optional, auto-generated from name if not provided
+    description = "A simple greeting function",
+    status = "active"  // "draft" or "active"
+)
+
+println("Created function: ${result.slug}")
+```
+
+### updateFunction()
+
+Update an existing function.
+
+```kotlin
+val result = client.functions.updateFunction(
+    slug = "hello-world",
+    name = "Hello World v2",
+    code = """
+        export default async function(req) {
+            const body = await req.json()
+            return new Response(JSON.stringify({
+                message: `Hello, ${'$'}{body.name}! Welcome to v2.`,
+                version: 2
+            }), {
+                headers: { "Content-Type": "application/json" }
+            })
+        }
+    """.trimIndent(),
+    status = "active"
+)
+```
+
+### deleteFunction()
+
+Delete a function.
+
+```kotlin
+client.functions.deleteFunction("old-function")
+```
+
+---
+
+## Error Handling
+
+```kotlin
+import io.insforge.exceptions.InsforgeHttpException
+
+try {
+    val response = client.functions.invoke<MyResponse>("my-function")
+    println("Success: $response")
+} catch (e: InsforgeHttpException) {
+    println("HTTP Error ${e.statusCode}: ${e.message}")
+    println("Error code: ${e.error}")
+    e.nextActions?.let { actions ->
+        println("Suggested actions: $actions")
+    }
+} catch (e: Exception) {
+    println("Unexpected error: ${e.message}")
+}
+```
+
+---
+
+## Android Integration
+
+### ViewModel Example
+
+```kotlin
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+
+class FunctionViewModel : ViewModel() {
+
+    private val _result = MutableStateFlow<Result<String>?>(null)
+    val result: StateFlow<Result<String>?> = _result
+
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading
+
+    @Serializable
+    data class ProcessRequest(val text: String)
+
+    @Serializable
+    data class ProcessResponse(val processed: String)
+
+    fun processText(text: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+
+            try {
+                val response = insforge.functions.invoke<ProcessResponse>(
+                    slug = "process-text",
+                    body = ProcessRequest(text = text)
+                )
+                _result.value = Result.success(response.processed)
+            } catch (e: Exception) {
+                _result.value = Result.failure(e)
+            }
+
+            _isLoading.value = false
+        }
+    }
+}
+```
+
+### Jetpack Compose Example
+
+```kotlin
+@Composable
+fun FunctionInvokeScreen(
+    viewModel: FunctionViewModel = viewModel()
+) {
+    val result by viewModel.result.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+
+    var inputText by remember { mutableStateOf("") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        OutlinedTextField(
+            value = inputText,
+            onValueChange = { inputText = it },
+            label = { Text("Enter text") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = { viewModel.processText(inputText) },
+            enabled = inputText.isNotEmpty() && !isLoading,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            } else {
+                Text("Process")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        result?.let { res ->
+            res.fold(
+                onSuccess = { processed ->
+                    Text(
+                        text = "Result: $processed",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                },
+                onFailure = { error ->
+                    Text(
+                        text = "Error: ${error.message}",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            )
+        }
+    }
+}
+```
+
+---
+
+## Complete Examples
+
+### AI-Powered Function
+
+```kotlin
+@Serializable
+data class AIRequest(
+    val prompt: String,
+    val maxTokens: Int = 500
+)
+
+@Serializable
+data class AIResponse(
+    val text: String,
+    val tokensUsed: Int
+)
+
+suspend fun generateWithAI(prompt: String): AIResponse {
+    return insforge.functions.invoke(
+        slug = "ai-generate",
+        body = AIRequest(prompt = prompt)
+    )
+}
+
+// Usage
+val response = generateWithAI("Write a haiku about Kotlin")
+println(response.text)
+println("Tokens used: ${response.tokensUsed}")
+```
+
+### Image Processing Function
+
+```kotlin
+@Serializable
+data class ImageProcessRequest(
+    val imageUrl: String,
+    val filters: List<String>,
+    val outputFormat: String = "jpeg"
+)
+
+@Serializable
+data class ImageProcessResponse(
+    val originalUrl: String,
+    val processedUrl: String,
+    val appliedFilters: List<String>
+)
+
+suspend fun processImage(imageUrl: String, filters: List<String>): ImageProcessResponse {
+    return insforge.functions.invoke(
+        slug = "process-image",
+        body = ImageProcessRequest(
+            imageUrl = imageUrl,
+            filters = filters
+        )
+    )
+}
+
+// Usage
+val result = processImage(
+    imageUrl = "https://example.com/photo.jpg",
+    filters = listOf("grayscale", "blur")
+)
+println("Processed image: ${result.processedUrl}")
+```
+
+### Batch Processing
+
+```kotlin
+@Serializable
+data class BatchRequest(
+    val items: List<String>,
+    val operation: String
+)
+
+@Serializable
+data class BatchResult(
+    val id: String,
+    val success: Boolean,
+    val message: String? = null
+)
+
+@Serializable
+data class BatchResponse(
+    val results: List<BatchResult>,
+    val successCount: Int,
+    val failureCount: Int
+)
+
+suspend fun processBatch(items: List<String>, operation: String): BatchResponse {
+    return insforge.functions.invoke(
+        slug = "batch-process",
+        body = BatchRequest(items = items, operation = operation)
+    )
+}
+
+// Usage
+val response = processBatch(
+    items = listOf("item-1", "item-2", "item-3"),
+    operation = "validate"
+)
+println("Success: ${response.successCount}, Failed: ${response.failureCount}")
+```
+
+---
+
+## Models Reference
+
+### FunctionMetadata
+
+```kotlin
+@Serializable
+data class FunctionMetadata(
+    val id: String,
+    val slug: String,
+    val name: String,
+    val description: String? = null,
+    val status: String,  // "draft", "active", "error"
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("updated_at") val updatedAt: String? = null,
+    @SerialName("deployed_at") val deployedAt: String? = null
+)
+```
+
+### FunctionDetails
+
+```kotlin
+@Serializable
+data class FunctionDetails(
+    val id: String,
+    val slug: String,
+    val name: String,
+    val description: String? = null,
+    val code: String,
+    val status: String,  // "draft", "active", "error"
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("updated_at") val updatedAt: String? = null,
+    @SerialName("deployed_at") val deployedAt: String? = null
+)
+```

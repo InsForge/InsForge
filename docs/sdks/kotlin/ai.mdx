@@ -3,112 +3,224 @@ title: AI SDK Reference
 description: AI chat completions and image generation with the InsForge Kotlin SDK
 ---
 
-<Info>
-  **Coming Soon** - The Kotlin SDK is currently in development. This documentation serves as a preview of the planned API.
-</Info>
+import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
 
 ## Installation
 
-```kotlin
-import dev.insforge.InsForgeClient
+<KotlinSdkInstallation />
 
-val insforge = InsForgeClient(
-    baseUrl = "https://your-app.us-east.insforge.app",
-    anonKey = "your-anon-key"
-)
-```
+---
 
-## chat.completions.create()
+## listModels()
 
-Create AI chat completions.
+List all available AI models.
 
-### Example (non-streaming)
+### Example
 
 ```kotlin
-val completion = insforge.ai.chat.completions.create(
-    model = "anthropic/claude-3.5-haiku",
-    messages = listOf(
-        ChatMessage(role = Role.USER, content = "What is the capital of France?")
-    )
-)
+val models = client.ai.listModels()
 
-Log.d("AI", completion.choices[0].message.content)
-```
-
-### Example (with image)
-
-```kotlin
-val imageData = bitmap.toByteArray()
-val base64Image = Base64.encodeToString(imageData, Base64.NO_WRAP)
-
-val completion = insforge.ai.chat.completions.create(
-    model = "anthropic/claude-3.5-haiku",
-    messages = listOf(
-        ChatMessage(
-            role = Role.USER,
-            content = listOf(
-                ContentPart.Text("What do you see in this image?"),
-                ContentPart.ImageUrl("data:image/jpeg;base64,$base64Image")
-            )
-        )
-    )
-)
-
-Log.d("AI", completion.choices[0].message.content)
-```
-
-### Example (streaming)
-
-```kotlin
-val stream = insforge.ai.chat.completions.createStream(
-    model = "openai/gpt-4",
-    messages = listOf(
-        ChatMessage(role = Role.USER, content = "Tell me a story")
-    )
-)
-
-stream.collect { chunk ->
-    chunk.choices[0].delta.content?.let { content ->
-        print(content)
-    }
+models.forEach { model ->
+    println("${model.provider}/${model.modelId}")
+    println("  Input: ${model.inputModality}, Output: ${model.outputModality}")
+    println("  Max tokens: ${model.maxTokens}")
 }
 ```
 
 ---
 
-## images.generate()
+## chatCompletion()
 
-Generate images using AI models.
+Create an AI chat completion.
+
+### Parameters
+
+- `model` (String) - Model identifier (e.g., "anthropic/claude-3.5-haiku")
+- `messages` (List<ChatMessage>) - Conversation messages
+- `temperature` (Double?, optional) - Sampling temperature (0.0-2.0)
+- `maxTokens` (Int?, optional) - Maximum tokens to generate
+- `systemPrompt` (String?, optional) - System prompt
+
+### Returns
+
+```kotlin
+ChatCompletionResponse
+```
+
+### Example (Basic)
+
+```kotlin
+val response = client.ai.chatCompletion(
+    model = "anthropic/claude-3.5-haiku",
+    messages = listOf(
+        ChatMessage(role = "user", content = "What is the capital of France?")
+    )
+)
+
+println(response.content)  // Direct access to content
+println("Tokens used: ${response.metadata.usage.totalTokens}")
+```
+
+### Example (With Parameters)
+
+```kotlin
+val response = client.ai.chatCompletion(
+    model = "openai/gpt-4",
+    messages = listOf(
+        ChatMessage(role = "system", content = "You are a helpful assistant."),
+        ChatMessage(role = "user", content = "Explain quantum computing in simple terms")
+    ),
+    temperature = 0.7,
+    maxTokens = 1000
+)
+
+println(response.content)
+```
+
+### Example (Multi-turn Conversation)
+
+```kotlin
+val conversationHistory = mutableListOf<ChatMessage>()
+
+// First message
+conversationHistory.add(ChatMessage(role = "user", content = "What is Kotlin?"))
+
+val response1 = client.ai.chatCompletion(
+    model = "anthropic/claude-3.5-haiku",
+    messages = conversationHistory
+)
+
+conversationHistory.add(ChatMessage(role = "assistant", content = response1.content))
+
+// Follow-up
+conversationHistory.add(ChatMessage(role = "user", content = "What are its main features?"))
+
+val response2 = client.ai.chatCompletion(
+    model = "anthropic/claude-3.5-haiku",
+    messages = conversationHistory
+)
+
+println(response2.content)
+```
+
+---
+
+## chatCompletionStream()
+
+Create a streaming chat completion. Returns `Flow<String>` that emits content chunks directly.
 
 ### Example
 
 ```kotlin
-val response = insforge.ai.images.generate(
+client.ai.chatCompletionStream(
+    model = "anthropic/claude-3.5-haiku",
+    messages = listOf(
+        ChatMessage(role = "user", content = "Tell me a story")
+    )
+).collect { content ->
+    print(content)  // Content string directly
+}
+```
+
+### Example (With StringBuilder)
+
+```kotlin
+val fullResponse = StringBuilder()
+
+client.ai.chatCompletionStream(
+    model = "openai/gpt-4",
+    messages = listOf(
+        ChatMessage(role = "user", content = "Explain quantum computing")
+    ),
+    temperature = 0.7
+).collect { content ->
+    fullResponse.append(content)
+    // Update UI with each chunk
+    updateUI(fullResponse.toString())
+}
+
+println("Complete response: $fullResponse")
+```
+
+---
+
+## generateImage()
+
+Generate images using AI models.
+
+### Parameters
+
+- `model` (String) - Image generation model (e.g., "openai/dall-e-3")
+- `prompt` (String) - Image description
+
+### Returns
+
+```kotlin
+ImageGenerationResponse
+```
+
+### Example
+
+```kotlin
+val response = client.ai.generateImage(
     model = "google/gemini-2.5-flash-image-preview",
-    prompt = "A serene mountain landscape at sunset",
-    size = "1024x1024"
+    prompt = "A serene mountain landscape at sunset"
 )
 
-// Convert base64 to Bitmap
-response.data[0].b64Json?.let { base64 ->
-    val imageData = Base64.decode(base64, Base64.DEFAULT)
-    val bitmap = BitmapFactory.decodeByteArray(imageData, 0, imageData.size)
-    imageView.setImageBitmap(bitmap)
+println("Generated ${response.count} image(s)")
 
-    // Upload to storage
-    val uploadResult = insforge.storage
-        .from("ai-images")
-        .uploadAuto(data = imageData, contentType = "image/png")
+response.images.forEach { image ->
+    val imageUrl = image.imageUrl.url
 
-    // Save to database
-    insforge.database
-        .from("generated_images")
-        .insert(
-            mapOf(
-                "prompt" to "A serene mountain landscape",
-                "image_url" to uploadResult.url
-            )
-        )
+    if (imageUrl.startsWith("data:image")) {
+        // Handle base64 encoded image
+        val base64Data = imageUrl.substringAfter("base64,")
+        val imageData = Base64.decode(base64Data, Base64.DEFAULT)
+        val bitmap = BitmapFactory.decodeByteArray(imageData, 0, imageData.size)
+        imageView.setImageBitmap(bitmap)
+    } else {
+        // Handle URL - load with Coil/Glide
+        // AsyncImage(model = imageUrl, ...)
+    }
+}
+```
+
+### Example (Save to Storage)
+
+```kotlin
+val response = client.ai.generateImage(
+    model = "openai/dall-e-3",
+    prompt = "A futuristic city skyline"
+)
+
+response.images.firstOrNull()?.let { image ->
+    val imageUrl = image.imageUrl.url
+
+    if (imageUrl.startsWith("data:image")) {
+        val base64Data = imageUrl.substringAfter("base64,")
+        val imageData = Base64.decode(base64Data, Base64.DEFAULT)
+
+        // Upload to storage
+        val uploadResult = client.storage
+            .from("ai-images")
+            .uploadWithAutoKey("generated.png", imageData) {
+                contentType = "image/png"
+            }
+
+        // Save reference to database
+        client.database
+            .from("generated_images")
+            .insertTyped(listOf(
+                GeneratedImageRecord(
+                    prompt = "A futuristic city skyline",
+                    imageUrl = uploadResult.url
+                )
+            ))
+            .returning()
+            .execute<GeneratedImageRecord>()
+
+        Log.d("AI", "Image saved: ${uploadResult.url}")
+    }
 }
 ```
 
@@ -155,11 +267,27 @@ fun ChatScreen() {
             IconButton(
                 onClick = {
                     if (inputText.isNotBlank() && !isLoading) {
+                        val userMessage = ChatMessage(role = "user", content = inputText)
+                        messages = messages + userMessage
+                        val currentInput = inputText
+                        inputText = ""
+
                         scope.launch {
-                            sendMessage(inputText, messages) { newMessages ->
-                                messages = newMessages
+                            isLoading = true
+                            try {
+                                val response = client.ai.chatCompletion(
+                                    model = "anthropic/claude-3.5-haiku",
+                                    messages = messages
+                                )
+                                messages = messages + ChatMessage(
+                                    role = "assistant",
+                                    content = response.content
+                                )
+                            } catch (e: Exception) {
+                                Log.e("Chat", "Error: ${e.message}")
+                            } finally {
+                                isLoading = false
                             }
-                            inputText = ""
                         }
                     }
                 },
@@ -171,23 +299,33 @@ fun ChatScreen() {
     }
 }
 
-suspend fun sendMessage(
-    text: String,
-    currentMessages: List<ChatMessage>,
-    onUpdate: (List<ChatMessage>) -> Unit
-) {
-    val userMessage = ChatMessage(role = Role.USER, content = text)
-    val updatedMessages = currentMessages + userMessage
-    onUpdate(updatedMessages)
+@Composable
+fun ChatBubble(message: ChatMessage) {
+    val isUser = message.role == "user"
 
-    try {
-        val completion = insforge.ai.chat.completions.create(
-            model = "anthropic/claude-3.5-haiku",
-            messages = updatedMessages
-        )
-        onUpdate(updatedMessages + completion.choices[0].message)
-    } catch (e: Exception) {
-        Log.e("Chat", "Error: ${e.message}")
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
+    ) {
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = if (isUser)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Text(
+                text = message.content,
+                modifier = Modifier.padding(12.dp),
+                color = if (isUser)
+                    MaterialTheme.colorScheme.onPrimary
+                else
+                    MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 ```
@@ -199,6 +337,7 @@ suspend fun sendMessage(
 fun StreamingChatScreen() {
     var response by remember { mutableStateOf("") }
     var isStreaming by remember { mutableStateOf(false) }
+    var prompt by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
     Column(
@@ -206,12 +345,14 @@ fun StreamingChatScreen() {
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        Text(
-            text = response,
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
+        OutlinedTextField(
+            value = prompt,
+            onValueChange = { prompt = it },
+            label = { Text("Your question") },
+            modifier = Modifier.fillMaxWidth()
         )
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         Button(
             onClick = {
@@ -220,20 +361,13 @@ fun StreamingChatScreen() {
                     response = ""
 
                     try {
-                        val stream = insforge.ai.chat.completions.createStream(
+                        client.ai.chatCompletionStream(
                             model = "anthropic/claude-3.5-haiku",
                             messages = listOf(
-                                ChatMessage(
-                                    role = Role.USER,
-                                    content = "Explain quantum computing"
-                                )
+                                ChatMessage(role = "user", content = prompt)
                             )
-                        )
-
-                        stream.collect { chunk ->
-                            chunk.choices[0].delta.content?.let { content ->
-                                response += content
-                            }
+                        ).collect { content ->
+                            response += content
                         }
                     } catch (e: Exception) {
                         Log.e("Stream", "Error: ${e.message}")
@@ -242,11 +376,20 @@ fun StreamingChatScreen() {
                     }
                 }
             },
-            enabled = !isStreaming,
+            enabled = prompt.isNotBlank() && !isStreaming,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(if (isStreaming) "Streaming..." else "Ask AI")
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = response,
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+        )
     }
 }
 ```
@@ -281,17 +424,21 @@ fun ImageGenerationScreen() {
                 scope.launch {
                     isGenerating = true
                     try {
-                        val response = insforge.ai.images.generate(
+                        val response = client.ai.generateImage(
                             model = "google/gemini-2.5-flash-image-preview",
-                            prompt = prompt,
-                            size = "1024x1024"
+                            prompt = prompt
                         )
 
-                        response.data[0].b64Json?.let { base64 ->
-                            val data = Base64.decode(base64, Base64.DEFAULT)
-                            generatedBitmap = BitmapFactory.decodeByteArray(
-                                data, 0, data.size
-                            )
+                        response.images.firstOrNull()?.let { image ->
+                            val imageUrl = image.imageUrl.url
+
+                            if (imageUrl.startsWith("data:image")) {
+                                val base64Data = imageUrl.substringAfter("base64,")
+                                val data = Base64.decode(base64Data, Base64.DEFAULT)
+                                generatedBitmap = BitmapFactory.decodeByteArray(
+                                    data, 0, data.size
+                                )
+                            }
                         }
                     } catch (e: Exception) {
                         Log.e("ImageGen", "Failed: ${e.message}")
@@ -323,4 +470,113 @@ fun ImageGenerationScreen() {
         }
     }
 }
+```
+
+---
+
+## Error Handling
+
+```kotlin
+import io.insforge.exceptions.InsforgeHttpException
+import io.insforge.exceptions.InsforgeException
+
+try {
+    val response = client.ai.chatCompletion(
+        model = "anthropic/claude-3.5-haiku",
+        messages = listOf(ChatMessage(role = "user", content = "Hello"))
+    )
+    println(response.content)
+} catch (e: InsforgeHttpException) {
+    when (e.error) {
+        "MODEL_NOT_FOUND" -> println("Model not available")
+        "RATE_LIMIT_EXCEEDED" -> println("Rate limit exceeded, try again later")
+        "INVALID_REQUEST" -> println("Invalid request: ${e.message}")
+        else -> println("API Error: ${e.message}")
+    }
+} catch (e: InsforgeException) {
+    println("SDK Error: ${e.message}")
+}
+```
+
+---
+
+## Models Reference
+
+### ChatMessage
+
+```kotlin
+@Serializable
+data class ChatMessage(
+    val role: String,  // "user", "assistant", "system"
+    val content: String
+)
+```
+
+### ChatCompletionResponse
+
+```kotlin
+@Serializable
+data class ChatCompletionResponse(
+    val success: Boolean,
+    val content: String,
+    val metadata: CompletionMetadata
+)
+
+@Serializable
+data class CompletionMetadata(
+    val model: String,
+    val usage: TokenUsage
+)
+
+@Serializable
+data class TokenUsage(
+    @SerialName("prompt_tokens") val promptTokens: Int,
+    @SerialName("completion_tokens") val completionTokens: Int,
+    @SerialName("total_tokens") val totalTokens: Int
+)
+```
+
+### ImageGenerationResponse
+
+```kotlin
+@Serializable
+data class ImageGenerationResponse(
+    val model: String,
+    val images: List<GeneratedImage>,
+    val text: String? = null,
+    val count: Int,
+    val metadata: ImageMetadata,
+    val nextActions: String
+)
+
+@Serializable
+data class GeneratedImage(
+    val type: String,  // "image_url"
+    @SerialName("image_url") val imageUrl: ImageUrl
+)
+
+@Serializable
+data class ImageUrl(
+    val url: String  // URL or data:image/... base64
+)
+
+@Serializable
+data class ImageMetadata(
+    val model: String,
+    val provider: String
+)
+```
+
+### AIModel
+
+```kotlin
+@Serializable
+data class AIModel(
+    val id: String,
+    val provider: String,
+    val modelId: String,
+    val inputModality: String,  // "text", "image", etc.
+    val outputModality: String,
+    val maxTokens: Int? = null
+)
 ```
