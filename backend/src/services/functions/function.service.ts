@@ -3,6 +3,7 @@ import {
   EdgeFunctionMetadataSchema,
   FunctionUploadRequest,
   FunctionUpdateRequest,
+  FunctionSchema,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { DatabaseError, Pool } from 'pg';
@@ -86,7 +87,7 @@ export class FunctionService {
   /**
    * Get a specific function by slug
    */
-  async getFunction(slug: string): Promise<Record<string, unknown> | undefined> {
+  async getFunction(slug: string): Promise<FunctionSchema | undefined> {
     try {
       const result = await this.getPool().query(
         `SELECT

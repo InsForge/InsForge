@@ -1,14 +1,5 @@
 import { apiClient } from '@/lib/api/client';
-
-export interface McpUsageRecord {
-  tool_name: string;
-  success: boolean;
-  created_at: string;
-}
-
-export interface McpUsageResponse {
-  records: McpUsageRecord[];
-}
+import { McpUsageRecord, GetMcpUsageResponse } from '@insforge/shared-schemas';
 
 export class UsageService {
   /**
@@ -22,7 +13,7 @@ export class UsageService {
 
     const data = (await apiClient.request(`/usage/mcp?${params.toString()}`, {
       headers: apiClient.withAccessToken(),
-    })) as McpUsageResponse;
+    })) as GetMcpUsageResponse;
 
     return data.records || [];
   }

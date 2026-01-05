@@ -7,7 +7,7 @@ export const functionSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   code: z.string(),
-  status: z.enum(['draft', 'active']),
+  status: z.enum(['draft', 'active', 'error']),
   createdAt: z.string(),
   updatedAt: z.string(),
   deployedAt: z.string().nullable(),

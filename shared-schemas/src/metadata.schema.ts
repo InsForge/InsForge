@@ -68,3 +68,31 @@ export type EdgeFunctionMetadataSchema = z.infer<typeof edgeFunctionMetadataSche
 export type AIMetadataSchema = z.infer<typeof aiMetadataSchema>;
 export type RealtimeMetadataSchema = z.infer<typeof realtimeMetadataSchema>;
 export type AppMetadataSchema = z.infer<typeof appMetaDataSchema>;
+
+// Database connection schemas
+export const databaseConnectionParametersSchema = z.object({
+  host: z.string(),
+  port: z.number(),
+  database: z.string(),
+  user: z.string(),
+  password: z.string(),
+  sslmode: z.string(),
+});
+
+export const databaseConnectionInfoSchema = z.object({
+  connectionURL: z.string(),
+  parameters: databaseConnectionParametersSchema,
+});
+
+export const databasePasswordInfoSchema = z.object({
+  databasePassword: z.string(),
+});
+
+export const apiKeyResponseSchema = z.object({
+  apiKey: z.string(),
+});
+
+export type DatabaseConnectionParameters = z.infer<typeof databaseConnectionParametersSchema>;
+export type DatabaseConnectionInfo = z.infer<typeof databaseConnectionInfoSchema>;
+export type DatabasePasswordInfo = z.infer<typeof databasePasswordInfoSchema>;
+export type ApiKeyResponse = z.infer<typeof apiKeyResponseSchema>;

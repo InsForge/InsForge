@@ -3,27 +3,14 @@ import crypto from 'crypto';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
+import { Secret, CreateSecretRequest, UpdateSecretRequest } from '@insforge/shared-schemas';
 
-export interface SecretSchema {
-  id: string;
-  key: string;
-  isActive: boolean;
-  isReserved: boolean;
-  lastUsedAt: Date | null;
-  expiresAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface CreateSecretInput {
-  key: string;
-  value: string;
+export interface CreateSecretInput extends CreateSecretRequest {
   isReserved?: boolean;
   expiresAt?: Date;
 }
 
-export interface UpdateSecretInput {
-  value?: string;
+export interface UpdateSecretInput extends UpdateSecretRequest {
   isActive?: boolean;
   isReserved?: boolean;
   expiresAt?: Date | null;
@@ -130,7 +117,7 @@ export class SecretService {
   /**
    * List all secrets (without decrypting values)
    */
-  async listSecrets(): Promise<SecretSchema[]> {
+  async listSecrets(): Promise<Secret[]> {
     try {
       const result = await this.getPool().query(
         `SELECT

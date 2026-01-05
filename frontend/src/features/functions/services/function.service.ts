@@ -1,19 +1,8 @@
 import { apiClient } from '@/lib/api/client';
-
-export interface EdgeFunction {
-  id: string;
-  slug: string;
-  name: string;
-  description?: string;
-  code?: string;
-  status: 'draft' | 'active' | 'error';
-  created_at: string;
-  updated_at: string;
-  deployed_at?: string;
-}
+import { FunctionSchema } from '@insforge/shared-schemas';
 
 export interface FunctionsResponse {
-  functions: EdgeFunction[];
+  functions: FunctionSchema[];
   runtime: {
     status: 'running' | 'unavailable';
   };
@@ -31,7 +20,7 @@ export class FunctionService {
     };
   }
 
-  async getFunctionBySlug(slug: string): Promise<EdgeFunction> {
+  async getFunctionBySlug(slug: string): Promise<FunctionSchema> {
     return apiClient.request(`/functions/${slug}`, {
       headers: apiClient.withAccessToken(),
     });

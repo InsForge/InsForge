@@ -1,26 +1,7 @@
 import { Pool } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
-
-export interface AIUsageByModel {
-  model: string;
-  total_input_tokens: number;
-  total_output_tokens: number;
-  total_images: number;
-}
-
-export interface UsageStats {
-  mcp_usage_count: number;
-  database_size_bytes: number;
-  storage_size_bytes: number;
-  ai_usage_by_model: AIUsageByModel[];
-}
-
-export interface MCPUsageRecord {
-  tool_name: string;
-  success: boolean;
-  created_at: string;
-}
+import { UsageStats, McpUsageRecord } from '@insforge/shared-schemas';
 
 /**
  * UsageService - Handles usage tracking and statistics
@@ -71,7 +52,7 @@ export class UsageService {
   /**
    * Get recent MCP usage records
    */
-  async getMCPUsage(limit: number = 5, success: boolean = true): Promise<MCPUsageRecord[]> {
+  async getMCPUsage(limit: number = 5, success: boolean = true): Promise<McpUsageRecord[]> {
     try {
       const result = await this.getPool().query(
         `SELECT tool_name, success, created_at
@@ -82,7 +63,7 @@ export class UsageService {
         [success, limit]
       );
 
-      return result.rows as MCPUsageRecord[];
+      return result.rows as McpUsageRecord[];
     } catch (error) {
       logger.error('Failed to get MCP usage', { error });
       throw new Error('Failed to get MCP usage');
