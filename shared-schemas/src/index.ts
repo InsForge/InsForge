@@ -16,3 +16,5 @@ export * from './realtime.schema';
 export * from './realtime-api.schema';
 export * from './docs.schema';
 export * from './email-api.schema';
+export * from './deployments.schema';
+export * from './deployments-api.schema';
