@@ -3,8 +3,6 @@ import http from 'http';
 import https from 'https';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
 
 const postgrestUrl = process.env.POSTGREST_BASE_URL || 'http://localhost:5430';
@@ -52,6 +50,16 @@ export interface ProxyResponse {
   headers: Record<string, unknown>;
 }
 
+/**
+ * Headers that should not be forwarded to the client
+ */
+const EXCLUDED_HEADERS = new Set([
+  'content-length',
+  'transfer-encoding',
+  'connection',
+  'content-encoding',
+]);
+
 export class PostgrestProxyService {
   private static instance: PostgrestProxyService;
   private tokenManager = TokenManager.getInstance();
@@ -67,6 +75,19 @@ export class PostgrestProxyService {
       PostgrestProxyService.instance = new PostgrestProxyService();
     }
     return PostgrestProxyService.instance;
+  }
+
+  /**
+   * Filter headers for forwarding to client (excludes problematic ones)
+   */
+  static filterHeaders(headers: Record<string, unknown>): Record<string, string> {
+    const filtered: Record<string, string> = {};
+    for (const [key, value] of Object.entries(headers)) {
+      if (!EXCLUDED_HEADERS.has(key.toLowerCase()) && value !== undefined) {
+        filtered[key] = value as string;
+      }
+    }
+    return filtered;
   }
 
   /**
@@ -140,45 +161,5 @@ export class PostgrestProxyService {
       status: response.status,
       headers: response.headers as Record<string, unknown>,
     };
-  }
-
-  /**
-   * Handle PostgREST errors and convert to AppError
-   */
-  handleError(error: unknown, targetUrl: string, method: string): never {
-    if (axios.isAxiosError(error)) {
-      logger.error('PostgREST request failed', {
-        url: targetUrl,
-        method,
-        error: {
-          code: error.code,
-          message: error.message,
-          response: error.response?.data,
-          responseStatus: error.response?.status,
-        },
-      });
-
-      if (error.response) {
-        // Forward PostgREST error as-is
-        const err = new AppError(
-          error.response.data?.message || 'PostgREST error',
-          error.response.status,
-          ERROR_CODES.INTERNAL_ERROR
-        );
-        (err as AppError & { postgrestError: unknown }).postgrestError = error.response.data;
-        throw err;
-      } else {
-        const errorMessage =
-          error.code === 'ECONNREFUSED'
-            ? 'PostgREST connection refused'
-            : error.code === 'ENOTFOUND'
-              ? 'PostgREST service not found'
-              : 'Database service unavailable';
-        throw new AppError(errorMessage, 503, ERROR_CODES.INTERNAL_ERROR);
-      }
-    }
-
-    logger.error('Unexpected error in PostgREST proxy', { error });
-    throw error;
   }
 }

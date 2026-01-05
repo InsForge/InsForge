@@ -113,7 +113,6 @@ export class DatabaseService {
         event_manipulation as "eventManipulation",
         action_orientation as "actionOrientation",
         action_condition as "actionCondition",
-        
         action_statement as "actionStatement"
       FROM information_schema.triggers
       WHERE event_object_schema = 'public'

@@ -16,21 +16,14 @@ const router = Router();
 const proxyService = PostgrestProxyService.getInstance();
 
 /**
- * Helper to forward response headers (excluding problematic ones)
+ * Helper to handle PostgREST proxy errors
  */
-function forwardResponseHeaders(res: Response, headers: Record<string, unknown>) {
-  Object.entries(headers).forEach(([key, value]) => {
-    const keyLower = key.toLowerCase();
-    if (
-      keyLower !== 'content-length' &&
-      keyLower !== 'transfer-encoding' &&
-      keyLower !== 'connection' &&
-      keyLower !== 'content-encoding' &&
-      value !== undefined
-    ) {
-      res.setHeader(key, value as string);
-    }
-  });
+function handleProxyError(error: unknown, res: Response, next: NextFunction) {
+  if (axios.isAxiosError(error) && error.response) {
+    res.status(error.response.status).json(error.response.data);
+  } else {
+    next(error);
+  }
 }
 
 /**
@@ -88,7 +81,8 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
     });
 
     // Forward response headers
-    forwardResponseHeaders(res, result.headers);
+    const headers = PostgrestProxyService.filterHeaders(result.headers);
+    Object.entries(headers).forEach(([key, value]) => res.setHeader(key, value));
 
     // Handle empty responses
     let responseData = result.data;
@@ -115,13 +109,7 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
 
     successResponse(res, responseData, result.status);
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response) {
-      res.status(error.response.status).json(error.response.data);
-    } else if (error instanceof AppError) {
-      next(error);
-    } else {
-      next(error);
-    }
+    handleProxyError(error, res, next);
   }
 };
 
@@ -151,7 +139,8 @@ const forwardRpcToPostgrest = async (req: AuthRequest, res: Response, next: Next
       apiKey: extractApiKey(req),
     });
 
-    forwardResponseHeaders(res, result.headers);
+    const headers = PostgrestProxyService.filterHeaders(result.headers);
+    Object.entries(headers).forEach(([key, value]) => res.setHeader(key, value));
 
     let responseData = result.data;
     if (
@@ -163,13 +152,7 @@ const forwardRpcToPostgrest = async (req: AuthRequest, res: Response, next: Next
 
     successResponse(res, responseData, result.status);
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response) {
-      res.status(error.response.status).json(error.response.data);
-    } else if (error instanceof AppError) {
-      next(error);
-    } else {
-      next(error);
-    }
+    handleProxyError(error, res, next);
   }
 };
 
