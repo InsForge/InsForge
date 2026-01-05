@@ -39,7 +39,9 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
     try {
       validateTableName(tableName);
     } catch (error) {
-      if (error instanceof AppError) throw error;
+      if (error instanceof AppError) {
+        throw error;
+      }
       throw new AppError('Invalid table name', 400, ERROR_CODES.INVALID_INPUT);
     }
 
@@ -54,7 +56,9 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
           if (item && typeof item === 'object') {
             const filtered: DatabaseRecord = {};
             for (const key in item) {
-              if (columnTypeMap[key] !== 'text' && item[key] === '') continue;
+              if (columnTypeMap[key] !== 'text' && item[key] === '') {
+                continue;
+              }
               filtered[key] = item[key];
             }
             return filtered;
