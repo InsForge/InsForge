@@ -92,7 +92,10 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
 
     // Handle empty responses
     let responseData = result.data;
-    if (result.data === undefined || (typeof result.data === 'string' && result.data.trim() === '')) {
+    if (
+      result.data === undefined ||
+      (typeof result.data === 'string' && result.data.trim() === '')
+    ) {
       responseData = [];
     }
 
@@ -151,7 +154,10 @@ const forwardRpcToPostgrest = async (req: AuthRequest, res: Response, next: Next
     forwardResponseHeaders(res, result.headers);
 
     let responseData = result.data;
-    if (result.data === undefined || (typeof result.data === 'string' && result.data.trim() === '')) {
+    if (
+      result.data === undefined ||
+      (typeof result.data === 'string' && result.data.trim() === '')
+    ) {
       responseData = null;
     }
 
