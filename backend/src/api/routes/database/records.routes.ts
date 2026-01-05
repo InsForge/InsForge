@@ -81,7 +81,7 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
       query: req.query as Record<string, unknown>,
       headers: req.headers as Record<string, string | string[] | undefined>,
       body: ['POST', 'PUT', 'PATCH'].includes(req.method) ? body : undefined,
-      apiKey: extractApiKey(req),
+      apiKey: extractApiKey(req) ?? undefined,
     });
 
     // Forward response headers
@@ -140,7 +140,7 @@ const forwardRpcToPostgrest = async (req: AuthRequest, res: Response, next: Next
       query: req.query as Record<string, unknown>,
       headers: req.headers as Record<string, string | string[] | undefined>,
       body: req.body,
-      apiKey: extractApiKey(req),
+      apiKey: extractApiKey(req) ?? undefined,
     });
 
     const headers = PostgrestProxyService.filterHeaders(result.headers);
