@@ -138,7 +138,7 @@ export function PrimaryMenu({
         )}
       >
         {/* Top navigation items with separators */}
-        <nav className="flex flex-col gap-2 overflow-y-auto scrollbar-thin scrollbar-track-transparent [&::-webkit-scrollbar-button]:hidden">
+        <nav className="flex flex-col gap-2 overflow-y-auto thin-scrollbar">
           {items.map((item) => (
             <div key={item.id}>
               <MenuItem item={item} />
