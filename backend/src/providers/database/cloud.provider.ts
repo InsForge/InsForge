@@ -78,7 +78,7 @@ export class CloudDatabaseProvider implements DatabaseProvider {
 
     try {
       const response = await axios.get(url, {
-        headers: { sign: signToken },
+        headers: { Authorization: `Bearer ${signToken}` },
         timeout: 10000,
       });
 
@@ -122,7 +122,7 @@ export class CloudDatabaseProvider implements DatabaseProvider {
 
     try {
       const response = await axios.get(url, {
-        headers: { sign: signToken },
+        headers: { Authorization: `Bearer ${signToken}` },
         timeout: 10000,
       });
 
