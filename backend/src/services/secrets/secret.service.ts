@@ -3,14 +3,15 @@ import crypto from 'crypto';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
-import { Secret, CreateSecretRequest, UpdateSecretRequest } from '@insforge/shared-schemas';
+import { Secret, CreateSecretRequest } from '@insforge/shared-schemas';
 
 export interface CreateSecretInput extends CreateSecretRequest {
   isReserved?: boolean;
   expiresAt?: Date;
 }
 
-export interface UpdateSecretInput extends UpdateSecretRequest {
+export interface UpdateSecretInput {
+  value?: string;
   isActive?: boolean;
   isReserved?: boolean;
   expiresAt?: Date | null;

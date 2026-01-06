@@ -24,11 +24,6 @@ export const createSecretResponseSchema = z.object({
   id: z.string(),
 });
 
-// PUT /secrets/:key - Update secret (user-facing API)
-export const updateSecretRequestSchema = z.object({
-  value: z.string().min(1, 'Value is required'),
-});
-
 export const updateSecretResponseSchema = z.object({
   success: z.literal(true),
   message: z.string(),
@@ -45,6 +40,5 @@ export type ListSecretsResponse = z.infer<typeof listSecretsResponseSchema>;
 export type GetSecretValueResponse = z.infer<typeof getSecretValueResponseSchema>;
 export type CreateSecretRequest = z.infer<typeof createSecretRequestSchema>;
 export type CreateSecretResponse = z.infer<typeof createSecretResponseSchema>;
-export type UpdateSecretRequest = z.infer<typeof updateSecretRequestSchema>;
 export type UpdateSecretResponse = z.infer<typeof updateSecretResponseSchema>;
 export type DeleteSecretResponse = z.infer<typeof deleteSecretResponseSchema>;
