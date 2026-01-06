@@ -80,7 +80,7 @@ export class DatabaseAdvanceService {
    * - Other DDL operations on auth schema (ALTER TABLE for indexes, etc.)
    */
   sanitizeQuery(query: string, _mode: 'strict' | 'relaxed' = 'strict'): string {
-    // Block database-level operations (keep regex for these as they're simple patterns)
+    // Block database-level operations
     const dangerousPatterns = [
       /DROP\s+DATABASE/i,
       /CREATE\s+DATABASE/i,
