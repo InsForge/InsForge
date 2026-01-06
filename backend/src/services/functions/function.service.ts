@@ -21,7 +21,7 @@ export class FunctionService {
   private static instance: FunctionService;
   private pool: Pool | null = null;
 
-  private constructor() { }
+  private constructor() {}
 
   static getInstance(): FunctionService {
     if (!FunctionService.instance) {

@@ -15,13 +15,13 @@ export class SecretService {
     return data.secrets as Secret[];
   }
 
-  async createSecret(input: CreateSecretRequest): Promise<{ id: string }> {
+  async createSecret(input: CreateSecretRequest): Promise<CreateSecretResponse> {
     const response: CreateSecretResponse = await apiClient.request('/secrets', {
       method: 'POST',
       headers: apiClient.withAccessToken(),
       body: JSON.stringify(input),
     });
-    return { id: response.id };
+    return response;
   }
 
   async deleteSecret(key: string): Promise<DeleteSecretResponse> {
