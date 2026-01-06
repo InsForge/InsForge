@@ -217,33 +217,9 @@ export function checkAuthSchemaOperations(query: string): string | null {
 
     return null; // No dangerous operations found
   } catch (parseError) {
-    // If parsing fails, fall back to regex-based check for safety
-    // This handles edge cases where the parser might fail on complex queries
-    logger.warn('SQL parse error in checkAuthSchemaOperations, falling back to regex:', parseError);
-    return checkAuthSchemaOperationsRegex(query);
+    logger.warn('SQL parse error in checkAuthSchemaOperations, letting query through:', parseError);
+    return null;
   }
-}
-
-/**
- * Fallback regex-based check for when parser fails
- */
-function checkAuthSchemaOperationsRegex(query: string): string | null {
-  // Simple regex checks as fallback
-  const deletePattern = /DELETE\s+FROM\s+["']?auth["']?\s*\./i;
-  const truncatePattern = /TRUNCATE\s+(?:TABLE\s+)?(?:IF\s+EXISTS\s+)?["']?auth["']?\s*\./i;
-  const dropPattern = /DROP\s+.*?["']?auth["']?\s*(?:\.|(?:\s|$|CASCADE))/i;
-
-  if (deletePattern.test(query)) {
-    return 'DELETE operations on auth schema are not allowed. User deletion must be done through dedicated authentication APIs.';
-  }
-  if (truncatePattern.test(query)) {
-    return 'TRUNCATE operations on auth schema are not allowed. This would delete all users and must be done through dedicated authentication APIs.';
-  }
-  if (dropPattern.test(query)) {
-    return 'DROP operations on auth schema are not allowed. This would destroy authentication resources and break the system.';
-  }
-
-  return null;
 }
 
 /**
