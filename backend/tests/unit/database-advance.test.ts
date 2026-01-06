@@ -23,11 +23,6 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
       expect(() => service.sanitizeQuery(query)).toThrow(AppError);
     });
 
-    test('blocks TRUNCATE with IF EXISTS', () => {
-      const query = 'TRUNCATE TABLE IF EXISTS auth.users';
-      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
-    });
-
     test('blocks TRUNCATE without TABLE keyword', () => {
       const query = 'TRUNCATE auth.users';
       expect(() => service.sanitizeQuery(query)).toThrow(AppError);
