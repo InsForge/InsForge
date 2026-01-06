@@ -141,13 +141,9 @@ export function checkAuthSchemaOperations(query: string): string | null {
       if (stmtType === 'TruncateStmt') {
         const relations = (data.relations as Array<Record<string, unknown>>) || [];
         for (const relation of relations) {
-          // TruncateStmt uses RangeVar objects
-          const rangeVar = relation.RangeVar as Record<string, unknown> | undefined;
-          if (rangeVar?.schemaname) {
-            const schemaName = rangeVar.schemaname as string;
-            if (schemaName.toLowerCase() === 'auth') {
-              return 'TRUNCATE operations on auth schema are not allowed. This would delete all users and must be done through dedicated authentication APIs.';
-            }
+          const schemaName = getSchemaName(relation);
+          if (schemaName?.toLowerCase() === 'auth') {
+            return 'TRUNCATE operations on auth schema are not allowed. This would delete all users and must be done through dedicated authentication APIs.';
           }
         }
       }
