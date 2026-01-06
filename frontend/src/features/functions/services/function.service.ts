@@ -1,40 +1,23 @@
 import { apiClient } from '@/lib/api/client';
-
-export interface EdgeFunction {
-  id: string;
-  slug: string;
-  name: string;
-  description?: string;
-  code?: string;
-  status: 'draft' | 'active' | 'error';
-  created_at: string;
-  updated_at: string;
-  deployed_at?: string;
-}
-
-export interface FunctionsResponse {
-  functions: EdgeFunction[];
-  runtime: {
-    status: 'running' | 'unavailable';
-  };
-}
+import { FunctionSchema, FunctionListResponse } from '@insforge/shared-schemas';
 
 export class FunctionService {
-  async listFunctions(): Promise<FunctionsResponse> {
-    const data = await apiClient.request('/functions', {
+  async listFunctions(): Promise<FunctionListResponse> {
+    const response: FunctionListResponse = await apiClient.request('/functions', {
       headers: apiClient.withAccessToken(),
     });
 
     return {
-      functions: Array.isArray(data.functions) ? data.functions : [],
-      runtime: data.runtime || { status: 'unavailable' },
+      functions: Array.isArray(response.functions) ? response.functions : [],
+      runtime: response.runtime || { status: 'unavailable' },
     };
   }
 
-  async getFunctionBySlug(slug: string): Promise<EdgeFunction> {
-    return apiClient.request(`/functions/${slug}`, {
+  async getFunctionBySlug(slug: string): Promise<FunctionSchema> {
+    const response: FunctionSchema = await apiClient.request(`/functions/${slug}`, {
       headers: apiClient.withAccessToken(),
     });
+    return response;
   }
 
   async deleteFunction(slug: string): Promise<void> {

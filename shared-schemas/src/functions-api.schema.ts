@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { functionSchema } from './functions.schema';
 
 export const functionUploadRequestSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -21,5 +22,13 @@ export const functionUpdateRequestSchema = z.object({
   status: z.enum(['draft', 'active']).optional(),
 });
 
+export const functionListResponseSchema = z.object({
+  functions: z.array(functionSchema),
+  runtime: z.object({
+    status: z.enum(['running', 'unavailable']),
+  }),
+});
+
 export type FunctionUploadRequest = z.infer<typeof functionUploadRequestSchema>;
 export type FunctionUpdateRequest = z.infer<typeof functionUpdateRequestSchema>;
+export type FunctionListResponse = z.infer<typeof functionListResponseSchema>;
