@@ -38,7 +38,8 @@ export interface CreateDeploymentOptions {
   name?: string;
   files?: Array<{
     file: string;
-    data: string;
+    sha: string;
+    size: number;
   }>;
   projectSettings?: {
     buildCommand?: string | null;
@@ -47,8 +48,14 @@ export interface CreateDeploymentOptions {
     devCommand?: string | null;
     rootDirectory?: string | null;
   };
-  target?: 'production' | 'preview';
   meta?: Record<string, string>;
+}
+
+export interface DeploymentFile {
+  path: string;
+  content: Buffer;
+  sha: string;
+  size: number;
 }
 
 export class VercelProvider {
@@ -283,12 +290,13 @@ export class VercelProvider {
         teamId: credentials.teamId,
         requestBody: {
           name: options.name || 'deployment',
-          target: options.target || 'production',
+          target: 'production',
           project: credentials.projectId,
           files: options.files,
           projectSettings: options.projectSettings,
           meta: options.meta,
         },
+        skipAutoDetectionConfirmation: '1',
       });
 
       logger.info('Vercel deployment created', {
@@ -377,6 +385,78 @@ export class VercelProvider {
   }
 
   /**
+   * Upsert environment variables for the project
+   * Creates new variables or updates existing ones
+   */
+  async upsertEnvironmentVariables(envVars: Array<{ key: string; value: string }>): Promise<void> {
+    const client = await this.getClient();
+    const credentials = await this.getCredentials();
+
+    try {
+      // Vercel SDK expects the upsert format
+      const upsertPayload = envVars.map((env) => ({
+        key: env.key,
+        value: env.value,
+        type: 'encrypted' as const,
+        target: ['production', 'preview', 'development'] as (
+          | 'production'
+          | 'preview'
+          | 'development'
+        )[],
+      }));
+
+      await client.projects.createProjectEnv({
+        idOrName: credentials.projectId,
+        teamId: credentials.teamId,
+        upsert: 'true',
+        requestBody: upsertPayload,
+      });
+
+      logger.info('Environment variables upserted', {
+        count: envVars.length,
+        keys: envVars.map((e) => e.key),
+      });
+    } catch (error) {
+      logger.error('Failed to upsert environment variables', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new AppError('Failed to upsert environment variables', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+  }
+
+  /**
+   * Get all environment variable keys for the project (values not returned for security)
+   */
+  async getEnvironmentVariableKeys(): Promise<string[]> {
+    const client = await this.getClient();
+    const credentials = await this.getCredentials();
+
+    try {
+      const response = await client.projects.filterProjectEnvs({
+        idOrName: credentials.projectId,
+        teamId: credentials.teamId,
+      });
+
+      // SDK returns a union type - check if response has 'envs' array
+      if ('envs' in response && Array.isArray(response.envs)) {
+        return response.envs.map((env) => env.key);
+      }
+
+      // Single env var response (shouldn't happen for list endpoint, but handle it)
+      if ('key' in response) {
+        return [response.key];
+      }
+
+      return [];
+    } catch (error) {
+      logger.warn('Failed to get environment variable keys', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return []; // Non-critical, return empty array
+    }
+  }
+
+  /**
    * Clear cached credentials (useful for forcing a refresh)
    */
   clearCredentials(): void {
@@ -385,5 +465,110 @@ export class VercelProvider {
     this.vercelClient = null;
     this.currentToken = undefined;
     logger.info('Vercel credentials cache cleared');
+  }
+
+  /**
+   * Upload a single file to Vercel
+   * Returns the SHA of the uploaded file
+   */
+  async uploadFile(fileContent: Buffer): Promise<string> {
+    const client = await this.getClient();
+    const credentials = await this.getCredentials();
+    const sha = await this.computeSha(fileContent);
+    try {
+      await client.deployments.uploadFile({
+        teamId: credentials.teamId,
+        xVercelDigest: sha,
+        contentLength: fileContent.length,
+        requestBody: fileContent,
+      });
+
+      logger.info('File uploaded to Vercel', { sha, size: fileContent.length });
+      return sha;
+    } catch (error) {
+      // 409 Conflict means file already exists (same SHA), which is fine
+      if (error instanceof Error && error.message.includes('409')) {
+        logger.info('File already exists on Vercel', { sha });
+        return sha;
+      }
+      logger.error('Failed to upload file to Vercel', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new AppError('Failed to upload file to Vercel', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+  }
+
+  /**
+   * Upload multiple files to Vercel in parallel
+   * Returns array of file info with paths and SHAs
+   */
+  async uploadFiles(
+    files: Array<{ path: string; content: Buffer }>
+  ): Promise<Array<{ file: string; sha: string; size: number }>> {
+    const uploadPromises = files.map(async ({ path, content }) => {
+      const sha = await this.uploadFile(content);
+      return {
+        file: path,
+        sha,
+        size: content.length,
+      };
+    });
+
+    return Promise.all(uploadPromises);
+  }
+
+  /**
+   * Compute SHA-1 hash of file content (Vercel uses SHA-1 for file deduplication)
+   */
+  private async computeSha(content: Buffer): Promise<string> {
+    const crypto = await import('crypto');
+    return crypto.createHash('sha1').update(content).digest('hex');
+  }
+
+  /**
+   * Create deployment using file SHAs (files must be pre-uploaded)
+   */
+  async createDeploymentWithFiles(
+    files: Array<{ file: string; sha: string; size: number }>,
+    options: Omit<CreateDeploymentOptions, 'files'> = {}
+  ): Promise<VercelDeploymentResult> {
+    const client = await this.getClient();
+    const credentials = await this.getCredentials();
+    try {
+      const deployment = await client.deployments.createDeployment({
+        teamId: credentials.teamId,
+        requestBody: {
+          name: options.name || 'deployment',
+          target: 'production',
+          project: credentials.projectId,
+          files: files,
+          projectSettings: options.projectSettings,
+          meta: options.meta,
+        },
+        skipAutoDetectionConfirmation: '1',
+      });
+
+      logger.info('Vercel deployment created with file SHAs', {
+        id: deployment.id,
+        url: deployment.url,
+        readyState: deployment.readyState,
+        fileCount: files.length,
+      });
+
+      return {
+        id: deployment.id,
+        url: deployment.url ? `https://${deployment.url}` : null,
+        state: deployment.readyState,
+        readyState: deployment.readyState,
+        name: deployment.name,
+        createdAt: new Date(deployment.createdAt),
+      };
+    } catch (error) {
+      logger.error('Failed to create Vercel deployment with files', {
+        error: error instanceof Error ? error.message : String(error),
+        fileCount: files.length,
+      });
+      throw new AppError('Failed to create Vercel deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
   }
 }

@@ -9,24 +9,42 @@ export const projectSettingsSchema = z.object({
   rootDirectory: z.string().nullable().optional(),
 });
 
-export const deploymentFileSchema = z.object({
-  file: z.string(),
-  data: z.string(),
+export const envVarSchema = z.object({
+  key: z.string(),
+  value: z.string(),
 });
 
-export const createDeploymentRequestSchema = z.object({
-  name: z.string().optional(),
-  files: z.array(deploymentFileSchema).optional(),
-  target: z.enum(['production', 'preview']).optional(),
+/**
+ * Response from creating a deployment - includes presigned upload info
+ */
+export const createDeploymentResponseSchema = z.object({
+  id: z.string().uuid(),
+  uploadUrl: z.string().url(),
+  uploadFields: z.record(z.string()), // Required for S3 presigned POST (policy, signature, key, etc.)
+});
+
+/**
+ * Request to start a deployment (step 2)
+ * Triggers upload to Vercel and creates the actual deployment
+ */
+export const startDeploymentRequestSchema = z.object({
   projectSettings: projectSettingsSchema.optional(),
+  envVars: z.array(envVarSchema).optional(),
   meta: z.record(z.string()).optional(),
 });
+
+/**
+ * Response from starting a deployment
+ */
+export const startDeploymentResponseSchema = deploymentSchema;
 
 export const listDeploymentsResponseSchema = z.object({
   deployments: z.array(deploymentSchema),
 });
 
 export type ProjectSettings = z.infer<typeof projectSettingsSchema>;
-export type DeploymentFile = z.infer<typeof deploymentFileSchema>;
-export type CreateDeploymentRequest = z.infer<typeof createDeploymentRequestSchema>;
+export type EnvVar = z.infer<typeof envVarSchema>;
+export type CreateDeploymentResponse = z.infer<typeof createDeploymentResponseSchema>;
+export type StartDeploymentRequest = z.infer<typeof startDeploymentRequestSchema>;
+export type StartDeploymentResponse = z.infer<typeof startDeploymentResponseSchema>;
 export type ListDeploymentsResponse = z.infer<typeof listDeploymentsResponseSchema>;
