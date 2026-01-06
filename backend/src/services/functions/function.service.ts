@@ -99,7 +99,7 @@ export class FunctionService {
           status,
           created_at as "createdAt",
           updated_at as "updatedAt",
-          deployed_at as "deployedAt",
+          deployed_at as "deployedAt"
         FROM functions.definitions
         WHERE slug = $1`,
         [slug]

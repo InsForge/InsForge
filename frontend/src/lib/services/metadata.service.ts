@@ -7,8 +7,8 @@ import {
 } from '@insforge/shared-schemas';
 
 export class MetadataService {
-  async fetchApiKey(): Promise<ApiKeyResponse> {
-    const data = await apiClient.request('/metadata/api-key');
+  async fetchApiKey(): Promise<string> {
+    const data: ApiKeyResponse = await apiClient.request('/metadata/api-key');
     return data.apiKey;
   }
 
