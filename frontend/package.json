@@ -61,6 +61,7 @@
     "@vitejs/plugin-react": "^4.7.0",
     "@vitest/ui": "^3.2.4",
     "jsdom": "^26.1.0",
+    "tailwind-scrollbar": "^4.0.2",
     "tailwindcss": "^4.1.11",
     "tailwindcss-animate": "^1.0.7",
     "vite": "^7.0.5",
