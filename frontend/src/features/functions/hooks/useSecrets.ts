@@ -2,9 +2,8 @@ import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   secretService,
-  type Secret,
-  type CreateSecretInput,
 } from '@/features/functions/services/secret.service';
+import type { Secret, CreateSecretRequest } from '@insforge/shared-schemas';
 import { useToast } from '@/lib/hooks/useToast';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 
@@ -31,7 +30,7 @@ export function useSecrets() {
 
   // Create secret mutation
   const createSecretMutation = useMutation({
-    mutationFn: (input: CreateSecretInput) => secretService.createSecret(input),
+    mutationFn: (input: CreateSecretRequest) => secretService.createSecret(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['secrets'] });
       showToast('Secret created successfully', 'success');
