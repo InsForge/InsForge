@@ -19,7 +19,7 @@ export default function DashboardPage() {
   const { totalUsers } = useUsers();
   const { records } = useMcpUsage();
 
-  const authCount = auth?.oauths.length ?? 0;
+  const authCount = auth?.oAuthProviders.length ?? 0;
   const tableCount = tables?.length ?? 0;
   const showBanner = location.state?.showSuccessBanner === true;
 

@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const docTypeSchema = z
   .enum([
     'instructions',
+    'auth-sdk',
     'db-sdk',
     'storage-sdk',
     'functions-sdk',
@@ -13,11 +14,12 @@ export const docTypeSchema = z
   ])
   .describe(
     `
-    Documentation type: 
+    Documentation type:
       "instructions" (essential backend setup - use FIRST),
       "db-sdk" (database operations),
       "storage-sdk" (file storage),
       "functions-sdk" (edge functions),
+      "auth-sdk" (direct SDK methods for custom auth flows),
       "auth-components-react" (authentication components for React+Vite applications),
       "auth-components-nextjs" (authentication components for Next.js applications),
       "ai-integration-sdk" (AI features),
