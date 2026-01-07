@@ -247,3 +247,20 @@
 ::-webkit-scrollbar-thumb:hover {
   background: var(--border-hover-color);
 }
+
+.thin-scrollbar {
+  scrollbar-width: thin;
+}
+
+.thin-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: var(--border-color);
+}
+
+.thin-scrollbar::-webkit-scrollbar-button {
+  display: none;
+}

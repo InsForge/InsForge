@@ -15,7 +15,7 @@ export function TablesEmptyState({
   onTemplateClick,
 }: TablesEmptyStateProps) {
   return (
-    <div className="flex justify-center w-full h-full bg-bg-gray dark:bg-neutral-800 px-6">
+    <div className="flex justify-center w-full h-full bg-bg-gray dark:bg-neutral-800 px-6 overflow-y-auto">
       <div className="flex flex-col gap-6 max-w-[1024px] w-full pb-9 pt-6">
         <h2 className="text-xl font-semibold text-zinc-950 dark:text-white leading-7 tracking-[-0.1px]">
           Create Your First Table
