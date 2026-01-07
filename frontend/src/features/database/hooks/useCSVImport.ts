@@ -1,8 +1,9 @@
 import { useMutation } from '@tanstack/react-query';
-import { recordService, CSVImportResponse } from '../services/record.service.js';
+import { recordService } from '../services/record.service.js';
+import { BulkUpsertResponse } from '@insforge/shared-schemas';
 
 interface UseCSVImportOptions {
-  onSuccess?: (data: CSVImportResponse) => void;
+  onSuccess?: (data: BulkUpsertResponse) => void;
   onError?: (error: Error) => void;
 }
 

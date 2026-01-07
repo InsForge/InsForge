@@ -362,7 +362,7 @@ export default function SQLEditorPage() {
             {isError && error ? (
               <ErrorViewer error={error} />
             ) : isSuccess && data ? (
-              <ResultsViewer data={data.rows || data.data || data} />
+              <ResultsViewer data={data.rows || data} />
             ) : (
               <div
                 className={cn(

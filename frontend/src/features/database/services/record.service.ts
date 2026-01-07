@@ -1,16 +1,7 @@
 import { ConvertedValue } from '@/components/datagrid/datagridTypes';
 import { apiClient } from '@/lib/api/client';
-import { ColumnSchema } from '@insforge/shared-schemas';
+import { ColumnSchema, BulkUpsertResponse } from '@insforge/shared-schemas';
 import { tableService } from './table.service';
-
-export interface CSVImportResponse {
-  success: boolean;
-  message?: string;
-  data?: {
-    rowCount: number;
-  };
-  error?: string; // For backend error messages
-}
 
 export class RecordService {
   /**
@@ -190,7 +181,7 @@ export class RecordService {
     return { valid: true };
   }
 
-  async importCSV(tableName: string, file: File): Promise<CSVImportResponse> {
+  async importCSV(tableName: string, file: File): Promise<BulkUpsertResponse> {
     const validation = this.validateCSVFile(file);
     if (!validation.valid) {
       throw new Error(validation.error || 'Invalid CSV file.');
@@ -200,19 +191,12 @@ export class RecordService {
     formData.append('file', file);
     formData.append('table', tableName);
 
-    const response = await apiClient.request(`/database/advance/bulk-upsert`, {
+    const response: BulkUpsertResponse = await apiClient.request(`/database/advance/bulk-upsert`, {
       method: 'POST',
       headers: apiClient.withAccessToken(),
       body: formData,
     });
-    return {
-      success: response.success,
-      message: response.message,
-      data: {
-        rowCount: response.rowsAffected,
-      },
-      error: response.error,
-    };
+    return response;
   }
 }
 

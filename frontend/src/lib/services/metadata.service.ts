@@ -1,26 +1,14 @@
 import { apiClient } from '@/lib/api/client';
-import { AppMetadataSchema } from '@insforge/shared-schemas';
-
-// TODO: Replace with schema from shared-schemas
-export interface DatabaseConnectionInfo {
-  connectionURL: string;
-  parameters: {
-    host: string;
-    port: number;
-    database: string;
-    user: string;
-    password: string;
-    sslmode: string;
-  };
-}
-
-export interface DatabasePasswordInfo {
-  databasePassword: string;
-}
+import {
+  ApiKeyResponse,
+  AppMetadataSchema,
+  DatabaseConnectionInfo,
+  DatabasePasswordInfo,
+} from '@insforge/shared-schemas';
 
 export class MetadataService {
-  async fetchApiKey() {
-    const data = await apiClient.request('/metadata/api-key');
+  async fetchApiKey(): Promise<string> {
+    const data: ApiKeyResponse = await apiClient.request('/metadata/api-key');
     return data.apiKey;
   }
 

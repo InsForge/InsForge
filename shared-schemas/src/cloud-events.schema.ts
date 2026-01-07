@@ -37,6 +37,24 @@ export const navigateToUsageSchema = z.object({
   type: z.literal('NAVIGATE_TO_USAGE'),
 });
 
+export const showContactModalEventSchema = z.object({
+  type: z.literal('SHOW_CONTACT_MODAL'),
+});
+
+export const showConnectOverlayEventSchema = z.object({
+  type: z.literal('SHOW_CONNECT_OVERLAY'),
+});
+
+export const authorizationCodeEventSchema = z.object({
+  type: z.literal('AUTHORIZATION_CODE'),
+  code: z.string(),
+});
+
+export const routeChangeEventSchema = z.object({
+  type: z.literal('ROUTE_CHANGE'),
+  path: z.string(),
+});
+
 export const cloudEventSchema = z.discriminatedUnion('type', [
   appRouteChangeEventSchema,
   authSuccessEventSchema,
@@ -46,6 +64,10 @@ export const cloudEventSchema = z.discriminatedUnion('type', [
   showSettingsOverlayEventSchema,
   onboardingSuccessSchema,
   navigateToUsageSchema,
+  showContactModalEventSchema,
+  showConnectOverlayEventSchema,
+  authorizationCodeEventSchema,
+  routeChangeEventSchema,
 ]);
 
 export type AppRouteChangeEvent = z.infer<typeof appRouteChangeEventSchema>;
@@ -55,3 +77,7 @@ export type McpConnectionStatusEvent = z.infer<typeof mcpConnectionStatusEventSc
 export type CloudEvent = z.infer<typeof cloudEventSchema>;
 export type ShowOnboardingOverlayEvent = z.infer<typeof showOnboardingOverlayEventSchema>;
 export type ShowSettingsOverlayEvent = z.infer<typeof showSettingsOverlayEventSchema>;
+export type ShowContactModalEvent = z.infer<typeof showContactModalEventSchema>;
+export type ShowConnectOverlayEvent = z.infer<typeof showConnectOverlayEventSchema>;
+export type AuthorizationCodeEvent = z.infer<typeof authorizationCodeEventSchema>;
+export type RouteChangeEvent = z.infer<typeof routeChangeEventSchema>;

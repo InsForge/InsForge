@@ -1,9 +1,9 @@
 import { CopyButton } from '@/components/CopyButton';
-import { type EdgeFunction } from '../services/function.service';
+import { FunctionSchema } from '@insforge/shared-schemas';
 import { cn, getBackendUrl } from '@/lib/utils/utils';
 import { format, formatDistance } from 'date-fns';
 interface FunctionRowProps {
-  function: EdgeFunction;
+  function: FunctionSchema;
   onClick: () => void;
   className?: string;
 }
@@ -49,9 +49,9 @@ export function FunctionRow({ function: func, onClick, className }: FunctionRowP
         <div className="col-span-2 px-3 py-1.5">
           <span
             className="text-sm text-muted-foreground dark:text-white truncate"
-            title={func.created_at}
+            title={func.createdAt}
           >
-            {format(new Date(func.created_at), 'MMM dd, yyyy HH:mm')}
+            {format(new Date(func.createdAt), 'MMM dd, yyyy HH:mm')}
           </span>
         </div>
 
@@ -59,10 +59,10 @@ export function FunctionRow({ function: func, onClick, className }: FunctionRowP
         <div className="col-span-2 px-3 py-1.5">
           <span
             className="text-sm text-muted-foreground dark:text-white truncate"
-            title={func.deployed_at}
+            title={func.deployedAt ?? ''}
           >
-            {func.deployed_at
-              ? formatDistance(new Date(func.deployed_at), new Date(), { addSuffix: true })
+            {func.deployedAt
+              ? formatDistance(new Date(func.deployedAt), new Date(), { addSuffix: true })
               : 'Never'}
           </span>
         </div>
