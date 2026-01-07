@@ -13,6 +13,7 @@ import {
   Users,
   Table,
   ChartBarBig,
+  Settings,
 } from 'lucide-react';
 import { postMessageToParent } from './cloudMessaging';
 
@@ -204,4 +205,11 @@ export const usageMenuItem: PrimaryMenuItem = {
   onClick: () => {
     postMessageToParent({ type: 'NAVIGATE_TO_USAGE' }, '*');
   },
+};
+
+export const settingsMenuItem: PrimaryMenuItem = {
+  id: 'settings',
+  label: 'Settings',
+  href: '/dashboard/settings',
+  icon: Settings,
 };

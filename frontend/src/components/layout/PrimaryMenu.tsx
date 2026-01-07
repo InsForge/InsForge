@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { ExternalLink, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
 import { cn } from '@/lib/utils/utils';
 import {
@@ -66,13 +66,22 @@ export function PrimaryMenu({
   };
 
   const BottomMenuItem = ({ item }: { item: PrimaryMenuItem }) => {
+    const { pathname } = useLocation();
+    const isActive = item.href ? pathname.startsWith(item.href) && item.href !== '' : false;
+
+    const itemClasses = cn(
+      baseButtonClasses,
+      isActive
+        ? 'bg-zinc-950 dark:bg-emerald-300 text-white dark:text-black hover:bg-zing-950 dark:hover:bg-emerald-300 hover:text-white dark:hover:text-black'
+        : 'hover:bg-zinc-100 dark:hover:bg-neutral-600 text-black dark:text-neutral-400'
+    );
     // For items with onClick handler or external links, use a button
     if (item.onClick || item.external) {
       return (
         <Tooltip>
           <TooltipTrigger asChild>
             <button
-              className={baseButtonClasses}
+              className={itemClasses}
               onClick={
                 item.onClick || (item.external ? () => window.open(item.href, '_blank') : undefined)
               }
@@ -108,7 +117,7 @@ export function PrimaryMenu({
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <Link to={item.href} className={baseButtonClasses}>
+          <Link to={item.href} className={itemClasses}>
             <div className="absolute left-2 h-5 w-5">
               <item.icon className="w-5 h-5" />
             </div>

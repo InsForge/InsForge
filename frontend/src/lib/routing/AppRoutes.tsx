@@ -25,6 +25,7 @@ import TriggersPage from '@/features/database/pages/TriggersPage';
 import PoliciesPage from '@/features/database/pages/PoliciesPage';
 import TemplatesPage from '@/features/database/pages/TemplatesPage';
 import AuditsPage from '@/features/logs/pages/AuditsPage';
+import SettingsPage from '@/features/settings/pages/SettingsPage';
 
 export function AppRoutes() {
   return (
@@ -88,6 +89,7 @@ export function AppRoutes() {
                   path="/dashboard/realtime/permissions"
                   element={<RealtimePermissionsPage />}
                 />
+                <Route path="/dashboard/settings" element={<SettingsPage />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </Layout>
