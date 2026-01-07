@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
-import { Secret, CreateSecretRequest } from '@insforge/shared-schemas';
+import { SecretSchema, CreateSecretRequest } from '@insforge/shared-schemas';
 
 export interface CreateSecretInput extends CreateSecretRequest {
   isReserved?: boolean;
@@ -118,7 +118,7 @@ export class SecretService {
   /**
    * List all secrets (without decrypting values)
    */
-  async listSecrets(): Promise<Secret[]> {
+  async listSecrets(): Promise<SecretSchema[]> {
     try {
       const result = await this.getPool().query(
         `SELECT

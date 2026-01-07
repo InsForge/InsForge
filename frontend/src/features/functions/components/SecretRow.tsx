@@ -1,12 +1,12 @@
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/radix/Button';
-import { Secret } from '@insforge/shared-schemas';
+import { SecretSchema } from '@insforge/shared-schemas';
 import { cn } from '@/lib/utils/utils';
 import { formatDistance } from 'date-fns';
 
 interface SecretRowProps {
-  secret: Secret;
-  onDelete: (secret: Secret) => void;
+  secret: SecretSchema;
+  onDelete: (secret: SecretSchema) => void;
   className?: string;
 }
 

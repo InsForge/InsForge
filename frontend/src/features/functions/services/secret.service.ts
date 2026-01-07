@@ -1,6 +1,6 @@
 import { apiClient } from '@/lib/api/client';
 import {
-  Secret,
+  SecretSchema,
   CreateSecretRequest,
   CreateSecretResponse,
   ListSecretsResponse,
@@ -8,11 +8,11 @@ import {
 } from '@insforge/shared-schemas';
 
 export class SecretService {
-  async listSecrets(): Promise<Secret[]> {
+  async listSecrets(): Promise<SecretSchema[]> {
     const data = (await apiClient.request('/secrets', {
       headers: apiClient.withAccessToken(),
     })) as ListSecretsResponse;
-    return data.secrets as Secret[];
+    return data.secrets as SecretSchema[];
   }
 
   async createSecret(input: CreateSecretRequest): Promise<CreateSecretResponse> {

@@ -1,9 +1,9 @@
 import { apiClient } from '@/lib/api/client';
-import { FunctionSchema, FunctionListResponse } from '@insforge/shared-schemas';
+import { FunctionSchema, ListFunctionsResponse } from '@insforge/shared-schemas';
 
 export class FunctionService {
-  async listFunctions(): Promise<FunctionListResponse> {
-    const response: FunctionListResponse = await apiClient.request('/functions', {
+  async listFunctions(): Promise<ListFunctionsResponse> {
+    const response: ListFunctionsResponse = await apiClient.request('/functions', {
       headers: apiClient.withAccessToken(),
     });
 

@@ -1,10 +1,10 @@
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import {
   EdgeFunctionMetadataSchema,
-  FunctionUploadRequest,
-  FunctionUpdateRequest,
+  UploadFunctionRequest,
+  UpdateFunctionRequest,
   FunctionSchema,
-  FunctionListResponse,
+  ListFunctionsResponse,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { DatabaseError, Pool } from 'pg';
@@ -36,7 +36,7 @@ export class FunctionService {
   /**
    * List all functions with runtime health check
    */
-  async listFunctions(): Promise<FunctionListResponse> {
+  async listFunctions(): Promise<ListFunctionsResponse> {
     try {
       const result = await this.getPool().query(
         `SELECT
@@ -119,7 +119,7 @@ export class FunctionService {
   /**
    * Create a new function
    */
-  async createFunction(data: FunctionUploadRequest): Promise<FunctionSchema> {
+  async createFunction(data: UploadFunctionRequest): Promise<FunctionSchema> {
     const client = await this.getPool().connect();
     try {
       const { name, code, description, status } = data;
@@ -185,7 +185,7 @@ export class FunctionService {
    */
   async updateFunction(
     slug: string,
-    updates: FunctionUpdateRequest
+    updates: UpdateFunctionRequest
   ): Promise<FunctionSchema | null> {
     const client = await this.getPool().connect();
     try {

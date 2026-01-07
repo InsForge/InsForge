@@ -12,4 +12,4 @@ export const secretSchema = z.object({
   updatedAt: z.string(),
 });
 
-export type Secret = z.infer<typeof secretSchema>;
+export type SecretSchema = z.infer<typeof secretSchema>;

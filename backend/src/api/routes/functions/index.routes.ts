@@ -5,7 +5,7 @@ import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
-import { functionUploadRequestSchema, functionUpdateRequestSchema } from '@insforge/shared-schemas';
+import { uploadFunctionRequestSchema, updateFunctionRequestSchema } from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { successResponse } from '@/utils/response.js';
@@ -53,7 +53,7 @@ router.get('/:slug', verifyAdmin, async (req: AuthRequest, res: Response, next: 
  */
 router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const validation = functionUploadRequestSchema.safeParse(req.body);
+    const validation = uploadFunctionRequestSchema.safeParse(req.body);
     if (!validation.success) {
       throw new AppError(JSON.stringify(validation.error.issues), 400, ERROR_CODES.INVALID_INPUT);
     }
@@ -103,7 +103,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
 router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { slug } = req.params;
-    const validation = functionUpdateRequestSchema.safeParse(req.body);
+    const validation = updateFunctionRequestSchema.safeParse(req.body);
 
     if (!validation.success) {
       throw new AppError(JSON.stringify(validation.error.issues), 400, ERROR_CODES.INVALID_INPUT);
