@@ -18,7 +18,7 @@ export type DeploymentStatusType = z.infer<typeof deploymentStatusSchema>;
 
 export const deploymentSchema = z.object({
   id: z.string().uuid(),
-  deploymentId: z.string().nullable(), // Provider's deployment ID, null until deployment starts
+  providerDeploymentId: z.string().nullable(), // Provider's deployment ID, null until deployment starts
   provider: z.string(),
   status: deploymentStatusSchema,
   url: z.string().nullable(),

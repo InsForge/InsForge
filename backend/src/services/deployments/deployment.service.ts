@@ -98,7 +98,7 @@ export class DeploymentService {
          VALUES ($1, $2)
          RETURNING
            id,
-           deployment_id as "deploymentId",
+           provider_deployment_id as "providerDeploymentId",
            provider,
            status,
            url,
@@ -250,14 +250,14 @@ export class DeploymentService {
       // Update deployment record with Vercel deployment info
       const updateResult = await this.getPool().query(
         `UPDATE system.deployments
-         SET deployment_id = $1,
+         SET provider_deployment_id = $1,
              status = $2,
              url = $3,
              metadata = COALESCE(metadata, '{}'::jsonb) || $4::jsonb
          WHERE id = $5
          RETURNING
            id,
-           deployment_id as "deploymentId",
+           provider_deployment_id as "providerDeploymentId",
            provider,
            status,
            url,
@@ -267,7 +267,7 @@ export class DeploymentService {
         [
           vercelDeployment.id,
           vercelStatus,
-          vercelDeployment.url,
+          this.getDeploymentUrl(vercelDeployment.url),
           JSON.stringify({
             vercelName: vercelDeployment.name,
             fileCount: uploadedFiles.length,
@@ -288,7 +288,7 @@ export class DeploymentService {
 
       logger.info('Deployment started', {
         id,
-        deploymentId: vercelDeployment.id,
+        providerDeploymentId: vercelDeployment.id,
         status: vercelStatus,
       });
 
@@ -307,6 +307,17 @@ export class DeploymentService {
       }).catch(() => {});
       throw new AppError('Failed to start deployment', 500, ERROR_CODES.INTERNAL_ERROR);
     }
+  }
+
+  /**
+   * Get the deployment URL - uses custom domain if APP_KEY is set, otherwise falls back to provider URL
+   */
+  private getDeploymentUrl(providerUrl: string | null): string | null {
+    const appKey = process.env.APP_KEY;
+    if (appKey) {
+      return `https://${appKey}.insforge.site`;
+    }
+    return providerUrl;
   }
 
   /**
@@ -370,7 +381,7 @@ export class DeploymentService {
       const result = await this.getPool().query(
         `SELECT
           id,
-          deployment_id as "deploymentId",
+          provider_deployment_id as "providerDeploymentId",
           provider,
           status,
           url,
@@ -404,7 +415,7 @@ export class DeploymentService {
       const result = await this.getPool().query(
         `SELECT
           id,
-          deployment_id as "deploymentId",
+          provider_deployment_id as "providerDeploymentId",
           provider,
           status,
           url,
@@ -412,7 +423,7 @@ export class DeploymentService {
           created_at as "createdAt",
           updated_at as "updatedAt"
          FROM system.deployments
-         WHERE deployment_id = $1`,
+         WHERE provider_deployment_id = $1`,
         [vercelDeploymentId]
       );
 
@@ -441,7 +452,7 @@ export class DeploymentService {
         return null;
       }
 
-      if (!deployment.deploymentId) {
+      if (!deployment.providerDeploymentId) {
         throw new AppError(
           'Cannot sync deployment: no provider deployment ID yet. Deployment may still be in WAITING status.',
           400,
@@ -450,7 +461,9 @@ export class DeploymentService {
       }
 
       // Fetch latest status from Vercel
-      const vercelDeployment = await this.vercelProvider.getDeployment(deployment.deploymentId);
+      const vercelDeployment = await this.vercelProvider.getDeployment(
+        deployment.providerDeploymentId
+      );
 
       // Use Vercel's status directly (uppercase to match our enum)
       const vercelStatus = (
@@ -466,7 +479,7 @@ export class DeploymentService {
          WHERE id = $4
          RETURNING
            id,
-           deployment_id as "deploymentId",
+           provider_deployment_id as "providerDeploymentId",
            provider,
            status,
            url,
@@ -475,7 +488,7 @@ export class DeploymentService {
            updated_at as "updatedAt"`,
         [
           vercelStatus,
-          vercelDeployment.url,
+          this.getDeploymentUrl(vercelDeployment.url),
           JSON.stringify({
             lastSyncedAt: new Date().toISOString(),
             ...(vercelDeployment.error && { error: vercelDeployment.error }),
@@ -507,7 +520,7 @@ export class DeploymentService {
       const result = await this.getPool().query(
         `SELECT
           id,
-          deployment_id as "deploymentId",
+          provider_deployment_id as "providerDeploymentId",
           provider,
           status,
           url,
@@ -541,8 +554,8 @@ export class DeploymentService {
       }
 
       // If deployment has a Vercel ID, cancel it on Vercel
-      if (deployment.deploymentId) {
-        await this.vercelProvider.cancelDeployment(deployment.deploymentId);
+      if (deployment.providerDeploymentId) {
+        await this.vercelProvider.cancelDeployment(deployment.providerDeploymentId);
       }
 
       // If deployment is in WAITING status, clean up S3 zip
@@ -566,7 +579,7 @@ export class DeploymentService {
 
       logger.info('Deployment cancelled', {
         id,
-        deploymentId: deployment.deploymentId,
+        providerDeploymentId: deployment.providerDeploymentId,
       });
     } catch (error) {
       if (error instanceof AppError) {
@@ -594,10 +607,10 @@ export class DeploymentService {
       const result = await this.getPool().query(
         `UPDATE system.deployments
          SET status = $1, url = COALESCE($2, url), metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb
-         WHERE deployment_id = $4
+         WHERE provider_deployment_id = $4
          RETURNING
            id,
-           deployment_id as "deploymentId",
+           provider_deployment_id as "providerDeploymentId",
            provider,
            status,
            url,
@@ -606,7 +619,7 @@ export class DeploymentService {
            updated_at as "updatedAt"`,
         [
           status,
-          url,
+          this.getDeploymentUrl(url),
           JSON.stringify({
             lastWebhookAt: new Date().toISOString(),
             ...webhookMetadata,
