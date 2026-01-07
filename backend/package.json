@@ -40,7 +40,6 @@
     "@databases/sql": "^3.3.0",
     "@types/multer": "^1.4.13",
     "@types/pg": "^8.15.4",
-    "@vercel/sdk": "^1.18.5",
     "adm-zip": "^0.5.16",
     "axios": "^1.11.0",
     "bcryptjs": "^3.0.2",

@@ -1,5 +1,6 @@
-import { Vercel } from '@vercel/sdk';
+import axios from 'axios';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -62,8 +63,6 @@ export class VercelProvider {
   private static instance: VercelProvider;
   private cloudCredentials: VercelCredentials | undefined;
   private fetchPromise: Promise<VercelCredentials> | null = null;
-  private vercelClient: Vercel | null = null;
-  private currentToken: string | undefined;
   private secretService: SecretService;
 
   private constructor() {
@@ -78,38 +77,16 @@ export class VercelProvider {
   }
 
   /**
-   * Get or create Vercel SDK client
-   * Recreates client if token has changed
-   */
-  private async getClient(): Promise<Vercel> {
-    const credentials = await this.getCredentials();
-
-    // Recreate client if token changed
-    if (!this.vercelClient || this.currentToken !== credentials.token) {
-      this.currentToken = credentials.token;
-      this.vercelClient = new Vercel({
-        bearerToken: credentials.token,
-      });
-    }
-
-    return this.vercelClient;
-  }
-
-  /**
    * Get Vercel credentials based on environment
-   * In cloud environment: fetches from cloud API with JWT authentication
-   * In local environment: returns from environment variables
    */
   async getCredentials(): Promise<VercelCredentials> {
     if (isCloudEnvironment()) {
-      // Check if we have valid cached credentials (not expired)
       if (
         this.cloudCredentials &&
         (!this.cloudCredentials.expiresAt || new Date() < this.cloudCredentials.expiresAt)
       ) {
         return this.cloudCredentials;
       }
-      // Fetch new credentials if expired or not present
       return await this.fetchCloudCredentials();
     }
 
@@ -124,7 +101,6 @@ export class VercelProvider {
         ERROR_CODES.INTERNAL_ERROR
       );
     }
-
     if (!teamId) {
       throw new AppError(
         'VERCEL_TEAM_ID not found in environment variables',
@@ -132,7 +108,6 @@ export class VercelProvider {
         ERROR_CODES.INTERNAL_ERROR
       );
     }
-
     if (!projectId) {
       throw new AppError(
         'VERCEL_PROJECT_ID not found in environment variables',
@@ -141,13 +116,7 @@ export class VercelProvider {
       );
     }
 
-    // Local credentials don't expire
-    return {
-      token,
-      teamId,
-      projectId,
-      expiresAt: null,
-    };
+    return { token, teamId, projectId, expiresAt: null };
   }
 
   /**
@@ -166,16 +135,13 @@ export class VercelProvider {
 
   /**
    * Fetch credentials from cloud service
-   * Uses promise memoization to prevent duplicate fetch requests
    */
   private async fetchCloudCredentials(): Promise<VercelCredentials> {
-    // If fetch is already in progress, wait for it
     if (this.fetchPromise) {
       logger.info('Vercel credentials fetch already in progress, waiting for completion...');
       return this.fetchPromise;
     }
 
-    // Start new fetch and store the promise
     this.fetchPromise = (async () => {
       try {
         const projectId = process.env.PROJECT_ID;
@@ -188,10 +154,8 @@ export class VercelProvider {
           throw new Error('JWT_SECRET not found in environment variables');
         }
 
-        // Sign a token for authentication
         const signature = jwt.sign({ projectId }, jwtSecret, { expiresIn: '1h' });
 
-        // Fetch credentials from cloud service with sign token as query parameter
         const response = await fetch(
           `${process.env.CLOUD_API_HOST || 'https://api.insforge.dev'}/sites/v1/credentials/${projectId}?sign=${signature}`
         );
@@ -202,26 +166,20 @@ export class VercelProvider {
 
         const data = (await response.json()) as CloudCredentialsResponse;
 
-        // Validate response
         if (!data.bearer_token || !data.vercel_project_id) {
           throw new Error('Invalid response: missing Vercel credentials');
         }
 
-        // Store webhook secret if provided
         if (data.webhook_secret) {
           await this.storeWebhookSecret(data.webhook_secret);
         }
 
-        // Store credentials with expiry
         this.cloudCredentials = {
           token: data.bearer_token,
-          teamId: data.project_id, // project_id from response is the team ID
+          teamId: data.project_id,
           projectId: data.vercel_project_id,
           expiresAt: new Date(data.expires_at),
         };
-
-        // Reset client to force recreation with new token
-        this.vercelClient = null;
 
         logger.info('Successfully fetched Vercel credentials from cloud', {
           expiresAt: this.cloudCredentials.expiresAt?.toISOString(),
@@ -234,7 +192,6 @@ export class VercelProvider {
         });
         throw error;
       } finally {
-        // Clear the promise after completion (success or failure)
         this.fetchPromise = null;
       }
     })();
@@ -243,26 +200,22 @@ export class VercelProvider {
   }
 
   /**
-   * Store webhook secret in secrets service if it doesn't exist or has changed
+   * Store webhook secret in secrets service
    */
   private async storeWebhookSecret(webhookSecret: string): Promise<void> {
     const secretKey = 'VERCEL_WEBHOOK_SECRET';
 
     try {
-      // Check if secret already exists and matches
       const existingSecret = await this.secretService.getSecretByKey(secretKey);
 
       if (existingSecret === webhookSecret) {
-        // Secret unchanged, no need to update
         return;
       }
 
       if (existingSecret !== null) {
-        // Update existing secret
         await this.secretService.updateSecretByKey(secretKey, { value: webhookSecret });
         logger.info('Vercel webhook secret updated');
       } else {
-        // Create new secret
         await this.secretService.createSecret({
           key: secretKey,
           value: webhookSecret,
@@ -271,7 +224,6 @@ export class VercelProvider {
         logger.info('Vercel webhook secret created');
       }
     } catch (error) {
-      // Log but don't fail - webhook secret is not critical for deployments
       logger.warn('Failed to store Vercel webhook secret', {
         error: error instanceof Error ? error.message : String(error),
       });
@@ -280,15 +232,15 @@ export class VercelProvider {
 
   /**
    * Create a new deployment on Vercel
+   * POST /v13/deployments
    */
   async createDeployment(options: CreateDeploymentOptions = {}): Promise<VercelDeploymentResult> {
-    const client = await this.getClient();
     const credentials = await this.getCredentials();
 
     try {
-      const deployment = await client.deployments.createDeployment({
-        teamId: credentials.teamId,
-        requestBody: {
+      const response = await axios.post(
+        `https://api.vercel.com/v13/deployments?teamId=${credentials.teamId}&skipAutoDetectionConfirmation=1`,
+        {
           name: options.name || 'deployment',
           target: 'production',
           project: credentials.projectId,
@@ -296,8 +248,10 @@ export class VercelProvider {
           projectSettings: options.projectSettings,
           meta: options.meta,
         },
-        skipAutoDetectionConfirmation: '1',
-      });
+        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      );
+
+      const deployment = response.data;
 
       logger.info('Vercel deployment created', {
         id: deployment.id,
@@ -323,16 +277,17 @@ export class VercelProvider {
 
   /**
    * Get deployment status by deployment ID
+   * GET /v13/deployments/:id
    */
   async getDeployment(deploymentId: string): Promise<VercelDeploymentResult> {
-    const client = await this.getClient();
     const credentials = await this.getCredentials();
 
     try {
-      const deployment = await client.deployments.getDeployment({
-        idOrUrl: deploymentId,
-        teamId: credentials.teamId,
-      });
+      const response = await axios.get(
+        `https://api.vercel.com/v13/deployments/${deploymentId}?teamId=${credentials.teamId}`,
+        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      );
+      const deployment = response.data;
 
       return {
         id: deployment.id,
@@ -349,8 +304,7 @@ export class VercelProvider {
           : undefined,
       };
     } catch (error) {
-      // Check for 404 errors
-      if (error instanceof Error && error.message.includes('404')) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
         throw new AppError(`Deployment not found: ${deploymentId}`, 404, ERROR_CODES.NOT_FOUND);
       }
       logger.error('Failed to get Vercel deployment', {
@@ -363,17 +317,17 @@ export class VercelProvider {
 
   /**
    * Cancel a deployment
+   * PATCH /v12/deployments/:id/cancel
    */
   async cancelDeployment(deploymentId: string): Promise<void> {
-    const client = await this.getClient();
     const credentials = await this.getCredentials();
 
     try {
-      await client.deployments.cancelDeployment({
-        id: deploymentId,
-        teamId: credentials.teamId,
-      });
-
+      await axios.patch(
+        `https://api.vercel.com/v12/deployments/${deploymentId}/cancel?teamId=${credentials.teamId}`,
+        {},
+        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      );
       logger.info('Vercel deployment cancelled', { deploymentId });
     } catch (error) {
       logger.error('Failed to cancel Vercel deployment', {
@@ -386,31 +340,24 @@ export class VercelProvider {
 
   /**
    * Upsert environment variables for the project
-   * Creates new variables or updates existing ones
+   * POST /v10/projects/:id/env
    */
   async upsertEnvironmentVariables(envVars: Array<{ key: string; value: string }>): Promise<void> {
-    const client = await this.getClient();
     const credentials = await this.getCredentials();
 
     try {
-      // Vercel SDK expects the upsert format
-      const upsertPayload = envVars.map((env) => ({
+      const payload = envVars.map((env) => ({
         key: env.key,
         value: env.value,
-        type: 'encrypted' as const,
-        target: ['production', 'preview', 'development'] as (
-          | 'production'
-          | 'preview'
-          | 'development'
-        )[],
+        type: 'encrypted',
+        target: ['production', 'preview', 'development'],
       }));
 
-      await client.projects.createProjectEnv({
-        idOrName: credentials.projectId,
-        teamId: credentials.teamId,
-        upsert: 'true',
-        requestBody: upsertPayload,
-      });
+      await axios.post(
+        `https://api.vercel.com/v10/projects/${credentials.projectId}/env?teamId=${credentials.teamId}&upsert=true`,
+        payload,
+        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      );
 
       logger.info('Environment variables upserted', {
         count: envVars.length,
@@ -425,69 +372,64 @@ export class VercelProvider {
   }
 
   /**
-   * Get all environment variable keys for the project (values not returned for security)
+   * Get all environment variable keys for the project
+   * GET /v9/projects/:id/env
    */
   async getEnvironmentVariableKeys(): Promise<string[]> {
-    const client = await this.getClient();
     const credentials = await this.getCredentials();
 
     try {
-      const response = await client.projects.filterProjectEnvs({
-        idOrName: credentials.projectId,
-        teamId: credentials.teamId,
-      });
+      const response = await axios.get(
+        `https://api.vercel.com/v9/projects/${credentials.projectId}/env?teamId=${credentials.teamId}`,
+        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      );
 
-      // SDK returns a union type - check if response has 'envs' array
-      if ('envs' in response && Array.isArray(response.envs)) {
-        return response.envs.map((env) => env.key);
-      }
-
-      // Single env var response (shouldn't happen for list endpoint, but handle it)
-      if ('key' in response) {
-        return [response.key];
-      }
-
-      return [];
+      const data = response.data as { envs?: Array<{ key: string }> };
+      return (data.envs || []).map((env) => env.key);
     } catch (error) {
       logger.warn('Failed to get environment variable keys', {
         error: error instanceof Error ? error.message : String(error),
       });
-      return []; // Non-critical, return empty array
+      return [];
     }
   }
 
   /**
-   * Clear cached credentials (useful for forcing a refresh)
+   * Clear cached credentials
    */
   clearCredentials(): void {
     this.cloudCredentials = undefined;
     this.fetchPromise = null;
-    this.vercelClient = null;
-    this.currentToken = undefined;
     logger.info('Vercel credentials cache cleared');
   }
 
   /**
    * Upload a single file to Vercel
-   * Returns the SHA of the uploaded file
+   * POST /v2/files
    */
   async uploadFile(fileContent: Buffer): Promise<string> {
-    const client = await this.getClient();
     const credentials = await this.getCredentials();
-    const sha = await this.computeSha(fileContent);
+    const sha = this.computeSha(fileContent);
+
     try {
-      await client.deployments.uploadFile({
-        teamId: credentials.teamId,
-        xVercelDigest: sha,
-        contentLength: fileContent.length,
-        requestBody: fileContent,
-      });
+      await axios.post(
+        `https://api.vercel.com/v2/files?teamId=${credentials.teamId}`,
+        fileContent,
+        {
+          headers: {
+            Authorization: `Bearer ${credentials.token}`,
+            'Content-Type': 'application/octet-stream',
+            'Content-Length': fileContent.length.toString(),
+            'x-vercel-digest': sha,
+          },
+        }
+      );
 
       logger.info('File uploaded to Vercel', { sha, size: fileContent.length });
       return sha;
     } catch (error) {
       // 409 Conflict means file already exists (same SHA), which is fine
-      if (error instanceof Error && error.message.includes('409')) {
+      if (axios.isAxiosError(error) && error.response?.status === 409) {
         logger.info('File already exists on Vercel', { sha });
         return sha;
       }
@@ -500,7 +442,6 @@ export class VercelProvider {
 
   /**
    * Upload multiple files to Vercel in parallel
-   * Returns array of file info with paths and SHAs
    */
   async uploadFiles(
     files: Array<{ path: string; content: Buffer }>
@@ -518,10 +459,9 @@ export class VercelProvider {
   }
 
   /**
-   * Compute SHA-1 hash of file content (Vercel uses SHA-1 for file deduplication)
+   * Compute SHA-1 hash of file content
    */
-  private async computeSha(content: Buffer): Promise<string> {
-    const crypto = await import('crypto');
+  private computeSha(content: Buffer): string {
     return crypto.createHash('sha1').update(content).digest('hex');
   }
 
@@ -532,12 +472,12 @@ export class VercelProvider {
     files: Array<{ file: string; sha: string; size: number }>,
     options: Omit<CreateDeploymentOptions, 'files'> = {}
   ): Promise<VercelDeploymentResult> {
-    const client = await this.getClient();
     const credentials = await this.getCredentials();
+
     try {
-      const deployment = await client.deployments.createDeployment({
-        teamId: credentials.teamId,
-        requestBody: {
+      const response = await axios.post(
+        `https://api.vercel.com/v13/deployments?teamId=${credentials.teamId}&skipAutoDetectionConfirmation=1`,
+        {
           name: options.name || 'deployment',
           target: 'production',
           project: credentials.projectId,
@@ -545,8 +485,10 @@ export class VercelProvider {
           projectSettings: options.projectSettings,
           meta: options.meta,
         },
-        skipAutoDetectionConfirmation: '1',
-      });
+        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      );
+
+      const deployment = response.data;
 
       logger.info('Vercel deployment created with file SHAs', {
         id: deployment.id,
