@@ -11,6 +11,7 @@ export const docTypeSchema = z
     'auth-components-react',
     'auth-components-nextjs',
     'real-time',
+    'deployment',
   ])
   .describe(
     `
@@ -23,7 +24,8 @@ export const docTypeSchema = z
       "auth-components-react" (authentication components for React+Vite applications),
       "auth-components-nextjs" (authentication components for Next.js applications),
       "ai-integration-sdk" (AI features),
-      "real-time" (real-time pub/sub through WebSockets)
+      "real-time" (real-time pub/sub through WebSockets),
+      "deployment" (deploy frontend applications via MCP tool)
     `
   );
 
