@@ -61,6 +61,7 @@ Available documentation types:
 - `"functions-sdk"` - Serverless functions invocation
 - `"ai-integration-sdk"` - AI chat and image generation
 - `"real-time"` - Real-time pub/sub (database + client events) via WebSockets
+- `"deployment"` - Deploy frontend applications via MCP tool
 
 ## When to Use SDK vs MCP Tools
 
@@ -79,6 +80,7 @@ Available documentation types:
 - Database schema management (`run-raw-sql`, `get-table-schema`)
 - Storage bucket creation (`create-bucket`, `list-buckets`, `delete-bucket`)
 - Serverless function deployment (`create-function`, `update-function`, `delete-function`)
+- Frontend deployment (`create-deployment`) - Deploy frontend apps to InsForge hosting
 
 ## Important Notes
 
