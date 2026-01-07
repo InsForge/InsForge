@@ -266,12 +266,15 @@ export default function SettingsPage() {
                           value={projectName}
                           onChange={(e) => handleProjectNameChange(e.target.value)}
                           placeholder="Project name"
-                          className="w-80 h-9"
+                          className="w-80 h-9 text-sm bg-gray-100 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg text-gray-900 dark:text-white"
                         />
                         <Button
                           onClick={handleSaveProjectName}
                           disabled={!hasNameChanged}
-                          className={cn('h-9', !hasNameChanged && 'opacity-40')}
+                          className={cn(
+                            'h-9 text-white dark:text-black bg-black dark:bg-primary-green hover:opacity-90 px-3 py-2 rounded-lg',
+                            !hasNameChanged && 'opacity-40'
+                          )}
                         >
                           Save
                         </Button>
@@ -288,7 +291,7 @@ export default function SettingsPage() {
                     <Button
                       variant="destructive"
                       onClick={() => void handleDeleteProject()}
-                      className="w-fit"
+                      className="w-30 bg-red-600 hover:bg-red-700 text-white dark:bg-red-200 dark:hover:bg-red-300 dark:text-red-700"
                     >
                       Delete Project
                     </Button>
