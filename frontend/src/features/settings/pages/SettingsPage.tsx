@@ -272,7 +272,7 @@ export default function SettingsPage() {
                           onClick={handleSaveProjectName}
                           disabled={!hasNameChanged}
                           className={cn(
-                            'h-9 text-white dark:text-black bg-black dark:bg-primary-green hover:opacity-90 px-3 py-2 rounded-lg',
+                            'h-9 text-white dark:text-black bg-black dark:bg-emerald-300 hover:opacity-90 px-3 py-2 rounded-lg',
                             !hasNameChanged && 'opacity-40'
                           )}
                         >
