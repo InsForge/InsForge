@@ -1,21 +1,12 @@
-import { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { Smartphone } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, Button, TooltipProvider } from '@/components';
 import { McpConnectionSection } from './McpConnectionSection';
-import { ApiCredentialsSection } from './ApiCredentialsSection';
-import { ConnectionStringSection } from './ConnectionStringSection';
 import { useApiKey } from '@/lib/hooks/useMetadata';
-import { cn, getBackendUrl, isInsForgeCloudProject, isIframe } from '@/lib/utils/utils';
+import { getBackendUrl, isInsForgeCloudProject, isIframe } from '@/lib/utils/utils';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 import DiscordIcon from '@/assets/logos/discord.svg?react';
 import { useModal } from '@/lib/hooks/useModal';
-
-export type ConnectionTab = 'mcp' | 'connection-string' | 'api-credentials';
-
-export interface ConnectionTabConfig {
-  id: ConnectionTab;
-  label: string;
-}
 
 const ONBOARDING_SKIPPED_KEY = 'insforge_onboarding_skipped';
 
@@ -32,7 +23,6 @@ export function setOnboardingSkipped(skipped: boolean): void {
 }
 
 export function OnboardingModal() {
-  const [activeTab, setActiveTab] = useState<ConnectionTab>('mcp');
   const { isOnboardingModalOpen, setOnboardingModalOpen } = useModal();
 
   const { apiKey, isLoading } = useApiKey();
@@ -41,19 +31,6 @@ export function OnboardingModal() {
   const displayApiKey = isLoading ? 'ik_' + '*'.repeat(32) : apiKey || '';
   const isCloudEnvironment = isInsForgeCloudProject();
   const isInIframe = isIframe();
-
-  const connectionTabs = useMemo<ConnectionTabConfig[]>(() => {
-    const tabs: ConnectionTabConfig[] = [
-      { id: 'mcp', label: 'MCP' },
-      { id: 'api-credentials', label: 'API Credentials' },
-    ];
-
-    if (isCloudEnvironment) {
-      tabs.splice(1, 0, { id: 'connection-string', label: 'Connection String' });
-    }
-
-    return tabs;
-  }, [isCloudEnvironment]);
 
   const handleSkipOnboarding = () => {
     setOnboardingSkipped(true);
@@ -77,43 +54,11 @@ export function OnboardingModal() {
             <h3 className="text-gray-900 dark:text-white text-2xl font-semibold leading-8 tracking-[-0.144px]">
               Connect Project
             </h3>
-
-            {/* Connection Type Tabs */}
-            <div className="relative">
-              <div className="flex gap-5">
-                {connectionTabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={cn(
-                      'pb-3 text-sm transition-colors border-b-2 cursor-pointer',
-                      activeTab === tab.id
-                        ? 'text-gray-900 dark:text-white border-gray-900 dark:border-white'
-                        : 'text-gray-500 dark:text-neutral-400 border-transparent hover:text-gray-700 dark:hover:text-neutral-300'
-                    )}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-              {/* Bottom border */}
-              <div className="absolute bottom-0 left-0 right-0 h-px bg-gray-200 dark:bg-neutral-700 -z-10" />
-            </div>
           </div>
 
           {/* Tab Content */}
-          <div className="px-6 overflow-hidden">
-            {activeTab === 'mcp' && (
-              <McpConnectionSection apiKey={displayApiKey} appUrl={appUrl} isLoading={isLoading} />
-            )}
-            {activeTab === 'connection-string' && isCloudEnvironment && <ConnectionStringSection />}
-            {activeTab === 'api-credentials' && (
-              <ApiCredentialsSection apiKey={displayApiKey} appUrl={appUrl} isLoading={isLoading} />
-            )}
-          </div>
-
-          {/* Help Section */}
-          <div className="flex items-end justify-between px-6 pb-6 pt-4">
+          <div className="flex flex-col gap-10 px-6 overflow-hidden">
+            <McpConnectionSection apiKey={displayApiKey} appUrl={appUrl} isLoading={isLoading} />
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
                 <span className="text-gray-500 dark:text-neutral-400 text-sm leading-6">
@@ -150,6 +95,17 @@ export function OnboardingModal() {
                 </span>
               </div>
             </div>
+          </div>
+
+          {/* Help Section */}
+          <div className="flex items-center justify-between p-6 border-t border-neutral-200 dark:border-neutral-700">
+            <Link
+              to="/dashboard/settings?tab=connect"
+              onClick={() => setOnboardingModalOpen(false)}
+              className="text-gray-500 dark:text-neutral-400 text-sm font-medium hover:underline"
+            >
+              Advanced Connection
+            </Link>
             <Button
               variant="outline"
               onClick={handleSkipOnboarding}
