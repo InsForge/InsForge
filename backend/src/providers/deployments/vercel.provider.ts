@@ -8,7 +8,7 @@ import { SecretService } from '@/services/secrets/secret.service.js';
 import logger from '@/utils/logger.js';
 
 interface CloudCredentialsResponse {
-  project_id: string;
+  team_id: string;
   vercel_project_id: string;
   bearer_token: string;
   expires_at: string;
@@ -176,7 +176,7 @@ export class VercelProvider {
 
         this.cloudCredentials = {
           token: data.bearer_token,
-          teamId: data.project_id,
+          teamId: data.team_id,
           projectId: data.vercel_project_id,
           expiresAt: new Date(data.expires_at),
         };
