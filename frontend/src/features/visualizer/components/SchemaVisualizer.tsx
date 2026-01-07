@@ -387,7 +387,13 @@ export function SchemaVisualizer({
             fitViewOptions={{ padding: 1, duration: 300, maxZoom: 2, minZoom: 1 }}
           />
         )}
-        {showMiniMap && <MiniMap nodeColor={(node: Node<CustomNodeData>) => getNodeColor(node)} />}
+        {showMiniMap && (
+          <MiniMap
+            nodeColor={(node: Node<CustomNodeData>) => getNodeColor(node)}
+            pannable
+            zoomable
+          />
+        )}
       </ReactFlow>
     </div>
   );
