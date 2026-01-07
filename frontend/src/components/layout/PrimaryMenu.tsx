@@ -72,7 +72,7 @@ export function PrimaryMenu({
     const itemClasses = cn(
       baseButtonClasses,
       isActive
-        ? 'bg-zinc-950 dark:bg-emerald-300 text-white dark:text-black hover:bg-zing-950 dark:hover:bg-emerald-300 hover:text-white dark:hover:text-black'
+        ? 'bg-zinc-950 dark:bg-emerald-300 text-white dark:text-black hover:bg-zinc-950 dark:hover:bg-emerald-300 hover:text-white dark:hover:text-black'
         : 'hover:bg-zinc-100 dark:hover:bg-neutral-600 text-black dark:text-neutral-400'
     );
     // For items with onClick handler or external links, use a button

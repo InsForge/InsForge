@@ -51,11 +51,12 @@ export default function SettingsPage() {
     return 'info';
   };
 
-  const [activeTab, setActiveTab] = useState<TabType>(getInitialTab);
+  const [activeTab, setActiveTab] = useState<TabType>(() => getInitialTab());
 
   const [version, setVersion] = useState<string>('');
   const [isVersionLoading, setIsVersionLoading] = useState(true);
   const [projectName, setProjectName] = useState('');
+  const [originalProjectName, setOriginalProjectName] = useState('');
   const [hasNameChanged, setHasNameChanged] = useState(false);
 
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
@@ -87,9 +88,30 @@ export default function SettingsPage() {
       });
   }, []);
 
+  // Listen for project info from cloud parent
+  useEffect(() => {
+    if (!isCloud || !isInIframe) {
+      return;
+    }
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'PROJECT_INFO' && event.data.name) {
+        setProjectName(event.data.name);
+        setOriginalProjectName(event.data.name);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    // Request project info when Settings page mounts
+    postMessageToParent({ type: 'REQUEST_PROJECT_INFO' }, '*');
+
+    return () => window.removeEventListener('message', handleMessage);
+  }, [isCloud, isInIframe]);
+
   const handleProjectNameChange = (value: string) => {
     setProjectName(value);
-    setHasNameChanged(value.trim() !== '');
+    setHasNameChanged(value.trim() !== originalProjectName);
   };
 
   const handleSaveProjectName = () => {
@@ -97,6 +119,9 @@ export default function SettingsPage() {
       return;
     }
     postMessageToParent({ type: 'UPDATE_PROJECT_NAME', name: projectName.trim() }, '*');
+    // Update original name after sending update request
+    setOriginalProjectName(projectName.trim());
+    setHasNameChanged(false);
   };
 
   const handleDeleteProject = async () => {
