@@ -10,7 +10,7 @@ Use the `create-deployment` tool with these parameters:
 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `sourceDirectory` | Yes | Path to source directory (e.g., `./frontend`) |
+| `sourceDirectory` | Yes | **Absolute path** to source directory (e.g., `/Users/me/project/frontend`). Relative paths do not work. |
 | `projectSettings.buildCommand` | No | Build command (default: auto-detected) |
 | `projectSettings.outputDirectory` | No | Build output directory (default: auto-detected) |
 | `projectSettings.installCommand` | No | Install command (default: `npm install`) |
@@ -22,7 +22,7 @@ Use the `create-deployment` tool with these parameters:
 
 ```json
 {
-  "sourceDirectory": "./frontend",
+  "sourceDirectory": "/Users/me/project/frontend",
   "projectSettings": {
     "buildCommand": "npm run build",
     "outputDirectory": "dist"
@@ -35,6 +35,7 @@ Use the `create-deployment` tool with these parameters:
 ```
 
 **Important**:
+- `sourceDirectory` must be an **absolute path** (relative paths don't work on Windows)
 - Pass the source directory, NOT pre-built static files
 - Include all required environment variables (e.g., `VITE_*` for Vite apps)
 
