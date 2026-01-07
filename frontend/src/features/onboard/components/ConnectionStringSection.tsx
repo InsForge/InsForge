@@ -80,7 +80,7 @@ function ParameterRow({ label, value, copyValue }: ParameterRowProps) {
         <CopyButton
           text={textToCopy}
           showText={false}
-          className="h-5 w-5 p-0.5 bg-transparent hover:bg-gray-200 dark:hover:bg-neutral-700 border-none rounded min-w-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="h-6 w-6 p-1 min-w-0 shrink-0 text-black dark:text-white bg-white dark:bg-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-600 border-none opacity-0 group-hover:opacity-100 transition-opacity"
         />
       )}
     </div>
@@ -140,7 +140,7 @@ export function ConnectionStringSection({ className }: ConnectionStringSectionPr
             <CopyButton
               text={connectionStringClipboard}
               showText={false}
-              className="h-6 w-6 p-1 bg-white dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-700 border-none rounded-md shadow-sm min-w-0 text-black dark:text-white"
+              className="h-6 w-6 p-1 min-w-0 shrink-0 text-black dark:text-white bg-white dark:bg-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-600 border-none"
             />
           </div>
         </div>
