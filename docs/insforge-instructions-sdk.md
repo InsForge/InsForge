@@ -53,9 +53,10 @@ Available documentation types:
 - `"instructions"` - Essential backend setup (START HERE)
 - `"db-sdk"` - Database operations with SDK
 - **Authentication** - Choose based on implementation:
-  - `"auth-components-react"` - Frontend auth for React+Vite (singlepage App)
-  - `"auth-components-react-router"` - Frontend auth for React(Vite+React Router) (Multipage App)
-  - `"auth-components-nextjs"` - Frontend auth for Nextjs (SSR App)
+  - `"auth-sdk"` - Direct SDK methods for custom auth flows
+  - `"auth-components-react"` - Pre-built auth UI for React+Vite (singlepage App)
+  - `"auth-components-react-router"` - Pre-built auth UI for React(Vite+React Router) (Multipage App)
+  - `"auth-components-nextjs"` - Pre-built auth UI for Nextjs (SSR App)
 - `"storage-sdk"` - File storage operations
 - `"functions-sdk"` - Serverless functions invocation
 - `"ai-integration-sdk"` - AI chat and image generation
@@ -81,7 +82,7 @@ Available documentation types:
 
 ## Important Notes
 
-- Use the right framework-specific component package for production-ready auth
+- For auth: use `auth-sdk` for custom UI, or framework-specific components for pre-built UI
 - SDK returns `{data, error}` structure for all operations
 - Database inserts require array format: `[{...}]`
 - Serverless functions have single endpoint (no subpaths)
