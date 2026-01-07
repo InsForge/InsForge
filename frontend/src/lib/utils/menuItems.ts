@@ -13,6 +13,7 @@ import {
   Users,
   Table,
   ChartBarBig,
+  Rocket,
 } from 'lucide-react';
 import { postMessageToParent } from './cloudMessaging';
 
@@ -204,4 +205,11 @@ export const usageMenuItem: PrimaryMenuItem = {
   onClick: () => {
     postMessageToParent({ type: 'NAVIGATE_TO_USAGE' }, '*');
   },
+};
+
+export const deploymentsMenuItem: PrimaryMenuItem = {
+  id: 'deployments',
+  label: 'Deployments',
+  href: '/dashboard/deployments',
+  icon: Rocket,
 };

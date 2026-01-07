@@ -23,7 +23,7 @@ export type DeploymentStatusType = (typeof DeploymentStatus)[keyof typeof Deploy
  */
 export interface DeploymentRecord {
   id: string;
-  deploymentId: string | null; // Provider's deployment ID, null until deployment starts
+  providerDeploymentId: string | null; // Provider's deployment ID, null until deployment starts
   provider: string;
   status: DeploymentStatusType;
   url: string | null;

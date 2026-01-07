@@ -78,7 +78,7 @@ router.post(
         module: 'DEPLOYMENTS',
         details: {
           id: deployment.id,
-          deploymentId: deployment.deploymentId,
+          providerDeploymentId: deployment.providerDeploymentId,
           provider: deployment.provider,
           status: deployment.status,
         },
@@ -103,7 +103,7 @@ router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextF
 
     const deployments = await deploymentService.listDeployments(limit, offset);
 
-    successResponse(res, { deployments });
+    successResponse(res, deployments);
   } catch (error) {
     next(error);
   }

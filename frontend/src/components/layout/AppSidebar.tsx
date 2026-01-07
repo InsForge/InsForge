@@ -6,6 +6,7 @@ import {
   staticMenuItems,
   documentationMenuItem,
   usageMenuItem,
+  deploymentsMenuItem,
   type PrimaryMenuItem,
 } from '@/lib/utils/menuItems';
 import { useLocation, matchPath } from 'react-router-dom';
@@ -47,6 +48,15 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
     [isInIframe]
   );
 
+  // Build main menu items - add deployments for cloud projects
+  const mainMenuItems = useMemo(() => {
+    if (isCloud) {
+      // Insert deployments after visualizer (at the end of main items)
+      return [...staticMenuItems, deploymentsMenuItem];
+    }
+    return staticMenuItems;
+  }, [isCloud]);
+
   // Build bottom menu items based on deployment environment
   const bottomMenuItems = useMemo(() => {
     const items = [];
@@ -64,7 +74,7 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   // Find which primary menu item matches the current route
   // Items with secondary menus use prefix matching (end: false)
   // Items without secondary menus use exact matching (end: true)
-  const activeMenu = staticMenuItems.find((item) => {
+  const activeMenu = mainMenuItems.find((item) => {
     const hasSecondaryMenu = !!item.secondaryMenu || item.id === 'logs';
     return matchPath({ path: item.href, end: !hasSecondaryMenu }, pathname);
   });
@@ -77,7 +87,7 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
     <>
       <div className="flex h-full">
         <PrimaryMenu
-          items={staticMenuItems}
+          items={mainMenuItems}
           bottomItems={bottomMenuItems}
           activeItemId={activeMenu?.id}
           isCollapsed={isCollapsed}
