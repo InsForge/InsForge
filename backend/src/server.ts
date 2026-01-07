@@ -151,6 +151,68 @@ export async function createApp() {
   app.use(express.json({ limit: '100mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+  // Basic health endpoints (root scope for k8s probes)
+  app.get('/live', (_req: Request, res: Response) => {
+    res.json({ status: 'ok' });
+  });
+
+  app.get('/ready', async (_req: Request, res: Response) => {
+    const pool = DatabaseManager.getInstance().getPool();
+
+    try {
+      await pool.query('SELECT 1');
+      return res.json({ status: 'ready', db: 'ok' });
+    } catch (error) {
+      logger.error('Readiness check failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return res.status(503).json({
+        status: 'not_ready',
+        db: 'down',
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.get('/health', async (_req: Request, res: Response) => {
+    const pool = DatabaseManager.getInstance().getPool();
+
+    let dbStatus: 'ok' | 'down' = 'ok';
+    let storageStatus: 'ok' | 'degraded' = 'ok';
+
+    try {
+      await pool.query('SELECT 1');
+    } catch (error) {
+      dbStatus = 'down';
+      logger.error('Health check DB failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    const usingS3 = Boolean(process.env.AWS_S3_BUCKET);
+    if (usingS3) {
+      const hasCreds = Boolean(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY);
+      if (!hasCreds) {
+        storageStatus = 'degraded';
+      }
+    }
+
+    let overall: 'ok' | 'degraded' | 'down' = 'ok';
+    if (dbStatus === 'down') {
+      overall = 'down';
+    } else if (storageStatus === 'degraded') {
+      overall = 'degraded';
+    }
+
+    const statusCode = overall === 'down' ? 503 : 200;
+    return res.status(statusCode).json({
+      status: overall,
+      db: dbStatus,
+      storage: storageStatus,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
   // Create API router and mount all API routes under /api
   const apiRouter = express.Router();
 
