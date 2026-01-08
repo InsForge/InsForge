@@ -10,7 +10,7 @@ import { AIConfigService } from '@/services/ai/ai-config.service.js';
 import { AIUsageService } from '@/services/ai/ai-usage.service.js';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import { AuditService } from '@/services/logs/audit.service.js';
-import logger from '@/utils/logger.js';
+import { logger } from '@/utils/logger.js';
 import {
   createAIConfigurationRequestSchema,
   updateAIConfigurationRequestSchema,
@@ -88,7 +88,7 @@ router.post(
             stack: streamError instanceof Error ? streamError.stack : undefined,
           });
           res.write(
-            `data: ${JSON.stringify({ error: true, meesage: streamError instanceof Error ? streamError.message : String(streamError) })}\n\n`
+            `data: ${JSON.stringify({ error: true, message: streamError instanceof Error ? streamError.message : String(streamError) })}\n\n`
           );
         }
 
