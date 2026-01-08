@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ExternalLink, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
 import { cn } from '@/lib/utils/utils';
 import {
@@ -66,8 +66,7 @@ export function PrimaryMenu({
   };
 
   const BottomMenuItem = ({ item }: { item: PrimaryMenuItem }) => {
-    const { pathname } = useLocation();
-    const isActive = item.href ? pathname.startsWith(item.href) && item.href !== '' : false;
+    const isActive = item.id === activeItemId;
 
     const itemClasses = cn(
       baseButtonClasses,

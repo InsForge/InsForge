@@ -41,10 +41,16 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   // Find which primary menu item matches the current route
   // Items with secondary menus use prefix matching (end: false)
   // Items without secondary menus use exact matching (end: true)
-  const activeMenu = staticMenuItems.find((item) => {
-    const hasSecondaryMenu = !!item.secondaryMenu || item.id === 'logs';
-    return matchPath({ path: item.href, end: !hasSecondaryMenu }, pathname);
-  });
+  const activeMenu = useMemo(() => {
+    const allItems = [...staticMenuItems, ...bottomMenuItems];
+    return allItems.find((item) => {
+      if (item.external || item.onClick) {
+        return false;
+      }
+      const hasSecondaryMenu = !!item.secondaryMenu || item.id === 'logs';
+      return matchPath({ path: item.href, end: !hasSecondaryMenu }, pathname);
+    });
+  }, [pathname, bottomMenuItems]);
 
   // Get secondary menu items (special case for logs)
   const secondaryMenuItems = activeMenu?.id === 'logs' ? logsMenuItems : activeMenu?.secondaryMenu;
