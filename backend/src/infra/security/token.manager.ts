@@ -6,8 +6,8 @@ import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 import type { TokenPayloadSchema } from '@insforge/shared-schemas';
 
 const JWT_SECRET = process.env.JWT_SECRET ?? '';
-// TODO: Change access token expiration time to 15 min
-const JWT_EXPIRES_IN = '7d';
+// RESOLVED: Access token expires in 15 minutes now (changed from 7 days)
+const JWT_EXPIRES_IN = '15m';
 const REFRESH_TOKEN_EXPIRES_IN = '7d';
 
 /**
