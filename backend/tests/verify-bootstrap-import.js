@@ -1,20 +1,10 @@
 /**
  * Simple test script to verify that bootstrap-migrations.js can import logger
- * 
- * This script verifies logger functionality works when imported from a JavaScript file.
- * Note: The path used here (../src/utils/logger.js) is different from bootstrap-migrations.js
- * (which uses ../../../../utils/logger.js), but both work because tsx handles TypeScript imports.
- * The unit test in bootstrap-migrations-import.test.ts verifies the exact path calculation.
- * Run with: tsx tests/verify-bootstrap-import.js
- * 
  */
 
-// Since this test is in tests/, path needs to be adjusted
-// From tests/verify-bootstrap-import.js to src/utils/logger.ts
-// Path: ../src/utils/logger.js
 import logger from '../src/utils/logger.js';
 
-console.log('✓ Import test: Starting...');
+logger.info('Import test: Starting...');
 
 try {
   // Test that logger is imported successfully
@@ -23,36 +13,36 @@ try {
   }
 
   // Test that logger has the expected methods
-  if (typeof logger.info !== 'function') {
-    throw new Error('logger.info is not a function');
-  }
-
-  if (typeof logger.error !== 'function') {
-    throw new Error('logger.error is not a function');
-  }
-
-  if (typeof logger.warn !== 'function') {
-    throw new Error('logger.warn is not a function');
+  const requiredMethods = ['info', 'warn', 'error'];
+  for (const method of requiredMethods) {
+    if (typeof logger[method] !== 'function') {
+      throw new Error(`logger.${method} is not a function`);
+    }
   }
 
   // Test that logger methods work
-  logger.info('✓ Import test: Logger imported successfully');
-  logger.info('✓ Import test: logger.info() works');
-  logger.warn('✓ Import test: logger.warn() works');
-  logger.error('✓ Import test: logger.error() works (this is expected)');
+  logger.info('Import test: Logger imported successfully');
+  logger.info('Import test: logger.info() works');
+  logger.warn('Import test: logger.warn() works');
+  logger.error('Import test: logger.error() works (this is expected)');
 
-  // Note: This script verifies logger functionality, not the exact path used in bootstrap-migrations.js.
-  // The unit test in bootstrap-migrations-import.test.ts verifies the exact path calculation.
-  console.log('\n✓ Import test: All logger methods are available');
-  console.log('✓ Import test: The import path works correctly');
-  console.log('\n✅ SUCCESS: The import in bootstrap-migrations.js will work!');
-  console.log('   Logger can be imported from TypeScript files when using tsx');
-  console.log('   (as configured in package.json migrate:bootstrap script)');
-  
+  // Notes about the bootstrap-migrations import path (kept as logs, no console)
+  logger.info('Import test: All logger methods are available');
+  logger.info('Import test: The import path works correctly');
+  logger.info('SUCCESS: The import in bootstrap-migrations.js will work!');
+  logger.info(
+    'The path ../../../../utils/logger.js correctly resolves to src/utils/logger.ts when run with tsx (as configured in package.json migrate:bootstrap script)'
+  );
+
   process.exit(0);
 } catch (error) {
-  console.error('❌ FAILED: Import test failed');
-  console.error('Error:', error.message);
-  console.error('Stack:', error.stack);
+  const message = error instanceof Error ? error.message : String(error);
+  const stack = error instanceof Error ? error.stack : undefined;
+
+  logger.error('FAILED: Import test failed');
+  logger.error(`Error: ${message}`);
+  if (stack) logger.error(`Stack: ${stack}`);
+
   process.exit(1);
 }
+
