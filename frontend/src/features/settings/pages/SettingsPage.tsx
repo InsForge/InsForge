@@ -143,16 +143,16 @@ export default function SettingsPage() {
   return (
     <>
       <ConfirmDialog {...confirmDialogProps} />
-      <main className="h-full bg-bg-gray dark:bg-neutral-800 overflow-y-auto py-8">
-        <div className="flex flex-col gap-6 w-full max-w-[1080px] mx-auto">
+      <main className="h-full bg-bg-gray dark:bg-neutral-800 overflow-hidden py-8">
+        <div className="h-full flex flex-col gap-6 w-full max-w-[1080px] mx-auto">
           {/* Header */}
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white tracking-[-0.1px]">
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white tracking-[-0.1px] shrink-0">
             Project Settings
           </h1>
 
           {/* Content */}
-          <div className="flex gap-6">
-            {/* Sidebar Tabs */}
+          <div className="flex-1 flex gap-6 min-h-0 overflow-hidden">
+            {/* Sidebar Tabs - Fixed, no scroll */}
             <div className="flex flex-col gap-2 w-50 shrink-0">
               <TabButton
                 id="info"
@@ -182,8 +182,8 @@ export default function SettingsPage() {
               />
             </div>
 
-            {/* Main Content Area */}
-            <div className="flex-1 flex flex-col gap-6">
+            {/* Main Content Area - Independent scroll */}
+            <div className="flex-1 flex flex-col gap-6 overflow-y-auto pb-48">
               {activeTab === 'info' && (
                 <div className="flex flex-col gap-6 bg-gray-200 dark:bg-[#333333] rounded-lg p-6">
                   <p className="text-base text-gray-900 dark:text-white">Project Information</p>
