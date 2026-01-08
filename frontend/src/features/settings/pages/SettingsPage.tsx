@@ -183,7 +183,7 @@ export default function SettingsPage() {
             </div>
 
             {/* Main Content Area - Independent scroll */}
-            <div className="flex-1 flex flex-col gap-6 overflow-y-auto thin-scrollbar pb-8">
+            <div className="flex-1 flex flex-col gap-6 overflow-y-auto pb-12">
               {activeTab === 'info' && (
                 <div className="flex flex-col gap-6 bg-gray-200 dark:bg-[#333333] rounded-lg p-6">
                   <p className="text-base text-gray-900 dark:text-white">Project Information</p>
@@ -301,7 +301,7 @@ export default function SettingsPage() {
 
               {activeTab === 'connect' && (
                 <TooltipProvider>
-                  <div className="flex flex-col gap-12">
+                  <div className="flex flex-col gap-12 mr-4">
                     <div className="flex flex-col gap-6">
                       <p className="text-black dark:text-white text-base">Recommended</p>
                       {/* MCP Section */}
