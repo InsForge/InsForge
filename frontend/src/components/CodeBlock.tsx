@@ -36,8 +36,8 @@ export function CodeBlock({
         {/* Header row with label and copy button */}
         <div className="flex items-center justify-between mb-2">
           {label && (
-            <div className="bg-white dark:bg-neutral-700 rounded px-2 shrink-0">
-              <span className="text-gray-900 dark:text-neutral-50 text-xs">{label}</span>
+            <div className="bg-white dark:bg-neutral-700 rounded px-2 shrink-0 h-5 flex items-center">
+              <span className="text-gray-900 dark:text-neutral-50 text-xs leading-5">{label}</span>
             </div>
           )}
           {showCopy && (
