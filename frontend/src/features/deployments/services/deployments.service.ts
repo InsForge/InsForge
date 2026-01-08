@@ -3,16 +3,17 @@ import type {
   DeploymentSchema,
   CreateDeploymentResponse,
   StartDeploymentRequest,
+  ListDeploymentsResponse,
 } from '@insforge/shared-schemas';
 
-export type { DeploymentSchema, CreateDeploymentResponse };
+export type { DeploymentSchema, CreateDeploymentResponse, ListDeploymentsResponse };
 
 export class DeploymentsService {
   // ============================================================================
   // Deployments
   // ============================================================================
 
-  async listDeployments(limit = 50, offset = 0): Promise<DeploymentSchema[]> {
+  async listDeployments(limit = 50, offset = 0): Promise<ListDeploymentsResponse> {
     const searchParams = new URLSearchParams();
     searchParams.set('limit', String(limit));
     searchParams.set('offset', String(offset));

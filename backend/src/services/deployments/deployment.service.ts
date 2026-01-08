@@ -513,27 +513,36 @@ export class DeploymentService {
   }
 
   /**
-   * List all deployments
+   * List all deployments with total count for pagination
    */
-  async listDeployments(limit: number = 50, offset: number = 0): Promise<DeploymentRecord[]> {
+  async listDeployments(
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<{ deployments: DeploymentRecord[]; total: number }> {
     try {
-      const result = await this.getPool().query(
-        `SELECT
-          id,
-          provider_deployment_id as "providerDeploymentId",
-          provider,
-          status,
-          url,
-          metadata,
-          created_at as "createdAt",
-          updated_at as "updatedAt"
-         FROM system.deployments
-         ORDER BY created_at DESC
-         LIMIT $1 OFFSET $2`,
-        [limit, offset]
-      );
+      const [dataResult, countResult] = await Promise.all([
+        this.getPool().query(
+          `SELECT
+            id,
+            provider_deployment_id as "providerDeploymentId",
+            provider,
+            status,
+            url,
+            metadata,
+            created_at as "createdAt",
+            updated_at as "updatedAt"
+           FROM system.deployments
+           ORDER BY created_at DESC
+           LIMIT $1 OFFSET $2`,
+          [limit, offset]
+        ),
+        this.getPool().query(`SELECT COUNT(*)::int as count FROM system.deployments`),
+      ]);
 
-      return result.rows;
+      return {
+        deployments: dataResult.rows,
+        total: countResult.rows[0]?.count ?? 0,
+      };
     } catch (error) {
       logger.error('Failed to list deployments', {
         error: error instanceof Error ? error.message : String(error),

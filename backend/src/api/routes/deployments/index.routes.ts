@@ -4,7 +4,7 @@ import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
-import { successResponse } from '@/utils/response.js';
+import { successResponse, paginatedResponse } from '@/utils/response.js';
 import { startDeploymentRequestSchema } from '@insforge/shared-schemas';
 
 const router = Router();
@@ -101,9 +101,9 @@ router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextF
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
 
-    const deployments = await deploymentService.listDeployments(limit, offset);
+    const { deployments, total } = await deploymentService.listDeployments(limit, offset);
 
-    successResponse(res, deployments);
+    paginatedResponse(res, deployments, total, offset);
   } catch (error) {
     next(error);
   }

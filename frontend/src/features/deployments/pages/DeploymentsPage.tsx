@@ -3,6 +3,7 @@ import { ChevronRight, ExternalLink } from 'lucide-react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import {
   Button,
+  PaginationControls,
   Skeleton,
   Tooltip,
   TooltipContent,
@@ -31,13 +32,22 @@ export default function DeploymentsPage() {
 
   const {
     deployments,
+    totalDeployments,
     isLoadingDeployments,
     refetchDeployments,
     syncDeployment,
     cancelDeployment,
     isSyncing,
     isCancelling,
+    pageSize,
+    currentPage,
+    totalPages,
+    setPage,
   } = useDeployments();
+
+  const handlePageChange = (page: number) => {
+    setPage(page);
+  };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -262,6 +272,20 @@ export default function DeploymentsPage() {
           </div>
         )}
       </div>
+
+      {/* Pagination */}
+      {deployments.length > 0 && (
+        <div className="shrink-0">
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            totalRecords={totalDeployments}
+            pageSize={pageSize}
+            recordLabel="deployments"
+          />
+        </div>
+      )}
     </div>
   );
 }

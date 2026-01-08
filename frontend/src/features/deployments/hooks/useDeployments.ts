@@ -23,7 +23,7 @@ export function useDeployments() {
   // ============================================================================
 
   const {
-    data: deployments = [],
+    data: deploymentsData,
     isLoading: isLoadingDeployments,
     error: deploymentsError,
     refetch: refetchDeployments,
@@ -33,6 +33,9 @@ export function useDeployments() {
       deploymentsService.listDeployments(paginationParams.limit, paginationParams.offset),
     staleTime: 30 * 1000, // 30 seconds - deployments status can change
   });
+
+  const deployments = deploymentsData?.data ?? [];
+  const totalDeployments = deploymentsData?.pagination?.total ?? 0;
 
   // ============================================================================
   // Mutations
@@ -116,13 +119,13 @@ export function useDeployments() {
   const deploymentsCount = deployments.length;
   const pageSize = paginationParams.limit;
   const currentPage = Math.floor(paginationParams.offset / pageSize) + 1;
-  // Note: Total count would ideally come from API, for now we estimate
-  const hasMorePages = deployments.length === pageSize;
+  const totalPages = Math.ceil(totalDeployments / pageSize) || 1;
 
   return {
     // Deployments
     deployments,
     deploymentsCount,
+    totalDeployments,
     selectedDeployment,
     isLoadingDeployments,
     deploymentsError,
@@ -130,7 +133,7 @@ export function useDeployments() {
     // Pagination
     pageSize,
     currentPage,
-    hasMorePages,
+    totalPages,
     setPage,
 
     // Loading states

@@ -39,7 +39,12 @@ export const startDeploymentRequestSchema = z.object({
 export const startDeploymentResponseSchema = deploymentSchema;
 
 export const listDeploymentsResponseSchema = z.object({
-  deployments: z.array(deploymentSchema),
+  data: z.array(deploymentSchema),
+  pagination: z.object({
+    limit: z.number(),
+    offset: z.number(),
+    total: z.number(),
+  }),
 });
 
 export type ProjectSettings = z.infer<typeof projectSettingsSchema>;
