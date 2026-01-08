@@ -1,6 +1,7 @@
 /**
  * Simple test script to verify that bootstrap-migrations.js can import logger
  */
+/* eslint-env node */
 
 import logger from '@/utils/logger.js';
 
