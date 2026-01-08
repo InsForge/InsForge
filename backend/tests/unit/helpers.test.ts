@@ -57,7 +57,7 @@ describe('convertSqlTypeToColumnType', () => {
     });
   });
 
-  it('returns first 5 chars for unknown types', () => {
-    expect(convertSqlTypeToColumnType('customtype')).toBe('custo');
+  it('returns first 8 chars for unknown types', () => {
+    expect(convertSqlTypeToColumnType('customtype')).toBe('customty');
   });
 });

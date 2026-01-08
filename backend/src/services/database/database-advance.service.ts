@@ -9,7 +9,7 @@ import {
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
-import { parseSQLStatements } from '@/utils/sql-parser.js';
+import { parseSQLStatements, checkAuthSchemaOperations } from '@/utils/sql-parser.js';
 import { validateTableName } from '@/utils/validations.js';
 import format from 'pg-format';
 import { parse } from 'csv-parse/sync';
@@ -69,10 +69,15 @@ export class DatabaseAdvanceService {
    * Blocks:
    * - DROP DATABASE, CREATE DATABASE, ALTER DATABASE
    * - pg_catalog and information_schema access
+   * - DELETE operations on auth schema (prevents user deletion via raw SQL)
+   * - TRUNCATE operations on auth schema (prevents mass user deletion)
+   * - DROP operations on auth schema (prevents destruction of tables, indexes, triggers, functions, views, sequences, schemas, policies, types, domains)
    *
-   * Note: System tables are now in separate schemas (system.*, auth.*, etc.)
-   * so underscore prefix checks and public.users checks are no longer needed.
-   * The API only accesses public schema through PostgREST.
+   * Allows:
+   * - SELECT queries on auth schema (for reading user data)
+   * - INSERT operations on auth schema (for test users)
+   * - CREATE TRIGGER on auth tables (for automatic profile creation, etc.)
+   * - Other DDL operations on auth schema (ALTER TABLE for indexes, etc.)
    */
   sanitizeQuery(query: string, _mode: 'strict' | 'relaxed' = 'strict'): string {
     // Block database-level operations
@@ -87,6 +92,15 @@ export class DatabaseAdvanceService {
       if (pattern.test(query)) {
         throw new AppError('Query contains restricted operations', 403, ERROR_CODES.FORBIDDEN);
       }
+    }
+
+    // Use parser-based check for auth schema operations
+    const authError = checkAuthSchemaOperations(query);
+    if (authError) {
+      logger.warn('Blocked operation on auth schema', {
+        query: query.substring(0, 100),
+      });
+      throw new AppError(authError, 403, ERROR_CODES.FORBIDDEN);
     }
 
     return query;
