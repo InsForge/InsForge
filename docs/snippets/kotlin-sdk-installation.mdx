@@ -8,8 +8,9 @@ repositories {
 }
 
 dependencies {
-    implementation("io.insforge:insforge-core:0.1.0-SNAPSHOT")
-    implementation("io.insforge:insforge-auth:0.1.0-SNAPSHOT")
+    implementation("io.insforge:insforge-kotlin:0.1.0-SNAPSHOT")
+
+    implementation("io.socket:socket.io-client:2.1.1")
 }
 ```
 
@@ -55,7 +56,12 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import io.insforge.createInsforgeClient
+import io.insforge.ai.AI
 import io.insforge.auth.Auth
+import io.insforge.database.Database
+import io.insforge.functions.Functions
+import io.insforge.realtime.Realtime
+import io.insforge.storage.Storage
 import io.insforge.auth.BrowserLauncher
 import io.insforge.auth.SessionStorage
 
@@ -96,6 +102,17 @@ class InsforgeManager(private val context: Context) {
                 }
             }
         }
+        // Install Database module
+        install(Database)
+
+        // Install Realtime module for real-time subscriptions
+        install(Realtime) {
+            debug = true
+        }
+        // Install other modules
+        install(Storage)
+        install(Functions)
+        install(AI)
     }
 }
 ```
