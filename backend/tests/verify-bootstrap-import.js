@@ -2,7 +2,7 @@
  * Simple test script to verify that bootstrap-migrations.js can import logger
  */
 
-import logger from '../src/utils/logger.js';
+import logger from '@/utils/logger.js';
 
 logger.info('Import test: Starting...');
 
@@ -28,12 +28,12 @@ try {
 
   // Notes about the bootstrap-migrations import path (kept as logs, no console)
   logger.info('Import test: All logger methods are available');
-  logger.info('Import test: The import path works correctly');
+  logger.info('Import test: Logger imported successfully via @/utils/logger.js');
   logger.info('SUCCESS: The import in bootstrap-migrations.js will work!');
   logger.info(
-    'The path ../../../../utils/logger.js correctly resolves to src/utils/logger.ts when run with tsx (as configured in package.json migrate:bootstrap script)'
+    'Logger module is accessible and functional when run with tsx (as configured in package.json migrate:bootstrap script)'
   );
-
+  
   process.exit(0);
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);

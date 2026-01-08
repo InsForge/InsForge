@@ -17,7 +17,7 @@ import pg from 'pg';
 // Note: This imports a TypeScript file. This works because the script is run with `tsx`
 // (see package.json migrate:bootstrap script), which can handle TypeScript imports.
 // The relative path goes up 4 levels: bootstrap -> migrations -> database -> infra -> src, then into utils.
-import logger from '../../../../utils/logger.js';
+import logger from '@/utils/logger.js';
 
 const { Pool } = pg;
 
