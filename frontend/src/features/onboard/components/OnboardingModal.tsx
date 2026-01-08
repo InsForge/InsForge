@@ -102,7 +102,7 @@ export function OnboardingModal() {
             <Link
               to="/dashboard/settings?tab=connect"
               onClick={() => setOnboardingModalOpen(false)}
-              className="text-gray-500 dark:text-neutral-400 text-sm font-medium hover:underline"
+              className="text-gray-500 dark:text-neutral-400 text-sm font-medium underline"
             >
               Advanced Connection
             </Link>
