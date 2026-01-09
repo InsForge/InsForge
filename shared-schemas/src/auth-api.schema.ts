@@ -30,6 +30,12 @@ export const createUserRequestSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
   name: nameSchema.optional(),
+  /**
+   * Optional URL to redirect to after email verification.
+   * When provided, the verification email link will include this URL
+   * as a redirect destination after successful verification.
+   */
+  emailRedirectTo: z.string().url().optional(),
 });
 
 /**
@@ -77,6 +83,12 @@ export const updateProfileRequestSchema = z.object({
  */
 export const sendVerificationEmailRequestSchema = z.object({
   email: emailSchema,
+  /**
+   * Optional URL to redirect to after email verification.
+   * When provided, the verification email link will include this URL
+   * as a redirect destination after successful verification.
+   */
+  emailRedirectTo: z.string().url().optional(),
 });
 
 /**
