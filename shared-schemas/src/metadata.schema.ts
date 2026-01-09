@@ -1,12 +1,10 @@
 import { z } from 'zod';
 import { storageBucketSchema } from './storage.schema';
-import { oAuthConfigSchema } from './auth.schema';
 import { realtimeChannelSchema } from './realtime.schema';
 import { realtimePermissionsResponseSchema } from './realtime-api.schema';
+import { getPublicAuthConfigResponseSchema } from './auth-api.schema';
 
-export const authMetadataSchema = z.object({
-  oauths: z.array(oAuthConfigSchema),
-});
+export const authMetadataSchema = getPublicAuthConfigResponseSchema;
 
 export const databaseMetadataSchema = z.object({
   tables: z.array(
@@ -68,3 +66,31 @@ export type EdgeFunctionMetadataSchema = z.infer<typeof edgeFunctionMetadataSche
 export type AIMetadataSchema = z.infer<typeof aiMetadataSchema>;
 export type RealtimeMetadataSchema = z.infer<typeof realtimeMetadataSchema>;
 export type AppMetadataSchema = z.infer<typeof appMetaDataSchema>;
+
+// Database connection schemas
+export const databaseConnectionParametersSchema = z.object({
+  host: z.string(),
+  port: z.number(),
+  database: z.string(),
+  user: z.string(),
+  password: z.string(),
+  sslmode: z.string(),
+});
+
+export const databaseConnectionInfoSchema = z.object({
+  connectionURL: z.string(),
+  parameters: databaseConnectionParametersSchema,
+});
+
+export const databasePasswordInfoSchema = z.object({
+  databasePassword: z.string(),
+});
+
+export const apiKeyResponseSchema = z.object({
+  apiKey: z.string(),
+});
+
+export type DatabaseConnectionParameters = z.infer<typeof databaseConnectionParametersSchema>;
+export type DatabaseConnectionInfo = z.infer<typeof databaseConnectionInfoSchema>;
+export type DatabasePasswordInfo = z.infer<typeof databasePasswordInfoSchema>;
+export type ApiKeyResponse = z.infer<typeof apiKeyResponseSchema>;

@@ -68,7 +68,12 @@ async function processSnippets(content: string, docsRoot: string): Promise<strin
 // Define available documentation files
 const DOCS_MAP: Record<DocTypeSchema, string> = {
   // General
-  instructions: 'insforge-instructions-sdk.md',
+  'instructions': 'insforge-instructions-sdk.md',
+  // UI Components - Framework-specific
+  'auth-components-react': 'sdks/typescript/ui-components/react.mdx',
+  'auth-components-nextjs': 'sdks/typescript/ui-components/nextjs.mdx',
+  // 'auth-components-react-router': 'core-concepts/authentication/ui-components/react-router.mdx',
+  'real-time': 'agent-docs/real-time.md',
 
   // TypeScript SDK
   'db-sdk-typescript': 'sdks/typescript/database.mdx',
@@ -77,8 +82,6 @@ const DOCS_MAP: Record<DocTypeSchema, string> = {
   'ai-sdk-typescript': 'sdks/typescript/ai.mdx',
   'auth-sdk-typescript': 'sdks/typescript/auth.mdx',
   'realtime-sdk-typescript': 'sdks/typescript/realtime.mdx',
-  'auth-components-react': 'sdks/typescript/ui-components/react.mdx',
-  'auth-components-nextjs': 'sdks/typescript/ui-components/nextjs.mdx',
 
   // Swift SDK
   'db-sdk-swift': 'sdks/swift/database.mdx',
@@ -117,7 +120,8 @@ const DOCS_MAP: Record<DocTypeSchema, string> = {
   'storage-sdk': 'sdks/typescript/storage.mdx',
   'functions-sdk': 'sdks/typescript/functions.mdx',
   'ai-integration-sdk': 'sdks/typescript/ai.mdx',
-  'real-time': 'sdks/typescript/realtime.mdx',
+  'realtime-sdk': 'sdks/typescript/realtime.mdx',
+  'auth-sdk': 'sdks/typescript/authentication/sdk.mdx',
 };
 
 // GET /api/docs/:docType - Get specific documentation

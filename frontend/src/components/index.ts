@@ -14,7 +14,6 @@ export { CodeBlock } from './CodeBlock';
 export { CodeEditor } from './CodeEditor';
 export { ConfirmDialog } from './ConfirmDialog';
 export { ConnectCTA } from './ConnectCTA';
-export { ProjectInfoModal } from './ProjectInfoModal';
 export { CopyButton } from './CopyButton';
 export { DeleteActionButton } from './DeleteActionButton';
 export { EmptyState } from './EmptyState';

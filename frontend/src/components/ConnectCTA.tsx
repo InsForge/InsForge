@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
-import { postMessageToParent } from '@/lib/utils/cloudMessaging';
+import { useModal } from '@/lib/hooks/useModal';
 
 interface ConnectCTAProps {
   className?: string;
@@ -11,6 +11,7 @@ interface ConnectCTAProps {
 export function ConnectCTA({ className, fallback }: ConnectCTAProps) {
   const navigate = useNavigate();
   const { hasCompletedOnboarding } = useMcpUsage();
+  const { setOnboardingModalOpen } = useModal();
 
   if (hasCompletedOnboarding) {
     return fallback;
@@ -18,7 +19,7 @@ export function ConnectCTA({ className, fallback }: ConnectCTAProps) {
 
   const handleConnect = () => {
     if (isInsForgeCloudProject()) {
-      postMessageToParent({ type: 'SHOW_ONBOARDING_OVERLAY' });
+      setOnboardingModalOpen(true);
     } else {
       void navigate('/dashboard/onboard');
     }

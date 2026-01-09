@@ -70,7 +70,7 @@ export function TemplatePreview({ template, onCancel }: TemplatePreviewProps) {
             externalSchemas={template.visualizerSchema}
             metadata={{
               auth: {
-                oauths: [],
+                providers: [],
               },
               database: {
                 tables: [],
@@ -80,7 +80,6 @@ export function TemplatePreview({ template, onCancel }: TemplatePreviewProps) {
                 buckets: [],
                 totalSizeInGB: 0,
               },
-              functions: [],
             }}
             showControls={false}
             showMiniMap={false}

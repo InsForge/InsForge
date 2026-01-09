@@ -88,7 +88,16 @@ const VisualizerPage = () => {
 
       {/* Schema Visualizer */}
       <div className="relative z-10 w-full h-full">
-        <SchemaVisualizer metadata={metadata} userCount={totalUsers} />
+        <SchemaVisualizer
+          metadata={{
+            auth: {
+              providers: metadata.auth.oAuthProviders,
+            },
+            database: metadata.database,
+            storage: metadata.storage,
+          }}
+          userCount={totalUsers}
+        />
       </div>
     </div>
   );

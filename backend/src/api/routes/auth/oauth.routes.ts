@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { AuthService } from '@/services/auth/auth.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
+import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
@@ -20,6 +21,7 @@ import { isOAuthSharedKeysAvailable } from '@/utils/environment.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
+const authConfigService = AuthConfigService.getInstance();
 const oAuthConfigService = OAuthConfigService.getInstance();
 const auditService = AuditService.getInstance();
 
@@ -246,14 +248,17 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
     }
 
     const validatedProvider = providerValidation.data;
+    const authConfig = await authConfigService.getAuthConfig();
 
-    if (!redirect_uri) {
+    const redirectUri = authConfig.signInRedirectTo || redirect_uri;
+
+    if (!redirectUri) {
       throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
     const jwtPayload = {
       provider: validatedProvider,
-      redirectUri: redirect_uri ? (redirect_uri as string) : undefined,
+      redirectUri,
       createdAt: Date.now(),
     };
     const jwtSecret = validateJwtSecret();

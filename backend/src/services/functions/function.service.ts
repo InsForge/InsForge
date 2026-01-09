@@ -1,21 +1,16 @@
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import {
   EdgeFunctionMetadataSchema,
-  FunctionUploadRequest,
-  FunctionUpdateRequest,
+  UploadFunctionRequest,
+  UpdateFunctionRequest,
+  FunctionSchema,
+  ListFunctionsResponse,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { DatabaseError, Pool } from 'pg';
 import fetch from 'node-fetch';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
-
-export interface FunctionWithRuntime {
-  functions: Record<string, unknown>[];
-  runtime: {
-    status: 'running' | 'unavailable';
-  };
-}
 
 export class FunctionService {
   private static instance: FunctionService;
@@ -41,12 +36,18 @@ export class FunctionService {
   /**
    * List all functions with runtime health check
    */
-  async listFunctions(): Promise<FunctionWithRuntime> {
+  async listFunctions(): Promise<ListFunctionsResponse> {
     try {
       const result = await this.getPool().query(
         `SELECT
-          id, slug, name, description, status,
-          created_at, updated_at, deployed_at
+          id,
+          slug,
+          name,
+          description,
+          status,
+          created_at as "createdAt",
+          updated_at as "updatedAt",
+          deployed_at as "deployedAt"
         FROM functions.definitions
         ORDER BY created_at DESC`
       );
@@ -86,12 +87,19 @@ export class FunctionService {
   /**
    * Get a specific function by slug
    */
-  async getFunction(slug: string): Promise<Record<string, unknown> | undefined> {
+  async getFunction(slug: string): Promise<FunctionSchema | undefined> {
     try {
       const result = await this.getPool().query(
         `SELECT
-          id, slug, name, description, code, status,
-          created_at, updated_at, deployed_at
+          id,
+          slug,
+          name,
+          description,
+          code,
+          status,
+          created_at as "createdAt",
+          updated_at as "updatedAt",
+          deployed_at as "deployedAt"
         FROM functions.definitions
         WHERE slug = $1`,
         [slug]
@@ -111,7 +119,7 @@ export class FunctionService {
   /**
    * Create a new function
    */
-  async createFunction(data: FunctionUploadRequest): Promise<Record<string, unknown>> {
+  async createFunction(data: UploadFunctionRequest): Promise<FunctionSchema> {
     const client = await this.getPool().connect();
     try {
       const { name, code, description, status } = data;
@@ -140,7 +148,7 @@ export class FunctionService {
 
       // Fetch the created function
       const result = await client.query(
-        `SELECT id, slug, name, description, status, created_at
+        `SELECT id, slug, name, description, status, created_at as "createdAt"
         FROM functions.definitions WHERE id = $1`,
         [id]
       );
@@ -177,8 +185,8 @@ export class FunctionService {
    */
   async updateFunction(
     slug: string,
-    updates: FunctionUpdateRequest
-  ): Promise<Record<string, unknown> | null> {
+    updates: UpdateFunctionRequest
+  ): Promise<FunctionSchema | null> {
     const client = await this.getPool().connect();
     try {
       // Check if function exists
@@ -240,7 +248,7 @@ export class FunctionService {
 
       // Fetch updated function
       const result = await client.query(
-        `SELECT id, slug, name, description, status, updated_at
+        `SELECT id, slug, name, description, status, updated_at as "updatedAt", deployed_at as "deployedAt"
         FROM functions.definitions WHERE slug = $1`,
         [slug]
       );

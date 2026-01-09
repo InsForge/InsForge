@@ -48,6 +48,7 @@ export const docTypeSchema = z
     'instructions',
     'auth-components-react',
     'auth-components-nextjs',
+    'real-time',
 
     // TypeScript SDK
     'db-sdk-typescript',
@@ -90,11 +91,12 @@ export const docTypeSchema = z
     'realtime-rest-api',
 
     // Legacy aliases (for backward compatibility)
+    'auth-sdk',
     'db-sdk',
     'storage-sdk',
     'functions-sdk',
     'ai-integration-sdk',
-    'real-time',
+    'realtime-sdk',
   ])
   .describe(
     `
@@ -136,9 +138,17 @@ export const docTypeSchema = z
 
     General:
       "instructions" - Essential backend setup (use FIRST)
+      "auth-components-react" (authentication components for React+Vite applications),
+      "auth-components-nextjs" (authentication components for Next.js applications),
+      "real-time" - Real-time pub/sub through WebSockets
 
-    Legacy (deprecated, use language-specific versions):
-      "db-sdk", "storage-sdk", "functions-sdk", "ai-integration-sdk", "real-time"
+    Documentation type:
+      "db-sdk" (database operations),
+      "storage-sdk" (file storage),
+      "functions-sdk" (edge functions),
+      "auth-sdk" (direct SDK methods for custom auth flows),
+      "ai-integration-sdk" (AI features),
+      "realtime-sdk" (real-time pub/sub through WebSockets)
     `
   );
 

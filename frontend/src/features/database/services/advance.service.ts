@@ -1,19 +1,5 @@
 import { apiClient } from '@/lib/api/client';
-
-export interface RawSQLRequest {
-  query: string;
-  params?: unknown[];
-}
-
-export interface RawSQLResponse {
-  rows?: unknown[];
-  rowCount?: number;
-  fields?: Array<{ name: string; dataTypeID: number }>;
-  success?: boolean;
-  data?: unknown[];
-  error?: string;
-  message?: string;
-}
+import { RawSQLRequest, RawSQLResponse } from '@insforge/shared-schemas';
 
 export class AdvanceService {
   /**

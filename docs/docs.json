@@ -31,7 +31,7 @@
         "groups": [
           {
             "group": "Getting Started",
-            "pages": ["introduction", "quickstart", "partnership"]
+            "pages": ["introduction", "quickstart", "partnership", "oauth-server"]
           },
           {
             "group": "Core Concepts",

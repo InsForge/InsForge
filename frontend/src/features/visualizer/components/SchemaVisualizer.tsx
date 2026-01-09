@@ -18,14 +18,21 @@ import { BucketNode } from './BucketNode';
 import { useAllTableSchemas } from '@/features/database/hooks/useTables';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import {
-  AppMetadataSchema,
   StorageBucketSchema,
-  AuthMetadataSchema,
   GetTableSchemaResponse,
+  DatabaseMetadataSchema,
+  StorageMetadataSchema,
+  OAuthProvidersSchema,
 } from '@insforge/shared-schemas';
 
 interface SchemaVisualizerProps {
-  metadata: AppMetadataSchema;
+  metadata: {
+    auth: {
+      providers: OAuthProvidersSchema[];
+    };
+    database: DatabaseMetadataSchema;
+    storage: StorageMetadataSchema;
+  };
   userCount?: number;
   // Optional external schemas for templates
   externalSchemas?: GetTableSchemaResponse[];
@@ -45,7 +52,7 @@ type BucketNodeData = {
 };
 
 type AuthNodeData = {
-  authMetadata: AuthMetadataSchema;
+  providers: OAuthProvidersSchema[];
   userCount?: number;
   isReferenced?: boolean;
 };
@@ -262,7 +269,7 @@ export function SchemaVisualizer({
       type: 'authNode',
       position: { x: 0, y: 0 },
       data: {
-        authMetadata: metadata.auth,
+        providers: metadata.auth.providers,
         userCount,
         isReferenced: isUsersReferenced,
       },
@@ -380,7 +387,13 @@ export function SchemaVisualizer({
             fitViewOptions={{ padding: 1, duration: 300, maxZoom: 2, minZoom: 1 }}
           />
         )}
-        {showMiniMap && <MiniMap nodeColor={(node: Node<CustomNodeData>) => getNodeColor(node)} />}
+        {showMiniMap && (
+          <MiniMap
+            nodeColor={(node: Node<CustomNodeData>) => getNodeColor(node)}
+            pannable
+            zoomable
+          />
+        )}
       </ReactFlow>
     </div>
   );

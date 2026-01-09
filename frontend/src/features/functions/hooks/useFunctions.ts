@@ -1,12 +1,13 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { functionService, type EdgeFunction } from '../services/function.service';
+import { functionService } from '../services/function.service';
+import { FunctionSchema } from '@insforge/shared-schemas';
 import { useToast } from '@/lib/hooks/useToast';
 
 export function useFunctions() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
-  const [selectedFunction, setSelectedFunction] = useState<EdgeFunction | null>(null);
+  const [selectedFunction, setSelectedFunction] = useState<FunctionSchema | null>(null);
 
   // Query to fetch all functions
   const {
@@ -26,7 +27,7 @@ export function useFunctions() {
 
   // Function to fetch and set selected function details
   const selectFunction = useCallback(
-    async (func: EdgeFunction) => {
+    async (func: FunctionSchema) => {
       try {
         const data = await functionService.getFunctionBySlug(func.slug);
         setSelectedFunction(data);
@@ -97,7 +98,7 @@ export function useFunctions() {
 
     // Helpers
     getFunctionBySlug: useCallback(
-      (slug: string): EdgeFunction | undefined => {
+      (slug: string): FunctionSchema | undefined => {
         return displayFunctions.find((func) => func.slug === slug);
       },
       [displayFunctions]
