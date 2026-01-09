@@ -1,18 +1,92 @@
 1. Add InsForge dependencies to your project
 
-build.gradle.kts:
-```kotlin
-repositories {
-    mavenLocal()  // 使用本地 Maven
-    mavenCentral()
-}
+<Tabs>
+  <Tab title="Maven Central">
+    build.gradle.kts:
+    ```kotlin
+    repositories {
+        mavenLocal() // For local development
+        mavenCentral()
+    }
 
-dependencies {
-    implementation("dev.insforge:insforge-kotlin:0.1.0-SNAPSHOT")
+    dependencies {
+        implementation("dev.insforge:insforge-kotlin:0.1.0-SNAPSHOT")
+    }
+    ```
+  </Tab>
+  <Tab title="GitHub Packages">
+    First, create a GitHub Personal Access Token:
+    - Go to GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+    - Select permission: `read:packages`
 
-    implementation("io.socket:socket.io-client:2.1.1")
-}
-```
+    Then configure your project using one of the following methods:
+
+    <AccordionGroup>
+      <Accordion title="Option A: Environment Variables">
+        settings.gradle.kts (or build.gradle.kts):
+        ```kotlin
+        repositories {
+            mavenCentral()
+            maven {
+                url = uri("https://maven.pkg.github.com/InsForge/insforge-kotlin")
+                credentials {
+                    username = System.getenv("GITHUB_USER") ?: ""
+                    password = System.getenv("GITHUB_TOKEN") ?: ""
+                }
+            }
+        }
+        ```
+
+        build.gradle.kts:
+        ```kotlin
+        dependencies {
+            implementation("dev.insforge:insforge-kotlin:0.1.0-SNAPSHOT")
+        }
+        ```
+
+        Set environment variables before building:
+        ```bash
+        export GITHUB_USER="your-github-username"
+        export GITHUB_TOKEN="your-personal-access-token"
+        ```
+      </Accordion>
+      <Accordion title="Option B: gradle.properties (Local Development)">
+        Add credentials to your global Gradle properties file:
+
+        ~/.gradle/gradle.properties:
+        ```properties
+        gpr.user=your-github-username
+        gpr.token=ghp_xxxxxxxxxxxx
+        ```
+
+        settings.gradle.kts:
+        ```kotlin
+        repositories {
+            mavenCentral()
+            maven {
+                url = uri("https://maven.pkg.github.com/InsForge/insforge-kotlin")
+                credentials {
+                    username = providers.gradleProperty("gpr.user").orNull ?: ""
+                    password = providers.gradleProperty("gpr.token").orNull ?: ""
+                }
+            }
+        }
+        ```
+
+        build.gradle.kts:
+        ```kotlin
+        dependencies {
+            implementation("dev.insforge:insforge-kotlin:0.1.0-SNAPSHOT")
+        }
+        ```
+
+        <Note>
+          The `~/.gradle/gradle.properties` file is stored outside your project, so credentials won't be accidentally committed to version control.
+        </Note>
+      </Accordion>
+    </AccordionGroup>
+  </Tab>
+</Tabs>
 
 2. Initialize InsForge SDK
 
