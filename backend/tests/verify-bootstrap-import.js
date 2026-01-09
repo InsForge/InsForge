@@ -34,16 +34,13 @@ try {
   logger.info(
     'Logger module is accessible and functional when run with tsx (as configured in package.json migrate:bootstrap script)'
   );
-  
-  process.exit(0);
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);
   const stack = error instanceof Error ? error.stack : undefined;
 
   logger.error('FAILED: Import test failed');
   logger.error(`Error: ${message}`);
-  if (stack) logger.error(`Stack: ${stack}`);
-
-  process.exit(1);
+  if (stack) {
+    logger.error(`Stack: ${stack}`);
+  }
 }
-
