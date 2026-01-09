@@ -138,9 +138,35 @@ export default defineConfig(
       'prettier/prettier': 'error',
     },
   },
+  // Backend test .js files configuration (needs to come before backend config)
+  {
+    files: ['backend/tests/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+        ...globals.es2021,
+      },
+    },
+    plugins: {
+      prettier: prettierPlugin,
+    },
+    rules: {
+      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      'no-debugger': 'error',
+      'no-duplicate-imports': 'error',
+      'no-unused-expressions': 'error',
+      'prefer-const': 'error',
+      'no-var': 'error',
+      eqeqeq: ['error', 'always'],
+      curly: ['error', 'all'],
+      'prettier/prettier': 'error',
+    },
+  },
   // Backend configuration
   {
-    files: ['backend/**/*.ts', 'backend/**/*.tsx'],
+    files: ['backend/**/*.ts', 'backend/**/*.tsx', 'backend/**/*.js'],
     ignores: ['backend/tests/**/*', 'backend/**/*.test.*', 'backend/**/*.spec.*'],
     languageOptions: {
       ecmaVersion: 'latest',
