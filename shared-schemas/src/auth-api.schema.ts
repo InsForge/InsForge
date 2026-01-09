@@ -24,18 +24,22 @@ export const paginationSchema = z.object({
 });
 
 /**
+ * Shared options for auth requests (extensible for future parameters)
+ */
+export const authOptionsSchema = z
+  .object({
+    emailRedirectTo: z.string().url().optional(),
+  })
+  .optional();
+
+/**
  * POST /api/auth/users - Create user
  */
 export const createUserRequestSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
   name: nameSchema.optional(),
-  /**
-   * Optional URL to redirect to after email verification.
-   * When provided, the verification email link will include this URL
-   * as a redirect destination after successful verification.
-   */
-  emailRedirectTo: z.string().url().optional(),
+  options: authOptionsSchema,
 });
 
 /**
@@ -83,12 +87,7 @@ export const updateProfileRequestSchema = z.object({
  */
 export const sendVerificationEmailRequestSchema = z.object({
   email: emailSchema,
-  /**
-   * Optional URL to redirect to after email verification.
-   * When provided, the verification email link will include this URL
-   * as a redirect destination after successful verification.
-   */
-  emailRedirectTo: z.string().url().optional(),
+  options: authOptionsSchema,
 });
 
 /**
@@ -337,6 +336,9 @@ export const authErrorResponseSchema = z.object({
 // ============================================================================
 // Type exports
 // ============================================================================
+
+// Shared options type
+export type AuthOptions = z.infer<typeof authOptionsSchema>;
 
 // Request types for type-safe request handling
 export type CreateUserRequest = z.infer<typeof createUserRequestSchema>;

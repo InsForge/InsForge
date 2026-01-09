@@ -13,6 +13,7 @@ import type {
   CreateAdminSessionResponse,
   AuthMetadataSchema,
   OAuthProvidersSchema,
+  AuthOptions,
 } from '@insforge/shared-schemas';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { AuthConfigService } from './auth-config.service.js';
@@ -108,13 +109,12 @@ export class AuthService {
   /**
    * User registration
    * Otherwise, returns user with access token for immediate login
-   * @param emailRedirectTo - Optional URL to redirect to after email verification
    */
   async register(
     email: string,
     password: string,
     name?: string,
-    emailRedirectTo?: string
+    options?: AuthOptions
   ): Promise<CreateUserResponse> {
     // Get email auth configuration and validate password
     const authConfigService = AuthConfigService.getInstance();
@@ -164,7 +164,8 @@ export class AuthService {
     if (emailAuthConfig.requireEmailVerification) {
       try {
         if (emailAuthConfig.verifyEmailMethod === 'link') {
-          await this.sendVerificationEmailWithLink(email, emailRedirectTo);
+          const redirectTo = emailAuthConfig.signInRedirectTo || options?.emailRedirectTo;
+          await this.sendVerificationEmailWithLink(email, redirectTo);
         } else {
           await this.sendVerificationEmailWithCode(email);
         }
@@ -272,7 +273,6 @@ export class AuthService {
    * Send verification email with clickable link
    * Creates a long cryptographic token and sends it via email as a clickable link
    * The link contains only the token (no email) for better privacy and security
-   * @param emailRedirectTo - Optional URL to redirect to after email verification
    */
   async sendVerificationEmailWithLink(email: string, emailRedirectTo?: string): Promise<void> {
     // Check if user exists
@@ -295,9 +295,7 @@ export class AuthService {
 
     // Build verification link URL using backend API endpoint
     // Include redirectTo parameter if provided
-    const linkUrl = emailRedirectTo
-      ? `${getApiBaseUrl()}/auth/verify-email?token=${token}&redirectTo=${encodeURIComponent(emailRedirectTo)}`
-      : `${getApiBaseUrl()}/auth/verify-email?token=${token}`;
+    const linkUrl = `${getApiBaseUrl()}/auth/verify-email?token=${token}${emailRedirectTo ? `&redirectTo=${encodeURIComponent(emailRedirectTo)}` : ''}`;
 
     // Send email with verification link
     const emailService = EmailService.getInstance();
