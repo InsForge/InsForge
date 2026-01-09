@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components';
 import { CursorDeeplinkGenerator } from './mcp/CursorDeeplinkGenerator';
+import { QoderDeeplinkGenerator } from './mcp/QoderDeeplinkGenerator';
 import { MCP_AGENTS, GenerateInstallCommand, createMCPConfig, type MCPAgent } from './mcp/helpers';
 import { cn } from '@/lib/utils/utils';
 
@@ -88,6 +89,16 @@ export function McpConnectionSection({
           </p>
           <div className="w-fit">
             <CursorDeeplinkGenerator apiKey={apiKey} os="macos-linux" />
+          </div>
+        </div>
+      ) : selectedAgent.id === 'qoder' ? (
+        <div className="flex flex-col gap-3">
+          <p className="text-gray-900 dark:text-white text-sm">
+            <span className="font-semibold leading-5">1.</span>
+            <span className="leading-6"> Install in one click</span>
+          </p>
+          <div className="w-fit">
+            <QoderDeeplinkGenerator apiKey={apiKey} os="macos-linux" />
           </div>
         </div>
       ) : selectedAgent.id === 'mcp' ? (
