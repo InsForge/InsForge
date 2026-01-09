@@ -10,8 +10,7 @@ The Database API provides PostgREST-style CRUD operations for your database tabl
 ## Headers
 
 ```bash
-x-api-key: your-anon-key
-Authorization: Bearer your-jwt-token
+Authorization: Bearer your-jwt-token-or-anon-key
 Content-Type: application/json
 ```
 
@@ -55,17 +54,14 @@ GET /api/database/records/{tableName}
 ```bash
 # Get all posts
 curl "https://your-app.insforge.app/api/database/records/posts" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token"
 
 # Get posts with filters
 curl "https://your-app.insforge.app/api/database/records/posts?status=eq.published&order=createdAt.desc&limit=10" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token"
 
 # Select specific columns
 curl "https://your-app.insforge.app/api/database/records/posts?select=id,title,author" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token"
 ```
 
@@ -115,7 +111,6 @@ POST /api/database/records/{tableName}
 ```bash
 # Create a single record
 curl -X POST "https://your-app.insforge.app/api/database/records/posts" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token" \
   -H "Content-Type: application/json" \
   -H "Prefer: return=representation" \
@@ -127,7 +122,6 @@ curl -X POST "https://your-app.insforge.app/api/database/records/posts" \
 
 # Create multiple records
 curl -X POST "https://your-app.insforge.app/api/database/records/posts" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token" \
   -H "Content-Type: application/json" \
   -H "Prefer: return=representation" \
@@ -183,7 +177,6 @@ Use filter operators to specify which records to update.
 ```bash
 # Update a single record by ID
 curl -X PATCH "https://your-app.insforge.app/api/database/records/posts?id=eq.248373e1-0aea-45ce-8844-5ef259203749" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token" \
   -H "Content-Type: application/json" \
   -H "Prefer: return=representation" \
@@ -194,7 +187,6 @@ curl -X PATCH "https://your-app.insforge.app/api/database/records/posts?id=eq.24
 
 # Update multiple records
 curl -X PATCH "https://your-app.insforge.app/api/database/records/posts?status=eq.draft" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token" \
   -H "Content-Type: application/json" \
   -d '{"status": "archived"}'
@@ -239,12 +231,10 @@ Use filter operators to specify which records to delete.
 ```bash
 # Delete by ID
 curl -X DELETE "https://your-app.insforge.app/api/database/records/posts?id=eq.248373e1-0aea-45ce-8844-5ef259203749" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token"
 
 # Delete with Prefer header to see deleted records
 curl -X DELETE "https://your-app.insforge.app/api/database/records/posts?status=eq.archived" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token" \
   -H "Prefer: return=representation"
 ```
@@ -333,4 +323,49 @@ curl "https://your-app.insforge.app/api/database/records/tasks?completed_at=is.n
 
 ### Upsert (Insert or Update)
 
-To upsert, use POST with a unique constraint violation handling on the database side, or check existence first and use PATCH if exists.
+Insert a record or update it if a conflict occurs on a unique constraint.
+
+```
+POST /api/database/records/{tableName}
+```
+
+#### Headers
+
+| Header | Value | Description |
+|--------|-------|-------------|
+| `Prefer` | `resolution=merge-duplicates` | Update existing record on conflict |
+| `Prefer` | `resolution=ignore-duplicates` | Ignore insert if record exists |
+
+#### Example
+
+```bash
+# Upsert: insert or update on conflict
+curl -X POST "https://your-app.insforge.app/api/database/records/user_settings" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -H "Prefer: resolution=merge-duplicates,return=representation" \
+  -d '[{
+    "user_id": "123e4567-e89b-12d3-a456-426614174000",
+    "theme": "dark",
+    "notifications": true
+  }]'
+```
+
+#### Response
+
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "user_id": "123e4567-e89b-12d3-a456-426614174000",
+    "theme": "dark",
+    "notifications": true,
+    "createdAt": "2025-01-01T00:00:00Z",
+    "updatedAt": "2025-01-21T11:00:00Z"
+  }
+]
+```
+
+<Note>
+Upsert requires a unique constraint (e.g., primary key or unique index) on the table. The conflict resolution is based on this constraint.
+</Note>

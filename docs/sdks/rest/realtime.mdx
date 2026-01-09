@@ -13,9 +13,15 @@ The REST API is for **management and history**. For real-time messaging, use the
 
 ## Headers
 
+For authenticated function invocations:
 ```bash
-x-api-key: your-anon-key
-Authorization: Bearer your-jwt-token
+Authorization: Bearer your-jwt-token-or-anon-key
+Content-Type: application/json
+```
+
+For admin endpoints:
+```bash
+Authorization: Bearer admin-jwt-token-Or-API-Key
 Content-Type: application/json
 ```
 
@@ -39,9 +45,6 @@ import { io } from 'socket.io-client';
 const socket = io('https://your-app.insforge.app', {
   auth: {
     token: 'your-jwt-token'
-  },
-  extraHeaders: {
-    'x-api-key': 'your-anon-key'
   }
 });
 
@@ -107,7 +110,6 @@ GET /api/realtime/channels
 
 ```bash
 curl "https://your-app.insforge.app/api/realtime/channels" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token"
 ```
 
@@ -148,7 +150,6 @@ GET /api/realtime/channels/{id}
 
 ```bash
 curl "https://your-app.insforge.app/api/realtime/channels/550e8400-e29b-41d4-a716-446655440000" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token"
 ```
 
@@ -187,7 +188,6 @@ POST /api/realtime/channels
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/realtime/channels" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token" \
   -H "Content-Type: application/json" \
   -d '{
@@ -233,7 +233,6 @@ PUT /api/realtime/channels/{id}
 
 ```bash
 curl -X PUT "https://your-app.insforge.app/api/realtime/channels/550e8400-e29b-41d4-a716-446655440002" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token" \
   -H "Content-Type: application/json" \
   -d '{
@@ -268,7 +267,6 @@ DELETE /api/realtime/channels/{id}
 
 ```bash
 curl -X DELETE "https://your-app.insforge.app/api/realtime/channels/550e8400-e29b-41d4-a716-446655440002" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token"
 ```
 
@@ -305,7 +303,6 @@ GET /api/realtime/messages
 
 ```bash
 curl "https://your-app.insforge.app/api/realtime/messages?channelId=550e8400-e29b-41d4-a716-446655440000&limit=50" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token"
 ```
 
@@ -351,7 +348,6 @@ GET /api/realtime/messages/stats
 
 ```bash
 curl "https://your-app.insforge.app/api/realtime/messages/stats?since=2024-01-01T00:00:00Z" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token"
 ```
 
@@ -385,7 +381,6 @@ GET /api/realtime/permissions
 
 ```bash
 curl "https://your-app.insforge.app/api/realtime/permissions" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token"
 ```
 

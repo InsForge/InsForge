@@ -13,18 +13,12 @@ https://your-app.us-east.insforge.app
 
 ## Authentication
 
-All API requests require authentication via headers:
+All API requests require authentication via the `Authorization` header:
 
-### API Key (Required)
-
-```bash
-x-api-key: your-anon-key
-```
-
-### Bearer Token (For authenticated requests)
+### Bearer Token
 
 ```bash
-Authorization: Bearer your-jwt-token
+Authorization: Bearer your-jwt-token-or-anon-key
 ```
 
 ## Quick Start
@@ -33,18 +27,15 @@ Authorization: Bearer your-jwt-token
 # Register a new user
 curl -X POST https://your-app.us-east.insforge.app/api/auth/users \
   -H "Content-Type: application/json" \
-  -H "x-api-key: your-anon-key" \
   -d '{"email": "user@example.com", "password": "securepassword123"}'
 
 # Sign in and get token
 curl -X POST https://your-app.us-east.insforge.app/api/auth/sessions \
   -H "Content-Type: application/json" \
-  -H "x-api-key: your-anon-key" \
   -d '{"email": "user@example.com", "password": "securepassword123"}'
 
 # Use the token for authenticated requests
 curl https://your-app.us-east.insforge.app/api/database/records/posts \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token"
 ```
 

@@ -9,14 +9,16 @@ The Authentication API provides endpoints for user registration, login, email ve
 
 ## Headers
 
+For authenticated function invocations:
 ```bash
-x-api-key: your-anon-key
+Authorization: Bearer your-jwt-token-or-anon-key
 Content-Type: application/json
 ```
 
-For authenticated endpoints:
+For admin endpoints:
 ```bash
-Authorization: Bearer your-jwt-token
+Authorization: Bearer admin-jwt-token-Or-API-Key
+Content-Type: application/json
 ```
 
 ---
@@ -41,7 +43,6 @@ POST /api/auth/users
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/users" \
-  -H "x-api-key: your-anon-key" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com",
@@ -92,7 +93,6 @@ POST /api/auth/sessions
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/sessions" \
-  -H "x-api-key: your-anon-key" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com",
@@ -130,7 +130,6 @@ GET /api/auth/sessions/current
 
 ```bash
 curl "https://your-app.insforge.app/api/auth/sessions/current" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token"
 ```
 
@@ -166,7 +165,6 @@ PATCH /api/auth/profiles/current
 
 ```bash
 curl -X PATCH "https://your-app.insforge.app/api/auth/profiles/current" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token" \
   -H "Content-Type: application/json" \
   -d '{
@@ -202,8 +200,7 @@ GET /api/auth/profiles/{userId}
 ### Example
 
 ```bash
-curl "https://your-app.insforge.app/api/auth/profiles/123e4567-e89b-12d3-a456-426614174000" \
-  -H "x-api-key: your-anon-key"
+curl "https://your-app.insforge.app/api/auth/profiles/123e4567-e89b-12d3-a456-426614174000"
 ```
 
 ### Response
@@ -238,7 +235,6 @@ POST /api/auth/email/send-verification
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/email/send-verification" \
-  -H "x-api-key: your-anon-key" \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com"}'
 ```
@@ -269,7 +265,6 @@ POST /api/auth/email/verify
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/email/verify" \
-  -H "x-api-key: your-anon-key" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com",
@@ -310,7 +305,6 @@ POST /api/auth/email/send-reset-password
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/email/send-reset-password" \
-  -H "x-api-key: your-anon-key" \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com"}'
 ```
@@ -332,7 +326,6 @@ POST /api/auth/email/exchange-reset-password-token
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/email/exchange-reset-password-token" \
-  -H "x-api-key: your-anon-key" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com",
@@ -366,7 +359,6 @@ POST /api/auth/email/reset-password
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/email/reset-password" \
-  -H "x-api-key: your-anon-key" \
   -H "Content-Type: application/json" \
   -d '{
     "newPassword": "newSecurePassword123",
@@ -407,8 +399,7 @@ GET /api/auth/oauth/{provider}?redirect_uri={redirectUri}
 ### Example
 
 ```bash
-curl "https://your-app.insforge.app/api/auth/oauth/google?redirect_uri=https://myapp.com/callback" \
-  -H "x-api-key: your-anon-key"
+curl "https://your-app.insforge.app/api/auth/oauth/google?redirect_uri=https://myapp.com/callback"
 ```
 
 ### Response
@@ -440,8 +431,7 @@ GET /api/auth/public-config
 ### Example
 
 ```bash
-curl "https://your-app.insforge.app/api/auth/public-config" \
-  -H "x-api-key: your-anon-key"
+curl "https://your-app.insforge.app/api/auth/public-config"
 ```
 
 ### Response

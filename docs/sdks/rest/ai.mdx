@@ -9,9 +9,15 @@ The AI API provides endpoints for chat completions and image generation using va
 
 ## Headers
 
+For authenticated function invocations:
 ```bash
-x-api-key: your-anon-key
-Authorization: Bearer your-jwt-token
+Authorization: Bearer your-jwt-token-or-anon-key
+Content-Type: application/json
+```
+
+For admin endpoints:
+```bash
+Authorization: Bearer admin-jwt-token-Or-API-Key
 Content-Type: application/json
 ```
 
@@ -29,8 +35,7 @@ GET /api/ai/models
 
 ```bash
 curl "https://your-app.insforge.app/api/ai/models" \
-  -H "x-api-key: your-anon-key" \
-  -H "Authorization: Bearer your-jwt-token"
+  -H "Authorization: Bearer your-jwt-token-or-anon-key"
 ```
 
 ### Response
@@ -119,8 +124,7 @@ POST /api/ai/chat/completion
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/ai/chat/completion" \
-  -H "x-api-key: your-anon-key" \
-  -H "Authorization: Bearer your-jwt-token" \
+  -H "Authorization: Bearer your-jwt-token-or-anon-key" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "anthropic/claude-3.5-haiku",
@@ -151,8 +155,7 @@ curl -X POST "https://your-app.insforge.app/api/ai/chat/completion" \
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/ai/chat/completion" \
-  -H "x-api-key: your-anon-key" \
-  -H "Authorization: Bearer your-jwt-token" \
+  -H "Authorization: Bearer your-jwt-token-or-anon-key" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "openai/gpt-4",
@@ -169,8 +172,7 @@ curl -X POST "https://your-app.insforge.app/api/ai/chat/completion" \
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/ai/chat/completion" \
-  -H "x-api-key: your-anon-key" \
-  -H "Authorization: Bearer your-jwt-token" \
+  -H "Authorization: Bearer your-jwt-token-or-anon-key" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "anthropic/claude-3.5-haiku",
@@ -196,8 +198,7 @@ POST /api/ai/chat/completion
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/ai/chat/completion" \
-  -H "x-api-key: your-anon-key" \
-  -H "Authorization: Bearer your-jwt-token" \
+  -H "Authorization: Bearer your-jwt-token-or-anon-key" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "anthropic/claude-3.5-haiku",
@@ -242,8 +243,7 @@ POST /api/ai/image/generation
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/ai/image/generation" \
-  -H "x-api-key: your-anon-key" \
-  -H "Authorization: Bearer your-jwt-token" \
+  -H "Authorization: Bearer your-jwt-token-or-anon-key" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "google/gemini-2.5-flash-image-preview",

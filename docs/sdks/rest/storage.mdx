@@ -9,9 +9,16 @@ The Storage API provides bucket-based file storage similar to S3. Upload, downlo
 
 ## Headers
 
+For authenticated function invocations:
 ```bash
-x-api-key: your-anon-key
-Authorization: Bearer your-jwt-token
+Authorization: Bearer your-jwt-token-or-anon-key
+Content-Type: application/json
+```
+
+For admin endpoints:
+```bash
+Authorization: Bearer admin-jwt-token-Or-API-Key
+Content-Type: application/json
 ```
 
 ---
@@ -39,7 +46,6 @@ PUT /api/storage/buckets/{bucketName}/objects/{objectKey}
 
 ```bash
 curl -X PUT "https://your-app.insforge.app/api/storage/buckets/avatars/objects/users/profile.jpg" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token" \
   -F "file=@/path/to/image.jpg"
 ```
@@ -71,7 +77,6 @@ POST /api/storage/buckets/{bucketName}/objects
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/storage/buckets/uploads/objects" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token" \
   -F "file=@/path/to/document.pdf"
 ```
@@ -111,7 +116,6 @@ POST /api/storage/buckets/{bucketName}/upload-strategy
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-strategy" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token" \
   -H "Content-Type: application/json" \
   -d '{
@@ -175,7 +179,6 @@ POST /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile-photo-123.jpg/confirm-upload" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token" \
   -H "Content-Type: application/json" \
   -d '{
@@ -211,7 +214,6 @@ GET /api/storage/buckets/{bucketName}/objects/{objectKey}
 
 ```bash
 curl "https://your-app.insforge.app/api/storage/buckets/avatars/objects/users/profile.jpg" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token" \
   -o profile.jpg
 ```
@@ -240,7 +242,6 @@ POST /api/storage/buckets/{bucketName}/objects/{objectKey}/download-strategy
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile.jpg/download-strategy" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token" \
   -H "Content-Type: application/json" \
   -d '{"expiresIn": 3600}'
@@ -279,7 +280,6 @@ DELETE /api/storage/buckets/{bucketName}/objects/{objectKey}
 
 ```bash
 curl -X DELETE "https://your-app.insforge.app/api/storage/buckets/avatars/objects/users/profile.jpg" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token"
 ```
 
@@ -313,7 +313,6 @@ GET /api/storage/buckets/{bucketName}/objects
 
 ```bash
 curl "https://your-app.insforge.app/api/storage/buckets/avatars/objects?prefix=users/&limit=50" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer your-jwt-token"
 ```
 
@@ -361,7 +360,6 @@ GET /api/storage/buckets
 
 ```bash
 curl "https://your-app.insforge.app/api/storage/buckets" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer admin-jwt-token"
 ```
 
@@ -390,7 +388,6 @@ POST /api/storage/buckets
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/storage/buckets" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer admin-jwt-token" \
   -H "Content-Type: application/json" \
   -d '{
@@ -424,7 +421,6 @@ PATCH /api/storage/buckets/{bucketName}
 
 ```bash
 curl -X PATCH "https://your-app.insforge.app/api/storage/buckets/user-uploads" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer admin-jwt-token" \
   -H "Content-Type: application/json" \
   -d '{"isPublic": true}'
@@ -450,7 +446,6 @@ DELETE /api/storage/buckets/{bucketName}/objects
 
 ```bash
 curl -X DELETE "https://your-app.insforge.app/api/storage/buckets/old-uploads/objects" \
-  -H "x-api-key: your-anon-key" \
   -H "Authorization: Bearer admin-jwt-token"
 ```
 

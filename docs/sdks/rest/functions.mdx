@@ -10,13 +10,17 @@ The Functions API provides endpoints for invoking and managing serverless functi
 ## Headers
 
 ```bash
-x-api-key: your-anon-key
 Content-Type: application/json
+```
+
+For authenticated function invocations:
+```bash
+Authorization: Bearer your-jwt-token-or-anon-key
 ```
 
 For admin endpoints:
 ```bash
-Authorization: Bearer admin-jwt-token
+Authorization: Bearer admin-jwt-token-Or-API-Key
 ```
 
 ---
@@ -47,7 +51,6 @@ Any JSON payload that the function expects.
 
 ```bash
 curl -X POST "https://your-app.insforge.app/functions/hello-world" \
-  -H "x-api-key: your-anon-key" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "John"
@@ -80,8 +83,7 @@ GET /api/functions
 
 ```bash
 curl "https://your-app.insforge.app/api/functions" \
-  -H "x-api-key: your-anon-key" \
-  -H "Authorization: Bearer admin-jwt-token"
+  -H "Authorization: Bearer admin-jwt-token-or-api-key"
 ```
 
 ### Response
@@ -123,8 +125,7 @@ GET /api/functions/{slug}
 
 ```bash
 curl "https://your-app.insforge.app/api/functions/hello-world" \
-  -H "x-api-key: your-anon-key" \
-  -H "Authorization: Bearer admin-jwt-token"
+  -H "Authorization: Bearer admin-jwt-token-or-api-key"
 ```
 
 ### Response
@@ -165,8 +166,7 @@ POST /api/functions
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/functions" \
-  -H "x-api-key: your-anon-key" \
-  -H "Authorization: Bearer admin-jwt-token" \
+  -H "Authorization: Bearer admin-jwt-token-or-api-key" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Hello World Function",
@@ -214,8 +214,7 @@ PUT /api/functions/{slug}
 
 ```bash
 curl -X PUT "https://your-app.insforge.app/api/functions/hello-world" \
-  -H "x-api-key: your-anon-key" \
-  -H "Authorization: Bearer admin-jwt-token" \
+  -H "Authorization: Bearer admin-jwt-token-or-api-key" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Hello World Function v2",
@@ -251,8 +250,7 @@ DELETE /api/functions/{slug}
 
 ```bash
 curl -X DELETE "https://your-app.insforge.app/api/functions/old-function" \
-  -H "x-api-key: your-anon-key" \
-  -H "Authorization: Bearer admin-jwt-token"
+  -H "Authorization: Bearer admin-jwt-token-or-api-key"
 ```
 
 ### Response
