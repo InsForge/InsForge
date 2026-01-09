@@ -180,8 +180,8 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
       );
     }
 
-    const { email, password, name } = validationResult.data;
-    const result: CreateUserResponse = await authService.register(email, password, name);
+    const { email, password, name, emailRedirectTo } = validationResult.data;
+    const result: CreateUserResponse = await authService.register(email, password, name, emailRedirectTo);
 
     // Set refresh token in httpOnly cookie and generate CSRF token
     if (result.accessToken && result.user) {
@@ -510,7 +510,7 @@ router.post(
         );
       }
 
-      const { email } = validationResult.data;
+      const { email, emailRedirectTo } = validationResult.data;
 
       // Get auth config to determine verification method
       const authConfig = await authConfigService.getAuthConfig();
@@ -519,7 +519,7 @@ router.post(
       // Note: User enumeration is prevented at service layer
       // Service returns gracefully (no error) if user not found
       if (method === 'link') {
-        await authService.sendVerificationEmailWithLink(email);
+        await authService.sendVerificationEmailWithLink(email, emailRedirectTo);
       } else {
         await authService.sendVerificationEmailWithCode(email);
       }
