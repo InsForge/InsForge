@@ -1,5 +1,47 @@
 import { z } from 'zod';
 
+export const sdkFeatureSchema = z.enum([
+  'db',
+  'storage',
+  'functions',
+  'auth',
+  'ai',
+  'realtime',
+]).describe(
+  `
+  SDK feature categories:
+
+  - "db" - Database operations
+  - "storage" - File storage
+  - "functions" - Edge functions
+  - "auth" - User authentication
+  - "ai" - AI features
+  - "realtime" - Real-time WebSockets
+  `
+);
+
+export type SdkFeatureSchema = z.infer<typeof sdkFeatureSchema>;
+
+export const sdkLanguageSchema = z
+.enum([
+  'typescript',
+  'swift',
+  'kotlin',
+  // 'flutter',
+  'rest-api',
+]).describe(
+  `
+  SDK languages:
+
+  - "typescript" - JavaScript/TypeScript SDK
+  - "swift" - Swift SDK
+  - "kotlin" - Kotlin SDK
+  - "rest-api" - REST API
+  `
+);
+
+export type SdkLanguageSchema = z.infer<typeof sdkLanguageSchema>;
+
 export const docTypeSchema = z
   .enum([
     // General
@@ -32,12 +74,20 @@ export const docTypeSchema = z
     'realtime-sdk-kotlin',
 
     // Flutter SDK
-    'db-sdk-flutter',
-    'storage-sdk-flutter',
-    'functions-sdk-flutter',
-    'auth-sdk-flutter',
-    'ai-sdk-flutter',
-    'realtime-sdk-flutter',
+    // 'db-sdk-flutter',
+    // 'storage-sdk-flutter',
+    // 'functions-sdk-flutter',
+    // 'auth-sdk-flutter',
+    // 'ai-sdk-flutter',
+    // 'realtime-sdk-flutter',
+
+    // REST API
+    'db-rest-api',
+    'storage-rest-api',
+    'auth-rest-api',
+    'functions-rest-api',
+    'ai-rest-api',
+    'realtime-rest-api',
 
     // Legacy aliases (for backward compatibility)
     'db-sdk',
@@ -76,13 +126,13 @@ export const docTypeSchema = z
       "ai-sdk-kotlin" - AI features
       "realtime-sdk-kotlin" - Real-time WebSockets
 
-    Flutter (Cross-platform mobile):
-      "db-sdk-flutter" - Database operations
-      "storage-sdk-flutter" - File storage
-      "functions-sdk-flutter" - Edge functions
-      "auth-sdk-flutter" - Authentication
-      "ai-sdk-flutter" - AI features
-      "realtime-sdk-flutter" - Real-time WebSockets
+    REST API:
+      "db-rest-api" - Database operations
+      "storage-rest-api" - File storage
+      "auth-rest-api" - Authentication
+      "functions-rest-api" - Edge functions
+      "ai-rest-api" - AI features
+      "realtime-rest-api" - Real-time WebSockets
 
     General:
       "instructions" - Essential backend setup (use FIRST)

@@ -152,15 +152,16 @@
             ]
           },
           {
-            "group": "Flutter",
-            "icon": "mobile",
+            "group": "REST API",
+            "icon": "code",
             "pages": [
-              "sdks/flutter/overview",
-              "sdks/flutter/database",
-              "sdks/flutter/auth",
-              "sdks/flutter/storage",
-              "sdks/flutter/ai",
-              "sdks/flutter/realtime"
+              "sdks/rest/overview",
+              "sdks/rest/database",
+              "sdks/rest/auth",
+              "sdks/rest/storage",
+              "sdks/rest/functions",
+              "sdks/rest/ai",
+              "sdks/rest/realtime"
             ]
           },
           {

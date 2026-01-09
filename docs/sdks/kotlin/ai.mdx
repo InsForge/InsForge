@@ -36,7 +36,7 @@ Create an AI chat completion.
 ### Parameters
 
 - `model` (String) - Model identifier (e.g., "anthropic/claude-3.5-haiku")
-- `messages` (List<ChatMessage>) - Conversation messages
+- `messages` (`List<ChatMessage>`) - Conversation messages
 - `temperature` (Double?, optional) - Sampling temperature (0.0-2.0)
 - `maxTokens` (Int?, optional) - Maximum tokens to generate
 - `systemPrompt` (String?, optional) - System prompt
@@ -477,8 +477,8 @@ fun ImageGenerationScreen() {
 ## Error Handling
 
 ```kotlin
-import io.insforge.exceptions.InsforgeHttpException
-import io.insforge.exceptions.InsforgeException
+import dev.insforge.exceptions.InsforgeHttpException
+import dev.insforge.exceptions.InsforgeException
 
 try {
     val response = client.ai.chatCompletion(

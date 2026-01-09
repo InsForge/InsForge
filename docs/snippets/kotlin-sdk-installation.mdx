@@ -8,7 +8,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.insforge:insforge-kotlin:0.1.0-SNAPSHOT")
+    implementation("dev.insforge:insforge-kotlin:0.1.0-SNAPSHOT")
 
     implementation("io.socket:socket.io-client:2.1.1")
 }
@@ -17,19 +17,13 @@ dependencies {
 2. Initialize InsForge SDK
 
 ```kotlin
-import io.insforge.createInsforgeClient
-import io.insforge.auth.Auth
-import io.insforge.auth.auth
-import io.insforge.database.Database
-import io.insforge.database.database
-import io.insforge.storage.Storage
-import io.insforge.storage.storage
-import io.insforge.functions.Functions
-import io.insforge.functions.functions
-import io.insforge.realtime.Realtime
-import io.insforge.realtime.realtime
-import io.insforge.ai.AI
-import io.insforge.ai.ai
+import dev.insforge.createInsforgeClient
+import dev.insforge.auth.Auth
+import dev.insforge.database.Database
+import dev.insforge.storage.Storage
+import dev.insforge.functions.Functions
+import dev.insforge.realtime.Realtime
+import dev.insforge.ai.AI
 
 val client = createInsforgeClient(
     baseUrl = "https://your-project.insforge.io",
@@ -55,15 +49,15 @@ val client = createInsforgeClient(
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import io.insforge.createInsforgeClient
-import io.insforge.ai.AI
-import io.insforge.auth.Auth
-import io.insforge.database.Database
-import io.insforge.functions.Functions
-import io.insforge.realtime.Realtime
-import io.insforge.storage.Storage
-import io.insforge.auth.BrowserLauncher
-import io.insforge.auth.SessionStorage
+import dev.insforge.createInsforgeClient
+import dev.insforge.ai.AI
+import dev.insforge.auth.Auth
+import dev.insforge.database.Database
+import dev.insforge.functions.Functions
+import dev.insforge.realtime.Realtime
+import dev.insforge.storage.Storage
+import dev.insforge.auth.BrowserLauncher
+import dev.insforge.auth.SessionStorage
 
 class InsforgeManager(private val context: Context) {
     

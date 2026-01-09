@@ -1,0 +1,442 @@
+---
+title: AI API Reference
+description: AI chat completions and image generation via REST API
+---
+
+## Overview
+
+The AI API provides endpoints for chat completions and image generation using various AI models through OpenRouter integration.
+
+## Headers
+
+```bash
+x-api-key: your-anon-key
+Authorization: Bearer your-jwt-token
+Content-Type: application/json
+```
+
+---
+
+## List Available Models
+
+Get all available AI models for text and image generation.
+
+```
+GET /api/ai/models
+```
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/ai/models" \
+  -H "x-api-key: your-anon-key" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### Response
+
+```json
+{
+  "text": [
+    {
+      "provider": "openrouter",
+      "configured": true,
+      "models": [
+        {
+          "id": "openai/gpt-4",
+          "name": "GPT-4",
+          "description": "OpenAI's most capable model",
+          "context_length": 8192,
+          "max_completion_tokens": 4096,
+          "pricing": {
+            "prompt": "0.00003",
+            "completion": "0.00006"
+          }
+        },
+        {
+          "id": "anthropic/claude-3.5-haiku",
+          "name": "Claude 3.5 Haiku",
+          "description": "Anthropic's fast and efficient model",
+          "context_length": 200000,
+          "max_completion_tokens": 4096
+        }
+      ]
+    }
+  ],
+  "image": [
+    {
+      "provider": "openrouter",
+      "configured": true,
+      "models": [
+        {
+          "id": "openai/dall-e-3",
+          "name": "DALL-E 3",
+          "description": "OpenAI's image generation model"
+        },
+        {
+          "id": "google/gemini-2.5-flash-image-preview",
+          "name": "Gemini 2.5 Flash Image",
+          "description": "Google's multimodal image generation"
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+## Chat Completion
+
+Generate AI chat completion.
+
+```
+POST /api/ai/chat/completion
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `model` | string | Yes | Model identifier (e.g., `openai/gpt-4`) |
+| `messages` | array | Yes | Array of chat messages |
+| `stream` | boolean | No | Enable streaming response (default: false) |
+| `temperature` | number | No | Sampling temperature (0-2) |
+| `maxTokens` | integer | No | Maximum tokens to generate |
+| `topP` | number | No | Nucleus sampling parameter (0-1) |
+| `systemPrompt` | string | No | System prompt to guide behavior |
+
+### Message Format
+
+```json
+{
+  "role": "user|assistant|system",
+  "content": "message text"
+}
+```
+
+### Example (Basic)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/ai/chat/completion" \
+  -H "x-api-key: your-anon-key" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "anthropic/claude-3.5-haiku",
+    "messages": [
+      {"role": "user", "content": "What is the capital of France?"}
+    ]
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "content": "The capital of France is Paris.",
+  "metadata": {
+    "model": "anthropic/claude-3.5-haiku",
+    "usage": {
+      "promptTokens": 15,
+      "completionTokens": 8,
+      "totalTokens": 23
+    }
+  }
+}
+```
+
+### Example (With Parameters)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/ai/chat/completion" \
+  -H "x-api-key: your-anon-key" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/gpt-4",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Explain quantum computing in simple terms."}
+    ],
+    "temperature": 0.7,
+    "maxTokens": 1000
+  }'
+```
+
+### Example (Multi-turn Conversation)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/ai/chat/completion" \
+  -H "x-api-key: your-anon-key" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "anthropic/claude-3.5-haiku",
+    "messages": [
+      {"role": "user", "content": "What is Kotlin?"},
+      {"role": "assistant", "content": "Kotlin is a modern programming language..."},
+      {"role": "user", "content": "What are its main features?"}
+    ]
+  }'
+```
+
+---
+
+## Streaming Chat Completion
+
+Enable streaming for real-time responses using Server-Sent Events (SSE).
+
+```
+POST /api/ai/chat/completion
+```
+
+### Request
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/ai/chat/completion" \
+  -H "x-api-key: your-anon-key" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "anthropic/claude-3.5-haiku",
+    "messages": [
+      {"role": "user", "content": "Tell me a story about a robot."}
+    ],
+    "stream": true
+  }'
+```
+
+### Response
+
+Server-Sent Events stream:
+
+```
+data: {"content": "Once"}
+data: {"content": " upon"}
+data: {"content": " a"}
+data: {"content": " time"}
+data: {"content": "..."}
+data: [DONE]
+```
+
+---
+
+## Image Generation
+
+Generate images using AI models.
+
+```
+POST /api/ai/image/generation
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `model` | string | Yes | Image model identifier (e.g., `openai/dall-e-3`) |
+| `prompt` | string | Yes | Text prompt describing the image |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/ai/image/generation" \
+  -H "x-api-key: your-anon-key" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "google/gemini-2.5-flash-image-preview",
+    "prompt": "A serene mountain landscape at sunset with a lake reflection"
+  }'
+```
+
+### Response
+
+```json
+{
+  "model": "google/gemini-2.5-flash-image-preview",
+  "images": [
+    {
+      "type": "image_url",
+      "image_url": {
+        "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEU..."
+      }
+    }
+  ],
+  "text": null,
+  "count": 1,
+  "metadata": {
+    "model": "google/gemini-2.5-flash-image-preview",
+    "provider": "openrouter"
+  },
+  "nextActions": "Images have been generated successfully. Use the returned URLs or base64 data to access them."
+}
+```
+
+<Note>
+Image URLs can be either:
+- Direct URLs (e.g., `https://...`)
+- Base64 data URLs (e.g., `data:image/png;base64,...`)
+
+Check the URL format to determine how to handle the image.
+</Note>
+
+---
+
+## Admin Endpoints
+
+### List AI Configurations
+
+```
+GET /api/ai/configurations
+```
+
+### Create AI Configuration
+
+```
+POST /api/ai/configurations
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `inputModality` | array | Yes | Input modalities (`text`, `image`) |
+| `outputModality` | array | Yes | Output modalities (`text`, `image`) |
+| `provider` | string | Yes | Provider name (e.g., `openrouter`) |
+| `modelId` | string | Yes | Model identifier |
+| `systemPrompt` | string | No | Default system prompt |
+
+### Update AI Configuration
+
+```
+PATCH /api/ai/configurations/{id}
+```
+
+### Delete AI Configuration
+
+```
+DELETE /api/ai/configurations/{id}
+```
+
+---
+
+## Usage Statistics
+
+### Get Usage Summary
+
+```
+GET /api/ai/usage/summary?startDate=2024-01-01&endDate=2024-01-31
+```
+
+### Response
+
+```json
+{
+  "totalRequests": 1500,
+  "totalTokens": 250000,
+  "totalCost": 12.50,
+  "byModel": {
+    "openai/gpt-4": {
+      "requests": 500,
+      "tokens": 100000,
+      "cost": 8.00
+    },
+    "anthropic/claude-3.5-haiku": {
+      "requests": 1000,
+      "tokens": 150000,
+      "cost": 4.50
+    }
+  }
+}
+```
+
+### Get Usage Records
+
+```
+GET /api/ai/usage?startDate=2024-01-01&endDate=2024-01-31&limit=50&offset=0
+```
+
+### Response
+
+```json
+[
+  {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "configId": "456e4567-e89b-12d3-a456-426614174000",
+    "modelId": "openai/gpt-4",
+    "promptTokens": 100,
+    "completionTokens": 50,
+    "totalTokens": 150,
+    "cost": 0.0075,
+    "createdAt": "2024-01-15T10:30:00Z"
+  }
+]
+```
+
+---
+
+## Error Responses
+
+### Model Not Found (400)
+
+```json
+{
+  "error": "MODEL_NOT_FOUND",
+  "message": "Model 'invalid-model' is not available",
+  "statusCode": 400
+}
+```
+
+### Missing Required Field (400)
+
+```json
+{
+  "error": "VALIDATION_ERROR",
+  "message": "model is required",
+  "statusCode": 400
+}
+```
+
+### Rate Limit Exceeded (429)
+
+```json
+{
+  "error": "RATE_LIMIT_EXCEEDED",
+  "message": "Too many requests. Please try again later.",
+  "statusCode": 429
+}
+```
+
+### Provider Error (500)
+
+```json
+{
+  "error": "PROVIDER_ERROR",
+  "message": "Failed to get response from AI provider",
+  "details": "OpenRouter API returned error",
+  "statusCode": 500
+}
+```
+
+---
+
+## Popular Models
+
+### Text Models
+
+| Model ID | Provider | Description |
+|----------|----------|-------------|
+| `openai/gpt-4` | OpenAI | Most capable GPT model |
+| `openai/gpt-4-turbo` | OpenAI | Faster GPT-4 variant |
+| `anthropic/claude-3.5-haiku` | Anthropic | Fast and efficient |
+| `anthropic/claude-3-opus` | Anthropic | Most capable Claude model |
+| `google/gemini-pro` | Google | Google's multimodal model |
+
+### Image Models
+
+| Model ID | Provider | Description |
+|----------|----------|-------------|
+| `openai/dall-e-3` | OpenAI | High-quality image generation |
+| `google/gemini-2.5-flash-image-preview` | Google | Multimodal image generation |

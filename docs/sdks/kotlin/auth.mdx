@@ -327,7 +327,7 @@ Update current user's profile.
 
 ### Parameters
 
-- `profile` (Map<String, Any>) - Profile fields to update
+- `profile` (`Map<String, Any>`) - Profile fields to update
 
 ### Returns
 
@@ -483,8 +483,8 @@ fun LoginScreen() {
 ## Error Handling
 
 ```kotlin
-import io.insforge.exceptions.InsforgeHttpException
-import io.insforge.exceptions.InsforgeException
+import dev.insforge.exceptions.InsforgeHttpException
+import dev.insforge.exceptions.InsforgeException
 
 try {
     val result = client.auth.signIn(email, password)

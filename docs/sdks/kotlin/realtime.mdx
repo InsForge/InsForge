@@ -146,7 +146,7 @@ Register an event listener for a specific event type.
 ### Example (Listen for INSERT Events)
 
 ```kotlin
-import io.insforge.realtime.models.SocketMessage
+import dev.insforge.realtime.models.SocketMessage
 
 client.realtime.connect()
 client.realtime.subscribe("todos")
@@ -307,7 +307,7 @@ Listen to real-time database changes triggered by INSERT, UPDATE, and DELETE ope
 ### Complete CRUD Example
 
 ```kotlin
-import io.insforge.realtime.models.SocketMessage
+import dev.insforge.realtime.models.SocketMessage
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -767,7 +767,7 @@ fun interface EventCallback<T> {
 ## Error Handling
 
 ```kotlin
-import io.insforge.exceptions.InsforgeException
+import dev.insforge.exceptions.InsforgeException
 
 try {
     client.realtime.connect()

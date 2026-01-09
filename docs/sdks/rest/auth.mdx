@@ -1,0 +1,534 @@
+---
+title: Authentication API Reference
+description: User authentication and session management via REST API
+---
+
+## Overview
+
+The Authentication API provides endpoints for user registration, login, email verification, password reset, and OAuth integration.
+
+## Headers
+
+```bash
+x-api-key: your-anon-key
+Content-Type: application/json
+```
+
+For authenticated endpoints:
+```bash
+Authorization: Bearer your-jwt-token
+```
+
+---
+
+## Register User
+
+Create a new user account.
+
+```
+POST /api/auth/users
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | Yes | User email address |
+| `password` | string | Yes | Password (must meet configured requirements) |
+| `name` | string | No | User display name |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/users" \
+  -H "x-api-key: your-anon-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword123",
+    "name": "John Doe"
+  }'
+```
+
+### Response
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": false,
+    "providers": ["email"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "requireEmailVerification": false
+}
+```
+
+<Note>
+If `requireEmailVerification` is `true`, `accessToken` will be `null` and the user must verify their email before logging in.
+</Note>
+
+---
+
+## Sign In
+
+Authenticate user and get access token.
+
+```
+POST /api/auth/sessions
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | Yes | User email address |
+| `password` | string | Yes | User password |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/sessions" \
+  -H "x-api-key: your-anon-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword123"
+  }'
+```
+
+### Response
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true,
+    "providers": ["email"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+---
+
+## Get Current User
+
+Get the currently authenticated user's info from JWT token.
+
+```
+GET /api/auth/sessions/current
+```
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/auth/sessions/current" \
+  -H "x-api-key: your-anon-key" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### Response
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "role": "authenticated"
+  }
+}
+```
+
+---
+
+## Update Profile
+
+Update the current user's profile.
+
+```
+PATCH /api/auth/profiles/current
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `profile` | object | Yes | Profile data (name, avatar_url, custom fields) |
+
+### Example
+
+```bash
+curl -X PATCH "https://your-app.insforge.app/api/auth/profiles/current" \
+  -H "x-api-key: your-anon-key" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "profile": {
+      "name": "John Doe",
+      "avatar_url": "https://example.com/avatar.jpg"
+    }
+  }'
+```
+
+### Response
+
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "profile": {
+    "name": "John Doe",
+    "avatar_url": "https://example.com/avatar.jpg"
+  }
+}
+```
+
+---
+
+## Get User Profile
+
+Get public profile information for a user by ID.
+
+```
+GET /api/auth/profiles/{userId}
+```
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/auth/profiles/123e4567-e89b-12d3-a456-426614174000" \
+  -H "x-api-key: your-anon-key"
+```
+
+### Response
+
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "profile": {
+    "name": "John Doe",
+    "avatar_url": "https://example.com/avatar.jpg"
+  }
+}
+```
+
+---
+
+## Email Verification
+
+### Send Verification Email
+
+```
+POST /api/auth/email/send-verification
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | Yes | User email address |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/send-verification" \
+  -H "x-api-key: your-anon-key" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com"}'
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "If your email is registered, we have sent you a verification code/link."
+}
+```
+
+### Verify Email
+
+```
+POST /api/auth/email/verify
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | For code method | User email address |
+| `otp` | string | Yes | 6-digit code or 64-char token from link |
+
+### Example (Code Method)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/verify" \
+  -H "x-api-key: your-anon-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "otp": "123456"
+  }'
+```
+
+### Response
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+---
+
+## Password Reset
+
+### Send Reset Email
+
+```
+POST /api/auth/email/send-reset-password
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | Yes | User email address |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/send-reset-password" \
+  -H "x-api-key: your-anon-key" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com"}'
+```
+
+### Exchange Code for Token (Code Method Only)
+
+```
+POST /api/auth/email/exchange-reset-password-token
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | Yes | User email address |
+| `code` | string | Yes | 6-digit code from email |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/exchange-reset-password-token" \
+  -H "x-api-key: your-anon-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "code": "123456"
+  }'
+```
+
+### Response
+
+```json
+{
+  "token": "abc123...",
+  "expiresAt": "2024-01-15T11:00:00Z"
+}
+```
+
+### Reset Password
+
+```
+POST /api/auth/email/reset-password
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `newPassword` | string | Yes | New password |
+| `otp` | string | Yes | Reset token (from exchange endpoint or magic link) |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/reset-password" \
+  -H "x-api-key: your-anon-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "newPassword": "newSecurePassword123",
+    "otp": "abc123..."
+  }'
+```
+
+### Response
+
+```json
+{
+  "message": "Password reset successfully"
+}
+```
+
+---
+
+## OAuth Authentication
+
+### Initiate OAuth Flow
+
+```
+GET /api/auth/oauth/{provider}?redirect_uri={redirectUri}
+```
+
+### Supported Providers
+
+- `google`
+- `github`
+- `discord`
+- `linkedin`
+- `facebook`
+- `apple`
+- `microsoft`
+- `x`
+- `spotify`
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/auth/oauth/google?redirect_uri=https://myapp.com/callback" \
+  -H "x-api-key: your-anon-key"
+```
+
+### Response
+
+```json
+{
+  "authUrl": "https://accounts.google.com/o/oauth2/v2/auth?client_id=..."
+}
+```
+
+### OAuth Callback
+
+After the user authenticates with the provider, they will be redirected to your `redirect_uri` with query parameters:
+
+```
+https://myapp.com/callback?access_token=xxx&user_id=xxx&email=xxx&name=xxx
+```
+
+---
+
+## Public Configuration
+
+Get public authentication settings (no auth required).
+
+```
+GET /api/auth/public-config
+```
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/auth/public-config" \
+  -H "x-api-key: your-anon-key"
+```
+
+### Response
+
+```json
+{
+  "oAuthProviders": [
+    {"provider": "google", "useSharedKey": true},
+    {"provider": "github", "useSharedKey": false}
+  ],
+  "requireEmailVerification": true,
+  "passwordMinLength": 8,
+  "requireNumber": true,
+  "requireLowercase": true,
+  "requireUppercase": false,
+  "requireSpecialChar": false,
+  "verifyEmailMethod": "code",
+  "resetPasswordMethod": "link"
+}
+```
+
+---
+
+## Admin Endpoints
+
+These endpoints require `project_admin` role.
+
+### List All Users
+
+```
+GET /api/auth/users?offset=0&limit=10&search=john
+```
+
+### Get User by ID
+
+```
+GET /api/auth/users/{userId}
+```
+
+### Delete Users
+
+```bash
+curl -X DELETE "https://your-app.insforge.app/api/auth/users" \
+  -H "Authorization: Bearer admin-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{"userIds": ["user-id-1", "user-id-2"]}'
+```
+
+### Generate Anonymous Token
+
+```
+POST /api/auth/tokens/anon
+```
+
+---
+
+## Error Responses
+
+### Invalid Credentials (401)
+
+```json
+{
+  "error": "INVALID_CREDENTIALS",
+  "message": "Invalid email or password",
+  "statusCode": 401,
+  "nextActions": "Check your email and password"
+}
+```
+
+### User Already Exists (409)
+
+```json
+{
+  "error": "USER_EXISTS",
+  "message": "User with this email already exists",
+  "statusCode": 409,
+  "nextActions": "Use a different email or sign in"
+}
+```
+
+### Email Not Verified (403)
+
+```json
+{
+  "error": "EMAIL_NOT_VERIFIED",
+  "message": "Please verify your email before signing in",
+  "statusCode": 403,
+  "nextActions": "Check your inbox for verification email"
+}
+```

@@ -37,7 +37,7 @@ Upload a file with a specific path/key.
 |--------|------|-------------|
 | `contentType` | String? | MIME type (e.g., "image/jpeg") |
 | `upsert` | Boolean | Overwrite if file exists (default: false) |
-| `metadata` | Map<String, String>? | Custom metadata |
+| `metadata` | `Map<String, String>?` | Custom metadata |
 
 ### Example
 
@@ -70,6 +70,7 @@ val result = insforge.storage["images"]
 
 Developers can use the following function to upload files from an Android Uri:
 
+```kotlin
 // Android Uri Upload sample:
 suspend fun uploadFromUri(
     bucket: BucketApi,
@@ -77,16 +78,17 @@ suspend fun uploadFromUri(
     context: Context,
     path: String
 ): FileUploadResponse {
-    val data = context.contentResolver.openInputStream(uri)?.use { 
-        it.readBytes() 
+    val data = context.contentResolver.openInputStream(uri)?.use {
+        it.readBytes()
     } ?: throw IllegalArgumentException("Cannot read Uri")
-    
+
     val contentType = context.contentResolver.getType(uri)
-    
+
     return bucket.upload(path, data) {
         this.contentType = contentType
     }
 }
+```
 
 ---
 

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import { successResponse } from '@/utils/response.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { DocTypeSchema, docTypeSchema } from '@insforge/shared-schemas';
+import { DocTypeSchema, docTypeSchema, SdkFeatureSchema, sdkFeatureSchema, SdkLanguageSchema, sdkLanguageSchema } from '@insforge/shared-schemas';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -97,12 +97,20 @@ const DOCS_MAP: Record<DocTypeSchema, string> = {
   'realtime-sdk-kotlin': 'sdks/kotlin/realtime.mdx',
 
   // Flutter SDK
-  'db-sdk-flutter': 'sdks/flutter/database.mdx',
-  'storage-sdk-flutter': 'sdks/flutter/storage.mdx',
-  'auth-sdk-flutter': 'sdks/flutter/auth.mdx',
-  'functions-sdk-flutter': 'sdks/flutter/functions.mdx',
-  'ai-sdk-flutter': 'sdks/flutter/ai.mdx',
-  'realtime-sdk-flutter': 'sdks/flutter/realtime.mdx',
+  // 'db-sdk-flutter': 'sdks/flutter/database.mdx',
+  // 'storage-sdk-flutter': 'sdks/flutter/storage.mdx',
+  // 'auth-sdk-flutter': 'sdks/flutter/auth.mdx',
+  // 'functions-sdk-flutter': 'sdks/flutter/functions.mdx',
+  // 'ai-sdk-flutter': 'sdks/flutter/ai.mdx',
+  // 'realtime-sdk-flutter': 'sdks/flutter/realtime.mdx',
+
+  // REST API
+  'db-rest-api': 'sdks/rest/database.mdx',
+  'storage-rest-api': 'sdks/rest/storage.mdx',
+  'auth-rest-api': 'sdks/rest/auth.mdx',
+  'functions-rest-api': 'sdks/rest/functions.mdx',
+  'ai-rest-api': 'sdks/rest/ai.mdx',
+  'realtime-rest-api': 'sdks/rest/realtime.mdx',
 
   // Legacy aliases (for backward compatibility) - map to TypeScript SDK
   'db-sdk': 'sdks/typescript/database.mdx',
@@ -118,6 +126,53 @@ router.get('/:docType', async (req: Request, res: Response, next: NextFunction) 
     const { docType } = req.params;
 
     // Validate doc type using Zod enum
+    const parsed = docTypeSchema.safeParse(docType);
+    if (!parsed.success) {
+      throw new AppError('Documentation not found', 404, ERROR_CODES.NOT_FOUND);
+    }
+
+    const docFileName = DOCS_MAP[parsed.data];
+
+    // Read the documentation file
+    // PROJECT_ROOT is set in the docker-compose.yml file to point to the InsForge directory
+    const projectRoot = process.env.PROJECT_ROOT || path.resolve(__dirname, '../../../..');
+    const docsRoot = path.join(projectRoot, 'docs');
+    const filePath = path.join(docsRoot, docFileName);
+    const rawContent = await readFile(filePath, 'utf-8');
+
+    // Process snippet imports and replace component tags with actual content
+    const content = await processSnippets(rawContent, docsRoot);
+
+    // Traditional REST: return documentation directly
+    return successResponse(res, {
+      type: docType,
+      content,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/docs/:docFeature/:docLanguage - Get specific documentation
+router.get('/:docFeature/:docLanguage', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { docFeature, docLanguage } = req.params;
+
+    // Validate doc feature and language using Zod enums
+    const parsedFeature = sdkFeatureSchema.safeParse(docFeature);
+    const parsedLanguage = sdkLanguageSchema.safeParse(docLanguage);
+
+    if (!parsedFeature.success || !parsedLanguage.success) {
+      throw new AppError('Documentation not found', 404, ERROR_CODES.NOT_FOUND);
+    }
+
+    // Construct the docType from feature and language
+    let docType: string;
+    if (parsedLanguage.data === 'rest-api') {
+      docType = `${docFeature}-${docLanguage}` as DocTypeSchema;
+    } else {
+      docType = `${docFeature}-sdk-${docLanguage}` as DocTypeSchema;
+    }
     const parsed = docTypeSchema.safeParse(docType);
     if (!parsed.success) {
       throw new AppError('Documentation not found', 404, ERROR_CODES.NOT_FOUND);

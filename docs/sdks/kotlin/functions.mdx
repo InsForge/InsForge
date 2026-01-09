@@ -192,7 +192,7 @@ client.functions.deleteFunction("old-function")
 ## Error Handling
 
 ```kotlin
-import io.insforge.exceptions.InsforgeHttpException
+import dev.insforge.exceptions.InsforgeHttpException
 
 try {
     val response = client.functions.invoke<MyResponse>("my-function")

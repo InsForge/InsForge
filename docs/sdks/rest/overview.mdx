@@ -1,0 +1,120 @@
+---
+title: REST API
+description: Direct HTTP API access to InsForge services
+---
+
+The InsForge REST API provides direct HTTP access to all InsForge services. Use this when you need to integrate with languages or platforms without an official SDK.
+
+## Base URL
+
+```
+https://your-app.us-east.insforge.app
+```
+
+## Authentication
+
+All API requests require authentication via headers:
+
+### API Key (Required)
+
+```bash
+x-api-key: your-anon-key
+```
+
+### Bearer Token (For authenticated requests)
+
+```bash
+Authorization: Bearer your-jwt-token
+```
+
+## Quick Start
+
+```bash
+# Register a new user
+curl -X POST https://your-app.us-east.insforge.app/api/auth/users \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: your-anon-key" \
+  -d '{"email": "user@example.com", "password": "securepassword123"}'
+
+# Sign in and get token
+curl -X POST https://your-app.us-east.insforge.app/api/auth/sessions \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: your-anon-key" \
+  -d '{"email": "user@example.com", "password": "securepassword123"}'
+
+# Use the token for authenticated requests
+curl https://your-app.us-east.insforge.app/api/database/records/posts \
+  -H "x-api-key: your-anon-key" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+## Response Format
+
+### Success Response
+
+Data is returned directly in the response body:
+
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "email": "user@example.com",
+  "createdAt": "2024-01-15T10:30:00Z"
+}
+```
+
+### Error Response
+
+```json
+{
+  "error": "ERROR_CODE",
+  "message": "Human-readable error message",
+  "statusCode": 400,
+  "nextActions": "Suggested action to resolve the error"
+}
+```
+
+## Common HTTP Status Codes
+
+| Status | Description |
+|--------|-------------|
+| `200` | Success |
+| `201` | Created |
+| `204` | No Content (for DELETE) |
+| `400` | Bad Request - Invalid input |
+| `401` | Unauthorized - Invalid or missing token |
+| `403` | Forbidden - Insufficient permissions |
+| `404` | Not Found |
+| `409` | Conflict - Resource already exists |
+| `500` | Internal Server Error |
+
+## Features
+
+- **Database** - PostgREST-style CRUD operations
+- **Authentication** - Email/password and OAuth authentication
+- **Storage** - File upload, download, and management
+- **Functions** - Invoke serverless edge functions
+- **AI** - Chat completions and image generation
+- **Realtime** - Channel management and message history (WebSocket for real-time)
+
+## API Reference
+
+<CardGroup cols={2}>
+  <Card title="Database" icon="database" href="/sdks/rest/database">
+    CRUD operations, filters, and queries
+  </Card>
+  <Card title="Authentication" icon="lock" href="/sdks/rest/auth">
+    Sign up, sign in, OAuth, and user management
+  </Card>
+  <Card title="Storage" icon="cloud-arrow-up" href="/sdks/rest/storage">
+    File upload, download, and management
+  </Card>
+  <Card title="Functions" icon="bolt" href="/sdks/rest/functions">
+    Invoke serverless edge functions
+  </Card>
+  <Card title="AI" icon="brain" href="/sdks/rest/ai">
+    Chat completions and image generation
+  </Card>
+  <Card title="Realtime" icon="signal-stream" href="/sdks/rest/realtime">
+    Channel management and message history
+  </Card>
+</CardGroup>
