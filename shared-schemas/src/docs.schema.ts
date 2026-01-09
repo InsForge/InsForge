@@ -46,6 +46,8 @@ export const docTypeSchema = z
   .enum([
     // General
     'instructions',
+    'auth-components-react',
+    'auth-components-nextjs',
 
     // TypeScript SDK
     'db-sdk-typescript',
@@ -54,8 +56,6 @@ export const docTypeSchema = z
     'ai-sdk-typescript',
     'auth-sdk-typescript',
     'realtime-sdk-typescript',
-    'auth-components-react',
-    'auth-components-nextjs',
 
     // Swift SDK
     'db-sdk-swift',
