@@ -13,6 +13,11 @@ interface TableSidebarProps {
   onDeleteTable?: (table: string) => void;
 }
 
+function sortTablesAlphabetically(tableNames: string[]): string[] {
+  // Copy to avoid mutating the source array and sort case-insensitively
+  return [...tableNames].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+}
+
 export function TableSidebar({
   tables,
   selectedTable,
@@ -39,6 +44,8 @@ export function TableSidebar({
       icon={Table}
       renderSkeleton={() => <TableListSkeleton />}
       renderEmptyState={(searchTerm) => <TableEmptyState searchTerm={searchTerm} />}
+      // Ensure tables are shown alphabetically in the sidebar
+      filterItems={sortTablesAlphabetically}
     />
   );
 }

@@ -10,6 +10,7 @@ import { AIConfigService } from '@/services/ai/ai-config.service.js';
 import { AIUsageService } from '@/services/ai/ai-usage.service.js';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import { AuditService } from '@/services/logs/audit.service.js';
+import logger from '@/utils/logger.js';
 import {
   createAIConfigurationRequestSchema,
   updateAIConfigurationRequestSchema,
@@ -82,7 +83,10 @@ router.post(
           res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
         } catch (streamError) {
           // If error occurs during streaming, send it in SSE format
-          console.error('Stream error:', streamError);
+          logger.error('Stream error during chat completion', {
+            error: streamError instanceof Error ? streamError.message : String(streamError),
+            stack: streamError instanceof Error ? streamError.stack : undefined,
+          });
           res.write(
             `data: ${JSON.stringify({ error: true, meesage: streamError instanceof Error ? streamError.message : String(streamError) })}\n\n`
           );
