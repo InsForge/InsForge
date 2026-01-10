@@ -40,6 +40,7 @@
     "@databases/sql": "^3.3.0",
     "@types/multer": "^1.4.13",
     "@types/pg": "^8.15.4",
+    "adm-zip": "^0.5.16",
     "axios": "^1.11.0",
     "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",
@@ -63,6 +64,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
     "@types/cookie-parser": "^1.4.8",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",

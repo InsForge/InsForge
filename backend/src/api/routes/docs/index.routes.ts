@@ -25,6 +25,7 @@ const DOCS_MAP: Record<DocTypeSchema, string> = {
   'functions-sdk': 'core-concepts/functions/sdk.mdx',
   'ai-integration-sdk': 'core-concepts/ai/sdk.mdx',
   'real-time': 'agent-docs/real-time.md',
+  'deployment': 'agent-docs/deployment.md',
 };
 
 // GET /api/docs/:docType - Get specific documentation

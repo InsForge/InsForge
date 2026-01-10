@@ -14,6 +14,7 @@ import {
   Table,
   ChartBarBig,
   Settings,
+  Rocket,
 } from 'lucide-react';
 import { postMessageToParent } from './cloudMessaging';
 
@@ -212,4 +213,11 @@ export const settingsMenuItem: PrimaryMenuItem = {
   label: 'Settings',
   href: '/dashboard/settings',
   icon: Settings,
+};
+
+export const deploymentsMenuItem: PrimaryMenuItem = {
+  id: 'deployments',
+  label: 'Deployments',
+  href: '/dashboard/deployments',
+  icon: Rocket,
 };
