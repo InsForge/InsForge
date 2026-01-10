@@ -32,6 +32,17 @@ export class SecretService {
     return SecretService.instance;
   }
 
+  /**
+   * Reset the singleton instance and pool cache (for testing only)
+   * @internal
+   */
+  public static resetForTesting(): void {
+    if (SecretService.instance) {
+      SecretService.instance.pool = null;
+    }
+    SecretService.instance = null as unknown as SecretService;
+  }
+
   private getPool(): Pool {
     if (!this.pool) {
       this.pool = DatabaseManager.getInstance().getPool();

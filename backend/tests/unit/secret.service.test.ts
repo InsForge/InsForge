@@ -86,15 +86,13 @@ describe('SecretService', () => {
       connect: ReturnType<typeof vi.fn>;
     }
 
-    const sharedMockPool: MockPool = {
-      connect: vi.fn(),
-    };
-
     let mockQuery: ReturnType<typeof vi.fn>;
     let mockRelease: ReturnType<typeof vi.fn>;
     let mockClient: MockPoolClient;
+    let mockPool: MockPool;
 
     beforeEach(() => {
+      SecretService.resetForTesting();
       vi.clearAllMocks();
 
       mockQuery = vi.fn();
@@ -104,9 +102,11 @@ describe('SecretService', () => {
         release: mockRelease,
       };
 
-      sharedMockPool.connect = vi.fn().mockResolvedValue(mockClient);
+      mockPool = {
+        connect: vi.fn().mockResolvedValue(mockClient),
+      };
 
-      const getPoolFn = vi.fn().mockReturnValue(sharedMockPool);
+      const getPoolFn = vi.fn().mockReturnValue(mockPool);
 
       vi.mocked(DatabaseManager.getInstance).mockReturnValue({
         getPool: getPoolFn,
@@ -122,7 +122,7 @@ describe('SecretService', () => {
     it('successfully rotates API key - happy path', async () => {
       const oldSecretId = 'old-secret-id-123';
       const newSecretId = 'new-secret-id-456';
-      const mockNewApiKey = 'ik_abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890';
+      const mockNewApiKey = secretService.generateApiKey();
 
       const generateApiKeySpy = vi
         .spyOn(secretService, 'generateApiKey')
@@ -139,7 +139,7 @@ describe('SecretService', () => {
 
       expect(result).toBe(mockNewApiKey);
       expect(result).toMatch(/^ik_[0-9a-f]{64}$/);
-      expect(sharedMockPool.connect).toHaveBeenCalledTimes(1);
+      expect(mockPool.connect).toHaveBeenCalledTimes(1);
       expect(mockQuery).toHaveBeenCalledTimes(5);
       expect(mockQuery).toHaveBeenNthCalledWith(1, 'BEGIN');
       expect(mockQuery).toHaveBeenNthCalledWith(
@@ -173,7 +173,7 @@ describe('SecretService', () => {
 
     it('rolls back transaction when create operation fails', async () => {
       const oldSecretId = 'old-secret-id-123';
-      const mockNewApiKey = 'ik_abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890';
+      const mockNewApiKey = secretService.generateApiKey();
       const dbError = new Error('Database insert failed');
 
       const generateApiKeySpy = vi
@@ -201,7 +201,7 @@ describe('SecretService', () => {
     it('rolls back transaction when logger.info throws', async () => {
       const oldSecretId = 'old-secret-id-123';
       const newSecretId = 'new-secret-id-456';
-      const mockNewApiKey = 'ik_abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890';
+      const mockNewApiKey = secretService.generateApiKey();
       const loggerError = new Error('Logger failed');
 
       const generateApiKeySpy = vi
@@ -308,7 +308,7 @@ describe('SecretService', () => {
 
     it('ensures original active key remains active when transaction fails', async () => {
       const oldSecretId = 'old-secret-id-123';
-      const mockNewApiKey = 'ik_abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890';
+      const mockNewApiKey = secretService.generateApiKey();
       const dbError = new Error('Database insert failed');
 
       const generateApiKeySpy = vi
@@ -337,7 +337,7 @@ describe('SecretService', () => {
     it('encrypts the new API key before storing', async () => {
       const oldSecretId = 'old-secret-id-123';
       const newSecretId = 'new-secret-id-456';
-      const mockNewApiKey = 'ik_abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890';
+      const mockNewApiKey = secretService.generateApiKey();
       const encryptedValue = 'encrypted_test_value';
 
       const generateApiKeySpy = vi
