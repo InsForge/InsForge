@@ -152,7 +152,8 @@ router.post('/api-key/rotate', async (req: AuthRequest, res: Response, next: Nex
       res,
       {
         success: true,
-        message: 'API key has been rotated successfully. The old key will be invalid after 24 hours.',
+        message:
+          'API key has been rotated successfully. The old key will be invalid after 24 hours.',
         apiKey: newApiKey,
       },
       200
