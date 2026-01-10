@@ -9,7 +9,24 @@
 --
 -- Solution: Use composite UNIQUE constraint on (email, is_project_admin) tuple.
 
--- 1. Drop the existing UNIQUE constraint on email
+BEGIN;
+
+BEGIN;
+
+-- 1. Pre-flight check for duplicate (email, is_project_admin) pairs
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM auth.users
+    GROUP BY email, is_project_admin
+    HAVING COUNT(*) > 1
+  ) THEN
+    RAISE EXCEPTION 'Duplicate (email, is_project_admin) pairs exist. Resolve before migration.';
+  END IF;
+END $$;
+
+-- 2. Drop the existing UNIQUE constraint on email
 -- The constraint was created implicitly in migration 000 with "email TEXT UNIQUE NOT NULL"
 -- We need to find and drop only the single-column email constraint
 DO $$
@@ -36,19 +53,6 @@ BEGIN
   END IF;
 END $$;
 
--- 2. Pre-flight check for duplicate (email, is_project_admin) pairs
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM auth.users
-    GROUP BY email, is_project_admin
-    HAVING COUNT(*) > 1
-  ) THEN
-    RAISE EXCEPTION 'Duplicate (email, is_project_admin) pairs exist. Resolve before migration.';
-  END IF;
-END $$;
-
 -- 3. Add new composite UNIQUE constraint on (email, is_project_admin)
 -- This allows the same email to exist twice:
 --   - Once with is_project_admin = true (admin/manager)
@@ -57,11 +61,12 @@ ALTER TABLE auth.users
   ADD CONSTRAINT users_email_is_project_admin_key
   UNIQUE (email, is_project_admin);
 
+COMMIT;
+
+COMMIT;
+
 -- migrate:down
 -- Rollback to single-column uniqueness on email
-ALTER TABLE auth.users
-  DROP CONSTRAINT IF EXISTS users_email_is_project_admin_key;
-
 -- Pre-flight check: ensure no duplicate emails exist before restoring single-column constraint
 DO $$
 BEGIN
@@ -74,6 +79,13 @@ BEGIN
     RAISE EXCEPTION 'Cannot downgrade: Multiple users share the same email address. Remove duplicate emails before downgrading.';
   END IF;
 END $$;
+
+ALTER TABLE auth.users
+  DROP CONSTRAINT IF EXISTS users_email_is_project_admin_key;
+
+
+ALTER TABLE auth.users
+  DROP CONSTRAINT IF EXISTS users_email_is_project_admin_key;
 
 DO $$
 BEGIN
