@@ -17,7 +17,7 @@ export interface StorageProvider {
   getUploadStrategy(
     bucket: string,
     key: string,
-    metadata: { contentType?: string; size?: number }
+    metadata: { contentType?: string; size?: number; maxFileSize?: number }
   ): Promise<UploadStrategyResponse>;
   getDownloadStrategy(
     bucket: string,
