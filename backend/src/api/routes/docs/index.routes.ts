@@ -141,7 +141,7 @@ const DOCS_MAP: Record<DocTypeSchema, string> = {
   'functions-sdk': 'sdks/typescript/functions.mdx',
   'ai-integration-sdk': 'sdks/typescript/ai.mdx',
   'realtime-sdk': 'sdks/typescript/realtime.mdx',
-  'auth-sdk': 'sdks/typescript/authentication/sdk.mdx',
+  'auth-sdk': 'sdks/typescript/auth.mdx',
 };
 
 // GET /api/docs/:docType - Get specific documentation
