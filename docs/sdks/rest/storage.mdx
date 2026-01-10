@@ -23,7 +23,135 @@ Content-Type: application/json
 
 ---
 
-## Upload Object
+## Upload Object with upload strategy
+
+InsForge supports two types of storage backends:
+1. **Local Storage**: Files are stored on the local filesystem. Use for development or low-volume production.
+2. **S3-Compatible**: Files are stored on S3-compatible object storage. Use for high-volume production.
+
+The steps to upload a file are:
+1. Get upload strategy
+2. Upload file
+3. Confirm upload (S3 only)
+
+---
+
+### Step 1: Get Upload Strategy
+
+Get the optimal upload strategy (direct or presigned URL) based on storage backend.
+The upload strategy API returns the optimal upload method based on the storage backend:
+- **Local Storage**: Direct upload to InsForge API
+- **S3-Compatible**: Presigned URL for direct upload to S3
+
+```
+POST /api/storage/buckets/{bucketName}/upload-strategy
+```
+
+#### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `filename` | string | Yes | Original filename |
+| `contentType` | string | No | MIME type of the file |
+| `size` | integer | No | File size in bytes |
+
+#### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-strategy" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filename": "profile-photo.jpg",
+    "contentType": "image/jpeg",
+    "size": 102400
+  }'
+```
+
+#### Response (S3 Backend)
+
+```json
+{
+  "method": "presigned",
+  "uploadUrl": "https://s3-bucket.amazonaws.com/",
+  "fields": {
+    "bucket": "my-s3-bucket",
+    "key": "app-key/avatars/profile-photo-1234567890-abc123.jpg",
+    "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+    "X-Amz-Credential": "...",
+    "Policy": "...",
+    "X-Amz-Signature": "..."
+  },
+  "key": "profile-photo-1234567890-abc123.jpg",
+  "confirmRequired": true,
+  "confirmUrl": "/api/storage/buckets/avatars/objects/profile-photo-1234567890-abc123.jpg/confirm-upload",
+  "expiresAt": "2025-09-05T01:00:00Z"
+}
+```
+
+#### Response (Local Storage)
+
+```json
+{
+  "method": "direct",
+  "uploadUrl": "/api/storage/buckets/avatars/objects/profile-photo-1234567890-abc123.jpg",
+  "key": "profile-photo-1234567890-abc123.jpg",
+  "confirmRequired": false
+}
+```
+
+---
+
+### Step 2: Upload File
+
+Upload the file to the specified URL using the provided method.
+- **Local Storage**: Use a PUT request to `uploadUrl` with `multipart/form-data` and a `file` field.
+- **S3-Compatible**: Use a POST request to `uploadUrl` with `multipart/form-data` and a `file` field. Include all fields from the `fields` object in the request.
+
+### Step 3: Confirm Presigned Upload (S3 Only)
+
+Confirm that a file was successfully uploaded to S3 using presigned URL.
+
+```
+POST /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload
+```
+
+#### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `size` | integer | Yes | File size in bytes |
+| `contentType` | string | No | MIME type of the file |
+| `etag` | string | No | S3 ETag of the uploaded object |
+
+#### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile-photo-123.jpg/confirm-upload" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "size": 102400,
+    "contentType": "image/jpeg"
+  }'
+```
+
+#### Response
+
+```json
+{
+  "bucket": "avatars",
+  "key": "profile-photo-123.jpg",
+  "size": 102400,
+  "mimeType": "image/jpeg",
+  "uploadedAt": "2024-01-21T10:30:00Z",
+  "url": "/api/storage/buckets/avatars/objects/profile-photo-123.jpg"
+}
+```
+
+---
+
+## Upload Object (Deprecated)
 
 Upload a file to a bucket with a specific key.
 
@@ -65,7 +193,7 @@ curl -X PUT "https://your-app.insforge.app/api/storage/buckets/avatars/objects/u
 
 ---
 
-## Upload with Auto-Generated Key
+## Upload with Auto-Generated Key (Deprecated)
 
 Upload a file with an auto-generated unique key.
 
@@ -96,113 +224,69 @@ curl -X POST "https://your-app.insforge.app/api/storage/buckets/uploads/objects"
 
 ---
 
-## Get Upload Strategy
+## Download Object with download strategy
 
-Get the optimal upload strategy (direct or presigned URL) based on storage backend.
+InsForge supports two types of storage backends:
+1. **Local Storage**: Files are stored on the local filesystem. Use for development or low-volume production.
+2. **S3-Compatible**: Files are stored on S3-compatible object storage. Use for high-volume production.
+
+The steps to download a file are:
+1. Get download strategy
+2. Download file from returned URL
+
+### Step 1: Get Download Strategy
+
+Get the optimal download strategy (direct URL or presigned URL) based on storage backend and bucket visibility.
+
+The download strategy API returns the optimal download method based on the storage backend and bucket visibility:
+- **Local Storage**: Direct download from InsForge API
+- **S3-Compatible**: Presigned URL for S3.
 
 ```
-POST /api/storage/buckets/{bucketName}/upload-strategy
+POST /api/storage/buckets/{bucketName}/objects/{objectKey}/download-strategy
 ```
 
-### Request Body
+#### Request Body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `filename` | string | Yes | Original filename |
-| `contentType` | string | No | MIME type of the file |
-| `size` | integer | No | File size in bytes |
+| `expiresIn` | integer | No | URL expiration in seconds (default: 3600) |
 
-### Example
+#### Example
 
 ```bash
-curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-strategy" \
+curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile.jpg/download-strategy" \
   -H "Authorization: Bearer your-jwt-token" \
   -H "Content-Type: application/json" \
-  -d '{
-    "filename": "profile-photo.jpg",
-    "contentType": "image/jpeg",
-    "size": 102400
-  }'
+  -d '{"expiresIn": 3600}'
 ```
 
-### Response (S3 Backend)
-
-```json
-{
-  "method": "presigned",
-  "uploadUrl": "https://s3-bucket.amazonaws.com/",
-  "fields": {
-    "bucket": "my-s3-bucket",
-    "key": "app-key/avatars/profile-photo-1234567890-abc123.jpg",
-    "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
-    "X-Amz-Credential": "...",
-    "Policy": "...",
-    "X-Amz-Signature": "..."
-  },
-  "key": "profile-photo-1234567890-abc123.jpg",
-  "confirmRequired": true,
-  "confirmUrl": "/api/storage/buckets/avatars/objects/profile-photo-1234567890-abc123.jpg/confirm-upload",
-  "expiresAt": "2025-09-05T01:00:00Z"
-}
-```
-
-### Response (Local Storage)
+#### Response (S3 Public Bucket)
 
 ```json
 {
   "method": "direct",
-  "uploadUrl": "/api/storage/buckets/avatars/objects/profile-photo-1234567890-abc123.jpg",
-  "key": "profile-photo-1234567890-abc123.jpg",
-  "confirmRequired": false
+  "url": "https://s3-bucket.s3.us-east-2.amazonaws.com/app-key/avatars/profile.jpg"
 }
 ```
 
----
-
-## Confirm Presigned Upload
-
-Confirm that a file was successfully uploaded to S3 using presigned URL.
-
-```
-POST /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload
-```
-
-### Request Body
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `size` | integer | Yes | File size in bytes |
-| `contentType` | string | No | MIME type of the file |
-| `etag` | string | No | S3 ETag of the uploaded object |
-
-### Example
-
-```bash
-curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile-photo-123.jpg/confirm-upload" \
-  -H "Authorization: Bearer your-jwt-token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "size": 102400,
-    "contentType": "image/jpeg"
-  }'
-```
-
-### Response
+#### Response (S3 Private Bucket)
 
 ```json
 {
-  "bucket": "avatars",
-  "key": "profile-photo-123.jpg",
-  "size": 102400,
-  "mimeType": "image/jpeg",
-  "uploadedAt": "2024-01-21T10:30:00Z",
-  "url": "/api/storage/buckets/avatars/objects/profile-photo-123.jpg"
+  "method": "presigned",
+  "url": "https://s3-bucket.s3.us-east-2.amazonaws.com/app-key/avatars/profile.jpg?X-Amz-Algorithm=...",
+  "expiresAt": "2025-09-05T01:00:00Z"
 }
 ```
 
+### Step 2: Download File
+
+Download the file from the returned URL, using the appropriate method.
+
 ---
 
-## Download Object
+## Download Object (Deprecated)
 
 Download a file from a bucket.
 
@@ -221,50 +305,6 @@ curl "https://your-app.insforge.app/api/storage/buckets/avatars/objects/users/pr
 ### Response
 
 Binary file content with appropriate `Content-Type` and `Content-Length` headers.
-
----
-
-## Get Download Strategy
-
-Get the optimal download strategy (direct URL or presigned URL) based on storage backend and bucket visibility.
-
-```
-POST /api/storage/buckets/{bucketName}/objects/{objectKey}/download-strategy
-```
-
-### Request Body
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `expiresIn` | integer | No | URL expiration in seconds (default: 3600) |
-
-### Example
-
-```bash
-curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile.jpg/download-strategy" \
-  -H "Authorization: Bearer your-jwt-token" \
-  -H "Content-Type: application/json" \
-  -d '{"expiresIn": 3600}'
-```
-
-### Response (S3 Public Bucket)
-
-```json
-{
-  "method": "direct",
-  "url": "https://s3-bucket.s3.us-east-2.amazonaws.com/app-key/avatars/profile.jpg"
-}
-```
-
-### Response (S3 Private Bucket)
-
-```json
-{
-  "method": "presigned",
-  "url": "https://s3-bucket.s3.us-east-2.amazonaws.com/app-key/avatars/profile.jpg?X-Amz-Algorithm=...",
-  "expiresAt": "2025-09-05T01:00:00Z"
-}
-```
 
 ---
 
