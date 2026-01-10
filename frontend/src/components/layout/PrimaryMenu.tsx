@@ -146,7 +146,7 @@ export function PrimaryMenu({
         )}
       >
         {/* Top navigation items with separators */}
-        <nav className="flex flex-col gap-2 overflow-y-auto thin-scrollbar overflow-x-hidden pr-2 w-full">
+        <nav className="flex flex-col gap-2 overflow-y-auto overflow-x-hidden pr-2 w-full">
           {items.map((item) => (
             <div key={item.id}>
               <MenuItem item={item} />
