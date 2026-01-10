@@ -140,13 +140,13 @@ export function PrimaryMenu({
     <TooltipProvider disableHoverableContent delayDuration={300}>
       <aside
         className={cn(
-          'bg-white dark:bg-neutral-800 border-r border-gray-200 dark:border-neutral-700 flex flex-col flex-shrink-0 pt-2 pb-6 px-2',
+          'bg-white dark:bg-neutral-800 border-r border-gray-200 dark:border-neutral-700 flex flex-col flex-shrink-0 pt-2 pb-6 pl-2',
           'transition-[width] duration-300 ease-in-out overflow-hidden',
           isCollapsed ? 'w-[52px]' : 'w-[200px]'
         )}
       >
         {/* Top navigation items with separators */}
-        <nav className="flex flex-col gap-2 overflow-y-auto thin-scrollbar">
+        <nav className="flex flex-col gap-2 overflow-y-auto overflow-x-hidden pr-2 w-full">
           {items.map((item) => (
             <div key={item.id}>
               <MenuItem item={item} />
