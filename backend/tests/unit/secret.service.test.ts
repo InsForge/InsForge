@@ -5,7 +5,7 @@ import { EncryptionManager } from '../../src/infra/security/encryption.manager.j
 import { DatabaseManager } from '../../src/infra/database/database.manager.js';
 import type { Pool, PoolClient } from 'pg';
 
-vi.mock('../../src/utils/logger', () => ({
+vi.mock('../../src/utils/logger.js', () => ({
   default: {
     info: vi.fn(),
     error: vi.fn(),
@@ -13,13 +13,13 @@ vi.mock('../../src/utils/logger', () => ({
   },
 }));
 
-vi.mock('../../src/infra/database/database.manager', () => ({
+vi.mock('../../src/infra/database/database.manager.js', () => ({
   DatabaseManager: {
     getInstance: vi.fn(),
   },
 }));
 
-vi.mock('../../src/infra/security/encryption.manager', () => ({
+vi.mock('../../src/infra/security/encryption.manager.js', () => ({
   EncryptionManager: {
     encrypt: vi.fn((value: string) => `encrypted_${value}`),
     decrypt: vi.fn((value: string) => value.replace('encrypted_', '')),
