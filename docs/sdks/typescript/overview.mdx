@@ -1,0 +1,72 @@
+---
+title: TypeScript SDK
+description: Official TypeScript/JavaScript SDK for InsForge
+---
+
+The InsForge TypeScript SDK provides a type-safe client for interacting with InsForge services from JavaScript and TypeScript applications.
+
+## Installation
+
+<CodeGroup>
+```bash npm
+npm install @insforge/sdk@latest
+```
+
+```bash yarn
+yarn add @insforge/sdk@latest
+```
+
+```bash pnpm
+pnpm add @insforge/sdk@latest
+```
+</CodeGroup>
+
+## Quick Start
+
+```typescript
+import { createClient } from '@insforge/sdk';
+
+const insforge = createClient({
+  baseUrl: 'https://your-app.us-east.insforge.app',
+  anonKey: 'your-anon-key'  // Optional: for public/unauthenticated requests
+});
+```
+
+## Features
+
+- **Database** - Type-safe CRUD operations with PostgREST
+- **Authentication** - Email/password and OAuth authentication
+- **Storage** - File upload, download, and management
+- **Functions** - Invoke serverless edge functions
+- **AI** - Chat completions and image generation
+- **Realtime** - WebSocket-based pub/sub messaging
+
+## Framework-Specific Packages
+
+For React and Next.js applications, we provide additional packages with pre-built UI components:
+
+- **[@insforge/react](/sdks/typescript/ui-components/react)** - React + Vite authentication components
+- **[@insforge/nextjs](/sdks/typescript/ui-components/nextjs)** - Next.js authentication with SSR support
+
+## SDK Reference
+
+<CardGroup cols={2}>
+  <Card title="Database" icon="database" href="/sdks/typescript/database">
+    CRUD operations, filters, and queries
+  </Card>
+  <Card title="Authentication" icon="lock" href="/sdks/typescript/auth">
+    Sign up, sign in, OAuth, and user management
+  </Card>
+  <Card title="Storage" icon="cloud-arrow-up" href="/sdks/typescript/storage">
+    File upload, download, and management
+  </Card>
+  <Card title="Functions" icon="bolt" href="/sdks/typescript/functions">
+    Invoke serverless edge functions
+  </Card>
+  <Card title="AI" icon="brain" href="/sdks/typescript/ai">
+    Chat completions and image generation
+  </Card>
+  <Card title="Realtime" icon="signal-stream" href="/sdks/typescript/realtime">
+    WebSocket pub/sub messaging
+  </Card>
+</CardGroup>
