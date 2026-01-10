@@ -1,14 +1,7 @@
 import { z } from 'zod';
 
 export const sdkFeatureSchema = z
-  .enum([
-    'db',
-    'storage',
-    'functions',
-    'auth',
-    'ai',
-    'realtime',
-  ])
+  .enum(['db', 'storage', 'functions', 'auth', 'ai', 'realtime'])
   .describe(
     `
     SDK feature categories:

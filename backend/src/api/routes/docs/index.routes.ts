@@ -26,7 +26,7 @@ async function processSnippets(content: string, docsRoot: string): Promise<strin
   const snippetImports: Map<string, string> = new Map();
   const snippetImportLines: Set<string> = new Set();
 
-  let match;
+  let match: RegExpExecArray | null;
   while ((match = importRegex.exec(content)) !== null) {
     const [fullMatch, componentName, importPath] = match;
     // Only process imports from /snippets/ directory
@@ -42,16 +42,17 @@ async function processSnippets(content: string, docsRoot: string): Promise<strin
     processedContent = processedContent.replace(importLine, '');
   }
 
-  // Resolve the docs root to an absolute path for security check
-  const resolvedDocsRoot = path.resolve(docsRoot);
+  // Resolve the allowed snippets directory to an absolute path for security check
+  const allowedDir = path.resolve(docsRoot, 'snippets');
 
   // Replace component usages with actual snippet content
   for (const [componentName, importPath] of snippetImports) {
-    // Resolve snippet path and verify it's within docsRoot (prevent path traversal)
+    // Resolve snippet path
     const snippetPath = path.resolve(docsRoot, importPath.replace(/^\//, ''));
 
-    // Security check: ensure resolved path is within docsRoot
-    if (!snippetPath.startsWith(resolvedDocsRoot)) {
+    // Security check: ensure resolved path is strictly inside docsRoot/snippets
+    const relativePath = path.relative(allowedDir, snippetPath);
+    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
       console.warn(`Snippet path traversal blocked: ${importPath}`);
       continue;
     }

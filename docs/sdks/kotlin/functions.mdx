@@ -29,6 +29,9 @@ T // Typed response (reified generic)
 ### Examples
 
 ```kotlin
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
+
 // Define response data class
 @Serializable
 data class HelloResponse(
@@ -104,6 +107,20 @@ val contentType = response.contentType()
 ## Admin Functions
 
 The following methods require admin/service role authentication.
+
+<Warning>
+These methods require the client to be initialized with a **service role key** instead of the anon key. Service role keys have elevated privileges and should only be used in secure server-side environments, never in client-side code.
+
+```kotlin
+// Initialize client with service role key for admin operations
+val adminClient = createInsforgeClient(
+    baseUrl = "https://your-project.insforge.io",
+    anonKey = "your-service-role-key"  // Use service role key or api key, not anon key
+) {
+    install(Functions)
+}
+```
+</Warning>
 
 ### listFunctions()
 
