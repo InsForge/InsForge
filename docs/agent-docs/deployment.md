@@ -74,6 +74,6 @@ SELECT url FROM system.deployments WHERE id = '<deployment-id>';
 
 | Task | Tool | Command |
 |------|------|---------|
-| Deploy app | `create-deployment` | Provide `sourceDir` and `envVars` |
+| Deploy app | `create-deployment` | Provide `sourceDirectory` and `envVars` |
 | Check status | `run-raw-sql` | `SELECT status FROM system.deployments WHERE id = '...'` |
 | List deployments | `run-raw-sql` | `SELECT * FROM system.deployments ORDER BY created_at DESC` |

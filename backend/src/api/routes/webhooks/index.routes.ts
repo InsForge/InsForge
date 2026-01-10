@@ -38,8 +38,10 @@ router.post('/vercel', async (req: Request, res: Response, next: NextFunction) =
       throw new AppError('Webhook not configured', 500, ERROR_CODES.INTERNAL_ERROR);
     }
 
-    // Verify the signature using HMAC-SHA1
-    const rawBody = JSON.stringify(req.body);
+    // req.body is raw Buffer (express.raw middleware applied in server.ts)
+    const rawBody = req.body as Buffer;
+
+    // Verify the signature using HMAC-SHA1 on original bytes
     const expectedSignature = crypto
       .createHmac('sha1', webhookSecret)
       .update(rawBody)
@@ -57,8 +59,8 @@ router.post('/vercel', async (req: Request, res: Response, next: NextFunction) =
       throw new AppError('Invalid signature', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
-    // Parse the webhook payload
-    const webhookPayload = req.body as VercelWebhookPayload;
+    // Parse the webhook payload after signature verification
+    const webhookPayload = JSON.parse(rawBody.toString()) as VercelWebhookPayload;
     const eventType = webhookPayload.type;
 
     // Check if this is a deployment event we handle

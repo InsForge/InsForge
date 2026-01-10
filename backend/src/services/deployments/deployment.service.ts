@@ -605,6 +605,9 @@ export class DeploymentService {
   /**
    * Update deployment status from webhook event
    * Uses Vercel deployment ID to find the deployment
+   *
+   * Note: For ERROR status, we fetch deployment details from Vercel API
+   * to get error information since webhooks don't include error reasons.
    */
   async updateDeploymentFromWebhook(
     vercelDeploymentId: string,
@@ -613,6 +616,31 @@ export class DeploymentService {
     webhookMetadata: Record<string, unknown>
   ): Promise<DeploymentRecord | null> {
     try {
+      // For ERROR status, fetch deployment details to get error information
+      // Vercel webhooks don't include error reasons in the payload
+      let errorInfo: { errorCode?: string; errorMessage?: string } | undefined;
+      if (status === 'ERROR') {
+        try {
+          const vercelDeployment = await this.vercelProvider.getDeployment(vercelDeploymentId);
+          if (vercelDeployment.error) {
+            errorInfo = {
+              errorCode: vercelDeployment.error.code,
+              errorMessage: vercelDeployment.error.message,
+            };
+            logger.info('Fetched error details from Vercel API', {
+              vercelDeploymentId,
+              errorCode: errorInfo.errorCode,
+            });
+          }
+        } catch (fetchError) {
+          // Log but don't fail the webhook update if we can't fetch error details
+          logger.warn('Failed to fetch error details from Vercel API', {
+            vercelDeploymentId,
+            error: fetchError instanceof Error ? fetchError.message : String(fetchError),
+          });
+        }
+      }
+
       const result = await this.getPool().query(
         `UPDATE system.deployments
          SET status = $1, url = COALESCE($2, url), metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb
@@ -632,6 +660,7 @@ export class DeploymentService {
           JSON.stringify({
             lastWebhookAt: new Date().toISOString(),
             ...webhookMetadata,
+            ...(errorInfo && { error: errorInfo }),
           }),
           vercelDeploymentId,
         ]
@@ -645,6 +674,7 @@ export class DeploymentService {
       logger.info('Deployment updated from webhook', {
         vercelDeploymentId,
         status,
+        ...(errorInfo && { errorCode: errorInfo.errorCode }),
       });
 
       return result.rows[0] as DeploymentRecord;

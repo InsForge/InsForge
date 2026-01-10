@@ -23,8 +23,8 @@ export const deploymentSchema = z.object({
   status: deploymentStatusSchema,
   url: z.string().nullable(),
   metadata: z.record(z.unknown()).nullable(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
 });
 
 export type DeploymentSchema = z.infer<typeof deploymentSchema>;

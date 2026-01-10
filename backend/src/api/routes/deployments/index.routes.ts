@@ -64,12 +64,16 @@ router.post(
 
       const { id } = req.params;
 
-      const validation = startDeploymentRequestSchema.safeParse(req.body);
-      if (!validation.success) {
-        throw new AppError(JSON.stringify(validation.error.issues), 400, ERROR_CODES.INVALID_INPUT);
+      const validationResult = startDeploymentRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
       }
 
-      const deployment = await deploymentService.startDeployment(id, validation.data);
+      const deployment = await deploymentService.startDeployment(id, validationResult.data);
 
       // Log audit
       await auditService.log({

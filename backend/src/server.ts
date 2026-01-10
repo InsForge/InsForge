@@ -150,7 +150,11 @@ export async function createApp() {
     next();
   });
 
-  // Apply JSON middleware
+  // Mount webhooks with raw body parser BEFORE JSON middleware
+  // This ensures signature verification uses the original bytes
+  app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhooksRouter);
+
+  // Apply JSON middleware for all other routes
   app.use(express.json({ limit: '100mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -181,7 +185,6 @@ export async function createApp() {
   apiRouter.use('/realtime', realtimeRouter);
   apiRouter.use('/email', emailRouter);
   apiRouter.use('/deployments', deploymentsRouter);
-  apiRouter.use('/webhooks', webhooksRouter);
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);

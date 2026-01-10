@@ -3,6 +3,7 @@ import { ChevronRight, ExternalLink } from 'lucide-react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import {
   Button,
+  ConfirmDialog,
   PaginationControls,
   Skeleton,
   Tooltip,
@@ -10,6 +11,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components';
+import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useDeployments } from '../hooks/useDeployments';
 import { DeploymentRow } from '../components/DeploymentRow';
 import DeploymentsEmptyState from '../components/DeploymentsEmptyState';
@@ -29,6 +31,8 @@ const statusColors: Record<string, string> = {
 export default function DeploymentsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedDeployment, setSelectedDeployment] = useState<DeploymentSchema | null>(null);
+
+  const { confirm, confirmDialogProps } = useConfirm();
 
   const {
     deployments,
@@ -62,8 +66,16 @@ export default function DeploymentsPage() {
     syncDeployment(id);
   };
 
-  const handleCancel = (id: string) => {
-    if (confirm('Are you sure you want to cancel this deployment?')) {
+  const handleCancel = async (id: string) => {
+    const shouldCancel = await confirm({
+      title: 'Cancel Deployment',
+      description: 'Are you sure you want to cancel this deployment? This action cannot be undone.',
+      confirmText: 'Confirm',
+      cancelText: 'Dismiss',
+      destructive: true,
+    });
+
+    if (shouldCancel) {
       cancelDeployment(id);
       setSelectedDeployment(null);
     }
@@ -75,7 +87,7 @@ export default function DeploymentsPage() {
     const canCancel = ['WAITING', 'UPLOADING', 'QUEUED', 'BUILDING'].includes(
       selectedDeployment.status
     );
-    const canSync = selectedDeployment.providerDeploymentId !== null;
+    const canSync = !!selectedDeployment.providerDeploymentId;
 
     return (
       <div className="h-full flex flex-col overflow-hidden">
@@ -96,7 +108,7 @@ export default function DeploymentsPage() {
           <div className="flex items-center gap-2">
             {canSync && (
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 onClick={() => handleSync(selectedDeployment.id)}
                 disabled={isSyncing}
@@ -108,7 +120,7 @@ export default function DeploymentsPage() {
               <Button
                 variant="destructive"
                 size="sm"
-                onClick={() => handleCancel(selectedDeployment.id)}
+                onClick={() => void handleCancel(selectedDeployment.id)}
                 disabled={isCancelling}
               >
                 {isCancelling ? 'Cancelling...' : 'Cancel'}
@@ -194,6 +206,8 @@ export default function DeploymentsPage() {
             )}
           </div>
         </div>
+
+        <ConfirmDialog {...confirmDialogProps} />
       </div>
     );
   }
@@ -247,7 +261,7 @@ export default function DeploymentsPage() {
                 <Skeleton key={i} className="h-14 rounded-[8px]" />
               ))}
             </>
-          ) : deployments.length >= 1 ? (
+          ) : deployments.length > 0 ? (
             <>
               {deployments.map((deployment) => (
                 <DeploymentRow
