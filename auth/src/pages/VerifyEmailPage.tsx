@@ -14,7 +14,20 @@ export function VerifyEmailPage() {
         broadcastService.broadcast(BroadcastEventType.EMAIL_VERIFIED_SUCCESS, data);
         // Redirect to custom URL if provided
         if (redirectTo) {
-          window.location.href = redirectTo;
+          const { accessToken, user, csrfToken } = data;
+          if (accessToken && user) {
+            const finalUrl = new URL(redirectTo, window.location.origin);
+            const params = new URLSearchParams();
+            params.set('access_token', accessToken);
+            params.set('user_id', user.id);
+            params.set('email', user.email);
+            params.set('name', String(user.profile?.name));
+            if (csrfToken) {
+              params.set('csrf_token', csrfToken);
+            }
+            finalUrl.search = params.toString();
+            window.location.href = finalUrl.toString();
+          }
         }
       }}
       onError={(error) => {
