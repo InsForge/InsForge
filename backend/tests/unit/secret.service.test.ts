@@ -3,6 +3,7 @@ import { SecretService } from '../../src/services/secrets/secret.service.js';
 import logger from '../../src/utils/logger.js';
 import { EncryptionManager } from '../../src/infra/security/encryption.manager.js';
 import { DatabaseManager } from '../../src/infra/database/database.manager.js';
+import type { Pool, PoolClient } from 'pg';
 
 vi.mock('../../src/utils/logger', () => ({
   default: {
@@ -76,13 +77,22 @@ describe('SecretService', () => {
   });
 
   describe('rotateApiKey', () => {
-    const sharedMockPool: any = {
+    interface MockPoolClient extends Partial<PoolClient> {
+      query: ReturnType<typeof vi.fn>;
+      release: ReturnType<typeof vi.fn>;
+    }
+
+    interface MockPool extends Partial<Pool> {
+      connect: ReturnType<typeof vi.fn>;
+    }
+
+    const sharedMockPool: MockPool = {
       connect: vi.fn(),
     };
     
     let mockQuery: ReturnType<typeof vi.fn>;
     let mockRelease: ReturnType<typeof vi.fn>;
-    let mockClient: any;
+    let mockClient: MockPoolClient;
 
     beforeEach(() => {
       vi.clearAllMocks();
@@ -100,7 +110,7 @@ describe('SecretService', () => {
 
       vi.mocked(DatabaseManager.getInstance).mockReturnValue({
         getPool: getPoolFn,
-      } as any);
+      } as Partial<DatabaseManager> as DatabaseManager);
 
       secretService = SecretService.getInstance();
     });
