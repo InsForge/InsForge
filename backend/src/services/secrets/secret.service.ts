@@ -396,6 +396,69 @@ export class SecretService {
   }
 
   /**
+   * Rotate API key (deactivate old, generate new)
+   * Returns the new API key
+   */
+  async rotateApiKey(): Promise<string> {
+    const client = await this.getPool().connect();
+    try {
+      await client.query('BEGIN');
+
+      // Find the currently active API_KEY secret
+      const oldSecretResult = await client.query(
+        `SELECT id FROM system.secrets 
+         WHERE key = 'API_KEY' 
+         AND is_active = true 
+         AND (expires_at IS NULL OR expires_at > NOW())
+         ORDER BY created_at DESC
+         LIMIT 1`
+      );
+
+      if (!oldSecretResult.rows.length) {
+        throw new Error('No active API key found to rotate');
+      }
+
+      const oldSecretId = oldSecretResult.rows[0].id;
+
+      // Deactivate the old API key with 24-hour grace period
+      await client.query(
+        `UPDATE system.secrets
+         SET is_active = false,
+             expires_at = NOW() + INTERVAL '24 hours'
+         WHERE id = $1`,
+        [oldSecretId]
+      );
+
+      // Generate new API key
+      const newApiKey = this.generateApiKey();
+      const encryptedValue = EncryptionManager.encrypt(newApiKey);
+
+      // Create new active API key
+      const newSecretResult = await client.query(
+        `INSERT INTO system.secrets (key, value_ciphertext, is_reserved)
+         VALUES ('API_KEY', $1, true)
+         RETURNING id`,
+        [encryptedValue]
+      );
+
+      await client.query('COMMIT');
+
+      logger.info('API key rotated', {
+        oldId: oldSecretId,
+        newId: newSecretResult.rows[0].id,
+      });
+
+      return newApiKey;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Failed to rotate API key', { error });
+      throw new Error('Failed to rotate API key');
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
    * Clean up expired secrets
    */
   async cleanupExpiredSecrets(): Promise<number> {
