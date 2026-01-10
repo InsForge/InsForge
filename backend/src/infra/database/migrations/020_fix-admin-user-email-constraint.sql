@@ -11,8 +11,6 @@
 
 BEGIN;
 
-BEGIN;
-
 -- 1. Pre-flight check for duplicate (email, is_project_admin) pairs
 DO $$
 BEGIN
@@ -63,10 +61,10 @@ ALTER TABLE auth.users
 
 COMMIT;
 
-COMMIT;
-
 -- migrate:down
 -- Rollback to single-column uniqueness on email
+BEGIN;
+
 -- Pre-flight check: ensure no duplicate emails exist before restoring single-column constraint
 DO $$
 BEGIN
@@ -79,10 +77,6 @@ BEGIN
     RAISE EXCEPTION 'Cannot downgrade: Multiple users share the same email address. Remove duplicate emails before downgrading.';
   END IF;
 END $$;
-
-ALTER TABLE auth.users
-  DROP CONSTRAINT IF EXISTS users_email_is_project_admin_key;
-
 
 ALTER TABLE auth.users
   DROP CONSTRAINT IF EXISTS users_email_is_project_admin_key;
@@ -106,3 +100,5 @@ BEGIN
     RAISE NOTICE 'Restored single-column UNIQUE constraint on auth.users.email';
   END IF;
 END $$;
+
+COMMIT;
