@@ -14,6 +14,10 @@
  */
 
 import pg from 'pg';
+// Note: This imports a TypeScript file. This works because the script is run with `tsx`
+// (see package.json migrate:bootstrap script), which can handle TypeScript imports.
+// The relative path goes up 4 levels: bootstrap -> migrations -> database -> infra -> src, then into utils.
+import logger from '@/utils/logger.js';
 
 const { Pool } = pg;
 
@@ -22,7 +26,7 @@ async function bootstrapMigrations() {
   const connectionString = process.env.DATABASE_URL;
 
   if (!connectionString) {
-    console.error('DATABASE_URL environment variable is not set');
+    logger.error('DATABASE_URL environment variable is not set');
     process.exit(1);
   }
 
@@ -49,7 +53,7 @@ async function bootstrapMigrations() {
       `);
 
       if (oldTableExists.rows[0].exists && !newTableExists.rows[0].exists) {
-        console.log('Bootstrap: Moving _migrations table to system.migrations...');
+        logger.info('Bootstrap: Moving _migrations table to system.migrations...');
 
         // Create system schema if it doesn't exist
         await client.query('CREATE SCHEMA IF NOT EXISTS system');
@@ -65,21 +69,24 @@ async function bootstrapMigrations() {
           throw error;
         }
 
-        console.log('Bootstrap: Successfully moved _migrations to system.migrations');
+        logger.info('Bootstrap: Successfully moved _migrations to system.migrations');
       } else if (newTableExists.rows[0].exists) {
         // Already migrated, nothing to do
-        console.log('Bootstrap: system.migrations already exists, skipping');
+        logger.info('Bootstrap: system.migrations already exists, skipping');
       } else if (!oldTableExists.rows[0].exists && !newTableExists.rows[0].exists) {
         // Fresh install - create system schema so node-pg-migrate can create its table there
-        console.log('Bootstrap: No existing migrations table, fresh install');
+        logger.info('Bootstrap: No existing migrations table, fresh install');
         await client.query('CREATE SCHEMA IF NOT EXISTS system');
-        console.log('Bootstrap: Created system schema for migrations');
+        logger.info('Bootstrap: Created system schema for migrations');
       }
     } finally {
       client.release();
     }
   } catch (error) {
-    console.error('Bootstrap migration failed:', error.message);
+    logger.error('Bootstrap migration failed', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     process.exitCode = 1;
   } finally {
     await pool.end();
@@ -88,6 +95,9 @@ async function bootstrapMigrations() {
 
 bootstrapMigrations().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
-  console.error('Bootstrap migration failed:', message);
+  logger.error('Bootstrap migration failed', {
+    error: message,
+    stack: error instanceof Error ? error.stack : undefined,
+  });
   process.exitCode = 1;
 });
