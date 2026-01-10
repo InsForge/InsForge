@@ -3,7 +3,7 @@ import { verifyAdmin, AuthRequest, verifyUser } from '@/api/middlewares/auth.js'
 import { AppError } from '@/api/middlewares/error.js';
 import { StorageService } from '@/services/storage/storage.service.js';
 import { successResponse } from '@/utils/response.js';
-import { upload, handleUploadError } from '@/api/middlewares/upload.js';
+import { upload, handleUploadError, createBucketUploadMiddleware } from '@/api/middlewares/upload.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { createBucketRequestSchema, updateBucketRequestSchema } from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
@@ -61,10 +61,10 @@ router.post(
           'Please check the request body, it must conform with the CreateBucketRequest schema.'
         );
       }
-      const { bucketName, isPublic } = validation.data;
+      const { bucketName, isPublic, maxFileSize } = validation.data;
 
       const storageService = StorageService.getInstance();
-      await storageService.createBucket(bucketName, isPublic);
+      await storageService.createBucket(bucketName, isPublic, maxFileSize);
 
       // Log audit for bucket creation
       await auditService.log({
@@ -74,6 +74,7 @@ router.post(
         details: {
           bucketName,
           isPublic,
+          maxFileSize: maxFileSize ?? null,
         },
         ip_address: req.ip,
       });
@@ -135,10 +136,13 @@ router.patch(
           'Please check the request body, it must conform with the UpdateBucketRequest schema.'
         );
       }
-      const { isPublic } = validation.data;
+      const { isPublic, maxFileSize } = validation.data;
 
       const storageService = StorageService.getInstance();
-      await storageService.updateBucketVisibility(bucketName, isPublic);
+      await storageService.updateBucket(bucketName, {
+        isPublic,
+        maxFileSize,
+      });
 
       // Log audit for bucket update
       await auditService.log({
@@ -148,6 +152,7 @@ router.patch(
         details: {
           bucketName,
           isPublic,
+          maxFileSize: maxFileSize ?? null,
         },
         ip_address: req.ip,
       });
@@ -229,7 +234,7 @@ router.get(
 router.put(
   '/buckets/:bucketName/objects/*',
   verifyUser,
-  upload.single('file'),
+  createBucketUploadMiddleware(),
   handleUploadError,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -269,7 +274,7 @@ router.put(
 router.post(
   '/buckets/:bucketName/objects',
   verifyUser,
-  upload.single('file'),
+  createBucketUploadMiddleware(),
   handleUploadError,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {

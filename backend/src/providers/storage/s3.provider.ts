@@ -157,7 +157,7 @@ export class S3StorageProvider implements StorageProvider {
   async getUploadStrategy(
     bucket: string,
     key: string,
-    metadata: { contentType?: string; size?: number }
+    metadata: { contentType?: string; size?: number; maxFileSize?: number }
   ): Promise<UploadStrategyResponse> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
@@ -166,13 +166,16 @@ export class S3StorageProvider implements StorageProvider {
     const s3Key = this.getS3Key(bucket, key);
     const expiresIn = ONE_HOUR_IN_SECONDS; // 1 hour
 
+    // Use bucket-specific max file size if provided, otherwise use metadata.size or default
+    const maxSize = metadata.maxFileSize ?? metadata.size ?? DEFAULT_MAX_UPLOAD_SIZE_BYTES;
+
     try {
       // Generate presigned POST URL for multipart form upload
       const { url, fields } = await createPresignedPost(this.s3Client, {
         Bucket: this.s3Bucket,
         Key: s3Key,
         Conditions: [
-          ['content-length-range', 0, metadata.size || DEFAULT_MAX_UPLOAD_SIZE_BYTES], // Max 10MB by default
+          ['content-length-range', 0, maxSize],
         ],
         Expires: expiresIn,
       });

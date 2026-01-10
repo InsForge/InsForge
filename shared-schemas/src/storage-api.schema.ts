@@ -4,10 +4,12 @@ import { storageFileSchema } from './storage.schema';
 export const createBucketRequestSchema = z.object({
   bucketName: z.string().min(1, 'Bucket name cannot be empty'),
   isPublic: z.boolean().default(true),
+  maxFileSize: z.number().positive().nullable().optional(), // Maximum file size in bytes, null/undefined means use global limit
 });
 
 export const updateBucketRequestSchema = z.object({
-  isPublic: z.boolean(),
+  isPublic: z.boolean().optional(),
+  maxFileSize: z.number().positive().nullable().optional(), // Maximum file size in bytes, null means use global limit
 });
 
 export const listObjectsResponseSchema = z.object({
