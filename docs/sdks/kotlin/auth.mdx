@@ -153,7 +153,7 @@ class AuthCallbackActivity : AppCompatActivity() {
             lifecycleScope.launch {
                 try {
                     // Callback URL handled by SDK
-                    val result = InsforgeManager.client.auth.handleAuthCallback(uri.toString())
+                    val result = client.auth.handleAuthCallback(uri.toString())
                     
                     // Auth success, navigate to main screen
                     Toast.makeText(this@AuthCallbackActivity, 
@@ -303,8 +303,7 @@ val currentSession: StateFlow<Session?>
 ```kotlin
 // Access current session value
 client.auth.currentSession.value?.let { session ->
-    Log.d("Auth", "Access token: ${session.accessToken}")
-    Log.d("Auth", "User: ${session.user.email}")
+    Log.d("Auth", "Session active for user: ${session.user.email}")
 }
 
 // Observe session changes

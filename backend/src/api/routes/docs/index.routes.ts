@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import { successResponse } from '@/utils/response.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { DocTypeSchema, docTypeSchema, SdkFeatureSchema, sdkFeatureSchema, SdkLanguageSchema, sdkLanguageSchema } from '@insforge/shared-schemas';
+import { DocTypeSchema, docTypeSchema, sdkFeatureSchema, sdkLanguageSchema } from '@insforge/shared-schemas';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,28 +14,47 @@ const router = Router();
 
 /**
  * Process MDX content to resolve snippet imports and component usage.
+ * Only handles imports from the /snippets/ directory for security.
  * Handles patterns like:
  *   import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
  *   <SwiftSdkInstallation />
+ * Non-snippet imports are preserved in the output.
  */
 async function processSnippets(content: string, docsRoot: string): Promise<string> {
-  // Extract all import statements for snippets
+  // Extract all import statements
   const importRegex = /^import\s+(\w+)\s+from\s+['"]([^'"]+)['"]\s*;?\s*$/gm;
-  const imports: Map<string, string> = new Map();
+  const snippetImports: Map<string, string> = new Map();
+  const snippetImportLines: Set<string> = new Set();
 
   let match;
   while ((match = importRegex.exec(content)) !== null) {
-    const [, componentName, importPath] = match;
-    imports.set(componentName, importPath);
+    const [fullMatch, componentName, importPath] = match;
+    // Only process imports from /snippets/ directory
+    if (importPath.startsWith('/snippets/')) {
+      snippetImports.set(componentName, importPath);
+      snippetImportLines.add(fullMatch);
+    }
   }
 
-  // Remove import statements from content
-  let processedContent = content.replace(importRegex, '');
+  // Only remove snippet import lines, preserve other imports
+  let processedContent = content;
+  for (const importLine of snippetImportLines) {
+    processedContent = processedContent.replace(importLine, '');
+  }
+
+  // Resolve the docs root to an absolute path for security check
+  const resolvedDocsRoot = path.resolve(docsRoot);
 
   // Replace component usages with actual snippet content
-  for (const [componentName, importPath] of imports) {
-    // Resolve snippet path (remove leading slash, it's relative to docs root)
-    const snippetPath = path.join(docsRoot, importPath.replace(/^\//, ''));
+  for (const [componentName, importPath] of snippetImports) {
+    // Resolve snippet path and verify it's within docsRoot (prevent path traversal)
+    const snippetPath = path.resolve(docsRoot, importPath.replace(/^\//, ''));
+
+    // Security check: ensure resolved path is within docsRoot
+    if (!snippetPath.startsWith(resolvedDocsRoot)) {
+      console.warn(`Snippet path traversal blocked: ${importPath}`);
+      continue;
+    }
 
     try {
       let snippetContent = await readFile(snippetPath, 'utf-8');
@@ -54,8 +73,8 @@ async function processSnippets(content: string, docsRoot: string): Promise<strin
       );
       processedContent = processedContent.replace(withChildrenRegex, snippetContent.trim());
     } catch {
-      // If snippet file not found, leave the component tag as-is
-      console.warn(`Snippet not found: ${snippetPath}`);
+      // If snippet file not found, log the import path (not absolute path) and leave component tag as-is
+      console.warn(`Snippet not found: ${importPath}`);
     }
   }
 

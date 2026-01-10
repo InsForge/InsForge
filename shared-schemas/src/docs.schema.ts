@@ -1,44 +1,47 @@
 import { z } from 'zod';
 
-export const sdkFeatureSchema = z.enum([
-  'db',
-  'storage',
-  'functions',
-  'auth',
-  'ai',
-  'realtime',
-]).describe(
-  `
-  SDK feature categories:
+export const sdkFeatureSchema = z
+  .enum([
+    'db',
+    'storage',
+    'functions',
+    'auth',
+    'ai',
+    'realtime',
+  ])
+  .describe(
+    `
+    SDK feature categories:
 
-  - "db" - Database operations
-  - "storage" - File storage
-  - "functions" - Edge functions
-  - "auth" - User authentication
-  - "ai" - AI features
-  - "realtime" - Real-time WebSockets
-  `
-);
+    - "db" - Database operations
+    - "storage" - File storage
+    - "functions" - Edge functions
+    - "auth" - User authentication
+    - "ai" - AI features
+    - "realtime" - Real-time WebSockets
+    `
+  );
 
 export type SdkFeatureSchema = z.infer<typeof sdkFeatureSchema>;
 
 export const sdkLanguageSchema = z
-.enum([
-  'typescript',
-  'swift',
-  'kotlin',
-  // 'flutter',
-  'rest-api',
-]).describe(
-  `
-  SDK languages:
+  .enum([
+    'typescript',
+    'swift',
+    'kotlin',
+    // 'flutter',
+    'rest-api',
+  ])
+  .describe(
+    `
+    SDK languages:
 
-  - "typescript" - JavaScript/TypeScript SDK
-  - "swift" - Swift SDK
-  - "kotlin" - Kotlin SDK
-  - "rest-api" - REST API
-  `
-);
+    - "typescript" - JavaScript/TypeScript SDK
+    - "swift" - Swift SDK
+    - "kotlin" - Kotlin SDK
+    - "rest-api" - REST API
+    `
+  );
 
 export type SdkLanguageSchema = z.infer<typeof sdkLanguageSchema>;
 
