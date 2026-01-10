@@ -62,6 +62,19 @@ ALTER TABLE auth.users
 ALTER TABLE auth.users
   DROP CONSTRAINT IF EXISTS users_email_is_project_admin_key;
 
+-- Pre-flight check: ensure no duplicate emails exist before restoring single-column constraint
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT email
+    FROM auth.users
+    GROUP BY email
+    HAVING COUNT(*) > 1
+  ) THEN
+    RAISE EXCEPTION 'Cannot downgrade: Multiple users share the same email address. Remove duplicate emails before downgrading.';
+  END IF;
+END $$;
+
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -77,6 +90,7 @@ BEGIN
     HAVING SUM(CASE WHEN kcu.column_name = 'email' THEN 1 ELSE 0 END) = 1
        AND COUNT(*) = 1
   ) THEN
-    EXECUTE 'ALTER TABLE auth.users ADD CONSTRAINT users_email_key UNIQUE (email)';
+    EXECUTE 'ALTER TABLE auth.users ADD UNIQUE (email)';
+    RAISE NOTICE 'Restored single-column UNIQUE constraint on auth.users.email';
   END IF;
 END $$;
