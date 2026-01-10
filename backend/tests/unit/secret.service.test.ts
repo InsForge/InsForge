@@ -89,7 +89,7 @@ describe('SecretService', () => {
     const sharedMockPool: MockPool = {
       connect: vi.fn(),
     };
-    
+
     let mockQuery: ReturnType<typeof vi.fn>;
     let mockRelease: ReturnType<typeof vi.fn>;
     let mockClient: MockPoolClient;
