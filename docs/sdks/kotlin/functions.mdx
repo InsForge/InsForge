@@ -114,7 +114,7 @@ These methods require the client to be initialized with a **service role key** i
 ```kotlin
 // Initialize client with service role key for admin operations
 val adminClient = createInsforgeClient(
-    baseUrl = "https://your-project.insforge.io",
+    baseUrl = "https://your-project.insforge.app",
     anonKey = "your-service-role-key"  // Use service role key or api key, not anon key
 ) {
     install(Functions)

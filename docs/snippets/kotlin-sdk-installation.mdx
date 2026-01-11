@@ -100,7 +100,7 @@ import dev.insforge.realtime.Realtime
 import dev.insforge.ai.AI
 
 val client = createInsforgeClient(
-    baseUrl = "https://your-project.insforge.io",
+    baseUrl = "https://your-project.insforge.app",
     anonKey = "your-api-key"
 ) {
     install(Auth)
@@ -136,7 +136,7 @@ import dev.insforge.auth.SessionStorage
 class InsforgeManager(private val context: Context) {
     
     val client = createInsforgeClient(
-        baseURL = "https://your-project.insforge.io",
+        baseURL = "https://your-project.insforge.app",
         anonKey = "your-anon-key"
     ) {
         install(Auth) {
