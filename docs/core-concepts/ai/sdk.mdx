@@ -20,35 +20,6 @@ Create AI chat completions with streaming support.
 - `topP` (number, optional) - Top-p sampling 0-1
 - `stream` (boolean, optional) - Enable streaming mode
 
-### Message Content Types
-
-Messages support multimodal content (OpenAI-compatible format):
-
-```typescript
-// Text only
-{ role: 'user', content: 'Hello!' }
-
-// Text + Image
-{
-  role: 'user',
-  content: [
-    { type: 'text', text: 'What is in this image?' },
-    { type: 'image_url', image_url: { url: 'https://...' } }  // or base64
-  ]
-}
-
-// Text + Audio
-{
-  role: 'user',
-  content: [
-    { type: 'text', text: 'Transcribe this audio' },
-    { type: 'input_audio', input_audio: { data: '<base64>', format: 'wav' } }
-  ]
-}
-```
-
-**Supported audio formats:** `wav`, `mp3`, `aiff`, `aac`, `ogg`, `flac`, `m4a`
-
 ### Returns (non-streaming)
 
 ```typescript

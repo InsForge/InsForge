@@ -37,6 +37,10 @@ export const getModalityIcon = (
       return Image;
     case 'audio':
       return Mic;
+    // case 'video':
+    //   return Video;
+    // case 'file':
+    //   return File;
     default:
       return Type;
   }
