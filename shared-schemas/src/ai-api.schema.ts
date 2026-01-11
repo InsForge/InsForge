@@ -140,6 +140,10 @@ export const getAIUsageSummaryRequestSchema = z.object({
 });
 
 // Export types
+export type TextContentSchema = z.infer<typeof textContentSchema>;
+export type ImageContentSchema = z.infer<typeof imageContentSchema>;
+export type AudioContentSchema = z.infer<typeof audioContentSchema>;
+export type ContentSchema = z.infer<typeof contentSchema>;
 export type ChatMessageSchema = z.infer<typeof chatMessageSchema>;
 export type ChatCompletionRequest = z.infer<typeof chatCompletionRequestSchema>;
 export type ChatCompletionResponse = z.infer<typeof chatCompletionResponseSchema>;
