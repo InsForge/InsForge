@@ -11,6 +11,14 @@ export interface OpenRouterImageMessage {
   };
 }
 
+export interface OpenRouterAudioMessage {
+  type: 'input_audio';
+  input_audio: {
+    data: string; // Base64-encoded audio data
+    format: string; // wav, mp3, aiff, aac, ogg, flac, m4a
+  };
+}
+
 // ============= OpenRouter API Types =============
 
 export interface RawOpenRouterModel {

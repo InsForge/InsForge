@@ -14,11 +14,40 @@ Create AI chat completions with streaming support.
 ### Parameters
 
 - `model` (string, required) - AI model (e.g., 'anthropic/claude-3.5-haiku', 'openai/gpt-4'), call `mcp__insforge__get-backend-metadata` tool to get available models
-- `messages` (array, required) - Array of message objects: `{role: "user"|"system"|"assistant", content: string}`
+- `messages` (array, required) - Array of message objects with text, image, or audio content
 - `temperature` (number, optional) - Sampling temperature 0-2
 - `maxTokens` (number, optional) - Max tokens to generate
 - `topP` (number, optional) - Top-p sampling 0-1
 - `stream` (boolean, optional) - Enable streaming mode
+
+### Message Content Types
+
+Messages support multimodal content (OpenAI-compatible format):
+
+```typescript
+// Text only
+{ role: 'user', content: 'Hello!' }
+
+// Text + Image
+{
+  role: 'user',
+  content: [
+    { type: 'text', text: 'What is in this image?' },
+    { type: 'image_url', image_url: { url: 'https://...' } }  // or base64
+  ]
+}
+
+// Text + Audio
+{
+  role: 'user',
+  content: [
+    { type: 'text', text: 'Transcribe this audio' },
+    { type: 'input_audio', input_audio: { data: '<base64>', format: 'wav' } }
+  ]
+}
+```
+
+**Supported audio formats:** `wav`, `mp3`, `aiff`, `aac`, `ogg`, `flac`, `m4a`
 
 ### Returns (non-streaming)
 
@@ -66,6 +95,31 @@ const completion = await insforge.ai.chat.completions.create({
           type: 'image_url',
           image_url: {
             url: 'https://example.com/photo.jpg', // or base64: 'data:image/jpeg;base64,...'
+          },
+        },
+      ],
+    },
+  ],
+});
+
+console.log(completion.choices[0].message.content);
+```
+
+### Example (with audio)
+
+```javascript
+const completion = await insforge.ai.chat.completions.create({
+  model: 'openai/gpt-4o-audio-preview',
+  messages: [
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'Transcribe this audio and summarize it' },
+        {
+          type: 'input_audio',
+          input_audio: {
+            data: audioBase64, // base64-encoded audio
+            format: 'wav',     // wav, mp3, aiff, aac, ogg, flac, m4a
           },
         },
       ],

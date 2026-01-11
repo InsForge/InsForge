@@ -22,7 +22,17 @@ export const imageContentSchema = z.object({
   }),
 });
 
-export const contentSchema = z.union([textContentSchema, imageContentSchema]);
+export const audioContentSchema = z.object({
+  type: z.literal('input_audio'),
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  input_audio: z.object({
+    // Base64-encoded audio data (direct URLs not supported for audio)
+    data: z.string(),
+    format: z.enum(['wav', 'mp3', 'aiff', 'aac', 'ogg', 'flac', 'm4a']),
+  }),
+});
+
+export const contentSchema = z.union([textContentSchema, imageContentSchema, audioContentSchema]);
 
 // Chat message supports both OpenAI format and legacy format for backward compatibility
 export const chatMessageSchema = z.object({
