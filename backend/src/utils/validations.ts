@@ -104,6 +104,17 @@ export function validateTableName(tableName: string): boolean {
 }
 
 /**
+ * Validates PostgreSQL function name for RPC calls
+ * @param functionName - The function name to validate
+ * @returns true if valid
+ * @throws AppError if invalid
+ */
+export function validateFunctionName(functionName: string): boolean {
+  validateIdentifier(functionName, 'function');
+  return true;
+}
+
+/**
  * Gets a safe error message for identifier validation
  * @param identifier - The identifier that failed validation
  * @param type - Type of identifier
