@@ -16,6 +16,8 @@ Create a new user account with email and password.
 - `email` (string, required) - User's email address
 - `password` (string, required) - User's password
 - `name` (string, optional) - User's display name
+- `options` (object, optional) - Additional options
+  - `emailRedirectTo` (string, optional) - Custom URL to redirect to after email verification. It's a fallback if you didn't set default redirect URL configured in your dashboard.
 
 ### Returns
 
@@ -432,6 +434,8 @@ Resend email verification when the previous OTP has expired or was not received.
 ### Parameters
 
 - `email` (string, required) - User's email address
+- `options` (object, optional) - Additional options
+  - `emailRedirectTo` (string, optional) - Custom URL to redirect to after email verification. It's a fallback if you didn't set default redirect URL configured in your dashboard.
 
 ### Returns
 
