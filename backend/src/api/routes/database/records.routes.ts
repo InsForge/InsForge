@@ -121,45 +121,4 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
 router.all('/:tableName', forwardToPostgrest);
 router.all('/:tableName/*', forwardToPostgrest);
 
-// ============================================
-// RPC Router
-// ============================================
-
-const rpcRouter = Router();
-
-/**
- * Forward RPC calls to PostgREST
- */
-const forwardRpcToPostgrest = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  const { functionName } = req.params;
-
-  try {
-    const result = await proxyService.forward({
-      method: req.method,
-      path: `/rpc/${functionName}`,
-      query: req.query as Record<string, unknown>,
-      headers: req.headers as Record<string, string | string[] | undefined>,
-      body: req.body,
-      apiKey: extractApiKey(req) ?? undefined,
-    });
-
-    const headers = PostgrestProxyService.filterHeaders(result.headers);
-    Object.entries(headers).forEach(([key, value]) => res.setHeader(key, value));
-
-    let responseData = result.data;
-    if (
-      result.data === undefined ||
-      (typeof result.data === 'string' && result.data.trim() === '')
-    ) {
-      responseData = null;
-    }
-
-    successResponse(res, responseData, result.status);
-  } catch (error) {
-    handleProxyError(error, res, next);
-  }
-};
-
-rpcRouter.all('/:functionName', forwardRpcToPostgrest);
-
-export { router as databaseRecordsRouter, rpcRouter as databaseRpcRouter };
+export { router as databaseRecordsRouter };
