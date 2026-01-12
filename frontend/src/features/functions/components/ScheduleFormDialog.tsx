@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useSchedules } from '@/features/functions/hooks/useSchedules';
-import type { ScheduleRow } from '../types/schedules';
+import type { ScheduleFormSchema } from '../types/schedules';
 import { useForm, Controller } from 'react-hook-form';
-import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { createScheduleRequestSchema, type ScheduleSchema } from '@insforge/shared-schemas';
 import {
   Dialog,
   DialogContent,
@@ -14,51 +14,38 @@ import {
 import { Button } from '@/components/radix/Button';
 import { JsonCellEditor } from '@/components/datagrid/cell-editors/JsonCellEditor';
 import { Switch } from '@/components/radix/Switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/radix/Select';
 import { Alert, AlertDescription } from '@/components/radix/Alert';
 import { ScrollArea } from '@/components/radix/ScrollArea';
-import { cn } from '@/lib/utils/utils';
-import { ChevronDown, Pencil } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 
-const createCronJobSchema = z.object({
-  name: z.string().min(1, 'Job name is required'),
-  cronSchedule: z.string().min(1, 'Cron schedule is required'),
-  functionUrl: z.string().url('Must be a valid URL'),
-  httpMethod: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).optional(),
-  contentType: z
-    .enum(['application/json', 'text/plain', 'application/x-www-form-urlencoded'])
-    .optional(),
-  headers: z
-    .union([z.string(), z.record(z.unknown())])
-    .nullable()
-    .optional(),
-  body: z
-    .union([z.string(), z.record(z.unknown())])
-    .nullable()
-    .optional(),
-});
-
-export type CronJobForm = z.infer<typeof createCronJobSchema>;
-
-interface CronJobFormDialogProps {
+interface ScheduleFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode?: 'create' | 'edit';
   scheduleId?: string | null;
-  initialValues?: Partial<CronJobForm>;
-  onSubmit?: (values: CronJobForm) => Promise<void> | void;
+  initialValues?: Partial<ScheduleFormSchema>;
+  onSubmit?: (values: ScheduleFormSchema) => Promise<void> | void;
 }
 
-export function CronJobFormDialog({
+export function ScheduleFormDialog({
   open,
   onOpenChange,
   mode = 'create',
   scheduleId,
   initialValues,
   onSubmit,
-}: CronJobFormDialogProps) {
+}: ScheduleFormDialogProps) {
   const [error, setError] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [editingField, setEditingField] = useState<'headers' | 'body' | null>(null);
+  const [contentType, setContentType] = useState('application/json');
 
   const getJsonDisplay = (value: unknown): string => {
     if (value === null || value === undefined) {
@@ -74,8 +61,8 @@ export function CronJobFormDialog({
     }
   };
 
-  const form = useForm<CronJobForm>({
-    resolver: zodResolver(createCronJobSchema),
+  const form = useForm<ScheduleFormSchema>({
+    resolver: zodResolver(createScheduleRequestSchema),
     mode: 'onChange',
     reValidateMode: 'onChange',
     defaultValues: {
@@ -83,20 +70,35 @@ export function CronJobFormDialog({
       cronSchedule: initialValues?.cronSchedule ?? '',
       functionUrl: initialValues?.functionUrl ?? '',
       httpMethod: initialValues?.httpMethod ?? 'POST',
-      contentType: initialValues?.contentType ?? 'application/json',
       headers: initialValues?.headers ?? { 'Content-Type': 'application/json' },
       body: initialValues?.body ?? {},
     },
   });
 
   const { getSchedule } = useSchedules();
-  const [scheduleData, setScheduleData] = useState<ScheduleRow | null>(null);
+  const [scheduleData, setScheduleData] = useState<ScheduleSchema | null>(null);
+
+  // Helper to extract Content-Type from headers
+  const extractContentType = (headers: Record<string, string> | null | undefined): string => {
+    if (!headers) {
+      return 'application/json';
+    }
+    return headers['Content-Type'] || headers['content-type'] || 'application/json';
+  };
+
+  // Update headers when contentType changes
+  const handleContentTypeChange = (newContentType: string) => {
+    setContentType(newContentType);
+    const currentHeaders = form.getValues('headers') ?? {};
+    form.setValue('headers', { ...currentHeaders, 'Content-Type': newContentType });
+  };
 
   useEffect(() => {
     if (!open) {
       setError(null);
       form.reset();
       setAdvancedOpen(false);
+      setContentType('application/json');
       return;
     }
 
@@ -104,33 +106,39 @@ export function CronJobFormDialog({
       const normalizedHeaders =
         scheduleData.headers === null
           ? { 'Content-Type': 'application/json' }
-          : typeof scheduleData.headers === 'string'
-            ? scheduleData.headers
-            : (scheduleData.headers as unknown as Record<string, unknown>);
+          : (scheduleData.headers as Record<string, string>);
 
       const normalizedBody =
         scheduleData.body === null
           ? {}
           : typeof scheduleData.body === 'string'
-            ? scheduleData.body
-            : (scheduleData.body as unknown as Record<string, unknown>);
+            ? (() => {
+                try {
+                  return JSON.parse(scheduleData.body) as Record<string, unknown>;
+                } catch {
+                  return {};
+                }
+              })()
+            : (scheduleData.body as Record<string, unknown>);
+
+      setContentType(extractContentType(normalizedHeaders));
 
       form.reset({
         name: scheduleData.name ?? '',
         cronSchedule: scheduleData.cronSchedule ?? '',
         functionUrl: scheduleData.functionUrl ?? '',
         httpMethod: scheduleData.httpMethod ?? 'POST',
-        contentType: 'application/json',
         headers: normalizedHeaders,
         body: normalizedBody,
       });
     } else if (initialValues) {
+      setContentType(extractContentType(initialValues.headers));
+
       form.reset({
         name: initialValues.name ?? '',
         cronSchedule: initialValues.cronSchedule ?? '',
         functionUrl: initialValues.functionUrl ?? '',
         httpMethod: initialValues.httpMethod ?? 'POST',
-        contentType: initialValues.contentType ?? 'application/json',
         headers: initialValues.headers ?? { 'Content-Type': 'application/json' },
         body: initialValues.body ?? {},
       });
@@ -147,7 +155,7 @@ export function CronJobFormDialog({
     void getSchedule(scheduleId)
       .then((s) => {
         if (mounted) {
-          setScheduleData(s as ScheduleRow | null);
+          setScheduleData(s as ScheduleSchema | null);
         }
       })
       .catch((err) => {
@@ -163,7 +171,7 @@ export function CronJobFormDialog({
     async (values) => {
       try {
         if (onSubmit) {
-          await onSubmit(values as CronJobForm);
+          await onSubmit(values as ScheduleFormSchema);
         }
         onOpenChange(false);
         form.reset();
@@ -183,22 +191,24 @@ export function CronJobFormDialog({
         <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col">
           <DialogHeader className="px-6 py-4 border-b border-zinc-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
             <DialogTitle className="text-xl font-semibold text-zinc-950 dark:text-white">
-              {mode === 'create' ? 'Create a Cron Job' : 'Edit Cron Job'}
+              {mode === 'create' ? 'Create Schedule' : 'Edit Schedule'}
             </DialogTitle>
           </DialogHeader>
 
-          <ScrollArea className="h-full max-h-[520px] overflow-auto">
+          <ScrollArea
+            className={`h-full overflow-auto ${advancedOpen ? 'max-h-[680px]' : 'max-h-[520px]'}`}
+          >
             <div className="px-6 py-6 space-y-8 bg-white dark:bg-neutral-900">
               <div className="grid gap-y-5 gap-x-6 md:grid-cols-[160px_minmax(0,1fr)] items-start">
-                {/* Job Name */}
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:text-right md:mt-2">
-                  Job Name<span className="ml-1 text-rose-600">*</span>
+                {/* Schedule Name */}
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:mt-2">
+                  Schedule Name
                 </label>
                 <div>
                   <input
                     {...form.register('name')}
                     className="w-full px-3 py-2 rounded border bg-white dark:bg-neutral-800 border-zinc-200 dark:border-neutral-700 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500"
-                    placeholder="Enter the job name"
+                    placeholder="Enter schedule name"
                   />
                   {form.formState.errors.name && (
                     <p className="text-xs text-rose-500 mt-1">
@@ -208,9 +218,9 @@ export function CronJobFormDialog({
                 </div>
 
                 {/* Cron Schedule */}
-                <div className="flex flex-col md:items-end md:justify-start md:text-right">
+                <div className="flex flex-col md:justify-start">
                   <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                    Cron Schedule<span className="ml-1 text-rose-600">*</span>
+                    Cron Schedule
                   </label>
                   <span className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
                     Pick from examples
@@ -280,8 +290,8 @@ export function CronJobFormDialog({
                 </div>
 
                 {/* Function URL */}
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:text-right md:mt-2">
-                  Function URL<span className="ml-1 text-rose-600">*</span>
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:mt-2">
+                  Function URL
                 </label>
                 <div>
                   <input
@@ -297,58 +307,58 @@ export function CronJobFormDialog({
                 </div>
 
                 {/* HTTP Method */}
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:text-right md:mt-2">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:mt-2">
                   HTTP Method
                 </label>
-                <div className="relative">
-                  <select
-                    {...form.register('httpMethod')}
-                    className="w-full px-3 py-2 rounded-md border bg-white dark:bg-neutral-800 border-zinc-200 dark:border-neutral-700 text-sm text-zinc-900 dark:text-zinc-100 appearance-none pr-10"
-                  >
-                    <option value="">Select http method</option>
-                    <option value="GET">GET</option>
-                    <option value="POST">POST</option>
-                    <option value="PUT">PUT</option>
-                    <option value="PATCH">PATCH</option>
-                    <option value="DELETE">DELETE</option>
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
-                </div>
+                <Controller
+                  control={form.control}
+                  name="httpMethod"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="GET">GET</SelectItem>
+                        <SelectItem value="POST">POST</SelectItem>
+                        <SelectItem value="PUT">PUT</SelectItem>
+                        <SelectItem value="PATCH">PATCH</SelectItem>
+                        <SelectItem value="DELETE">DELETE</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
 
                 {/* Content Type */}
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:text-right md:mt-2">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:mt-2">
                   Content Type
                 </label>
-                <div className="relative">
-                  <select
-                    {...form.register('contentType')}
-                    className="w-full px-3 py-2 rounded-md border bg-white dark:bg-neutral-800 border-zinc-200 dark:border-neutral-700 text-sm text-zinc-900 dark:text-zinc-100 appearance-none pr-10"
-                  >
-                    <option value="">Select content type</option>
-                    <option value="application/json">application/json</option>
-                    <option value="text/plain">text/plain</option>
-                    <option value="application/x-www-form-urlencoded">
+                <Select value={contentType} onValueChange={handleContentTypeChange}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="application/json">application/json</SelectItem>
+                    <SelectItem value="text/plain">text/plain</SelectItem>
+                    <SelectItem value="application/x-www-form-urlencoded">
                       application/x-www-form-urlencoded
-                    </option>
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
-                </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Advanced options toggle - following same grid layout */}
-              <div className="grid gap-y-5 gap-x-6 md:grid-cols-[160px_minmax(0,1fr)] items-start">
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:text-right md:mt-2">
+              <div className="grid gap-y-5 gap-x-6 md:grid-cols-[160px_minmax(0,1fr)] items-center">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                   Advanced options
                 </label>
-                <div>
-                  <Switch checked={advancedOpen} onCheckedChange={(val) => setAdvancedOpen(val)} />
-                </div>
+                <Switch checked={advancedOpen} onCheckedChange={(val) => setAdvancedOpen(val)} />
               </div>
 
               {advancedOpen && (
                 <div className="grid gap-y-5 gap-x-6 md:grid-cols-[160px_minmax(0,1fr)] items-start">
                   {/* Headers (JSON) */}
-                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:text-right md:mt-2">
+                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:mt-2">
                     Headers (JSON)
                   </label>
                   <div className="space-y-2">
@@ -407,7 +417,7 @@ export function CronJobFormDialog({
                   </div>
 
                   {/* Body (JSON) */}
-                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:text-right md:mt-2">
+                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:mt-2">
                     Body (JSON)
                   </label>
                   <div className="space-y-2">
@@ -480,16 +490,14 @@ export function CronJobFormDialog({
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              className="h-10 px-5 bg-zinc-800 text-white hover:bg-zinc-700 dark:bg-neutral-700 dark:text-zinc-100 dark:border-neutral-600 dark:hover:bg-neutral-600"
+              className="h-10 px-5 dark:bg-neutral-600 dark:text-zinc-300 dark:border-neutral-600 dark:hover:bg-neutral-700"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              className={cn(
-                'h-10 px-5 font-medium bg-emerald-500 text-white hover:bg-emerald-600 dark:bg-emerald-300 dark:text-black dark:hover:bg-emerald-400 rounded-md transition-colors disabled:opacity-60 disabled:cursor-not-allowed'
-              )}
-              disabled={!form.formState.isValid}
+              className="h-10 px-5 font-medium bg-zinc-950 text-white hover:bg-zinc-800 dark:bg-emerald-300 dark:text-zinc-950 dark:hover:bg-emerald-400 disabled:opacity-40"
+              disabled={!form.formState.isValid || form.formState.isSubmitting}
             >
               {mode === 'create' ? 'Create' : 'Save'}
             </Button>

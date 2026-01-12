@@ -26,7 +26,7 @@ export const scheduleSchema = z.object({
   updatedAt: z.string().datetime(),
 });
 
-export const executionLogSchema = z.object({
+export const scheduleLogSchema = z.object({
   id: z.string().uuid(),
   scheduleId: z.string().uuid(),
   executedAt: z.string().datetime(),
@@ -36,5 +36,5 @@ export const executionLogSchema = z.object({
   message: z.string().nullable(),
 });
 
-export type Schedule = z.infer<typeof scheduleSchema>;
-export type ExecutionLog = z.infer<typeof executionLogSchema>;
+export type ScheduleSchema = z.infer<typeof scheduleSchema>;
+export type ScheduleLogSchema = z.infer<typeof scheduleLogSchema>;

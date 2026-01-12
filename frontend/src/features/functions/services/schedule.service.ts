@@ -1,124 +1,85 @@
 import { apiClient } from '@/lib/api/client';
-import type { ScheduleRow } from '@/features/functions/types/schedules';
-import {
-  listSchedulesResponseSchema,
-  getScheduleResponseSchema,
-  upsertScheduleResponseSchema,
-  listExecutionLogsResponseSchema,
-  deleteScheduleResponseSchema,
+import type {
+  ScheduleSchema,
+  ListSchedulesResponse,
+  ListExecutionLogsResponse,
+  CreateScheduleRequest,
+  CreateScheduleResponse,
+  UpdateScheduleRequest,
+  UpdateScheduleResponse,
+  DeleteScheduleResponse,
 } from '@insforge/shared-schemas';
 
-export interface UpsertScheduleInput {
-  id?: string;
-  name: string;
-  cronSchedule: string;
-  functionUrl: string;
-  httpMethod: string;
-  headers?: Record<string, string>;
-  body?: Record<string, unknown> | string;
-}
-
-export interface UpsertScheduleResponse {
-  id: string;
-  cronJobId?: string | null;
-  message: string;
-}
-
-export interface ToggleScheduleResponse {
-  message: string;
-}
-
 export class ScheduleService {
-  async listSchedules(): Promise<ScheduleRow[]> {
-    const resp = await apiClient.request('/schedules', {
+  async listSchedules(): Promise<ScheduleSchema[]> {
+    const response: ListSchedulesResponse = await apiClient.request('/schedules', {
       headers: apiClient.withAccessToken(),
     });
-
-    const parsed = listSchedulesResponseSchema.safeParse(resp);
-    if (!parsed.success) {
-      throw new Error(
-        parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ')
-      );
-    }
-    return parsed.data as ScheduleRow[];
+    return response as ScheduleSchema[];
   }
 
-  async getSchedule(id: string): Promise<ScheduleRow | null> {
-    const resp = await apiClient.request(`/schedules/${encodeURIComponent(id)}`, {
-      headers: apiClient.withAccessToken(),
-    });
-    const parsed = getScheduleResponseSchema.safeParse(resp);
-    if (!parsed.success) {
-      throw new Error(
-        parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ')
-      );
-    }
-    return parsed.data as ScheduleRow;
-  }
-
-  async upsertSchedule(payload: UpsertScheduleInput): Promise<UpsertScheduleResponse> {
-    const resp = await apiClient.request('/schedules', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...apiClient.withAccessToken(),
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const parsed = upsertScheduleResponseSchema.safeParse(resp);
-    if (!parsed.success) {
-      throw new Error(
-        parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ')
-      );
-    }
-    return parsed.data;
-  }
-
-  async toggleSchedule(scheduleId: string, isActive: boolean): Promise<ToggleScheduleResponse> {
-    const resp = await apiClient.request(`/schedules/${encodeURIComponent(scheduleId)}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        ...apiClient.withAccessToken(),
-      },
-      body: JSON.stringify({ isActive }),
-    });
-
-    if (!resp || typeof resp.message !== 'string') {
-      throw new Error('Invalid response from toggle schedule');
-    }
-    return { message: resp.message };
-  }
-
-  async deleteSchedule(scheduleId: string): Promise<{ message: string }> {
-    const resp = await apiClient.request(`/schedules/${encodeURIComponent(scheduleId)}`, {
-      method: 'DELETE',
-      headers: apiClient.withAccessToken(),
-    });
-    const parsed = deleteScheduleResponseSchema.safeParse(resp);
-    if (!parsed.success) {
-      throw new Error(
-        parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ')
-      );
-    }
-    return parsed.data;
-  }
-
-  async listExecutionLogs(scheduleId: string, limit = 50, offset = 0) {
-    const resp = await apiClient.request(
-      `/schedules/${encodeURIComponent(scheduleId)}/logs?limit=${limit}&offset=${offset}`,
+  async getSchedule(id: string): Promise<ScheduleSchema | null> {
+    const response: ScheduleSchema = await apiClient.request(
+      `/schedules/${encodeURIComponent(id)}`,
       {
         headers: apiClient.withAccessToken(),
       }
     );
-    const parsed = listExecutionLogsResponseSchema.safeParse(resp);
-    if (!parsed.success) {
-      throw new Error(
-        parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ')
-      );
-    }
-    return parsed.data;
+    return response;
+  }
+
+  async createSchedule(payload: CreateScheduleRequest): Promise<CreateScheduleResponse> {
+    const response: CreateScheduleResponse = await apiClient.request('/schedules', {
+      method: 'POST',
+      headers: apiClient.withAccessToken(),
+      body: JSON.stringify(payload),
+    });
+    return response;
+  }
+
+  async updateSchedule(
+    scheduleId: string,
+    payload: UpdateScheduleRequest
+  ): Promise<UpdateScheduleResponse> {
+    const response: UpdateScheduleResponse = await apiClient.request(
+      `/schedules/${encodeURIComponent(scheduleId)}`,
+      {
+        method: 'PATCH',
+        headers: apiClient.withAccessToken(),
+        body: JSON.stringify(payload),
+      }
+    );
+    return response;
+  }
+
+  async deleteSchedule(scheduleId: string): Promise<DeleteScheduleResponse> {
+    const response: DeleteScheduleResponse = await apiClient.request(
+      `/schedules/${encodeURIComponent(scheduleId)}`,
+      {
+        method: 'DELETE',
+        headers: apiClient.withAccessToken(),
+      }
+    );
+    return response;
+  }
+
+  async listExecutionLogs(
+    scheduleId: string,
+    limit = 50,
+    offset = 0
+  ): Promise<ListExecutionLogsResponse> {
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      offset: offset.toString(),
+    });
+
+    const response: ListExecutionLogsResponse = await apiClient.request(
+      `/schedules/${encodeURIComponent(scheduleId)}/logs?${params.toString()}`,
+      {
+        headers: apiClient.withAccessToken(),
+      }
+    );
+    return response;
   }
 }
 

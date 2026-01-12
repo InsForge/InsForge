@@ -9,9 +9,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components';
-import { CronJobFormDialog, CronJobForm } from '../components/CronJobFormDialog';
+import { ScheduleFormDialog } from '../components/ScheduleFormDialog';
+import type { ScheduleFormSchema } from '../types/schedules';
 import ScheduleRow from '../components/ScheduleRow';
-import ScheduleExecutionLogs from '../components/ScheduleExecutionLogs';
+import ScheduleLogs from '../components/ScheduleLogs';
 import { Alert, AlertDescription } from '@/components/radix/Alert';
 import { EmptyState } from '@/components/EmptyState';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -38,9 +39,10 @@ export default function SchedulesPage() {
     schedules,
     isLoading: isLoadingSchedules,
     error: schedulesError,
-    createOrUpdate,
+    createSchedule,
+    updateSchedule,
     deleteSchedule: deleteScheduleFn,
-    isToggling: isTogglingStatus,
+    isUpdating,
     isDeleting: isDeletingSchedule,
     toggleSchedule: toggleScheduleFn,
     refetch,
@@ -123,9 +125,9 @@ export default function SchedulesPage() {
     return undefined;
   };
 
-  const handleCreateOnSubmit = async (values: CronJobForm) => {
+  const handleCreateOnSubmit = async (values: ScheduleFormSchema) => {
     try {
-      const ok = await createOrUpdate({
+      const ok = await createSchedule({
         name: values.name,
         cronSchedule: values.cronSchedule,
         functionUrl: values.functionUrl,
@@ -143,13 +145,12 @@ export default function SchedulesPage() {
     }
   };
 
-  const handleEditOnSubmit = async (values: CronJobForm) => {
+  const handleEditOnSubmit = async (values: ScheduleFormSchema) => {
     try {
       if (!editingScheduleId) {
         return;
       }
-      const ok = await createOrUpdate({
-        id: editingScheduleId,
+      const ok = await updateSchedule(editingScheduleId, {
         name: values.name,
         cronSchedule: values.cronSchedule,
         functionUrl: values.functionUrl,
@@ -182,11 +183,7 @@ export default function SchedulesPage() {
           <p className="text-xl text-zinc-950 dark:text-white">{selectedScheduleForLogs.name}</p>
         </div>
         <div className="flex-1 min-h-0">
-          <ScheduleExecutionLogs
-            scheduleId={selectedScheduleForLogs.id}
-            scheduleName={selectedScheduleForLogs.name}
-            onBack={handleBackFromLogs}
-          />
+          <ScheduleLogs scheduleId={selectedScheduleForLogs.id} />
         </div>
       </div>
     );
@@ -250,13 +247,13 @@ export default function SchedulesPage() {
           <div className="col-span-2 py-1 px-3">Next Run</div>
           <div className="col-span-2 py-1 px-3">Last Run</div>
           <div className="col-span-2 py-1 px-3">Created</div>
-          <div className="col-span-1 py-1 px-3">Status</div>
-          <div className="col-span-1 py-1 px-3">Actions</div>
+          <div className="col-span-1 py-1 px-3">Active</div>
+          <div className="col-span-1 py-1 px-3" />
         </div>
       </div>
 
       {/* Create dialog */}
-      <CronJobFormDialog
+      <ScheduleFormDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
         mode="create"
@@ -265,7 +262,7 @@ export default function SchedulesPage() {
 
       {/* Edit dialog */}
       {editingScheduleId && (
-        <CronJobFormDialog
+        <ScheduleFormDialog
           open={editOpen}
           onOpenChange={(open) => {
             setEditOpen(open);
@@ -301,7 +298,7 @@ export default function SchedulesPage() {
                 onEdit={(id) => handleEditSchedule(id)}
                 onDelete={(id) => void handleDeleteSchedule(id)}
                 onToggle={(id, isActive) => void toggleScheduleFn(id, isActive)}
-                isLoading={Boolean(isTogglingStatus || isDeletingSchedule)}
+                isLoading={Boolean(isUpdating || isDeletingSchedule)}
               />
             ))
           ) : null}

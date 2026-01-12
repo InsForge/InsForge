@@ -1,14 +1,27 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { ScheduleRow } from '@/features/functions/types/schedules';
-import {
-  scheduleService,
-  type UpsertScheduleInput,
-  type UpsertScheduleResponse,
-} from '@/features/functions/services/schedule.service';
+import type {
+  ScheduleSchema,
+  CreateScheduleRequest,
+  CreateScheduleResponse,
+  UpdateScheduleRequest,
+  UpdateScheduleResponse,
+} from '@insforge/shared-schemas';
+import { scheduleService } from '@/features/functions/services/schedule.service';
 import { useToast } from '@/lib/hooks/useToast';
 
 const SCHEDULES_QUERY_KEY = ['schedules'];
+const SCHEDULE_LOGS_QUERY_KEY = ['schedule-logs'];
+
+export function useScheduleLogs(scheduleId: string, limit = 50, offset = 0) {
+  return useQuery({
+    queryKey: [SCHEDULE_LOGS_QUERY_KEY, scheduleId, limit, offset],
+    queryFn: () => scheduleService.listExecutionLogs(scheduleId, limit, offset),
+    enabled: !!scheduleId,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+  });
+}
 
 export function useSchedules() {
   const queryClient = useQueryClient();
@@ -21,7 +34,7 @@ export function useSchedules() {
     isLoading,
     error,
     refetch,
-  } = useQuery<ScheduleRow[]>({
+  } = useQuery<ScheduleSchema[]>({
     queryKey: SCHEDULES_QUERY_KEY,
     queryFn: () => scheduleService.listSchedules(),
     staleTime: 2 * 60 * 1000,
@@ -39,42 +52,53 @@ export function useSchedules() {
 
   const schedules = allSchedules;
 
-  const upsertMutation = useMutation<UpsertScheduleResponse, Error, UpsertScheduleInput>({
-    mutationFn: (payload: UpsertScheduleInput) => scheduleService.upsertSchedule(payload),
+  const createMutation = useMutation<CreateScheduleResponse, Error, CreateScheduleRequest>({
+    mutationFn: (payload: CreateScheduleRequest) => scheduleService.createSchedule(payload),
     onSuccess: () => {
       setErrorState(null);
-      showToast('Cron job saved', 'success');
+      showToast('Cron job created', 'success');
       void queryClient.invalidateQueries({ queryKey: SCHEDULES_QUERY_KEY });
     },
     onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : String(err ?? 'Failed to save cron job');
+      const msg = err instanceof Error ? err.message : String(err ?? 'Failed to create cron job');
       setErrorState(err instanceof Error ? err : new Error(msg));
       showToast(msg, 'error');
     },
   });
 
-  const toggleMutation = useMutation({
-    mutationFn: ({ scheduleId, isActive }: { scheduleId: string; isActive: boolean }) =>
-      scheduleService.toggleSchedule(scheduleId, isActive),
-    onMutate: async ({ scheduleId, isActive }: { scheduleId: string; isActive: boolean }) => {
-      await queryClient.cancelQueries({ queryKey: SCHEDULES_QUERY_KEY });
-      const previous = queryClient.getQueryData<ScheduleRow[]>(SCHEDULES_QUERY_KEY);
-      queryClient.setQueryData<ScheduleRow[] | undefined>(SCHEDULES_QUERY_KEY, (old) =>
-        old?.map((s) => (s.id === scheduleId ? { ...s, isActive } : s))
-      );
-      return { previous } as { previous?: ScheduleRow[] };
+  const updateMutation = useMutation<
+    UpdateScheduleResponse,
+    Error,
+    { scheduleId: string; payload: UpdateScheduleRequest }
+  >({
+    mutationFn: ({ scheduleId, payload }) => scheduleService.updateSchedule(scheduleId, payload),
+    onMutate: async ({ scheduleId, payload }) => {
+      // Optimistic update for isActive toggle
+      if (payload.isActive !== undefined) {
+        const newIsActive = payload.isActive;
+        await queryClient.cancelQueries({ queryKey: SCHEDULES_QUERY_KEY });
+        const previous = queryClient.getQueryData<ScheduleSchema[]>(SCHEDULES_QUERY_KEY);
+        queryClient.setQueryData<ScheduleSchema[] | undefined>(SCHEDULES_QUERY_KEY, (old) =>
+          old?.map((s) => (s.id === scheduleId ? { ...s, isActive: newIsActive } : s))
+        );
+        return { previous } as { previous?: ScheduleSchema[] };
+      }
+      return {};
     },
     onError: (err: unknown, _variables, context: unknown) => {
-      const ctx = context as { previous?: ScheduleRow[] } | undefined;
+      const ctx = context as { previous?: ScheduleSchema[] } | undefined;
       if (ctx?.previous) {
         queryClient.setQueryData(SCHEDULES_QUERY_KEY, ctx.previous);
       }
-      setErrorState(err instanceof Error ? err : new Error(String(err ?? 'Toggle failed')));
-      const msg = err instanceof Error ? err.message : String(err ?? 'Toggle failed');
+      setErrorState(
+        err instanceof Error ? err : new Error(String(err ?? 'Failed to update cron job'))
+      );
+      const msg = err instanceof Error ? err.message : String(err ?? 'Failed to update cron job');
       showToast(msg, 'error');
     },
     onSuccess: () => {
       setErrorState(null);
+      showToast('Cron job updated', 'success');
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: SCHEDULES_QUERY_KEY });
@@ -85,14 +109,14 @@ export function useSchedules() {
     mutationFn: (scheduleId: string) => scheduleService.deleteSchedule(scheduleId),
     onMutate: async (scheduleId: string) => {
       await queryClient.cancelQueries({ queryKey: SCHEDULES_QUERY_KEY });
-      const previous = queryClient.getQueryData<ScheduleRow[]>(SCHEDULES_QUERY_KEY);
-      queryClient.setQueryData<ScheduleRow[] | undefined>(SCHEDULES_QUERY_KEY, (old) =>
+      const previous = queryClient.getQueryData<ScheduleSchema[]>(SCHEDULES_QUERY_KEY);
+      queryClient.setQueryData<ScheduleSchema[] | undefined>(SCHEDULES_QUERY_KEY, (old) =>
         old?.filter((s) => s.id !== scheduleId)
       );
-      return { previous } as { previous?: ScheduleRow[] };
+      return { previous } as { previous?: ScheduleSchema[] };
     },
     onError: (err: unknown, _variables, context: unknown) => {
-      const ctx = context as { previous?: ScheduleRow[] } | undefined;
+      const ctx = context as { previous?: ScheduleSchema[] } | undefined;
       if (ctx?.previous) {
         queryClient.setQueryData(SCHEDULES_QUERY_KEY, ctx.previous);
       }
@@ -109,17 +133,30 @@ export function useSchedules() {
     },
   });
 
-  const createOrUpdate = useCallback(
-    async (payload: UpsertScheduleInput) => {
+  const createSchedule = useCallback(
+    async (payload: CreateScheduleRequest) => {
       try {
-        await upsertMutation.mutateAsync(payload);
+        await createMutation.mutateAsync(payload);
         return true;
       } catch (err: unknown) {
-        setErrorState(err instanceof Error ? err : new Error(String(err ?? 'Save failed')));
+        setErrorState(err instanceof Error ? err : new Error(String(err ?? 'Create failed')));
         return false;
       }
     },
-    [upsertMutation]
+    [createMutation]
+  );
+
+  const updateSchedule = useCallback(
+    async (scheduleId: string, payload: UpdateScheduleRequest) => {
+      try {
+        await updateMutation.mutateAsync({ scheduleId, payload });
+        return true;
+      } catch (err: unknown) {
+        setErrorState(err instanceof Error ? err : new Error(String(err ?? 'Update failed')));
+        return false;
+      }
+    },
+    [updateMutation]
   );
 
   const deleteSchedule = useCallback(
@@ -138,14 +175,14 @@ export function useSchedules() {
   const toggleSchedule = useCallback(
     async (scheduleId: string, isActive: boolean) => {
       try {
-        await toggleMutation.mutateAsync({ scheduleId, isActive });
+        await updateMutation.mutateAsync({ scheduleId, payload: { isActive } });
         return true;
       } catch (err: unknown) {
         setErrorState(err instanceof Error ? err : new Error(String(err ?? 'Toggle failed')));
         return false;
       }
     },
-    [toggleMutation]
+    [updateMutation]
   );
 
   const getSchedule = useCallback(async (scheduleId: string) => {
@@ -155,11 +192,7 @@ export function useSchedules() {
     return scheduleService.getSchedule(scheduleId);
   }, []);
 
-  const listExecutionLogs = useCallback(async (scheduleId: string, limit = 50, offset = 0) => {
-    return scheduleService.listExecutionLogs(scheduleId, limit, offset);
-  }, []);
-
-  const filteredSchedules = schedules.filter((s: ScheduleRow) =>
+  const filteredSchedules = schedules.filter((s: ScheduleSchema) =>
     s.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -172,22 +205,21 @@ export function useSchedules() {
 
     // Loading states
     isLoading,
-    isCreating: upsertMutation.isPending,
+    isCreating: createMutation.isPending,
+    isUpdating: updateMutation.isPending,
+    isSaving: createMutation.isPending || updateMutation.isPending,
     isDeleting: deleteMutation.isPending,
-    isToggling: toggleMutation.isPending,
 
     // Error
     error: errorState,
 
     // Actions
-    createOrUpdate,
+    createSchedule,
+    updateSchedule,
     deleteSchedule,
     toggleSchedule,
     getSchedule,
-    listExecutionLogs,
     setSearchQuery,
     refetch,
-
-    // Confirm dialog props
   };
 }

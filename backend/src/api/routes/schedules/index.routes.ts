@@ -1,19 +1,10 @@
 import { Router, Response, NextFunction } from 'express';
-import { z } from 'zod';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
 import { ScheduleService } from '@/services/schedules/schedule.service.js';
 import { successResponse } from '@/utils/response.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
-import {
-  upsertScheduleRequestSchema,
-  listSchedulesResponseSchema,
-  getScheduleResponseSchema,
-  upsertScheduleResponseSchema,
-  deleteScheduleResponseSchema,
-  listExecutionLogsResponseSchema,
-} from '@insforge/shared-schemas';
-import { randomUUID } from 'crypto';
+import { createScheduleRequestSchema, updateScheduleRequestSchema } from '@insforge/shared-schemas';
 
 const router = Router();
 const scheduleService = ScheduleService.getInstance();
@@ -28,30 +19,7 @@ router.use(verifyAdmin);
 router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const schedules = await scheduleService.listSchedules();
-    // Convert date-like fields to ISO strings and compute isActive fallback
-    const schedulesWithStringDates = schedules.map((schedule) => ({
-      ...schedule,
-      lastExecutedAt: schedule.lastExecutedAt
-        ? new Date(schedule.lastExecutedAt).toISOString()
-        : null,
-      createdAt: new Date(schedule.createdAt).toISOString(),
-      updatedAt: new Date(schedule.updatedAt).toISOString(),
-      nextRun: schedule.nextRun ? new Date(schedule.nextRun).toISOString() : null,
-      isActive: typeof schedule.isActive === 'boolean' ? schedule.isActive : !!schedule.cronJobId,
-    }));
-
-    // Validate the response against the shared schema using safeParse so we can return
-    // a useful error instead of throwing an uncaught validation exception.
-    const parsed = listSchedulesResponseSchema.safeParse(schedulesWithStringDates);
-    if (!parsed.success) {
-      throw new AppError(
-        parsed.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
-
-    successResponse(res, parsed.data);
+    successResponse(res, schedules);
   } catch (error) {
     next(error);
   }
@@ -68,60 +36,29 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
     if (!schedule) {
       throw new AppError('Schedule not found.', 404, ERROR_CODES.NOT_FOUND);
     }
-
-    const scheduleWithStringDates = {
-      ...schedule,
-      lastExecutedAt: schedule.lastExecutedAt
-        ? new Date(schedule.lastExecutedAt).toISOString()
-        : null,
-      createdAt: new Date(schedule.createdAt).toISOString(),
-      updatedAt: new Date(schedule.updatedAt).toISOString(),
-      nextRun: schedule.nextRun ? new Date(schedule.nextRun).toISOString() : null,
-      isActive: typeof schedule.isActive === 'boolean' ? schedule.isActive : !!schedule.cronJobId,
-    };
-
-    // Validate with safeParse to avoid throwing an uncontrolled exception on invalid data
-    const parsed = getScheduleResponseSchema.safeParse(scheduleWithStringDates);
-    if (!parsed.success) {
-      throw new AppError(
-        parsed.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
-
-    successResponse(res, parsed.data);
+    successResponse(res, schedule);
   } catch (error) {
     next(error);
   }
 });
 
+/**
+ * GET /api/schedules/:id/logs
+ * Get execution logs for a schedule
+ */
 router.get('/:id/logs', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
     const offset = parseInt(req.query.offset as string) || 0;
 
-    const logs = await scheduleService.getExecutionLogs(id, limit, offset);
-
-    const logsWithStringDates = {
-      logs: logs.logs.map((log) => ({
-        ...log,
-        executedAt: log.executedAt,
-      })),
-      totalCount: logs.total,
-      limit: logs.limit,
-      offset: logs.offset,
-    };
-    const validatedResponse = listExecutionLogsResponseSchema.safeParse(logsWithStringDates);
-    if (!validatedResponse.success) {
-      throw new AppError(
-        validatedResponse.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
-    successResponse(res, validatedResponse.data);
+    const result = await scheduleService.getExecutionLogs(id, limit, offset);
+    successResponse(res, {
+      logs: result.logs,
+      totalCount: result.total,
+      limit: result.limit,
+      offset: result.offset,
+    });
   } catch (error) {
     next(error);
   }
@@ -129,11 +66,11 @@ router.get('/:id/logs', async (req: AuthRequest, res: Response, next: NextFuncti
 
 /**
  * POST /api/schedules
- * Create or update a schedule (upsert)
+ * Create a new schedule
  */
 router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const validation = upsertScheduleRequestSchema.safeParse(req.body);
+    const validation = createScheduleRequestSchema.safeParse(req.body);
     if (!validation.success) {
       throw new AppError(
         validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
@@ -142,30 +79,16 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
       );
     }
 
-    const { data } = validation;
-    const scheduleId = data.id || randomUUID();
-
-    const result = await scheduleService.upsertSchedule({
-      scheduleId,
-      name: data.name,
-      cronSchedule: data.cronSchedule,
-      functionUrl: data.functionUrl,
-      httpMethod: data.httpMethod,
-      headers: data.headers,
-      body: data.body,
-    });
-
-    const responsePayload = {
-      id: scheduleId,
-      // The cron_job_id from the DB function is a string (BIGINT)
-      cronJobId: result.cron_job_id,
-      message: 'Schedule processed successfully',
-    };
-    const statusCode = result.isCreating ? 201 : 200;
-    // Validate the response against the shared schema
-    const validatedResponse = upsertScheduleResponseSchema.parse(responsePayload);
-
-    successResponse(res, validatedResponse, statusCode);
+    const result = await scheduleService.createSchedule(validation.data);
+    successResponse(
+      res,
+      {
+        id: result.id,
+        cronJobId: result.cron_job_id,
+        message: 'Schedule created successfully',
+      },
+      201
+    );
   } catch (error) {
     next(error);
   }
@@ -173,28 +96,27 @@ router.post('/', async (req: AuthRequest, res: Response, next: NextFunction) => 
 
 /**
  * PATCH /api/schedules/:id
- * Toggle active state of a schedule (enable / disable)
+ * Update a schedule (partial update, including toggle)
  */
 router.patch('/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
 
-    const toggleSchema = z.object({ isActive: z.boolean() });
-    const parsed = toggleSchema.safeParse(req.body);
-    if (!parsed.success) {
+    const validation = updateScheduleRequestSchema.safeParse(req.body);
+    if (!validation.success) {
       throw new AppError(
-        parsed.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
         ERROR_CODES.INVALID_INPUT
       );
     }
 
-    const { isActive } = parsed.data;
-
-    // Toggle via service
-    const result = await scheduleService.toggleSchedule(id, isActive);
-
-    successResponse(res, { message: isActive ? 'Schedule enabled' : 'Schedule disabled', result });
+    const result = await scheduleService.updateSchedule(id, validation.data);
+    successResponse(res, {
+      id: result.id,
+      cronJobId: result.cron_job_id,
+      message: 'Schedule updated successfully',
+    });
   } catch (error) {
     next(error);
   }
@@ -208,12 +130,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response, next: NextFunction
   try {
     const { id } = req.params;
     await scheduleService.deleteSchedule(id);
-
-    const responsePayload = { message: 'Schedule deleted successfully.' };
-
-    // Validate the response against the shared schema
-    const validatedResponse = deleteScheduleResponseSchema.parse(responsePayload);
-    successResponse(res, validatedResponse);
+    successResponse(res, { message: 'Schedule deleted successfully.' });
   } catch (error) {
     next(error);
   }
