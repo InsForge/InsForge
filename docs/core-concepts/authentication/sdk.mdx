@@ -421,9 +421,9 @@ const { data, error } = await insforge.auth.setProfile({
 
 ---
 
-## sendVerificationEmail()
+## resendVerificationEmail()
 
-Send email verification using the method configured in auth settings (`verifyEmailMethod`). When method is `code`, sends a 6-digit numeric code. When method is `link`, sends a magic link.
+Resend email verification when the previous OTP has expired or was not received. Uses the method configured in auth settings (`verifyEmailMethod`). When method is `code`, sends a 6-digit numeric code. When method is `link`, sends a magic link.
 
 <Note>
   This endpoint prevents user enumeration by returning success even if the email doesn't exist.
@@ -445,7 +445,7 @@ Send email verification using the method configured in auth settings (`verifyEma
 ### Example
 
 ```javascript
-const { data, error } = await insforge.auth.sendVerificationEmail({
+const { data, error } = await insforge.auth.resendVerificationEmail({
   email: 'user@example.com',
 });
 

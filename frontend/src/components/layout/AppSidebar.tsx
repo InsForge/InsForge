@@ -7,6 +7,7 @@ import {
   documentationMenuItem,
   usageMenuItem,
   settingsMenuItem,
+  deploymentsMenuItem,
   type PrimaryMenuItem,
 } from '@/lib/utils/menuItems';
 import { useLocation, matchPath } from 'react-router-dom';
@@ -23,6 +24,15 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
 
   const isCloud = isInsForgeCloudProject();
   const isInIframe = isIframe();
+
+  // Build main menu items - add deployments for cloud projects
+  const mainMenuItems = useMemo(() => {
+    if (isCloud) {
+      // Insert deployments after visualizer (at the end of main items)
+      return [...staticMenuItems, deploymentsMenuItem];
+    }
+    return staticMenuItems;
+  }, [isCloud]);
 
   // Build bottom menu items based on deployment environment
   const bottomMenuItems = useMemo(() => {
@@ -42,7 +52,7 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   // Items with secondary menus use prefix matching (end: false)
   // Items without secondary menus use exact matching (end: true)
   const activeMenu = useMemo(() => {
-    const allItems = [...staticMenuItems, ...bottomMenuItems];
+    const allItems = [...mainMenuItems, ...bottomMenuItems];
     return allItems.find((item) => {
       if (item.external || item.onClick) {
         return false;
@@ -50,7 +60,7 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
       const hasSecondaryMenu = !!item.secondaryMenu || item.id === 'logs';
       return matchPath({ path: item.href, end: !hasSecondaryMenu }, pathname);
     });
-  }, [pathname, bottomMenuItems]);
+  }, [mainMenuItems, bottomMenuItems, pathname]);
 
   // Get secondary menu items (special case for logs)
   const secondaryMenuItems = activeMenu?.id === 'logs' ? logsMenuItems : activeMenu?.secondaryMenu;
@@ -59,7 +69,7 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   return (
     <div className="flex h-full">
       <PrimaryMenu
-        items={staticMenuItems}
+        items={mainMenuItems}
         bottomItems={bottomMenuItems}
         activeItemId={activeMenu?.id}
         isCollapsed={isCollapsed}

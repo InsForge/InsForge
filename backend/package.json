@@ -15,8 +15,9 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
+    "test:bootstrap-import": "tsx tests/verify-bootstrap-import.js",
     "test:e2e": "./tests/run-all-tests.sh",
-    "migrate:bootstrap": "node src/infra/database/migrations/bootstrap/bootstrap-migrations.js",
+    "migrate:bootstrap": "tsx src/infra/database/migrations/bootstrap/bootstrap-migrations.js",
     "migrate:up": "npm run migrate:bootstrap && node-pg-migrate up --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
     "migrate:down": "node-pg-migrate down --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
     "migrate:create": "node-pg-migrate create --migrations-dir src/infra/database/migrations --migrations-schema system --migrations-table migrations",
@@ -40,6 +41,7 @@
     "@databases/sql": "^3.3.0",
     "@types/multer": "^1.4.13",
     "@types/pg": "^8.15.4",
+    "adm-zip": "^0.5.16",
     "axios": "^1.11.0",
     "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",
@@ -63,6 +65,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
     "@types/cookie-parser": "^1.4.8",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",

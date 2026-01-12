@@ -532,7 +532,7 @@ function CustomAuthFlow() {
     reloadAuth,
     
     // Email verification
-    sendVerificationEmail,
+    resendVerificationEmail,
     verifyEmail,
     
     // Password reset
@@ -579,7 +579,7 @@ function CustomAuthFlow() {
 | `signOut()` | `Promise<void>` | Sign out user |
 | `updateUser(profile)` | `Promise` | Update user profile |
 | `reloadAuth()` | `Promise` | Refresh auth state from backend |
-| `sendVerificationEmail(email)` | `Promise` | Send email verification code |
+| `resendVerificationEmail(email)` | `Promise` | Resend email verification link or otp |
 | `verifyEmail(otp, email?)` | `Promise` | Verify email with OTP code |
 | `sendResetPasswordEmail(email)` | `Promise` | Send password reset email |
 | `resetPassword(token, newPassword)` | `Promise` | Reset password with token |

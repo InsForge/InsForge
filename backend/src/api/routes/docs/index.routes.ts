@@ -5,7 +5,14 @@ import { fileURLToPath } from 'url';
 import { successResponse } from '@/utils/response.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { AppError } from '@/api/middlewares/error.js';
-import { DocTypeSchema, docTypeSchema, sdkFeatureSchema, sdkLanguageSchema } from '@insforge/shared-schemas';
+import {
+  DocTypeSchema,
+  SdkFeatureSchema,
+  SdkLanguageSchema,
+  docTypeSchema,
+  sdkFeatureSchema,
+  sdkLanguageSchema,
+} from '@insforge/shared-schemas';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -85,66 +92,64 @@ async function processSnippets(content: string, docsRoot: string): Promise<strin
   return processedContent.trim();
 }
 
-// Define available documentation files
-const DOCS_MAP: Record<DocTypeSchema, string> = {
-  // General
+// Legacy documentation map for GET /api/docs/:docType endpoint
+// Only contains keys defined in DocTypeSchema for type safety
+const LEGACY_DOCS_MAP: Record<DocTypeSchema, string> = {
   'instructions': 'insforge-instructions-sdk.md',
-  // UI Components - Framework-specific
   'auth-components-react': 'sdks/typescript/ui-components/react.mdx',
   'auth-components-nextjs': 'sdks/typescript/ui-components/nextjs.mdx',
-  // 'auth-components-react-router': 'core-concepts/authentication/ui-components/react-router.mdx',
   'real-time': 'agent-docs/real-time.md',
-
-  // TypeScript SDK
-  'db-sdk-typescript': 'sdks/typescript/database.mdx',
-  'storage-sdk-typescript': 'sdks/typescript/storage.mdx',
-  'functions-sdk-typescript': 'sdks/typescript/functions.mdx',
-  'ai-sdk-typescript': 'sdks/typescript/ai.mdx',
-  'auth-sdk-typescript': 'sdks/typescript/auth.mdx',
-  'realtime-sdk-typescript': 'sdks/typescript/realtime.mdx',
-
-  // Swift SDK
-  'db-sdk-swift': 'sdks/swift/database.mdx',
-  'storage-sdk-swift': 'sdks/swift/storage.mdx',
-  'auth-sdk-swift': 'sdks/swift/auth.mdx',
-  'functions-sdk-swift': 'sdks/swift/functions.mdx',
-  'ai-sdk-swift': 'sdks/swift/ai.mdx',
-  'realtime-sdk-swift': 'sdks/swift/realtime.mdx',
-
-  // Kotlin SDK
-  'db-sdk-kotlin': 'sdks/kotlin/database.mdx',
-  'storage-sdk-kotlin': 'sdks/kotlin/storage.mdx',
-  'auth-sdk-kotlin': 'sdks/kotlin/auth.mdx',
-  'functions-sdk-kotlin': 'sdks/kotlin/functions.mdx',
-  'ai-sdk-kotlin': 'sdks/kotlin/ai.mdx',
-  'realtime-sdk-kotlin': 'sdks/kotlin/realtime.mdx',
-
-  // Flutter SDK
-  // 'db-sdk-flutter': 'sdks/flutter/database.mdx',
-  // 'storage-sdk-flutter': 'sdks/flutter/storage.mdx',
-  // 'auth-sdk-flutter': 'sdks/flutter/auth.mdx',
-  // 'functions-sdk-flutter': 'sdks/flutter/functions.mdx',
-  // 'ai-sdk-flutter': 'sdks/flutter/ai.mdx',
-  // 'realtime-sdk-flutter': 'sdks/flutter/realtime.mdx',
-
-  // REST API
-  'db-rest-api': 'sdks/rest/database.mdx',
-  'storage-rest-api': 'sdks/rest/storage.mdx',
-  'auth-rest-api': 'sdks/rest/auth.mdx',
-  'functions-rest-api': 'sdks/rest/functions.mdx',
-  'ai-rest-api': 'sdks/rest/ai.mdx',
-  'realtime-rest-api': 'sdks/rest/realtime.mdx',
-
-  // Legacy aliases (for backward compatibility) - map to TypeScript SDK
+  'deployment': 'agent-docs/deployment.md',
+  // Legacy SDK aliases - map to TypeScript SDK
   'db-sdk': 'sdks/typescript/database.mdx',
   'storage-sdk': 'sdks/typescript/storage.mdx',
   'functions-sdk': 'sdks/typescript/functions.mdx',
   'ai-integration-sdk': 'sdks/typescript/ai.mdx',
-  'realtime-sdk': 'sdks/typescript/realtime.mdx',
   'auth-sdk': 'sdks/typescript/auth.mdx',
 };
 
-// GET /api/docs/:docType - Get specific documentation
+// SDK documentation map for GET /api/docs/:docFeature/:docLanguage endpoint
+// Supports feature × language combinations with type safety
+const SDK_DOCS_MAP: Record<SdkFeatureSchema, Partial<Record<SdkLanguageSchema, string>>> = {
+  'db': {
+    'typescript': 'sdks/typescript/database.mdx',
+    'swift': 'sdks/swift/database.mdx',
+    'kotlin': 'sdks/kotlin/database.mdx',
+    'rest-api': 'sdks/rest/database.mdx',
+  },
+  'storage': {
+    'typescript': 'sdks/typescript/storage.mdx',
+    'swift': 'sdks/swift/storage.mdx',
+    'kotlin': 'sdks/kotlin/storage.mdx',
+    'rest-api': 'sdks/rest/storage.mdx',
+  },
+  'functions': {
+    'typescript': 'sdks/typescript/functions.mdx',
+    'swift': 'sdks/swift/functions.mdx',
+    'kotlin': 'sdks/kotlin/functions.mdx',
+    'rest-api': 'sdks/rest/functions.mdx',
+  },
+  'auth': {
+    'typescript': 'sdks/typescript/auth.mdx',
+    'swift': 'sdks/swift/auth.mdx',
+    'kotlin': 'sdks/kotlin/auth.mdx',
+    'rest-api': 'sdks/rest/auth.mdx',
+  },
+  'ai': {
+    'typescript': 'sdks/typescript/ai.mdx',
+    'swift': 'sdks/swift/ai.mdx',
+    'kotlin': 'sdks/kotlin/ai.mdx',
+    'rest-api': 'sdks/rest/ai.mdx',
+  },
+  'realtime': {
+    'typescript': 'sdks/typescript/realtime.mdx',
+    'swift': 'sdks/swift/realtime.mdx',
+    'kotlin': 'sdks/kotlin/realtime.mdx',
+    'rest-api': 'sdks/rest/realtime.mdx',
+  },
+};
+
+// GET /api/docs/:docType - Get specific documentation (legacy endpoint)
 router.get('/:docType', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { docType } = req.params;
@@ -155,7 +160,7 @@ router.get('/:docType', async (req: Request, res: Response, next: NextFunction) 
       throw new AppError('Documentation not found', 404, ERROR_CODES.NOT_FOUND);
     }
 
-    const docFileName = DOCS_MAP[parsed.data];
+    const docFileName = LEGACY_DOCS_MAP[parsed.data];
 
     // Read the documentation file
     // PROJECT_ROOT is set in the docker-compose.yml file to point to the InsForge directory
@@ -177,7 +182,7 @@ router.get('/:docType', async (req: Request, res: Response, next: NextFunction) 
   }
 });
 
-// GET /api/docs/:docFeature/:docLanguage - Get specific documentation
+// GET /api/docs/:docFeature/:docLanguage - Get specific SDK documentation
 router.get('/:docFeature/:docLanguage', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { docFeature, docLanguage } = req.params;
@@ -190,19 +195,19 @@ router.get('/:docFeature/:docLanguage', async (req: Request, res: Response, next
       throw new AppError('Documentation not found', 404, ERROR_CODES.NOT_FOUND);
     }
 
-    // Construct the docType from feature and language
-    let docType: string;
-    if (parsedLanguage.data === 'rest-api') {
-      docType = `${docFeature}-${docLanguage}` as DocTypeSchema;
-    } else {
-      docType = `${docFeature}-sdk-${docLanguage}` as DocTypeSchema;
-    }
-    const parsed = docTypeSchema.safeParse(docType);
-    if (!parsed.success) {
+    // Look up the documentation file from SDK_DOCS_MAP
+    const featureDocs = SDK_DOCS_MAP[parsedFeature.data];
+    const docFileName = featureDocs[parsedLanguage.data];
+
+    if (!docFileName) {
       throw new AppError('Documentation not found', 404, ERROR_CODES.NOT_FOUND);
     }
 
-    const docFileName = DOCS_MAP[parsed.data];
+    // Construct docType for response
+    const docType =
+      parsedLanguage.data === 'rest-api'
+        ? `${parsedFeature.data}-${parsedLanguage.data}`
+        : `${parsedFeature.data}-sdk-${parsedLanguage.data}`;
 
     // Read the documentation file
     // PROJECT_ROOT is set in the docker-compose.yml file to point to the InsForge directory
@@ -227,14 +232,30 @@ router.get('/:docFeature/:docLanguage', async (req: Request, res: Response, next
 // GET /api/docs - List available documentation
 router.get('/', (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const available = (Object.keys(DOCS_MAP) as DocTypeSchema[]).map((key) => ({
+    // List legacy documentation
+    const legacyDocs = (Object.keys(LEGACY_DOCS_MAP) as DocTypeSchema[]).map((key) => ({
       type: key,
-      filename: DOCS_MAP[key],
+      filename: LEGACY_DOCS_MAP[key],
       endpoint: `/api/docs/${key}`,
     }));
 
+    // List SDK documentation (feature × language combinations)
+    const sdkDocs: { type: string; filename: string; endpoint: string }[] = [];
+    for (const [feature, languages] of Object.entries(SDK_DOCS_MAP)) {
+      for (const [language, filename] of Object.entries(languages)) {
+        if (filename) {
+          const type = language === 'rest-api' ? `${feature}-${language}` : `${feature}-sdk-${language}`;
+          sdkDocs.push({
+            type,
+            filename,
+            endpoint: `/api/docs/${feature}/${language}`,
+          });
+        }
+      }
+    }
+
     // Traditional REST: return list directly
-    return successResponse(res, available);
+    return successResponse(res, [...legacyDocs, ...sdkDocs]);
   } catch (error) {
     next(error);
   }

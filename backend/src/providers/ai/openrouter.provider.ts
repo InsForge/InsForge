@@ -185,7 +185,10 @@ export class OpenRouterProvider {
         };
       }
     } catch (error) {
-      console.error('Failed to fetch remaining credits:', error);
+      logger.error('Failed to fetch remaining credits', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       throw error;
     }
   }
@@ -243,7 +246,10 @@ export class OpenRouterProvider {
 
         return data.openrouter.api_key;
       } catch (error) {
-        console.error('Failed to fetch cloud API key:', error);
+        logger.error('Failed to fetch cloud API key', {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
         throw error;
       } finally {
         // Clear the promise after completion (success or failure)
@@ -317,7 +323,10 @@ export class OpenRouterProvider {
 
         return data.openrouter.api_key;
       } catch (error) {
-        console.error('Failed to renew cloud API key:', error);
+        logger.error('Failed to renew cloud API key', {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
         throw error;
       } finally {
         // Clear the promise after completion (success or failure)

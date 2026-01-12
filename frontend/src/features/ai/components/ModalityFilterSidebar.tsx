@@ -14,6 +14,7 @@ const modalityOptions: Array<{
 }> = [
   { value: 'text', label: 'Text' },
   { value: 'image', label: 'Image' },
+  { value: 'audio', label: 'Audio' },
 ];
 
 export function ModalityFilterSidebar({

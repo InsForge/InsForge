@@ -18,7 +18,7 @@ export interface ModelOption {
   systemPrompt?: string | null;
 }
 
-import { Type, Image } from 'lucide-react';
+import { Type, Image, Mic } from 'lucide-react';
 import GrokIcon from '@/assets/logos/grok.svg?react';
 import GeminiIcon from '@/assets/logos/gemini.svg?react';
 import ClaudeIcon from '@/assets/logos/claude_code.svg?react';
@@ -35,8 +35,8 @@ export const getModalityIcon = (
       return Type;
     case 'image':
       return Image;
-    // case 'audio':
-    //   return Mic;
+    case 'audio':
+      return Mic;
     // case 'video':
     //   return Video;
     // case 'file':
