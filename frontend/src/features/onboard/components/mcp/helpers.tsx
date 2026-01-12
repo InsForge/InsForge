@@ -13,6 +13,9 @@ import ClineLogo from '@/assets/logos/cline.svg?react';
 import RooCodeLogo from '@/assets/logos/roo_code.svg';
 import QoderLogo from '@/assets/logos/qoder.svg?react';
 import CopilotLogo from '@/assets/logos/copilot.svg?react';
+import AntigravityLogo from '@/assets/logos/antigravity.svg?react';
+import OpenAILogo from '@/assets/logos/openai.svg?react';
+import KiroLogo from '@/assets/logos/kiro.svg?react';
 import { getBackendUrl } from '@/lib/utils/utils';
 // import CodexLogo from '@/assets/logos/openai.svg?react';
 
@@ -63,11 +66,21 @@ export const MCP_AGENTS: MCPAgent[] = [
     displayName: 'Copilot',
     logo: <CopilotLogo className="w-5 h-5 dark:text-white" />,
   },
-  // {
-  //   id: 'codex',
-  //   displayName: 'Codex',
-  //   logo: <CodexLogo className="w-5 h-5 dark:text-white" />,
-  // },
+  {
+    id: 'antigravity',
+    displayName: 'Antigravity',
+    logo: <AntigravityLogo className="w-5 h-5 dark:text-white" />,
+  },
+  {
+    id: 'codex',
+    displayName: 'Codex',
+    logo: <OpenAILogo className="w-5 h-5 dark:text-white" />,
+  },
+  {
+    id: 'kiro',
+    displayName: 'Kiro',
+    logo: <KiroLogo className="w-5 h-5 dark:text-white" />,
+  },
   {
     id: 'mcp',
     displayName: 'MCP JSON',
