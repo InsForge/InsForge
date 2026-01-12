@@ -14,7 +14,7 @@ import StoragePage from '@/features/storage/pages/StoragePage';
 import VisualizerPage from '@/features/visualizer/pages/VisualizerPage';
 import FunctionsPage from '@/features/functions/pages/FunctionsPage';
 import SecretsPage from '@/features/functions/pages/SecretsPage';
-import SchedulesPage from '@/features/functions/page/SchedulesPage';
+import SchedulesPage from '@/features/functions/pages/SchedulesPage';
 import AIPage from '@/features/ai/pages/AIPage';
 import RealtimeChannelsPage from '@/features/realtime/pages/RealtimeChannelsPage';
 import RealtimeMessagesPage from '@/features/realtime/pages/RealtimeMessagesPage';

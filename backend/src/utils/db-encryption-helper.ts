@@ -1,5 +1,5 @@
 import { PoolClient } from 'pg';
-import { AppError } from '@/api/middleware/error';
+import { AppError } from '@/api/middlewares/error';
 import { ERROR_CODES } from '@/types/error-constants';
 
 export async function SetEncryptionKeyForClient(client: PoolClient): Promise<void> {

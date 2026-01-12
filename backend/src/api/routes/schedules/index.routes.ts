@@ -1,9 +1,9 @@
 import { Router, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { AuthRequest, verifyAdmin } from '@/api/middleware/auth.js';
-import { ScheduleService } from '@/core/schedule/schedule.js';
+import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
+import { ScheduleService } from '@/services/schedules/schedule.service.js';
 import { successResponse } from '@/utils/response.js';
-import { AppError } from '@/api/middleware/error.js';
+import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import {
   upsertScheduleRequestSchema,
