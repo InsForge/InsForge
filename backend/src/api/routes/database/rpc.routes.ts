@@ -35,11 +35,7 @@ const forwardRpcToPostgrest = async (req: AuthRequest, res: Response, next: Next
       if (error instanceof AppError) {
         throw error;
       }
-      throw new AppError(
-        `Invalid function name: ${functionName}`,
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
+      throw new AppError(`Invalid function name: ${functionName}`, 400, ERROR_CODES.INVALID_INPUT);
     }
 
     const result = await proxyService.forward({
