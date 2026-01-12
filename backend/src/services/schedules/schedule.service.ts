@@ -4,12 +4,15 @@ import { SecretService } from '@/services/secrets/secret.service.js';
 import { ERROR_CODES } from '@/types/error-constants';
 import { AppError } from '@/api/middlewares/error.js';
 import { SetEncryptionKeyForClient } from '@/utils/db-encryption-helper.js';
-import { UpsertScheduleRequest, type Schedule } from '@insforge/shared-schemas';
+import {
+  type CreateScheduleRequest,
+  type UpdateScheduleRequest,
+  type ScheduleSchema,
+} from '@insforge/shared-schemas';
 import { CronExpressionParser } from 'cron-parser';
+import { randomUUID } from 'crypto';
 
 import { QueryResult } from 'pg';
-
-type UpsertScheduleData = UpsertScheduleRequest & { scheduleId: string };
 
 export class ScheduleService {
   private static instance: ScheduleService;
@@ -66,7 +69,7 @@ export class ScheduleService {
     }
   }
 
-  private computeNextRunForSchedule(schedule: Schedule | null): string | null {
+  private computeNextRunForSchedule(schedule: ScheduleSchema | null): string | null {
     try {
       if (!schedule || !schedule.cronSchedule) {
         return null;
@@ -102,6 +105,30 @@ export class ScheduleService {
       });
       return null;
     }
+  }
+
+  private toISOString(date: unknown): string {
+    if (!date) {
+      return '';
+    }
+    if (date instanceof Date) {
+      return date.toISOString();
+    }
+    if (typeof date === 'string') {
+      return date;
+    }
+    return String(date);
+  }
+
+  private formatScheduleResponse(schedule: ScheduleSchema) {
+    return {
+      ...schedule,
+      lastExecutedAt: schedule.lastExecutedAt ? this.toISOString(schedule.lastExecutedAt) : null,
+      createdAt: this.toISOString(schedule.createdAt),
+      updatedAt: this.toISOString(schedule.updatedAt),
+      nextRun: schedule.nextRun ? this.toISOString(schedule.nextRun) : null,
+      isActive: typeof schedule.isActive === 'boolean' ? schedule.isActive : !!schedule.cronJobId,
+    };
   }
 
   private async resolveHeaderSecrets(
@@ -156,17 +183,16 @@ export class ScheduleService {
       FROM schedules.jobs
       ORDER BY created_at DESC
     `;
-      const pool = this.dbManager.getPool();
-      const result = await pool.query(sql);
-      const schedules = result.rows as Schedule[];
+      const result = await this.dbManager.getPool().query(sql);
+      const schedules = result.rows as ScheduleSchema[];
 
-      const enriched = schedules.map((s: Schedule) => ({
-        ...s,
-        nextRun: this.computeNextRunForSchedule(s),
-      }));
+      const formatted = schedules.map((s) => {
+        const withNextRun = { ...s, nextRun: this.computeNextRunForSchedule(s) };
+        return this.formatScheduleResponse(withNextRun);
+      });
 
-      logger.info(`Retrieved ${enriched.length} schedules`);
-      return enriched;
+      logger.info(`Retrieved ${formatted.length} schedules`);
+      return formatted;
     } catch (error) {
       logger.error('Error retrieving schedules:', error);
       throw error;
@@ -174,9 +200,6 @@ export class ScheduleService {
   }
 
   async getScheduleById(id: string) {
-    if (!id) {
-      throw new AppError('Invalid schedule ID provided.', 400, ERROR_CODES.INVALID_INPUT);
-    }
     try {
       const sql = `
       SELECT
@@ -195,38 +218,34 @@ export class ScheduleService {
       FROM schedules.jobs
       WHERE id = $1
     `;
-      const pool = this.dbManager.getPool();
-      const result = await pool.query(sql, [id]);
-      const schedule = (result.rows[0] as Schedule) || null;
-      if (schedule) {
-        schedule.nextRun = this.computeNextRunForSchedule(schedule);
-      }
-      if (schedule) {
-        logger.info('Successfully retrieved schedule by ID', { scheduleId: id });
-      } else {
+      const result = await this.dbManager.getPool().query(sql, [id]);
+      const schedule = (result.rows[0] as ScheduleSchema) || null;
+      if (!schedule) {
         logger.warn('Schedule not found for ID', { scheduleId: id });
+        return null;
       }
-      return schedule || null;
+      logger.info('Successfully retrieved schedule by ID', { scheduleId: id });
+      const withNextRun = { ...schedule, nextRun: this.computeNextRunForSchedule(schedule) };
+      return this.formatScheduleResponse(withNextRun);
     } catch (error) {
       logger.error('Error in getScheduleById service', { scheduleId: id, error });
       throw error;
     }
   }
 
-  async upsertSchedule(data: UpsertScheduleData) {
+  async createSchedule(data: CreateScheduleRequest) {
     try {
       this.validateCronExpression(data.cronSchedule);
 
+      const scheduleId = randomUUID();
       const resolvedHeaders = data.headers ? await this.resolveHeaderSecrets(data.headers) : {};
-      const existingSchedule = await this.getScheduleById(data.scheduleId);
-      const isCreating = !existingSchedule;
       const sql = `
         SELECT * FROM schedules.upsert_job(
           $1::UUID, $2::TEXT, $3::TEXT, $4::TEXT, $5::TEXT, $6::JSONB, $7::JSONB
         )
       `;
       const values = [
-        data.scheduleId,
+        scheduleId,
         data.name,
         data.cronSchedule,
         data.httpMethod,
@@ -236,16 +255,12 @@ export class ScheduleService {
       ];
       const result = await this.queryWithEncryption(sql, values);
       const jobResult = (result.rows && result.rows[0]) as
-        | {
-            success?: boolean;
-            cron_job_id?: string;
-            message?: string;
-          }
+        | { success?: boolean; cron_job_id?: string; message?: string }
         | undefined;
 
       if (!jobResult || !jobResult.success) {
-        logger.error('Failed to upsert schedule via database function', {
-          scheduleId: data.scheduleId,
+        logger.error('Failed to create schedule via database function', {
+          scheduleId,
           dbMessage: jobResult?.message,
         });
         throw new AppError(
@@ -255,38 +270,94 @@ export class ScheduleService {
         );
       }
 
-      logger.info('Successfully upserted schedule', {
-        scheduleId: data.scheduleId,
+      logger.info('Successfully created schedule', {
+        scheduleId,
         cronJobId: jobResult.cron_job_id,
-        operation: isCreating ? 'create' : 'update',
       });
-      return { ...jobResult, isCreating };
+      return { id: scheduleId, cron_job_id: jobResult.cron_job_id };
     } catch (error) {
-      logger.error('Error in upsertSchedule service', { scheduleId: data.scheduleId, error });
+      logger.error('Error in createSchedule service', { error });
       throw error;
     }
   }
 
-  async toggleSchedule(id: string, isActive: boolean) {
-    if (!id) {
-      throw new AppError('Invalid schedule ID provided.', 400, ERROR_CODES.INVALID_INPUT);
-    }
+  async updateSchedule(id: string, data: UpdateScheduleRequest) {
+    try {
+      const existingSchedule = await this.getScheduleById(id);
+      if (!existingSchedule) {
+        throw new AppError('Schedule not found', 404, ERROR_CODES.NOT_FOUND);
+      }
 
-    if (isActive) {
-      const sql = 'SELECT * FROM schedules.enable_job($1::UUID)';
-      const result = await this.queryWithEncryption(sql, [id]);
-      return (result.rows && result.rows[0]) as Record<string, unknown>;
-    } else {
-      const sql = 'SELECT * FROM schedules.disable_job($1::UUID)';
-      const result = await this.queryWithEncryption(sql, [id]);
-      return (result.rows && result.rows[0]) as Record<string, unknown>;
+      // Check if we need to update schedule fields (not just isActive toggle)
+      const hasScheduleFields =
+        data.name !== undefined ||
+        data.cronSchedule !== undefined ||
+        data.functionUrl !== undefined ||
+        data.httpMethod !== undefined ||
+        data.headers !== undefined ||
+        data.body !== undefined;
+
+      let cronJobId: string | null | undefined = existingSchedule.cronJobId;
+
+      // Update schedule fields if any provided
+      if (hasScheduleFields) {
+        const cronSchedule = data.cronSchedule ?? existingSchedule.cronSchedule;
+        this.validateCronExpression(cronSchedule);
+
+        const resolvedHeaders = data.headers
+          ? await this.resolveHeaderSecrets(data.headers)
+          : existingSchedule.headers || {};
+
+        const sql = `
+          SELECT * FROM schedules.upsert_job(
+            $1::UUID, $2::TEXT, $3::TEXT, $4::TEXT, $5::TEXT, $6::JSONB, $7::JSONB
+          )
+        `;
+        const values = [
+          id,
+          data.name ?? existingSchedule.name,
+          cronSchedule,
+          data.httpMethod ?? existingSchedule.httpMethod,
+          data.functionUrl ?? existingSchedule.functionUrl,
+          resolvedHeaders,
+          data.body ?? existingSchedule.body ?? {},
+        ];
+        const result = await this.queryWithEncryption(sql, values);
+        const jobResult = (result.rows && result.rows[0]) as
+          | { success?: boolean; cron_job_id?: string; message?: string }
+          | undefined;
+
+        if (!jobResult || !jobResult.success) {
+          logger.error('Failed to update schedule via database function', {
+            scheduleId: id,
+            dbMessage: jobResult?.message,
+          });
+          throw new AppError(
+            jobResult?.message || 'Database operation failed',
+            500,
+            ERROR_CODES.DATABASE_INTERNAL_ERROR
+          );
+        }
+        cronJobId = jobResult.cron_job_id;
+      }
+
+      // Handle isActive toggle if provided
+      if (data.isActive !== undefined && data.isActive !== existingSchedule.isActive) {
+        const toggleSql = data.isActive
+          ? 'SELECT * FROM schedules.enable_job($1::UUID)'
+          : 'SELECT * FROM schedules.disable_job($1::UUID)';
+        await this.queryWithEncryption(toggleSql, [id]);
+      }
+
+      logger.info('Successfully updated schedule', { scheduleId: id });
+      return { id, cron_job_id: cronJobId };
+    } catch (error) {
+      logger.error('Error in updateSchedule service', { scheduleId: id, error });
+      throw error;
     }
   }
 
   async deleteSchedule(id: string) {
-    if (!id) {
-      throw new AppError('Invalid schedule ID provided.', 400, ERROR_CODES.INVALID_INPUT);
-    }
     try {
       const sql = 'SELECT * FROM schedules.delete_job($1::UUID)';
       const result = await this.queryWithEncryption(sql, [id]);
@@ -318,9 +389,6 @@ export class ScheduleService {
   }
 
   async getExecutionLogs(scheduleId: string, limit: number = 50, offset: number = 0) {
-    if (!scheduleId) {
-      throw new AppError('Invalid schedule ID provided.', 400, ERROR_CODES.INVALID_INPUT);
-    }
     try {
       const sql = `
         SELECT

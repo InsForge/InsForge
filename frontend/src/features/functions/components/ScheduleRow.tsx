@@ -1,12 +1,19 @@
 import { cn } from '@/lib/utils/utils';
-import type { ScheduleRow as ScheduleRowType } from '../types/schedules';
+import type { ScheduleSchema } from '@insforge/shared-schemas';
 import { format } from 'date-fns';
-import ActionMenu from './ActionMenu';
-import { ScheduleToggleCell } from './ScheduleToggleCell';
+import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Switch } from '@/components/radix/Switch';
+import { Button } from '@/components/radix/Button';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/radix/DropdownMenu';
 import { CopyButton } from '@/components/CopyButton';
 
 interface ScheduleRowProps {
-  schedule: ScheduleRowType;
+  schedule: ScheduleSchema;
   onClick: () => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
@@ -48,9 +55,10 @@ export function ScheduleRow({
               {schedule.functionUrl}
             </span>
             <CopyButton
+              variant="secondary"
               showText={false}
               text={schedule.functionUrl}
-              className="h-7 w-7 dark:hover:bg-neutral-500 dark:data-[copied=true]:group-hover:bg-neutral-700 dark:data-[copied=true]:hover:bg-neutral-700"
+              className="h-7 w-7"
             />
           </div>
         </div>
@@ -87,21 +95,51 @@ export function ScheduleRow({
           </span>
         </div>
 
-        <div className="col-span-1 min-w-0 px-3 py-1.5 flex items-center justify-center">
-          <div onClick={(e) => e.stopPropagation()}>
-            <ScheduleToggleCell row={schedule} isLoading={Boolean(isLoading)} onToggle={onToggle} />
-          </div>
+        <div
+          className="col-span-1 min-w-0 px-3 py-1.5 flex items-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Switch
+            checked={Boolean(schedule.isActive)}
+            onCheckedChange={(next) => onToggle(schedule.id, next)}
+            disabled={isLoading}
+            aria-label={`${schedule.name} active toggle`}
+          />
         </div>
 
         <div
           className="col-span-1 min-w-0 px-3 py-1.5 flex items-center justify-end"
           onClick={(e) => e.stopPropagation()}
         >
-          <ActionMenu
-            ariaLabel={`Actions for ${schedule.name}`}
-            onEdit={() => onEdit(schedule.id)}
-            onDelete={() => onDelete(schedule.id)}
-          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 hover:bg-zinc-200 dark:hover:bg-neutral-600"
+                title={`Actions for ${schedule.name}`}
+              >
+                <MoreHorizontal className="h-4 w-4 text-zinc-500 dark:text-zinc-300" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              sideOffset={6}
+              className="w-40"
+              onCloseAutoFocus={(e) => e.preventDefault()}
+            >
+              <DropdownMenuItem onSelect={() => onEdit(schedule.id)}>
+                <Pencil className="mr-2 h-4 w-4 text-zinc-700 dark:text-zinc-300" />
+                <span>Edit</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => onDelete(schedule.id)}
+                className="text-destructive dark:text-red-400"
+              >
+                <Trash2 className="mr-2 h-4 w-4 text-destructive dark:text-red-400" />
+                <span>Delete</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </div>
