@@ -471,6 +471,7 @@ struct LoginView: View {
     @EnvironmentObject var authState: InsForgeAuthState
     @State private var email = ""
     @State private var password = ""
+    @State private var errorMessage: String?
 
     var body: some View {
         VStack(spacing: 20) {
@@ -481,9 +482,19 @@ struct LoginView: View {
             SecureField("Password", text: $password)
                 .textFieldStyle(.roundedBorder)
 
+            if let errorMessage {
+                Text(errorMessage)
+                    .foregroundColor(.red)
+                    .font(.caption)
+            }
+
             Button("Sign In") {
                 Task {
-                    try await authState.signIn(email: email, password: password)
+                    do {
+                        try await authState.signIn(email: email, password: password)
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
                 }
             }
             .buttonStyle(.borderedProminent)
@@ -493,7 +504,11 @@ struct LoginView: View {
                 request.requestedScopes = [.email, .fullName]
             } onCompletion: { result in
                 Task {
-                    try await authState.signInWithApple(result: result)
+                    do {
+                        try await authState.signInWithApple(result: result)
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
                 }
             }
         }

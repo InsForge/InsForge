@@ -95,17 +95,18 @@ async function processSnippets(content: string, docsRoot: string): Promise<strin
 // Legacy documentation map for GET /api/docs/:docType endpoint
 // Only contains keys defined in DocTypeSchema for type safety
 const LEGACY_DOCS_MAP: Record<DocTypeSchema, string> = {
-  'instructions': 'insforge-instructions-sdk.md',
+  instructions: 'insforge-instructions-sdk.md',
+  'db-sdk': 'sdks/typescript/database.mdx',
+  'auth-sdk': 'sdks/typescript/auth.mdx',
+  // UI Components - Framework-specific
   'auth-components-react': 'sdks/typescript/ui-components/react.mdx',
   'auth-components-nextjs': 'sdks/typescript/ui-components/nextjs.mdx',
-  'real-time': 'agent-docs/real-time.md',
-  'deployment': 'agent-docs/deployment.md',
-  // Legacy SDK aliases - map to TypeScript SDK
-  'db-sdk': 'sdks/typescript/database.mdx',
+  // 'auth-components-react-router': 'sdks/typescript/ui-components/react-router.mdx',
   'storage-sdk': 'sdks/typescript/storage.mdx',
   'functions-sdk': 'sdks/typescript/functions.mdx',
   'ai-integration-sdk': 'sdks/typescript/ai.mdx',
-  'auth-sdk': 'sdks/typescript/auth.mdx',
+  'real-time': 'agent-docs/real-time.md',
+  'deployment': 'agent-docs/deployment.md',
 };
 
 // SDK documentation map for GET /api/docs/:docFeature/:docLanguage endpoint

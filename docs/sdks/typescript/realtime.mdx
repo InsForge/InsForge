@@ -97,7 +97,8 @@ if (response.ok) {
   console.error('Failed:', response.error?.message)
 }
 
-const response = await insforge.realtime.subscribe('orders:456')
+// Subscribe to another channel
+const response2 = await insforge.realtime.subscribe('orders:456')
 ```
 
 ### Output (Success)

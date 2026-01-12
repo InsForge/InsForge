@@ -136,7 +136,7 @@ import dev.insforge.auth.SessionStorage
 class InsforgeManager(private val context: Context) {
     
     val client = createInsforgeClient(
-        baseURL = "https://your-app.insforge.app",
+        baseUrl = "https://your-app.insforge.app",
         anonKey = "your-anon-key"
     ) {
         install(Auth) {

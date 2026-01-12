@@ -8,7 +8,7 @@ The InsForge REST API provides direct HTTP access to all InsForge services. Use 
 ## Base URL
 
 ```
-https://your-app.us-east.insforge.app
+https://your-app.insforge.app
 ```
 
 ## Authentication
@@ -25,17 +25,17 @@ Authorization: Bearer your-jwt-token-or-anon-key
 
 ```bash
 # Register a new user
-curl -X POST https://your-app.us-east.insforge.app/api/auth/users \
+curl -X POST https://your-app.insforge.app/api/auth/users \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "password": "securepassword123"}'
 
 # Sign in and get token
-curl -X POST https://your-app.us-east.insforge.app/api/auth/sessions \
+curl -X POST https://your-app.insforge.app/api/auth/sessions \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "password": "securepassword123"}'
 
 # Use the token for authenticated requests
-curl https://your-app.us-east.insforge.app/api/database/records/posts \
+curl https://your-app.insforge.app/api/database/records/posts \
   -H "Authorization: Bearer your-jwt-token"
 ```
 
