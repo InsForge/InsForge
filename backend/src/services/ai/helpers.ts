@@ -24,7 +24,7 @@ export function sortModalities(modalities: string[]): string[] {
  * Filter to only supported modalities and sort
  */
 export function filterAndSortModalities(modalities: string[]): ModalitySchema[] {
-  const supportedModalities: ModalitySchema[] = ['text', 'image'];
+  const supportedModalities: ModalitySchema[] = ['text', 'image', 'audio'];
   const filtered = modalities.filter((m): m is ModalitySchema =>
     supportedModalities.includes(m as ModalitySchema)
   );
