@@ -215,6 +215,7 @@ struct FunctionDemoView: View {
         .padding()
     }
 
+    @MainActor
     func invokeFunction() async {
         isLoading = true
         errorMessage = nil
@@ -229,13 +230,9 @@ struct FunctionDemoView: View {
                 body: ["name": "SwiftUI"]
             )
 
-            await MainActor.run {
-                result = response.message
-            }
+            result = response.message
         } catch {
-            await MainActor.run {
-                errorMessage = "Error: \(error.localizedDescription)"
-            }
+            errorMessage = "Error: \(error.localizedDescription)"
         }
 
         isLoading = false
@@ -297,6 +294,7 @@ struct ProcessDataView: View {
         .padding()
     }
 
+    @MainActor
     func processData() async {
         isProcessing = true
 
@@ -356,6 +354,7 @@ struct ImageProcessView: View {
         }
     }
 
+    @MainActor
     func processImage() async {
         guard let image = selectedImage,
               let imageData = image.jpegData(compressionQuality: 0.8) else {
@@ -384,9 +383,7 @@ struct ImageProcessView: View {
                 )
             )
 
-            await MainActor.run {
-                processedImageURL = response.processedUrl
-            }
+            processedImageURL = response.processedUrl
         } catch {
             print("Image processing failed: \(error)")
         }
@@ -442,6 +439,7 @@ struct AIAssistantView: View {
         .padding()
     }
 
+    @MainActor
     func generate() async {
         isGenerating = true
 
@@ -455,9 +453,7 @@ struct AIAssistantView: View {
                 )
             )
 
-            await MainActor.run {
-                response = result.text
-            }
+            response = result.text
         } catch {
             print("Generation failed: \(error)")
         }
@@ -492,6 +488,7 @@ struct BatchProcessView: View {
         let message: String?
     }
 
+    @MainActor
     func processBatch() async {
         isProcessing = true
 
@@ -504,10 +501,7 @@ struct BatchProcessView: View {
                 )
             )
 
-            await MainActor.run {
-                results = response.results
-            }
-
+            results = response.results
             print("Success: \(response.successCount), Failed: \(response.failureCount)")
         } catch {
             print("Batch processing failed: \(error)")
