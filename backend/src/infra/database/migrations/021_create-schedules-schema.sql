@@ -91,7 +91,7 @@ BEGIN
   END IF;
 
   v_key := current_setting('app.encryption_key', true);
-  IF v_key IS NULL THEN
+  IF v_key IS NULL OR v_key = '' THEN
     RAISE EXCEPTION 'Encryption key app.encryption_key is not set';
   END IF;
 
@@ -114,7 +114,7 @@ BEGIN
   END IF;
 
   v_key := current_setting('app.encryption_key', true);
-  IF v_key IS NULL THEN
+  IF v_key IS NULL OR v_key = '' THEN
     RAISE EXCEPTION 'Encryption key app.encryption_key is not set';
   END IF;
 
@@ -276,7 +276,8 @@ CREATE OR REPLACE FUNCTION schedules.upsert_job(
   p_cron_expression TEXT,
   p_http_method TEXT,
   p_function_url TEXT,
-  p_headers JSONB,
+  p_headers_template JSONB,
+  p_resolved_headers JSONB,
   p_body JSONB
 )
 RETURNS TABLE(cron_job_id BIGINT, success BOOLEAN, message TEXT) AS $$
@@ -286,8 +287,8 @@ DECLARE
   v_function_call TEXT;
   v_encrypted_headers TEXT;
 BEGIN
-  -- Encrypt headers before storing
-  v_encrypted_headers := schedules.encrypt_headers(p_headers);
+  -- Encrypt resolved headers (with actual secret values) before storing
+  v_encrypted_headers := schedules.encrypt_headers(p_resolved_headers);
 
   -- Unschedule any existing job for this schedule to prevent duplicates
   SELECT j.cron_job_id INTO v_existing_cron_id
@@ -303,6 +304,8 @@ BEGIN
   SELECT cron.schedule(p_cron_expression, v_function_call) INTO v_new_cron_id;
 
   -- Insert or update the job record
+  -- headers = original template (safe to display)
+  -- encrypted_headers = resolved values (used at runtime)
   INSERT INTO schedules.jobs (
     id, name, cron_schedule, function_url, http_method, encrypted_headers, headers, body, cron_job_id, is_active, created_at, updated_at
   ) VALUES (
@@ -312,7 +315,7 @@ BEGIN
     p_function_url,
     p_http_method,
     v_encrypted_headers,
-    p_headers,
+    p_headers_template,
     p_body,
     v_new_cron_id,
     TRUE,
