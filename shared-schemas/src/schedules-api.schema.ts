@@ -21,7 +21,7 @@ export const createScheduleRequestSchema = z.object({
   headers: z
     .record(z.string())
     .optional()
-    .describe('Header values starting with "secret:" will be resolved from the secrets store.'),
+    .describe('Header values can reference secrets using ${{secrets.KEY_NAME}} syntax.'),
   body: z.record(z.unknown()).optional().describe('The JSON body to send with the request.'),
 });
 
@@ -37,7 +37,7 @@ export const updateScheduleRequestSchema = z.object({
   headers: z
     .record(z.string())
     .optional()
-    .describe('Header values starting with "secret:" will be resolved from the secrets store.'),
+    .describe('Header values can reference secrets using ${{secrets.KEY_NAME}} syntax.'),
   body: z.record(z.unknown()).optional().describe('The JSON body to send with the request.'),
   isActive: z.boolean().optional().describe('Enable or disable the schedule.'),
 });

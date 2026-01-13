@@ -118,7 +118,7 @@ export class ScheduleService {
     headers: Record<string, string>
   ): Promise<Record<string, string>> {
     const resolvedHeaders: Record<string, string> = {};
-    const secretRegex = /secret:(\S+)/g;
+    const secretRegex = /\$\{\{secrets\.([^}]+)\}\}/g;
 
     for (const key in headers) {
       let value = headers[key];
@@ -221,10 +221,11 @@ export class ScheduleService {
       this.validateCronExpression(data.cronSchedule);
 
       const scheduleId = randomUUID();
+      const headersTemplate = data.headers || {};
       const resolvedHeaders = data.headers ? await this.resolveHeaderSecrets(data.headers) : {};
       const sql = `
         SELECT * FROM schedules.upsert_job(
-          $1::UUID, $2::TEXT, $3::TEXT, $4::TEXT, $5::TEXT, $6::JSONB, $7::JSONB
+          $1::UUID, $2::TEXT, $3::TEXT, $4::TEXT, $5::TEXT, $6::JSONB, $7::JSONB, $8::JSONB
         )
       `;
       const values = [
@@ -233,6 +234,7 @@ export class ScheduleService {
         data.cronSchedule,
         data.httpMethod,
         data.functionUrl,
+        headersTemplate,
         resolvedHeaders,
         data.body || {},
       ];
@@ -287,13 +289,14 @@ export class ScheduleService {
         const cronSchedule = data.cronSchedule ?? existingSchedule.cronSchedule;
         this.validateCronExpression(cronSchedule);
 
+        const headersTemplate = data.headers ?? existingSchedule.headers ?? {};
         const resolvedHeaders = data.headers
           ? await this.resolveHeaderSecrets(data.headers)
-          : existingSchedule.headers || {};
+          : await this.resolveHeaderSecrets(existingSchedule.headers || {});
 
         const sql = `
           SELECT * FROM schedules.upsert_job(
-            $1::UUID, $2::TEXT, $3::TEXT, $4::TEXT, $5::TEXT, $6::JSONB, $7::JSONB
+            $1::UUID, $2::TEXT, $3::TEXT, $4::TEXT, $5::TEXT, $6::JSONB, $7::JSONB, $8::JSONB
           )
         `;
         const values = [
@@ -302,6 +305,7 @@ export class ScheduleService {
           cronSchedule,
           data.httpMethod ?? existingSchedule.httpMethod,
           data.functionUrl ?? existingSchedule.functionUrl,
+          headersTemplate,
           resolvedHeaders,
           data.body ?? existingSchedule.body ?? {},
         ];
