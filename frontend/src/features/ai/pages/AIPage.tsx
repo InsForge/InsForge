@@ -30,10 +30,7 @@ export default function AIPage() {
   const isCloud = isInsForgeCloudProject();
 
   // Dynamically generate provider tabs from available models
-  const providers = useMemo(
-    () => generateProviderTabs(allAvailableModels),
-    [allAvailableModels]
-  );
+  const providers = useMemo(() => generateProviderTabs(allAvailableModels), [allAvailableModels]);
 
   const { data: credits, error: getAICreditsError } = useAIRemainingCredits(!isCloud);
   const { confirm, confirmDialogProps } = useConfirm();
