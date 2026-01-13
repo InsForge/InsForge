@@ -7,7 +7,7 @@ import { useConfirm } from '@/lib/hooks/useConfirm';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
 import {
   CLOUD_PROVIDERS,
-  SELF_HOSTED_PROVIDERS,
+  PROVIDERS,
   filterModelsByProvider,
   toModelOption,
   formatCredits,
@@ -29,7 +29,7 @@ export default function AIPage() {
   } = useAIConfigs();
 
   const isCloud = isInsForgeCloudProject();
-  const providers = isCloud ? CLOUD_PROVIDERS : SELF_HOSTED_PROVIDERS;
+  const providers = isCloud ? CLOUD_PROVIDERS : PROVIDERS;
 
   const { data: credits } = useAIRemainingCredits(!isCloud);
   const { confirm, confirmDialogProps } = useConfirm();

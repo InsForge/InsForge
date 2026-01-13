@@ -34,7 +34,8 @@ export interface ProviderTab {
   logo: React.FunctionComponent<React.SVGProps<SVGSVGElement>> | undefined;
 }
 
-// Cloud environment: 5 providers
+const MAIN_PROVIDER_IDS = ['openai', 'google', 'anthropic', 'x-ai', 'deepseek', 'amazon', 'qwen'];
+
 export const CLOUD_PROVIDERS: ProviderTab[] = [
   { id: 'openai', displayName: 'OpenAI', logo: OpenAIIcon },
   { id: 'google', displayName: 'Gemini', logo: GeminiIcon },
@@ -43,8 +44,7 @@ export const CLOUD_PROVIDERS: ProviderTab[] = [
   { id: 'deepseek', displayName: 'DeepSeek', logo: DeepseekIcon },
 ];
 
-// Self-hosted environment: 7 providers
-export const SELF_HOSTED_PROVIDERS: ProviderTab[] = [
+export const PROVIDERS: ProviderTab[] = [
   { id: 'openai', displayName: 'OpenAI', logo: OpenAIIcon },
   { id: 'google', displayName: 'Gemini', logo: GeminiIcon },
   { id: 'anthropic', displayName: 'Claude', logo: ClaudeIcon },
@@ -52,6 +52,7 @@ export const SELF_HOSTED_PROVIDERS: ProviderTab[] = [
   { id: 'deepseek', displayName: 'DeepSeek', logo: DeepseekIcon },
   { id: 'amazon', displayName: 'Amazon', logo: AmazonIcon },
   { id: 'qwen', displayName: 'Qwen', logo: QwenIcon },
+  { id: 'other', displayName: 'Other', logo: undefined },
 ];
 
 // Extract provider ID from modelId (e.g., "openai/gpt-4o" -> "openai")
@@ -64,6 +65,11 @@ export const filterModelsByProvider = (
   models: AIModelSchema[],
   providerId: string
 ): AIModelSchema[] => {
+  if (providerId === 'other') {
+    return models.filter(
+      (model) => !MAIN_PROVIDER_IDS.includes(getProviderIdFromModelId(model.modelId))
+    );
+  }
   return models.filter((model) => getProviderIdFromModelId(model.modelId) === providerId);
 };
 

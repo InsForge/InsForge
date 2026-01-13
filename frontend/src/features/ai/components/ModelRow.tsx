@@ -13,10 +13,7 @@ export function ModelRow({ model, isEnabled, requests, onToggle }: ModelRowProps
     <div className="grid grid-cols-[200px_173px_173px_173px_173px_80px] gap-3 px-6 py-4 items-center rounded-lg bg-neutral-100 dark:bg-[#323232] mb-3">
       {/* Model with Toggle */}
       <div className="flex items-center gap-3">
-        <Switch
-          checked={isEnabled}
-          onCheckedChange={() => onToggle(model.modelId, isEnabled)}
-        />
+        <Switch checked={isEnabled} onCheckedChange={() => onToggle(model.modelId, isEnabled)} />
         <span className="text-base font-medium text-black dark:text-white truncate">
           {model.modelName}
         </span>
