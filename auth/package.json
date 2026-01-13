@@ -10,11 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@insforge/react": "1.1.2-dev.2",
+    "@insforge/react": "1.1.2-dev.4",
     "@insforge/sdk": "1.1.0-dev.2",
+    "clsx": "^2.1.1",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
-    "react-router-dom": "^7.7.0"
+    "react-router-dom": "^7.7.0",
+    "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.11",
