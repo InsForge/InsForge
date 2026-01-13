@@ -31,7 +31,7 @@ export default function AIPage() {
   const isCloud = isInsForgeCloudProject();
   const providers = isCloud ? CLOUD_PROVIDERS : PROVIDERS;
 
-  const { data: credits } = useAIRemainingCredits(!isCloud);
+  const { data: credits, error: getAICreditsError } = useAIRemainingCredits(!isCloud);
   const { confirm, confirmDialogProps } = useConfirm();
 
   const [activeTab, setActiveTab] = useState(providers[0]?.id || 'openai');
@@ -184,7 +184,13 @@ export default function AIPage() {
         {/* Tab Content - Scrollbar on page edge */}
         <TabsContent value={activeTab} className="flex-1 min-h-0 overflow-y-auto mt-0">
           <div className="max-w-[1080px] mx-auto w-full pt-6 pb-6">
-            {isLoading ? (
+            {getAICreditsError ? (
+              <div className="flex items-center justify-center h-64 text-neutral-500 dark:text-neutral-400">
+                <p className="text-sm font-normal text-neutral-500 dark:text-neutral-400">
+                  {getAICreditsError.message}
+                </p>
+              </div>
+            ) : isLoading ? (
               <div className="flex items-center justify-center h-64">
                 <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
               </div>
