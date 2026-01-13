@@ -89,9 +89,9 @@ export const filterModelsByProvider = (
   return models.filter((model) => getProviderIdFromModelId(model.modelId) === providerId);
 };
 
-// Dynamically generate provider tabs from available models
+// Dynamically generate provider tabs
 // Providers with logos get their own tab, others go to "Other"
-export const getProvidersFromModels = (models: AIModelSchema[]): ProviderTab[] => {
+export const generateProviderTabs = (models: AIModelSchema[]): ProviderTab[] => {
   // Extract unique provider IDs from models
   const providerIds = new Set<string>();
   models.forEach((model) => {
@@ -101,7 +101,6 @@ export const getProvidersFromModels = (models: AIModelSchema[]): ProviderTab[] =
     }
   });
 
-  // Separate providers with logos (main) from those without (other)
   const mainProviders: ProviderTab[] = [];
   let hasOtherProviders = false;
 
@@ -117,9 +116,6 @@ export const getProvidersFromModels = (models: AIModelSchema[]): ProviderTab[] =
       hasOtherProviders = true;
     }
   });
-
-  // Sort main providers by display name
-  mainProviders.sort((a, b) => a.displayName.localeCompare(b.displayName));
 
   // Add "Other" tab at the end if there are providers without logos
   if (hasOtherProviders) {

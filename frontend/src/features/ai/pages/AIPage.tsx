@@ -6,7 +6,7 @@ import { useAIRemainingCredits } from '../hooks/useAIUsage';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
 import {
-  getProvidersFromModels,
+  generateProviderTabs,
   filterModelsByProvider,
   toModelOption,
   formatCredits,
@@ -31,7 +31,7 @@ export default function AIPage() {
 
   // Dynamically generate provider tabs from available models
   const providers = useMemo(
-    () => getProvidersFromModels(allAvailableModels),
+    () => generateProviderTabs(allAvailableModels),
     [allAvailableModels]
   );
 
