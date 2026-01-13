@@ -339,9 +339,50 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /functions/{slug}:
+    get:
+      summary: Execute function (GET)
+      description: Execute a function using GET method. Proxied to Deno runtime.
+      tags:
+        - Client
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_-]+$'
+          description: Function slug identifier
+          example: "hello-world"
+      responses:
+        '200':
+          description: Function executed successfully
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties: true
+              example:
+                message: "Hello, World!"
+        '404':
+          description: Function not found or not active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Function not found or not active"
+        '502':
+          description: Failed to proxy to Deno runtime
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Failed to connect to Deno runtime"
+
     post:
-      summary: Execute function
-      description: Execute a function with the provided request
+      summary: Execute function (POST)
+      description: Execute a function using POST method with JSON body. Proxied to Deno runtime.
       tags:
         - Client
       parameters:
@@ -381,15 +422,115 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 error: "Function not found or not active"
-        '500':
-          description: Function execution error
+        '502':
+          description: Failed to proxy to Deno runtime
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
-                error: "Function execution failed"
-                message: "TypeError: Cannot read property 'name' of undefined"
+                error: "Failed to connect to Deno runtime"
+
+    put:
+      summary: Execute function (PUT)
+      description: Execute a function using PUT method. Proxied to Deno runtime.
+      tags:
+        - Client
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_-]+$'
+          description: Function slug identifier
+          example: "hello-world"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Function executed successfully
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties: true
+        '502':
+          description: Failed to proxy to Deno runtime
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      summary: Execute function (PATCH)
+      description: Execute a function using PATCH method. Proxied to Deno runtime.
+      tags:
+        - Client
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_-]+$'
+          description: Function slug identifier
+          example: "hello-world"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Function executed successfully
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties: true
+        '502':
+          description: Failed to proxy to Deno runtime
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Execute function (DELETE)
+      description: Execute a function using DELETE method. Proxied to Deno runtime.
+      tags:
+        - Client
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_-]+$'
+          description: Function slug identifier
+          example: "hello-world"
+      responses:
+        '200':
+          description: Function executed successfully
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties: true
+        '502':
+          description: Failed to proxy to Deno runtime
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
 components:
   securitySchemes:

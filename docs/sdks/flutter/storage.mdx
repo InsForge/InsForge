@@ -1,0 +1,392 @@
+---
+title: Storage SDK Reference
+description: File upload, download, and management with the InsForge Flutter SDK
+---
+
+<Info>
+  **Coming Soon** - The Flutter SDK is currently in development. This documentation serves as a preview of the planned API.
+</Info>
+
+## Installation
+
+```dart
+import 'package:insforge/insforge.dart';
+
+final insforge = InsForgeClient(
+  baseUrl: 'https://your-app.insforge.app',
+  anonKey: 'your-anon-key',
+);
+```
+
+## from()
+
+Get a bucket instance for file operations.
+
+### Example
+
+```dart
+final bucket = insforge.storage.from('images');
+```
+
+---
+
+## upload()
+
+Upload a file with a specific path/key.
+
+### Example
+
+```dart
+// Upload from Uint8List
+final imageBytes = await imageFile.readAsBytes();
+final result = await insforge.storage
+    .from('images')
+    .upload(
+      path: 'posts/post-123/cover.jpg',
+      data: imageBytes,
+      contentType: 'image/jpeg',
+    );
+
+print('Uploaded: ${result.url}');
+
+// Upload from File
+final file = File('/path/to/photo.jpg');
+final result = await insforge.storage
+    .from('documents')
+    .uploadFile(
+      path: 'reports/annual-2024.pdf',
+      file: file,
+    );
+```
+
+---
+
+## uploadAuto()
+
+Upload a file with auto-generated unique key.
+
+### Example
+
+```dart
+final imageBytes = await pickedImage.readAsBytes();
+final result = await insforge.storage
+    .from('uploads')
+    .uploadAuto(
+      data: imageBytes,
+      contentType: 'image/jpeg',
+      fileExtension: 'jpg',
+    );
+
+// Save to database
+await insforge.database
+    .from('posts')
+    .insert({
+      'image_url': result.url,
+      'image_key': result.key,
+      'user_id': userId,
+    });
+```
+
+---
+
+## download()
+
+Download a file as bytes.
+
+### Example
+
+```dart
+// Download file
+final bytes = await insforge.storage
+    .from('images')
+    .download(path: 'posts/post-123/cover.jpg');
+
+// Display as Image
+final image = Image.memory(Uint8List.fromList(bytes));
+```
+
+---
+
+## remove()
+
+Delete a file from storage.
+
+### Example
+
+```dart
+// Get the file key from database
+final response = await insforge.database
+    .from('posts')
+    .select('image_key')
+    .eq('id', 'post-123')
+    .single();
+
+final imageKey = response.data['image_key'];
+
+// Delete from storage
+await insforge.storage
+    .from('images')
+    .remove(path: imageKey);
+
+// Clear database reference
+await insforge.database
+    .from('posts')
+    .update({'image_url': null, 'image_key': null})
+    .eq('id', 'post-123');
+```
+
+---
+
+## getPublicUrl()
+
+Get a public URL for a file.
+
+### Example
+
+```dart
+final url = insforge.storage
+    .from('images')
+    .getPublicUrl(path: 'posts/post-123/cover.jpg');
+
+print('Public URL: $url');
+```
+
+---
+
+## Flutter Widget Integration
+
+### Image Picker with Upload
+
+```dart
+import 'package:image_picker/image_picker.dart';
+
+class ImageUploadWidget extends StatefulWidget {
+  @override
+  _ImageUploadWidgetState createState() => _ImageUploadWidgetState();
+}
+
+class _ImageUploadWidgetState extends State<ImageUploadWidget> {
+  final ImagePicker _picker = ImagePicker();
+  String? _uploadedUrl;
+  bool _isUploading = false;
+
+  Future<void> _pickAndUpload() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+
+    if (image == null) return;
+
+    setState(() {
+      _isUploading = true;
+    });
+
+    try {
+      final bytes = await image.readAsBytes();
+      final result = await insforge.storage
+          .from('photos')
+          .uploadAuto(
+            data: bytes,
+            contentType: 'image/jpeg',
+            fileExtension: 'jpg',
+          );
+
+      setState(() {
+        _uploadedUrl = result.url;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Upload failed: $e')),
+      );
+    } finally {
+      setState(() {
+        _isUploading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        ElevatedButton.icon(
+          onPressed: _isUploading ? null : _pickAndUpload,
+          icon: Icon(Icons.photo),
+          label: Text('Select Photo'),
+        ),
+        SizedBox(height: 16),
+        if (_isUploading)
+          CircularProgressIndicator()
+        else if (_uploadedUrl != null)
+          Image.network(
+            _uploadedUrl!,
+            height: 200,
+            fit: BoxFit.cover,
+          ),
+      ],
+    );
+  }
+}
+```
+
+### Cached Network Image
+
+```dart
+import 'package:cached_network_image/cached_network_image.dart';
+
+class InsForgeImage extends StatelessWidget {
+  final String bucket;
+  final String path;
+  final double? width;
+  final double? height;
+  final BoxFit fit;
+
+  const InsForgeImage({
+    required this.bucket,
+    required this.path,
+    this.width,
+    this.height,
+    this.fit = BoxFit.cover,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final url = insforge.storage
+        .from(bucket)
+        .getPublicUrl(path: path);
+
+    return CachedNetworkImage(
+      imageUrl: url,
+      width: width,
+      height: height,
+      fit: fit,
+      placeholder: (context, url) => Center(
+        child: CircularProgressIndicator(),
+      ),
+      errorWidget: (context, url, error) => Icon(Icons.error),
+    );
+  }
+}
+
+// Usage
+InsForgeImage(
+  bucket: 'avatars',
+  path: 'user-123.jpg',
+  width: 100,
+  height: 100,
+)
+```
+
+### File Upload with Progress
+
+```dart
+class FileUploadWithProgress extends StatefulWidget {
+  @override
+  _FileUploadWithProgressState createState() => _FileUploadWithProgressState();
+}
+
+class _FileUploadWithProgressState extends State<FileUploadWithProgress> {
+  double _progress = 0;
+  bool _isUploading = false;
+
+  Future<void> _uploadFile(File file) async {
+    setState(() {
+      _isUploading = true;
+      _progress = 0;
+    });
+
+    try {
+      final result = await insforge.storage
+          .from('videos')
+          .uploadFile(
+            path: 'videos/${DateTime.now().millisecondsSinceEpoch}.mp4',
+            file: file,
+            onProgress: (progress) {
+              setState(() {
+                _progress = progress;
+              });
+            },
+          );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Upload complete!')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Upload failed: $e')),
+      );
+    } finally {
+      setState(() {
+        _isUploading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        if (_isUploading) ...[
+          LinearProgressIndicator(value: _progress),
+          SizedBox(height: 8),
+          Text('${(_progress * 100).toInt()}%'),
+        ],
+        ElevatedButton(
+          onPressed: _isUploading
+              ? null
+              : () async {
+                  // Pick file and upload
+                },
+          child: Text('Upload File'),
+        ),
+      ],
+    );
+  }
+}
+```
+
+---
+
+## Camera Integration
+
+```dart
+import 'package:image_picker/image_picker.dart';
+
+class CameraUploadWidget extends StatelessWidget {
+  final ImagePicker _picker = ImagePicker();
+
+  Future<String?> takePhotoAndUpload() async {
+    final XFile? photo = await _picker.pickImage(
+      source: ImageSource.camera,
+      maxWidth: 1920,
+      maxHeight: 1080,
+      imageQuality: 85,
+    );
+
+    if (photo == null) return null;
+
+    final bytes = await photo.readAsBytes();
+    final result = await insforge.storage
+        .from('photos')
+        .uploadAuto(
+          data: bytes,
+          contentType: 'image/jpeg',
+        );
+
+    return result.url;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: Icon(Icons.camera_alt),
+      onPressed: () async {
+        final url = await takePhotoAndUpload();
+        if (url != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Photo uploaded!')),
+          );
+        }
+      },
+    );
+  }
+}
+```

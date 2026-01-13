@@ -1,0 +1,513 @@
+---
+title: Functions SDK Reference
+description: Invoke serverless functions with the InsForge Swift SDK
+---
+
+import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
+
+## Installation
+
+<SwiftSdkInstallation />
+
+<Note>
+Currently, InsForge only supports JavaScript/TypeScript functions running in a Deno environment.
+</Note>
+
+---
+
+## invoke()
+
+Invoke a serverless function by slug.
+
+### Parameters
+
+- `slug` (String) - Function slug/name
+- `body` ([String: Any], optional) - Request body as dictionary
+
+### Overloads
+
+The `invoke` method has three overloads:
+
+1. **With dictionary body, returning typed response**
+   ```swift
+   func invoke<T: Decodable>(_ slug: String, body: [String: Any]?) async throws -> T
+   ```
+
+2. **With Encodable body, returning typed response**
+   ```swift
+   func invoke<I: Encodable, O: Decodable>(_ slug: String, body: I) async throws -> O
+   ```
+
+3. **Without expecting response body**
+   ```swift
+   func invoke(_ slug: String, body: [String: Any]?) async throws
+   ```
+
+<Note>
+SDK automatically includes authentication token from logged-in user.
+</Note>
+
+---
+
+## Examples
+
+### Example: Basic Invocation with Typed Response
+
+```swift
+// Define response model
+struct HelloResponse: Codable {
+    let message: String
+    let timestamp: String
+}
+
+// Invoke function with dictionary body
+let response: HelloResponse = try await insforge.functions.invoke(
+    "hello-world",
+    body: ["name": "World", "greeting": "Hello"]
+)
+
+print(response.message)  // "Hello, World!"
+```
+
+### Example: With Encodable Request Body
+
+```swift
+// Define request and response models
+struct GreetingRequest: Codable {
+    let name: String
+    let greeting: String
+}
+
+struct GreetingResponse: Codable {
+    let message: String
+    let timestamp: String
+}
+
+// Invoke with typed request
+let request = GreetingRequest(name: "World", greeting: "Hello")
+let response: GreetingResponse = try await insforge.functions.invoke(
+    "hello-world",
+    body: request
+)
+
+print(response.message)
+```
+
+### Example: Fire-and-Forget (No Response)
+
+```swift
+// Invoke without expecting a response
+try await insforge.functions.invoke(
+    "log-event",
+    body: [
+        "event": "user_action",
+        "action": "button_click",
+        "timestamp": Date().timeIntervalSince1970
+    ]
+)
+```
+
+### Example: Get Stats
+
+```swift
+struct StatsResponse: Codable {
+    let posts: Int
+    let comments: Int
+}
+
+let stats: StatsResponse = try await insforge.functions.invoke(
+    "get-stats",
+    body: nil
+)
+
+print("Posts: \(stats.posts), Comments: \(stats.comments)")
+```
+
+### Example: Update Resource
+
+```swift
+struct UpdateRequest: Codable {
+    let id: String
+    let status: String
+}
+
+struct UpdateResponse: Codable {
+    let updated: Bool
+    let id: String
+}
+
+let response: UpdateResponse = try await insforge.functions.invoke(
+    "update-status",
+    body: UpdateRequest(id: "123", status: "active")
+)
+
+if response.updated {
+    print("Successfully updated \(response.id)")
+}
+```
+
+---
+
+## Error Handling
+
+```swift
+do {
+    let response: MyResponse = try await insforge.functions.invoke(
+        "my-function",
+        body: ["key": "value"]
+    )
+    print("Success: \(response)")
+} catch let error as InsForgeError {
+    switch error {
+    case .httpError(let statusCode, let message):
+        print("HTTP Error \(statusCode): \(message)")
+    case .decodingError(let error):
+        print("Failed to decode response: \(error)")
+    case .networkError(let error):
+        print("Network error: \(error)")
+    default:
+        print("Error: \(error)")
+    }
+} catch {
+    print("Unexpected error: \(error)")
+}
+```
+
+---
+
+## SwiftUI Integration
+
+### Function Invocation View
+
+```swift
+import SwiftUI
+
+struct FunctionDemoView: View {
+    @State private var result: String = ""
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Button("Invoke Function") {
+                Task {
+                    await invokeFunction()
+                }
+            }
+            .disabled(isLoading)
+
+            if isLoading {
+                ProgressView()
+            }
+
+            if let error = errorMessage {
+                Text(error)
+                    .foregroundColor(.red)
+            }
+
+            if !result.isEmpty {
+                Text(result)
+                    .padding()
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(8)
+            }
+        }
+        .padding()
+    }
+
+    @MainActor
+    func invokeFunction() async {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            struct Response: Codable {
+                let message: String
+            }
+
+            let response: Response = try await insforge.functions.invoke(
+                "hello-world",
+                body: ["name": "SwiftUI"]
+            )
+
+            result = response.message
+        } catch {
+            errorMessage = "Error: \(error.localizedDescription)"
+        }
+
+        isLoading = false
+    }
+}
+```
+
+### With User Input
+
+```swift
+struct ProcessDataView: View {
+    @State private var inputText = ""
+    @State private var processedResult: ProcessedData?
+    @State private var isProcessing = false
+
+    struct ProcessRequest: Codable {
+        let text: String
+        let options: Options
+
+        struct Options: Codable {
+            let uppercase: Bool
+            let trim: Bool
+        }
+    }
+
+    struct ProcessedData: Codable {
+        let original: String
+        let processed: String
+        let characterCount: Int
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            TextField("Enter text to process", text: $inputText)
+                .textFieldStyle(.roundedBorder)
+
+            Button("Process") {
+                Task {
+                    await processData()
+                }
+            }
+            .disabled(inputText.isEmpty || isProcessing)
+
+            if isProcessing {
+                ProgressView("Processing...")
+            }
+
+            if let result = processedResult {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Original: \(result.original)")
+                    Text("Processed: \(result.processed)")
+                    Text("Characters: \(result.characterCount)")
+                }
+                .padding()
+                .background(Color.blue.opacity(0.1))
+                .cornerRadius(8)
+            }
+        }
+        .padding()
+    }
+
+    @MainActor
+    func processData() async {
+        isProcessing = true
+
+        do {
+            let request = ProcessRequest(
+                text: inputText,
+                options: .init(uppercase: true, trim: true)
+            )
+
+            processedResult = try await insforge.functions.invoke(
+                "process-text",
+                body: request
+            )
+        } catch {
+            print("Processing failed: \(error)")
+        }
+
+        isProcessing = false
+    }
+}
+```
+
+---
+
+## Complete Examples
+
+### Example: Image Processing Function
+
+```swift
+struct ImageProcessView: View {
+    @State private var selectedImage: UIImage?
+    @State private var processedImageURL: String?
+    @State private var isProcessing = false
+
+    struct ProcessImageRequest: Codable {
+        let imageUrl: String
+        let filters: [String]
+        let outputFormat: String
+    }
+
+    struct ProcessImageResponse: Codable {
+        let originalUrl: String
+        let processedUrl: String
+        let appliedFilters: [String]
+    }
+
+    var body: some View {
+        VStack {
+            // Image picker and display...
+
+            Button("Apply Filters") {
+                Task {
+                    await processImage()
+                }
+            }
+            .disabled(selectedImage == nil || isProcessing)
+        }
+    }
+
+    @MainActor
+    func processImage() async {
+        guard let image = selectedImage,
+              let imageData = image.jpegData(compressionQuality: 0.8) else {
+            return
+        }
+
+        isProcessing = true
+
+        do {
+            // First upload the image
+            let uploadResult = try await insforge.storage
+                .from("temp-uploads")
+                .upload(
+                    data: imageData,
+                    fileName: "input.jpg",
+                    options: FileOptions(contentType: "image/jpeg")
+                )
+
+            // Then invoke the processing function
+            let response: ProcessImageResponse = try await insforge.functions.invoke(
+                "process-image",
+                body: ProcessImageRequest(
+                    imageUrl: uploadResult.url,
+                    filters: ["grayscale", "blur"],
+                    outputFormat: "jpeg"
+                )
+            )
+
+            processedImageURL = response.processedUrl
+        } catch {
+            print("Image processing failed: \(error)")
+        }
+
+        isProcessing = false
+    }
+}
+```
+
+### Example: AI-Powered Function
+
+```swift
+struct AIAssistantView: View {
+    @State private var prompt = ""
+    @State private var response = ""
+    @State private var isGenerating = false
+
+    struct AIRequest: Codable {
+        let prompt: String
+        let maxTokens: Int
+        let temperature: Double
+    }
+
+    struct AIResponse: Codable {
+        let text: String
+        let tokensUsed: Int
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            TextEditor(text: $prompt)
+                .frame(height: 100)
+                .border(Color.gray, width: 1)
+
+            Button("Generate") {
+                Task {
+                    await generate()
+                }
+            }
+            .disabled(prompt.isEmpty || isGenerating)
+
+            if isGenerating {
+                ProgressView("Generating...")
+            }
+
+            if !response.isEmpty {
+                ScrollView {
+                    Text(response)
+                        .padding()
+                }
+            }
+        }
+        .padding()
+    }
+
+    @MainActor
+    func generate() async {
+        isGenerating = true
+
+        do {
+            let result: AIResponse = try await insforge.functions.invoke(
+                "ai-generate",
+                body: AIRequest(
+                    prompt: prompt,
+                    maxTokens: 500,
+                    temperature: 0.7
+                )
+            )
+
+            response = result.text
+        } catch {
+            print("Generation failed: \(error)")
+        }
+
+        isGenerating = false
+    }
+}
+```
+
+### Example: Batch Operations
+
+```swift
+struct BatchProcessView: View {
+    @State private var items: [String] = []
+    @State private var results: [BatchResult] = []
+    @State private var isProcessing = false
+
+    struct BatchRequest: Codable {
+        let items: [String]
+        let operation: String
+    }
+
+    struct BatchResponse: Codable {
+        let results: [BatchResult]
+        let successCount: Int
+        let failureCount: Int
+    }
+
+    struct BatchResult: Codable, Identifiable {
+        let id: String
+        let success: Bool
+        let message: String?
+    }
+
+    @MainActor
+    func processBatch() async {
+        isProcessing = true
+
+        do {
+            let response: BatchResponse = try await insforge.functions.invoke(
+                "batch-process",
+                body: BatchRequest(
+                    items: items,
+                    operation: "validate"
+                )
+            )
+
+            results = response.results
+            print("Success: \(response.successCount), Failed: \(response.failureCount)")
+        } catch {
+            print("Batch processing failed: \(error)")
+        }
+
+        isProcessing = false
+    }
+}
+```

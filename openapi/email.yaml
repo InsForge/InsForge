@@ -5,12 +5,12 @@ info:
   description: Custom email sending endpoints for sending raw HTML emails
 
 paths:
-  /api/email/send:
+  /api/email/send-raw:
     post:
       summary: Send raw HTML email
-      description: Send a custom HTML email to one or more recipients. Requires admin authentication.
+      description: Send a custom HTML email to one or more recipients. Requires user authentication.
       tags:
-        - Admin
+        - Client
       security:
         - bearerAuth: []
       requestBody:
@@ -39,7 +39,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: Forbidden - admin access required
+          description: Forbidden - authentication required
           content:
             application/json:
               schema:

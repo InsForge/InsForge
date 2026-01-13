@@ -1,0 +1,553 @@
+---
+title: Realtime API Reference
+description: Channel management, message history, and WebSocket pub/sub via REST API
+---
+
+## Overview
+
+The Realtime API provides REST endpoints for channel management and message history, plus WebSocket (Socket.IO) for real-time pub/sub messaging.
+
+<Note>
+The REST API is for **management and history**. For real-time messaging, use the **WebSocket connection** (Socket.IO).
+</Note>
+
+## Headers
+
+For authenticated function invocations:
+```bash
+Authorization: Bearer your-jwt-token-or-anon-key
+Content-Type: application/json
+```
+
+For admin endpoints:
+```bash
+Authorization: Bearer admin-jwt-token-Or-API-Key
+Content-Type: application/json
+```
+
+---
+
+## WebSocket Connection
+
+Real-time pub/sub messaging uses Socket.IO over WebSocket.
+
+### Connection URL
+
+```
+wss://your-app.insforge.app
+```
+
+### Connection Example (JavaScript)
+
+```javascript
+import { io } from 'socket.io-client';
+
+const socket = io('https://your-app.insforge.app', {
+  auth: {
+    token: 'your-jwt-token'
+  }
+});
+
+// Subscribe to a channel
+socket.emit('REALTIME_SUBSCRIBE', { channel: 'orders' }, (response) => {
+  if (response.ok) {
+    console.log('Subscribed to:', response.channel);
+  } else {
+    console.error('Subscribe failed:', response.error);
+  }
+});
+
+// Listen for events
+socket.on('INSERT', (message) => {
+  console.log('New record inserted:', message);
+});
+
+socket.on('UPDATE', (message) => {
+  console.log('Record updated:', message);
+});
+
+socket.on('DELETE', (message) => {
+  console.log('Record deleted:', message);
+});
+
+// Publish a message
+socket.emit('REALTIME_PUBLISH', {
+  channel: 'orders',
+  event: 'order.created',
+  payload: { orderId: '123', status: 'pending' }
+});
+
+// Unsubscribe
+socket.emit('REALTIME_UNSUBSCRIBE', { channel: 'orders' });
+
+// Disconnect
+socket.disconnect();
+```
+
+### Socket Events
+
+| Event | Direction | Description |
+|-------|-----------|-------------|
+| `REALTIME_SUBSCRIBE` | Client → Server | Subscribe to a channel |
+| `REALTIME_UNSUBSCRIBE` | Client → Server | Unsubscribe from a channel |
+| `REALTIME_PUBLISH` | Client → Server | Publish a message |
+| `INSERT` | Server → Client | Database insert notification |
+| `UPDATE` | Server → Client | Database update notification |
+| `DELETE` | Server → Client | Database delete notification |
+| Custom events | Both | Any custom event name |
+
+---
+
+## REST API: Channels
+
+All channel management endpoints require **admin authentication**.
+
+### List All Channels
+
+```
+GET /api/realtime/channels
+```
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/realtime/channels" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### Response
+
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "pattern": "order:*",
+    "description": "Order updates channel",
+    "webhookUrls": ["https://example.com/webhook"],
+    "enabled": true,
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440001",
+    "pattern": "chat:*",
+    "description": "Chat room messages",
+    "webhookUrls": null,
+    "enabled": true,
+    "createdAt": "2024-01-16T11:00:00Z",
+    "updatedAt": "2024-01-16T11:00:00Z"
+  }
+]
+```
+
+---
+
+### Get Channel by ID
+
+```
+GET /api/realtime/channels/{id}
+```
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/realtime/channels/550e8400-e29b-41d4-a716-446655440000" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### Response
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "pattern": "order:*",
+  "description": "Order updates channel",
+  "webhookUrls": ["https://example.com/webhook"],
+  "enabled": true,
+  "createdAt": "2024-01-15T10:30:00Z",
+  "updatedAt": "2024-01-15T10:30:00Z"
+}
+```
+
+---
+
+### Create Channel
+
+```
+POST /api/realtime/channels
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `pattern` | string | Yes | Channel pattern (supports wildcards like `order:*`) |
+| `description` | string | No | Human-readable description |
+| `webhookUrls` | array | No | URLs to receive webhook notifications |
+| `enabled` | boolean | No | Whether channel is active (default: true) |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/realtime/channels" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pattern": "notifications:*",
+    "description": "User notifications channel",
+    "webhookUrls": ["https://example.com/webhook"],
+    "enabled": true
+  }'
+```
+
+### Response
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440002",
+  "pattern": "notifications:*",
+  "description": "User notifications channel",
+  "webhookUrls": ["https://example.com/webhook"],
+  "enabled": true,
+  "createdAt": "2024-01-17T09:00:00Z",
+  "updatedAt": "2024-01-17T09:00:00Z"
+}
+```
+
+---
+
+### Update Channel
+
+```
+PUT /api/realtime/channels/{id}
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `pattern` | string | No | Updated channel pattern |
+| `description` | string | No | Updated description |
+| `webhookUrls` | array | No | Updated webhook URLs |
+| `enabled` | boolean | No | Updated enabled status |
+
+### Example
+
+```bash
+curl -X PUT "https://your-app.insforge.app/api/realtime/channels/550e8400-e29b-41d4-a716-446655440002" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "Updated notifications channel",
+    "enabled": false
+  }'
+```
+
+### Response
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440002",
+  "pattern": "notifications:*",
+  "description": "Updated notifications channel",
+  "webhookUrls": ["https://example.com/webhook"],
+  "enabled": false,
+  "createdAt": "2024-01-17T09:00:00Z",
+  "updatedAt": "2024-01-17T14:00:00Z"
+}
+```
+
+---
+
+### Delete Channel
+
+```
+DELETE /api/realtime/channels/{id}
+```
+
+### Example
+
+```bash
+curl -X DELETE "https://your-app.insforge.app/api/realtime/channels/550e8400-e29b-41d4-a716-446655440002" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### Response
+
+```json
+{
+  "message": "Channel deleted"
+}
+```
+
+---
+
+## REST API: Messages
+
+All message endpoints require **admin authentication**.
+
+### List Messages
+
+Retrieve message history with optional filters.
+
+```
+GET /api/realtime/messages
+```
+
+### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `channelId` | uuid | Filter by channel ID |
+| `eventName` | string | Filter by event name |
+| `limit` | integer | Maximum messages (1-1000, default: 100) |
+| `offset` | integer | Messages to skip |
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/realtime/messages?channelId=550e8400-e29b-41d4-a716-446655440000&limit=50" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### Response
+
+```json
+[
+  {
+    "id": "660e8400-e29b-41d4-a716-446655440000",
+    "eventName": "order.created",
+    "channelId": "550e8400-e29b-41d4-a716-446655440000",
+    "channelName": "order:123",
+    "payload": {
+      "orderId": "123",
+      "status": "pending"
+    },
+    "senderType": "user",
+    "senderId": "770e8400-e29b-41d4-a716-446655440000",
+    "wsAudienceCount": 5,
+    "whAudienceCount": 1,
+    "whDeliveredCount": 1,
+    "createdAt": "2024-01-15T10:30:00Z"
+  }
+]
+```
+
+---
+
+### Get Message Statistics
+
+```
+GET /api/realtime/messages/stats
+```
+
+### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `channelId` | uuid | Filter by channel ID |
+| `since` | datetime | Filter stats since timestamp |
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/realtime/messages/stats?since=2024-01-01T00:00:00Z" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### Response
+
+```json
+{
+  "totalMessages": 1250,
+  "whDeliveryRate": 0.98,
+  "topEvents": [
+    {"eventName": "order.created", "count": 450},
+    {"eventName": "order.updated", "count": 380},
+    {"eventName": "order.completed", "count": 220}
+  ]
+}
+```
+
+---
+
+## REST API: Permissions
+
+The permissions endpoint requires **admin authentication**.
+
+### Get Realtime Permissions
+
+Get RLS policies for subscribe and publish operations.
+
+```
+GET /api/realtime/permissions
+```
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/realtime/permissions" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### Response
+
+```json
+{
+  "subscribe": {
+    "policies": [
+      {
+        "policyName": "allow_authenticated_subscribe",
+        "tableName": "realtime_channels",
+        "command": "SELECT",
+        "roles": ["authenticated"],
+        "using": "enabled = true",
+        "withCheck": null
+      }
+    ]
+  },
+  "publish": {
+    "policies": [
+      {
+        "policyName": "allow_authenticated_publish",
+        "tableName": "realtime_messages",
+        "command": "INSERT",
+        "roles": ["authenticated"],
+        "using": null,
+        "withCheck": "true"
+      }
+    ]
+  }
+}
+```
+
+---
+
+## Channel Patterns
+
+Channels support wildcard patterns for flexible subscription matching:
+
+| Pattern | Matches |
+|---------|---------|
+| `orders` | Exact match: `orders` |
+| `order:*` | `order:123`, `order:456`, `order:abc` |
+| `chat:room:*` | `chat:room:general`, `chat:room:support` |
+
+---
+
+## Message Structure
+
+Messages received via WebSocket have the following structure:
+
+```json
+{
+  "channel": "orders",
+  "messageId": "660e8400-e29b-41d4-a716-446655440000",
+  "senderType": "user",
+  "senderId": "770e8400-e29b-41d4-a716-446655440000",
+  "payload": {
+    "orderId": "123",
+    "status": "pending",
+    "items": [...]
+  }
+}
+```
+
+---
+
+## Error Responses
+
+### Channel Not Found (404)
+
+```json
+{
+  "error": "NOT_FOUND",
+  "message": "Channel not found",
+  "statusCode": 404
+}
+```
+
+### Invalid Input (400)
+
+```json
+{
+  "error": "INVALID_INPUT",
+  "message": "pattern: Channel pattern is required",
+  "statusCode": 400
+}
+```
+
+### Invalid Webhook URL (400)
+
+```json
+{
+  "error": "INVALID_INPUT",
+  "message": "webhookUrls.0: Invalid url",
+  "statusCode": 400
+}
+```
+
+---
+
+## Use Cases
+
+### Database Change Notifications
+
+1. Create a channel with pattern matching your table:
+   ```json
+   {"pattern": "todos"}
+   ```
+
+2. Subscribe via WebSocket:
+   ```javascript
+   socket.emit('REALTIME_SUBSCRIBE', { channel: 'todos' });
+   ```
+
+3. Listen for database events:
+   ```javascript
+   socket.on('INSERT', (msg) => console.log('New todo:', msg.payload));
+   socket.on('UPDATE', (msg) => console.log('Updated todo:', msg.payload));
+   socket.on('DELETE', (msg) => console.log('Deleted todo:', msg.payload));
+   ```
+
+### Chat Application
+
+1. Create a channel pattern for chat rooms:
+   ```json
+   {"pattern": "chat:*"}
+   ```
+
+2. Subscribe to a specific room:
+   ```javascript
+   socket.emit('REALTIME_SUBSCRIBE', { channel: 'chat:room123' });
+   ```
+
+3. Send messages:
+   ```javascript
+   socket.emit('REALTIME_PUBLISH', {
+     channel: 'chat:room123',
+     event: 'message',
+     payload: { text: 'Hello!', sender: 'user123' }
+   });
+   ```
+
+4. Receive messages:
+   ```javascript
+   socket.on('message', (msg) => displayMessage(msg.payload));
+   ```
+
+### Webhook Integration
+
+Configure webhooks to receive messages at external URLs:
+
+```json
+{
+  "pattern": "orders",
+  "webhookUrls": [
+    "https://api.example.com/webhooks/orders",
+    "https://slack.example.com/hooks/orders"
+  ]
+}
+```
+
+Each message published to the channel will be POSTed to all configured webhook URLs.

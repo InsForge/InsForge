@@ -1,0 +1,464 @@
+---
+title: Storage SDK Reference
+description: File upload, download, and management with the InsForge Swift SDK
+---
+
+import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
+
+## Installation
+
+<SwiftSdkInstallation />
+
+## from()
+
+Get a file API reference for a bucket.
+
+### Example
+
+```swift
+let bucket = insforge.storage.from("images")
+```
+
+---
+
+## Bucket Operations
+
+### createBucket()
+
+Creates a new storage bucket.
+
+```swift
+// Create a public bucket
+try await insforge.storage.createBucket("avatars")
+
+// Create a private bucket
+try await insforge.storage.createBucket(
+    "documents",
+    options: BucketOptions(isPublic: false)
+)
+```
+
+### listBuckets()
+
+List all bucket names.
+
+```swift
+let buckets = try await insforge.storage.listBuckets()
+// ["avatars", "documents", "uploads"]
+```
+
+### updateBucket()
+
+Update a bucket's visibility.
+
+```swift
+try await insforge.storage.updateBucket(
+    "documents",
+    options: BucketOptions(isPublic: true)
+)
+```
+
+### deleteBucket()
+
+Delete a bucket.
+
+```swift
+try await insforge.storage.deleteBucket("old-bucket")
+```
+
+---
+
+## upload()
+
+Upload a file to the bucket.
+
+### Parameters
+
+- `path` (String) - The object key/path for the file
+- `data` (Data) - File data to upload
+- `options` (FileOptions, optional) - Upload options including contentType
+
+### Examples
+
+```swift
+// Upload with specific path
+let imageData = UIImage(named: "photo")?.jpegData(compressionQuality: 0.8)
+let file = try await insforge.storage
+    .from("images")
+    .upload(
+        path: "posts/post-123/cover.jpg",
+        data: imageData!,
+        options: FileOptions(contentType: "image/jpeg")
+    )
+
+print("Uploaded: \(file.url)")
+print("Key: \(file.key)")
+
+// Upload from file URL
+let fileURL = URL(fileURLWithPath: "/path/to/document.pdf")
+let file = try await insforge.storage
+    .from("documents")
+    .upload(
+        path: "reports/annual-2024.pdf",
+        fileURL: fileURL
+    )
+
+// Upload with auto-generated key
+let file = try await insforge.storage
+    .from("uploads")
+    .upload(
+        data: imageData!,
+        fileName: "profile.jpg",
+        options: FileOptions(contentType: "image/jpeg")
+    )
+```
+
+---
+
+## download()
+
+Download a file as Data.
+
+### Example
+
+```swift
+// Download file
+let data = try await insforge.storage
+    .from("images")
+    .download(path: "posts/post-123/cover.jpg")
+
+// Convert to UIImage
+if let image = UIImage(data: data) {
+    imageView.image = image
+}
+```
+
+---
+
+## list()
+
+List files in a bucket.
+
+### Parameters
+
+- `options` (ListOptions, optional) - Options including prefix, limit, offset
+
+### Examples
+
+```swift
+// List all files
+let files = try await insforge.storage
+    .from("images")
+    .list()
+
+// List with prefix filter
+let userFiles = try await insforge.storage
+    .from("images")
+    .list(options: ListOptions(prefix: "users/", limit: 50))
+
+// Shorthand with prefix
+let files = try await insforge.storage
+    .from("images")
+    .list(prefix: "posts/", limit: 20, offset: 0)
+
+// Iterate results
+for file in files {
+    print("Key: \(file.key), Size: \(file.size)")
+}
+```
+
+---
+
+## delete()
+
+Delete a file from storage.
+
+### Example
+
+```swift
+// Delete a file
+try await insforge.storage
+    .from("images")
+    .delete(path: "posts/post-123/cover.jpg")
+
+// Delete with database cleanup
+let posts: [Post] = try await insforge.database
+    .from("posts")
+    .select("id, image_key")
+    .eq("id", value: "post-123")
+    .execute()
+
+if let post = posts.first, let imageKey = post.imageKey {
+    // Delete from storage
+    try await insforge.storage
+        .from("images")
+        .delete(path: imageKey)
+
+    // Clear database reference
+    struct PostUpdate: Codable {
+        let imageUrl: String?
+        let imageKey: String?
+    }
+
+    let _: [Post] = try await insforge.database
+        .from("posts")
+        .eq("id", value: "post-123")
+        .update(PostUpdate(imageUrl: nil, imageKey: nil))
+}
+```
+
+---
+
+## getPublicURL()
+
+Get a public URL for a file in a public bucket.
+
+### Example
+
+```swift
+let url = insforge.storage
+    .from("images")
+    .getPublicURL(path: "posts/post-123/cover.jpg")
+
+print("Public URL: \(url)")
+```
+
+---
+
+## Upload Strategy
+
+Get upload strategy for large files (direct or presigned URL).
+
+### getUploadStrategy()
+
+```swift
+let strategy = try await insforge.storage
+    .from("videos")
+    .getUploadStrategy(
+        filename: "large-video.mp4",
+        contentType: "video/mp4",
+        size: 104857600  // 100MB
+    )
+
+if strategy.method == "presigned" {
+    // Upload directly to S3 using presigned URL
+    print("Upload URL: \(strategy.uploadUrl)")
+    print("Key: \(strategy.key)")
+
+    // After uploading to presigned URL, confirm the upload
+    if strategy.confirmRequired {
+        let file = try await insforge.storage
+            .from("videos")
+            .confirmUpload(
+                path: strategy.key,
+                size: 104857600,
+                contentType: "video/mp4"
+            )
+    }
+}
+```
+
+### confirmUpload()
+
+Confirm a presigned upload after uploading directly to S3.
+
+```swift
+let file = try await insforge.storage
+    .from("videos")
+    .confirmUpload(
+        path: "videos/large-video.mp4",
+        size: 104857600,
+        contentType: "video/mp4",
+        etag: "\"abc123\""  // Optional S3 ETag
+    )
+```
+
+---
+
+## Download Strategy
+
+Get download strategy for private files (direct or presigned URL).
+
+### getDownloadStrategy()
+
+```swift
+let strategy = try await insforge.storage
+    .from("documents")
+    .getDownloadStrategy(
+        path: "private/confidential.pdf",
+        expiresIn: 3600  // URL expires in 1 hour
+    )
+
+if strategy.method == "presigned" {
+    // Use presigned URL to download
+    print("Download URL: \(strategy.url)")
+    print("Expires: \(strategy.expiresAt ?? "N/A")")
+}
+```
+
+---
+
+## SwiftUI Integration
+
+### Image Picker with Upload
+
+```swift
+import SwiftUI
+import PhotosUI
+
+struct ImageUploadView: View {
+    @State private var selectedItem: PhotosPickerItem?
+    @State private var uploadedUrl: String?
+    @State private var isUploading = false
+
+    var body: some View {
+        VStack {
+            PhotosPicker(selection: $selectedItem, matching: .images) {
+                Label("Select Photo", systemImage: "photo")
+            }
+
+            if isUploading {
+                ProgressView("Uploading...")
+            }
+
+            if let url = uploadedUrl {
+                AsyncImage(url: URL(string: url)) { image in
+                    image.resizable().scaledToFit()
+                } placeholder: {
+                    ProgressView()
+                }
+                .frame(height: 200)
+            }
+        }
+        .onChange(of: selectedItem) { newItem in
+            Task {
+                await uploadPhoto(item: newItem)
+            }
+        }
+    }
+
+    func uploadPhoto(item: PhotosPickerItem?) async {
+        guard let item = item,
+              let data = try? await item.loadTransferable(type: Data.self) else {
+            return
+        }
+
+        isUploading = true
+
+        do {
+            let file = try await insforge.storage
+                .from("photos")
+                .upload(
+                    data: data,
+                    fileName: "photo.jpg",
+                    options: FileOptions(contentType: "image/jpeg")
+                )
+
+            uploadedUrl = file.url
+        } catch {
+            print("Upload failed: \(error)")
+        }
+
+        isUploading = false
+    }
+}
+```
+
+### Async Image with InsForge
+
+```swift
+struct InsForgeImage: View {
+    let bucket: String
+    let path: String
+
+    @State private var imageData: Data?
+
+    var body: some View {
+        Group {
+            if let data = imageData, let uiImage = UIImage(data: data) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                ProgressView()
+            }
+        }
+        .task {
+            await loadImage()
+        }
+    }
+
+    func loadImage() async {
+        do {
+            imageData = try await insforge.storage
+                .from(bucket)
+                .download(path: path)
+        } catch {
+            print("Failed to load image: \(error)")
+        }
+    }
+}
+```
+
+---
+
+## Options Reference
+
+### FileOptions
+
+Options for file upload operations.
+
+```swift
+public struct FileOptions {
+    /// The Content-Type header value (auto-inferred if not specified)
+    var contentType: String?
+
+    /// Optional extra headers for the request
+    var headers: [String: String]?
+}
+```
+
+### BucketOptions
+
+Options for bucket creation/update.
+
+```swift
+public struct BucketOptions {
+    /// Whether the bucket is publicly accessible (default: true)
+    var isPublic: Bool
+}
+```
+
+### ListOptions
+
+Options for listing files.
+
+```swift
+public struct ListOptions {
+    /// Filter objects by key prefix
+    var prefix: String?
+
+    /// Maximum number of results (1-1000, default: 100)
+    var limit: Int
+
+    /// Offset for pagination (default: 0)
+    var offset: Int
+}
+```
+
+---
+
+## StoredFile Model
+
+The response model for storage operations.
+
+```swift
+public struct StoredFile {
+    let bucket: String      // Bucket name
+    let key: String         // Object key/path
+    let size: Int           // File size in bytes
+    let mimeType: String?   // MIME type
+    let uploadedAt: Date    // Upload timestamp
+    let url: String         // Public or signed URL
+}
+```

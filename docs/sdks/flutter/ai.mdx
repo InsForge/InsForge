@@ -1,0 +1,420 @@
+---
+title: AI SDK Reference
+description: AI chat completions and image generation with the InsForge Flutter SDK
+---
+
+<Info>
+  **Coming Soon** - The Flutter SDK is currently in development. This documentation serves as a preview of the planned API.
+</Info>
+
+## Installation
+
+```dart
+import 'package:insforge/insforge.dart';
+
+final insforge = InsForgeClient(
+  baseUrl: 'https://your-app.insforge.app',
+  anonKey: 'your-anon-key',
+);
+```
+
+## chat.completions.create()
+
+Create AI chat completions.
+
+### Example (non-streaming)
+
+```dart
+final completion = await insforge.ai.chat.completions.create(
+  model: 'anthropic/claude-3.5-haiku',
+  messages: [
+    ChatMessage(role: Role.user, content: 'What is the capital of France?'),
+  ],
+);
+
+print(completion.choices[0].message.content);
+```
+
+### Example (with image)
+
+```dart
+import 'dart:convert';
+
+final imageBytes = await imageFile.readAsBytes();
+final base64Image = base64Encode(imageBytes);
+
+final completion = await insforge.ai.chat.completions.create(
+  model: 'anthropic/claude-3.5-haiku',
+  messages: [
+    ChatMessage(
+      role: Role.user,
+      content: [
+        ContentPart.text('What do you see in this image?'),
+        ContentPart.imageUrl('data:image/jpeg;base64,$base64Image'),
+      ],
+    ),
+  ],
+);
+
+print(completion.choices[0].message.content);
+```
+
+### Example (streaming)
+
+```dart
+final stream = insforge.ai.chat.completions.createStream(
+  model: 'openai/gpt-4',
+  messages: [
+    ChatMessage(role: Role.user, content: 'Tell me a story'),
+  ],
+);
+
+await for (final chunk in stream) {
+  final content = chunk.choices[0].delta.content;
+  if (content != null) {
+    stdout.write(content);
+  }
+}
+```
+
+---
+
+## images.generate()
+
+Generate images using AI models.
+
+### Example
+
+```dart
+final response = await insforge.ai.images.generate(
+  model: 'google/gemini-2.5-flash-image-preview',
+  prompt: 'A serene mountain landscape at sunset',
+  size: '1024x1024',
+);
+
+// Convert base64 to image
+final base64 = response.data[0].b64Json;
+if (base64 != null) {
+  final bytes = base64Decode(base64);
+
+  // Display image
+  final image = Image.memory(Uint8List.fromList(bytes));
+
+  // Upload to storage
+  final uploadResult = await insforge.storage
+      .from('ai-images')
+      .uploadAuto(
+        data: bytes,
+        contentType: 'image/png',
+      );
+
+  // Save to database
+  await insforge.database
+      .from('generated_images')
+      .insert({
+        'prompt': 'A serene mountain landscape',
+        'image_url': uploadResult.url,
+      });
+}
+```
+
+---
+
+## Flutter Widget Integration
+
+### Chat Screen
+
+```dart
+class ChatScreen extends StatefulWidget {
+  @override
+  _ChatScreenState createState() => _ChatScreenState();
+}
+
+class _ChatScreenState extends State<ChatScreen> {
+  final List<ChatMessage> _messages = [];
+  final TextEditingController _controller = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  bool _isLoading = false;
+
+  Future<void> _sendMessage() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty || _isLoading) return;
+
+    _controller.clear();
+
+    setState(() {
+      _messages.add(ChatMessage(role: Role.user, content: text));
+      _isLoading = true;
+    });
+
+    _scrollToBottom();
+
+    try {
+      final completion = await insforge.ai.chat.completions.create(
+        model: 'anthropic/claude-3.5-haiku',
+        messages: _messages,
+      );
+
+      setState(() {
+        _messages.add(completion.choices[0].message);
+      });
+
+      _scrollToBottom();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('AI Chat')),
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: EdgeInsets.all(16),
+              itemCount: _messages.length,
+              itemBuilder: (context, index) {
+                final message = _messages[index];
+                return ChatBubble(message: message);
+              },
+            ),
+          ),
+          if (_isLoading)
+            Padding(
+              padding: EdgeInsets.all(8),
+              child: CircularProgressIndicator(),
+            ),
+          Container(
+            padding: EdgeInsets.all(8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    decoration: InputDecoration(
+                      hintText: 'Type a message...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                    ),
+                    onSubmitted: (_) => _sendMessage(),
+                  ),
+                ),
+                SizedBox(width: 8),
+                IconButton(
+                  icon: Icon(Icons.send),
+                  onPressed: _sendMessage,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ChatBubble extends StatelessWidget {
+  final ChatMessage message;
+
+  const ChatBubble({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    final isUser = message.role == Role.user;
+
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: EdgeInsets.symmetric(vertical: 4),
+        padding: EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isUser ? Colors.blue : Colors.grey[300],
+          borderRadius: BorderRadius.circular(16),
+        ),
+        constraints: BoxConstraints(maxWidth: 280),
+        child: Text(
+          message.content.toString(),
+          style: TextStyle(
+            color: isUser ? Colors.white : Colors.black,
+          ),
+        ),
+      ),
+    );
+  }
+}
+```
+
+### Streaming Chat
+
+```dart
+class StreamingChatScreen extends StatefulWidget {
+  @override
+  _StreamingChatScreenState createState() => _StreamingChatScreenState();
+}
+
+class _StreamingChatScreenState extends State<StreamingChatScreen> {
+  String _response = '';
+  bool _isStreaming = false;
+
+  Future<void> _streamResponse() async {
+    setState(() {
+      _isStreaming = true;
+      _response = '';
+    });
+
+    try {
+      final stream = insforge.ai.chat.completions.createStream(
+        model: 'anthropic/claude-3.5-haiku',
+        messages: [
+          ChatMessage(role: Role.user, content: 'Explain quantum computing'),
+        ],
+      );
+
+      await for (final chunk in stream) {
+        final content = chunk.choices[0].delta.content;
+        if (content != null) {
+          setState(() {
+            _response += content;
+          });
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      setState(() {
+        _isStreaming = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Streaming AI')),
+      body: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                child: Text(_response),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: _isStreaming ? null : _streamResponse,
+              child: Text(_isStreaming ? 'Streaming...' : 'Ask AI'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+### Image Generation Screen
+
+```dart
+class ImageGenerationScreen extends StatefulWidget {
+  @override
+  _ImageGenerationScreenState createState() => _ImageGenerationScreenState();
+}
+
+class _ImageGenerationScreenState extends State<ImageGenerationScreen> {
+  final TextEditingController _promptController = TextEditingController();
+  Uint8List? _generatedImage;
+  bool _isGenerating = false;
+
+  Future<void> _generateImage() async {
+    final prompt = _promptController.text.trim();
+    if (prompt.isEmpty || _isGenerating) return;
+
+    setState(() {
+      _isGenerating = true;
+      _generatedImage = null;
+    });
+
+    try {
+      final response = await insforge.ai.images.generate(
+        model: 'google/gemini-2.5-flash-image-preview',
+        prompt: prompt,
+        size: '1024x1024',
+      );
+
+      final base64 = response.data[0].b64Json;
+      if (base64 != null) {
+        setState(() {
+          _generatedImage = base64Decode(base64);
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      setState(() {
+        _isGenerating = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('AI Image Generator')),
+      body: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          children: [
+            TextField(
+              controller: _promptController,
+              decoration: InputDecoration(
+                labelText: 'Describe your image...',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+            SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _isGenerating ? null : _generateImage,
+              child: Text(_isGenerating ? 'Generating...' : 'Generate Image'),
+            ),
+            SizedBox(height: 16),
+            if (_isGenerating)
+              CircularProgressIndicator()
+            else if (_generatedImage != null)
+              Expanded(
+                child: Image.memory(
+                  _generatedImage!,
+                  fit: BoxFit.contain,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```

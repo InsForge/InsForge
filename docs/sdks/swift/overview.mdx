@@ -1,0 +1,73 @@
+---
+title: Swift SDK
+description: Official Swift SDK for InsForge - iOS, macOS, tvOS, and watchOS
+---
+
+import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
+
+The InsForge Swift SDK provides a native Swift client for interacting with InsForge services from iOS, macOS, tvOS, and watchOS applications.
+
+## Installation
+
+### Swift Package Manager
+
+<SwiftSdkInstallation />
+
+Or add it via Xcode:
+1. File → Add Packages...
+2. Enter: `https://github.com/insforge/insforge-swift.git`
+
+### CocoaPods(coming soon)
+
+```ruby
+pod 'InsForge', '~> 1.0'
+```
+
+## Quick Start
+
+```swift
+import InsForge
+
+let insforge = InsForgeClient(
+    baseUrl: "https://your-app.insforge.app",
+    anonKey: "your-anon-key"
+)
+```
+
+## Features
+
+- **Database** - Type-safe CRUD operations with Codable support
+- **Authentication** - Email/password and OAuth authentication
+- **Storage** - File upload, download, and management
+- **AI** - Chat completions and image generation
+- **Realtime** - WebSocket-based pub/sub messaging
+- **SwiftUI Integration** - Property wrappers and environment values
+
+## Platform Support
+
+| Platform | Minimum Version |
+|----------|----------------|
+| iOS | 15.0+ |
+| macOS | 12.0+ |
+| tvOS | 15.0+ |
+| watchOS | 8.0+ |
+
+## SDK Reference
+
+<CardGroup cols={2}>
+  <Card title="Database" icon="database" href="/sdks/swift/database">
+    CRUD operations with Codable models
+  </Card>
+  <Card title="Authentication" icon="lock" href="/sdks/swift/auth">
+    Sign up, sign in, OAuth, and user management
+  </Card>
+  <Card title="Storage" icon="cloud-arrow-up" href="/sdks/swift/storage">
+    File upload, download, and management
+  </Card>
+  <Card title="AI" icon="brain" href="/sdks/swift/ai">
+    Chat completions and image generation
+  </Card>
+  <Card title="Realtime" icon="signal-stream" href="/sdks/swift/realtime">
+    WebSocket pub/sub messaging
+  </Card>
+</CardGroup>

@@ -1,0 +1,552 @@
+---
+title: Storage API Reference
+description: File storage and bucket management via REST API
+---
+
+## Overview
+
+The Storage API provides bucket-based file storage similar to S3. Upload, download, and manage files with support for both local and S3-compatible storage backends.
+
+## Headers
+
+For authenticated function invocations:
+```bash
+Authorization: Bearer your-jwt-token-or-anon-key
+Content-Type: application/json
+```
+
+For admin endpoints:
+```bash
+Authorization: Bearer admin-jwt-token-Or-API-Key
+Content-Type: application/json
+```
+
+---
+
+## Upload Object with upload strategy
+
+InsForge supports two types of storage backends:
+1. **Local Storage**: Files are stored on the local filesystem. Use for development or low-volume production.
+2. **S3-Compatible**: Files are stored on S3-compatible object storage. Use for high-volume production.
+
+The steps to upload a file are:
+1. Get upload strategy
+2. Upload file
+3. Confirm upload (S3 only)
+
+---
+
+### Step 1: Get Upload Strategy
+
+Get the optimal upload strategy (direct or presigned URL) based on storage backend.
+The upload strategy API returns the optimal upload method based on the storage backend:
+- **Local Storage**: Direct upload to InsForge API
+- **S3-Compatible**: Presigned URL for direct upload to S3
+
+```
+POST /api/storage/buckets/{bucketName}/upload-strategy
+```
+
+#### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `filename` | string | Yes | Original filename |
+| `contentType` | string | No | MIME type of the file |
+| `size` | integer | No | File size in bytes |
+
+#### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/upload-strategy" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filename": "profile-photo.jpg",
+    "contentType": "image/jpeg",
+    "size": 102400
+  }'
+```
+
+#### Response (S3 Backend)
+
+```json
+{
+  "method": "presigned",
+  "uploadUrl": "https://s3-bucket.amazonaws.com/",
+  "fields": {
+    "bucket": "my-s3-bucket",
+    "key": "app-key/avatars/profile-photo-1234567890-abc123.jpg",
+    "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+    "X-Amz-Credential": "...",
+    "Policy": "...",
+    "X-Amz-Signature": "..."
+  },
+  "key": "profile-photo-1234567890-abc123.jpg",
+  "confirmRequired": true,
+  "confirmUrl": "/api/storage/buckets/avatars/objects/profile-photo-1234567890-abc123.jpg/confirm-upload",
+  "expiresAt": "2025-09-05T01:00:00Z"
+}
+```
+
+#### Response (Local Storage)
+
+```json
+{
+  "method": "direct",
+  "uploadUrl": "/api/storage/buckets/avatars/objects/profile-photo-1234567890-abc123.jpg",
+  "key": "profile-photo-1234567890-abc123.jpg",
+  "confirmRequired": false
+}
+```
+
+---
+
+### Step 2: Upload File
+
+Upload the file to the specified URL using the provided method.
+- **Local Storage**: Use a PUT request to `uploadUrl` with `multipart/form-data` and a `file` field.
+- **S3-Compatible**: Use a POST request to `uploadUrl` with `multipart/form-data` and a `file` field. Include all fields from the `fields` object in the request.
+
+### Step 3: Confirm Presigned Upload (S3 Only)
+
+Confirm that a file was successfully uploaded to S3 using presigned URL.
+
+```
+POST /api/storage/buckets/{bucketName}/objects/{objectKey}/confirm-upload
+```
+
+#### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `size` | integer | Yes | File size in bytes |
+| `contentType` | string | No | MIME type of the file |
+| `etag` | string | No | S3 ETag of the uploaded object |
+
+#### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile-photo-123.jpg/confirm-upload" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "size": 102400,
+    "contentType": "image/jpeg"
+  }'
+```
+
+#### Response
+
+```json
+{
+  "bucket": "avatars",
+  "key": "profile-photo-123.jpg",
+  "size": 102400,
+  "mimeType": "image/jpeg",
+  "uploadedAt": "2024-01-21T10:30:00Z",
+  "url": "/api/storage/buckets/avatars/objects/profile-photo-123.jpg"
+}
+```
+
+---
+
+## Upload Object (Deprecated)
+
+Upload a file to a bucket with a specific key.
+
+```
+PUT /api/storage/buckets/{bucketName}/objects/{objectKey}
+```
+
+### Path Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `bucketName` | string | Name of the bucket |
+| `objectKey` | string | Object key (can include `/` for pseudo-folders) |
+
+### Request Body
+
+`multipart/form-data` with a `file` field.
+
+### Example
+
+```bash
+curl -X PUT "https://your-app.insforge.app/api/storage/buckets/avatars/objects/users/profile.jpg" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -F "file=@/path/to/image.jpg"
+```
+
+### Response
+
+```json
+{
+  "bucket": "avatars",
+  "key": "users/profile.jpg",
+  "size": 102400,
+  "mimeType": "image/jpeg",
+  "uploadedAt": "2024-01-15T10:30:00Z",
+  "url": "/api/storage/buckets/avatars/objects/users/profile.jpg"
+}
+```
+
+---
+
+## Upload with Auto-Generated Key (Deprecated)
+
+Upload a file with an auto-generated unique key.
+
+```
+POST /api/storage/buckets/{bucketName}/objects
+```
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/storage/buckets/uploads/objects" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -F "file=@/path/to/document.pdf"
+```
+
+### Response
+
+```json
+{
+  "bucket": "uploads",
+  "key": "document-1737546841234-a3f2b1.pdf",
+  "size": 204800,
+  "mimeType": "application/pdf",
+  "uploadedAt": "2024-01-21T10:30:00Z",
+  "url": "/api/storage/buckets/uploads/objects/document-1737546841234-a3f2b1.pdf"
+}
+```
+
+---
+
+## Download Object with download strategy
+
+InsForge supports two types of storage backends:
+1. **Local Storage**: Files are stored on the local filesystem. Use for development or low-volume production.
+2. **S3-Compatible**: Files are stored on S3-compatible object storage. Use for high-volume production.
+
+The steps to download a file are:
+1. Get download strategy
+2. Download file from returned URL
+
+### Step 1: Get Download Strategy
+
+Get the optimal download strategy (direct URL or presigned URL) based on storage backend and bucket visibility.
+
+The download strategy API returns the optimal download method based on the storage backend and bucket visibility:
+- **Local Storage**: Direct download from InsForge API
+- **S3-Compatible**: Presigned URL for S3.
+
+```
+POST /api/storage/buckets/{bucketName}/objects/{objectKey}/download-strategy
+```
+
+#### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `expiresIn` | integer | No | URL expiration in seconds (default: 3600) |
+
+#### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/storage/buckets/avatars/objects/profile.jpg/download-strategy" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{"expiresIn": 3600}'
+```
+
+#### Response (S3 Public Bucket)
+
+```json
+{
+  "method": "direct",
+  "url": "https://s3-bucket.s3.us-east-2.amazonaws.com/app-key/avatars/profile.jpg"
+}
+```
+
+#### Response (S3 Private Bucket)
+
+```json
+{
+  "method": "presigned",
+  "url": "https://s3-bucket.s3.us-east-2.amazonaws.com/app-key/avatars/profile.jpg?X-Amz-Algorithm=...",
+  "expiresAt": "2025-09-05T01:00:00Z"
+}
+```
+
+### Step 2: Download File
+
+Download the file from the returned URL, using the appropriate method.
+
+---
+
+## Download Object (Deprecated)
+
+Download a file from a bucket.
+
+```
+GET /api/storage/buckets/{bucketName}/objects/{objectKey}
+```
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/storage/buckets/avatars/objects/users/profile.jpg" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -o profile.jpg
+```
+
+### Response
+
+Binary file content with appropriate `Content-Type` and `Content-Length` headers.
+
+---
+
+## Delete Object
+
+Delete a file from a bucket.
+
+```
+DELETE /api/storage/buckets/{bucketName}/objects/{objectKey}
+```
+
+### Example
+
+```bash
+curl -X DELETE "https://your-app.insforge.app/api/storage/buckets/avatars/objects/users/profile.jpg" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### Response
+
+```json
+{
+  "message": "Object deleted successfully"
+}
+```
+
+---
+
+## List Objects in Bucket
+
+List all objects in a bucket with optional filtering.
+
+```
+GET /api/storage/buckets/{bucketName}/objects
+```
+
+### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `prefix` | string | Filter by key prefix (e.g., `users/`) |
+| `search` | string | Search objects by key (partial match) |
+| `limit` | integer | Maximum objects to return (1-1000, default: 100) |
+| `offset` | integer | Number of objects to skip |
+
+### Example
+
+```bash
+# Filter by prefix
+curl "https://your-app.insforge.app/api/storage/buckets/avatars/objects?prefix=users/&limit=50" \
+  -H "Authorization: Bearer your-jwt-token"
+
+# Search by key
+curl "https://your-app.insforge.app/api/storage/buckets/avatars/objects?search=profile" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### Response
+
+```json
+{
+  "data": [
+    {
+      "bucket": "avatars",
+      "key": "users/user123.jpg",
+      "size": 102400,
+      "mimeType": "image/jpeg",
+      "uploadedAt": "2024-01-15T10:30:00Z",
+      "url": "/api/storage/buckets/avatars/objects/users/user123.jpg"
+    },
+    {
+      "bucket": "avatars",
+      "key": "users/user456.png",
+      "size": 204800,
+      "mimeType": "image/png",
+      "uploadedAt": "2024-01-16T11:00:00Z",
+      "url": "/api/storage/buckets/avatars/objects/users/user456.png"
+    }
+  ],
+  "pagination": {
+    "offset": 0,
+    "limit": 100,
+    "total": 2
+  }
+}
+```
+
+---
+
+## Bucket Management (Admin)
+
+### List All Buckets
+
+```
+GET /api/storage/buckets
+```
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/storage/buckets" \
+  -H "Authorization: Bearer admin-jwt-token"
+```
+
+### Response
+
+```json
+{
+  "buckets": ["avatars", "documents", "uploads", "public"]
+}
+```
+
+### Create Bucket
+
+```
+POST /api/storage/buckets
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `bucketName` | string | Yes | Bucket name (alphanumeric, underscore, hyphen) |
+| `isPublic` | boolean | No | Whether bucket is publicly accessible (default: true) |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/storage/buckets" \
+  -H "Authorization: Bearer admin-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bucketName": "user-uploads",
+    "isPublic": false
+  }'
+```
+
+### Response
+
+```json
+{
+  "message": "Bucket created successfully",
+  "bucket": "user-uploads"
+}
+```
+
+### Update Bucket
+
+```
+PATCH /api/storage/buckets/{bucketName}
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `isPublic` | boolean | Yes | Whether bucket is publicly accessible |
+
+### Example
+
+```bash
+curl -X PATCH "https://your-app.insforge.app/api/storage/buckets/user-uploads" \
+  -H "Authorization: Bearer admin-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{"isPublic": true}'
+```
+
+### Response
+
+```json
+{
+  "message": "Bucket visibility updated",
+  "bucket": "user-uploads",
+  "isPublic": true
+}
+```
+
+### Delete Bucket
+
+```
+DELETE /api/storage/buckets/{bucketName}
+```
+
+### Example
+
+```bash
+curl -X DELETE "https://your-app.insforge.app/api/storage/buckets/old-uploads" \
+  -H "Authorization: Bearer admin-jwt-token"
+```
+
+### Response
+
+```json
+{
+  "message": "Bucket deleted successfully"
+}
+```
+
+---
+
+## Error Responses
+
+### Bucket Not Found (404)
+
+```json
+{
+  "error": "BUCKET_NOT_FOUND",
+  "message": "Bucket 'nonexistent' does not exist",
+  "statusCode": 404,
+  "nextActions": "Create the bucket first"
+}
+```
+
+### Object Not Found (404)
+
+```json
+{
+  "error": "OBJECT_NOT_FOUND",
+  "message": "Object 'missing.jpg' not found in bucket 'avatars'",
+  "statusCode": 404,
+  "nextActions": "Check the bucket and key combination"
+}
+```
+
+### Invalid File (400)
+
+```json
+{
+  "error": "INVALID_FILE",
+  "message": "No file provided in the request",
+  "statusCode": 400,
+  "nextActions": "Include a file in the multipart form data"
+}
+```
+
+### Bucket Already Exists (409)
+
+```json
+{
+  "error": "BUCKET_EXISTS",
+  "message": "Bucket 'avatars' already exists",
+  "statusCode": 409,
+  "nextActions": "Choose a different bucket name"
+}
+```
