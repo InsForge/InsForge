@@ -3,7 +3,6 @@ import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { ERROR_CODES } from '@/types/error-constants';
 import { AppError } from '@/api/middlewares/error.js';
-import { SetEncryptionKeyForClient } from '@/utils/db-encryption-helper.js';
 import {
   type CreateScheduleRequest,
   type UpdateScheduleRequest,
@@ -50,22 +49,6 @@ export class ScheduleService {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       throw new AppError(`Invalid cron expression: ${msg}`, 400, ERROR_CODES.INVALID_INPUT);
-    }
-  }
-
-  private async queryWithEncryption(queryText: string, values: unknown[]): Promise<QueryResult> {
-    const pool = this.dbManager.getPool();
-    if (!pool) {
-      logger.error('Database pool not initialized when calling queryWithEncryption');
-      throw new AppError('Database service is not available.', 500, ERROR_CODES.DATABASE_NOT_FOUND);
-    }
-    const client = await pool.connect();
-    try {
-      await SetEncryptionKeyForClient(client);
-      const res = await client.query(queryText, values);
-      return res;
-    } finally {
-      client.release();
     }
   }
 
@@ -253,7 +236,7 @@ export class ScheduleService {
         resolvedHeaders,
         data.body || {},
       ];
-      const result = await this.queryWithEncryption(sql, values);
+      const result = await this.dbManager.getPool().query(sql, values);
       const jobResult = (result.rows && result.rows[0]) as
         | { success?: boolean; cron_job_id?: string; message?: string }
         | undefined;
@@ -322,7 +305,7 @@ export class ScheduleService {
           resolvedHeaders,
           data.body ?? existingSchedule.body ?? {},
         ];
-        const result = await this.queryWithEncryption(sql, values);
+        const result = await this.dbManager.getPool().query(sql, values);
         const jobResult = (result.rows && result.rows[0]) as
           | { success?: boolean; cron_job_id?: string; message?: string }
           | undefined;
@@ -346,7 +329,7 @@ export class ScheduleService {
         const toggleSql = data.isActive
           ? 'SELECT * FROM schedules.enable_job($1::UUID)'
           : 'SELECT * FROM schedules.disable_job($1::UUID)';
-        await this.queryWithEncryption(toggleSql, [id]);
+        await this.dbManager.getPool().query(toggleSql, [id]);
       }
 
       logger.info('Successfully updated schedule', { scheduleId: id });
@@ -360,7 +343,7 @@ export class ScheduleService {
   async deleteSchedule(id: string) {
     try {
       const sql = 'SELECT * FROM schedules.delete_job($1::UUID)';
-      const result = await this.queryWithEncryption(sql, [id]);
+      const result = await this.dbManager.getPool().query(sql, [id]);
       const deleteResult = (result.rows && result.rows[0]) as
         | {
             success?: boolean;
@@ -414,17 +397,15 @@ export class ScheduleService {
         message: string | null;
       };
 
-      const logs = (await this.queryWithEncryption(sql, [
-        scheduleId,
-        limit,
-        offset,
-      ])) as QueryResult<ExecRow>;
+      const logs = (await this.dbManager
+        .getPool()
+        .query(sql, [scheduleId, limit, offset])) as QueryResult<ExecRow>;
 
       const countSql = `
         SELECT COUNT(*) as total FROM schedules.job_logs
         WHERE job_id = $1::UUID
       `;
-      const countResult = await this.queryWithEncryption(countSql, [scheduleId]);
+      const countResult = await this.dbManager.getPool().query(countSql, [scheduleId]);
       const total = parseInt((countResult.rows[0] as { total: string })?.total || '0', 10);
 
       const formattedLogs = (logs.rows as ExecRow[]).map((log) => {
