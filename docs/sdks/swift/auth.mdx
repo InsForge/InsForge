@@ -141,7 +141,7 @@ do {
 
 ---
 
-## signInWithDefaultPage()
+## signInWithDefaultView()
 
 InsForge provides a hosted authentication page that supports:
 - **OAuth Providers**: Google, GitHub, Discord, LinkedIn, Facebook, Instagram, TikTok, Apple, X (Twitter), Spotify, Microsoft
@@ -152,7 +152,7 @@ This approach simplifies authentication by letting InsForge handle the UI and OA
 ### Authentication Flow
 
 ```
-1. App calls signInWithDefaultPage(redirectTo:)
+1. App calls signInWithDefaultView(redirectTo:)
    ↓
 2. SDK returns authentication URL
    ↓
@@ -208,7 +208,7 @@ InsForge SDK supports two callback methods:
 
 **Usage**:
 ```swift
-let authURL = client.auth.signInWithDefaultPage(
+let authURL = client.auth.signInWithDefaultView(
     redirectTo: "yourapp://auth/callback"
 )
 ```
@@ -316,7 +316,7 @@ struct YourApp: App {
 
 **Usage**:
 ```swift
-let authURL = client.auth.signInWithDefaultPage(
+let authURL = client.auth.signInWithDefaultView(
     redirectTo: "https://yourdomain.com/auth/callback"
 )
 ```
@@ -377,12 +377,12 @@ struct ContentView: View {
             // Choose callback method based on your configuration:
 
             // Option 1: Custom URL Scheme (Development)
-            let authURL = client.auth.signInWithDefaultPage(
+            let authURL = client.auth.signInWithDefaultView(
                 redirectTo: "yourapp://auth/callback"
             )
 
             // Option 2: Universal Link (Production iOS)
-            // let authURL = client.auth.signInWithDefaultPage(
+            // let authURL = client.auth.signInWithDefaultView(
             //     redirectTo: "https://yourdomain.com/auth/callback"
             // )
 
