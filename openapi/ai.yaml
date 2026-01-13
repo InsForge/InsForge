@@ -349,7 +349,7 @@ paths:
             schema:
               $ref: '#/components/schemas/ImageGenerationOptions'
       responses:
-        '201':
+        '200':
           description: Images generated successfully
           content:
             application/json:

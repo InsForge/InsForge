@@ -25,7 +25,7 @@ Content-Type: application/json
 
 ## List Available Models
 
-Get all available AI models for text and image generation.
+Get all available AI models for text and image generation. **Requires admin authentication.**
 
 ```
 GET /api/ai/models
@@ -35,7 +35,7 @@ GET /api/ai/models
 
 ```bash
 curl "https://your-app.insforge.app/api/ai/models" \
-  -H "Authorization: Bearer your-jwt-token-or-anon-key"
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
 ```
 
 ### Response
@@ -214,12 +214,13 @@ curl -X POST "https://your-app.insforge.app/api/ai/chat/completion" \
 Server-Sent Events stream:
 
 ```
-data: {"content": "Once"}
-data: {"content": " upon"}
-data: {"content": " a"}
-data: {"content": " time"}
-data: {"content": "..."}
-data: [DONE]
+data: {"chunk": "Once"}
+data: {"chunk": " upon"}
+data: {"chunk": " a"}
+data: {"chunk": " time"}
+data: {"chunk": "..."}
+data: {"tokenUsage": {"promptTokens": 15, "completionTokens": 50, "totalTokens": 65}}
+data: {"done": true}
 ```
 
 ---
@@ -281,6 +282,32 @@ Image URLs can be either:
 
 Check the URL format to determine how to handle the image.
 </Note>
+
+---
+
+## Get Remaining Credits
+
+Get remaining credits for the current API key from OpenRouter. **Requires admin authentication.**
+
+```
+GET /api/ai/credits
+```
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/ai/credits" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### Response
+
+```json
+{
+  "credits": 50.25,
+  "usage": 149.75
+}
+```
 
 ---
 

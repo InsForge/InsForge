@@ -346,13 +346,19 @@ GET /api/storage/buckets/{bucketName}/objects
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `prefix` | string | Filter by key prefix (e.g., `users/`) |
+| `search` | string | Search objects by key (partial match) |
 | `limit` | integer | Maximum objects to return (1-1000, default: 100) |
 | `offset` | integer | Number of objects to skip |
 
 ### Example
 
 ```bash
+# Filter by prefix
 curl "https://your-app.insforge.app/api/storage/buckets/avatars/objects?prefix=users/&limit=50" \
+  -H "Authorization: Bearer your-jwt-token"
+
+# Search by key
+curl "https://your-app.insforge.app/api/storage/buckets/avatars/objects?search=profile" \
   -H "Authorization: Bearer your-jwt-token"
 ```
 
@@ -479,13 +485,13 @@ curl -X PATCH "https://your-app.insforge.app/api/storage/buckets/user-uploads" \
 ### Delete Bucket
 
 ```
-DELETE /api/storage/buckets/{bucketName}/objects
+DELETE /api/storage/buckets/{bucketName}
 ```
 
 ### Example
 
 ```bash
-curl -X DELETE "https://your-app.insforge.app/api/storage/buckets/old-uploads/objects" \
+curl -X DELETE "https://your-app.insforge.app/api/storage/buckets/old-uploads" \
   -H "Authorization: Bearer admin-jwt-token"
 ```
 

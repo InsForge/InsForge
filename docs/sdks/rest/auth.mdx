@@ -64,12 +64,13 @@ curl -X POST "https://your-app.insforge.app/api/auth/users" \
     "updatedAt": "2024-01-15T10:30:00Z"
   },
   "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "csrfToken": "abc123...",
   "requireEmailVerification": false
 }
 ```
 
 <Note>
-If `requireEmailVerification` is `true`, `accessToken` will be `null` and the user must verify their email before logging in.
+If `requireEmailVerification` is `true`, `accessToken` and `csrfToken` will be `null` and the user must verify their email before logging in.
 </Note>
 
 ---
@@ -112,7 +113,82 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions" \
     "createdAt": "2024-01-15T10:30:00Z",
     "updatedAt": "2024-01-15T10:30:00Z"
   },
-  "accessToken": "eyJhbGciOiJIUzI1NiIs..."
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "csrfToken": "abc123..."
+}
+```
+
+<Note>
+The `csrfToken` is required for the refresh token endpoint. Store it securely and include it in the `X-CSRF-Token` header when calling `/api/auth/refresh`.
+</Note>
+
+---
+
+## Refresh Token
+
+Refresh access token using httpOnly refresh token cookie.
+
+```
+POST /api/auth/refresh
+```
+
+### Headers
+
+| Header | Type | Required | Description |
+|--------|------|----------|-------------|
+| `X-CSRF-Token` | string | Yes | CSRF token received from login/register response |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/refresh" \
+  -H "X-CSRF-Token: abc123..." \
+  --cookie "refresh_token=..."
+```
+
+### Response
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true,
+    "providers": ["email"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "csrfToken": "def456..."
+}
+```
+
+<Note>
+Token rotation is implemented for security. Each refresh returns a new CSRF token that must be used for subsequent refresh requests.
+</Note>
+
+---
+
+## Logout
+
+Logout and clear refresh token cookie.
+
+```
+POST /api/auth/logout
+```
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/logout"
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "Logged out successfully"
 }
 ```
 
@@ -281,7 +357,8 @@ curl -X POST "https://your-app.insforge.app/api/auth/email/verify" \
     "email": "user@example.com",
     "emailVerified": true
   },
-  "accessToken": "eyJhbGciOiJIUzI1NiIs..."
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "csrfToken": "abc123..."
 }
 ```
 
@@ -415,8 +492,12 @@ curl "https://your-app.insforge.app/api/auth/oauth/google?redirect_uri=https://m
 After the user authenticates with the provider, they will be redirected to your `redirect_uri` with query parameters:
 
 ```
-https://myapp.com/callback?access_token=xxx&user_id=xxx&email=xxx&name=xxx
+https://myapp.com/callback?access_token=xxx&user_id=xxx&email=xxx&name=xxx&csrf_token=xxx
 ```
+
+<Note>
+The `csrf_token` is required for the refresh token endpoint. Store it securely along with the access token.
+</Note>
 
 ---
 
@@ -484,6 +565,114 @@ curl -X DELETE "https://your-app.insforge.app/api/auth/users" \
 
 ```
 POST /api/auth/tokens/anon
+```
+
+### Get Auth Configuration
+
+Get current authentication settings (admin only).
+
+```
+GET /api/auth/config
+```
+
+#### Example
+
+```bash
+curl "https://your-app.insforge.app/api/auth/config" \
+  -H "Authorization: Bearer admin-jwt-token"
+```
+
+#### Response
+
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "requireEmailVerification": true,
+  "passwordMinLength": 8,
+  "requireNumber": true,
+  "requireLowercase": true,
+  "requireUppercase": false,
+  "requireSpecialChar": false,
+  "verifyEmailMethod": "code",
+  "resetPasswordMethod": "link",
+  "verifyEmailRedirectTo": "https://myapp.com/verify-success",
+  "resetPasswordRedirectTo": "https://myapp.com/reset-success",
+  "signInRedirectTo": "https://myapp.com/dashboard",
+  "createdAt": "2024-01-15T10:30:00Z",
+  "updatedAt": "2024-01-15T10:30:00Z"
+}
+```
+
+### Update Auth Configuration
+
+Update authentication settings (admin only).
+
+```
+PUT /api/auth/config
+```
+
+#### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `requireEmailVerification` | boolean | No | Whether email verification is required |
+| `passwordMinLength` | integer | No | Minimum password length (4-128) |
+| `requireNumber` | boolean | No | Require numbers in password |
+| `requireLowercase` | boolean | No | Require lowercase in password |
+| `requireUppercase` | boolean | No | Require uppercase in password |
+| `requireSpecialChar` | boolean | No | Require special characters in password |
+| `verifyEmailMethod` | string | No | Email verification method (`code` or `link`) |
+| `resetPasswordMethod` | string | No | Password reset method (`code` or `link`) |
+| `verifyEmailRedirectTo` | string | No | Redirect URL after email verification |
+| `resetPasswordRedirectTo` | string | No | Redirect URL after password reset |
+| `signInRedirectTo` | string | No | Redirect URL after sign in |
+
+#### Example
+
+```bash
+curl -X PUT "https://your-app.insforge.app/api/auth/config" \
+  -H "Authorization: Bearer admin-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "requireEmailVerification": true,
+    "passwordMinLength": 10,
+    "verifyEmailMethod": "link"
+  }'
+```
+
+### Exchange Admin Session
+
+Exchange a cloud provider authorization code for an admin session.
+
+```
+POST /api/auth/admin/sessions/exchange
+```
+
+#### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `code` | string | Yes | Authorization code or JWT from Insforge Cloud |
+
+#### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/admin/sessions/exchange" \
+  -H "Content-Type: application/json" \
+  -d '{"code": "eyJhbGciOiJIUzI1NiIs..."}'
+```
+
+#### Response
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "admin@example.com",
+    "role": "project_admin"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs..."
+}
 ```
 
 ---

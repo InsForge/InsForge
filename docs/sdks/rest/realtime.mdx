@@ -100,6 +100,8 @@ socket.disconnect();
 
 ## REST API: Channels
 
+All channel management endpoints require **admin authentication**.
+
 ### List All Channels
 
 ```
@@ -110,7 +112,7 @@ GET /api/realtime/channels
 
 ```bash
 curl "https://your-app.insforge.app/api/realtime/channels" \
-  -H "Authorization: Bearer your-jwt-token"
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
 ```
 
 ### Response
@@ -150,7 +152,7 @@ GET /api/realtime/channels/{id}
 
 ```bash
 curl "https://your-app.insforge.app/api/realtime/channels/550e8400-e29b-41d4-a716-446655440000" \
-  -H "Authorization: Bearer your-jwt-token"
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
 ```
 
 ### Response
@@ -188,7 +190,7 @@ POST /api/realtime/channels
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/realtime/channels" \
-  -H "Authorization: Bearer your-jwt-token" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
   -H "Content-Type: application/json" \
   -d '{
     "pattern": "notifications:*",
@@ -233,7 +235,7 @@ PUT /api/realtime/channels/{id}
 
 ```bash
 curl -X PUT "https://your-app.insforge.app/api/realtime/channels/550e8400-e29b-41d4-a716-446655440002" \
-  -H "Authorization: Bearer your-jwt-token" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
   -H "Content-Type: application/json" \
   -d '{
     "description": "Updated notifications channel",
@@ -267,7 +269,7 @@ DELETE /api/realtime/channels/{id}
 
 ```bash
 curl -X DELETE "https://your-app.insforge.app/api/realtime/channels/550e8400-e29b-41d4-a716-446655440002" \
-  -H "Authorization: Bearer your-jwt-token"
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
 ```
 
 ### Response
@@ -281,6 +283,8 @@ curl -X DELETE "https://your-app.insforge.app/api/realtime/channels/550e8400-e29
 ---
 
 ## REST API: Messages
+
+All message endpoints require **admin authentication**.
 
 ### List Messages
 
@@ -303,7 +307,7 @@ GET /api/realtime/messages
 
 ```bash
 curl "https://your-app.insforge.app/api/realtime/messages?channelId=550e8400-e29b-41d4-a716-446655440000&limit=50" \
-  -H "Authorization: Bearer your-jwt-token"
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
 ```
 
 ### Response
@@ -348,7 +352,7 @@ GET /api/realtime/messages/stats
 
 ```bash
 curl "https://your-app.insforge.app/api/realtime/messages/stats?since=2024-01-01T00:00:00Z" \
-  -H "Authorization: Bearer your-jwt-token"
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
 ```
 
 ### Response
@@ -369,6 +373,8 @@ curl "https://your-app.insforge.app/api/realtime/messages/stats?since=2024-01-01
 
 ## REST API: Permissions
 
+The permissions endpoint requires **admin authentication**.
+
 ### Get Realtime Permissions
 
 Get RLS policies for subscribe and publish operations.
@@ -381,7 +387,7 @@ GET /api/realtime/permissions
 
 ```bash
 curl "https://your-app.insforge.app/api/realtime/permissions" \
-  -H "Authorization: Bearer your-jwt-token"
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
 ```
 
 ### Response

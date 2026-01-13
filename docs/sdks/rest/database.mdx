@@ -369,3 +369,392 @@ curl -X POST "https://your-app.insforge.app/api/database/records/user_settings" 
 <Note>
 Upsert requires a unique constraint (e.g., primary key or unique index) on the table. The conflict resolution is based on this constraint.
 </Note>
+
+---
+
+## Call RPC Function
+
+Execute a database function via PostgREST RPC. Supports all HTTP methods (GET, POST, PUT, PATCH, DELETE).
+
+```
+POST /api/database/rpc/{functionName}
+```
+
+### Example
+
+```bash
+# Call a function with parameters
+curl -X POST "https://your-app.insforge.app/api/database/rpc/get_user_stats" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "123e4567-e89b-12d3-a456-426614174000"}'
+
+# Call a function without parameters
+curl -X POST "https://your-app.insforge.app/api/database/rpc/get_total_count" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### Response
+
+```json
+{
+  "total_posts": 42,
+  "total_comments": 128,
+  "last_activity": "2025-01-15T10:30:00Z"
+}
+```
+
+---
+
+## Admin Endpoints
+
+The following endpoints require admin authentication.
+
+### Headers for Admin Endpoints
+
+```bash
+Authorization: Bearer admin-jwt-token-Or-API-Key
+Content-Type: application/json
+```
+
+---
+
+## List Database Functions
+
+Get all database functions in the public schema. **Requires admin authentication.**
+
+```
+GET /api/database/functions
+```
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/database/functions" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### Response
+
+```json
+[
+  {
+    "name": "get_user_stats",
+    "schema": "public",
+    "language": "plpgsql",
+    "returnType": "json",
+    "arguments": "user_id uuid",
+    "definition": "BEGIN ... END;"
+  }
+]
+```
+
+---
+
+## List Database Indexes
+
+Get all database indexes. **Requires admin authentication.**
+
+```
+GET /api/database/indexes
+```
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/database/indexes" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### Response
+
+```json
+[
+  {
+    "name": "posts_pkey",
+    "tableName": "posts",
+    "columns": ["id"],
+    "isUnique": true,
+    "isPrimary": true,
+    "definition": "CREATE UNIQUE INDEX posts_pkey ON public.posts USING btree (id)"
+  }
+]
+```
+
+---
+
+## List RLS Policies
+
+Get all Row Level Security policies. **Requires admin authentication.**
+
+```
+GET /api/database/policies
+```
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/database/policies" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### Response
+
+```json
+[
+  {
+    "name": "Users can view own posts",
+    "tableName": "posts",
+    "command": "SELECT",
+    "roles": ["authenticated"],
+    "using": "(auth.uid() = user_id)",
+    "withCheck": null
+  }
+]
+```
+
+---
+
+## List Database Triggers
+
+Get all database triggers. **Requires admin authentication.**
+
+```
+GET /api/database/triggers
+```
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/database/triggers" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key"
+```
+
+### Response
+
+```json
+[
+  {
+    "name": "update_timestamp",
+    "tableName": "posts",
+    "timing": "BEFORE",
+    "events": ["UPDATE"],
+    "functionName": "update_updated_at_column",
+    "enabled": true
+  }
+]
+```
+
+---
+
+## Execute Raw SQL (Strict Mode)
+
+Execute raw SQL query with strict sanitization. Blocks access to system tables and auth.users. **Requires admin authentication.**
+
+```
+POST /api/database/advance/rawsql
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `query` | string | Yes | SQL query to execute |
+| `params` | array | No | Query parameters for parameterized queries |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/advance/rawsql" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "SELECT * FROM posts WHERE published = $1",
+    "params": [true]
+  }'
+```
+
+### Response
+
+```json
+{
+  "rows": [
+    {
+      "id": "248373e1-0aea-45ce-8844-5ef259203749",
+      "title": "My Post",
+      "published": true
+    }
+  ],
+  "rowCount": 1,
+  "command": "SELECT"
+}
+```
+
+---
+
+## Execute Raw SQL (Relaxed Mode)
+
+Execute raw SQL query with relaxed sanitization. Allows SELECT and INSERT into system tables. **Use with caution. Requires admin authentication.**
+
+```
+POST /api/database/advance/rawsql/unrestricted
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `query` | string | Yes | SQL query to execute |
+| `params` | array | No | Query parameters for parameterized queries |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/advance/rawsql/unrestricted" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "SELECT * FROM auth.users LIMIT 10"
+  }'
+```
+
+### Response
+
+```json
+{
+  "rows": [...],
+  "rowCount": 10,
+  "command": "SELECT"
+}
+```
+
+<Warning>
+This endpoint has relaxed restrictions and can access system tables. Use only when necessary and ensure proper authorization.
+</Warning>
+
+---
+
+## Export Database
+
+Export database schema and/or data in SQL or JSON format. **Requires admin authentication.**
+
+```
+POST /api/database/advance/export
+```
+
+### Request Body
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `tables` | array | No | all | List of tables to export |
+| `format` | string | No | sql | Export format (`sql` or `json`) |
+| `includeData` | boolean | No | true | Include table data |
+| `includeFunctions` | boolean | No | false | Include database functions |
+| `includeSequences` | boolean | No | false | Include sequences |
+| `includeViews` | boolean | No | false | Include views |
+| `rowLimit` | integer | No | - | Maximum rows per table |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/advance/export" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tables": ["posts", "comments"],
+    "format": "sql",
+    "includeData": true,
+    "rowLimit": 1000
+  }'
+```
+
+### Response
+
+```json
+{
+  "format": "sql",
+  "content": "CREATE TABLE posts (...); INSERT INTO posts VALUES (...);",
+  "tables": ["posts", "comments"]
+}
+```
+
+---
+
+## Import Database
+
+Import database from SQL file. **Requires admin authentication.**
+
+```
+POST /api/database/advance/import
+```
+
+### Request (multipart/form-data)
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `file` | file | Yes | - | SQL file to import |
+| `truncate` | boolean | No | false | Truncate existing tables before import |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/database/advance/import" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -F "file=@backup.sql" \
+  -F "truncate=false"
+```
+
+### Response
+
+```json
+{
+  "filename": "backup.sql",
+  "fileSize": 102400,
+  "tables": ["posts", "comments", "users"],
+  "rowsImported": 1500
+}
+```
+
+---
+
+## Bulk Upsert
+
+Bulk insert or update data from CSV or JSON file. **Requires admin authentication.**
+
+```
+POST /api/database/advance/bulk-upsert
+```
+
+### Request (multipart/form-data)
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `file` | file | Yes | CSV or JSON file containing data |
+| `table` | string | Yes | Target table name |
+| `upsertKey` | string | No | Column name for upsert conflict resolution |
+
+### Example
+
+```bash
+# Import from CSV
+curl -X POST "https://your-app.insforge.app/api/database/advance/bulk-upsert" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -F "file=@data.csv" \
+  -F "table=posts" \
+  -F "upsertKey=id"
+
+# Import from JSON
+curl -X POST "https://your-app.insforge.app/api/database/advance/bulk-upsert" \
+  -H "Authorization: Bearer admin-jwt-token-Or-API-Key" \
+  -F "file=@data.json" \
+  -F "table=posts"
+```
+
+### Response
+
+```json
+{
+  "rowsAffected": 150,
+  "totalRecords": 150,
+  "table": "posts"
+}

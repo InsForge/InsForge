@@ -342,7 +342,19 @@ export default async function(request) {
 }
 ```
 
-### Execution Error (500)
+### Execution Error (502)
+
+When the Deno runtime fails to execute the function:
+
+```json
+{
+  "error": "Failed to connect to Deno runtime"
+}
+```
+
+### Function Runtime Error (500)
+
+When the function code throws an error:
 
 ```json
 {
