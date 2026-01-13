@@ -31,7 +31,7 @@
         "groups": [
           {
             "group": "Getting Started",
-            "pages": ["introduction", "quickstart", "partnership", "oauth-server"]
+            "pages": ["introduction", "quickstart", "mcp-setup", "vscode-extension", "partnership", "oauth-server"]
           },
           {
             "group": "Core Concepts",

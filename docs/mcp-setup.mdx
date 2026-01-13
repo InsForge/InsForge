@@ -1,0 +1,332 @@
+---
+title: "MCP Setup"
+description: "Manual MCP configuration for AI coding assistants"
+---
+
+## Overview
+
+The InsForge MCP server gives your AI coding assistant direct access to your backend - database queries, schema management, storage, and more.
+
+<Tip>
+  You can also use the [VS Code extension](/vscode-extension) for one-click MCP installation.
+</Tip>
+
+Follow the instructions below for your AI client.
+
+## Prerequisites
+
+- An **AI coding assistant** (Cursor, Claude Code, GitHub Copilot, etc.)
+- An **InsForge project** - [create one here](https://insforge.dev) if you haven't already
+
+## Configuration
+
+Select your AI coding assistant:
+
+<AccordionGroup>
+  <Accordion title="Cursor">
+    ### Installation
+
+    You can one-click install the MCP server in Cursor by clicking the "Add to Cursor" button in the screenshot below:
+
+    ![Connect Project](/images/mcp-setup/connect-project.png)
+
+    Alternatively, you can install the InsForge MCP server manually:
+
+    1. Open **Cursor Settings**
+    2. Go to **Tools & MCP**
+    3. Click **New MCP Server (Add a Custom MCP Server)**
+
+    <Frame>
+      <video
+        src="/images/mcp-setup/Cursor-MCP-1.mp4"
+        autoPlay
+        muted
+        loop
+        playsInline
+      />
+    </Frame>
+
+    4. Paste the MCP JSON from your InsForge project
+    5. Save the configuration file
+    6. You should see a green dot, indicating InsForge is installed successfully
+
+    <Frame>
+      <video
+        src="/images/mcp-setup/Cursor-MCP-2.mp4"
+        autoPlay
+        muted
+        loop
+        playsInline
+      />
+    </Frame>
+
+    ### Verify Installation
+
+    To verify the connection, start a new chat session in **Cursor** and send this prompt to your agent:
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    If the connection is successful, you will see the **Connected** status indicator on your InsForge dashboard (top right corner).
+
+    <video
+      controls
+      autoPlay
+      muted
+      loop
+      playsInline
+      width="100%"
+      src="/images/mcp-setup/Cursor-MCP-3.mp4"
+    />
+  </Accordion>
+
+  <Accordion title="Claude Code">
+    ### Installation
+
+    Add the InsForge MCP server to your **Claude Code**:
+
+    1. Select **Claude Code** in the dropdown list
+    2. Copy and paste the following installation command in your terminal
+
+    ![Claude Code Connect](/images/mcp-setup/claude-code-connect.png)
+
+    3. Run the command
+
+    <Frame>
+      <video
+        src="/images/mcp-setup/CC-MCP-1.mp4"
+        autoPlay
+        muted
+        loop
+        playsInline
+      />
+    </Frame>
+
+    ### Verify Installation
+
+    To verify the connection, start a new chat session in **Claude Code** and send this prompt to your agent:
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    If the connection is successful, you will see the **MCP Connected** status indicator on your InsForge dashboard (top right corner).
+
+    <video
+      controls
+      autoPlay
+      muted
+      loop
+      playsInline
+      width="100%"
+      src="/images/mcp-setup/CC-MCP-2.mp4"
+    />
+  </Accordion>
+
+  <Accordion title="GitHub Copilot">
+    ### Installation
+
+    Add the InsForge MCP server to your **GitHub Copilot**:
+
+    1. Select **Copilot** in the dropdown list
+    2. Open the terminal and paste the following installation command in your **GitHub Copilot** terminal
+
+    ![Copilot Setup](/images/mcp-setup/copilot-1.png)
+
+    3. Run the command
+
+    ![Copilot Install](/images/mcp-setup/copilot-2.png)
+
+    ### Verify Installation
+
+    To verify the connection, start a new chat session in **Copilot** and send this prompt to your agent:
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    If the connection is successful, you will see the **MCP Connected** status indicator on your InsForge dashboard (top right corner).
+
+    ![Copilot Connected](/images/mcp-setup/copilot-3.png)
+  </Accordion>
+
+  <Accordion title="Windsurf">
+    ### Installation
+
+    Add the InsForge MCP server to your **Windsurf**:
+
+    1. Select **Windsurf** in the dropdown list
+    2. Copy and paste the following installation command in your Windsurf terminal
+
+    ![Windsurf Setup](/images/mcp-setup/windsurf-1.png)
+
+    3. Run the command
+
+    ### Verify Installation
+
+    To verify the connection, start a new chat session in **Windsurf** and send this prompt to your agent:
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    If the connection is successful, you will see the **MCP Connected** status indicator on your InsForge dashboard (top right corner).
+
+    ![Windsurf Connected](/images/mcp-setup/windsurf-2.png)
+  </Accordion>
+
+  <Accordion title="Cline">
+    ### Installation
+
+    Add the InsForge MCP server to your **Cline**:
+
+    1. Select **Cline** in the dropdown list
+    2. Copy and paste the following installation command in your **Cline** terminal
+
+    ![Cline Setup](/images/mcp-setup/cline-1.png)
+
+    3. Run the command
+
+    ![Cline Install](/images/mcp-setup/cline-2.png)
+
+    ### Verify Installation
+
+    To verify the connection, start a new chat session in **Cline** and send this prompt to your agent:
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    If the connection is successful, you will see the **MCP Connected** status indicator on your InsForge dashboard (top right corner).
+
+    ![Cline Connected](/images/mcp-setup/cline-3.png)
+  </Accordion>
+
+  <Accordion title="Roo Code">
+    ### Installation
+
+    Add the InsForge MCP server to your **Roo Code**:
+
+    1. Select **Roo Code** in the dropdown list
+    2. Copy and paste the following installation command in your **Roo Code** terminal
+
+    ![Roo Code Setup](/images/mcp-setup/roocode-1.png)
+
+    3. Run the command
+
+    ### Verify Installation
+
+    To verify the connection, start a new chat session in **Roo Code** and send this prompt to your agent:
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    If the connection is successful, you will see the **MCP Connected** status indicator on your InsForge dashboard (top right corner).
+
+    ![Roo Code Connected](/images/mcp-setup/roocode-2.png)
+  </Accordion>
+
+  <Accordion title="MCP JSON">
+    ### Installation
+
+    Add the InsForge MCP server to your coding agent with MCP JSON:
+
+    1. Select **MCP JSON** in the dropdown list
+    2. Copy and paste the following **MCP JSON** configuration in your agent
+
+    ![MCP JSON Setup](/images/mcp-setup/mcp-json-1.png)
+
+    ### Verify Installation
+
+    To verify the connection, start a new chat session and send this prompt to your agent:
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    If the connection is successful, you will see the **MCP Connected** status indicator on your InsForge dashboard (top right corner).
+
+    ![MCP JSON Connected](/images/mcp-setup/mcp-json-2.png)
+  </Accordion>
+
+  <Accordion title="Trae">
+    ### Installation
+
+    Add the InsForge MCP server to your **Trae**:
+
+    1. Select **Trae** in the dropdown list
+    2. Copy and paste the following installation command in your **Trae** terminal
+
+    ![Trae Setup](/images/mcp-setup/trae-1.png)
+
+    3. Run the command
+
+    ![Trae Install](/images/mcp-setup/trae-2.png)
+
+    Alternatively, Trae offers a first-party integration with InsForge, allowing you to install InsForge directly from Trae's official MCP marketplace:
+
+    1. Open Trae's **Settings** → navigate to **MCP**
+    2. Click on **Add** and then select **Add from Marketplace**
+    3. Search "InsForge" and add it from the marketplace
+
+    ![Trae Marketplace](/images/mcp-setup/trae-3.png)
+
+    4. For required credentials API_KEY and API_BASE_URL, you can find it in your InsForge's **Settings**, under the **Connect** tab
+
+    ![Trae Credentials](/images/mcp-setup/trae-4.png)
+
+    ### Verify Installation
+
+    To verify the connection, start a new chat in **Trae** and send this prompt to your agent:
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    If the connection is successful, you will see the **MCP Connected** status indicator on your InsForge dashboard (top right corner).
+
+    ![Trae Connected](/images/mcp-setup/trae-5.png)
+  </Accordion>
+
+  <Accordion title="Qoder">
+    ### Installation
+
+    Add the InsForge MCP server to your **Qoder**:
+
+    1. Select **Qoder** in the dropdown list
+    2. Copy and paste the following installation command in your **Qoder** terminal
+
+    ![Qoder Setup](/images/mcp-setup/qoder-1.png)
+
+    3. Run the command
+
+    ### Verify Installation
+
+    To verify the connection, start a new chat session in **Qoder** and send this prompt to your agent:
+
+    ```
+    I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to
+    learn about InsForge instructions.
+    ```
+
+    If the connection is successful, you will see the **MCP Connected** status indicator on your InsForge dashboard (top right corner).
+
+    ![Qoder Connected](/images/mcp-setup/qoder-2.png)
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<Accordion title="Changes not taking effect">
+  Most AI clients require a full restart after MCP config changes. Close and reopen the application.
+</Accordion>
