@@ -202,6 +202,13 @@ export default function AIPage() {
                   <button
                     onClick={() => handleSort('inputPrice')}
                     className="flex items-center gap-1 hover:text-black dark:hover:text-white transition-colors"
+                    aria-sort={
+                      sortField === 'inputPrice'
+                        ? sortDirection === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : 'none'
+                    }
                   >
                     Input Price
                     <SortIndicator field="inputPrice" />
@@ -210,6 +217,13 @@ export default function AIPage() {
                   <button
                     onClick={() => handleSort('outputPrice')}
                     className="flex items-center gap-1 hover:text-black dark:hover:text-white transition-colors"
+                    aria-sort={
+                      sortField === 'inputPrice'
+                        ? sortDirection === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : 'none'
+                    }
                   >
                     Output Price
                     <SortIndicator field="outputPrice" />
@@ -217,6 +231,13 @@ export default function AIPage() {
                   <button
                     onClick={() => handleSort('requests')}
                     className="flex items-center gap-1 justify-end hover:text-black dark:hover:text-white transition-colors"
+                    aria-sort={
+                      sortField === 'inputPrice'
+                        ? sortDirection === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : 'none'
+                    }
                   >
                     Requests
                     <SortIndicator field="requests" />
