@@ -246,7 +246,7 @@ export default function DeploymentsPage() {
         <p className="text-sm text-muted-foreground dark:text-neutral-400">
           Ship your app to live in seconds with just one prompt.{' '}
           <a
-            href="https://docs.insforge.dev/core-concepts/deployments/achitecture"
+            href="https://docs.insforge.dev/core-concepts/deployments/architecture"
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-600 dark:text-blue-400 hover:underline"
