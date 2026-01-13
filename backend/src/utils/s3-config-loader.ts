@@ -1,9 +1,51 @@
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import logger from '@/utils/logger.js';
+import { isCloudEnvironment } from '@/utils/environment.js';
 
-// TODO: make these configurable in env variables in cloud backend
-const CONFIG_BUCKET = process.env.AWS_CONFIG_BUCKET || 'insforge-config';
-const CONFIG_REGION = process.env.AWS_CONFIG_REGION || 'us-east-2';
+/**
+ * Validate and get S3 config bucket
+ * In cloud environments, bucket is required
+ * In local environments, uses default if not provided
+ */
+function getConfigBucket(): string {
+  const bucket = process.env.AWS_CONFIG_BUCKET;
+
+  // In cloud environments, bucket is required
+  if (isCloudEnvironment()) {
+    if (!bucket || !bucket.trim()) {
+      throw new Error(
+        'AWS_CONFIG_BUCKET environment variable is required in cloud environments. ' +
+        'Please set AWS_CONFIG_BUCKET to your S3 bucket name.'
+      );
+    }
+    return bucket.trim();
+  }
+
+  // In local environments, use default or provided value
+  return bucket || 'insforge-config';
+}
+
+/**
+ * Validate and get S3 config region
+ * Defaults to us-east-2 if not provided
+ */
+function getConfigRegion(): string {
+  const region = process.env.AWS_CONFIG_REGION;
+
+  if (!region || !region.trim()) {
+    // Default to us-east-2 if not provided
+    logger.warn(
+      'AWS_CONFIG_REGION not set, using default: us-east-2. ' +
+      'Set AWS_CONFIG_REGION to override.'
+    );
+    return 'us-east-2';
+  }
+
+  return region.trim();
+}
+
+const CONFIG_BUCKET = getConfigBucket();
+const CONFIG_REGION = getConfigRegion();
 
 let s3Client: S3Client | null = null;
 
@@ -58,6 +100,8 @@ export async function fetchS3Config<T>(key: string): Promise<T | null> {
   } catch (error) {
     logger.warn(`Failed to fetch config from S3: ${key}`, {
       error: error instanceof Error ? error.message : String(error),
+      bucket: CONFIG_BUCKET,
+      region: CONFIG_REGION,
     });
     return null;
   }
