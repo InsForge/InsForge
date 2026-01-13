@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { Loader2, ArrowUp, ArrowDown } from 'lucide-react';
-import { ConfirmDialog, Tabs, TabsList, TabsTrigger, TabsContent, Switch } from '@/components';
+import { ConfirmDialog, Tabs, TabsList, TabsTrigger, TabsContent } from '@/components';
 import { useAIConfigs } from '../hooks/useAIConfigs';
 import { useAIRemainingCredits } from '../hooks/useAIUsage';
 import { useConfirm } from '@/lib/hooks/useConfirm';
@@ -10,11 +10,12 @@ import {
   SELF_HOSTED_PROVIDERS,
   filterModelsByProvider,
   toModelOption,
+  formatCredits,
+  type SortField,
+  type SortDirection,
 } from '../helpers';
+import { ModelRow } from '../components';
 import type { AIModelSchema } from '@insforge/shared-schemas';
-
-type SortField = 'inputPrice' | 'outputPrice' | 'requests';
-type SortDirection = 'asc' | 'desc';
 
 export default function AIPage() {
   const {
@@ -95,28 +96,6 @@ export default function AIPage() {
     ) : (
       <ArrowUp className="w-4 h-4" />
     );
-  };
-
-  // Format credits display
-  const formatCredits = (remaining: number) => {
-    if (remaining >= 1000) {
-      return `${(remaining / 1000).toFixed(1)}K`;
-    }
-    return remaining.toFixed(2);
-  };
-
-  // Format price per million tokens
-  const formatPrice = (price?: number) => {
-    if (price === undefined || price === 0) {
-      return 'Free';
-    }
-    if (price < 0.01) {
-      return `$${price.toFixed(4)}`;
-    }
-    if (price < 1) {
-      return `$${price.toFixed(2)}`;
-    }
-    return `$${price.toFixed(1)}`;
   };
 
   const handleToggleModel = useCallback(
@@ -245,70 +224,15 @@ export default function AIPage() {
                 </div>
 
                 {/* Table Body */}
-                {modelsForActiveProvider.map((model) => {
-                  const isEnabled = configuredModelIds.includes(model.modelId);
-                  const config = configurationMap.get(model.modelId);
-                  const requests = config?.totalRequests || 0;
-
-                  return (
-                    <div
-                      key={model.modelId}
-                      className="grid grid-cols-[200px_173px_173px_173px_173px_80px] gap-3 px-6 py-4 items-center rounded-lg bg-neutral-100 dark:bg-[#323232] mb-3"
-                    >
-                      {/* Model with Toggle */}
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          checked={isEnabled}
-                          onCheckedChange={() => handleSwitchChange(model.modelId, isEnabled)}
-                        />
-                        <span className="text-base font-medium text-black dark:text-white truncate">
-                          {model.modelName}
-                        </span>
-                      </div>
-
-                      {/* Input Modalities */}
-                      <div className="text-sm leading-6 text-black dark:text-white">
-                        {model.inputModality
-                          .map((m) => m.charAt(0).toUpperCase() + m.slice(1))
-                          .join(' / ')}
-                      </div>
-
-                      {/* Input Price */}
-                      <div className="text-sm text-black dark:text-white">
-                        {formatPrice(model.inputPrice)}
-                        {model.inputPrice && (
-                          <span className="text-neutral-400 dark:text-neutral-500">
-                            {' '}
-                            / M tokens
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Output Modalities */}
-                      <div className="text-sm leading-6 text-black dark:text-white">
-                        {model.outputModality
-                          .map((m) => m.charAt(0).toUpperCase() + m.slice(1))
-                          .join(' / ')}
-                      </div>
-
-                      {/* Output Price */}
-                      <div className="text-sm text-black dark:text-white">
-                        {formatPrice(model.outputPrice)}
-                        {model.outputPrice && (
-                          <span className="text-neutral-400 dark:text-neutral-500">
-                            {' '}
-                            / M tokens
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Requests Count */}
-                      <div className="text-right text-sm leading-6 text-black dark:text-white">
-                        {requests > 0 ? requests.toLocaleString() : '-'}
-                      </div>
-                    </div>
-                  );
-                })}
+                {modelsForActiveProvider.map((model) => (
+                  <ModelRow
+                    key={model.modelId}
+                    model={model}
+                    isEnabled={configuredModelIds.includes(model.modelId)}
+                    requests={configurationMap.get(model.modelId)?.totalRequests || 0}
+                    onToggle={handleSwitchChange}
+                  />
+                ))}
               </>
             )}
           </div>

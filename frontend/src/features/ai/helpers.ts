@@ -19,7 +19,6 @@ export interface ModelOption {
   systemPrompt?: string | null;
 }
 
-import { Type, Image, Mic } from 'lucide-react';
 import GrokIcon from '@/assets/logos/grok.svg?react';
 import GeminiIcon from '@/assets/logos/gemini.svg?react';
 import ClaudeIcon from '@/assets/logos/claude_code.svg?react';
@@ -66,25 +65,6 @@ export const filterModelsByProvider = (
   providerId: string
 ): AIModelSchema[] => {
   return models.filter((model) => getProviderIdFromModelId(model.modelId) === providerId);
-};
-
-export const getModalityIcon = (
-  modality: ModalitySchema
-): React.FunctionComponent<React.SVGProps<SVGSVGElement>> => {
-  switch (modality) {
-    case 'text':
-      return Type;
-    case 'image':
-      return Image;
-    case 'audio':
-      return Mic;
-    // case 'video':
-    //   return Video;
-    // case 'file':
-    //   return File;
-    default:
-      return Type;
-  }
 };
 
 export const formatTokenCount = (count: number): string => {
@@ -185,4 +165,35 @@ export const sortModelsByConfigurationStatus = (
     }
     return aConfigured ? 1 : -1;
   });
+};
+
+// Sorting types
+export type SortField = 'inputPrice' | 'outputPrice' | 'requests';
+export type SortDirection = 'asc' | 'desc';
+
+// Format credits display
+export const formatCredits = (remaining: number): string => {
+  if (remaining >= 1000) {
+    return `${(remaining / 1000).toFixed(1)}K`;
+  }
+  return remaining.toFixed(2);
+};
+
+// Format price per million tokens
+export const formatPrice = (price?: number): string => {
+  if (price === undefined || price === 0) {
+    return 'Free';
+  }
+  if (price < 0.01) {
+    return `$${price.toFixed(4)}`;
+  }
+  if (price < 1) {
+    return `$${price.toFixed(2)}`;
+  }
+  return `$${price.toFixed(1)}`;
+};
+
+// Format modality for display
+export const formatModality = (modality: string): string => {
+  return modality.charAt(0).toUpperCase() + modality.slice(1);
 };
