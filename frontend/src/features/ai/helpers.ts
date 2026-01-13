@@ -34,52 +34,9 @@ export interface ProviderTab {
   logo: React.FunctionComponent<React.SVGProps<SVGSVGElement>> | undefined;
 }
 
-const MAIN_PROVIDER_IDS = ['openai', 'google', 'anthropic', 'x-ai', 'deepseek', 'amazon', 'qwen'];
-
-export const CLOUD_PROVIDERS: ProviderTab[] = [
-  { id: 'openai', displayName: 'OpenAI', logo: OpenAIIcon },
-  { id: 'google', displayName: 'Gemini', logo: GeminiIcon },
-  { id: 'anthropic', displayName: 'Claude', logo: ClaudeIcon },
-  { id: 'x-ai', displayName: 'Grok', logo: GrokIcon },
-  { id: 'deepseek', displayName: 'DeepSeek', logo: DeepseekIcon },
-];
-
-export const PROVIDERS: ProviderTab[] = [
-  { id: 'openai', displayName: 'OpenAI', logo: OpenAIIcon },
-  { id: 'google', displayName: 'Gemini', logo: GeminiIcon },
-  { id: 'anthropic', displayName: 'Claude', logo: ClaudeIcon },
-  { id: 'x-ai', displayName: 'Grok', logo: GrokIcon },
-  { id: 'deepseek', displayName: 'DeepSeek', logo: DeepseekIcon },
-  { id: 'amazon', displayName: 'Amazon', logo: AmazonIcon },
-  { id: 'qwen', displayName: 'Qwen', logo: QwenIcon },
-  { id: 'other', displayName: 'Other', logo: undefined },
-];
-
 // Extract provider ID from modelId (e.g., "openai/gpt-4o" -> "openai")
 export const getProviderIdFromModelId = (modelId: string): string => {
   return modelId.split('/')[0] || '';
-};
-
-// Filter models by provider ID
-export const filterModelsByProvider = (
-  models: AIModelSchema[],
-  providerId: string
-): AIModelSchema[] => {
-  if (providerId === 'other') {
-    return models.filter(
-      (model) => !MAIN_PROVIDER_IDS.includes(getProviderIdFromModelId(model.modelId))
-    );
-  }
-  return models.filter((model) => getProviderIdFromModelId(model.modelId) === providerId);
-};
-
-export const formatTokenCount = (count: number): string => {
-  if (count >= 1000000) {
-    return `${(count / 1000000).toFixed(1)}M`;
-  } else if (count >= 1000) {
-    return `${(count / 1000).toFixed(1)}K`;
-  }
-  return count.toString();
 };
 
 export const getProviderDisplayName = (providerId: string): string => {
@@ -115,6 +72,74 @@ export const getProviderLogo = (
     qwen: QwenIcon,
   };
   return logoMap[providerId];
+};
+
+// Filter models by provider ID
+export const filterModelsByProvider = (
+  models: AIModelSchema[],
+  providerId: string
+): AIModelSchema[] => {
+  if (providerId === 'other') {
+    // "other" tab contains models whose provider has no logo
+    return models.filter((model) => {
+      const modelProviderId = getProviderIdFromModelId(model.modelId);
+      return !getProviderLogo(modelProviderId);
+    });
+  }
+  return models.filter((model) => getProviderIdFromModelId(model.modelId) === providerId);
+};
+
+// Dynamically generate provider tabs from available models
+// Providers with logos get their own tab, others go to "Other"
+export const getProvidersFromModels = (models: AIModelSchema[]): ProviderTab[] => {
+  // Extract unique provider IDs from models
+  const providerIds = new Set<string>();
+  models.forEach((model) => {
+    const providerId = getProviderIdFromModelId(model.modelId);
+    if (providerId) {
+      providerIds.add(providerId);
+    }
+  });
+
+  // Separate providers with logos (main) from those without (other)
+  const mainProviders: ProviderTab[] = [];
+  let hasOtherProviders = false;
+
+  providerIds.forEach((providerId) => {
+    const logo = getProviderLogo(providerId);
+    if (logo) {
+      mainProviders.push({
+        id: providerId,
+        displayName: getProviderDisplayName(providerId),
+        logo,
+      });
+    } else {
+      hasOtherProviders = true;
+    }
+  });
+
+  // Sort main providers by display name
+  mainProviders.sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+  // Add "Other" tab at the end if there are providers without logos
+  if (hasOtherProviders) {
+    mainProviders.push({
+      id: 'other',
+      displayName: 'Other',
+      logo: undefined,
+    });
+  }
+
+  return mainProviders;
+};
+
+export const formatTokenCount = (count: number): string => {
+  if (count >= 1000000) {
+    return `${(count / 1000000).toFixed(1)}M`;
+  } else if (count >= 1000) {
+    return `${(count / 1000).toFixed(1)}K`;
+  }
+  return count.toString();
 };
 
 // Helper function to filter AI models based on selected modalities

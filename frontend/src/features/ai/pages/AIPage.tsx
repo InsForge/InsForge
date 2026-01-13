@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Loader2, ArrowUp, ArrowDown } from 'lucide-react';
 import { ConfirmDialog, Tabs, TabsList, TabsTrigger, TabsContent } from '@/components';
 import { useAIConfigs } from '../hooks/useAIConfigs';
@@ -6,8 +6,7 @@ import { useAIRemainingCredits } from '../hooks/useAIUsage';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
 import {
-  CLOUD_PROVIDERS,
-  PROVIDERS,
+  getProvidersFromModels,
   filterModelsByProvider,
   toModelOption,
   formatCredits,
@@ -29,14 +28,26 @@ export default function AIPage() {
   } = useAIConfigs();
 
   const isCloud = isInsForgeCloudProject();
-  const providers = isCloud ? CLOUD_PROVIDERS : PROVIDERS;
+
+  // Dynamically generate provider tabs from available models
+  const providers = useMemo(
+    () => getProvidersFromModels(allAvailableModels),
+    [allAvailableModels]
+  );
 
   const { data: credits, error: getAICreditsError } = useAIRemainingCredits(!isCloud);
   const { confirm, confirmDialogProps } = useConfirm();
 
-  const [activeTab, setActiveTab] = useState(providers[0]?.id || 'openai');
+  const [activeTab, setActiveTab] = useState<string>('');
   const [sortField, setSortField] = useState<SortField>('inputPrice');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  // Set default active tab when providers are loaded
+  useEffect(() => {
+    if (providers.length > 0 && !activeTab) {
+      setActiveTab(providers[0].id);
+    }
+  }, [providers, activeTab]);
 
   // Create a map from modelId to configuration for quick lookup
   const configurationMap = useMemo(() => {
