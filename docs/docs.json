@@ -89,10 +89,16 @@
                 ]
               },
               {
-                "group": "Email (Private Preview)",
+                "group": "Email (Experimental)",
                 "pages": [
                   "core-concepts/email/architecture",
                   "core-concepts/email/sdk"
+                ]
+              },
+              {
+                "group": "Deployments (Experimental)",
+                "pages": [
+                  "core-concepts/deployments/architecture"
                 ]
               }
             ]
