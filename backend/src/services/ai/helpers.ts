@@ -47,9 +47,13 @@ export function calculatePricePerMillion(pricing: RawOpenRouterModel['pricing'])
   const completionCostPerToken = parseFloat(pricing.completion) || 0;
 
   // Convert from cost per token to cost per million tokens
+  // Round to 6 decimal places to avoid floating point precision issues
+  const inputPrice = Math.round(promptCostPerToken * 1_000_000 * 1_000_000) / 1_000_000;
+  const outputPrice = Math.round(completionCostPerToken * 1_000_000 * 1_000_000) / 1_000_000;
+
   return {
-    inputPrice: promptCostPerToken * 1_000_000,
-    outputPrice: completionCostPerToken * 1_000_000,
+    inputPrice: Math.max(0, inputPrice), // Ensure non-negative
+    outputPrice: Math.max(0, outputPrice), // Ensure non-negative
   };
 }
 

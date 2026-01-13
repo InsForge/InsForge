@@ -27,7 +27,7 @@ export function ModelRow({ model, isEnabled, requests, onToggle }: ModelRowProps
       {/* Input Price */}
       <div className="text-sm text-black dark:text-white">
         {formatPrice(model.inputPrice)}
-        {model.inputPrice && (
+        {model.inputPrice !== undefined && model.inputPrice > 0 && (
           <span className="text-neutral-400 dark:text-neutral-500"> / M tokens</span>
         )}
       </div>
@@ -40,7 +40,7 @@ export function ModelRow({ model, isEnabled, requests, onToggle }: ModelRowProps
       {/* Output Price */}
       <div className="text-sm text-black dark:text-white">
         {formatPrice(model.outputPrice)}
-        {model.outputPrice && (
+        {model.outputPrice !== undefined && model.outputPrice > 0 && (
           <span className="text-neutral-400 dark:text-neutral-500"> / M tokens</span>
         )}
       </div>

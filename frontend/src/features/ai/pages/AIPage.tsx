@@ -164,14 +164,14 @@ export default function AIPage() {
       >
         {/* Tabs List */}
         <TabsList className="bg-transparent border-b border-neutral-200 dark:border-neutral-700 rounded-none h-auto p-0 justify-start gap-0 flex-shrink-0">
-          <div className="max-w-[1080px] mx-auto w-full space-x-6">
+          <div className="max-w-[1080px] mx-auto w-full space-x-6 h-8.5 flex items-start">
             {providers.map((provider) => {
               const Logo = provider.logo;
               return (
                 <TabsTrigger
                   key={provider.id}
                   value={provider.id}
-                  className="relative rounded-none border-b-2 border-transparent gap-1 pb-3 px-0 pt-0 text-sm font-normal text-neutral-500 dark:text-neutral-400 hover:text-black dark:hover:text-white data-[state=active]:border-black dark:data-[state=active]:border-white data-[state=active]:text-black dark:data-[state=active]:text-white data-[state=active]:shadow-none bg-transparent data-[state=active]:bg-transparent"
+                  className="h-full relative rounded-none border-b-2 border-transparent gap-1 pb-3 px-0 pt-0 text-sm font-normal text-neutral-500 dark:text-neutral-400 hover:text-black dark:hover:text-white data-[state=active]:border-black dark:data-[state=active]:border-white data-[state=active]:text-black dark:data-[state=active]:text-white data-[state=active]:shadow-none bg-transparent data-[state=active]:bg-transparent"
                 >
                   {Logo && <Logo className="w-5 h-5" />}
                   {provider.displayName}
@@ -218,7 +218,7 @@ export default function AIPage() {
                     onClick={() => handleSort('outputPrice')}
                     className="flex items-center gap-1 hover:text-black dark:hover:text-white transition-colors"
                     aria-sort={
-                      sortField === 'inputPrice'
+                      sortField === 'outputPrice'
                         ? sortDirection === 'asc'
                           ? 'ascending'
                           : 'descending'
@@ -232,7 +232,7 @@ export default function AIPage() {
                     onClick={() => handleSort('requests')}
                     className="flex items-center gap-1 justify-end hover:text-black dark:hover:text-white transition-colors"
                     aria-sort={
-                      sortField === 'inputPrice'
+                      sortField === 'requests'
                         ? sortDirection === 'asc'
                           ? 'ascending'
                           : 'descending'
