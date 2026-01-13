@@ -94,6 +94,12 @@
                   "core-concepts/email/architecture",
                   "core-concepts/email/sdk"
                 ]
+              },
+              {
+                "group": "Deployments (Experimental)",
+                "pages": [
+                  "core-concepts/deployments/architecture"
+                ]
               }
             ]
           },
