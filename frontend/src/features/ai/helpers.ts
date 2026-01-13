@@ -11,7 +11,8 @@ export interface ModelOption {
   logo: React.ComponentType<React.SVGProps<SVGSVGElement>> | undefined;
   inputModality: ModalitySchema[];
   outputModality: ModalitySchema[];
-  priceLevel?: number;
+  inputPrice?: number; // Price per million tokens in USD
+  outputPrice?: number; // Price per million tokens in USD
   usageStats?: {
     totalRequests: number;
   };
@@ -26,6 +27,46 @@ import OpenAIIcon from '@/assets/logos/openai.svg?react';
 import AmazonIcon from '@/assets/logos/amazon.svg?react';
 import DeepseekIcon from '@/assets/logos/deepseek.svg?react';
 import QwenIcon from '@/assets/logos/qwen.svg?react';
+
+// Provider tab configuration
+export interface ProviderTab {
+  id: string;
+  displayName: string;
+  logo: React.FunctionComponent<React.SVGProps<SVGSVGElement>> | undefined;
+}
+
+// Cloud environment: 5 providers
+export const CLOUD_PROVIDERS: ProviderTab[] = [
+  { id: 'openai', displayName: 'OpenAI', logo: OpenAIIcon },
+  { id: 'google', displayName: 'Gemini', logo: GeminiIcon },
+  { id: 'anthropic', displayName: 'Claude', logo: ClaudeIcon },
+  { id: 'x-ai', displayName: 'Grok', logo: GrokIcon },
+  { id: 'deepseek', displayName: 'DeepSeek', logo: DeepseekIcon },
+];
+
+// Self-hosted environment: 7 providers
+export const SELF_HOSTED_PROVIDERS: ProviderTab[] = [
+  { id: 'openai', displayName: 'OpenAI', logo: OpenAIIcon },
+  { id: 'google', displayName: 'Gemini', logo: GeminiIcon },
+  { id: 'anthropic', displayName: 'Claude', logo: ClaudeIcon },
+  { id: 'x-ai', displayName: 'Grok', logo: GrokIcon },
+  { id: 'deepseek', displayName: 'DeepSeek', logo: DeepseekIcon },
+  { id: 'amazon', displayName: 'Amazon', logo: AmazonIcon },
+  { id: 'qwen', displayName: 'Qwen', logo: QwenIcon },
+];
+
+// Extract provider ID from modelId (e.g., "openai/gpt-4o" -> "openai")
+export const getProviderIdFromModelId = (modelId: string): string => {
+  return modelId.split('/')[0] || '';
+};
+
+// Filter models by provider ID
+export const filterModelsByProvider = (
+  models: AIModelSchema[],
+  providerId: string
+): AIModelSchema[] => {
+  return models.filter((model) => getProviderIdFromModelId(model.modelId) === providerId);
+};
 
 export const getModalityIcon = (
   modality: ModalitySchema
