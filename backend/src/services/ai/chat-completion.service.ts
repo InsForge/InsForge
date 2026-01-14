@@ -53,6 +53,12 @@ interface OpenRouterUrlCitation {
   };
 }
 
+// Message structure that may contain annotations (from OpenRouter response)
+interface MessageWithAnnotations {
+  content?: string | null;
+  annotations?: OpenRouterUrlCitation[];
+}
+
 export class ChatCompletionService {
   private static instance: ChatCompletionService;
   private aiUsageService = AIUsageService.getInstance();
@@ -207,8 +213,7 @@ export class ChatCompletionService {
    * Parse annotations from OpenRouter response to our format
    */
   private parseAnnotations(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    message: any
+    message: MessageWithAnnotations | undefined | null
   ): UrlCitationAnnotation[] | undefined {
     if (!message?.annotations || !Array.isArray(message.annotations)) {
       return undefined;
@@ -216,7 +221,7 @@ export class ChatCompletionService {
 
     const annotations: UrlCitationAnnotation[] = [];
 
-    for (const annotation of message.annotations as OpenRouterUrlCitation[]) {
+    for (const annotation of message.annotations) {
       if (annotation.type === 'url_citation' && annotation.url_citation) {
         annotations.push({
           type: 'url_citation',
@@ -291,7 +296,9 @@ export class ChatCompletionService {
       }
 
       // Parse annotations from response (for web search results)
-      const annotations = this.parseAnnotations(response.choices[0]?.message);
+      const annotations = this.parseAnnotations(
+        response.choices[0]?.message as MessageWithAnnotations | undefined
+      );
 
       return {
         text: response.choices[0]?.message?.content || '',
@@ -364,8 +371,9 @@ export class ChatCompletionService {
         }
 
         // Check for annotations in the chunk (web search results)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const chunkAnnotations = this.parseAnnotations(chunk.choices[0]?.delta as any);
+        const chunkAnnotations = this.parseAnnotations(
+          chunk.choices[0]?.delta as MessageWithAnnotations | undefined
+        );
         if (chunkAnnotations) {
           collectedAnnotations = collectedAnnotations || [];
           collectedAnnotations.push(...chunkAnnotations);
