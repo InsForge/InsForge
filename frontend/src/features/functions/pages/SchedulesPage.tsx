@@ -15,7 +15,7 @@ import { normalizeHeaders } from '../helpers';
 import ScheduleRow from '../components/ScheduleRow';
 import ScheduleLogs from '../components/ScheduleLogs';
 import { Alert, AlertDescription } from '@/components/radix/Alert';
-import { EmptyState } from '@/components/EmptyState';
+import ScheduleEmptyState from '../components/ScheduleEmptyState';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
@@ -263,10 +263,7 @@ export default function SchedulesPage() {
           {isLoadingSchedules ? (
             [...Array(4)].map((_, i) => <Skeleton key={i} className="h-14 rounded-[8px]" />)
           ) : schedules.length === 0 ? (
-            <EmptyState
-              title="No Schedules"
-              description="Create your first schedule to get started"
-            />
+            <ScheduleEmptyState />
           ) : paginatedSchedules.length >= 1 ? (
             paginatedSchedules.map((s) => (
               <ScheduleRow
