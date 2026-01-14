@@ -190,7 +190,7 @@ export default function AIPage() {
         </TabsList>
 
         {/* Tab Content - Scrollbar on page edge */}
-        <TabsContent value={activeTab} className="flex-1 min-h-0 overflow-y-auto mt-0">
+        <TabsContent value={activeTab} className="flex-1 min-h-0 overflow-y-auto scrollbar-gutter-stable mt-0">
           <div className="max-w-[1080px] mx-auto w-full pt-6 pb-6">
             {getAICreditsError ? (
               <div className="flex items-center justify-center h-64 text-neutral-500 dark:text-neutral-400">

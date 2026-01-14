@@ -14,18 +14,18 @@ export function ModelRow({ model, isEnabled, requests, onToggle }: ModelRowProps
       {/* Model with Toggle */}
       <div className="flex items-center gap-3">
         <Switch checked={isEnabled} onCheckedChange={() => onToggle(model.modelId, isEnabled)} />
-        <span className="text-base font-medium text-black dark:text-white truncate">
+        <span className="text-base font-medium text-black dark:text-white truncate" title={model.modelName}>
           {model.modelName}
         </span>
       </div>
 
       {/* Input Modalities */}
-      <div className="text-sm leading-6 text-black dark:text-white">
+      <div className="text-sm leading-6 text-black dark:text-white" title={model.inputModality.map(formatModality).join(' / ')}>
         {model.inputModality.map(formatModality).join(' / ')}
       </div>
 
       {/* Input Price */}
-      <div className="text-sm text-black dark:text-white">
+      <div className="text-sm text-black dark:text-white" title={formatPrice(model.inputPrice)}>
         {formatPrice(model.inputPrice)}
         {model.inputPrice !== undefined && model.inputPrice > 0 && (
           <span className="text-neutral-400 dark:text-neutral-500"> / M tokens</span>
@@ -33,12 +33,12 @@ export function ModelRow({ model, isEnabled, requests, onToggle }: ModelRowProps
       </div>
 
       {/* Output Modalities */}
-      <div className="text-sm leading-6 text-black dark:text-white">
+      <div className="text-sm leading-6 text-black dark:text-white" title={model.outputModality.map(formatModality).join(' / ')}>
         {model.outputModality.map(formatModality).join(' / ')}
       </div>
 
       {/* Output Price */}
-      <div className="text-sm text-black dark:text-white">
+      <div className="text-sm text-black dark:text-white" title={formatPrice(model.outputPrice)}>
         {formatPrice(model.outputPrice)}
         {model.outputPrice !== undefined && model.outputPrice > 0 && (
           <span className="text-neutral-400 dark:text-neutral-500"> / M tokens</span>
@@ -46,7 +46,7 @@ export function ModelRow({ model, isEnabled, requests, onToggle }: ModelRowProps
       </div>
 
       {/* Requests Count */}
-      <div className="text-right text-sm leading-6 text-black dark:text-white">
+      <div className="text-right text-sm leading-6 text-black dark:text-white" title={requests > 0 ? requests.toLocaleString() : '-'}>
         {requests > 0 ? requests.toLocaleString() : '-'}
       </div>
     </div>
