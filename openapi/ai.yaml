@@ -432,7 +432,7 @@ components:
           $ref: '#/components/schemas/WebSearchPlugin'
         thinking:
           type: boolean
-          description: Enable extended reasoning capabilities (appends :thinking to model ID)
+          description: Enable extended reasoning capabilities (appends :thinking to model ID if not already present), only works with Anthropic models with the :thinking suffix.
 
     ChatCompletionResponse:
       type: object
