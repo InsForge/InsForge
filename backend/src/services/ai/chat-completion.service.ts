@@ -101,12 +101,18 @@ export class ChatCompletionService {
 
   /**
    * Validate model and get config
+   * For models with variants (e.g., model:thinking), first checks the full model ID
    */
-  async validateAndGetConfig(modelId: string): Promise<AIConfigurationSchema | null> {
-    const aiConfig = await this.aiConfigService.findByModelId(modelId);
+  async validateAndGetConfig(
+    modelId: string,
+    thinking?: boolean
+  ): Promise<AIConfigurationSchema | null> {
+    // Build the actual model ID with optional :thinking suffix
+    const actualModelId = this.buildModelId(modelId, thinking);
+    const aiConfig = await this.aiConfigService.findByModelId(actualModelId);
     if (!aiConfig) {
       throw new Error(
-        `Model ${modelId} is not enabled. Please contact your administrator to enable this model.`
+        `Model ${actualModelId} is not enabled. Please contact your administrator to enable this model.`
       );
     }
     return aiConfig;
@@ -116,7 +122,7 @@ export class ChatCompletionService {
    * Build the model ID with optional :thinking suffix
    */
   private buildModelId(model: string, thinking?: boolean): string {
-    if (thinking) {
+    if (thinking && model.endsWith(':thinking') === false) {
       return `${model}:thinking`;
     }
     return model;
@@ -188,8 +194,8 @@ export class ChatCompletionService {
     options: ChatCompletionOptions
   ): Promise<ChatCompletionResponse> {
     try {
-      // Validate model and get config
-      const aiConfig = await this.validateAndGetConfig(options.model);
+      // Validate model and get config (pass thinking option for variant checking)
+      const aiConfig = await this.validateAndGetConfig(options.model, options.thinking);
 
       // Build model ID with optional :thinking suffix
       const modelId = this.buildModelId(options.model, options.thinking);
@@ -228,7 +234,7 @@ export class ChatCompletionService {
           aiConfig.id,
           tokenUsage.promptTokens,
           tokenUsage.completionTokens,
-          options.model
+          modelId // pass the actual model ID used
         );
       }
 
@@ -265,8 +271,8 @@ export class ChatCompletionService {
     annotations?: UrlCitationAnnotation[];
   }> {
     try {
-      // Validate model and get config
-      const aiConfig = await this.validateAndGetConfig(options.model);
+      // Validate model and get config (pass thinking option for variant checking)
+      const aiConfig = await this.validateAndGetConfig(options.model, options.thinking);
 
       // Build model ID with optional :thinking suffix
       const modelId = this.buildModelId(options.model, options.thinking);
@@ -336,7 +342,7 @@ export class ChatCompletionService {
           aiConfig.id,
           tokenUsage.promptTokens,
           tokenUsage.completionTokens,
-          options.model
+          modelId // pass the actual model ID used
         );
       }
     } catch (error) {

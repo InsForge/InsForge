@@ -28,7 +28,7 @@ websearch_response=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/ai/chat/comp
     -H "Authorization: Bearer $ADMIN_TOKEN" \
     -H "Content-Type: application/json" \
     -d '{
-        "model": "openai/gpt-4o-mini",
+        "model": "openai/gpt-4o",
         "messages": [{"role": "user", "content": "What are the latest AI news today?"}],
         "webSearch": {
             "enabled": true,
@@ -62,7 +62,7 @@ exa_response=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/ai/chat/completion
     -H "Authorization: Bearer $ADMIN_TOKEN" \
     -H "Content-Type: application/json" \
     -d '{
-        "model": "openai/gpt-4o-mini",
+        "model": "openai/gpt-4o",
         "messages": [{"role": "user", "content": "What is the current weather in Tokyo?"}],
         "webSearch": {
             "enabled": true,
@@ -91,9 +91,8 @@ thinking_response=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/ai/chat/compl
     -H "Authorization: Bearer $ADMIN_TOKEN" \
     -H "Content-Type: application/json" \
     -d '{
-        "model": "deepseek/deepseek-r1",
-        "messages": [{"role": "user", "content": "What is 15 + 27?"}],
-        "thinking": true
+        "model": "anthropic/claude-3.7-sonnet:thinking",
+        "messages": [{"role": "user", "content": "What is 15 + 27?"}]
     }')
 
 status=$(echo "$thinking_response" | tail -n 1)
@@ -116,7 +115,7 @@ combined_response=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/ai/chat/compl
     -H "Authorization: Bearer $ADMIN_TOKEN" \
     -H "Content-Type: application/json" \
     -d '{
-        "model": "anthropic/claude-sonnet-4",
+        "model": "anthropic/claude-3.7-sonnet",
         "messages": [{"role": "user", "content": "What are the recent developments in AI?"}],
         "webSearch": {
             "enabled": true,
@@ -147,7 +146,7 @@ stream_output=$(curl -s -N -X POST "$API_BASE/ai/chat/completion" \
     -H "Authorization: Bearer $ADMIN_TOKEN" \
     -H "Content-Type: application/json" \
     -d '{
-        "model": "openai/gpt-4o-mini",
+        "model": "openai/gpt-4o",
         "messages": [{"role": "user", "content": "Latest tech news in one sentence"}],
         "stream": true,
         "webSearch": {
@@ -173,7 +172,7 @@ thinking_stream=$(curl -s -N -X POST "$API_BASE/ai/chat/completion" \
     -H "Authorization: Bearer $ADMIN_TOKEN" \
     -H "Content-Type: application/json" \
     -d '{
-        "model": "deepseek/deepseek-r1",
+        "model": "anthropic/claude-3.7-sonnet",
         "messages": [{"role": "user", "content": "What is 2+2?"}],
         "stream": true,
         "thinking": true
@@ -195,7 +194,7 @@ custom_prompt_response=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/ai/chat/
     -H "Authorization: Bearer $ADMIN_TOKEN" \
     -H "Content-Type: application/json" \
     -d '{
-        "model": "openai/gpt-4o-mini",
+        "model": "openai/gpt-4o",
         "messages": [{"role": "user", "content": "Tell me about SpaceX launches"}],
         "webSearch": {
             "enabled": true,
