@@ -1,12 +1,11 @@
 import { useState, useCallback, useMemo } from 'react';
 import { MoreHorizontal, Plus, Trash2, Pencil, Mail, ChevronDown } from 'lucide-react';
-import { OAuthConfigDialog, AuthPreview } from '@/features/auth/components';
+import { OAuthConfigDialog } from '@/features/auth/components';
 import { useOAuthConfig } from '@/features/auth/hooks/useOAuthConfig';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import {
   Button,
   ConfirmDialog,
-  CopyButton,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -14,12 +13,7 @@ import {
   DropdownMenuSeparator,
 } from '@/components';
 import type { OAuthProvidersSchema } from '@insforge/shared-schemas';
-import {
-  oauthProviders,
-  type OAuthProviderInfo,
-  getAuthImplementationPrompt,
-} from '@/features/auth/helpers';
-import { getBackendUrl } from '@/lib/utils/utils';
+import { oauthProviders, type OAuthProviderInfo } from '@/features/auth/helpers';
 
 export default function AuthMethodsPage() {
   const [selectedProvider, setSelectedProvider] = useState<OAuthProviderInfo>();
