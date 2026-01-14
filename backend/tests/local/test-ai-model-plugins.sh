@@ -9,18 +9,18 @@ source "$SCRIPT_DIR/../test-config.sh"
 echo "🧪 Testing AI Web Search and Thinking features..."
 
 API_BASE="$TEST_API_BASE"
-ADMIN_TOKEN="ik_0322f7447cd878f2e419dc8900fe3e5e"
+ADMIN_TOKEN=""
 
 # Get admin token
 echo "🔑 Getting admin token..."
-# ADMIN_TOKEN=$(get_admin_token)
+ADMIN_TOKEN=$(get_admin_token)
 
-# if [ -z "$ADMIN_TOKEN" ]; then
-#     print_fail "Failed to get admin token"
-#     exit 1
-# fi
-# print_success "Got admin token"
-# echo ""
+if [ -z "$ADMIN_TOKEN" ]; then
+    print_fail "Failed to get admin token"
+    exit 1
+fi
+print_success "Got admin token"
+echo ""
 
 # 1. Test chat completion with Web Search
 echo "🔍 Test 1: Chat completion with Web Search..."
