@@ -32,7 +32,26 @@ export const audioContentSchema = z.object({
   }),
 });
 
-export const contentSchema = z.union([textContentSchema, imageContentSchema, audioContentSchema]);
+// File content schema for PDFs and other documents (OpenRouter format)
+export const fileContentSchema = z.object({
+  type: z.literal('file'),
+  file: z.object({
+    // Filename with extension (e.g., "document.pdf")
+    filename: z.string(),
+    // File data can be:
+    // - Public URL: "https://example.com/document.pdf"
+    // - Base64 data URL: "data:application/pdf;base64,..."
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    file_data: z.string(),
+  }),
+});
+
+export const contentSchema = z.union([
+  textContentSchema,
+  imageContentSchema,
+  audioContentSchema,
+  fileContentSchema,
+]);
 
 // Chat message supports both OpenAI format and legacy format for backward compatibility
 export const chatMessageSchema = z.object({
@@ -57,6 +76,21 @@ export const webSearchPluginSchema = z.object({
   searchPrompt: z.string().optional(),
 });
 
+// File Parser Plugin configuration for OpenRouter PDF processing
+export const fileParserPluginSchema = z.object({
+  enabled: z.boolean(),
+  pdf: z
+    .object({
+      // PDF processing engine:
+      // - "pdf-text": Best for well-structured PDFs with clear text content (Free)
+      // - "mistral-ocr": Best for scanned documents or PDFs with images ($2 per 1,000 pages)
+      // - "native": Only available for models that support file input natively (charged as input tokens)
+      // If not specified, defaults to native if available, otherwise mistral-ocr
+      engine: z.enum(['pdf-text', 'mistral-ocr', 'native']).optional(),
+    })
+    .optional(),
+});
+
 export const chatCompletionRequestSchema = z.object({
   model: z.string(),
   messages: z.array(chatMessageSchema),
@@ -67,6 +101,9 @@ export const chatCompletionRequestSchema = z.object({
   // Web Search: Incorporate relevant web search results into the response
   // Results are returned in the annotations field
   webSearch: webSearchPluginSchema.optional(),
+  // File Parser: Configure PDF processing for file content in messages
+  // When files are included in messages, this controls how PDFs are parsed
+  fileParser: fileParserPluginSchema.optional(),
   // Thinking/Reasoning mode: Enable extended reasoning capabilities
   // Appends ":thinking" to the model ID for chain-of-thought reasoning
   thinking: z.boolean().optional(),
@@ -85,10 +122,26 @@ export const urlCitationAnnotationSchema = z.object({
   }),
 });
 
+// File annotation from PDF parsing results
+// Can be passed back in subsequent requests to skip re-parsing costs
+export const fileAnnotationSchema = z.object({
+  type: z.literal('file'),
+  file: z.object({
+    filename: z.string(),
+    // Parsed content from the PDF (used for caching)
+    parsedContent: z.string().optional(),
+    // Additional metadata from the parser
+    metadata: z.record(z.unknown()).optional(),
+  }),
+});
+
+// Combined annotation schema for all annotation types
+export const annotationSchema = z.union([urlCitationAnnotationSchema, fileAnnotationSchema]);
+
 export const chatCompletionResponseSchema = z.object({
   text: z.string(),
-  // Web search URL citations (present when webSearch is enabled)
-  annotations: z.array(urlCitationAnnotationSchema).optional(),
+  // Annotations from web search or file parsing (can be URL citations or file annotations)
+  annotations: z.array(annotationSchema).optional(),
   metadata: z
     .object({
       model: z.string(),
@@ -178,10 +231,14 @@ export const getAIUsageSummaryRequestSchema = z.object({
 export type TextContentSchema = z.infer<typeof textContentSchema>;
 export type ImageContentSchema = z.infer<typeof imageContentSchema>;
 export type AudioContentSchema = z.infer<typeof audioContentSchema>;
+export type FileContentSchema = z.infer<typeof fileContentSchema>;
 export type ContentSchema = z.infer<typeof contentSchema>;
 export type ChatMessageSchema = z.infer<typeof chatMessageSchema>;
 export type WebSearchPlugin = z.infer<typeof webSearchPluginSchema>;
+export type FileParserPlugin = z.infer<typeof fileParserPluginSchema>;
 export type UrlCitationAnnotation = z.infer<typeof urlCitationAnnotationSchema>;
+export type FileAnnotation = z.infer<typeof fileAnnotationSchema>;
+export type Annotation = z.infer<typeof annotationSchema>;
 export type ChatCompletionRequest = z.infer<typeof chatCompletionRequestSchema>;
 export type ChatCompletionResponse = z.infer<typeof chatCompletionResponseSchema>;
 export type ImageGenerationRequest = z.infer<typeof imageGenerationRequestSchema>;

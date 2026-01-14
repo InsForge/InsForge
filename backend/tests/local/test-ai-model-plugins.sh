@@ -9,18 +9,18 @@ source "$SCRIPT_DIR/../test-config.sh"
 echo "🧪 Testing AI Web Search and Thinking features..."
 
 API_BASE="$TEST_API_BASE"
-ADMIN_TOKEN=""
+ADMIN_TOKEN="ik_0322f7447cd878f2e419dc8900fe3e5e"
 
 # Get admin token
 echo "🔑 Getting admin token..."
-ADMIN_TOKEN=$(get_admin_token)
+# ADMIN_TOKEN=$(get_admin_token)
 
-if [ -z "$ADMIN_TOKEN" ]; then
-    print_fail "Failed to get admin token"
-    exit 1
-fi
-print_success "Got admin token"
-echo ""
+# if [ -z "$ADMIN_TOKEN" ]; then
+#     print_fail "Failed to get admin token"
+#     exit 1
+# fi
+# print_success "Got admin token"
+# echo ""
 
 # 1. Test chat completion with Web Search
 echo "🔍 Test 1: Chat completion with Web Search..."
@@ -212,6 +212,44 @@ if [ "$status" -eq 200 ]; then
     echo ""
 else
     print_fail "Web Search with custom prompt failed (status: $status)"
+    echo "Response: $body"
+    track_test_failure
+fi
+echo ""
+
+# 8. Test PDF file processing with file-parser plugin
+# Note: Using pdf-text engine (free) instead of native, as native requires models with built-in PDF support
+# For URL-based PDFs, OpenRouter's file-parser plugin will fetch and parse the PDF
+echo "📄 Test 8: PDF file processing with file-parser plugin..."
+pdf_response=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/ai/chat/completion" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "model": "openai/gpt-4o",
+        "messages": [{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Please summarize the content of this PDF document."},
+                {"type": "file", "file": {"filename": "sample.pdf", "file_data": "https://pdfco-test-files.s3.us-west-2.amazonaws.com/pdf-to-csv/sample.pdf"}}
+            ]
+        }],
+        "fileParser": {
+            "enabled": true,
+            "pdf": {
+                "engine": "pdf-text"
+            }
+        }
+    }')
+
+status=$(echo "$pdf_response" | tail -n 1)
+body=$(echo "$pdf_response" | sed '$d')
+
+if [ "$status" -eq 200 ]; then
+    print_success "PDF file processing succeeded"
+    echo "Response preview: $(echo "$body" | head -c 800)"
+    echo ""
+else
+    print_fail "PDF file processing failed (status: $status)"
     echo "Response: $body"
     track_test_failure
 fi

@@ -19,15 +19,26 @@ interface OpenRouterWebPlugin {
   search_prompt?: string;
 }
 
+// OpenRouter plugin type for file parsing (PDF processing)
+interface OpenRouterFileParserPlugin {
+  id: 'file-parser';
+  pdf?: {
+    engine?: 'pdf-text' | 'mistral-ocr' | 'native';
+  };
+}
+
+// Union type for all OpenRouter plugins
+type OpenRouterPlugin = OpenRouterWebPlugin | OpenRouterFileParserPlugin;
+
 // Extended request type with OpenRouter-specific fields
 interface OpenRouterChatCompletionRequest
   extends OpenAI.Chat.ChatCompletionCreateParamsNonStreaming {
-  plugins?: OpenRouterWebPlugin[];
+  plugins?: OpenRouterPlugin[];
 }
 
 interface OpenRouterChatCompletionStreamingRequest
   extends OpenAI.Chat.ChatCompletionCreateParamsStreaming {
-  plugins?: OpenRouterWebPlugin[];
+  plugins?: OpenRouterPlugin[];
 }
 
 // OpenRouter annotation format from API response
@@ -134,7 +145,7 @@ export class ChatCompletionService {
    */
   private buildWebSearchPlugin(
     webSearch?: ChatCompletionOptions['webSearch']
-  ): OpenRouterWebPlugin[] | undefined {
+  ): OpenRouterWebPlugin | undefined {
     if (!webSearch?.enabled) {
       return undefined;
     }
@@ -151,7 +162,45 @@ export class ChatCompletionService {
       plugin.search_prompt = webSearch.searchPrompt;
     }
 
-    return [plugin];
+    return plugin;
+  }
+
+  /**
+   * Build file parser plugin configuration for PDF processing
+   */
+  private buildFileParserPlugin(
+    fileParser?: ChatCompletionOptions['fileParser']
+  ): OpenRouterFileParserPlugin | undefined {
+    if (!fileParser?.enabled) {
+      return undefined;
+    }
+
+    const plugin: OpenRouterFileParserPlugin = { id: 'file-parser' };
+
+    if (fileParser.pdf?.engine) {
+      plugin.pdf = { engine: fileParser.pdf.engine };
+    }
+
+    return plugin;
+  }
+
+  /**
+   * Build all plugins array from options
+   */
+  private buildPlugins(options: ChatCompletionOptions): OpenRouterPlugin[] | undefined {
+    const plugins: OpenRouterPlugin[] = [];
+
+    const webSearchPlugin = this.buildWebSearchPlugin(options.webSearch);
+    if (webSearchPlugin) {
+      plugins.push(webSearchPlugin);
+    }
+
+    const fileParserPlugin = this.buildFileParserPlugin(options.fileParser);
+    if (fileParserPlugin) {
+      plugins.push(fileParserPlugin);
+    }
+
+    return plugins.length > 0 ? plugins : undefined;
   }
 
   /**
@@ -204,7 +253,7 @@ export class ChatCompletionService {
       // Apply system prompt from config if available
       const formattedMessages = this.formatMessages(messages, aiConfig?.systemPrompt);
 
-      // Build request with optional web search plugin
+      // Build request with optional plugins (web search, file parser)
       const request: OpenRouterChatCompletionRequest = {
         model: modelId,
         messages: formattedMessages,
@@ -212,7 +261,7 @@ export class ChatCompletionService {
         max_tokens: options.maxTokens ?? 4096,
         top_p: options.topP,
         stream: false,
-        plugins: this.buildWebSearchPlugin(options.webSearch),
+        plugins: this.buildPlugins(options),
       };
 
       // Send request with automatic renewal and retry logic
@@ -283,7 +332,7 @@ export class ChatCompletionService {
       // Apply system prompt from config if available
       const formattedMessages = this.formatMessages(messages, aiConfig?.systemPrompt);
 
-      // Build request with optional web search plugin
+      // Build request with optional plugins (web search, file parser)
       const request: OpenRouterChatCompletionStreamingRequest = {
         model: modelId,
         messages: formattedMessages,
@@ -291,7 +340,7 @@ export class ChatCompletionService {
         max_tokens: options.maxTokens ?? 4096,
         top_p: options.topP,
         stream: true,
-        plugins: this.buildWebSearchPlugin(options.webSearch),
+        plugins: this.buildPlugins(options),
       };
 
       // Send request with automatic renewal and retry logic
