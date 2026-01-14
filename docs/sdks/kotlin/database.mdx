@@ -130,11 +130,63 @@ val posts = insforge.database
     .select("id, title, content")
     .execute<Post>()  // Returns List<Post>
 
-// With relationships
+// With relationships (typed)
+@Serializable
+data class PostWithComments(
+    val id: String,
+    val title: String,
+    val content: String,
+    val comments: List<Comment>
+)
+
 val posts = insforge.database
     .from("posts")
     .select("*, comments(id, content)")
     .execute<PostWithComments>()  // Returns List<PostWithComments>
+```
+
+---
+
+## executeRaw()
+
+Execute SELECT query and return raw JSON array. Use this method when you need to work with dynamic/untyped data, such as queries with joins that return nested objects.
+
+### Examples
+
+```kotlin
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+
+// Query with relationships - raw JSON access
+val result = insforge.database
+    .from("tweets")
+    .select("id, content, profiles!tweets_user_id_fkey(username)")
+    .executeRaw()  // Returns JsonArray
+
+result.forEach { element ->
+    val obj = element.jsonObject
+    val id = obj["id"]?.jsonPrimitive?.content
+    val content = obj["content"]?.jsonPrimitive?.content
+    val profile = obj["profiles"]?.jsonObject
+    val username = profile?.get("username")?.jsonPrimitive?.content
+
+    println("Tweet by $username: $content")
+}
+
+// Dynamic queries where structure is unknown
+val rawData = insforge.database
+    .from("dynamic_table")
+    .select()
+    .executeRaw()
+
+// Process raw JSON as needed
+rawData.forEach { element ->
+    val obj = element.jsonObject
+    obj.keys.forEach { key ->
+        println("$key: ${obj[key]}")
+    }
+}
 ```
 
 ---

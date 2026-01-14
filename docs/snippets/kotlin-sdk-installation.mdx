@@ -115,6 +115,40 @@ val client = createInsforgeClient(
 }
 ```
 
+3. Enable Logging (Optional)
+
+For debugging, you can configure the SDK log level:
+
+```kotlin
+import dev.insforge.InsforgeLogLevel
+
+val client = createInsforgeClient(
+    baseUrl = "https://your-app.insforge.app",
+    anonKey = "your-api-key"
+) {
+    // DEBUG: logs request method/URL and response status
+    // VERBOSE: logs full headers and request/response bodies
+    logLevel = InsforgeLogLevel.DEBUG
+
+    install(Auth)
+    install(Database)
+    // ... other modules
+}
+```
+
+| Log Level | Description |
+|-----------|-------------|
+| `NONE` | No logging (default, recommended for production) |
+| `ERROR` | Only errors |
+| `WARN` | Warnings and errors |
+| `INFO` | Informational messages |
+| `DEBUG` | Debug info (request method, URL, response status) |
+| `VERBOSE` | Full details (headers, request/response bodies) |
+
+<Note>
+  Use `NONE` or `ERROR` in production to avoid exposing sensitive data in logs.
+</Note>
+
 ### Android Initialization
 
 1. Initialize InsForge SDK (With Local Storage and Browser Launcher for OAuth)
