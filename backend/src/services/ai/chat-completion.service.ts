@@ -20,7 +20,8 @@ interface OpenRouterWebPlugin {
 }
 
 // Extended request type with OpenRouter-specific fields
-interface OpenRouterChatCompletionRequest extends OpenAI.Chat.ChatCompletionCreateParamsNonStreaming {
+interface OpenRouterChatCompletionRequest
+  extends OpenAI.Chat.ChatCompletionCreateParamsNonStreaming {
   plugins?: OpenRouterWebPlugin[];
 }
 
@@ -216,7 +217,9 @@ export class ChatCompletionService {
 
       // Send request with automatic renewal and retry logic
       const response = await this.openRouterProvider.sendRequest((client) =>
-        client.chat.completions.create(request as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming)
+        client.chat.completions.create(
+          request as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming
+        )
       );
 
       // Extract token usage if available
