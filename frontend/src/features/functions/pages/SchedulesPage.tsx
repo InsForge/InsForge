@@ -10,7 +10,8 @@ import {
   TooltipTrigger,
 } from '@/components';
 import { ScheduleFormDialog } from '../components/ScheduleFormDialog';
-import type { ScheduleFormSchema } from '../types/schedules';
+import type { ScheduleFormSchema } from '../types';
+import { normalizeHeaders } from '../helpers';
 import ScheduleRow from '../components/ScheduleRow';
 import ScheduleLogs from '../components/ScheduleLogs';
 import { Alert, AlertDescription } from '@/components/radix/Alert';
@@ -101,29 +102,6 @@ export default function SchedulesPage() {
   const handleBackFromLogs = useCallback(() => {
     setSelectedScheduleForLogs(null);
   }, []);
-
-  const normalizeHeaders = (h: unknown): Record<string, string> | undefined => {
-    if (h === null) {
-      return undefined;
-    }
-    if (typeof h === 'string') {
-      try {
-        const parsed = JSON.parse(h);
-        if (parsed && typeof parsed === 'object') {
-          return Object.fromEntries(Object.entries(parsed).map(([k, v]) => [k, String(v)]));
-        }
-        return undefined;
-      } catch {
-        return undefined;
-      }
-    }
-    if (typeof h === 'object') {
-      return Object.fromEntries(
-        Object.entries(h as Record<string, unknown>).map(([k, v]) => [k, String(v)])
-      );
-    }
-    return undefined;
-  };
 
   const handleCreateOnSubmit = async (values: ScheduleFormSchema) => {
     try {

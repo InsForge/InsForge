@@ -10,11 +10,13 @@ interface ScheduleLogsProps {
 }
 
 export function ScheduleLogs({ scheduleId }: ScheduleLogsProps) {
-  const [currentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
   const offset = (currentPage - 1) * PAGE_SIZE;
 
   const { data, isLoading, error } = useScheduleLogs(scheduleId, PAGE_SIZE, offset);
   const logs = data?.logs || [];
+  const total = data?.totalCount ?? 0;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const columns = useMemo((): LogsColumnDef[] => {
     const defs: LogsColumnDef[] = [
@@ -113,7 +115,7 @@ export function ScheduleLogs({ scheduleId }: ScheduleLogsProps) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 min-h-0 overflow-hidden px-4 py-4">
+      <div className="flex-1 min-h-0 overflow-hidden">
         {error ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-sm text-red-600 dark:text-red-400">
@@ -121,7 +123,21 @@ export function ScheduleLogs({ scheduleId }: ScheduleLogsProps) {
             </p>
           </div>
         ) : (
-          <LogsDataGrid columnDefs={columns} data={logs} noPadding={false} loading={isLoading} />
+          <LogsDataGrid
+            columnDefs={columns}
+            data={logs}
+            loading={isLoading}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={PAGE_SIZE}
+            totalRecords={total}
+            onPageChange={setCurrentPage}
+            emptyState={
+              <div className="text-sm text-zinc-500 dark:text-zinc-400">
+                No execution logs found
+              </div>
+            }
+          />
         )}
       </div>
     </div>

@@ -11,11 +11,10 @@ import { scheduleService } from '@/features/functions/services/schedule.service'
 import { useToast } from '@/lib/hooks/useToast';
 
 const SCHEDULES_QUERY_KEY = ['schedules'];
-const SCHEDULE_LOGS_QUERY_KEY = ['schedule-logs'];
 
 export function useScheduleLogs(scheduleId: string, limit = 50, offset = 0) {
   return useQuery({
-    queryKey: [SCHEDULE_LOGS_QUERY_KEY, scheduleId, limit, offset],
+    queryKey: ['schedules', 'logs', scheduleId, limit, offset],
     queryFn: () => scheduleService.listExecutionLogs(scheduleId, limit, offset),
     enabled: !!scheduleId,
     staleTime: 30 * 1000,
@@ -185,12 +184,19 @@ export function useSchedules() {
     [updateMutation]
   );
 
-  const getSchedule = useCallback(async (scheduleId: string) => {
-    if (!scheduleId) {
-      return null;
-    }
-    return scheduleService.getSchedule(scheduleId);
-  }, []);
+  const getSchedule = useCallback(
+    async (scheduleId: string) => {
+      if (!scheduleId) {
+        return null;
+      }
+      return queryClient.fetchQuery({
+        queryKey: ['schedules', scheduleId],
+        queryFn: () => scheduleService.getSchedule(scheduleId),
+        staleTime: 30 * 1000,
+      });
+    },
+    [queryClient]
+  );
 
   const filteredSchedules = schedules.filter((s: ScheduleSchema) =>
     s.name.toLowerCase().includes(searchQuery.toLowerCase())

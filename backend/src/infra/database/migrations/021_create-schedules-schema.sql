@@ -123,8 +123,8 @@ BEGIN
     v_decrypted := pgp_sym_decrypt(decode(p_encrypted_headers, 'base64'), v_key);
     RETURN v_decrypted::JSONB;
   EXCEPTION WHEN others THEN
-    RAISE NOTICE 'Decryption failed for value: %, error: %', left(p_encrypted_headers, 50), SQLERRM;
-    RETURN '{}'::JSONB;
+    RAISE WARNING 'Decryption failed for value: %, error: %', left(p_encrypted_headers, 50), SQLERRM;
+    RAISE;  -- Re-raise so execute_job logs the actual failure reason
   END;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -416,6 +416,11 @@ BEGIN
   SELECT cron_job_id INTO v_cron_job_id
   FROM schedules.jobs WHERE id = p_job_id;
 
+  IF NOT FOUND THEN
+    RETURN QUERY SELECT FALSE, 'Job not found';
+    RETURN;
+  END IF;
+
   IF v_cron_job_id IS NOT NULL THEN
     PERFORM cron.unschedule(v_cron_job_id);
   END IF;
@@ -427,20 +432,3 @@ EXCEPTION WHEN OTHERS THEN
   RETURN QUERY SELECT FALSE, SQLERRM;
 END;
 $$ LANGUAGE plpgsql;
-
--- ============================================================================
--- GRANTS
--- ============================================================================
-
--- Grant schema access
-GRANT USAGE ON SCHEMA schedules TO authenticated;
-
--- Grant table access (restrict as needed via RLS)
-GRANT SELECT, INSERT, UPDATE, DELETE ON schedules.jobs TO authenticated;
-GRANT SELECT ON schedules.job_logs TO authenticated;
-
--- Grant function execution
-GRANT EXECUTE ON FUNCTION schedules.upsert_job TO authenticated;
-GRANT EXECUTE ON FUNCTION schedules.disable_job TO authenticated;
-GRANT EXECUTE ON FUNCTION schedules.enable_job TO authenticated;
-GRANT EXECUTE ON FUNCTION schedules.delete_job TO authenticated;

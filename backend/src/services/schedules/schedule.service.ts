@@ -124,15 +124,14 @@ export class ScheduleService {
       let value = headers[key];
       if (typeof value === 'string') {
         const matches = [...value.matchAll(secretRegex)];
+        const uniqueSecretKeys = [...new Set(matches.map((m) => m[1]))];
 
-        for (const match of matches) {
-          const placeholder = match[0];
-          const secretKey = match[1];
-
+        for (const secretKey of uniqueSecretKeys) {
           const secretValue = await this.secretService.getSecretByKey(secretKey);
 
           if (secretValue) {
-            value = value.replace(placeholder, secretValue);
+            const placeholder = `\${{secrets.${secretKey}}}`;
+            value = value.replaceAll(placeholder, secretValue);
           } else {
             throw new AppError(
               `Secret with key "${secretKey}" not found for schedule header "${key}".`,
@@ -431,7 +430,7 @@ export class ScheduleService {
           executedAt: executedAtStr,
           statusCode: log.statusCode,
           success: log.success,
-          durationMs: parseInt(log.durationMs, 10),
+          durationMs: parseInt(log.durationMs, 10) || 0,
           message: log.message,
         };
       });

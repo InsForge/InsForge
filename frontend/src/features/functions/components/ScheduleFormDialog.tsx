@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSchedules } from '@/features/functions/hooks/useSchedules';
-import type { ScheduleFormSchema } from '../types/schedules';
+import type { ScheduleFormSchema } from '../types';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createScheduleRequestSchema, type ScheduleSchema } from '@insforge/shared-schemas';
@@ -400,12 +400,8 @@ export function ScheduleFormDialog({
                                   field.onChange(null);
                                   return;
                                 }
-                                try {
-                                  const parsed = JSON.parse(v);
-                                  field.onChange(parsed);
-                                } catch {
-                                  field.onChange(v);
-                                }
+                                const parsed = JSON.parse(v);
+                                field.onChange(parsed);
                               }}
                               onCancel={() => setEditingField(null)}
                               className="w-full"
@@ -457,12 +453,8 @@ export function ScheduleFormDialog({
                                   field.onChange(null);
                                   return;
                                 }
-                                try {
-                                  const parsed = JSON.parse(v);
-                                  field.onChange(parsed);
-                                } catch {
-                                  field.onChange(v);
-                                }
+                                const parsed = JSON.parse(v);
+                                field.onChange(parsed);
                               }}
                               onCancel={() => setEditingField(null)}
                               className="w-full"
@@ -497,7 +489,11 @@ export function ScheduleFormDialog({
             <Button
               type="submit"
               className="h-10 px-5 font-medium bg-zinc-950 text-white hover:bg-zinc-800 dark:bg-emerald-300 dark:text-zinc-950 dark:hover:bg-emerald-400 disabled:opacity-40"
-              disabled={!form.formState.isValid || form.formState.isSubmitting}
+              disabled={
+                !form.formState.isValid ||
+                form.formState.isSubmitting ||
+                (mode === 'edit' && !form.formState.isDirty)
+              }
             >
               {mode === 'create' ? 'Create' : 'Save'}
             </Button>
