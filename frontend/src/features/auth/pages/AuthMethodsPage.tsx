@@ -99,11 +99,8 @@ export default function AuthMethodsPage() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      {/* Two column layout */}
       <div className="h-full flex overflow-hidden">
-        {/* Left Section - Auth Methods List */}
         <div className="flex-1 bg-slate-50 dark:bg-[#2d2d2d] flex flex-col overflow-hidden">
-          {/* Header */}
           <div className="flex items-center justify-between px-4 py-6 gap-3">
             <h2 className="px-4 text-xl font-semibold text-gray-900 dark:text-white tracking-tight">
               Auth Methods
@@ -230,32 +227,6 @@ export default function AuthMethodsPage() {
                     </div>
                   );
                 })}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Section - Preview */}
-        <div className="w-[688px] bg-slate-50 dark:bg-[#2d2d2d] p-3 flex flex-col overflow-hidden">
-          <div className="h-full bg-gray-200 dark:bg-neutral-700 rounded-xl overflow-hidden flex flex-col">
-            {/* Preview Header */}
-            <div className="flex items-center justify-end px-6 py-3 gap-3">
-              <p className="text-sm font-medium text-gray-700 dark:text-white">
-                Integrate Authentication to Your Application
-              </p>
-              <CopyButton
-                text={getAuthImplementationPrompt(getBackendUrl())}
-                copyText="Copy Prompt"
-                variant="primary"
-                className="w-34"
-              />
-            </div>
-
-            {/* Preview Content */}
-            <div className="flex-1 overflow-y-auto py-8 flex flex-col items-center justify-center gap-4">
-              <AuthPreview />
-              <p className="text-xs text-gray-500 dark:text-neutral-400 text-center">
-                Preview Mode
-              </p>
             </div>
           </div>
         </div>
