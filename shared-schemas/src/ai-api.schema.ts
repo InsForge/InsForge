@@ -110,7 +110,8 @@ export const aiModelSchema = z.object({
   outputModality: z.array(modalitySchema).min(1),
   provider: z.string(),
   modelId: z.string(),
-  priceLevel: z.number().min(0).max(3).optional(),
+  inputPrice: z.number().min(0).optional(), // Price per million tokens in USD
+  outputPrice: z.number().min(0).optional(), // Price per million tokens in USD
 });
 
 export const createAIConfigurationRequestSchema = aiConfigurationSchema.omit({

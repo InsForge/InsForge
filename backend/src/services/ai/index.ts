@@ -8,6 +8,6 @@ export { ImageGenerationService } from './image-generation.service.js';
 export {
   sortModalities,
   filterAndSortModalities,
-  calculatePriceLevel,
+  calculatePricePerMillion,
   getProviderOrder,
 } from './helpers.js';

@@ -101,6 +101,10 @@
   .font-mono {
     font-family: var(--fontFamilyMono);
   }
+
+  .scrollbar-gutter-stable {
+    scrollbar-gutter: stable;
+  }
 }
 
 @layer components {
