@@ -6,9 +6,40 @@ import type {
   AIConfigurationSchema,
   ChatCompletionResponse,
   ChatMessageSchema,
+  UrlCitationAnnotation,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { ChatCompletionOptions } from '@/types/ai.js';
+
+// OpenRouter plugin type for web search
+interface OpenRouterWebPlugin {
+  id: 'web';
+  engine?: 'native' | 'exa';
+  max_results?: number;
+  search_prompt?: string;
+}
+
+// Extended request type with OpenRouter-specific fields
+interface OpenRouterChatCompletionRequest extends OpenAI.Chat.ChatCompletionCreateParamsNonStreaming {
+  plugins?: OpenRouterWebPlugin[];
+}
+
+interface OpenRouterChatCompletionStreamingRequest
+  extends OpenAI.Chat.ChatCompletionCreateParamsStreaming {
+  plugins?: OpenRouterWebPlugin[];
+}
+
+// OpenRouter annotation format from API response
+interface OpenRouterUrlCitation {
+  type: 'url_citation';
+  url_citation: {
+    url: string;
+    title?: string;
+    content?: string;
+    start_index?: number;
+    end_index?: number;
+  };
+}
 
 export class ChatCompletionService {
   private static instance: ChatCompletionService;
@@ -82,9 +113,75 @@ export class ChatCompletionService {
   }
 
   /**
+   * Build the model ID with optional :thinking suffix
+   */
+  private buildModelId(model: string, thinking?: boolean): string {
+    if (thinking) {
+      return `${model}:thinking`;
+    }
+    return model;
+  }
+
+  /**
+   * Build web search plugin configuration
+   */
+  private buildWebSearchPlugin(
+    webSearch?: ChatCompletionOptions['webSearch']
+  ): OpenRouterWebPlugin[] | undefined {
+    if (!webSearch?.enabled) {
+      return undefined;
+    }
+
+    const plugin: OpenRouterWebPlugin = { id: 'web' };
+
+    if (webSearch.engine) {
+      plugin.engine = webSearch.engine;
+    }
+    if (webSearch.maxResults) {
+      plugin.max_results = webSearch.maxResults;
+    }
+    if (webSearch.searchPrompt) {
+      plugin.search_prompt = webSearch.searchPrompt;
+    }
+
+    return [plugin];
+  }
+
+  /**
+   * Parse annotations from OpenRouter response to our format
+   */
+  private parseAnnotations(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    message: any
+  ): UrlCitationAnnotation[] | undefined {
+    if (!message?.annotations || !Array.isArray(message.annotations)) {
+      return undefined;
+    }
+
+    const annotations: UrlCitationAnnotation[] = [];
+
+    for (const annotation of message.annotations as OpenRouterUrlCitation[]) {
+      if (annotation.type === 'url_citation' && annotation.url_citation) {
+        annotations.push({
+          type: 'url_citation',
+          urlCitation: {
+            url: annotation.url_citation.url,
+            title: annotation.url_citation.title,
+            content: annotation.url_citation.content,
+            startIndex: annotation.url_citation.start_index,
+            endIndex: annotation.url_citation.end_index,
+          },
+        });
+      }
+    }
+
+    return annotations.length > 0 ? annotations : undefined;
+  }
+
+  /**
    * Send a chat message to the specified model
    * @param messages - Array of messages for conversation
-   * @param options - Chat options including model, temperature, etc.
+   * @param options - Chat options including model, temperature, webSearch, thinking, etc.
    */
   async chat(
     messages: ChatMessageSchema[],
@@ -94,20 +191,26 @@ export class ChatCompletionService {
       // Validate model and get config
       const aiConfig = await this.validateAndGetConfig(options.model);
 
+      // Build model ID with optional :thinking suffix
+      const modelId = this.buildModelId(options.model, options.thinking);
+
       // Apply system prompt from config if available
       const formattedMessages = this.formatMessages(messages, aiConfig?.systemPrompt);
-      const request: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming = {
-        model: options.model,
+
+      // Build request with optional web search plugin
+      const request: OpenRouterChatCompletionRequest = {
+        model: modelId,
         messages: formattedMessages,
         temperature: options.temperature ?? 0.7,
         max_tokens: options.maxTokens ?? 4096,
         top_p: options.topP,
         stream: false,
+        plugins: this.buildWebSearchPlugin(options.webSearch),
       };
 
       // Send request with automatic renewal and retry logic
       const response = await this.openRouterProvider.sendRequest((client) =>
-        client.chat.completions.create(request)
+        client.chat.completions.create(request as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming)
       );
 
       // Extract token usage if available
@@ -129,10 +232,14 @@ export class ChatCompletionService {
         );
       }
 
+      // Parse annotations from response (for web search results)
+      const annotations = this.parseAnnotations(response.choices[0]?.message);
+
       return {
         text: response.choices[0]?.message?.content || '',
+        annotations,
         metadata: {
-          model: options.model,
+          model: modelId,
           usage: tokenUsage,
         },
       };
@@ -147,7 +254,7 @@ export class ChatCompletionService {
   /**
    * Stream a chat response
    * @param messages - Array of messages for conversation
-   * @param options - Chat options including model, temperature, etc.
+   * @param options - Chat options including model, temperature, webSearch, thinking, etc.
    */
   async *streamChat(
     messages: ChatMessageSchema[],
@@ -155,26 +262,32 @@ export class ChatCompletionService {
   ): AsyncGenerator<{
     chunk?: string;
     tokenUsage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
+    annotations?: UrlCitationAnnotation[];
   }> {
     try {
       // Validate model and get config
       const aiConfig = await this.validateAndGetConfig(options.model);
 
+      // Build model ID with optional :thinking suffix
+      const modelId = this.buildModelId(options.model, options.thinking);
+
       // Apply system prompt from config if available
       const formattedMessages = this.formatMessages(messages, aiConfig?.systemPrompt);
 
-      const request: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
-        model: options.model,
+      // Build request with optional web search plugin
+      const request: OpenRouterChatCompletionStreamingRequest = {
+        model: modelId,
         messages: formattedMessages,
         temperature: options.temperature ?? 0.7,
         max_tokens: options.maxTokens ?? 4096,
         top_p: options.topP,
         stream: true,
+        plugins: this.buildWebSearchPlugin(options.webSearch),
       };
 
       // Send request with automatic renewal and retry logic
       const stream = await this.openRouterProvider.sendRequest((client) =>
-        client.chat.completions.create(request)
+        client.chat.completions.create(request as OpenAI.Chat.ChatCompletionCreateParamsStreaming)
       );
 
       const tokenUsage = {
@@ -183,10 +296,21 @@ export class ChatCompletionService {
         totalTokens: 0,
       };
 
+      // Collect annotations from streaming response
+      let collectedAnnotations: UrlCitationAnnotation[] | undefined;
+
       for await (const chunk of stream) {
         const content = chunk.choices[0]?.delta?.content;
         if (content) {
           yield { chunk: content };
+        }
+
+        // Check for annotations in the chunk (web search results)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const chunkAnnotations = this.parseAnnotations(chunk.choices[0]?.delta as any);
+        if (chunkAnnotations) {
+          collectedAnnotations = collectedAnnotations || [];
+          collectedAnnotations.push(...chunkAnnotations);
         }
 
         // Check if this chunk contains usage data
@@ -199,6 +323,11 @@ export class ChatCompletionService {
           // Yield the accumulated usage
           yield { tokenUsage: { ...tokenUsage } };
         }
+      }
+
+      // Yield annotations at the end if present
+      if (collectedAnnotations && collectedAnnotations.length > 0) {
+        yield { annotations: collectedAnnotations };
       }
 
       // Track usage after streaming completes

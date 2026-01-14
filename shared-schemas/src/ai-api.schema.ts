@@ -43,6 +43,20 @@ export const chatMessageSchema = z.object({
   images: z.array(z.object({ url: z.string() })).optional(),
 });
 
+// Web Search Plugin configuration for OpenRouter
+export const webSearchPluginSchema = z.object({
+  enabled: z.boolean(),
+  // Engine selection:
+  // - "native": Always use provider's built-in web search (OpenAI, Anthropic, Perplexity, xAI)
+  // - "exa": Use Exa's search API
+  // - undefined: Auto-select (native if available, otherwise Exa)
+  engine: z.enum(['native', 'exa']).optional(),
+  // Maximum number of search results (1-10, default: 5)
+  maxResults: z.number().min(1).max(10).optional(),
+  // Custom prompt for attaching search results to the message
+  searchPrompt: z.string().optional(),
+});
+
 export const chatCompletionRequestSchema = z.object({
   model: z.string(),
   messages: z.array(chatMessageSchema),
@@ -50,10 +64,31 @@ export const chatCompletionRequestSchema = z.object({
   maxTokens: z.number().positive().optional(),
   topP: z.number().min(0).max(1).optional(),
   stream: z.boolean().optional(),
+  // Web Search: Incorporate relevant web search results into the response
+  // Results are returned in the annotations field
+  webSearch: webSearchPluginSchema.optional(),
+  // Thinking/Reasoning mode: Enable extended reasoning capabilities
+  // Appends ":thinking" to the model ID for chain-of-thought reasoning
+  thinking: z.boolean().optional(),
+});
+
+// URL citation annotation from web search results
+export const urlCitationAnnotationSchema = z.object({
+  type: z.literal('url_citation'),
+  urlCitation: z.object({
+    url: z.string(),
+    title: z.string().optional(),
+    content: z.string().optional(),
+    // Character indices in the response text where this citation applies
+    startIndex: z.number().optional(),
+    endIndex: z.number().optional(),
+  }),
 });
 
 export const chatCompletionResponseSchema = z.object({
   text: z.string(),
+  // Web search URL citations (present when webSearch is enabled)
+  annotations: z.array(urlCitationAnnotationSchema).optional(),
   metadata: z
     .object({
       model: z.string(),
@@ -145,6 +180,8 @@ export type ImageContentSchema = z.infer<typeof imageContentSchema>;
 export type AudioContentSchema = z.infer<typeof audioContentSchema>;
 export type ContentSchema = z.infer<typeof contentSchema>;
 export type ChatMessageSchema = z.infer<typeof chatMessageSchema>;
+export type WebSearchPlugin = z.infer<typeof webSearchPluginSchema>;
+export type UrlCitationAnnotation = z.infer<typeof urlCitationAnnotationSchema>;
 export type ChatCompletionRequest = z.infer<typeof chatCompletionRequestSchema>;
 export type ChatCompletionResponse = z.infer<typeof chatCompletionResponseSchema>;
 export type ImageGenerationRequest = z.infer<typeof imageGenerationRequestSchema>;
