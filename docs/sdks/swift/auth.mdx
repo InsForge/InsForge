@@ -149,6 +149,10 @@ InsForge provides a hosted authentication page that supports:
 
 This approach simplifies authentication by letting InsForge handle the UI and OAuth flows.
 
+<Note>
+For direct OAuth provider authentication without the hosted page, use [signInWithOAuthView()](#signinwithoauthview) instead.
+</Note>
+
 ### Authentication Flow
 
 ```
@@ -334,6 +338,288 @@ let authURL = client.auth.signInWithDefaultView(
 | **macOS Desktop** | Custom URL Scheme | Custom URL Scheme |
 | **iOS Mobile** | Custom URL Scheme | Universal Links ⭐️ |
 | **Android Mobile** | Custom URI Scheme | App Links ⭐️ |
+
+---
+
+## signInWithOAuthView()
+
+Sign in directly with a specific OAuth provider. Unlike `signInWithDefaultView()` which shows a hosted page with all authentication options, this method opens the OAuth provider's authentication page directly in the system browser.
+
+### Supported Providers
+
+```swift
+public enum OAuthProvider: String, Sendable {
+    case google
+    case github
+    case discord
+    case linkedin
+    case facebook
+    case instagram
+    case tiktok
+    case apple
+    case x
+    case spotify
+    case microsoft
+}
+```
+
+### Parameters
+
+- `provider` (`OAuthProvider`) - The OAuth provider to authenticate with
+- `redirectTo` (`String`) - Callback URL where InsForge will redirect after authentication
+
+### Authentication Flow
+
+```
+1. App calls signInWithOAuthView(provider:redirectTo:)
+   ↓
+2. SDK fetches the OAuth authorization URL from InsForge
+   ↓
+3. SDK opens the OAuth provider's page in browser
+   ↓
+4. User authenticates with the provider (Google, GitHub, etc.)
+   ↓
+5. Provider redirects to InsForge, then InsForge redirects to your callback URL
+   ↓
+6. App intercepts callback URL (via Custom URL Scheme or Universal Links)
+   ↓
+7. App calls handleAuthCallback(_:)
+   ↓
+8. SDK creates session and updates auth state
+```
+
+### Example
+
+#### Basic Usage
+
+```swift
+import SwiftUI
+import InsForge
+
+struct LoginView: View {
+    let client: InsForgeClient
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Sign in with")
+                .font(.headline)
+
+            // Google Sign In
+            Button {
+                Task {
+                    try await client.auth.signInWithOAuthView(
+                        provider: .google,
+                        redirectTo: "yourapp://auth/callback"
+                    )
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "g.circle.fill")
+                    Text("Continue with Google")
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+
+            // GitHub Sign In
+            Button {
+                Task {
+                    try await client.auth.signInWithOAuthView(
+                        provider: .github,
+                        redirectTo: "yourapp://auth/callback"
+                    )
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "chevron.left.forwardslash.chevron.right")
+                    Text("Continue with GitHub")
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+
+            // Apple Sign In
+            Button {
+                Task {
+                    try await client.auth.signInWithOAuthView(
+                        provider: .apple,
+                        redirectTo: "yourapp://auth/callback"
+                    )
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "apple.logo")
+                    Text("Continue with Apple")
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding()
+    }
+}
+```
+
+#### Complete App Example
+
+```swift
+import SwiftUI
+import InsForge
+
+@main
+struct YourApp: App {
+    let client = InsForgeClient(
+        baseURL: URL(string: "https://your-instance.insforge.app")!,
+        anonKey: "your-api-key"
+    )
+
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .environmentObject(client)
+                .onOpenURL { url in
+                    // Handles callback from OAuth provider
+                    Task {
+                        do {
+                            let response = try await client.auth.handleAuthCallback(url)
+                            print("Authenticated: \(response.user.email)")
+                        } catch {
+                            print("Auth failed: \(error)")
+                        }
+                    }
+                }
+        }
+    }
+}
+
+struct ContentView: View {
+    @EnvironmentObject var client: InsForgeClient
+    @State private var isAuthenticated = false
+
+    var body: some View {
+        if isAuthenticated {
+            DashboardView()
+        } else {
+            OAuthLoginView()
+        }
+    }
+}
+
+struct OAuthLoginView: View {
+    @EnvironmentObject var client: InsForgeClient
+    @State private var errorMessage: String?
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Welcome")
+                .font(.largeTitle)
+                .fontWeight(.bold)
+
+            Text("Sign in to continue")
+                .foregroundColor(.secondary)
+
+            VStack(spacing: 12) {
+                // Google
+                OAuthButton(
+                    provider: .google,
+                    title: "Continue with Google",
+                    icon: "g.circle.fill"
+                )
+
+                // GitHub
+                OAuthButton(
+                    provider: .github,
+                    title: "Continue with GitHub",
+                    icon: "chevron.left.forwardslash.chevron.right"
+                )
+
+                // Discord
+                OAuthButton(
+                    provider: .discord,
+                    title: "Continue with Discord",
+                    icon: "bubble.left.fill"
+                )
+
+                // Apple
+                OAuthButton(
+                    provider: .apple,
+                    title: "Continue with Apple",
+                    icon: "apple.logo"
+                )
+            }
+
+            if let error = errorMessage {
+                Text(error)
+                    .foregroundColor(.red)
+                    .font(.caption)
+            }
+        }
+        .padding()
+    }
+
+    @ViewBuilder
+    func OAuthButton(provider: OAuthProvider, title: String, icon: String) -> some View {
+        Button {
+            Task {
+                do {
+                    // Use Custom URL Scheme for development
+                    try await client.auth.signInWithOAuthView(
+                        provider: provider,
+                        redirectTo: "yourapp://auth/callback"
+                    )
+
+                    // Or use Universal Links for production:
+                    // try await client.auth.signInWithOAuthView(
+                    //     provider: provider,
+                    //     redirectTo: "https://yourdomain.com/auth/callback"
+                    // )
+                } catch {
+                    errorMessage = error.localizedDescription
+                }
+            }
+        } label: {
+            HStack {
+                Image(systemName: icon)
+                Text(title)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+        }
+        .buttonStyle(.bordered)
+    }
+}
+```
+
+### URL Scheme Configuration
+
+The callback URL configuration is the same as `signInWithDefaultView()`. You can use either:
+
+#### Custom URL Scheme (Development)
+
+**Info.plist**:
+```xml
+<key>CFBundleURLTypes</key>
+<array>
+    <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+            <string>yourapp</string>
+        </array>
+        <key>CFBundleURLName</key>
+        <string>com.yourcompany.yourapp</string>
+    </dict>
+</array>
+```
+
+#### Universal Links (Production)
+
+See the [Universal Links Setup](#option-2-universal-links--app-links-recommended-for-production) section above for detailed configuration.
+
+<Note>
+The callback handling with `handleAuthCallback(_:)` works the same way for both `signInWithDefaultView()` and `signInWithOAuthView()`. The only difference is how the authentication flow starts.
+</Note>
+
+---
 
 ### Complete Authentication Code
 

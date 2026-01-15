@@ -82,6 +82,10 @@ InsForge provides a hosted authentication page that supports:
 
 Start authentication flow with the hosted authentication page.
 
+<Note>
+For direct OAuth provider authentication without the hosted page, use [signInWithOAuthPage()](#signinwithoauthpage) instead.
+</Note>
+
 ### Example
 
 1. Configure App Link / Deep Link Callback
@@ -257,6 +261,252 @@ adb shell am start -a android.intent.action.VIEW \
 | **macOS Desktop** | Custom URL Scheme | Custom URL Scheme |
 | **iOS Mobile** | Custom URL Scheme | Universal Links ⭐️ |
 | **Android Mobile** | Custom URI Scheme | App Links ⭐️ |
+
+---
+
+## signInWithOAuthPage()
+
+Sign in directly with a specific OAuth provider. Unlike `signInWithDefaultPage()` which shows a hosted page with all options, this method opens the OAuth provider's authentication page directly in the system browser.
+
+### Supported Providers
+
+```kotlin
+enum class OAuthProvider(val value: String) {
+    GOOGLE("google"),
+    GITHUB("github"),
+    DISCORD("discord"),
+    LINKEDIN("linkedin"),
+    FACEBOOK("facebook"),
+    INSTAGRAM("instagram"),
+    TIKTOK("tiktok"),
+    APPLE("apple"),
+    X("x"),
+    SPOTIFY("spotify"),
+    MICROSOFT("microsoft")
+}
+```
+
+### Parameters
+
+- `provider` (`OAuthProvider`) - The OAuth provider to authenticate with
+- `redirectUri` (`String`) - Callback URL where InsForge will redirect after authentication
+
+### Returns
+
+```kotlin
+String  // The OAuth authorization URL (also opens in browser automatically)
+```
+
+### Example
+
+1. Configure BrowserLauncher
+
+When creating the InsForge client, configure the `browserLauncher` to handle opening URLs:
+
+```kotlin
+val client = createInsforgeClient(baseURL, anonKey) {
+    install(Auth) {
+        browserLauncher = BrowserLauncher { url ->
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            context.startActivity(intent)
+        }
+        persistSession = true
+        sessionStorage = mySessionStorage
+    }
+}
+```
+
+2. Configure App Link / Deep Link Callback
+
+Configure your callback Activity in AndroidManifest.xml (same as `signInWithDefaultPage`):
+
+- Option A: Custom URL Scheme (for Development)
+
+```xml
+<activity
+    android:name=".AuthCallbackActivity"
+    android:launchMode="singleTask"
+    android:exported="true">
+    <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="yourapp" android:host="auth" android:path="/callback" />
+    </intent-filter>
+</activity>
+```
+
+- Option B: App Links (for Production)
+
+```xml
+<activity
+    android:name=".AuthCallbackActivity"
+    android:launchMode="singleTask"
+    android:exported="true">
+    <intent-filter android:autoVerify="true">
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="https" android:host="yourdomain.com" android:path="/auth/callback" />
+    </intent-filter>
+</activity>
+```
+
+3. Initiate OAuth Login with Specific Provider
+
+```kotlin
+// Start OAuth flow with Google
+fun startGoogleLogin() {
+    lifecycleScope.launch {
+        val authUrl = client.auth.signInWithOAuthPage(
+            OAuthProvider.GOOGLE,
+            "yourapp://auth/callback"
+        )
+        // Browser opens automatically via browserLauncher
+    }
+}
+
+// Start OAuth flow with GitHub
+fun startGitHubLogin() {
+    lifecycleScope.launch {
+        client.auth.signInWithOAuthPage(
+            OAuthProvider.GITHUB,
+            "yourapp://auth/callback"
+        )
+    }
+}
+```
+
+4. Handle OAuth Callback
+
+```kotlin
+class AuthCallbackActivity : AppCompatActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        handleIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        intent?.let { handleIntent(it) }
+    }
+
+    private fun handleIntent(intent: Intent) {
+        intent.data?.let { uri ->
+            lifecycleScope.launch {
+                try {
+                    // Callback URL handled by SDK
+                    val result = client.auth.handleAuthCallback(uri.toString())
+
+                    // Auth success, navigate to main screen
+                    Toast.makeText(this@AuthCallbackActivity,
+                        "Success: ${result.email}", Toast.LENGTH_SHORT).show()
+
+                    startActivity(Intent(this@AuthCallbackActivity, MainActivity::class.java))
+                    finish()
+
+                } catch (e: Exception) {
+                    // Handle error
+                    Toast.makeText(this@AuthCallbackActivity,
+                        "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    finish()
+                }
+            }
+        }
+    }
+}
+```
+
+### Authentication Flow
+
+```
+1. App calls signInWithOAuthPage(provider, redirectUri)
+2. SDK fetches the OAuth authorization URL from InsForge
+3. SDK automatically opens the OAuth URL in system browser
+4. User authenticates with the provider (Google, GitHub, etc.)
+5. Provider redirects to InsForge, then InsForge redirects to your callback URL
+6. Android intercepts callback URL (via Custom URL Scheme or App Links)
+7. App calls handleAuthCallback(url)
+8. SDK creates session, updates auth state, and persists token
+```
+
+### Jetpack Compose Example
+
+```kotlin
+@Composable
+fun OAuthLoginScreen() {
+    val scope = rememberCoroutineScope()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "Sign in with",
+            style = MaterialTheme.typography.headlineSmall
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Google Sign In
+        Button(
+            onClick = {
+                scope.launch {
+                    client.auth.signInWithOAuthPage(
+                        OAuthProvider.GOOGLE,
+                        "yourapp://auth/callback"
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Continue with Google")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // GitHub Sign In
+        Button(
+            onClick = {
+                scope.launch {
+                    client.auth.signInWithOAuthPage(
+                        OAuthProvider.GITHUB,
+                        "yourapp://auth/callback"
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Continue with GitHub")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Discord Sign In
+        Button(
+            onClick = {
+                scope.launch {
+                    client.auth.signInWithOAuthPage(
+                        OAuthProvider.DISCORD,
+                        "yourapp://auth/callback"
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Continue with Discord")
+        }
+    }
+}
+```
+
+<Note>
+The `browserLauncher` must be configured when installing the Auth module. If not configured, `signInWithOAuthPage()` will throw an `IllegalStateException`.
+</Note>
 
 ---
 
