@@ -150,7 +150,7 @@ describe('SecretService', () => {
       expect(mockQuery).toHaveBeenNthCalledWith(
         3,
         expect.stringContaining('UPDATE system.secrets'),
-        [oldSecretId]
+        expect.arrayContaining([oldSecretId, 24])
       );
       expect(mockQuery).toHaveBeenNthCalledWith(
         4,
@@ -364,6 +364,64 @@ describe('SecretService', () => {
 
       generateApiKeySpy.mockRestore();
       encryptSpy.mockRestore();
+    });
+
+    it('supports custom grace period for API key rotation', async () => {
+      const oldSecretId = 'old-secret-id-123';
+      const newSecretId = 'new-secret-id-456';
+      const mockNewApiKey = secretService.generateApiKey();
+      const customGracePeriod = 48;
+
+      const generateApiKeySpy = vi
+        .spyOn(secretService, 'generateApiKey')
+        .mockReturnValue(mockNewApiKey);
+
+      mockQuery
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ id: oldSecretId }] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ id: newSecretId }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      const result = await secretService.rotateApiKey(customGracePeriod);
+
+      expect(result).toBe(mockNewApiKey);
+      expect(mockQuery).toHaveBeenNthCalledWith(
+        3,
+        expect.stringContaining('UPDATE system.secrets'),
+        expect.arrayContaining([oldSecretId, customGracePeriod])
+      );
+
+      generateApiKeySpy.mockRestore();
+    });
+
+    it('supports immediate revocation when grace period is 0', async () => {
+      const oldSecretId = 'old-secret-id-123';
+      const newSecretId = 'new-secret-id-456';
+      const mockNewApiKey = secretService.generateApiKey();
+
+      const generateApiKeySpy = vi
+        .spyOn(secretService, 'generateApiKey')
+        .mockReturnValue(mockNewApiKey);
+
+      mockQuery
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ id: oldSecretId }] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ id: newSecretId }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      const result = await secretService.rotateApiKey(0);
+
+      expect(result).toBe(mockNewApiKey);
+      const updateCall = mockQuery.mock.calls.find(
+        (call) =>
+          call[0]?.includes('UPDATE system.secrets') && call[0]?.includes('expires_at = NOW()')
+      );
+      expect(updateCall).toBeDefined();
+      expect(updateCall?.[1]).toEqual([oldSecretId]);
+
+      generateApiKeySpy.mockRestore();
     });
   });
 });

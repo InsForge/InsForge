@@ -356,8 +356,15 @@ export class SecretService {
 
   /**
    * Rotate a secret (create new value, keep old for grace period)
+   * @param id - The ID of the secret to rotate
+   * @param newValue - The new value for the secret
+   * @param gracePeriodHours - Grace period in hours before old secret expires (default: 24). Use 0 for immediate revocation.
    */
-  async rotateSecret(id: string, newValue: string): Promise<{ newId: string }> {
+  async rotateSecret(
+    id: string,
+    newValue: string,
+    gracePeriodHours: number = 24
+  ): Promise<{ newId: string }> {
     const client = await this.getPool().connect();
     try {
       await client.query('BEGIN');
@@ -372,13 +379,24 @@ export class SecretService {
 
       const secretKey = oldSecretResult.rows[0].key;
 
-      await client.query(
-        `UPDATE system.secrets
-         SET is_active = false,
-             expires_at = NOW() + INTERVAL '24 hours'
-         WHERE id = $1`,
-        [id]
-      );
+      // Deactivate the old secret with configurable grace period
+      if (gracePeriodHours === 0) {
+        await client.query(
+          `UPDATE system.secrets
+           SET is_active = false,
+               expires_at = NOW()
+           WHERE id = $1`,
+          [id]
+        );
+      } else {
+        await client.query(
+          `UPDATE system.secrets
+           SET is_active = false,
+               expires_at = NOW() + INTERVAL '1 hour' * $2
+           WHERE id = $1`,
+          [id, gracePeriodHours]
+        );
+      }
 
       const encryptedValue = EncryptionManager.encrypt(newValue);
       const newSecretResult = await client.query(
@@ -408,9 +426,10 @@ export class SecretService {
 
   /**
    * Rotate API key (deactivate old, generate new)
-   * Returns the new API key
+   * @param gracePeriodHours - Grace period in hours before old key expires (default: 24). Use 0 for immediate revocation.
+   * @returns The new API key
    */
-  async rotateApiKey(): Promise<string> {
+  async rotateApiKey(gracePeriodHours: number = 24): Promise<string> {
     const client = await this.getPool().connect();
     try {
       await client.query('BEGIN');
@@ -431,14 +450,24 @@ export class SecretService {
 
       const oldSecretId = oldSecretResult.rows[0].id;
 
-      // Deactivate the old API key with 24-hour grace period
-      await client.query(
-        `UPDATE system.secrets
-         SET is_active = false,
-             expires_at = NOW() + INTERVAL '24 hours'
-         WHERE id = $1`,
-        [oldSecretId]
-      );
+      // Deactivate the old API key with configurable grace period
+      if (gracePeriodHours === 0) {
+        await client.query(
+          `UPDATE system.secrets
+           SET is_active = false,
+               expires_at = NOW()
+           WHERE id = $1`,
+          [oldSecretId]
+        );
+      } else {
+        await client.query(
+          `UPDATE system.secrets
+           SET is_active = false,
+               expires_at = NOW() + INTERVAL '1 hour' * $2
+           WHERE id = $1`,
+          [oldSecretId, gracePeriodHours]
+        );
+      }
 
       // Generate new API key
       const newApiKey = this.generateApiKey();

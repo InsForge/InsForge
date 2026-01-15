@@ -136,24 +136,34 @@ router.post('/api-key/rotate', async (req: AuthRequest, res: Response, next: Nex
     const secretService = SecretService.getInstance();
     const auditService = AuditService.getInstance();
 
+    // Optional grace period in hours (default: 24, 0 for immediate revocation)
+    const gracePeriodHours = req.body.gracePeriodHours ?? 24;
+
     // Rotate the API key
-    const newApiKey = await secretService.rotateApiKey();
+    const newApiKey = await secretService.rotateApiKey(gracePeriodHours);
 
     // Log audit
     await auditService.log({
       actor: req.user?.email || 'api-key',
       action: 'ROTATE_API_KEY',
       module: 'SECRETS',
-      details: { key: 'API_KEY' },
+      details: {
+        key: 'API_KEY',
+        gracePeriodHours,
+      },
       ip_address: req.ip,
     });
+
+    const message =
+      gracePeriodHours === 0
+        ? 'API key has been rotated successfully. The old key has been immediately revoked.'
+        : `API key has been rotated successfully. The old key will be invalid after ${gracePeriodHours} hours.`;
 
     successResponse(
       res,
       {
         success: true,
-        message:
-          'API key has been rotated successfully. The old key will be invalid after 24 hours.',
+        message,
         apiKey: newApiKey,
       },
       200
