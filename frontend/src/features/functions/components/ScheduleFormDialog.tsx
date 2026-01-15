@@ -13,7 +13,6 @@ import {
 } from '@/components/radix/Dialog';
 import { Button } from '@/components/radix/Button';
 import { JsonCellEditor } from '@/components/datagrid/cell-editors/JsonCellEditor';
-import { Switch } from '@/components/radix/Switch';
 import {
   Select,
   SelectContent,
@@ -43,7 +42,6 @@ export function ScheduleFormDialog({
   onSubmit,
 }: ScheduleFormDialogProps) {
   const [error, setError] = useState<string | null>(null);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [editingField, setEditingField] = useState<'headers' | 'body' | null>(null);
   const [contentType, setContentType] = useState('application/json');
 
@@ -97,7 +95,6 @@ export function ScheduleFormDialog({
     if (!open) {
       setError(null);
       form.reset();
-      setAdvancedOpen(false);
       setContentType('application/json');
       return;
     }
@@ -195,13 +192,11 @@ export function ScheduleFormDialog({
             </DialogTitle>
           </DialogHeader>
 
-          <ScrollArea
-            className={`h-full overflow-auto ${advancedOpen ? 'max-h-[680px]' : 'max-h-[520px]'}`}
-          >
+          <ScrollArea className="h-full overflow-auto max-h-[680px]">
             <div className="px-6 py-6 space-y-8 bg-white dark:bg-neutral-900">
-              <div className="grid gap-y-5 gap-x-6 md:grid-cols-[160px_minmax(0,1fr)] items-start">
+              <div className="grid gap-y-5 gap-x-6 md:grid-cols-[160px_minmax(0,1fr)] items-center">
                 {/* Schedule Name */}
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:mt-2">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                   Schedule Name
                 </label>
                 <div>
@@ -218,7 +213,7 @@ export function ScheduleFormDialog({
                 </div>
 
                 {/* Cron Schedule */}
-                <div className="flex flex-col md:justify-start">
+                <div className="flex flex-col self-start">
                   <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                     Cron Schedule
                   </label>
@@ -226,7 +221,7 @@ export function ScheduleFormDialog({
                     Pick from examples
                   </span>
                 </div>
-                <div>
+                <div className="self-start">
                   <input
                     {...form.register('cronSchedule')}
                     className="w-full px-3 py-2 rounded border bg-white dark:bg-neutral-800 border-zinc-200 dark:border-neutral-700 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500"
@@ -290,7 +285,7 @@ export function ScheduleFormDialog({
                 </div>
 
                 {/* Function URL */}
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:mt-2">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                   Function URL
                 </label>
                 <div>
@@ -307,7 +302,7 @@ export function ScheduleFormDialog({
                 </div>
 
                 {/* HTTP Method */}
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:mt-2">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                   HTTP Method
                 </label>
                 <Controller
@@ -330,7 +325,7 @@ export function ScheduleFormDialog({
                 />
 
                 {/* Content Type */}
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:mt-2">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                   Content Type
                 </label>
                 <Select value={contentType} onValueChange={handleContentTypeChange}>
@@ -347,125 +342,113 @@ export function ScheduleFormDialog({
                 </Select>
               </div>
 
-              {/* Advanced options toggle - following same grid layout */}
               <div className="grid gap-y-5 gap-x-6 md:grid-cols-[160px_minmax(0,1fr)] items-center">
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Advanced options
+                {/* Headers (JSON) */}
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 self-start mt-2">
+                  Headers (JSON)
                 </label>
-                <Switch checked={advancedOpen} onCheckedChange={(val) => setAdvancedOpen(val)} />
-              </div>
-
-              {advancedOpen && (
-                <div className="grid gap-y-5 gap-x-6 md:grid-cols-[160px_minmax(0,1fr)] items-start">
-                  {/* Headers (JSON) */}
-                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:mt-2">
-                    Headers (JSON)
-                  </label>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 px-3 py-2 rounded-lg border bg-zinc-50 dark:bg-neutral-800/50 border-zinc-200 dark:border-neutral-700 text-sm text-zinc-600 dark:text-zinc-400 font-mono truncate">
-                        {getJsonDisplay(form.watch('headers')).slice(0, 50)}
-                        {getJsonDisplay(form.watch('headers')).length > 50 && '...'}
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setEditingField(editingField === 'headers' ? null : 'headers')
-                        }
-                        className="shrink-0 dark:text-zinc-100"
-                      >
-                        <Pencil className="h-3.5 w-3.5" /> Edit
-                      </Button>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 px-3 py-2 rounded-lg border bg-zinc-50 dark:bg-neutral-800/50 border-zinc-200 dark:border-neutral-700 text-sm text-zinc-600 dark:text-zinc-400 font-mono truncate">
+                      {getJsonDisplay(form.watch('headers')).slice(0, 50)}
+                      {getJsonDisplay(form.watch('headers')).length > 50 && '...'}
                     </div>
-                    {editingField === 'headers' && (
-                      <Controller
-                        control={form.control}
-                        name="headers"
-                        render={({ field }) => {
-                          const inputValue =
-                            field.value === null || field.value === undefined
-                              ? 'null'
-                              : typeof field.value === 'string'
-                                ? field.value
-                                : JSON.stringify(field.value, null, 2);
-
-                          return (
-                            <JsonCellEditor
-                              value={inputValue}
-                              nullable
-                              onValueChange={(v) => {
-                                if (v === 'null') {
-                                  field.onChange(null);
-                                  return;
-                                }
-                                const parsed = JSON.parse(v);
-                                field.onChange(parsed);
-                              }}
-                              onCancel={() => setEditingField(null)}
-                              className="w-full"
-                            />
-                          );
-                        }}
-                      />
-                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditingField(editingField === 'headers' ? null : 'headers')}
+                      className="shrink-0 dark:text-zinc-100"
+                    >
+                      <Pencil className="h-3.5 w-3.5" /> Edit
+                    </Button>
                   </div>
+                  {editingField === 'headers' && (
+                    <Controller
+                      control={form.control}
+                      name="headers"
+                      render={({ field }) => {
+                        const inputValue =
+                          field.value === null || field.value === undefined
+                            ? 'null'
+                            : typeof field.value === 'string'
+                              ? field.value
+                              : JSON.stringify(field.value, null, 2);
 
-                  {/* Body (JSON) */}
-                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 md:mt-2">
-                    Body (JSON)
-                  </label>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 px-3 py-2 rounded-lg border bg-zinc-50 dark:bg-neutral-800/50 border-zinc-200 dark:border-neutral-700 text-sm text-zinc-600 dark:text-zinc-400 font-mono truncate">
-                        {getJsonDisplay(form.watch('body')).slice(0, 50)}
-                        {getJsonDisplay(form.watch('body')).length > 50 && '...'}
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setEditingField(editingField === 'body' ? null : 'body')}
-                        className="shrink-0 dark:text-zinc-100"
-                      >
-                        <Pencil className="h-3.5 w-3.5 dark:text-zinc-100" /> Edit
-                      </Button>
-                    </div>
-                    {editingField === 'body' && (
-                      <Controller
-                        control={form.control}
-                        name="body"
-                        render={({ field }) => {
-                          const inputValue =
-                            field.value === null || field.value === undefined
-                              ? 'null'
-                              : typeof field.value === 'string'
-                                ? field.value
-                                : JSON.stringify(field.value, null, 2);
-
-                          return (
-                            <JsonCellEditor
-                              value={inputValue}
-                              nullable
-                              onValueChange={(v) => {
-                                if (v === 'null') {
-                                  field.onChange(null);
-                                  return;
-                                }
-                                const parsed = JSON.parse(v);
-                                field.onChange(parsed);
-                              }}
-                              onCancel={() => setEditingField(null)}
-                              className="w-full"
-                            />
-                          );
-                        }}
-                      />
-                    )}
-                  </div>
+                        return (
+                          <JsonCellEditor
+                            value={inputValue}
+                            nullable
+                            onValueChange={(v) => {
+                              if (v === 'null') {
+                                field.onChange(null);
+                                return;
+                              }
+                              const parsed = JSON.parse(v);
+                              field.onChange(parsed);
+                            }}
+                            onCancel={() => setEditingField(null)}
+                            className="w-full"
+                          />
+                        );
+                      }}
+                    />
+                  )}
                 </div>
-              )}
+
+                {/* Body (JSON) */}
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 self-start mt-2">
+                  Body (JSON)
+                </label>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 px-3 py-2 rounded-lg border bg-zinc-50 dark:bg-neutral-800/50 border-zinc-200 dark:border-neutral-700 text-sm text-zinc-600 dark:text-zinc-400 font-mono truncate">
+                      {getJsonDisplay(form.watch('body')).slice(0, 50)}
+                      {getJsonDisplay(form.watch('body')).length > 50 && '...'}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditingField(editingField === 'body' ? null : 'body')}
+                      className="shrink-0 dark:text-zinc-100"
+                    >
+                      <Pencil className="h-3.5 w-3.5 dark:text-zinc-100" /> Edit
+                    </Button>
+                  </div>
+                  {editingField === 'body' && (
+                    <Controller
+                      control={form.control}
+                      name="body"
+                      render={({ field }) => {
+                        const inputValue =
+                          field.value === null || field.value === undefined
+                            ? 'null'
+                            : typeof field.value === 'string'
+                              ? field.value
+                              : JSON.stringify(field.value, null, 2);
+
+                        return (
+                          <JsonCellEditor
+                            value={inputValue}
+                            nullable
+                            onValueChange={(v) => {
+                              if (v === 'null') {
+                                field.onChange(null);
+                                return;
+                              }
+                              const parsed = JSON.parse(v);
+                              field.onChange(parsed);
+                            }}
+                            onCancel={() => setEditingField(null)}
+                            className="w-full"
+                          />
+                        );
+                      }}
+                    />
+                  )}
+                </div>
+              </div>
             </div>
           </ScrollArea>
 
