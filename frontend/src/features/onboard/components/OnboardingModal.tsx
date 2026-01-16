@@ -46,18 +46,18 @@ export function OnboardingModal() {
   return (
     <Dialog open={isOnboardingModalOpen} onOpenChange={handleModalClose}>
       <TooltipProvider>
-        <DialogContent className="max-w-[640px] bg-white dark:bg-neutral-800 dark:border-neutral-700 p-0 gap-6">
+        <DialogContent className="max-w-[640px] max-h-[calc(100vh-48px)] flex flex-col bg-white dark:bg-neutral-800 dark:border-neutral-700 p-0 gap-6">
           <DialogTitle className="sr-only">Connect Project</DialogTitle>
 
           {/* Header Section */}
-          <div className="flex flex-col gap-6 px-6 pt-6">
+          <div className="flex flex-col gap-6 px-6 pt-6 shrink-0">
             <h3 className="text-gray-900 dark:text-white text-2xl font-semibold leading-8 tracking-[-0.144px]">
               Connect Project
             </h3>
           </div>
 
           {/* Tab Content */}
-          <div className="flex flex-col gap-10 px-6 overflow-hidden">
+          <div className="flex flex-col gap-10 px-6 overflow-y-auto min-h-0 flex-1">
             <McpConnectionSection apiKey={displayApiKey} appUrl={appUrl} isLoading={isLoading} />
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
@@ -98,7 +98,7 @@ export function OnboardingModal() {
           </div>
 
           {/* Help Section */}
-          <div className="flex items-center justify-between p-6 border-t border-neutral-200 dark:border-neutral-700">
+          <div className="flex items-center justify-between p-6 border-t border-neutral-200 dark:border-neutral-700 shrink-0">
             <Link
               to="/dashboard/settings?tab=connect"
               onClick={() => setOnboardingModalOpen(false)}
