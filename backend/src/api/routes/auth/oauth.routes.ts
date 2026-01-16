@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { AuthService } from '@/services/auth/auth.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
-import { OAuthExchangeService } from '@/services/auth/oauth-exchange.service.js';
+import { OAuthPKCEService } from '@/services/auth/oauth-pkce.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
@@ -25,7 +25,7 @@ const router = Router();
 const authService = AuthService.getInstance();
 const authConfigService = AuthConfigService.getInstance();
 const oAuthConfigService = OAuthConfigService.getInstance();
-const oAuthExchangeService = OAuthExchangeService.getInstance();
+const oAuthPKCEService = OAuthPKCEService.getInstance();
 const auditService = AuditService.getInstance();
 
 // Helper function to validate JWT_SECRET
@@ -370,7 +370,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
 
     // Create exchange code for PKCE flow (instead of exposing tokens in URL)
     // Only store minimal data - user/token/redirectTo are fetched fresh on exchange
-    const exchangeCode = oAuthExchangeService.createExchangeCode({
+    const exchangeCode = oAuthPKCEService.createCode({
       userId: result.user.id,
       codeChallenge,
       provider: validatedProvider,
@@ -451,7 +451,7 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
 
       // Create exchange code for PKCE flow (instead of exposing tokens in URL)
       // Only store minimal data - user/token/redirectTo are fetched fresh on exchange
-      const exchangeCode = oAuthExchangeService.createExchangeCode({
+      const exchangeCode = oAuthPKCEService.createCode({
         userId: result.user.id,
         codeChallenge,
         provider: validatedProvider,
@@ -504,7 +504,7 @@ router.post('/exchange', async (req: Request, res: Response, next: NextFunction)
     const { code, code_verifier } = validationResult.data;
 
     // Exchange code for tokens with PKCE validation (fetches user fresh from DB)
-    const result = await oAuthExchangeService.exchangeCodeForTokens(code, code_verifier);
+    const result = await oAuthPKCEService.exchangeCode(code, code_verifier);
 
     // Set refresh token in httpOnly cookie
     const tokenManager = TokenManager.getInstance();
