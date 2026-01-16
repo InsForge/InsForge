@@ -278,6 +278,20 @@ export const updateOAuthConfigRequestSchema = oAuthConfigSchema
   .partial();
 
 /**
+ * POST /api/auth/oauth/exchange - Exchange OAuth code for tokens
+ * Used in PKCE flow to exchange an authorization code for tokens
+ * Note: code_verifier uses snake_case as per OAuth 2.0 PKCE specification (RFC 7636)
+ */
+export const oAuthCodeExchangeRequestSchema = z.object({
+  code: z.string().min(1, 'Exchange code is required'),
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  code_verifier: z
+    .string()
+    .min(43, 'Code verifier must be at least 43 characters')
+    .max(128, 'Code verifier must be at most 128 characters'),
+});
+
+/**
  * Response for GET /api/auth/oauth/configs
  */
 export const listOAuthConfigsResponseSchema = z.object({
@@ -349,6 +363,7 @@ export type DeleteUsersRequest = z.infer<typeof deleteUsersRequestSchema>;
 export type UpdateProfileRequest = z.infer<typeof updateProfileRequestSchema>;
 export type CreateOAuthConfigRequest = z.infer<typeof createOAuthConfigRequestSchema>;
 export type UpdateOAuthConfigRequest = z.infer<typeof updateOAuthConfigRequestSchema>;
+export type OAuthCodeExchangeRequest = z.infer<typeof oAuthCodeExchangeRequestSchema>;
 export type UpdateAuthConfigRequest = z.infer<typeof updateAuthConfigRequestSchema>;
 export type SendVerificationEmailRequest = z.infer<typeof sendVerificationEmailRequestSchema>;
 export type VerifyEmailRequest = z.infer<typeof verifyEmailRequestSchema>;
