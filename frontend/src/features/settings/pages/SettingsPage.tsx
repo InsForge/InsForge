@@ -293,8 +293,8 @@ export default function SettingsPage() {
                           )}
                         </div>
                         <p className="text-xs text-gray-500 dark:text-neutral-400">
-                          This key has full access control to your project and should be kept secure.
-                          Do not expose this key in your frontend code.
+                          This key has full access control to your project and should be kept
+                          secure. Do not expose this key in your frontend code.
                         </p>
                       </div>
                     </div>
