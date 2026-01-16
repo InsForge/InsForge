@@ -4,7 +4,13 @@ import { Settings, Info, Plug } from 'lucide-react';
 import { CopyButton, TooltipProvider, Input, Button, ConfirmDialog } from '@/components';
 import { useApiKey } from '@/lib/hooks/useMetadata';
 import { useConfirm } from '@/lib/hooks/useConfirm';
-import { cn, getBackendUrl, isInsForgeCloudProject, isIframe } from '@/lib/utils/utils';
+import {
+  cn,
+  getBackendUrl,
+  isInsForgeCloudProject,
+  isIframe,
+  compareVersions,
+} from '@/lib/utils/utils';
 import {
   McpConnectionSection,
   ConnectionStringSection,
@@ -58,6 +64,8 @@ export default function SettingsPage() {
   const [projectName, setProjectName] = useState('');
   const [originalProjectName, setOriginalProjectName] = useState('');
   const [hasNameChanged, setHasNameChanged] = useState(false);
+  const [isVersionOutdated, setIsVersionOutdated] = useState(false);
+  const [isUpdatingVersion, setIsUpdatingVersion] = useState(false);
 
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
   const { confirm, confirmDialogProps } = useConfirm();
@@ -88,16 +96,29 @@ export default function SettingsPage() {
       });
   }, []);
 
-  // Listen for project info from cloud parent
+  // Listen for messages from cloud parent
   useEffect(() => {
     if (!isCloud || !isInIframe) {
       return;
     }
 
     const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'PROJECT_INFO' && event.data.name) {
-        setProjectName(event.data.name);
-        setOriginalProjectName(event.data.name);
+      if (event.data?.type === 'PROJECT_INFO') {
+        // Handle project name
+        if (event.data.name) {
+          setProjectName(event.data.name);
+          setOriginalProjectName(event.data.name);
+        }
+        // Handle version info
+        if (event.data.latestVersion && event.data.currentVersion) {
+          const comparison = compareVersions(event.data.currentVersion, event.data.latestVersion);
+          setIsVersionOutdated(comparison < 0);
+        }
+      }
+
+      // Handle version update started confirmation
+      if (event.data?.type === 'VERSION_UPDATE_STARTED') {
+        setIsUpdatingVersion(true);
       }
     };
 
@@ -138,6 +159,10 @@ export default function SettingsPage() {
     }
 
     postMessageToParent({ type: 'DELETE_PROJECT' }, '*');
+  };
+
+  const handleUpdateVersion = () => {
+    postMessageToParent({ type: 'UPDATE_PROJECT_VERSION' }, '*');
   };
 
   return (
@@ -238,13 +263,24 @@ export default function SettingsPage() {
                     <label className="text-sm leading-6 text-gray-900 dark:text-white w-25 shrink-0 pt-1.5">
                       Version
                     </label>
-                    <div
-                      className={cn(
-                        'flex-1 h-9 flex items-center text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 pl-3 pr-2 rounded-lg',
-                        isVersionLoading && 'animate-pulse'
+                    <div className="flex-1 flex items-center gap-3">
+                      <div
+                        className={cn(
+                          'h-9 flex items-center text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 pl-3 pr-2 rounded-lg',
+                          isVersionLoading && 'animate-pulse'
+                        )}
+                      >
+                        {isVersionLoading ? 'Loading...' : version || 'Unknown'}
+                      </div>
+                      {isCloud && isInIframe && isVersionOutdated && (
+                        <Button
+                          onClick={handleUpdateVersion}
+                          disabled={isUpdatingVersion}
+                          className="h-9 text-white dark:text-black bg-black dark:bg-emerald-300 hover:opacity-90 px-3 py-2 rounded-lg"
+                        >
+                          {isUpdatingVersion ? 'Updating...' : 'Update'}
+                        </Button>
                       )}
-                    >
-                      {isVersionLoading ? 'Loading...' : version || 'Unknown'}
                     </div>
                   </div>
                 </div>
