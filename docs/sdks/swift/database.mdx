@@ -158,6 +158,74 @@ let posts = try await insforge.database
 
 ---
 
+## rpc()
+
+Call PostgreSQL stored functions (RPC - Remote Procedure Call). This method allows you to directly invoke SQL functions defined in your database.
+
+### Parameters
+
+- `functionName` (String) - Name of the PostgreSQL function to call
+- `args` ([String: Any]?, optional) - Arguments to pass to the function
+
+### Examples
+
+```swift
+// Define response models
+struct UserStats: Decodable {
+    let totalPosts: Int
+    let totalComments: Int
+}
+
+struct User: Decodable {
+    let id: String
+    let name: String
+    let email: String
+}
+
+// Call function with parameters, returning array
+let stats: [UserStats] = try await insforge.database
+    .rpc("get_user_stats", args: ["user_id": "123"])
+    .execute()
+
+// Call function with parameters, returning single result
+let stat: UserStats = try await insforge.database
+    .rpc("get_user_stats", args: ["user_id": "123"])
+    .executeSingle()
+
+// Call function without parameters
+let users: [User] = try await insforge.database
+    .rpc("get_all_active_users")
+    .execute()
+
+// Call function with multiple parameters
+let results: [Post] = try await insforge.database
+    .rpc("search_posts", args: [
+        "search_term": "swift",
+        "limit": 10,
+        "offset": 0
+    ])
+    .execute()
+
+// Call function with no return value (void function)
+try await insforge.database
+    .rpc("cleanup_old_records", args: ["days": 30])
+    .execute()
+
+// Call function returning a single primitive value
+let count: Int = try await insforge.database
+    .rpc("count_active_posts")
+    .executeSingle()
+```
+
+### Implementation Details
+
+- **No arguments**: Uses GET request to `/api/database/rpc/{functionName}`
+- **With arguments**: Uses POST request with JSON body to `/api/database/rpc/{functionName}`
+- Use `execute()` for functions returning arrays or void
+- Use `executeSingle()` for functions returning a single object or value
+
+---
+
 ## Filters
 
 | Filter | Description | Example |

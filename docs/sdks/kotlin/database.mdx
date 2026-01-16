@@ -191,6 +191,122 @@ rawData.forEach { element ->
 
 ---
 
+## rpc()
+
+Call PostgreSQL stored functions (RPC - Remote Procedure Call). This method allows you to directly invoke SQL functions defined in your database.
+
+### Signature
+
+```kotlin
+// Typed RPC call - deserializes response to specified type
+suspend inline fun <reified T> rpc(
+    functionName: String,
+    args: Map<String, Any?>? = null
+): T
+
+// Raw RPC call - returns JsonElement for dynamic processing
+suspend fun rpcRaw(
+    functionName: String,
+    args: Map<String, Any?>? = null
+): JsonElement
+```
+
+### Parameters
+
+- `functionName` (String) - Name of the PostgreSQL function to call
+- `args` (Map<String, Any?>?, optional) - Arguments to pass to the function
+
+### Implementation Details
+
+- **No arguments**: Uses GET request to `/api/database/rpc/{functionName}`
+- **With arguments**: Uses POST request with JSON body to `/api/database/rpc/{functionName}`
+
+### Examples
+
+```kotlin
+// Define response data classes
+@Serializable
+data class UserStats(
+    val totalPosts: Int,
+    val totalLikes: Int,
+    val joinedAt: String
+)
+
+@Serializable
+data class User(
+    val id: String,
+    val name: String,
+    val email: String
+)
+
+// Call function with parameters
+val stats = insforge.database.rpc<UserStats>(
+    "get_user_stats",
+    mapOf("user_id" to 123)
+)
+println("Total posts: ${stats.totalPosts}")
+
+// Call function without parameters
+val users = insforge.database.rpc<List<User>>("get_all_active_users")
+users.forEach { user ->
+    println("User: ${user.name}")
+}
+
+// Call function returning a single value
+val count = insforge.database.rpc<Int>("count_active_posts")
+println("Active posts: $count")
+
+// Call function with multiple parameters
+val result = insforge.database.rpc<List<Post>>(
+    "search_posts",
+    mapOf(
+        "search_term" to "kotlin",
+        "limit" to 10,
+        "offset" to 0
+    )
+)
+```
+
+### rpcRaw() Examples
+
+Use `rpcRaw()` when the return type is dynamic or unknown at compile time.
+
+```kotlin
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+
+// Get raw JSON response
+val result = insforge.database.rpcRaw(
+    "some_dynamic_function",
+    mapOf("param" to "value")
+)
+
+// Process based on actual response structure
+when (result) {
+    is JsonArray -> {
+        result.forEach { element ->
+            val obj = element.jsonObject
+            println("Item: ${obj["name"]?.jsonPrimitive?.content}")
+        }
+    }
+    is JsonObject -> {
+        println("Single result: ${result["data"]}")
+    }
+    is JsonPrimitive -> {
+        println("Value: ${result.content}")
+    }
+}
+
+// Handle complex nested structures
+val complexResult = insforge.database.rpcRaw("get_dashboard_data")
+val dashboard = complexResult.jsonObject
+val userCount = dashboard["user_count"]?.jsonPrimitive?.int
+val recentPosts = dashboard["recent_posts"]?.jsonArray
+```
+
+---
+
 ## Filters
 
 | Filter | Description | Example |
