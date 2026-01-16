@@ -110,8 +110,8 @@ export default function SettingsPage() {
           setOriginalProjectName(event.data.name);
         }
         // Handle version info
-        if (event.data.latestVersion && event.data.currentVersion) {
-          const comparison = compareVersions(event.data.currentVersion, event.data.latestVersion);
+        if (event.data.latestVersion) {
+          const comparison = compareVersions(version, event.data.latestVersion);
           setIsVersionOutdated(comparison < 0);
         }
       }
