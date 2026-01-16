@@ -1,31 +1,5 @@
 // Type definitions for database user records
 
-/**
- * Client type for authentication endpoints
- * - web: Browser-based clients (default) - uses httpOnly cookies for refresh tokens
- * - mobile: Mobile app clients - refresh token returned in response body
- * - desktop: Desktop app clients - refresh token returned in response body
- */
-export type ClientType = 'web' | 'mobile' | 'desktop';
-
-/**
- * Parse and validate client_type query parameter
- * Returns 'web' as default if not provided or invalid
- */
-export function parseClientType(value: unknown): ClientType {
-  if (value === 'mobile' || value === 'desktop') {
-    return value;
-  }
-  return 'web';
-}
-
-/**
- * Check if the client type uses cookies for refresh tokens
- */
-export function isWebClient(clientType: ClientType): boolean {
-  return clientType === 'web';
-}
-
 export interface UserRecord {
   id: string;
   email: string;
