@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { AuthService } from '@/services/auth/auth.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
+import { OAuthExchangeService } from '@/services/auth/oauth-exchange.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
@@ -14,6 +15,7 @@ import jwt from 'jsonwebtoken';
 import {
   createOAuthConfigRequestSchema,
   updateOAuthConfigRequestSchema,
+  oAuthCodeExchangeRequestSchema,
   type ListOAuthConfigsResponse,
   oAuthProvidersSchema,
 } from '@insforge/shared-schemas';
@@ -23,6 +25,7 @@ const router = Router();
 const authService = AuthService.getInstance();
 const authConfigService = AuthConfigService.getInstance();
 const oAuthConfigService = OAuthConfigService.getInstance();
+const oAuthExchangeService = OAuthExchangeService.getInstance();
 const auditService = AuditService.getInstance();
 
 // Helper function to validate JWT_SECRET
@@ -235,7 +238,7 @@ router.delete(
 router.get('/:provider', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { provider } = req.params;
-    const { redirect_uri } = req.query;
+    const { redirect_uri, code_challenge } = req.query;
 
     // Validate provider using OAuthProvidersSchema
     const providerValidation = oAuthProvidersSchema.safeParse(provider);
@@ -256,9 +259,19 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
       throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
+    // PKCE: Require code_challenge for secure token exchange
+    if (!code_challenge || typeof code_challenge !== 'string') {
+      throw new AppError(
+        'code_challenge is required for PKCE flow',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
     const jwtPayload = {
       provider: validatedProvider,
       redirectUri,
+      codeChallenge: code_challenge,
       createdAt: Date.now(),
     };
     const jwtSecret = validateJwtSecret();
@@ -303,14 +316,17 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
 
     let redirectUri: string;
     let provider: string;
+    let codeChallenge: string;
     try {
       const jwtSecret = validateJwtSecret();
       const decodedState = jwt.verify(state, jwtSecret) as {
         provider: string;
         redirectUri: string;
+        codeChallenge: string;
       };
       redirectUri = decodedState.redirectUri || '';
       provider = decodedState.provider || '';
+      codeChallenge = decodedState.codeChallenge || '';
     } catch {
       logger.warn('Invalid state parameter', { state });
       throw new AppError('Invalid state parameter', 400, ERROR_CODES.INVALID_INPUT);
@@ -331,6 +347,10 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       throw new AppError('redirectUri is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
+    if (!codeChallenge) {
+      throw new AppError('code_challenge is required in state', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
     if (success !== 'true') {
       const errorMessage = error || 'OAuth Authentication Failed';
       logger.warn('Shared OAuth callback failed', { error: errorMessage, provider });
@@ -348,21 +368,16 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     // Handle shared callback - transforms payload and creates/finds user
     const result = await authService.handleSharedCallback(validatedProvider, payloadData);
 
-    // Set refresh token in httpOnly cookie and generate CSRF token
-    const tokenManager = TokenManager.getInstance();
-    const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-    setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
-    const csrfToken = tokenManager.generateCsrfToken(refreshToken);
+    // Create exchange code for PKCE flow (instead of exposing tokens in URL)
+    // Only store minimal data - user/token/redirectTo are fetched fresh on exchange
+    const exchangeCode = oAuthExchangeService.createExchangeCode({
+      userId: result.user.id,
+      codeChallenge,
+      provider: validatedProvider,
+    });
 
-    const params = new URLSearchParams();
-    // TODO: Remove all the parameters, will use PKCE in future
-    params.set('access_token', result.accessToken);
-    params.set('user_id', result.user.id);
-    params.set('email', result.user.email);
-    params.set('name', String(result?.user?.profile?.name));
-    params.set('csrf_token', csrfToken);
-
-    res.redirect(`${redirectUri}?${params.toString()}`);
+    // Redirect with only the exchange code (no sensitive tokens in URL)
+    res.redirect(`${redirectUri}?code=${exchangeCode}`);
   } catch (error) {
     logger.error('Shared OAuth callback error', { error });
     next(error);
@@ -388,16 +403,19 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
       throw new AppError('State parameter is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    // Decode redirectUri from state (needed for both success and error paths)
+    // Decode state data (needed for both success and error paths)
     let redirectUri: string;
+    let codeChallenge: string;
 
     try {
       const jwtSecret = validateJwtSecret();
       const stateData = jwt.verify(state, jwtSecret) as {
         provider: string;
         redirectUri: string;
+        codeChallenge: string;
       };
       redirectUri = stateData.redirectUri || '';
+      codeChallenge = stateData.codeChallenge || '';
     } catch {
       // Invalid state
       logger.warn('Invalid state in provider callback', { state });
@@ -406,6 +424,10 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
 
     if (!redirectUri) {
       throw new AppError('redirectUri is required', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
+    if (!codeChallenge) {
+      throw new AppError('code_challenge is required in state', 400, ERROR_CODES.INVALID_INPUT);
     }
 
     try {
@@ -427,24 +449,16 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
         state: state || undefined,
       });
 
-      // Set refresh token in httpOnly cookie and generate CSRF token
-      const tokenManager = TokenManager.getInstance();
-      const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-      setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
-      const csrfToken = tokenManager.generateCsrfToken(refreshToken);
+      // Create exchange code for PKCE flow (instead of exposing tokens in URL)
+      // Only store minimal data - user/token/redirectTo are fetched fresh on exchange
+      const exchangeCode = oAuthExchangeService.createExchangeCode({
+        userId: result.user.id,
+        codeChallenge,
+        provider: validatedProvider,
+      });
 
-      // Construct redirect URL with query parameters
-      const params = new URLSearchParams();
-      // TODO: Remove all the parameters, will use PKCE in future
-      params.set('access_token', result.accessToken);
-      params.set('user_id', result.user.id);
-      params.set('email', result.user.email);
-      params.set('name', String(result?.user?.profile?.name));
-      params.set('csrf_token', csrfToken);
-
-      const finalRedirectUri = `${redirectUri}?${params.toString()}`;
-
-      return res.redirect(finalRedirectUri);
+      // Redirect with only the exchange code (no sensitive tokens in URL)
+      return res.redirect(`${redirectUri}?code=${exchangeCode}`);
     } catch (error) {
       logger.error('OAuth callback error', {
         error: error instanceof Error ? error.message : error,
@@ -474,5 +488,42 @@ router.get('/:provider/callback', handleOAuthCallback);
 
 // POST /api/auth/oauth/:provider/callback - OAuth provider callback (Apple uses POST with form_post)
 router.post('/:provider/callback', handleOAuthCallback);
+
+// POST /api/auth/oauth/exchange - Exchange code for tokens (PKCE flow)
+router.post('/exchange', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const validationResult = oAuthCodeExchangeRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      throw new AppError(
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const { code, code_verifier } = validationResult.data;
+
+    // Exchange code for tokens with PKCE validation (fetches user fresh from DB)
+    const result = await oAuthExchangeService.exchangeCodeForTokens(code, code_verifier);
+
+    // Set refresh token in httpOnly cookie
+    const tokenManager = TokenManager.getInstance();
+    const refreshToken = tokenManager.generateRefreshToken(result.user.id);
+    setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+
+    // Generate CSRF token for client
+    const csrfToken = tokenManager.generateCsrfToken(refreshToken);
+
+    successResponse(res, {
+      accessToken: result.accessToken,
+      user: result.user,
+      csrfToken,
+      redirectTo: result.redirectTo,
+    });
+  } catch (error) {
+    logger.error('OAuth exchange error', { error });
+    next(error);
+  }
+});
 
 export default router;
