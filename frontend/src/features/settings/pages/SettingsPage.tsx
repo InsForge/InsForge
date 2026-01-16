@@ -266,7 +266,7 @@ export default function SettingsPage() {
                     <div className="flex-1 flex items-center gap-3">
                       <div
                         className={cn(
-                          'h-9 flex items-center text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 pl-3 pr-2 rounded-lg',
+                          'h-9 w-full flex items-center text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 pl-3 pr-2 rounded-lg',
                           isVersionLoading && 'animate-pulse'
                         )}
                       >
