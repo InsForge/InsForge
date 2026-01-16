@@ -140,6 +140,7 @@ export const resetPasswordRequestSchema = z.object({
 /**
  * Response for POST /api/auth/users
  * Includes optional redirectTo URL when user is successfully registered and email verification is not required
+ * For mobile/desktop clients: refreshToken is returned in body instead of cookie
  */
 export const createUserResponseSchema = z.object({
   user: userSchema.optional(),
@@ -147,38 +148,46 @@ export const createUserResponseSchema = z.object({
   requireEmailVerification: z.boolean().optional(),
   redirectTo: z.string().url().optional(),
   csrfToken: z.string().nullable().optional(),
+  refreshToken: z.string().optional(), // For mobile/desktop clients (no cookies)
 });
 
 /**
  * Response for POST /api/auth/sessions
  * Includes user and access token, plus optional redirectTo URL for frontend navigation
+ * For mobile/desktop clients: refreshToken is returned in body instead of cookie
  */
 export const createSessionResponseSchema = z.object({
   user: userSchema,
   accessToken: z.string(),
   redirectTo: z.string().url().optional(),
   csrfToken: z.string().nullable().optional(),
+  refreshToken: z.string().optional(), // For mobile/desktop clients (no cookies)
 });
 
 /**
  * Response for POST /api/auth/email/verify
  * Includes user and access token, plus optional redirectTo URL for frontend navigation
+ * For mobile/desktop clients: refreshToken is returned in body instead of cookie
  */
 export const verifyEmailResponseSchema = z.object({
   user: userSchema,
   accessToken: z.string(),
   redirectTo: z.string().url().optional(),
   csrfToken: z.string().nullable().optional(),
+  refreshToken: z.string().optional(), // For mobile/desktop clients (no cookies)
 });
 
 /**
  * Response for POST /api/auth/refresh
- * Returns new access token and CSRF token after token refresh
+ * Returns new access token after token refresh
+ * For web clients: csrfToken is returned (refresh token is in cookie)
+ * For mobile/desktop clients: refreshToken is returned in body
  */
 export const refreshSessionResponseSchema = z.object({
   accessToken: z.string(),
   user: userSchema,
-  csrfToken: z.string(),
+  csrfToken: z.string().optional(), // For web clients (cookie-based)
+  refreshToken: z.string().optional(), // For mobile/desktop clients (no cookies)
 });
 
 /**

@@ -20,6 +20,7 @@ import {
   oAuthProvidersSchema,
 } from '@insforge/shared-schemas';
 import { isOAuthSharedKeysAvailable } from '@/utils/environment.js';
+import { parseClientType, isWebClient } from '@/types/auth.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -490,8 +491,11 @@ router.get('/:provider/callback', handleOAuthCallback);
 router.post('/:provider/callback', handleOAuthCallback);
 
 // POST /api/auth/oauth/exchange - Exchange code for tokens (PKCE flow)
+// Query params: client_type (optional) - 'web' (default), 'mobile', or 'desktop'
 router.post('/exchange', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const clientType = parseClientType(req.query.client_type);
+
     const validationResult = oAuthCodeExchangeRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
       throw new AppError(
@@ -506,20 +510,30 @@ router.post('/exchange', async (req: Request, res: Response, next: NextFunction)
     // Exchange code for tokens with PKCE validation (fetches user fresh from DB)
     const result = await oAuthPKCEService.exchangeCode(code, code_verifier);
 
-    // Set refresh token in httpOnly cookie
+    // Set refresh token based on client type
     const tokenManager = TokenManager.getInstance();
     const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-    setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
 
-    // Generate CSRF token for client
-    const csrfToken = tokenManager.generateCsrfToken(refreshToken);
+    if (isWebClient(clientType)) {
+      // Web clients: use httpOnly cookie + CSRF token
+      setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+      const csrfToken = tokenManager.generateCsrfToken(refreshToken);
 
-    successResponse(res, {
-      accessToken: result.accessToken,
-      user: result.user,
-      csrfToken,
-      redirectTo: result.redirectTo,
-    });
+      successResponse(res, {
+        accessToken: result.accessToken,
+        user: result.user,
+        csrfToken,
+        redirectTo: result.redirectTo,
+      });
+    } else {
+      // Mobile/Desktop clients: return refresh token in response body
+      successResponse(res, {
+        accessToken: result.accessToken,
+        user: result.user,
+        refreshToken,
+        redirectTo: result.redirectTo,
+      });
+    }
   } catch (error) {
     logger.error('OAuth exchange error', { error });
     next(error);

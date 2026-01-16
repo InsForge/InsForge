@@ -42,6 +42,7 @@ import {
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import logger from '@/utils/logger.js';
+import { parseClientType, isWebClient } from '@/types/auth.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -169,8 +170,11 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
 });
 
 // POST /api/auth/users - Create a new user (registration)
+// Query params: client_type (optional) - 'web' (default), 'mobile', or 'desktop'
 router.post('/users', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const clientType = parseClientType(req.query.client_type);
+
     const validationResult = createUserRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
       throw new AppError(
@@ -183,12 +187,19 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
     const { email, password, name, options } = validationResult.data;
     const result: CreateUserResponse = await authService.register(email, password, name, options);
 
-    // Set refresh token in httpOnly cookie and generate CSRF token
+    // Set refresh token based on client type
     if (result.accessToken && result.user) {
       const tokenManager = TokenManager.getInstance();
       const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-      setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
-      result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
+
+      if (isWebClient(clientType)) {
+        // Web clients: use httpOnly cookie + CSRF token
+        setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+        result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
+      } else {
+        // Mobile/Desktop clients: return refresh token in response body
+        result.refreshToken = refreshToken;
+      }
     }
 
     const socket = SocketManager.getInstance();
@@ -206,8 +217,11 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
 });
 
 // POST /api/auth/sessions - Create a new session (login)
+// Query params: client_type (optional) - 'web' (default), 'mobile', or 'desktop'
 router.post('/sessions', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const clientType = parseClientType(req.query.client_type);
+
     const validationResult = createSessionRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
       throw new AppError(
@@ -220,11 +234,18 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
     const { email, password } = validationResult.data;
     const result: CreateSessionResponse = await authService.login(email, password);
 
-    // Set refresh token in httpOnly cookie and generate CSRF token
+    // Set refresh token based on client type
     const tokenManager = TokenManager.getInstance();
     const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-    setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
-    result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
+
+    if (isWebClient(clientType)) {
+      // Web clients: use httpOnly cookie + CSRF token
+      setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+      result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
+    } else {
+      // Mobile/Desktop clients: return refresh token in response body
+      result.refreshToken = refreshToken;
+    }
 
     successResponse(res, result);
   } catch (error) {
@@ -232,24 +253,47 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
   }
 });
 
-// POST /api/auth/refresh - Refresh access token using httpOnly cookie
-// Requires X-CSRF-Token header for CSRF protection
+// POST /api/auth/refresh - Refresh access token
+// Query params: client_type (optional) - 'web' (default), 'mobile', or 'desktop'
+// Web clients: uses httpOnly cookie + X-CSRF-Token header
+// Mobile/Desktop clients: uses refresh_token in request body
 router.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
+  const clientType = parseClientType(req.query.client_type);
+
   try {
-    const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
-
-    if (!refreshToken) {
-      throw new AppError('No refresh token provided', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
-    }
-
     const tokenManager = TokenManager.getInstance();
 
-    // Verify CSRF token by re-computing from refresh token
-    const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
-    if (!tokenManager.verifyCsrfToken(csrfHeader, refreshToken)) {
-      logger.warn('[Auth:Refresh] CSRF token validation failed');
-      throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+    let refreshToken: string | undefined;
+
+    if (isWebClient(clientType)) {
+      // Web clients: get refresh token from cookie
+      refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
+
+      if (!refreshToken) {
+        throw new AppError('No refresh token provided', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      }
+
+      // Verify CSRF token by re-computing from refresh token (web only)
+      const csrfHeader = req.headers['x-csrf-token'] as string | undefined;
+      if (!tokenManager.verifyCsrfToken(csrfHeader, refreshToken)) {
+        logger.warn('[Auth:Refresh] CSRF token validation failed');
+        throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
+      }
+    } else {
+      // Mobile/Desktop clients: get refresh token from request body
+      const bodyToken = req.body?.refresh_token;
+
+      if (typeof bodyToken !== 'string' || bodyToken.length === 0) {
+        throw new AppError(
+          'No refresh token provided. For mobile/desktop clients, pass refresh_token in request body.',
+          401,
+          ERROR_CODES.AUTH_UNAUTHORIZED
+        );
+      }
+
+      refreshToken = bodyToken;
     }
+
     const payload = tokenManager.verifyRefreshToken(refreshToken);
 
     // Fetch CURRENT user data from DB (email/role may have changed)
@@ -257,7 +301,9 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
 
     if (!user) {
       logger.warn('[Auth:Refresh] User not found for valid refresh token', { userId: payload.sub });
-      clearAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME);
+      if (isWebClient(clientType)) {
+        clearAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME);
+      }
       throw new AppError('User not found', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
     }
 
@@ -271,25 +317,46 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     // Generate new refresh token (token rotation for security)
     const newRefreshToken = tokenManager.generateRefreshToken(user.id);
 
-    setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, newRefreshToken);
-    const newCsrfToken = tokenManager.generateCsrfToken(newRefreshToken);
+    if (isWebClient(clientType)) {
+      // Web clients: set cookie + return CSRF token
+      setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, newRefreshToken);
+      const newCsrfToken = tokenManager.generateCsrfToken(newRefreshToken);
 
-    successResponse(res, {
-      accessToken: newAccessToken,
-      user: user,
-      csrfToken: newCsrfToken,
-    });
+      successResponse(res, {
+        accessToken: newAccessToken,
+        user: user,
+        csrfToken: newCsrfToken,
+      });
+    } else {
+      // Mobile/Desktop clients: return refresh token in body
+      successResponse(res, {
+        accessToken: newAccessToken,
+        user: user,
+        refreshToken: newRefreshToken,
+      });
+    }
   } catch (error) {
-    // Clear invalid cookie on error
-    clearAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME);
+    // Clear invalid cookie on error (only for web clients)
+    if (isWebClient(clientType)) {
+      clearAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME);
+    }
     next(error);
   }
 });
 
 // POST /api/auth/logout - Logout and clear refresh token cookie
+// Query params: client_type (optional) - 'web' (default), 'mobile', or 'desktop'
+// Web clients: clears the httpOnly refresh token cookie
+// Mobile/Desktop clients: no server-side action needed (client should discard token)
 router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
   try {
-    clearAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME);
+    const clientType = parseClientType(req.query.client_type);
+
+    if (isWebClient(clientType)) {
+      clearAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME);
+    }
+    // For mobile/desktop: no server-side cleanup needed
+    // Client is responsible for discarding the refresh token
 
     successResponse(res, {
       success: true,
@@ -549,11 +616,14 @@ router.post(
 // Uses verifyEmailMethod from auth config to determine verification type:
 // - 'code': expects email + 6-digit numeric code
 // - 'link': expects 64-char hex token only
+// Query params: client_type (optional) - 'web' (default), 'mobile', or 'desktop'
 router.post(
   '/email/verify',
   verifyOTPLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const clientType = parseClientType(req.query.client_type);
+
       const validationResult = verifyEmailRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
         throw new AppError(
@@ -586,11 +656,19 @@ router.post(
         result = await authService.verifyEmailWithCode(email, otp);
       }
 
-      // Set refresh token in httpOnly cookie and generate CSRF token
+      // Set refresh token based on client type
       const tokenManager = TokenManager.getInstance();
       const refreshToken = tokenManager.generateRefreshToken(result.user.id);
-      setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
-      result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
+
+      if (isWebClient(clientType)) {
+        // Web clients: use httpOnly cookie + CSRF token
+        setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+        result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
+      } else {
+        // Mobile/Desktop clients: return refresh token in response body
+        result.refreshToken = refreshToken;
+      }
+
       successResponse(res, result);
     } catch (error) {
       next(error);
