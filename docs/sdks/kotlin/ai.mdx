@@ -1,6 +1,6 @@
 ---
 title: AI SDK Reference
-description: AI chat completions and image generation with the InsForge Kotlin SDK
+description: AI chat completions, web search, file parsing, and image generation with the InsForge Kotlin SDK
 ---
 
 import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
@@ -40,6 +40,9 @@ Create an AI chat completion.
 - `temperature` (Double?, optional) - Sampling temperature (0.0-2.0)
 - `maxTokens` (Int?, optional) - Maximum tokens to generate
 - `systemPrompt` (String?, optional) - System prompt
+- `webSearch` (WebSearchPlugin?, optional) - Enable web search capabilities
+- `fileParser` (FileParserPlugin?, optional) - Enable file/PDF parsing
+- `thinking` (Boolean?, optional) - Enable extended reasoning mode
 
 ### Returns
 
@@ -57,8 +60,13 @@ val response = client.ai.chatCompletion(
     )
 )
 
-println(response.content)  // Direct access to content
+println(response.text)  // Direct access to text content
 println("Tokens used: ${response.metadata.usage.totalTokens}")
+
+// Access annotations if available
+response.annotations?.forEach { annotation ->
+    println("Citation: ${annotation.urlCitation.url}")
+}
 ```
 
 ### Example (With Parameters)
@@ -74,7 +82,7 @@ val response = client.ai.chatCompletion(
     maxTokens = 1000
 )
 
-println(response.content)
+println(response.text)
 ```
 
 ### Example (Multi-turn Conversation)
@@ -90,7 +98,7 @@ val response1 = client.ai.chatCompletion(
     messages = conversationHistory
 )
 
-conversationHistory.add(ChatMessage(role = "assistant", content = response1.content))
+conversationHistory.add(ChatMessage(role = "assistant", content = response1.text))
 
 // Follow-up
 conversationHistory.add(ChatMessage(role = "user", content = "What are its main features?"))
@@ -100,7 +108,135 @@ val response2 = client.ai.chatCompletion(
     messages = conversationHistory
 )
 
-println(response2.content)
+println(response2.text)
+```
+
+### Example (With Web Search)
+
+```kotlin
+val response = client.ai.chatCompletion(
+    model = "openai/gpt-4",
+    messages = listOf(
+        ChatMessage(role = "user", content = "What are the latest news about AI?")
+    ),
+    webSearch = WebSearchPlugin(
+        enabled = true,
+        maxResults = 5,
+        engine = WebSearchEngine.NATIVE
+    )
+)
+
+println(response.text)
+
+// Access URL citations from search results
+response.annotations?.forEach { annotation ->
+    println("Source: ${annotation.urlCitation.title} - ${annotation.urlCitation.url}")
+}
+```
+
+### Example (With PDF Parsing)
+
+```kotlin
+val response = client.ai.chatCompletion(
+    model = "openai/gpt-4",
+    messages = listOf(
+        ChatMessage(role = "user", content = "Summarize the content of this PDF")
+    ),
+    fileParser = FileParserPlugin(
+        enabled = true,
+        pdf = PdfParserConfig(engine = PdfEngine.MISTRAL_OCR)
+    )
+)
+
+println(response.text)
+```
+
+### Example (With Extended Reasoning)
+
+```kotlin
+val response = client.ai.chatCompletion(
+    model = "anthropic/claude-3.5-sonnet",
+    messages = listOf(
+        ChatMessage(role = "user", content = "Solve this complex math problem step by step...")
+    ),
+    thinking = true
+)
+
+println(response.text)
+```
+
+### Example (Combined Features)
+
+```kotlin
+val response = client.ai.chatCompletion(
+    model = "openai/gpt-4",
+    messages = messages,
+    webSearch = WebSearchPlugin(enabled = true, maxResults = 3),
+    fileParser = FileParserPlugin(enabled = true),
+    thinking = true
+)
+
+println(response.text)
+```
+
+---
+
+## chatCompletionWithWebSearch()
+
+Convenience method for chat completion with web search enabled.
+
+### Parameters
+
+- `model` (String) - Model identifier
+- `messages` (`List<ChatMessage>`) - Conversation messages
+- `maxResults` (Int?, optional) - Maximum search results (default: 5)
+- `engine` (WebSearchEngine?, optional) - Search engine to use
+- `temperature` (Double?, optional) - Sampling temperature
+- `maxTokens` (Int?, optional) - Maximum tokens to generate
+
+### Example
+
+```kotlin
+val response = client.ai.chatCompletionWithWebSearch(
+    model = "openai/gpt-4",
+    messages = listOf(
+        ChatMessage(role = "user", content = "What are today's top news headlines?")
+    ),
+    maxResults = 5
+)
+
+println(response.text)
+
+// Access citations
+response.annotations?.forEach { annotation ->
+    println("- ${annotation.urlCitation.title}: ${annotation.urlCitation.url}")
+}
+```
+
+---
+
+## chatCompletionWithThinking()
+
+Convenience method for chat completion with extended reasoning mode enabled.
+
+### Parameters
+
+- `model` (String) - Model identifier
+- `messages` (`List<ChatMessage>`) - Conversation messages
+- `temperature` (Double?, optional) - Sampling temperature
+- `maxTokens` (Int?, optional) - Maximum tokens to generate
+
+### Example
+
+```kotlin
+val response = client.ai.chatCompletionWithThinking(
+    model = "anthropic/claude-3.5-sonnet",
+    messages = listOf(
+        ChatMessage(role = "user", content = "Analyze this complex problem and provide a detailed solution...")
+    )
+)
+
+println(response.text)
 ```
 
 ---
@@ -108,6 +244,16 @@ println(response2.content)
 ## chatCompletionStream()
 
 Create a streaming chat completion. Returns `Flow<String>` that emits content chunks directly.
+
+### Parameters
+
+- `model` (String) - Model identifier
+- `messages` (`List<ChatMessage>`) - Conversation messages
+- `temperature` (Double?, optional) - Sampling temperature
+- `maxTokens` (Int?, optional) - Maximum tokens to generate
+- `webSearch` (WebSearchPlugin?, optional) - Enable web search capabilities
+- `fileParser` (FileParserPlugin?, optional) - Enable file/PDF parsing
+- `thinking` (Boolean?, optional) - Enable extended reasoning mode
 
 ### Example
 
@@ -140,6 +286,20 @@ client.ai.chatCompletionStream(
 }
 
 println("Complete response: $fullResponse")
+```
+
+### Example (Streaming with Web Search)
+
+```kotlin
+client.ai.chatCompletionStream(
+    model = "openai/gpt-4",
+    messages = listOf(
+        ChatMessage(role = "user", content = "What's happening in tech news today?")
+    ),
+    webSearch = WebSearchPlugin(enabled = true, maxResults = 3)
+).collect { content ->
+    print(content)
+}
 ```
 
 ---
@@ -281,7 +441,7 @@ fun ChatScreen() {
                                 )
                                 messages = messages + ChatMessage(
                                     role = "assistant",
-                                    content = response.content
+                                    content = response.text
                                 )
                             } catch (e: Exception) {
                                 Log.e("Chat", "Error: ${e.message}")
@@ -485,7 +645,7 @@ try {
         model = "anthropic/claude-3.5-haiku",
         messages = listOf(ChatMessage(role = "user", content = "Hello"))
     )
-    println(response.content)
+    println(response.text)
 } catch (e: InsforgeHttpException) {
     when (e.error) {
         "MODEL_NOT_FOUND" -> println("Model not available")
@@ -501,6 +661,48 @@ try {
 ---
 
 ## Models Reference
+
+### Enums
+
+```kotlin
+// Search engine options for web search
+enum class WebSearchEngine {
+    @SerialName("native") NATIVE,
+    @SerialName("exa") EXA
+}
+
+// PDF processing engine options
+enum class PdfEngine {
+    @SerialName("pdf-text") PDF_TEXT,
+    @SerialName("mistral-ocr") MISTRAL_OCR,
+    @SerialName("native") NATIVE
+}
+```
+
+### Plugin Configuration
+
+```kotlin
+// Web search plugin configuration
+@Serializable
+data class WebSearchPlugin(
+    val enabled: Boolean = true,
+    @SerialName("max_results") val maxResults: Int? = null,
+    val engine: WebSearchEngine? = null
+)
+
+// PDF parser configuration
+@Serializable
+data class PdfParserConfig(
+    val engine: PdfEngine? = null
+)
+
+// File parser plugin configuration
+@Serializable
+data class FileParserPlugin(
+    val enabled: Boolean = true,
+    val pdf: PdfParserConfig? = null
+)
+```
 
 ### ChatMessage
 
@@ -518,7 +720,8 @@ data class ChatMessage(
 @Serializable
 data class ChatCompletionResponse(
     val success: Boolean,
-    val content: String,
+    val text: String,
+    val annotations: List<UrlCitationAnnotation>? = null,
     val metadata: CompletionMetadata
 )
 
@@ -533,6 +736,26 @@ data class TokenUsage(
     @SerialName("prompt_tokens") val promptTokens: Int,
     @SerialName("completion_tokens") val completionTokens: Int,
     @SerialName("total_tokens") val totalTokens: Int
+)
+```
+
+### Annotations
+
+```kotlin
+// URL citation information from web search results
+@Serializable
+data class UrlCitation(
+    val url: String,
+    val title: String? = null,
+    @SerialName("start_index") val startIndex: Int? = null,
+    @SerialName("end_index") val endIndex: Int? = null
+)
+
+// Annotation containing URL citation
+@Serializable
+data class UrlCitationAnnotation(
+    val type: String,  // "url_citation"
+    @SerialName("url_citation") val urlCitation: UrlCitation
 )
 ```
 
