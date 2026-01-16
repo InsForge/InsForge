@@ -198,7 +198,7 @@ describe('SecretService', () => {
       generateApiKeySpy.mockRestore();
     });
 
-    it('rolls back transaction when logger.info throws', async () => {
+    it('succeeds even when logger.info throws after COMMIT', async () => {
       const oldSecretId = 'old-secret-id-123';
       const newSecretId = 'new-secret-id-456';
       const mockNewApiKey = secretService.generateApiKey();
@@ -217,15 +217,17 @@ describe('SecretService', () => {
         .mockResolvedValueOnce({ rows: [{ id: oldSecretId }] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ id: newSecretId }] })
-        .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] });
 
-      await expect(secretService.rotateApiKey()).rejects.toThrow('Failed to rotate API key');
+      const result = await secretService.rotateApiKey();
 
+      expect(result).toBe(mockNewApiKey);
       expect(mockQuery).toHaveBeenCalledWith('COMMIT');
-      expect(mockQuery).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockQuery).not.toHaveBeenCalledWith('ROLLBACK');
       expect(logger.error).toHaveBeenCalledTimes(1);
-      expect(logger.error).toHaveBeenCalledWith('Failed to rotate API key', { error: loggerError });
+      expect(logger.error).toHaveBeenCalledWith('Failed to log API key rotation', {
+        error: loggerError,
+      });
       expect(mockRelease).toHaveBeenCalledTimes(1);
 
       generateApiKeySpy.mockRestore();

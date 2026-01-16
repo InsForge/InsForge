@@ -408,11 +408,15 @@ export class SecretService {
 
       await client.query('COMMIT');
 
-      logger.info('Secret rotated', {
-        oldId: id,
-        newId: newSecretResult.rows[0].id,
-        key: secretKey,
-      });
+      try {
+        logger.info('Secret rotated', {
+          oldId: id,
+          newId: newSecretResult.rows[0].id,
+          key: secretKey,
+        });
+      } catch (logError) {
+        logger.error('Failed to log secret rotation', { error: logError });
+      }
 
       return { newId: newSecretResult.rows[0].id };
     } catch (error) {
@@ -483,10 +487,14 @@ export class SecretService {
 
       await client.query('COMMIT');
 
-      logger.info('API key rotated', {
-        oldId: oldSecretId,
-        newId: newSecretResult.rows[0].id,
-      });
+      try {
+        logger.info('API key rotated', {
+          oldId: oldSecretId,
+          newId: newSecretResult.rows[0].id,
+        });
+      } catch (logError) {
+        logger.error('Failed to log API key rotation', { error: logError });
+      }
 
       return newApiKey;
     } catch (error) {
