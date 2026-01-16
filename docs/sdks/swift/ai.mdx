@@ -1,6 +1,6 @@
 ---
 title: AI SDK Reference
-description: AI chat completions and image generation with the InsForge Swift SDK
+description: AI chat completions, web search, file parsing, and image generation with the InsForge Swift SDK
 ---
 
 import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
@@ -22,6 +22,9 @@ Generate AI chat completions.
 - `maxTokens` (Int, optional) - Max tokens to generate
 - `topP` (Double, optional) - Top-p sampling parameter
 - `systemPrompt` (String, optional) - System prompt for the conversation
+- `webSearch` (WebSearchPlugin?, optional) - Enable web search capabilities
+- `fileParser` (FileParserPlugin?, optional) - Enable file/PDF parsing
+- `thinking` (Bool?, optional) - Enable extended reasoning mode (Anthropic models only)
 
 ### Returns
 
@@ -47,6 +50,16 @@ if let metadata = response.metadata {
     print("Model: \(metadata.model)")
     if let usage = metadata.usage {
         print("Tokens used: \(usage.totalTokens)")
+    }
+}
+
+// Access annotations if available (from web search)
+if let annotations = response.annotations {
+    for annotation in annotations {
+        print("Citation: \(annotation.urlCitation.url)")
+        if let title = annotation.urlCitation.title {
+            print("Title: \(title)")
+        }
     }
 }
 ```
@@ -78,6 +91,76 @@ let response = try await insforge.ai.chatCompletion(
         ChatMessage(role: .assistant, content: "2 + 2 equals 4."),
         ChatMessage(role: .user, content: "What about 3 + 3?")
     ]
+)
+
+print(response.text)
+```
+
+### Example with Web Search
+
+```swift
+let response = try await insforge.ai.chatCompletion(
+    model: "openai/gpt-4",
+    messages: [
+        ChatMessage(role: .user, content: "What's the latest news about AI?")
+    ],
+    webSearch: WebSearchPlugin(
+        enabled: true,
+        maxResults: 5,
+        engine: .native
+    )
+)
+
+print(response.text)
+
+// Access URL citations from search results
+if let annotations = response.annotations {
+    for annotation in annotations {
+        print("Source: \(annotation.urlCitation.title ?? "Unknown") - \(annotation.urlCitation.url)")
+    }
+}
+```
+
+### Example with PDF Parsing
+
+```swift
+let response = try await insforge.ai.chatCompletion(
+    model: "openai/gpt-4",
+    messages: [
+        ChatMessage(role: .user, content: "Summarize this PDF document...")
+    ],
+    fileParser: FileParserPlugin(
+        enabled: true,
+        pdf: PdfParserConfig(engine: .mistralOcr)
+    )
+)
+
+print(response.text)
+```
+
+### Example with Extended Reasoning (Thinking)
+
+```swift
+let response = try await insforge.ai.chatCompletion(
+    model: "anthropic/claude-3-opus",
+    messages: [
+        ChatMessage(role: .user, content: "Solve this complex problem step by step...")
+    ],
+    thinking: true
+)
+
+print(response.text)
+```
+
+### Example with Combined Features
+
+```swift
+let response = try await insforge.ai.chatCompletion(
+    model: "openai/gpt-4",
+    messages: messages,
+    webSearch: WebSearchPlugin(enabled: true, maxResults: 3),
+    fileParser: FileParserPlugin(enabled: true),
+    thinking: true
 )
 
 print(response.text)
@@ -363,6 +446,57 @@ struct ImageGenerationView: View {
 
 ## Models Reference
 
+### Enums
+
+```swift
+// Search engine options for web search
+public enum WebSearchEngine: String, Codable {
+    case native
+    case exa
+}
+
+// PDF processing engine options
+public enum PdfEngine: String, Codable {
+    case pdfText = "pdf-text"
+    case mistralOcr = "mistral-ocr"
+    case native
+}
+```
+
+### Plugin Configuration
+
+```swift
+// Web search plugin configuration
+public struct WebSearchPlugin: Codable, Sendable {
+    let enabled: Bool
+    let engine: WebSearchEngine?
+    let maxResults: Int?          // 1-10, default: 5
+    let searchPrompt: String?     // Custom prompt for search results
+
+    init(
+        enabled: Bool = true,
+        engine: WebSearchEngine? = nil,
+        maxResults: Int? = nil,
+        searchPrompt: String? = nil
+    )
+}
+
+// PDF parser configuration
+public struct PdfParserConfig: Codable, Sendable {
+    let engine: PdfEngine?
+
+    init(engine: PdfEngine? = nil)
+}
+
+// File parser plugin configuration
+public struct FileParserPlugin: Codable, Sendable {
+    let enabled: Bool
+    let pdf: PdfParserConfig?
+
+    init(enabled: Bool = true, pdf: PdfParserConfig? = nil)
+}
+```
+
 ### ChatMessage
 
 ```swift
@@ -382,7 +516,8 @@ public struct ChatMessage: Codable, Sendable {
 
 ```swift
 public struct ChatCompletionResponse: Codable, Sendable {
-    let text: String              // The generated response text
+    let text: String                              // The generated response text
+    let annotations: [UrlCitationAnnotation]?     // URL citations from web search
     let metadata: Metadata?
 
     // Computed properties
@@ -393,6 +528,25 @@ public struct ChatCompletionResponse: Codable, Sendable {
         let model: String
         let usage: TokenUsage?
     }
+}
+```
+
+### Annotations
+
+```swift
+// URL citation information from web search results
+public struct UrlCitation: Codable, Sendable {
+    let url: String
+    let title: String?
+    let content: String?
+    let startIndex: Int?
+    let endIndex: Int?
+}
+
+// Annotation containing URL citation
+public struct UrlCitationAnnotation: Codable, Sendable {
+    let type: String              // "url_citation"
+    let urlCitation: UrlCitation
 }
 ```
 
