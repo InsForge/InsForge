@@ -64,6 +64,7 @@ export default function SettingsPage() {
   const [projectName, setProjectName] = useState('');
   const [originalProjectName, setOriginalProjectName] = useState('');
   const [hasNameChanged, setHasNameChanged] = useState(false);
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [isVersionOutdated, setIsVersionOutdated] = useState(false);
   const [isUpdatingVersion, setIsUpdatingVersion] = useState(false);
 
@@ -109,10 +110,8 @@ export default function SettingsPage() {
           setProjectName(event.data.name);
           setOriginalProjectName(event.data.name);
         }
-        // Handle version info
         if (event.data.latestVersion) {
-          const comparison = compareVersions(version, event.data.latestVersion);
-          setIsVersionOutdated(comparison < 0);
+          setLatestVersion(event.data.latestVersion);
         }
       }
 
@@ -129,6 +128,14 @@ export default function SettingsPage() {
 
     return () => window.removeEventListener('message', handleMessage);
   }, [isCloud, isInIframe]);
+
+  // Compare versions when both values are available
+  useEffect(() => {
+    if (version && latestVersion) {
+      const comparison = compareVersions(version, latestVersion);
+      setIsVersionOutdated(comparison < 0);
+    }
+  }, [version, latestVersion]);
 
   const handleProjectNameChange = (value: string) => {
     setProjectName(value);
