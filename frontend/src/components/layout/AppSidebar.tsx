@@ -4,14 +4,12 @@ import { PrimaryMenu } from './PrimaryMenu';
 import { SecondaryMenu } from './SecondaryMenu';
 import {
   staticMenuItems,
-  documentationMenuItem,
-  usageMenuItem,
   settingsMenuItem,
   deploymentsMenuItem,
   type PrimaryMenuItem,
 } from '@/lib/utils/menuItems';
 import { useLocation, matchPath } from 'react-router-dom';
-import { isInsForgeCloudProject, isIframe } from '@/lib/utils/utils';
+import { isInsForgeCloudProject } from '@/lib/utils/utils';
 
 interface AppSidebarProps extends React.HTMLAttributes<HTMLElement> {
   isCollapsed: boolean;
@@ -23,7 +21,6 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   const { menuItems: logsMenuItems, isLoading: logsLoading } = useLogSources();
 
   const isCloud = isInsForgeCloudProject();
-  const isInIframe = isIframe();
 
   // Build main menu items - add deployments for cloud projects
   const mainMenuItems = useMemo(() => {
@@ -37,16 +34,9 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   // Build bottom menu items based on deployment environment
   const bottomMenuItems = useMemo(() => {
     const items: PrimaryMenuItem[] = [];
-
-    // Only show Usage when in iframe (postMessage to parent works)
-    if (isCloud && isInIframe) {
-      items.push(usageMenuItem);
-    }
-
-    items.push(documentationMenuItem);
     items.push(settingsMenuItem);
     return items;
-  }, [isCloud, isInIframe]);
+  }, []);
 
   // Find which primary menu item matches the current route
   // Items with secondary menus use prefix matching (end: false)

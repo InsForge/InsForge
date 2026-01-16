@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Settings, Info, Plug } from 'lucide-react';
+import { Settings, Info, Plug, ChartBarBig } from 'lucide-react';
 import { CopyButton, TooltipProvider, Input, Button, ConfirmDialog } from '@/components';
 import { useApiKey } from '@/lib/hooks/useMetadata';
 import { useConfirm } from '@/lib/hooks/useConfirm';
@@ -12,7 +12,7 @@ import {
 } from '@/features/onboard';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 
-type TabType = 'info' | 'settings' | 'connect';
+type TabType = 'info' | 'usage' | 'settings' | 'connect';
 
 interface TabButtonProps {
   id: TabType;
@@ -45,10 +45,20 @@ export default function SettingsPage() {
   // Get initial tab from URL param, default to 'info'
   const getInitialTab = (): TabType => {
     const tabParam = searchParams.get('tab');
-    if (tabParam === 'connect' || tabParam === 'settings' || tabParam === 'info') {
+    if (
+      tabParam === 'connect' ||
+      tabParam === 'settings' ||
+      tabParam === 'info' ||
+      tabParam === 'usage'
+    ) {
       return tabParam;
     }
     return 'info';
+  };
+
+  // Handle usage tab click - navigates to parent usage page
+  const handleUsageClick = () => {
+    postMessageToParent({ type: 'NAVIGATE_TO_USAGE' }, '*');
   };
 
   const [activeTab, setActiveTab] = useState<TabType>(() => getInitialTab());
@@ -161,6 +171,17 @@ export default function SettingsPage() {
                 isActive={activeTab === 'info'}
                 onClick={() => setActiveTab('info')}
               />
+
+              {/* Only show Usage tab in cloud environment & iframe */}
+              {isCloud && isInIframe && (
+                <TabButton
+                  id="usage"
+                  label="Usage"
+                  icon={ChartBarBig}
+                  isActive={false}
+                  onClick={handleUsageClick}
+                />
+              )}
 
               {/* Only show Settings tab in cloud environment & iframe */}
               {isCloud && isInIframe && (
