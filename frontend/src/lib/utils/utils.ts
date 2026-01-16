@@ -194,3 +194,28 @@ export function formatDate(timestamp: string): string {
   }
   return format(date, 'MMM dd, yyyy');
 }
+
+/**
+ * Compare two semantic version strings
+ * @param v1 - First version string
+ * @param v2 - Second version string
+ * @returns -1 if v1 < v2, 0 if equal, 1 if v1 > v2
+ */
+export function compareVersions(v1: string, v2: string): number {
+  const cleanV1 = v1.startsWith('v') ? v1.slice(1) : v1;
+  const cleanV2 = v2.startsWith('v') ? v2.slice(1) : v2;
+  const parts1 = cleanV1.split('.').map(Number);
+  const parts2 = cleanV2.split('.').map(Number);
+
+  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+    const p1 = parts1[i] || 0;
+    const p2 = parts2[i] || 0;
+    if (p1 < p2) {
+      return -1;
+    }
+    if (p1 > p2) {
+      return 1;
+    }
+  }
+  return 0;
+}
