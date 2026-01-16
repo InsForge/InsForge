@@ -377,7 +377,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     });
 
     // Redirect with only the exchange code (no sensitive tokens in URL)
-    res.redirect(`${redirectUri}?code=${exchangeCode}`);
+    res.redirect(`${redirectUri}?insforge_code=${exchangeCode}`);
   } catch (error) {
     logger.error('Shared OAuth callback error', { error });
     next(error);
@@ -458,7 +458,7 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
       });
 
       // Redirect with only the exchange code (no sensitive tokens in URL)
-      return res.redirect(`${redirectUri}?code=${exchangeCode}`);
+      return res.redirect(`${redirectUri}?insforge_code=${exchangeCode}`);
     } catch (error) {
       logger.error('OAuth callback error', {
         error: error instanceof Error ? error.message : error,
