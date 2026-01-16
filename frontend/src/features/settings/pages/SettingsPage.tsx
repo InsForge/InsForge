@@ -45,12 +45,7 @@ export default function SettingsPage() {
   // Get initial tab from URL param, default to 'info'
   const getInitialTab = (): TabType => {
     const tabParam = searchParams.get('tab');
-    if (
-      tabParam === 'connect' ||
-      tabParam === 'settings' ||
-      tabParam === 'info' ||
-      tabParam === 'usage'
-    ) {
+    if (tabParam === 'connect' || tabParam === 'settings' || tabParam === 'info') {
       return tabParam;
     }
     return 'info';
