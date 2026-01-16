@@ -405,7 +405,7 @@ components:
           example: openai/gpt-4
         messages:
           type: array
-          description: Array of messages for conversation
+          description: Array of messages for conversation (supports text, images, audio, and files/PDFs)
           items:
             $ref: '#/components/schemas/ChatMessage'
         stream:
@@ -428,15 +428,25 @@ components:
         systemPrompt:
           type: string
           description: System prompt to guide model behavior
+        webSearch:
+          $ref: '#/components/schemas/WebSearchPlugin'
+        fileParser:
+          $ref: '#/components/schemas/FileParserPlugin'
+        thinking:
+          type: boolean
+          description: Enable extended reasoning capabilities (appends :thinking to model ID if not already present). Not every model supports this, only works with Anthropic models with the :thinking suffix.
 
     ChatCompletionResponse:
       type: object
       properties:
-        success:
-          type: boolean
-        content:
+        text:
           type: string
-          description: AI model response
+          description: AI model response content
+        annotations:
+          type: array
+          description: URL citations from web search results (present when webSearch is enabled)
+          items:
+            $ref: '#/components/schemas/UrlCitationAnnotation'
         metadata:
           type: object
           properties:
@@ -454,6 +464,106 @@ components:
           type: integer
         totalTokens:
           type: integer
+
+    WebSearchPlugin:
+      type: object
+      required:
+        - enabled
+      properties:
+        enabled:
+          type: boolean
+          description: Enable web search integration
+        engine:
+          type: string
+          enum: [native, exa]
+          description: |
+            Search engine selection:
+            - native: Use provider's built-in web search (OpenAI, Anthropic, Perplexity, xAI)
+            - exa: Use Exa's search API
+            - undefined: Auto-select (native if available, otherwise Exa)
+        maxResults:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 5
+          description: Maximum number of search results to include
+        searchPrompt:
+          type: string
+          description: Custom prompt for attaching search results to the message
+
+    FileParserPlugin:
+      type: object
+      required:
+        - enabled
+      properties:
+        enabled:
+          type: boolean
+          description: Enable file parsing for PDFs in messages
+        pdf:
+          type: object
+          properties:
+            engine:
+              type: string
+              enum: [pdf-text, mistral-ocr, native]
+              description: |
+                PDF processing engine:
+                - pdf-text: Best for well-structured PDFs with clear text content (Free)
+                - mistral-ocr: Best for scanned documents or PDFs with images ($2 per 1,000 pages)
+                - native: Only for models with native file support (charged as input tokens)
+                If not specified, defaults to native if available, otherwise mistral-ocr
+
+    FileContent:
+      type: object
+      description: File content for PDFs and other documents
+      required:
+        - type
+        - file
+      properties:
+        type:
+          type: string
+          enum: [file]
+        file:
+          type: object
+          required:
+            - filename
+            - file_data
+          properties:
+            filename:
+              type: string
+              description: Filename with extension (e.g., "document.pdf")
+              example: document.pdf
+            file_data:
+              type: string
+              description: |
+                File data can be:
+                - Public URL: "https://example.com/document.pdf"
+                - Base64 data URL: "data:application/pdf;base64,..."
+              example: "https://example.com/document.pdf"
+
+    UrlCitationAnnotation:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [url_citation]
+        urlCitation:
+          type: object
+          properties:
+            url:
+              type: string
+              description: URL of the cited source
+            title:
+              type: string
+              description: Title of the cited page
+            content:
+              type: string
+              description: Relevant content snippet from the source
+            startIndex:
+              type: integer
+              description: Start character index in response text where citation applies
+            endIndex:
+              type: integer
+              description: End character index in response text where citation applies
 
     ImageGenerationOptions:
       type: object

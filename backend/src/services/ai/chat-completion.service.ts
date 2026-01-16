@@ -6,9 +6,58 @@ import type {
   AIConfigurationSchema,
   ChatCompletionResponse,
   ChatMessageSchema,
+  UrlCitationAnnotation,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { ChatCompletionOptions } from '@/types/ai.js';
+
+// OpenRouter plugin type for web search
+interface OpenRouterWebPlugin {
+  id: 'web';
+  engine?: 'native' | 'exa';
+  max_results?: number;
+  search_prompt?: string;
+}
+
+// OpenRouter plugin type for file parsing (PDF processing)
+interface OpenRouterFileParserPlugin {
+  id: 'file-parser';
+  pdf?: {
+    engine?: 'pdf-text' | 'mistral-ocr' | 'native';
+  };
+}
+
+// Union type for all OpenRouter plugins
+type OpenRouterPlugin = OpenRouterWebPlugin | OpenRouterFileParserPlugin;
+
+// Extended request type with OpenRouter-specific fields
+interface OpenRouterChatCompletionRequest
+  extends OpenAI.Chat.ChatCompletionCreateParamsNonStreaming {
+  plugins?: OpenRouterPlugin[];
+}
+
+interface OpenRouterChatCompletionStreamingRequest
+  extends OpenAI.Chat.ChatCompletionCreateParamsStreaming {
+  plugins?: OpenRouterPlugin[];
+}
+
+// OpenRouter annotation format from API response
+interface OpenRouterUrlCitation {
+  type: 'url_citation';
+  url_citation: {
+    url: string;
+    title?: string;
+    content?: string;
+    start_index?: number;
+    end_index?: number;
+  };
+}
+
+// Message structure that may contain annotations (from OpenRouter response)
+interface MessageWithAnnotations {
+  content?: string | null;
+  annotations?: OpenRouterUrlCitation[];
+}
 
 export class ChatCompletionService {
   private static instance: ChatCompletionService;
@@ -70,44 +119,161 @@ export class ChatCompletionService {
 
   /**
    * Validate model and get config
+   * For models with variants (e.g., model:thinking), first checks the full model ID
    */
-  async validateAndGetConfig(modelId: string): Promise<AIConfigurationSchema | null> {
-    const aiConfig = await this.aiConfigService.findByModelId(modelId);
+  async validateAndGetConfig(
+    modelId: string,
+    thinking?: boolean
+  ): Promise<AIConfigurationSchema | null> {
+    // Build the actual model ID with optional :thinking suffix
+    const actualModelId = this.buildModelId(modelId, thinking);
+    const aiConfig = await this.aiConfigService.findByModelId(actualModelId);
     if (!aiConfig) {
       throw new Error(
-        `Model ${modelId} is not enabled. Please contact your administrator to enable this model.`
+        `Model ${actualModelId} is not enabled. Please contact your administrator to enable this model.`
       );
     }
     return aiConfig;
   }
 
   /**
+   * Build the model ID with optional :thinking suffix
+   */
+  private buildModelId(model: string, thinking?: boolean): string {
+    if (thinking && model.endsWith(':thinking') === false) {
+      return `${model}:thinking`;
+    }
+    return model;
+  }
+
+  /**
+   * Build web search plugin configuration
+   */
+  private buildWebSearchPlugin(
+    webSearch?: ChatCompletionOptions['webSearch']
+  ): OpenRouterWebPlugin | undefined {
+    if (!webSearch?.enabled) {
+      return undefined;
+    }
+
+    const plugin: OpenRouterWebPlugin = { id: 'web' };
+
+    if (webSearch.engine) {
+      plugin.engine = webSearch.engine;
+    }
+    if (webSearch.maxResults) {
+      plugin.max_results = webSearch.maxResults;
+    }
+    if (webSearch.searchPrompt) {
+      plugin.search_prompt = webSearch.searchPrompt;
+    }
+
+    return plugin;
+  }
+
+  /**
+   * Build file parser plugin configuration for PDF processing
+   */
+  private buildFileParserPlugin(
+    fileParser?: ChatCompletionOptions['fileParser']
+  ): OpenRouterFileParserPlugin | undefined {
+    if (!fileParser?.enabled) {
+      return undefined;
+    }
+
+    const plugin: OpenRouterFileParserPlugin = { id: 'file-parser' };
+
+    if (fileParser.pdf?.engine) {
+      plugin.pdf = { engine: fileParser.pdf.engine };
+    }
+
+    return plugin;
+  }
+
+  /**
+   * Build all plugins array from options
+   */
+  private buildPlugins(options: ChatCompletionOptions): OpenRouterPlugin[] | undefined {
+    const plugins: OpenRouterPlugin[] = [];
+
+    const webSearchPlugin = this.buildWebSearchPlugin(options.webSearch);
+    if (webSearchPlugin) {
+      plugins.push(webSearchPlugin);
+    }
+
+    const fileParserPlugin = this.buildFileParserPlugin(options.fileParser);
+    if (fileParserPlugin) {
+      plugins.push(fileParserPlugin);
+    }
+
+    return plugins.length > 0 ? plugins : undefined;
+  }
+
+  /**
+   * Parse annotations from OpenRouter response to our format
+   */
+  private parseAnnotations(
+    message: MessageWithAnnotations | undefined | null
+  ): UrlCitationAnnotation[] | undefined {
+    if (!message?.annotations || !Array.isArray(message.annotations)) {
+      return undefined;
+    }
+
+    const annotations: UrlCitationAnnotation[] = [];
+
+    for (const annotation of message.annotations) {
+      if (annotation.type === 'url_citation' && annotation.url_citation) {
+        annotations.push({
+          type: 'url_citation',
+          urlCitation: {
+            url: annotation.url_citation.url,
+            title: annotation.url_citation.title,
+            content: annotation.url_citation.content,
+            startIndex: annotation.url_citation.start_index,
+            endIndex: annotation.url_citation.end_index,
+          },
+        });
+      }
+    }
+
+    return annotations.length > 0 ? annotations : undefined;
+  }
+
+  /**
    * Send a chat message to the specified model
    * @param messages - Array of messages for conversation
-   * @param options - Chat options including model, temperature, etc.
+   * @param options - Chat options including model, temperature, webSearch, thinking, etc.
    */
   async chat(
     messages: ChatMessageSchema[],
     options: ChatCompletionOptions
   ): Promise<ChatCompletionResponse> {
     try {
-      // Validate model and get config
-      const aiConfig = await this.validateAndGetConfig(options.model);
+      // Validate model and get config (pass thinking option for variant checking)
+      const aiConfig = await this.validateAndGetConfig(options.model, options.thinking);
+
+      // Build model ID with optional :thinking suffix
+      const modelId = this.buildModelId(options.model, options.thinking);
 
       // Apply system prompt from config if available
       const formattedMessages = this.formatMessages(messages, aiConfig?.systemPrompt);
-      const request: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming = {
-        model: options.model,
+
+      // Build request with optional plugins (web search, file parser)
+      const request: OpenRouterChatCompletionRequest = {
+        model: modelId,
         messages: formattedMessages,
         temperature: options.temperature ?? 0.7,
         max_tokens: options.maxTokens ?? 4096,
         top_p: options.topP,
         stream: false,
+        plugins: this.buildPlugins(options),
       };
 
       // Send request with automatic renewal and retry logic
       const response = await this.openRouterProvider.sendRequest((client) =>
-        client.chat.completions.create(request)
+        client.chat.completions.create(
+          request as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming
+        )
       );
 
       // Extract token usage if available
@@ -125,14 +291,20 @@ export class ChatCompletionService {
           aiConfig.id,
           tokenUsage.promptTokens,
           tokenUsage.completionTokens,
-          options.model
+          modelId // pass the actual model ID used
         );
       }
 
+      // Parse annotations from response (for web search results)
+      const annotations = this.parseAnnotations(
+        response.choices[0]?.message as MessageWithAnnotations | undefined
+      );
+
       return {
         text: response.choices[0]?.message?.content || '',
+        annotations,
         metadata: {
-          model: options.model,
+          model: modelId,
           usage: tokenUsage,
         },
       };
@@ -147,7 +319,7 @@ export class ChatCompletionService {
   /**
    * Stream a chat response
    * @param messages - Array of messages for conversation
-   * @param options - Chat options including model, temperature, etc.
+   * @param options - Chat options including model, temperature, webSearch, thinking, etc.
    */
   async *streamChat(
     messages: ChatMessageSchema[],
@@ -155,26 +327,32 @@ export class ChatCompletionService {
   ): AsyncGenerator<{
     chunk?: string;
     tokenUsage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
+    annotations?: UrlCitationAnnotation[];
   }> {
     try {
-      // Validate model and get config
-      const aiConfig = await this.validateAndGetConfig(options.model);
+      // Validate model and get config (pass thinking option for variant checking)
+      const aiConfig = await this.validateAndGetConfig(options.model, options.thinking);
+
+      // Build model ID with optional :thinking suffix
+      const modelId = this.buildModelId(options.model, options.thinking);
 
       // Apply system prompt from config if available
       const formattedMessages = this.formatMessages(messages, aiConfig?.systemPrompt);
 
-      const request: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
-        model: options.model,
+      // Build request with optional plugins (web search, file parser)
+      const request: OpenRouterChatCompletionStreamingRequest = {
+        model: modelId,
         messages: formattedMessages,
         temperature: options.temperature ?? 0.7,
         max_tokens: options.maxTokens ?? 4096,
         top_p: options.topP,
         stream: true,
+        plugins: this.buildPlugins(options),
       };
 
       // Send request with automatic renewal and retry logic
       const stream = await this.openRouterProvider.sendRequest((client) =>
-        client.chat.completions.create(request)
+        client.chat.completions.create(request as OpenAI.Chat.ChatCompletionCreateParamsStreaming)
       );
 
       const tokenUsage = {
@@ -183,10 +361,22 @@ export class ChatCompletionService {
         totalTokens: 0,
       };
 
+      // Collect annotations from streaming response
+      let collectedAnnotations: UrlCitationAnnotation[] | undefined;
+
       for await (const chunk of stream) {
         const content = chunk.choices[0]?.delta?.content;
         if (content) {
           yield { chunk: content };
+        }
+
+        // Check for annotations in the chunk (web search results)
+        const chunkAnnotations = this.parseAnnotations(
+          chunk.choices[0]?.delta as MessageWithAnnotations | undefined
+        );
+        if (chunkAnnotations) {
+          collectedAnnotations = collectedAnnotations || [];
+          collectedAnnotations.push(...chunkAnnotations);
         }
 
         // Check if this chunk contains usage data
@@ -201,13 +391,18 @@ export class ChatCompletionService {
         }
       }
 
+      // Yield annotations at the end if present
+      if (collectedAnnotations && collectedAnnotations.length > 0) {
+        yield { annotations: collectedAnnotations };
+      }
+
       // Track usage after streaming completes
       if (aiConfig?.id && tokenUsage.totalTokens > 0) {
         await this.aiUsageService.trackChatUsage(
           aiConfig.id,
           tokenUsage.promptTokens,
           tokenUsage.completionTokens,
-          options.model
+          modelId // pass the actual model ID used
         );
       }
     } catch (error) {

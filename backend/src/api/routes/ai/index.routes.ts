@@ -77,6 +77,9 @@ router.post(
             if (data.tokenUsage) {
               res.write(`data: ${JSON.stringify({ tokenUsage: data.tokenUsage })}\n\n`);
             }
+            if (data.annotations) {
+              res.write(`data: ${JSON.stringify({ annotations: data.annotations })}\n\n`);
+            }
           }
 
           // Send completion signal
