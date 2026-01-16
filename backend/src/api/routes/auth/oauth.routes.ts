@@ -10,6 +10,7 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
 import { setAuthCookie, REFRESH_TOKEN_COOKIE_NAME } from '@/utils/cookies.js';
+import { parseClientType } from '@/utils/utils.js';
 import logger from '@/utils/logger.js';
 import jwt from 'jsonwebtoken';
 import {
@@ -20,7 +21,6 @@ import {
   oAuthProvidersSchema,
 } from '@insforge/shared-schemas';
 import { isOAuthSharedKeysAvailable } from '@/utils/environment.js';
-import { parseClientType, isWebClient } from '@/types/auth.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -514,7 +514,7 @@ router.post('/exchange', async (req: Request, res: Response, next: NextFunction)
     const tokenManager = TokenManager.getInstance();
     const refreshToken = tokenManager.generateRefreshToken(result.user.id);
 
-    if (isWebClient(clientType)) {
+    if (clientType === 'web') {
       // Web clients: use httpOnly cookie + CSRF token
       setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
       const csrfToken = tokenManager.generateCsrfToken(refreshToken);
