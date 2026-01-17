@@ -10,9 +10,14 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 const emailCooldowns = new Map<string, number>();
 
 /**
+ * Cleanup interval reference for graceful shutdown
+ */
+let cleanupInterval: NodeJS.Timeout | null = null;
+
+/**
  * Cleanup old cooldown entries every 5 minutes
  */
-setInterval(
+cleanupInterval = setInterval(
   () => {
     const now = Date.now();
     const fiveMinutes = 5 * 60 * 1000;
@@ -25,6 +30,17 @@ setInterval(
   },
   5 * 60 * 1000
 );
+
+/**
+ * Clean up resources for graceful shutdown
+ */
+export function destroyEmailCooldownInterval(): void {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
+  }
+  emailCooldowns.clear();
+}
 
 /**
  * Per-IP rate limiter for email otp requests
