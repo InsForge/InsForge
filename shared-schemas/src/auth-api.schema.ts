@@ -140,6 +140,7 @@ export const resetPasswordRequestSchema = z.object({
 /**
  * Response for POST /api/auth/users
  * Includes optional redirectTo URL when user is successfully registered and email verification is not required
+ * For mobile/desktop clients: refreshToken is returned in body instead of cookie
  */
 export const createUserResponseSchema = z.object({
   user: userSchema.optional(),
@@ -147,38 +148,46 @@ export const createUserResponseSchema = z.object({
   requireEmailVerification: z.boolean().optional(),
   redirectTo: z.string().url().optional(),
   csrfToken: z.string().nullable().optional(),
+  refreshToken: z.string().optional(), // For mobile/desktop clients (no cookies)
 });
 
 /**
  * Response for POST /api/auth/sessions
  * Includes user and access token, plus optional redirectTo URL for frontend navigation
+ * For mobile/desktop clients: refreshToken is returned in body instead of cookie
  */
 export const createSessionResponseSchema = z.object({
   user: userSchema,
   accessToken: z.string(),
   redirectTo: z.string().url().optional(),
   csrfToken: z.string().nullable().optional(),
+  refreshToken: z.string().optional(), // For mobile/desktop clients (no cookies)
 });
 
 /**
  * Response for POST /api/auth/email/verify
  * Includes user and access token, plus optional redirectTo URL for frontend navigation
+ * For mobile/desktop clients: refreshToken is returned in body instead of cookie
  */
 export const verifyEmailResponseSchema = z.object({
   user: userSchema,
   accessToken: z.string(),
   redirectTo: z.string().url().optional(),
   csrfToken: z.string().nullable().optional(),
+  refreshToken: z.string().optional(), // For mobile/desktop clients (no cookies)
 });
 
 /**
  * Response for POST /api/auth/refresh
- * Returns new access token and CSRF token after token refresh
+ * Returns new access token after token refresh
+ * For web clients: csrfToken is returned (refresh token is in cookie)
+ * For mobile/desktop clients: refreshToken is returned in body
  */
 export const refreshSessionResponseSchema = z.object({
   accessToken: z.string(),
   user: userSchema,
-  csrfToken: z.string(),
+  csrfToken: z.string().optional(), // For web clients (cookie-based)
+  refreshToken: z.string().optional(), // For mobile/desktop clients (no cookies)
 });
 
 /**
@@ -278,6 +287,28 @@ export const updateOAuthConfigRequestSchema = oAuthConfigSchema
   .partial();
 
 /**
+ * Base64url character validation regex (RFC 7636)
+ * Allows: A-Z, a-z, 0-9, -, _ (no padding)
+ */
+const base64urlRegex = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * GET /api/auth/oauth/:provider - Initialize OAuth flow
+ * Query params for PKCE flow as per RFC 7636
+ * Note: code_challenge uses snake_case as per OAuth 2.0 PKCE specification
+ */
+export const oAuthInitRequestSchema = z.object({
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  redirect_uri: z.string().url().optional(),
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  code_challenge: z
+    .string()
+    .min(43, 'Code challenge must be at least 43 characters')
+    .max(128, 'Code challenge must be at most 128 characters')
+    .regex(base64urlRegex, 'Code challenge must be base64url encoded'),
+});
+
+/**
  * POST /api/auth/oauth/exchange - Exchange OAuth code for tokens
  * Used in PKCE flow to exchange an authorization code for tokens
  * Note: code_verifier uses snake_case as per OAuth 2.0 PKCE specification (RFC 7636)
@@ -288,7 +319,8 @@ export const oAuthCodeExchangeRequestSchema = z.object({
   code_verifier: z
     .string()
     .min(43, 'Code verifier must be at least 43 characters')
-    .max(128, 'Code verifier must be at most 128 characters'),
+    .max(128, 'Code verifier must be at most 128 characters')
+    .regex(base64urlRegex, 'Code verifier must be base64url encoded'),
 });
 
 /**
@@ -363,6 +395,7 @@ export type DeleteUsersRequest = z.infer<typeof deleteUsersRequestSchema>;
 export type UpdateProfileRequest = z.infer<typeof updateProfileRequestSchema>;
 export type CreateOAuthConfigRequest = z.infer<typeof createOAuthConfigRequestSchema>;
 export type UpdateOAuthConfigRequest = z.infer<typeof updateOAuthConfigRequestSchema>;
+export type OAuthInitRequest = z.infer<typeof oAuthInitRequestSchema>;
 export type OAuthCodeExchangeRequest = z.infer<typeof oAuthCodeExchangeRequestSchema>;
 export type UpdateAuthConfigRequest = z.infer<typeof updateAuthConfigRequestSchema>;
 export type SendVerificationEmailRequest = z.infer<typeof sendVerificationEmailRequestSchema>;
