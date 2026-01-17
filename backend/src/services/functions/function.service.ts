@@ -11,12 +11,19 @@ import { DatabaseError, Pool } from 'pg';
 import fetch from 'node-fetch';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
+import { DenoDeployProvider } from '@/providers/functions/deno-deploy.provider.js';
+import { SecretService } from '@/services/secrets/secret.service.js';
 
 export class FunctionService {
   private static instance: FunctionService;
   private pool: Pool | null = null;
+  private denoDeployProvider: DenoDeployProvider;
+  private secretService: SecretService;
 
-  private constructor() {}
+  private constructor() {
+    this.denoDeployProvider = DenoDeployProvider.getInstance();
+    this.secretService = SecretService.getInstance();
+  }
 
   static getInstance(): FunctionService {
     if (!FunctionService.instance) {
@@ -153,6 +160,15 @@ export class FunctionService {
         [id]
       );
 
+      // Trigger deployment to Deno Deploy (async, non-blocking)
+      if (status === 'active') {
+        this.triggerDeployment().catch((err) => {
+          logger.error('Background deployment failed', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
+      }
+
       return result.rows[0];
     } catch (error) {
       // Re-throw AppErrors as-is
@@ -253,6 +269,16 @@ export class FunctionService {
         [slug]
       );
 
+      // Trigger deployment if code or status changed
+      const shouldDeploy = updates.code !== undefined || updates.status !== undefined;
+      if (shouldDeploy) {
+        this.triggerDeployment().catch((err) => {
+          logger.error('Background deployment failed', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
+      }
+
       return result.rows[0];
     } catch (error) {
       logger.error('Failed to update function', {
@@ -279,6 +305,14 @@ export class FunctionService {
       if (result.rowCount === 0) {
         return false;
       }
+
+      // Trigger redeployment without the deleted function
+      this.triggerDeployment().catch((err) => {
+        logger.error('Background deployment failed after function deletion', {
+          error: err instanceof Error ? err.message : String(err),
+          deletedSlug: slug,
+        });
+      });
 
       return true;
     } catch (error) {
@@ -334,4 +368,237 @@ export class FunctionService {
       }
     }
   }
+
+  // ============================================
+  // Deno Deploy Integration
+  // ============================================
+
+  /**
+   * Get the Deno Deploy project ID for this InsForge instance
+   * Format: insforge-{app_key}-functions
+   */
+  private getDenoProjectId(): string {
+    const appKey = process.env.APP_KEY || process.env.PROJECT_ID || 'local';
+    return `insforge-${appKey}-functions`;
+  }
+
+  /**
+   * Trigger deployment of all active functions to Deno Deploy
+   * This is called asynchronously after function CRUD operations
+   */
+  private async triggerDeployment(): Promise<void> {
+    if (!this.denoDeployProvider.isConfigured()) {
+      logger.debug('Deno Deploy not configured, skipping deployment');
+      return;
+    }
+
+    const projectId = this.getDenoProjectId();
+
+    try {
+      const activeFunctions = await this.getActiveFunctionsWithCode();
+      const secrets = await this.getFunctionSecrets();
+      const functionSlugs = activeFunctions.map((f) => f.slug);
+
+      logger.info('Deploying to Deno Deploy', {
+        projectId,
+        functionCount: activeFunctions.length,
+        functions: functionSlugs,
+      });
+
+      const result = await this.denoDeployProvider.deployFunctions(projectId, activeFunctions, secrets);
+
+      // Save initial deployment record
+      await this.saveDeployment({
+        id: result.id,
+        projectId: result.projectId,
+        status: 'pending',
+        url: result.url,
+        functionCount: activeFunctions.length,
+        functions: functionSlugs,
+      });
+
+      logger.info('Deno Deploy deployment created', {
+        deploymentId: result.id,
+        status: result.status,
+        url: result.url,
+      });
+
+      // Poll for final status in background
+      this.pollDeploymentStatus(result.id, functionSlugs).catch((err) => {
+        logger.error('Failed to poll deployment status', {
+          error: err instanceof Error ? err.message : String(err),
+          deploymentId: result.id,
+        });
+      });
+    } catch (error) {
+      logger.error('Deno Deploy deployment failed', {
+        error: error instanceof Error ? error.message : String(error),
+        projectId,
+      });
+      // Don't re-throw - this is a background operation
+    }
+  }
+
+  /**
+   * Poll for deployment status and update DB when complete
+   */
+  private async pollDeploymentStatus(deploymentId: string, functions: string[]): Promise<void> {
+    try {
+      const result = await this.denoDeployProvider.waitForDeployment(deploymentId);
+
+      // Update deployment record with final status
+      await this.updateDeployment(deploymentId, {
+        status: result.status,
+        url: result.url,
+        errorMessage: result.errorMessage,
+        errorFile: result.errorFile,
+        errorFunction: result.errorFunction,
+        buildLogs: result.buildLogs,
+      });
+
+      if (result.status === 'success') {
+        logger.info('Deno Deploy deployment succeeded', {
+          deploymentId,
+          url: result.url,
+          functions,
+        });
+      } else {
+        logger.error('Deno Deploy deployment failed', {
+          deploymentId,
+          errorMessage: result.errorMessage,
+          errorFile: result.errorFile,
+          errorFunction: result.errorFunction,
+        });
+      }
+    } catch (error) {
+      logger.error('Error polling deployment status', {
+        error: error instanceof Error ? error.message : String(error),
+        deploymentId,
+      });
+    }
+  }
+
+  /**
+   * Save deployment record to database
+   */
+  private async saveDeployment(deployment: {
+    id: string;
+    projectId: string;
+    status: string;
+    url: string | null;
+    functionCount: number;
+    functions: string[];
+  }): Promise<void> {
+    await this.getPool().query(
+      `INSERT INTO functions.deployments (id, project_id, status, url, function_count, functions)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        deployment.id,
+        deployment.projectId,
+        deployment.status,
+        deployment.url,
+        deployment.functionCount,
+        JSON.stringify(deployment.functions),
+      ]
+    );
+  }
+
+  /**
+   * Update deployment record with final status
+   */
+  private async updateDeployment(
+    deploymentId: string,
+    update: {
+      status: string;
+      url: string | null;
+      errorMessage?: string;
+      errorFile?: string;
+      errorFunction?: string;
+      buildLogs?: string[];
+    }
+  ): Promise<void> {
+    await this.getPool().query(
+      `UPDATE functions.deployments
+       SET status = $1, url = $2, error_message = $3, error_file = $4, error_function = $5, build_logs = $6
+       WHERE id = $7`,
+      [
+        update.status,
+        update.url,
+        update.errorMessage || null,
+        update.errorFile || null,
+        update.errorFunction || null,
+        update.buildLogs ? JSON.stringify(update.buildLogs) : null,
+        deploymentId,
+      ]
+    );
+  }
+
+  /**
+   * Sync existing functions to Deno Deploy on server startup
+   * Called once when the server boots to ensure existing functions are deployed
+   */
+  async syncDeployment(): Promise<void> {
+    if (!this.denoDeployProvider.isConfigured()) {
+      logger.debug('Deno Deploy not configured, skipping sync');
+      return;
+    }
+
+    try {
+      const activeFunctions = await this.getActiveFunctionsWithCode();
+
+      if (activeFunctions.length === 0) {
+        logger.debug('No active functions to sync');
+        return;
+      }
+
+      logger.info('Syncing existing functions to Deno Deploy on startup', {
+        functionCount: activeFunctions.length,
+        functions: activeFunctions.map((f) => f.slug),
+      });
+
+      await this.triggerDeployment();
+    } catch (error) {
+      logger.error('Failed to sync functions on startup', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // Don't throw - server should still start
+    }
+  }
+
+  /**
+   * Get all active functions with their code
+   */
+  private async getActiveFunctionsWithCode(): Promise<Array<{ slug: string; code: string }>> {
+    const result = await this.getPool().query(
+      `SELECT slug, code FROM functions.definitions WHERE status = 'active' ORDER BY created_at`
+    );
+    return result.rows;
+  }
+
+  /**
+   * Get all active secrets for function injection
+   */
+  private async getFunctionSecrets(): Promise<Record<string, string>> {
+    try {
+      const secrets = await this.secretService.listSecrets();
+      const secretMap: Record<string, string> = {};
+
+      for (const secret of secrets) {
+        if (!secret.isReserved) {
+          const value = await this.secretService.getSecretByKey(secret.key);
+          if (value) {
+            secretMap[secret.key] = value;
+          }
+        }
+      }
+
+      return secretMap;
+    } catch (error) {
+      logger.warn('Failed to fetch secrets for deployment', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return {};
+    }
+  }
+
 }
