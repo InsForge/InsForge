@@ -33,6 +33,7 @@ import { OAuthPKCEService } from '@/services/auth/oauth-pkce.service.js';
 import { seedBackend } from '@/utils/seed.js';
 import logger from '@/utils/logger.js';
 import { initSqlParser } from '@/utils/sql-parser.js';
+import { FunctionService } from '@/services/functions/function.service.js';
 import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 const __filename = fileURLToPath(import.meta.url);
@@ -293,6 +294,14 @@ async function initializeServer() {
     // Initialize RealtimeManager (pg_notify listener)
     const realtimeManager = RealtimeManager.getInstance();
     await realtimeManager.initialize();
+
+    // Sync existing functions to Deno Deploy (non-blocking)
+    const functionService = FunctionService.getInstance();
+    functionService.syncDeployment().catch((err) => {
+      logger.error('Failed to sync functions to Deno Deploy', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
   } catch (error) {
     logger.error('Failed to initialize server', {
       error: error instanceof Error ? error.message : String(error),
