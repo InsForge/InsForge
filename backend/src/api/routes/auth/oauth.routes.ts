@@ -16,6 +16,7 @@ import jwt from 'jsonwebtoken';
 import {
   createOAuthConfigRequestSchema,
   updateOAuthConfigRequestSchema,
+  oAuthInitRequestSchema,
   oAuthCodeExchangeRequestSchema,
   type ListOAuthConfigsResponse,
   oAuthProvidersSchema,
@@ -239,7 +240,6 @@ router.delete(
 router.get('/:provider', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { provider } = req.params;
-    const { redirect_uri, code_challenge } = req.query;
 
     // Validate provider using OAuthProvidersSchema
     const providerValidation = oAuthProvidersSchema.safeParse(provider);
@@ -251,6 +251,17 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
       );
     }
 
+    // Validate query params (PKCE code_challenge per RFC 7636)
+    const queryValidation = oAuthInitRequestSchema.safeParse(req.query);
+    if (!queryValidation.success) {
+      throw new AppError(
+        queryValidation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const { redirect_uri, code_challenge } = queryValidation.data;
     const validatedProvider = providerValidation.data;
     const authConfig = await authConfigService.getAuthConfig();
 
@@ -258,15 +269,6 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
 
     if (!redirectUri) {
       throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
-    }
-
-    // PKCE: Require code_challenge for secure token exchange
-    if (!code_challenge || typeof code_challenge !== 'string') {
-      throw new AppError(
-        'code_challenge is required for PKCE flow',
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
     }
 
     const jwtPayload = {
@@ -355,7 +357,9 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     if (success !== 'true') {
       const errorMessage = error || 'OAuth Authentication Failed';
       logger.warn('Shared OAuth callback failed', { error: errorMessage, provider });
-      return res.redirect(`${redirectUri}/?error=${encodeURIComponent(String(errorMessage))}`);
+      const errorUrl = new URL(redirectUri);
+      errorUrl.searchParams.set('error', String(errorMessage));
+      return res.redirect(errorUrl.toString());
     }
 
     if (!payload) {
@@ -378,7 +382,9 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     });
 
     // Redirect with only the exchange code (no sensitive tokens in URL)
-    res.redirect(`${redirectUri}?insforge_code=${exchangeCode}`);
+    const successUrl = new URL(redirectUri);
+    successUrl.searchParams.set('insforge_code', exchangeCode);
+    res.redirect(successUrl.toString());
   } catch (error) {
     logger.error('Shared OAuth callback error', { error });
     next(error);
@@ -459,7 +465,9 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
       });
 
       // Redirect with only the exchange code (no sensitive tokens in URL)
-      return res.redirect(`${redirectUri}?insforge_code=${exchangeCode}`);
+      const successUrl = new URL(redirectUri);
+      successUrl.searchParams.set('insforge_code', exchangeCode);
+      return res.redirect(successUrl.toString());
     } catch (error) {
       logger.error('OAuth callback error', {
         error: error instanceof Error ? error.message : error,
@@ -473,10 +481,9 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
       const errorMessage = error instanceof Error ? error.message : 'OAuth Authentication Failed';
 
       // Redirect with error in URL parameters
-      const params = new URLSearchParams();
-      params.set('error', errorMessage);
-
-      return res.redirect(`${redirectUri}?${params.toString()}`);
+      const errorUrl = new URL(redirectUri);
+      errorUrl.searchParams.set('error', errorMessage);
+      return res.redirect(errorUrl.toString());
     }
   } catch (error) {
     logger.error('OAuth callback error', { error });

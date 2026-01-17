@@ -287,6 +287,28 @@ export const updateOAuthConfigRequestSchema = oAuthConfigSchema
   .partial();
 
 /**
+ * Base64url character validation regex (RFC 7636)
+ * Allows: A-Z, a-z, 0-9, -, _ (no padding)
+ */
+const base64urlRegex = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * GET /api/auth/oauth/:provider - Initialize OAuth flow
+ * Query params for PKCE flow as per RFC 7636
+ * Note: code_challenge uses snake_case as per OAuth 2.0 PKCE specification
+ */
+export const oAuthInitRequestSchema = z.object({
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  redirect_uri: z.string().url().optional(),
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  code_challenge: z
+    .string()
+    .min(43, 'Code challenge must be at least 43 characters')
+    .max(128, 'Code challenge must be at most 128 characters')
+    .regex(base64urlRegex, 'Code challenge must be base64url encoded'),
+});
+
+/**
  * POST /api/auth/oauth/exchange - Exchange OAuth code for tokens
  * Used in PKCE flow to exchange an authorization code for tokens
  * Note: code_verifier uses snake_case as per OAuth 2.0 PKCE specification (RFC 7636)
@@ -297,7 +319,8 @@ export const oAuthCodeExchangeRequestSchema = z.object({
   code_verifier: z
     .string()
     .min(43, 'Code verifier must be at least 43 characters')
-    .max(128, 'Code verifier must be at most 128 characters'),
+    .max(128, 'Code verifier must be at most 128 characters')
+    .regex(base64urlRegex, 'Code verifier must be base64url encoded'),
 });
 
 /**
@@ -372,6 +395,7 @@ export type DeleteUsersRequest = z.infer<typeof deleteUsersRequestSchema>;
 export type UpdateProfileRequest = z.infer<typeof updateProfileRequestSchema>;
 export type CreateOAuthConfigRequest = z.infer<typeof createOAuthConfigRequestSchema>;
 export type UpdateOAuthConfigRequest = z.infer<typeof updateOAuthConfigRequestSchema>;
+export type OAuthInitRequest = z.infer<typeof oAuthInitRequestSchema>;
 export type OAuthCodeExchangeRequest = z.infer<typeof oAuthCodeExchangeRequestSchema>;
 export type UpdateAuthConfigRequest = z.infer<typeof updateAuthConfigRequestSchema>;
 export type SendVerificationEmailRequest = z.infer<typeof sendVerificationEmailRequestSchema>;
