@@ -32,7 +32,7 @@ import { seedBackend } from '@/utils/seed.js';
 import logger from '@/utils/logger.js';
 import { initSqlParser } from '@/utils/sql-parser.js';
 import packageJson from '../../package.json';
-
+import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -185,6 +185,7 @@ export async function createApp() {
   apiRouter.use('/realtime', realtimeRouter);
   apiRouter.use('/email', emailRouter);
   apiRouter.use('/deployments', deploymentsRouter);
+  apiRouter.use('/schedules', schedulesRouter);
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);

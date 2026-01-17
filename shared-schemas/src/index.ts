@@ -20,3 +20,5 @@ export * from './docs.schema';
 export * from './email-api.schema';
 export * from './deployments.schema';
 export * from './deployments-api.schema';
+export * from './schedules.schema';
+export * from './schedules-api.schema';
