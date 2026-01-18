@@ -30,7 +30,7 @@ export default function SecretsPage() {
     <div className="h-full flex flex-col overflow-hidden">
       <div className="flex flex-col gap-6 p-4">
         {/* Header */}
-        <p className="h-7 text-xl text-zinc-950 dark:text-white">Secrets</p>
+        <h1 className="text-xl font-normal text-zinc-950 dark:text-white">Secrets</h1>
 
         {/* Add New Secret Portal */}
         <div className="bg-white dark:bg-[#333333] rounded-[8px]">
