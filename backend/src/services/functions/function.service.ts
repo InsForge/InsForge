@@ -405,7 +405,11 @@ export class FunctionService {
         functions: functionSlugs,
       });
 
-      const result = await this.denoDeployProvider.deployFunctions(projectId, activeFunctions, secrets);
+      const result = await this.denoDeployProvider.deployFunctions(
+        projectId,
+        activeFunctions,
+        secrets
+      );
 
       // Save initial deployment record
       await this.saveDeployment({
@@ -600,5 +604,4 @@ export class FunctionService {
       return {};
     }
   }
-
 }
