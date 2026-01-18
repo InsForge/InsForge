@@ -324,7 +324,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
       socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
       socket.off(ServerEvents.MCP_CONNECTED, handleMcpConnected);
     };
-  }, [state.isConnected, queryClient]);
+  }, [state.isConnected, queryClient, updateState]);
 
   // Context value
   const contextValue = useMemo<SocketContextValue>(
