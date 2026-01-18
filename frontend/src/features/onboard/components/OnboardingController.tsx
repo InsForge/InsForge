@@ -34,6 +34,7 @@ export function OnboardingController() {
 
       switch (cloudEvent.type) {
         case 'SHOW_ONBOARDING_OVERLAY':
+          console.log('SHOW_ONBOARDING_OVERLAY');
           setOnboardingModalOpen(true);
           break;
       }
@@ -51,10 +52,13 @@ export function OnboardingController() {
   // Auto-open onboarding modal for new users (non-iframe mode only)
   // In iframe mode, Cloud controls when to show the modal via messages
   useEffect(() => {
+    console.log('AUTO_OPEN_ONBOARDING_MODAL');
     if (isIframe()) {
+      console.log('IS_IFRAME, RETURN');
       return;
     }
     if (!isMcpLoading && !hasCompletedOnboarding && !getOnboardingSkipped()) {
+      console.log('SET_ONBOARDING_MODAL_OPEN');
       setOnboardingModalOpen(true);
     }
   }, [isMcpLoading, hasCompletedOnboarding, setOnboardingModalOpen]);
