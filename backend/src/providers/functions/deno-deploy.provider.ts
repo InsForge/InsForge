@@ -144,11 +144,7 @@ export class DenoDeployProvider {
 
     if (!createResponse.ok) {
       const errorText = await createResponse.text();
-      throw new AppError(
-        `Failed to create project: ${errorText}`,
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
+      throw new AppError(`Failed to create project: ${errorText}`, 500, ERROR_CODES.INTERNAL_ERROR);
     }
 
     logger.info('Deno Deploy project created', { projectId });
@@ -248,7 +244,8 @@ export class DenoDeployProvider {
       return {
         id: data.id,
         projectId: data.projectId,
-        status: data.status === 'success' ? 'success' : data.status === 'failed' ? 'failed' : 'pending',
+        status:
+          data.status === 'success' ? 'success' : data.status === 'failed' ? 'failed' : 'pending',
         url: domains.length > 0 ? `https://${domains[0]}` : `https://${projectId}.deno.dev`,
         createdAt: new Date(data.createdAt),
       };
@@ -293,7 +290,8 @@ export class DenoDeployProvider {
       return {
         id: data.id,
         projectId: data.projectId,
-        status: data.status === 'success' ? 'success' : data.status === 'failed' ? 'failed' : 'pending',
+        status:
+          data.status === 'success' ? 'success' : data.status === 'failed' ? 'failed' : 'pending',
         url: domains.length > 0 ? `https://${domains[0]}` : null,
         createdAt: new Date(data.createdAt),
       };
@@ -315,11 +313,14 @@ export class DenoDeployProvider {
     const credentials = this.getCredentials();
 
     try {
-      const response = await fetch(`${DENO_DEPLOY_API_BASE}/deployments/${deploymentId}/build_logs`, {
-        headers: {
-          Authorization: `Bearer ${credentials.token}`,
-        },
-      });
+      const response = await fetch(
+        `${DENO_DEPLOY_API_BASE}/deployments/${deploymentId}/build_logs`,
+        {
+          headers: {
+            Authorization: `Bearer ${credentials.token}`,
+          },
+        }
+      );
 
       if (!response.ok) {
         return [];
@@ -456,8 +457,8 @@ export class DenoDeployProvider {
     }
 
     // Check if user already imports from runtime
-    const hasRuntimeImport = userCode.includes('from "../runtime.ts"') ||
-                             userCode.includes("from '../runtime.ts'");
+    const hasRuntimeImport =
+      userCode.includes('from "../runtime.ts"') || userCode.includes("from '../runtime.ts'");
 
     // Deno-native format - prepend runtime import only if not already present
     if (hasRuntimeImport) {
