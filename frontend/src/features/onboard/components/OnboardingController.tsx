@@ -72,7 +72,9 @@ export function OnboardingController() {
   // Auto-close onboarding modal when a new MCP connection is established in real-time
   // This handles the case where user already has MCP records but opens modal again
   useEffect(() => {
-    if (!socket) return;
+    if (!socket) {
+      return;
+    }
 
     const handleMcpConnected = () => {
       setOnboardingModalOpen(false);

@@ -31,7 +31,9 @@ export function OnboardingOverlay() {
 
   // Listen for MCP connection events to auto-advance to step 2
   useEffect(() => {
-    if (!socket) return;
+    if (!socket) {
+      return;
+    }
 
     const handleMcpConnected = () => {
       setIsStep1Completed(true);
