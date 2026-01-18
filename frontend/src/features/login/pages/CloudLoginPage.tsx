@@ -5,15 +5,13 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { usePartnerOrigin } from '../hooks/usePartnerOrigin';
-import { useModal } from '@/lib/hooks/useModal';
 
 export default function CloudLoginPage() {
   const navigate = useNavigate();
   const { loginWithAuthorizationCode, isAuthenticated } = useAuth();
-  const { hasCompletedOnboarding, isLoading: isMcpUsageLoading } = useMcpUsage();
+  const { isLoading: isMcpUsageLoading } = useMcpUsage();
   const { isPartnerOrigin } = usePartnerOrigin();
   const [authError, setAuthError] = useState<string | null>(null);
-  const { setOnboardingModalOpen } = useModal();
   // Handle authorization code from postMessage
   const onAuthorizationCodeReceived = useCallback(
     async (event: MessageEvent) => {
@@ -84,18 +82,9 @@ export default function CloudLoginPage() {
 
   useEffect(() => {
     if (isAuthenticated && !isMcpUsageLoading) {
-      if (!hasCompletedOnboarding) {
-        setOnboardingModalOpen(true);
-      }
       void navigate('/dashboard', { replace: true });
     }
-  }, [
-    hasCompletedOnboarding,
-    isAuthenticated,
-    isMcpUsageLoading,
-    navigate,
-    setOnboardingModalOpen,
-  ]);
+  }, [isAuthenticated, isMcpUsageLoading, navigate]);
 
   // Show error state if authentication failed
   if (authError) {

@@ -1,9 +1,12 @@
 import { ReactElement } from 'react';
 export interface MCPAgent {
   id: string;
+  slug: string;
   displayName: string;
   logo?: ReactElement;
 }
+
+export const MCP_SETUP_BASE_URL = 'https://docs.insforge.dev/mcp-setup';
 
 import TraeLogo from '@/assets/logos/trae.svg?react';
 import CursorLogo from '@/assets/logos/cursor.svg?react';
@@ -28,61 +31,73 @@ export const GenerateInstallCommand = (agent: MCPAgent, apiKey: string) => {
 export const MCP_AGENTS: MCPAgent[] = [
   {
     id: 'cursor',
+    slug: 'cursor',
     displayName: 'Cursor',
     logo: <CursorLogo className="w-6 h-6" />,
   },
   {
     id: 'claude-code',
+    slug: 'claude-code',
     displayName: 'Claude Code',
     logo: <ClaudeLogo className="w-6 h-6" />,
   },
   {
     id: 'trae',
+    slug: 'trae',
     displayName: 'Trae',
     logo: <TraeLogo className="w-5 h-5" />,
   },
   {
     id: 'cline',
+    slug: 'cline',
     displayName: 'Cline',
     logo: <ClineLogo className="w-6 h-6 dark:text-white" />,
   },
   {
     id: 'windsurf',
+    slug: 'windsurf',
     displayName: 'Windsurf',
     logo: <WindsurfLogo className="w-6 h-6 dark:text-white" />,
   },
   {
     id: 'roocode',
+    slug: 'roo-code',
     displayName: 'Roo Code',
     logo: <img src={RooCodeLogo} alt="" className="dark:invert" />,
   },
   {
     id: 'qoder',
+    slug: 'qoder',
     displayName: 'Qoder',
     logo: <QoderLogo className="w-5 h-5 dark:text-white" />,
   },
   {
     id: 'copilot',
+    slug: 'github-copilot',
     displayName: 'Copilot',
     logo: <CopilotLogo className="w-5 h-5 dark:text-white" />,
   },
   {
     id: 'antigravity',
+    slug: 'google-antigravity',
     displayName: 'Antigravity',
     logo: <AntigravityLogo className="w-5 h-5 dark:text-white" />,
   },
   {
     id: 'codex',
+    slug: 'codex',
     displayName: 'Codex',
     logo: <OpenAILogo className="w-5 h-5 dark:text-white" />,
   },
   {
     id: 'kiro',
+    slug: 'kiro',
     displayName: 'Kiro',
     logo: <KiroLogo className="w-5 h-5 dark:text-white" />,
   },
   {
     id: 'mcp',
+    slug: 'manual',
     displayName: 'MCP JSON',
   },
 ];

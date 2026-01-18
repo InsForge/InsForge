@@ -1,8 +1,9 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useModal } from '@/lib/hooks/useModal';
 import { parseCloudEvent } from '@/lib/utils/cloudMessaging';
 import { isIframe } from '@/lib/utils/utils';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
+import { useSocket, ServerEvents } from '@/lib/contexts/SocketContext';
 import { getOnboardingSkipped, setOnboardingSkipped } from './OnboardingModal';
 
 /**
@@ -14,6 +15,8 @@ import { getOnboardingSkipped, setOnboardingSkipped } from './OnboardingModal';
 export function OnboardingController() {
   const { setOnboardingModalOpen } = useModal();
   const { hasCompletedOnboarding, isLoading: isMcpLoading } = useMcpUsage();
+  const { socket } = useSocket();
+  const hasHandledInitialState = useRef(false);
 
   // Handle messages from Cloud parent window (iframe mode only)
   const handleMessage = useCallback(
@@ -57,12 +60,32 @@ export function OnboardingController() {
   }, [isMcpLoading, hasCompletedOnboarding, setOnboardingModalOpen]);
 
   // Auto-close onboarding modal when MCP connection is established (all modes)
+  // This handles the initial load case (hasCompletedOnboarding changes from false to true)
   useEffect(() => {
-    if (!isMcpLoading && hasCompletedOnboarding) {
+    if (!isMcpLoading && hasCompletedOnboarding && !hasHandledInitialState.current) {
+      hasHandledInitialState.current = true;
       setOnboardingModalOpen(false);
       setOnboardingSkipped(false);
     }
   }, [hasCompletedOnboarding, isMcpLoading, setOnboardingModalOpen]);
+
+  // Auto-close onboarding modal when a new MCP connection is established in real-time
+  // This handles the case where user already has MCP records but opens modal again
+  useEffect(() => {
+    if (!socket) {
+      return;
+    }
+
+    const handleMcpConnected = () => {
+      setOnboardingModalOpen(false);
+      setOnboardingSkipped(false);
+    };
+
+    socket.on(ServerEvents.MCP_CONNECTED, handleMcpConnected);
+    return () => {
+      socket.off(ServerEvents.MCP_CONNECTED, handleMcpConnected);
+    };
+  }, [socket, setOnboardingModalOpen]);
 
   return null;
 }

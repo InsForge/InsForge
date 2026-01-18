@@ -5,6 +5,7 @@ export {
   getOnboardingSkipped,
   setOnboardingSkipped,
 } from './components/OnboardingModal';
+export { OnboardingOverlay } from './components/OnboardingOverlay';
 export { VideoDemoModal } from './components/VideoDemoModal';
 export { McpConnectionSection } from './components/McpConnectionSection';
 export { ApiCredentialsSection } from './components/ApiCredentialsSection';

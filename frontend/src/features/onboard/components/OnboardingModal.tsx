@@ -1,10 +1,10 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Smartphone } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, Button, TooltipProvider } from '@/components';
 import { McpConnectionSection } from './McpConnectionSection';
+import { MCP_SETUP_BASE_URL, MCP_AGENTS } from './mcp/helpers';
 import { useApiKey } from '@/lib/hooks/useMetadata';
-import { getBackendUrl, isInsForgeCloudProject, isIframe } from '@/lib/utils/utils';
-import { postMessageToParent } from '@/lib/utils/cloudMessaging';
+import { getBackendUrl } from '@/lib/utils/utils';
 import DiscordIcon from '@/assets/logos/discord.svg?react';
 import { useModal } from '@/lib/hooks/useModal';
 
@@ -24,13 +24,13 @@ export function setOnboardingSkipped(skipped: boolean): void {
 
 export function OnboardingModal() {
   const { isOnboardingModalOpen, setOnboardingModalOpen } = useModal();
+  const [selectedAgentSlug, setSelectedAgentSlug] = useState(MCP_AGENTS[0].slug);
 
   const { apiKey, isLoading } = useApiKey();
   const appUrl = getBackendUrl();
 
   const displayApiKey = isLoading ? 'ik_' + '*'.repeat(32) : apiKey || '';
-  const isCloudEnvironment = isInsForgeCloudProject();
-  const isInIframe = isIframe();
+  const guideUrl = `${MCP_SETUP_BASE_URL}#${selectedAgentSlug}`;
 
   const handleSkipOnboarding = () => {
     setOnboardingSkipped(true);
@@ -58,22 +58,25 @@ export function OnboardingModal() {
 
           {/* Tab Content */}
           <div className="flex flex-col gap-10 px-6 overflow-y-auto min-h-0 flex-1">
-            <McpConnectionSection apiKey={displayApiKey} appUrl={appUrl} isLoading={isLoading} />
+            <McpConnectionSection
+              apiKey={displayApiKey}
+              appUrl={appUrl}
+              isLoading={isLoading}
+              onAgentChange={(agent) => setSelectedAgentSlug(agent.slug)}
+            />
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
                 <span className="text-gray-500 dark:text-neutral-400 text-sm leading-6">
                   Need help?
                 </span>
-                {isCloudEnvironment && isInIframe && (
-                  <Button
-                    variant="ghost"
-                    onClick={() => postMessageToParent({ type: 'SHOW_CONTACT_MODAL' })}
-                    className="gap-1.5 px-2 py-1 h-auto text-white group hover:bg-transparent"
-                  >
-                    <Smartphone className="w-5 h-5" />
-                    <span className="text-sm font-medium group-hover:underline">Text Us</span>
-                  </Button>
-                )}
+                <a
+                  href={guideUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm leading-6 font-medium text-white"
+                >
+                  Step by Step Guide
+                </a>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-gray-500 dark:text-neutral-400 text-sm leading-6">
@@ -83,7 +86,7 @@ export function OnboardingModal() {
                   href="https://discord.gg/DvBtaEc9Jz"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 hover:underline"
+                  className="inline-flex items-center gap-1"
                 >
                   <DiscordIcon className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
                   <span className="text-indigo-500 dark:text-indigo-400 text-sm leading-6 font-medium">
