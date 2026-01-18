@@ -9,7 +9,7 @@ import { usePartnerOrigin } from '../hooks/usePartnerOrigin';
 export default function CloudLoginPage() {
   const navigate = useNavigate();
   const { loginWithAuthorizationCode, isAuthenticated } = useAuth();
-  const { hasCompletedOnboarding, isLoading: isMcpUsageLoading } = useMcpUsage();
+  const { isLoading: isMcpUsageLoading } = useMcpUsage();
   const { isPartnerOrigin } = usePartnerOrigin();
   const [authError, setAuthError] = useState<string | null>(null);
   // Handle authorization code from postMessage
@@ -84,7 +84,7 @@ export default function CloudLoginPage() {
     if (isAuthenticated && !isMcpUsageLoading) {
       void navigate('/dashboard', { replace: true });
     }
-  }, [hasCompletedOnboarding, isAuthenticated, isMcpUsageLoading, navigate]);
+  }, [isAuthenticated, isMcpUsageLoading, navigate]);
 
   // Show error state if authentication failed
   if (authError) {

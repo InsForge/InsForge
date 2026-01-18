@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useApiKey } from '@/lib/hooks/useMetadata';
 import { getBackendUrl, isInsForgeCloudProject } from '@/lib/utils/utils';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
-import { useSocket } from '@/lib/contexts/SocketContext';
+import { useSocket, ServerEvents } from '@/lib/contexts/SocketContext';
 import { OnboardingStep } from './OnboardingStep';
 import { InstallStep } from './steps/InstallStep';
 import { VerifyConnectionStep } from './steps/VerifyConnectionStep';
@@ -17,7 +17,7 @@ export function OnboardingOverlay() {
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
   const appUrl = getBackendUrl();
   const { hasCompletedOnboarding, isLoading: isMcpLoading } = useMcpUsage();
-  const { lastMcpConnectionTimestamp } = useSocket();
+  const { socket } = useSocket();
 
   const [isStep1Completed, setIsStep1Completed] = useState(false);
   const [selectedAgentSlug, setSelectedAgentSlug] = useState(MCP_AGENTS[0].slug);
@@ -29,11 +29,19 @@ export function OnboardingOverlay() {
   const shouldShow = isCloudEnvironment && !isLoading && !hasCompletedOnboarding;
   const isOnDashboardPage = location.pathname === '/dashboard';
 
+  // Listen for MCP connection events to auto-advance to step 2
   useEffect(() => {
-    if (lastMcpConnectionTimestamp !== null) {
+    if (!socket) return;
+
+    const handleMcpConnected = () => {
       setIsStep1Completed(true);
-    }
-  }, [lastMcpConnectionTimestamp]);
+    };
+
+    socket.on(ServerEvents.MCP_CONNECTED, handleMcpConnected);
+    return () => {
+      socket.off(ServerEvents.MCP_CONNECTED, handleMcpConnected);
+    };
+  }, [socket]);
 
   if (!shouldShow) {
     return null;

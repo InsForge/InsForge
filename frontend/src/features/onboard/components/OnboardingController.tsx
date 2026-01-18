@@ -3,7 +3,7 @@ import { useModal } from '@/lib/hooks/useModal';
 import { parseCloudEvent } from '@/lib/utils/cloudMessaging';
 import { isIframe } from '@/lib/utils/utils';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
-import { useSocket } from '@/lib/contexts/SocketContext';
+import { useSocket, ServerEvents } from '@/lib/contexts/SocketContext';
 import { getOnboardingSkipped, setOnboardingSkipped } from './OnboardingModal';
 
 /**
@@ -15,7 +15,7 @@ import { getOnboardingSkipped, setOnboardingSkipped } from './OnboardingModal';
 export function OnboardingController() {
   const { setOnboardingModalOpen } = useModal();
   const { hasCompletedOnboarding, isLoading: isMcpLoading } = useMcpUsage();
-  const { lastMcpConnectionTimestamp } = useSocket();
+  const { socket } = useSocket();
   const hasHandledInitialState = useRef(false);
 
   // Handle messages from Cloud parent window (iframe mode only)
@@ -72,11 +72,18 @@ export function OnboardingController() {
   // Auto-close onboarding modal when a new MCP connection is established in real-time
   // This handles the case where user already has MCP records but opens modal again
   useEffect(() => {
-    if (lastMcpConnectionTimestamp !== null) {
+    if (!socket) return;
+
+    const handleMcpConnected = () => {
       setOnboardingModalOpen(false);
       setOnboardingSkipped(false);
-    }
-  }, [lastMcpConnectionTimestamp, setOnboardingModalOpen]);
+    };
+
+    socket.on(ServerEvents.MCP_CONNECTED, handleMcpConnected);
+    return () => {
+      socket.off(ServerEvents.MCP_CONNECTED, handleMcpConnected);
+    };
+  }, [socket, setOnboardingModalOpen]);
 
   return null;
 }
