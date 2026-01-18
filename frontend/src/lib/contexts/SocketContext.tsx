@@ -55,6 +55,7 @@ interface SocketState {
   isConnected: boolean;
   connectionError: string | null;
   socketId: string | null;
+  lastMcpConnectionTimestamp: number | null;
 }
 
 interface SocketActions {
@@ -90,6 +91,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
     isConnected: false,
     connectionError: null,
     socketId: null,
+    lastMcpConnectionTimestamp: null,
   });
 
   // Refs
@@ -300,6 +302,9 @@ export function SocketProvider({ children }: SocketProviderProps) {
     // Handle MCP_CONNECTED events
     const handleMcpConnected = (message: SocketMessage) => {
       void queryClient.invalidateQueries({ queryKey: ['mcp-usage'] });
+
+      // Update timestamp to trigger onboarding modal close
+      updateState({ lastMcpConnectionTimestamp: Date.now() });
 
       // Notify parent window (for cloud onboarding)
       postMessageToParent({

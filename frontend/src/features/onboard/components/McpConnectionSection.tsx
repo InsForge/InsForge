@@ -18,6 +18,7 @@ interface McpConnectionSectionProps {
   appUrl: string;
   isLoading?: boolean;
   className?: string;
+  onAgentChange?: (agent: MCPAgent) => void;
 }
 
 export function McpConnectionSection({
@@ -25,8 +26,14 @@ export function McpConnectionSection({
   appUrl,
   isLoading = false,
   className,
+  onAgentChange,
 }: McpConnectionSectionProps) {
   const [selectedAgent, setSelectedAgent] = useState<MCPAgent>(MCP_AGENTS[0]);
+
+  const handleAgentChange = (agent: MCPAgent) => {
+    setSelectedAgent(agent);
+    onAgentChange?.(agent);
+  };
 
   const installCommand = useMemo(() => {
     return GenerateInstallCommand(selectedAgent, apiKey);
@@ -68,7 +75,7 @@ export function McpConnectionSection({
           {MCP_AGENTS.map((agent) => (
             <DropdownMenuItem
               key={agent.id}
-              onSelect={() => setSelectedAgent(agent)}
+              onSelect={() => handleAgentChange(agent)}
               className="flex items-center gap-2 px-2 py-2 text-gray-900 dark:text-white text-sm hover:bg-gray-100 dark:hover:bg-neutral-700 cursor-pointer"
             >
               {agent.logo && (
