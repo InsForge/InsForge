@@ -48,7 +48,9 @@ export function OnboardingOverlay() {
             Connect Project to get started
           </span>
           <Button
-            onClick={() => { navigate('/dashboard') }}
+            onClick={() => {
+              void navigate('/dashboard');
+            }}
             className="h-8 px-3 rounded-md bg-emerald-300 text-black text-sm font-medium hover:bg-emerald-400"
           >
             Connect Project
