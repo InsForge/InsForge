@@ -18,7 +18,6 @@ import { Alert, AlertDescription } from '@/components/radix/Alert';
 import ScheduleEmptyState from '../components/ScheduleEmptyState';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useConfirm } from '@/lib/hooks/useConfirm';
-import { useToast } from '@/lib/hooks/useToast';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 
 const PAGE_SIZE = 50;
@@ -35,7 +34,6 @@ export default function SchedulesPage() {
   } | null>(null);
   const { confirm, confirmDialogProps } = useConfirm();
 
-  const { showToast } = useToast();
   const {
     schedules,
     isLoading: isLoadingSchedules,
@@ -114,7 +112,6 @@ export default function SchedulesPage() {
         body: values.body ?? undefined,
       });
       if (!ok) {
-        showToast('Failed to create schedule', 'error');
         throw new Error('create failed');
       }
     } catch (err) {
@@ -137,7 +134,6 @@ export default function SchedulesPage() {
         body: values.body ?? undefined,
       });
       if (!ok) {
-        showToast('Failed to update schedule', 'error');
         throw new Error('update failed');
       }
     } catch (err) {
