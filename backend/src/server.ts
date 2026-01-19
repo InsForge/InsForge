@@ -293,10 +293,10 @@ async function initializeServer() {
     const realtimeManager = RealtimeManager.getInstance();
     await realtimeManager.initialize();
 
-    // Sync existing functions to Deno Deploy (non-blocking)
+    // Sync existing functions to Deno Subhosting (non-blocking)
     const functionService = FunctionService.getInstance();
     functionService.syncDeployment().catch((err) => {
-      logger.error('Failed to sync functions to Deno Deploy', {
+      logger.error('Failed to sync functions to Deno Subhosting', {
         error: err instanceof Error ? err.message : String(err),
       });
     });
