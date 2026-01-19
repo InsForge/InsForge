@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Test script for Deno Deploy migration
-# Usage: ./scripts/test-deno-deploy.sh [API_URL]
+# Test script for Deno Subhosting migration
+# Usage: ./scripts/test-deno-subhosting.sh [API_URL]
 
 set -e
 
@@ -40,13 +40,13 @@ log_info "Test 1: Creating test function..."
 CREATE_RESPONSE=$(curl -s -X POST "$API_URL/api/functions" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "deno-deploy-test",
-    "slug": "deno-deploy-test",
-    "code": "export default async function(req: Request) {\n  const url = new URL(req.url);\n  return new Response(JSON.stringify({\n    message: \"Hello from Deno Deploy!\",\n    path: url.pathname,\n    timestamp: new Date().toISOString()\n  }), {\n    headers: { \"Content-Type\": \"application/json\" }\n  });\n}",
+    "name": "subhosting-test",
+    "slug": "subhosting-test",
+    "code": "export default async function(req: Request) {\n  const url = new URL(req.url);\n  return new Response(JSON.stringify({\n    message: \"Hello from Deno Subhosting!\",\n    path: url.pathname,\n    timestamp: new Date().toISOString()\n  }), {\n    headers: { \"Content-Type\": \"application/json\" }\n  });\n}",
     "status": "active"
   }')
 
-if echo "$CREATE_RESPONSE" | grep -q '"slug":"deno-deploy-test"'; then
+if echo "$CREATE_RESPONSE" | grep -q '"slug":"subhosting-test"'; then
   log_pass "Function created successfully"
 else
   log_fail "Failed to create function: $CREATE_RESPONSE"
@@ -87,15 +87,15 @@ if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
 fi
 
 # -----------------------------------------------------------------------------
-# Test 3: Invoke Function on Deno Deploy
+# Test 3: Invoke Function on Deno Subhosting
 # -----------------------------------------------------------------------------
 if [ -n "$DEPLOY_URL" ] && [ "$DEPLOY_STATUS" = "success" ]; then
-  log_info "Test 3: Invoking function on Deno Deploy..."
+  log_info "Test 3: Invoking function on Deno Subhosting..."
 
-  INVOKE_RESPONSE=$(curl -s "$DEPLOY_URL/deno-deploy-test" 2>/dev/null || echo "CURL_FAILED")
+  INVOKE_RESPONSE=$(curl -s "$DEPLOY_URL/subhosting-test" 2>/dev/null || echo "CURL_FAILED")
 
-  if echo "$INVOKE_RESPONSE" | grep -q '"message":"Hello from Deno Deploy!"'; then
-    log_pass "Function invoked successfully on Deno Deploy"
+  if echo "$INVOKE_RESPONSE" | grep -q '"message":"Hello from Deno Subhosting!"'; then
+    log_pass "Function invoked successfully on Deno Subhosting"
     echo "Response: $INVOKE_RESPONSE"
   else
     log_fail "Function invocation failed: $INVOKE_RESPONSE"
@@ -109,13 +109,13 @@ fi
 # -----------------------------------------------------------------------------
 log_info "Test 4: Updating function..."
 
-UPDATE_RESPONSE=$(curl -s -X PATCH "$API_URL/api/functions/deno-deploy-test" \
+UPDATE_RESPONSE=$(curl -s -X PATCH "$API_URL/api/functions/subhosting-test" \
   -H "Content-Type: application/json" \
   -d '{
     "code": "export default async function(req: Request) {\n  return new Response(JSON.stringify({\n    message: \"Updated function!\",\n    version: 2\n  }), {\n    headers: { \"Content-Type\": \"application/json\" }\n  });\n}"
   }')
 
-if echo "$UPDATE_RESPONSE" | grep -q '"slug":"deno-deploy-test"'; then
+if echo "$UPDATE_RESPONSE" | grep -q '"slug":"subhosting-test"'; then
   log_pass "Function updated successfully"
 else
   log_fail "Failed to update function: $UPDATE_RESPONSE"
@@ -127,10 +127,10 @@ sleep 10
 
 # Verify updated function
 if [ -n "$DEPLOY_URL" ]; then
-  UPDATED_RESPONSE=$(curl -s "$DEPLOY_URL/deno-deploy-test" 2>/dev/null || echo "CURL_FAILED")
+  UPDATED_RESPONSE=$(curl -s "$DEPLOY_URL/subhosting-test" 2>/dev/null || echo "CURL_FAILED")
 
   if echo "$UPDATED_RESPONSE" | grep -q '"version":2'; then
-    log_pass "Updated function works on Deno Deploy"
+    log_pass "Updated function works on Deno Subhosting"
   else
     log_fail "Updated function not reflecting changes: $UPDATED_RESPONSE"
   fi
@@ -183,7 +183,7 @@ fi
 # -----------------------------------------------------------------------------
 log_info "Test 7: Deleting test functions..."
 
-DELETE1=$(curl -s -X DELETE "$API_URL/api/functions/deno-deploy-test")
+DELETE1=$(curl -s -X DELETE "$API_URL/api/functions/subhosting-test")
 DELETE2=$(curl -s -X DELETE "$API_URL/api/functions/secret-test")
 
 log_pass "Functions deleted (cleanup)"
@@ -191,12 +191,12 @@ log_pass "Functions deleted (cleanup)"
 # Wait for redeployment without deleted functions
 sleep 5
 
-# Verify functions are gone from Deno Deploy
+# Verify functions are gone from Deno Subhosting
 if [ -n "$DEPLOY_URL" ]; then
-  GONE_RESPONSE=$(curl -s "$DEPLOY_URL/deno-deploy-test" 2>/dev/null || echo "CURL_FAILED")
+  GONE_RESPONSE=$(curl -s "$DEPLOY_URL/subhosting-test" 2>/dev/null || echo "CURL_FAILED")
 
   if echo "$GONE_RESPONSE" | grep -q '"error":"Function not found"'; then
-    log_pass "Deleted function no longer accessible on Deno Deploy"
+    log_pass "Deleted function no longer accessible on Deno Subhosting"
   else
     log_info "Function may still be cached: $GONE_RESPONSE"
   fi

@@ -2,13 +2,13 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
 
-const DENO_DEPLOY_API_BASE = 'https://api.deno.com/v1';
+const DENO_SUBHOSTING_API_BASE = 'https://api.deno.com/v1';
 
 // ============================================
 // Types (internal to this provider)
 // ============================================
 
-interface DenoDeployCredentials {
+interface DenoSubhostingCredentials {
   token: string;
   organizationId: string;
 }
@@ -30,13 +30,13 @@ export interface FunctionDeploymentResult {
   };
 }
 
-interface DenoDeployAsset {
+interface DenoSubhostingAsset {
   kind: 'file';
   content: string;
   encoding: 'utf-8';
 }
 
-interface DenoDeployApiResponse {
+interface DenoSubhostingApiResponse {
   id: string;
   projectId: string;
   status: 'pending' | 'success' | 'failed';
@@ -44,45 +44,44 @@ interface DenoDeployApiResponse {
   createdAt: string;
 }
 
-export class DenoDeployProvider {
-  private static instance: DenoDeployProvider;
+export class DenoSubhostingProvider {
+  private static instance: DenoSubhostingProvider;
 
   private constructor() {}
 
-  static getInstance(): DenoDeployProvider {
-    if (!DenoDeployProvider.instance) {
-      DenoDeployProvider.instance = new DenoDeployProvider();
+  static getInstance(): DenoSubhostingProvider {
+    if (!DenoSubhostingProvider.instance) {
+      DenoSubhostingProvider.instance = new DenoSubhostingProvider();
     }
-    return DenoDeployProvider.instance;
+    return DenoSubhostingProvider.instance;
   }
 
   /**
-   * Check if Deno Deploy is properly configured
+   * Check if Deno Subhosting is properly configured
    */
   isConfigured(): boolean {
-    if (process.env.DENO_DEPLOY_ENABLED === 'false') {
-      return false;
-    }
-    return !!(process.env.DENO_DEPLOY_TOKEN && process.env.DENO_DEPLOY_ORG_ID);
+    const token = process.env.DENO_SUBHOSTING_TOKEN;
+    const orgId = process.env.DENO_SUBHOSTING_ORG_ID;
+    return !!(token && orgId);
   }
 
   /**
-   * Get Deno Deploy credentials from environment variables
+   * Get Deno Subhosting credentials from environment variables
    */
-  getCredentials(): DenoDeployCredentials {
-    const token = process.env.DENO_DEPLOY_TOKEN;
-    const organizationId = process.env.DENO_DEPLOY_ORG_ID;
+  getCredentials(): DenoSubhostingCredentials {
+    const token = process.env.DENO_SUBHOSTING_TOKEN;
+    const organizationId = process.env.DENO_SUBHOSTING_ORG_ID;
 
     if (!token) {
       throw new AppError(
-        'DENO_DEPLOY_TOKEN not found in environment variables',
+        'DENO_SUBHOSTING_TOKEN not found in environment variables',
         500,
         ERROR_CODES.INTERNAL_ERROR
       );
     }
     if (!organizationId) {
       throw new AppError(
-        'DENO_DEPLOY_ORG_ID not found in environment variables',
+        'DENO_SUBHOSTING_ORG_ID not found in environment variables',
         500,
         ERROR_CODES.INTERNAL_ERROR
       );
@@ -98,7 +97,7 @@ export class DenoDeployProvider {
     const credentials = this.getCredentials();
 
     // Check if project exists
-    const checkResponse = await fetch(`${DENO_DEPLOY_API_BASE}/projects/${projectId}`, {
+    const checkResponse = await fetch(`${DENO_SUBHOSTING_API_BASE}/projects/${projectId}`, {
       headers: { Authorization: `Bearer ${credentials.token}` },
     });
 
@@ -115,10 +114,10 @@ export class DenoDeployProvider {
     }
 
     // Create project
-    logger.info('Creating Deno Deploy project', { projectId });
+    logger.info('Creating Deno Subhosting project', { projectId });
 
     const createResponse = await fetch(
-      `${DENO_DEPLOY_API_BASE}/organizations/${credentials.organizationId}/projects`,
+      `${DENO_SUBHOSTING_API_BASE}/organizations/${credentials.organizationId}/projects`,
       {
         method: 'POST',
         headers: {
@@ -134,11 +133,11 @@ export class DenoDeployProvider {
       throw new AppError(`Failed to create project: ${errorText}`, 500, ERROR_CODES.INTERNAL_ERROR);
     }
 
-    logger.info('Deno Deploy project created', { projectId });
+    logger.info('Deno Subhosting project created', { projectId });
   }
 
   /**
-   * Deploy functions to Deno Deploy
+   * Deploy functions to Deno Subhosting
    *
    * Creates a multi-file deployment with:
    * - main.ts: Router that handles path-based routing
@@ -156,7 +155,7 @@ export class DenoDeployProvider {
       await this.ensureProject(projectId);
 
       // Build assets map
-      const assets: Record<string, DenoDeployAsset> = {
+      const assets: Record<string, DenoSubhostingAsset> = {
         'main.ts': {
           kind: 'file',
           content: this.generateRouter(functions),
@@ -181,7 +180,7 @@ export class DenoDeployProvider {
         };
       }
 
-      logger.info('Deploying to Deno Deploy', {
+      logger.info('Deploying to Deno Subhosting', {
         projectId,
         functionCount: functions.length,
         functions: functions.map((f) => f.slug),
@@ -193,11 +192,11 @@ export class DenoDeployProvider {
         assets,
         // Pass secrets directly as env vars - accessible via Deno.env.get('KEY')
         envVars: secrets,
-        // Setting domains makes this a production deployment
-        domains: [`${projectId}.deno.dev`],
+        // Use template variable for stable subdomain (Subhosting resolves this)
+        domains: ['{project.name}.deno.dev'],
       };
 
-      const response = await fetch(`${DENO_DEPLOY_API_BASE}/projects/${projectId}/deployments`, {
+      const response = await fetch(`${DENO_SUBHOSTING_API_BASE}/projects/${projectId}/deployments`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${credentials.token}`,
@@ -208,21 +207,21 @@ export class DenoDeployProvider {
 
       if (!response.ok) {
         const errorText = await response.text();
-        logger.error('Deno Deploy API error', {
+        logger.error('Deno Subhosting API error', {
           status: response.status,
           error: errorText,
           projectId,
         });
         throw new AppError(
-          `Deno Deploy failed: ${response.status} - ${errorText}`,
+          `Deno Subhosting failed: ${response.status} - ${errorText}`,
           500,
           ERROR_CODES.INTERNAL_ERROR
         );
       }
 
-      const data = (await response.json()) as DenoDeployApiResponse;
+      const data = (await response.json()) as DenoSubhostingApiResponse;
 
-      logger.info('Deno Deploy deployment created', {
+      logger.info('Deno Subhosting deployment created', {
         deploymentId: data.id,
         projectId: data.projectId,
         status: data.status,
@@ -243,11 +242,11 @@ export class DenoDeployProvider {
         throw error;
       }
 
-      logger.error('Failed to deploy to Deno Deploy', {
+      logger.error('Failed to deploy to Deno Subhosting', {
         error: error instanceof Error ? error.message : String(error),
         projectId,
       });
-      throw new AppError('Failed to deploy to Deno Deploy', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('Failed to deploy to Deno Subhosting', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
@@ -258,7 +257,7 @@ export class DenoDeployProvider {
     const credentials = this.getCredentials();
 
     try {
-      const response = await fetch(`${DENO_DEPLOY_API_BASE}/deployments/${deploymentId}`, {
+      const response = await fetch(`${DENO_SUBHOSTING_API_BASE}/deployments/${deploymentId}`, {
         headers: {
           Authorization: `Bearer ${credentials.token}`,
         },
@@ -275,7 +274,7 @@ export class DenoDeployProvider {
         );
       }
 
-      const data = (await response.json()) as DenoDeployApiResponse;
+      const data = (await response.json()) as DenoSubhostingApiResponse;
       const domains = data.domains || [];
 
       return {
@@ -291,11 +290,11 @@ export class DenoDeployProvider {
         throw error;
       }
 
-      logger.error('Failed to get Deno Deploy deployment', {
+      logger.error('Failed to get Deno Subhosting deployment', {
         error: error instanceof Error ? error.message : String(error),
         deploymentId,
       });
-      throw new AppError('Failed to get Deno Deploy deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError('Failed to get Deno Subhosting deployment', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
@@ -307,7 +306,7 @@ export class DenoDeployProvider {
 
     try {
       const response = await fetch(
-        `${DENO_DEPLOY_API_BASE}/deployments/${deploymentId}/build_logs`,
+        `${DENO_SUBHOSTING_API_BASE}/deployments/${deploymentId}/build_logs`,
         {
           headers: {
             Authorization: `Bearer ${credentials.token}`,
