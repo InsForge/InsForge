@@ -190,21 +190,46 @@ export async function createApp() {
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);
 
-  // Proxy function execution to Deno runtime
+  // Proxy function execution to Deno Subhosting or local runtime
   app.all('/functions/:slug', async (req: Request, res: Response) => {
     try {
       const { slug } = req.params;
-      const denoUrl = process.env.DENO_RUNTIME_URL || 'http://localhost:7133';
+      const functionService = FunctionService.getInstance();
+
+      // Determine target URL: Deno Subhosting if configured, otherwise local runtime
+      let targetUrl: string;
+      if (functionService.isSubhostingConfigured()) {
+        const deploymentUrl = await functionService.getDeploymentUrl();
+        if (deploymentUrl) {
+          targetUrl = `${deploymentUrl}/${slug}`;
+        } else {
+          // Fallback to local runtime if no deployment yet
+          const denoUrl = process.env.DENO_RUNTIME_URL || 'http://localhost:7133';
+          targetUrl = `${denoUrl}/${slug}`;
+        }
+      } else {
+        const denoUrl = process.env.DENO_RUNTIME_URL || 'http://localhost:7133';
+        targetUrl = `${denoUrl}/${slug}`;
+      }
+
+      // Append query string if present
+      const queryString = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
+
+      // Build headers - exclude hop-by-hop headers and set correct Host
+      const headers: Record<string, string> = {};
+      const skipHeaders = ['host', 'connection', 'keep-alive', 'transfer-encoding'];
+      for (const [key, value] of Object.entries(req.headers)) {
+        if (!skipHeaders.includes(key.toLowerCase()) && typeof value === 'string') {
+          headers[key] = value;
+        }
+      }
 
       // Simple direct proxy - just pass everything through
-      const response = await fetch(
-        `${denoUrl}/${slug}${req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : ''}`,
-        {
-          method: req.method,
-          headers: req.headers as HeadersInit,
-          body: ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body),
-        }
-      );
+      const response = await fetch(`${targetUrl}${queryString}`, {
+        method: req.method,
+        headers,
+        body: ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body),
+      });
 
       // Get response text
       const responseText = await response.text();

@@ -3,6 +3,39 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
 
 const DENO_SUBHOSTING_API_BASE = 'https://api.deno.com/v1';
+const DEFAULT_TIMEOUT_MS = 10000;
+
+// ============================================
+// Helper functions
+// ============================================
+
+/**
+ * Fetch with timeout using AbortController
+ * Throws a clear error on timeout, surfaces underlying fetch errors
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs: number = DEFAULT_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`Request to ${url} timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 // ============================================
 // Types (internal to this provider)
@@ -97,9 +130,12 @@ export class DenoSubhostingProvider {
     const credentials = this.getCredentials();
 
     // Check if project exists
-    const checkResponse = await fetch(`${DENO_SUBHOSTING_API_BASE}/projects/${projectId}`, {
-      headers: { Authorization: `Bearer ${credentials.token}` },
-    });
+    const checkResponse = await fetchWithTimeout(
+      `${DENO_SUBHOSTING_API_BASE}/projects/${projectId}`,
+      {
+        headers: { Authorization: `Bearer ${credentials.token}` },
+      }
+    );
 
     if (checkResponse.ok) {
       return; // Project exists
@@ -116,7 +152,7 @@ export class DenoSubhostingProvider {
     // Create project
     logger.info('Creating Deno Subhosting project', { projectId });
 
-    const createResponse = await fetch(
+    const createResponse = await fetchWithTimeout(
       `${DENO_SUBHOSTING_API_BASE}/organizations/${credentials.organizationId}/projects`,
       {
         method: 'POST',
@@ -196,14 +232,18 @@ export class DenoSubhostingProvider {
         domains: ['{project.name}.deno.dev'],
       };
 
-      const response = await fetch(`${DENO_SUBHOSTING_API_BASE}/projects/${projectId}/deployments`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${credentials.token}`,
-          'Content-Type': 'application/json',
+      const response = await fetchWithTimeout(
+        `${DENO_SUBHOSTING_API_BASE}/projects/${projectId}/deployments`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${credentials.token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
         },
-        body: JSON.stringify(payload),
-      });
+        30000 // 30s timeout for deployments (larger payload)
+      );
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -257,11 +297,14 @@ export class DenoSubhostingProvider {
     const credentials = this.getCredentials();
 
     try {
-      const response = await fetch(`${DENO_SUBHOSTING_API_BASE}/deployments/${deploymentId}`, {
-        headers: {
-          Authorization: `Bearer ${credentials.token}`,
-        },
-      });
+      const response = await fetchWithTimeout(
+        `${DENO_SUBHOSTING_API_BASE}/deployments/${deploymentId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${credentials.token}`,
+          },
+        }
+      );
 
       if (!response.ok) {
         if (response.status === 404) {
@@ -294,7 +337,11 @@ export class DenoSubhostingProvider {
         error: error instanceof Error ? error.message : String(error),
         deploymentId,
       });
-      throw new AppError('Failed to get Deno Subhosting deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'Failed to get Deno Subhosting deployment',
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
     }
   }
 
@@ -305,7 +352,7 @@ export class DenoSubhostingProvider {
     const credentials = this.getCredentials();
 
     try {
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         `${DENO_SUBHOSTING_API_BASE}/deployments/${deploymentId}/build_logs`,
         {
           headers: {
@@ -593,9 +640,9 @@ Deno.serve(async (req: Request) => {
 
   /**
    * Sanitize slug to valid JavaScript identifier
-   * Converts hyphens to underscores
+   * Prefixes with underscore and replaces hyphens with underscores
    */
   private sanitizeSlug(slug: string): string {
-    return slug.replace(/-/g, '_');
+    return `_${slug.replace(/-/g, '_')}`;
   }
 }
