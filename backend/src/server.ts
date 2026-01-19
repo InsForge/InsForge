@@ -192,65 +192,38 @@ export async function createApp() {
 
   // Proxy function execution to Deno Subhosting or local runtime
   app.all('/functions/:slug', async (req: Request, res: Response) => {
+    const { slug } = req.params;
+
     try {
-      const { slug } = req.params;
       const functionService = FunctionService.getInstance();
+      const localRuntime = process.env.DENO_RUNTIME_URL || 'http://localhost:7133';
 
-      // Determine target URL: Deno Subhosting if configured, otherwise local runtime
-      let targetUrl: string;
-      if (functionService.isSubhostingConfigured()) {
-        const deploymentUrl = await functionService.getDeploymentUrl();
-        if (deploymentUrl) {
-          targetUrl = `${deploymentUrl}/${slug}`;
-        } else {
-          // Fallback to local runtime if no deployment yet
-          const denoUrl = process.env.DENO_RUNTIME_URL || 'http://localhost:7133';
-          targetUrl = `${denoUrl}/${slug}`;
-        }
-      } else {
-        const denoUrl = process.env.DENO_RUNTIME_URL || 'http://localhost:7133';
-        targetUrl = `${denoUrl}/${slug}`;
-      }
+      // Get target base URL: prefer Subhosting deployment, fallback to local runtime
+      const baseUrl =
+        (functionService.isSubhostingConfigured() && (await functionService.getDeploymentUrl())) ||
+        localRuntime;
 
-      // Append query string if present
-      const queryString = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
+      // Build target URL with query string
+      const targetUrl = new URL(`/${slug}`, baseUrl);
+      targetUrl.search = new URL(req.url, `http://${req.headers.host}`).search;
 
-      // Build headers - exclude hop-by-hop headers and set correct Host
-      const headers: Record<string, string> = {};
-      const skipHeaders = ['host', 'connection', 'keep-alive', 'transfer-encoding'];
-      for (const [key, value] of Object.entries(req.headers)) {
-        if (!skipHeaders.includes(key.toLowerCase()) && typeof value === 'string') {
-          headers[key] = value;
-        }
-      }
-
-      // Simple direct proxy - just pass everything through
-      const response = await fetch(`${targetUrl}${queryString}`, {
+      const response = await fetch(targetUrl, {
         method: req.method,
-        headers,
+        headers: {
+          'content-type': req.headers['content-type'] || 'application/json',
+          accept: req.headers.accept || '*/*',
+        },
         body: ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body),
       });
-
-      // Get response text
-      const responseText = await response.text();
 
       res
         .status(response.status)
         .set('Content-Type', response.headers.get('content-type') || 'application/json')
         .set('Access-Control-Allow-Origin', '*')
-        .send(responseText);
+        .send(await response.text());
     } catch (error) {
-      logger.error('Failed to proxy to Deno runtime', {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        slug: req.params.slug,
-      });
-
-      // Return the actual error from Deno or connection error
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      res.status(502).json({
-        error: errorMessage,
-      });
+      logger.error('Failed to proxy function', { slug, error: String(error) });
+      res.status(502).json({ error: error instanceof Error ? error.message : String(error) });
     }
   });
 
