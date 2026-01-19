@@ -20,6 +20,8 @@ export class FunctionService {
   private denoSubhostingProvider: DenoSubhostingProvider;
   private secretService: SecretService;
   private cachedDeploymentUrl: string | null = null;
+  private deploymentTimer: ReturnType<typeof setTimeout> | null = null;
+  private static readonly DEPLOYMENT_DEBOUNCE_MS = 2000;
 
   private constructor() {
     this.denoSubhostingProvider = DenoSubhostingProvider.getInstance();
@@ -163,11 +165,7 @@ export class FunctionService {
 
       // Trigger deployment to Deno Subhosting (async, non-blocking)
       if (status === 'active') {
-        this.triggerDeployment().catch((err) => {
-          logger.error('Background deployment failed', {
-            error: err instanceof Error ? err.message : String(err),
-          });
-        });
+        this.scheduleDeployment();
       }
 
       return result.rows[0];
@@ -273,11 +271,7 @@ export class FunctionService {
       // Trigger deployment if code or status changed
       const shouldDeploy = updates.code !== undefined || updates.status !== undefined;
       if (shouldDeploy) {
-        this.triggerDeployment().catch((err) => {
-          logger.error('Background deployment failed', {
-            error: err instanceof Error ? err.message : String(err),
-          });
-        });
+        this.scheduleDeployment();
       }
 
       return result.rows[0];
@@ -308,12 +302,7 @@ export class FunctionService {
       }
 
       // Trigger redeployment without the deleted function
-      this.triggerDeployment().catch((err) => {
-        logger.error('Background deployment failed after function deletion', {
-          error: err instanceof Error ? err.message : String(err),
-          deletedSlug: slug,
-        });
-      });
+      this.scheduleDeployment();
 
       return true;
     } catch (error) {
@@ -384,6 +373,19 @@ export class FunctionService {
   }
 
   /**
+   * Schedule a deployment with debouncing to coalesce rapid changes
+   */
+  private scheduleDeployment(): void {
+    if (this.deploymentTimer) {
+      clearTimeout(this.deploymentTimer);
+    }
+    this.deploymentTimer = setTimeout(() => {
+      this.deploymentTimer = null;
+      void this.triggerDeployment();
+    }, FunctionService.DEPLOYMENT_DEBOUNCE_MS);
+  }
+
+  /**
    * Trigger deployment of all active functions to Deno Subhosting
    * This is called asynchronously after function CRUD operations
    */
@@ -429,12 +431,7 @@ export class FunctionService {
       });
 
       // Poll for final status in background
-      this.pollDeploymentStatus(result.id, functionSlugs).catch((err) => {
-        logger.error('Failed to poll deployment status', {
-          error: err instanceof Error ? err.message : String(err),
-          deploymentId: result.id,
-        });
-      });
+      void this.pollDeploymentStatus(result.id, functionSlugs);
     } catch (error) {
       logger.error('Deno Subhosting deployment failed', {
         error: error instanceof Error ? error.message : String(error),
@@ -550,6 +547,14 @@ export class FunctionService {
   }
 
   /**
+   * Trigger redeployment of functions (public wrapper)
+   * Used when secrets are updated to redeploy with new values
+   */
+  redeploy(): void {
+    this.scheduleDeployment();
+  }
+
+  /**
    * Get the latest successful deployment URL (cached)
    */
   async getDeploymentUrl(): Promise<string | null> {
@@ -637,7 +642,7 @@ export class FunctionService {
       const secretMap: Record<string, string> = {};
 
       for (const secret of secrets) {
-        if (!secret.isReserved) {
+        if (secret.isActive) {
           const value = await this.secretService.getSecretByKey(secret.key);
           if (value) {
             secretMap[secret.key] = value;
