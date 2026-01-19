@@ -375,11 +375,11 @@ export class FunctionService {
 
   /**
    * Get the Deno Deploy project ID for this InsForge instance
-   * Format: insforge-{app_key}-functions
+   * Format: {app_key}-functions (max 26 chars for Deno Deploy)
    */
   private getDenoProjectId(): string {
     const appKey = process.env.APP_KEY || process.env.PROJECT_ID || 'local';
-    return `insforge-${appKey}-functions`;
+    return `${appKey}-functions`;
   }
 
   /**
