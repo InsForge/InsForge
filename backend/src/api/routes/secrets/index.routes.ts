@@ -6,7 +6,6 @@ import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
-import logger from '@/utils/logger.js';
 
 const router = Router();
 const secretService = SecretService.getInstance();
@@ -159,8 +158,8 @@ router.put('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: N
       ip_address: req.ip,
     });
 
-    // Trigger redeployment if value changed
-    if (value) {
+    // Trigger redeployment if value changed (check undefined, not truthy, to allow empty strings)
+    if (value !== undefined) {
       triggerSecretsRedeployment();
     }
 
