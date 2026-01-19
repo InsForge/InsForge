@@ -165,7 +165,15 @@ export class DenoDeployProvider {
       };
 
       // Add each function file
+      const VALID_SLUG_PATTERN = /^[a-zA-Z0-9_-]+$/;
       for (const func of functions) {
+        if (!VALID_SLUG_PATTERN.test(func.slug)) {
+          throw new AppError(
+            `Invalid function slug: "${func.slug}" - must be alphanumeric with hyphens or underscores only`,
+            400,
+            ERROR_CODES.INVALID_INPUT
+          );
+        }
         assets[`functions/${func.slug}.ts`] = {
           kind: 'file',
           content: this.transformUserCode(func.code, func.slug),
