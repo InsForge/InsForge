@@ -19,6 +19,31 @@ log_info() { echo -e "${YELLOW}[INFO]${NC} $1"; }
 log_pass() { echo -e "${GREEN}[PASS]${NC} $1"; PASS=$((PASS+1)); }
 log_fail() { echo -e "${RED}[FAIL]${NC} $1"; FAIL=$((FAIL+1)); }
 
+# Poll for deployment completion, sets DEPLOY_URL and DEPLOY_STATUS
+wait_for_deployment() {
+  local max_attempts=${1:-30}
+  local attempt=0
+  DEPLOY_URL=""
+  DEPLOY_STATUS=""
+
+  while [ $attempt -lt $max_attempts ]; do
+    LIST_RESPONSE=$(curl -s "$API_URL/api/functions")
+    DEPLOY_STATUS=$(echo "$LIST_RESPONSE" | grep -o '"deployment":{[^}]*}' | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+    DEPLOY_URL=$(echo "$LIST_RESPONSE" | grep -o '"deployment":{[^}]*}' | grep -o '"url":"[^"]*"' | cut -d'"' -f4)
+
+    if [ "$DEPLOY_STATUS" = "success" ]; then
+      return 0
+    elif [ "$DEPLOY_STATUS" = "failed" ]; then
+      return 1
+    fi
+
+    echo -n "."
+    sleep 2
+    attempt=$((attempt+1))
+  done
+  return 1
+}
+
 # -----------------------------------------------------------------------------
 # Prerequisites Check
 # -----------------------------------------------------------------------------
@@ -57,33 +82,14 @@ fi
 # -----------------------------------------------------------------------------
 log_info "Test 2: Waiting for deployment to complete..."
 
-DEPLOY_URL=""
-DEPLOY_STATUS=""
-MAX_ATTEMPTS=30
-ATTEMPT=0
-
-while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-  LIST_RESPONSE=$(curl -s "$API_URL/api/functions")
-
-  DEPLOY_STATUS=$(echo "$LIST_RESPONSE" | grep -o '"deployment":{[^}]*}' | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
-  DEPLOY_URL=$(echo "$LIST_RESPONSE" | grep -o '"deployment":{[^}]*}' | grep -o '"url":"[^"]*"' | cut -d'"' -f4)
-
-  if [ "$DEPLOY_STATUS" = "success" ]; then
-    log_pass "Deployment succeeded: $DEPLOY_URL"
-    break
-  elif [ "$DEPLOY_STATUS" = "failed" ]; then
+if wait_for_deployment 30; then
+  log_pass "Deployment succeeded: $DEPLOY_URL"
+else
+  if [ "$DEPLOY_STATUS" = "failed" ]; then
     log_fail "Deployment failed"
-    echo "$LIST_RESPONSE" | jq '.deployment' 2>/dev/null || echo "$LIST_RESPONSE"
-    break
+  else
+    log_fail "Deployment timed out"
   fi
-
-  echo -n "."
-  sleep 2
-  ((ATTEMPT++))
-done
-
-if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
-  log_fail "Deployment timed out after ${MAX_ATTEMPTS} attempts"
 fi
 
 # -----------------------------------------------------------------------------
@@ -121,12 +127,9 @@ else
   log_fail "Failed to update function: $UPDATE_RESPONSE"
 fi
 
-# Wait for redeployment
+# Wait for redeployment and get new deployment URL
 log_info "Waiting for redeployment..."
-sleep 10
-
-# Verify updated function
-if [ -n "$DEPLOY_URL" ]; then
+if wait_for_deployment 30; then
   UPDATED_RESPONSE=$(curl -s "$DEPLOY_URL/subhosting-test" 2>/dev/null || echo "CURL_FAILED")
 
   if echo "$UPDATED_RESPONSE" | grep -q '"version":2'; then
@@ -134,6 +137,8 @@ if [ -n "$DEPLOY_URL" ]; then
   else
     log_fail "Updated function not reflecting changes: $UPDATED_RESPONSE"
   fi
+else
+  log_fail "Redeployment failed or timed out"
 fi
 
 # -----------------------------------------------------------------------------
