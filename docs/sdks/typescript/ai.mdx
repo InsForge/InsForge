@@ -309,23 +309,22 @@ Generate images using AI models.
 - `height` (number, optional) - Image height in pixels
 - `size` (string, optional) - Predefined size ('1024x1024', '512x512')
 - `numImages` (number, optional) - Number of images to generate
-- `quality` ('standard' | 'hd', optional) - Image quality
-- `style` ('vivid' | 'natural', optional) - Image style
+- `quality` (string, optional) - Image quality: "standard" or "hd"
+- `style` (string, optional) - Image style: "vivid" or "natural"
 
 ### Returns
 
 ```typescript
 {
   created: number,
-  data: Array<{
-    b64_json?: string,  // Base64 encoded image
-    content?: string    // Text response from model
-  }>,
-  usage?: {
-    total_tokens: number,
-    input_tokens: number,
-    output_tokens: number
-  }
+  data: ImageData[],
+  usage?: TokenUsage
+}
+
+// ImageData type
+interface ImageData {
+  b64_json?: string,  // Base64 encoded image
+  content?: string    // Text response from model
 }
 ```
 
@@ -427,7 +426,8 @@ interface FileContent {
 }
 
 // Message content can be string or array of content parts
-type MessageContent = string | (TextContent | ImageUrlContent | FileContent)[];
+type MessageContent = string | ContentPart[];
+type ContentPart = TextContent | ImageUrlContent | FileContent;
 
 // Chat message
 interface ChatMessage {
@@ -463,20 +463,24 @@ interface ChatCompletionResponse {
   object: 'chat.completion';
   created: number;
   model: string;
-  choices: Array<{
-    index: number;
-    message: {
-      role: 'assistant';
-      content: string;
-      annotations?: UrlCitationAnnotation[];
-    };
-    finish_reason: string;
-  }>;
-  usage: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
+  choices: ChatChoice[];
+  usage: TokenUsage;
+}
+
+interface ChatChoice {
+  index: number;
+  message: {
+    role: 'assistant';
+    content: string;
+    annotations?: UrlCitationAnnotation[];
   };
+  finish_reason: string;
+}
+
+interface TokenUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
 }
 ```
 
@@ -485,14 +489,18 @@ interface ChatCompletionResponse {
 ```typescript
 interface ImageGenerationResponse {
   created: number;
-  data: Array<{
-    b64_json?: string;
-    content?: string;
-  }>;
-  usage?: {
-    total_tokens: number;
-    input_tokens: number;
-    output_tokens: number;
-  };
+  data: ImageData[];
+  usage?: ImageTokenUsage;
+}
+
+interface ImageData {
+  b64_json?: string;
+  content?: string;
+}
+
+interface ImageTokenUsage {
+  total_tokens: number;
+  input_tokens: number;
+  output_tokens: number;
 }
 ```
