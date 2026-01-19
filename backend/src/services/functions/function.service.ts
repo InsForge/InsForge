@@ -19,6 +19,7 @@ export class FunctionService {
   private pool: Pool | null = null;
   private denoSubhostingProvider: DenoSubhostingProvider;
   private secretService: SecretService;
+  private cachedDeploymentUrl: string | null = null;
 
   private constructor() {
     this.denoSubhostingProvider = DenoSubhostingProvider.getInstance();
@@ -461,6 +462,10 @@ export class FunctionService {
       });
 
       if (result.status === 'success') {
+        // Update cached deployment URL
+        if (result.url) {
+          this.cachedDeploymentUrl = result.url;
+        }
         logger.info('Deno Subhosting deployment succeeded', {
           deploymentId,
           url: result.url,
@@ -538,8 +543,43 @@ export class FunctionService {
   }
 
   /**
+   * Check if Deno Subhosting is configured
+   */
+  isSubhostingConfigured(): boolean {
+    return this.denoSubhostingProvider.isConfigured();
+  }
+
+  /**
+   * Get the latest successful deployment URL (cached)
+   */
+  async getDeploymentUrl(): Promise<string | null> {
+    // Return cached URL if available
+    if (this.cachedDeploymentUrl) {
+      return this.cachedDeploymentUrl;
+    }
+
+    try {
+      const result = await this.getPool().query(
+        `SELECT url FROM functions.deployments
+         WHERE status = 'success' AND url IS NOT NULL
+         ORDER BY created_at DESC LIMIT 1`
+      );
+      const url = result.rows[0]?.url || null;
+      if (url) {
+        this.cachedDeploymentUrl = url;
+      }
+      return url;
+    } catch (error) {
+      logger.error('Failed to get deployment URL', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  /**
    * Sync existing functions to Deno Subhosting on server startup
-   * Called once when the server boots to ensure existing functions are deployed
+   * Only deploys if there's no existing successful deployment
    */
   async syncDeployment(): Promise<void> {
     if (!this.denoSubhostingProvider.isConfigured()) {
@@ -548,6 +588,15 @@ export class FunctionService {
     }
 
     try {
+      // Check if there's already a successful deployment
+      const existingUrl = await this.getDeploymentUrl();
+      if (existingUrl) {
+        logger.info('Existing Deno Subhosting deployment found, skipping sync', {
+          url: existingUrl,
+        });
+        return;
+      }
+
       const activeFunctions = await this.getActiveFunctionsWithCode();
 
       if (activeFunctions.length === 0) {
@@ -555,7 +604,7 @@ export class FunctionService {
         return;
       }
 
-      logger.info('Syncing existing functions to Deno Subhosting on startup', {
+      logger.info('No existing deployment found, syncing functions to Deno Subhosting', {
         functionCount: activeFunctions.length,
         functions: activeFunctions.map((f) => f.slug),
       });
