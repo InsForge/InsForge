@@ -16,8 +16,8 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 log_info() { echo -e "${YELLOW}[INFO]${NC} $1"; }
-log_pass() { echo -e "${GREEN}[PASS]${NC} $1"; ((PASS++)); }
-log_fail() { echo -e "${RED}[FAIL]${NC} $1"; ((FAIL++)); }
+log_pass() { echo -e "${GREEN}[PASS]${NC} $1"; PASS=$((PASS+1)); }
+log_fail() { echo -e "${RED}[FAIL]${NC} $1"; FAIL=$((FAIL+1)); }
 
 # -----------------------------------------------------------------------------
 # Prerequisites Check
@@ -183,8 +183,8 @@ fi
 # -----------------------------------------------------------------------------
 log_info "Test 7: Deleting test functions..."
 
-DELETE1=$(curl -s -X DELETE "$API_URL/api/functions/subhosting-test")
-DELETE2=$(curl -s -X DELETE "$API_URL/api/functions/secret-test")
+curl -s -X DELETE "$API_URL/api/functions/subhosting-test" > /dev/null
+curl -s -X DELETE "$API_URL/api/functions/secret-test" > /dev/null
 
 log_pass "Functions deleted (cleanup)"
 
