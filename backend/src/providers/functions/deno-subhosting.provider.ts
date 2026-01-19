@@ -1,5 +1,6 @@
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
+import { config } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
 
 const DENO_SUBHOSTING_API_BASE = 'https://api.deno.com/v1';
@@ -93,28 +94,26 @@ export class DenoSubhostingProvider {
    * Check if Deno Subhosting is properly configured
    */
   isConfigured(): boolean {
-    const token = process.env.DENO_SUBHOSTING_TOKEN;
-    const orgId = process.env.DENO_SUBHOSTING_ORG_ID;
-    return !!(token && orgId);
+    const { token, organizationId } = config.denoSubhosting;
+    return !!(token && organizationId);
   }
 
   /**
-   * Get Deno Subhosting credentials from environment variables
+   * Get Deno Subhosting credentials from config
    */
   getCredentials(): DenoSubhostingCredentials {
-    const token = process.env.DENO_SUBHOSTING_TOKEN;
-    const organizationId = process.env.DENO_SUBHOSTING_ORG_ID;
+    const { token, organizationId } = config.denoSubhosting;
 
     if (!token) {
       throw new AppError(
-        'DENO_SUBHOSTING_TOKEN not found in environment variables',
+        'DENO_SUBHOSTING_TOKEN not configured',
         500,
         ERROR_CODES.INTERNAL_ERROR
       );
     }
     if (!organizationId) {
       throw new AppError(
-        'DENO_SUBHOSTING_ORG_ID not found in environment variables',
+        'DENO_SUBHOSTING_ORG_ID not configured',
         500,
         ERROR_CODES.INTERNAL_ERROR
       );
