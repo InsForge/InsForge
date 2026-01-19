@@ -44,19 +44,6 @@ interface DenoDeployApiResponse {
   createdAt: string;
 }
 
-/**
- * Runtime code - shared utilities for all functions
- * Provides InsForge SDK client
- *
- * Users can import in their functions:
- *   import { createClient } from "../runtime.ts";
- */
-const RUNTIME_CODE = `
-import { createClient as _createClient } from 'npm:@insforge/sdk';
-
-export const createClient = _createClient;
-`;
-
 export class DenoDeployProvider {
   private static instance: DenoDeployProvider;
 
@@ -155,7 +142,6 @@ export class DenoDeployProvider {
    *
    * Creates a multi-file deployment with:
    * - main.ts: Router that handles path-based routing
-   * - runtime.ts: Shared utilities (SDK, base64, secrets)
    * - functions/{slug}.ts: Individual function files
    */
   async deployFunctions(
@@ -176,11 +162,6 @@ export class DenoDeployProvider {
           content: this.generateRouter(functions),
           encoding: 'utf-8',
         },
-        'runtime.ts': {
-          kind: 'file',
-          content: RUNTIME_CODE,
-          encoding: 'utf-8',
-        },
       };
 
       // Add each function file
@@ -196,14 +177,14 @@ export class DenoDeployProvider {
         projectId,
         functionCount: functions.length,
         functions: functions.map((f) => f.slug),
+        secretCount: Object.keys(secrets).length,
       });
 
       const payload = {
         entryPointUrl: 'main.ts',
         assets,
-        envVars: {
-          FUNCTION_SECRETS: JSON.stringify(secrets),
-        },
+        // Pass secrets directly as env vars - accessible via Deno.env.get('KEY')
+        envVars: secrets,
         // Setting domains makes this a production deployment
         domains: [`${projectId}.deno.dev`],
       };
@@ -250,7 +231,9 @@ export class DenoDeployProvider {
         createdAt: new Date(data.createdAt),
       };
     } catch (error) {
-      if (error instanceof AppError) throw error;
+      if (error instanceof AppError) {
+        throw error;
+      }
 
       logger.error('Failed to deploy to Deno Deploy', {
         error: error instanceof Error ? error.message : String(error),
@@ -296,7 +279,9 @@ export class DenoDeployProvider {
         createdAt: new Date(data.createdAt),
       };
     } catch (error) {
-      if (error instanceof AppError) throw error;
+      if (error instanceof AppError) {
+        throw error;
+      }
 
       logger.error('Failed to get Deno Deploy deployment', {
         error: error instanceof Error ? error.message : String(error),
@@ -444,10 +429,11 @@ export class DenoDeployProvider {
    *
    * Supports two formats:
    *
-   * 1. Legacy (module.exports) - converted automatically:
+   * 1. Legacy (module.exports) - converted automatically, createClient injected:
    *    module.exports = async function(req) { return new Response("Hello"); }
    *
-   * 2. Deno-native (export default) - runtime imports prepended:
+   * 2. Deno-native (export default) - used as-is, user imports directly:
+   *    import { createClient } from 'npm:@insforge/sdk';
    *    export default async function(req: Request) { return new Response("Hello"); }
    */
   private transformUserCode(userCode: string, slug: string): string {
@@ -456,30 +442,21 @@ export class DenoDeployProvider {
       return this.convertLegacyFormat(userCode, slug);
     }
 
-    // Check if user already imports from runtime
-    const hasRuntimeImport =
-      userCode.includes('from "../runtime.ts"') || userCode.includes("from '../runtime.ts'");
-
-    // Deno-native format - prepend runtime import only if not already present
-    if (hasRuntimeImport) {
-      return `// Function: ${slug}\n${userCode}`;
-    }
-
-    return `// Function: ${slug}
-import { createClient } from "../runtime.ts";
-
-${userCode}`;
+    // Deno-native format - use as-is (user imports directly)
+    return `// Function: ${slug}\n${userCode}`;
   }
 
   /**
    * Convert legacy module.exports format to Deno export default
+   * Injects createClient so it's available in scope for legacy code
    *
    * Input:  module.exports = async function(req) { ... }
    * Output: export default async function(req: Request) { ... }
    */
   private convertLegacyFormat(userCode: string, slug: string): string {
     return `// Function: ${slug} (legacy format)
-import { createClient } from "../runtime.ts";
+// createClient is injected and available in scope
+import { createClient } from 'npm:@insforge/sdk';
 
 const _legacyModule: { exports: unknown } = { exports: {} };
 const module = _legacyModule;
