@@ -23,7 +23,7 @@ import { webhooksRouter } from '@/api/routes/webhooks/index.routes.js';
 import { errorMiddleware } from '@/api/middlewares/error.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { RealtimeManager } from '@/infra/realtime/realtime.manager.js';
-import fetch, { HeadersInit } from 'node-fetch';
+import fetch from 'node-fetch';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { LogService } from '@/services/logs/log.service.js';
 import { StorageService } from '@/services/storage/storage.service.js';
