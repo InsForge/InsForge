@@ -1,8 +1,8 @@
-import { createClient } from '@insforge/sdk';
+import { createClient, type InsForgeClient } from '@insforge/sdk';
 import { getBackendUrl } from './utils';
 
 const backendUrl = getBackendUrl();
 
-export const insforge = createClient({
+export const insforge: InsForgeClient = createClient({
   baseUrl: backendUrl,
 });

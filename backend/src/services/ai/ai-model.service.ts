@@ -2,7 +2,7 @@ import { isCloudEnvironment } from '@/utils/environment.js';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import type { RawOpenRouterModel } from '@/types/ai.js';
 import type { AIModelSchema } from '@insforge/shared-schemas';
-import { calculatePriceLevel, filterAndSortModalities, getProviderOrder } from './helpers.js';
+import { calculatePricePerMillion, filterAndSortModalities, getProviderOrder } from './helpers.js';
 
 export class AIModelService {
   /**
@@ -40,14 +40,18 @@ export class AIModelService {
     const rawModels = data.data || [];
 
     const models: AIModelSchema[] = rawModels
-      .map((rawModel) => ({
-        id: rawModel.id, // OpenRouter provided model ID
-        modelId: rawModel.id,
-        provider: 'openrouter',
-        inputModality: filterAndSortModalities(rawModel.architecture?.input_modalities || []),
-        outputModality: filterAndSortModalities(rawModel.architecture?.output_modalities || []),
-        priceLevel: calculatePriceLevel(rawModel.pricing),
-      }))
+      .map((rawModel) => {
+        const { inputPrice, outputPrice } = calculatePricePerMillion(rawModel.pricing);
+        return {
+          id: rawModel.id, // OpenRouter provided model ID
+          modelId: rawModel.id,
+          provider: 'openrouter',
+          inputModality: filterAndSortModalities(rawModel.architecture?.input_modalities || []),
+          outputModality: filterAndSortModalities(rawModel.architecture?.output_modalities || []),
+          inputPrice,
+          outputPrice,
+        };
+      })
       .sort((a, b) => {
         const [aCompany = '', bCompany = ''] = [a.id.split('/')[0], b.id.split('/')[0]];
 

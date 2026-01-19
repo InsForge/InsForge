@@ -216,31 +216,44 @@ export default function DeploymentsPage() {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Fixed Page Header */}
-      <div className="shrink-0 flex items-center gap-3 p-4 pb-0">
-        <h1 className="text-xl font-normal text-zinc-950 dark:text-white">Deployments</h1>
+      <div className="shrink-0 flex flex-col gap-1 p-4 pb-0">
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-normal text-zinc-950 dark:text-white">Deployments</h1>
 
-        {/* Separator */}
-        <div className="h-6 w-px bg-gray-200 dark:bg-neutral-700" />
+          {/* Separator */}
+          <div className="h-6 w-px bg-gray-200 dark:bg-neutral-700" />
 
-        {/* Refresh button */}
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="p-1 h-9 w-9"
-                onClick={() => void handleRefresh()}
-                disabled={isRefreshing}
-              >
-                <RefreshIcon className="h-5 w-5 text-zinc-400 dark:text-neutral-400" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" align="center">
-              <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+          {/* Refresh button */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="p-1 h-9 w-9"
+                  onClick={() => void handleRefresh()}
+                  disabled={isRefreshing}
+                >
+                  <RefreshIcon className="h-5 w-5 text-zinc-400 dark:text-neutral-400" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" align="center">
+                <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+        <p className="text-sm text-muted-foreground dark:text-neutral-400">
+          Ship your app to live in seconds with just one prompt.{' '}
+          <a
+            href="https://docs.insforge.dev/core-concepts/deployments/architecture"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            Learn more
+          </a>
+        </p>
       </div>
 
       {/* Fixed Table Header */}

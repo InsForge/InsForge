@@ -32,27 +32,29 @@ export function filterAndSortModalities(modalities: string[]): ModalitySchema[] 
 }
 
 /**
- * Calculate price level (0-3)
+ * Calculate price per million tokens from OpenRouter pricing
+ * OpenRouter pricing is per token, we convert to per million tokens
  */
-export function calculatePriceLevel(pricing: RawOpenRouterModel['pricing']): number {
+export function calculatePricePerMillion(pricing: RawOpenRouterModel['pricing']): {
+  inputPrice: number;
+  outputPrice: number;
+} {
   if (!pricing) {
-    return 0;
-  }
-  if (pricing.prompt === '0' && pricing.completion === '0') {
-    return 0;
+    return { inputPrice: 0, outputPrice: 0 };
   }
 
   const promptCostPerToken = parseFloat(pricing.prompt) || 0;
   const completionCostPerToken = parseFloat(pricing.completion) || 0;
-  const avgCostPer1M = ((promptCostPerToken + completionCostPerToken) / 2) * 1000000;
 
-  if (avgCostPer1M <= 3) {
-    return 1;
-  }
-  if (avgCostPer1M <= 15) {
-    return 2;
-  }
-  return 3;
+  // Convert from cost per token to cost per million tokens
+  // Round to 6 decimal places to avoid floating point precision issues
+  const inputPrice = Math.round(promptCostPerToken * 1_000_000 * 1_000_000) / 1_000_000;
+  const outputPrice = Math.round(completionCostPerToken * 1_000_000 * 1_000_000) / 1_000_000;
+
+  return {
+    inputPrice: Math.max(0, inputPrice), // Ensure non-negative
+    outputPrice: Math.max(0, outputPrice), // Ensure non-negative
+  };
 }
 
 /**

@@ -11,14 +11,14 @@ export interface ModelOption {
   logo: React.ComponentType<React.SVGProps<SVGSVGElement>> | undefined;
   inputModality: ModalitySchema[];
   outputModality: ModalitySchema[];
-  priceLevel?: number;
+  inputPrice?: number; // Price per million tokens in USD
+  outputPrice?: number; // Price per million tokens in USD
   usageStats?: {
     totalRequests: number;
   };
   systemPrompt?: string | null;
 }
 
-import { Type, Image, Mic } from 'lucide-react';
 import GrokIcon from '@/assets/logos/grok.svg?react';
 import GeminiIcon from '@/assets/logos/gemini.svg?react';
 import ClaudeIcon from '@/assets/logos/claude_code.svg?react';
@@ -27,32 +27,16 @@ import AmazonIcon from '@/assets/logos/amazon.svg?react';
 import DeepseekIcon from '@/assets/logos/deepseek.svg?react';
 import QwenIcon from '@/assets/logos/qwen.svg?react';
 
-export const getModalityIcon = (
-  modality: ModalitySchema
-): React.FunctionComponent<React.SVGProps<SVGSVGElement>> => {
-  switch (modality) {
-    case 'text':
-      return Type;
-    case 'image':
-      return Image;
-    case 'audio':
-      return Mic;
-    // case 'video':
-    //   return Video;
-    // case 'file':
-    //   return File;
-    default:
-      return Type;
-  }
-};
+// Provider tab configuration
+export interface ProviderTab {
+  id: string;
+  displayName: string;
+  logo: React.FunctionComponent<React.SVGProps<SVGSVGElement>> | undefined;
+}
 
-export const formatTokenCount = (count: number): string => {
-  if (count >= 1000000) {
-    return `${(count / 1000000).toFixed(1)}M`;
-  } else if (count >= 1000) {
-    return `${(count / 1000).toFixed(1)}K`;
-  }
-  return count.toString();
+// Extract provider ID from modelId (e.g., "openai/gpt-4o" -> "openai")
+export const getProviderIdFromModelId = (modelId: string): string => {
+  return modelId.split('/')[0] || '';
 };
 
 export const getProviderDisplayName = (providerId: string): string => {
@@ -88,6 +72,70 @@ export const getProviderLogo = (
     qwen: QwenIcon,
   };
   return logoMap[providerId];
+};
+
+// Filter models by provider ID
+export const filterModelsByProvider = (
+  models: AIModelSchema[],
+  providerId: string
+): AIModelSchema[] => {
+  if (providerId === 'other') {
+    // "other" tab contains models whose provider has no logo
+    return models.filter((model) => {
+      const modelProviderId = getProviderIdFromModelId(model.modelId);
+      return !getProviderLogo(modelProviderId);
+    });
+  }
+  return models.filter((model) => getProviderIdFromModelId(model.modelId) === providerId);
+};
+
+// Dynamically generate provider tabs
+// Providers with logos get their own tab, others go to "Other"
+export const generateProviderTabs = (models: AIModelSchema[]): ProviderTab[] => {
+  // Extract unique provider IDs from models
+  const providerIds = new Set<string>();
+  models.forEach((model) => {
+    const providerId = getProviderIdFromModelId(model.modelId);
+    if (providerId) {
+      providerIds.add(providerId);
+    }
+  });
+
+  const mainProviders: ProviderTab[] = [];
+  let hasOtherProviders = false;
+
+  providerIds.forEach((providerId) => {
+    const logo = getProviderLogo(providerId);
+    if (logo) {
+      mainProviders.push({
+        id: providerId,
+        displayName: getProviderDisplayName(providerId),
+        logo,
+      });
+    } else {
+      hasOtherProviders = true;
+    }
+  });
+
+  // Add "Other" tab at the end if there are providers without logos
+  if (hasOtherProviders) {
+    mainProviders.push({
+      id: 'other',
+      displayName: 'Other',
+      logo: undefined,
+    });
+  }
+
+  return mainProviders;
+};
+
+export const formatTokenCount = (count: number): string => {
+  if (count >= 1000000) {
+    return `${(count / 1000000).toFixed(1)}M`;
+  } else if (count >= 1000) {
+    return `${(count / 1000).toFixed(1)}K`;
+  }
+  return count.toString();
 };
 
 // Helper function to filter AI models based on selected modalities
@@ -144,4 +192,35 @@ export const sortModelsByConfigurationStatus = (
     }
     return aConfigured ? 1 : -1;
   });
+};
+
+// Sorting types
+export type SortField = 'inputPrice' | 'outputPrice' | 'requests';
+export type SortDirection = 'asc' | 'desc';
+
+// Format credits display
+export const formatCredits = (remaining: number): string => {
+  if (remaining >= 1000) {
+    return `${(remaining / 1000).toFixed(1)}K`;
+  }
+  return remaining.toFixed(2);
+};
+
+// Format price per million tokens
+export const formatPrice = (price?: number): string => {
+  if (price === undefined || price === 0) {
+    return 'Free';
+  }
+  if (price < 0.01) {
+    return `$${price.toFixed(4)}`;
+  }
+  if (price < 1) {
+    return `$${price.toFixed(2)}`;
+  }
+  return `$${price.toFixed(1)}`;
+};
+
+// Format modality for display
+export const formatModality = (modality: string): string => {
+  return modality.charAt(0).toUpperCase() + modality.slice(1);
 };

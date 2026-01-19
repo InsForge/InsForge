@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
 import { ThemeProvider } from '@/lib/contexts/ThemeContext';
-import { OnboardingModal } from '@/features/onboard';
+import { OnboardingModal, OnboardingOverlay } from '@/features/onboard';
 import { isIframe } from '@/lib/utils/utils';
 
 interface LayoutProps {
@@ -25,7 +25,10 @@ export default function Layout({ children }: LayoutProps) {
         {/* Main layout - sidebars + content in flexbox */}
         <div className="flex-1 flex overflow-hidden">
           <AppSidebar isCollapsed={sidebarCollapsed} onToggleCollapse={handleToggleCollapse} />
-          <main className="flex-1 overflow-y-auto">{children}</main>
+          <main className="flex-1 overflow-y-auto relative">
+            {children}
+            <OnboardingOverlay />
+          </main>
         </div>
       </div>
       <OnboardingModal />
