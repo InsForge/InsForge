@@ -207,12 +207,18 @@ export async function createApp() {
       const targetUrl = new URL(`/${slug}`, baseUrl);
       targetUrl.search = new URL(req.url, `http://${req.headers.host}`).search;
 
+      // Build headers, filtering out non-string values and overriding host
+      const headers: Record<string, string> = {};
+      for (const [key, value] of Object.entries(req.headers)) {
+        if (typeof value === 'string') {
+          headers[key] = value;
+        }
+      }
+      headers.host = targetUrl.host;
+
       const response = await fetch(targetUrl, {
         method: req.method,
-        headers: {
-          ...req.headers,
-          host: targetUrl.host,
-        } as Record<string, string>,
+        headers,
         body: ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body),
       });
 

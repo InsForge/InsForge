@@ -1,14 +1,24 @@
 import { Router, Response, NextFunction } from 'express';
 import { SecretService } from '@/services/secrets/secret.service.js';
+import { FunctionService } from '@/services/functions/function.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
+import logger from '@/utils/logger.js';
 
 const router = Router();
 const secretService = SecretService.getInstance();
 const auditService = AuditService.getInstance();
+const functionService = FunctionService.getInstance();
+
+// Trigger function redeployment with updated secrets (non-blocking, debounced)
+const triggerSecretsRedeployment = () => {
+  if (functionService.isSubhostingConfigured()) {
+    functionService.redeploy();
+  }
+};
 
 /**
  * List all secrets (metadata only, no values)
@@ -95,6 +105,9 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
       ip_address: req.ip,
     });
 
+    // Trigger redeployment with new secret
+    triggerSecretsRedeployment();
+
     successResponse(
       res,
       {
@@ -146,6 +159,11 @@ router.put('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: N
       ip_address: req.ip,
     });
 
+    // Trigger redeployment if value changed
+    if (value) {
+      triggerSecretsRedeployment();
+    }
+
     successResponse(res, {
       success: true,
       message: `Secret ${key} has been updated successfully`,
@@ -191,6 +209,9 @@ router.delete('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next
       details: { key },
       ip_address: req.ip,
     });
+
+    // Trigger redeployment without deleted secret
+    triggerSecretsRedeployment();
 
     successResponse(res, {
       success: true,

@@ -320,6 +320,19 @@ export async function seedBackend(): Promise<void> {
       logger.info('✅ ANON_KEY secret initialized');
     }
 
+    // Add INSFORGE_BASE_URL for edge functions to call back to API
+    const baseUrl = process.env.API_BASE_URL || 'http://localhost:7130';
+    const existingBaseUrlSecret = await secretService.getSecretByKey('INSFORGE_BASE_URL');
+
+    if (existingBaseUrlSecret === null) {
+      await secretService.createSecret({
+        key: 'INSFORGE_BASE_URL',
+        isReserved: true,
+        value: baseUrl,
+      });
+      logger.info('✅ INSFORGE_BASE_URL secret initialized');
+    }
+
     logger.info(`API key generated: ${apiKey}`);
     logger.info(`Setup complete:
       - Save this API key for your apps!
