@@ -213,9 +213,9 @@ export async function createApp() {
       const response = await fetch(targetUrl, {
         method: req.method,
         headers: {
-          'content-type': req.headers['content-type'] || 'application/json',
-          accept: req.headers.accept || '*/*',
-        },
+          ...req.headers,
+          host: targetUrl.host,
+        } as Record<string, string>,
         body: ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body),
       });
 
