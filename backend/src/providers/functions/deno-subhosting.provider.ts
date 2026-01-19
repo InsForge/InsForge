@@ -2,6 +2,7 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { config } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
+import { z } from 'zod';
 
 const DENO_SUBHOSTING_API_BASE = 'https://api.deno.com/v1';
 const DEFAULT_TIMEOUT_MS = 10000;
@@ -39,7 +40,7 @@ async function fetchWithTimeout(
 }
 
 // ============================================
-// Types (internal to this provider)
+// Schemas (with runtime validation)
 // ============================================
 
 interface DenoSubhostingCredentials {
@@ -47,22 +48,30 @@ interface DenoSubhostingCredentials {
   organizationId: string;
 }
 
-export interface FunctionDefinition {
-  slug: string;
-  code: string;
-}
+export const functionDefinitionSchema = z.object({
+  slug: z.string().min(1),
+  code: z.string().min(1),
+});
 
-export interface FunctionDeploymentResult {
-  id: string;
-  projectId: string;
-  status: 'pending' | 'success' | 'failed';
-  url: string | null;
-  createdAt: Date;
-  error?: {
-    code: string;
-    message: string;
-  };
-}
+export type FunctionDefinition = z.infer<typeof functionDefinitionSchema>;
+
+const deploymentStatusSchema = z.enum(['pending', 'success', 'failed']);
+
+export const functionDeploymentResultSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  status: deploymentStatusSchema,
+  url: z.string().nullable(),
+  createdAt: z.coerce.date(),
+  error: z
+    .object({
+      code: z.string(),
+      message: z.string(),
+    })
+    .optional(),
+});
+
+export type FunctionDeploymentResult = z.infer<typeof functionDeploymentResultSchema>;
 
 interface DenoSubhostingAsset {
   kind: 'file';
@@ -70,13 +79,22 @@ interface DenoSubhostingAsset {
   encoding: 'utf-8';
 }
 
-interface DenoSubhostingApiResponse {
-  id: string;
-  projectId: string;
-  status: 'pending' | 'success' | 'failed';
-  domains: string[];
-  createdAt: string;
-}
+// Schema for Deno Subhosting API response
+const denoSubhostingApiResponseSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  status: z.string().transform((s) => {
+    if (s === 'success') {
+      return 'success' as const;
+    }
+    if (s === 'failed') {
+      return 'failed' as const;
+    }
+    return 'pending' as const;
+  }),
+  domains: z.array(z.string()).default([]),
+  createdAt: z.string(),
+});
 
 export class DenoSubhostingProvider {
   private static instance: DenoSubhostingProvider;
@@ -250,7 +268,7 @@ export class DenoSubhostingProvider {
         );
       }
 
-      const data = (await response.json()) as DenoSubhostingApiResponse;
+      const data = denoSubhostingApiResponseSchema.parse(await response.json());
 
       logger.info('Deno Subhosting deployment created', {
         deploymentId: data.id,
@@ -259,13 +277,12 @@ export class DenoSubhostingProvider {
         domains: data.domains,
       });
 
-      const domains = data.domains || [];
       return {
         id: data.id,
         projectId: data.projectId,
-        status:
-          data.status === 'success' ? 'success' : data.status === 'failed' ? 'failed' : 'pending',
-        url: domains.length > 0 ? `https://${domains[0]}` : `https://${projectId}.deno.dev`,
+        status: data.status,
+        url:
+          data.domains.length > 0 ? `https://${data.domains[0]}` : `https://${projectId}.deno.dev`,
         createdAt: new Date(data.createdAt),
       };
     } catch (error) {
@@ -308,15 +325,13 @@ export class DenoSubhostingProvider {
         );
       }
 
-      const data = (await response.json()) as DenoSubhostingApiResponse;
-      const domains = data.domains || [];
+      const data = denoSubhostingApiResponseSchema.parse(await response.json());
 
       return {
         id: data.id,
         projectId: data.projectId,
-        status:
-          data.status === 'success' ? 'success' : data.status === 'failed' ? 'failed' : 'pending',
-        url: domains.length > 0 ? `https://${domains[0]}` : null,
+        status: data.status,
+        url: data.domains.length > 0 ? `https://${data.domains[0]}` : null,
         createdAt: new Date(data.createdAt),
       };
     } catch (error) {
