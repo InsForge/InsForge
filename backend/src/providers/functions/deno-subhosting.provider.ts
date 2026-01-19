@@ -105,18 +105,10 @@ export class DenoSubhostingProvider {
     const { token, organizationId } = config.denoSubhosting;
 
     if (!token) {
-      throw new AppError(
-        'DENO_SUBHOSTING_TOKEN not configured',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
+      throw new AppError('DENO_SUBHOSTING_TOKEN not configured', 500, ERROR_CODES.INTERNAL_ERROR);
     }
     if (!organizationId) {
-      throw new AppError(
-        'DENO_SUBHOSTING_ORG_ID not configured',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
+      throw new AppError('DENO_SUBHOSTING_ORG_ID not configured', 500, ERROR_CODES.INTERNAL_ERROR);
     }
 
     return { token, organizationId };
