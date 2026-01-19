@@ -298,6 +298,17 @@ paths:
       description: Creates a new user account
       tags:
           - Client
+      parameters:
+        - name: client_type
+          in: query
+          schema:
+            type: string
+            enum: [web, mobile, desktop]
+            default: web
+          description: |
+            Client type determines how refresh tokens are returned:
+            - web: Refresh token stored in httpOnly cookie, csrfToken returned in response
+            - mobile/desktop: refreshToken returned directly in response body
       requestBody:
         required: true
         content:
@@ -336,7 +347,11 @@ paths:
                   csrfToken:
                     type: string
                     nullable: true
-                    description: CSRF token for use with refresh endpoint (null if email verification required)
+                    description: CSRF token for use with refresh endpoint (web clients only, null if email verification required)
+                  refreshToken:
+                    type: string
+                    nullable: true
+                    description: Refresh token for mobile/desktop clients (null for web clients or if email verification required)
                   requireEmailVerification:
                     type: boolean
                     description: Whether email verification is required before login
@@ -472,9 +487,20 @@ paths:
   /api/auth/sessions:
     post:
       summary: User login
-      description: Authenticates user and returns access token. Sets httpOnly refresh token cookie.
+      description: Authenticates user and returns access token. For web clients, sets httpOnly refresh token cookie. For mobile/desktop clients, returns refreshToken in response body.
       tags:
         - Client
+      parameters:
+        - name: client_type
+          in: query
+          schema:
+            type: string
+            enum: [web, mobile, desktop]
+            default: web
+          description: |
+            Client type determines how refresh tokens are returned:
+            - web: Refresh token stored in httpOnly cookie, csrfToken returned in response
+            - mobile/desktop: refreshToken returned directly in response body
       requestBody:
         required: true
         content:
@@ -504,7 +530,12 @@ paths:
                     type: string
                   csrfToken:
                     type: string
-                    description: CSRF token for use with refresh endpoint
+                    nullable: true
+                    description: CSRF token for use with refresh endpoint (web clients only)
+                  refreshToken:
+                    type: string
+                    nullable: true
+                    description: Refresh token for mobile/desktop clients (null for web clients)
                   redirectTo:
                     type: string
                     format: uri
@@ -517,16 +548,37 @@ paths:
   /api/auth/refresh:
     post:
       summary: Refresh access token
-      description: Refresh access token using httpOnly refresh token cookie. Requires X-CSRF-Token header for CSRF protection.
+      description: |
+        Refresh access token using refresh token.
+        - Web clients: Use httpOnly refresh token cookie with X-CSRF-Token header
+        - Mobile/Desktop clients: Send refreshToken in request body
       tags:
         - Client
       parameters:
-        - name: X-CSRF-Token
-          in: header
-          required: true
+        - name: client_type
+          in: query
           schema:
             type: string
-          description: CSRF token received from login/register response
+            enum: [web, mobile, desktop]
+            default: web
+          description: |
+            Client type determines how refresh tokens are handled:
+            - web: Refresh token from httpOnly cookie, requires X-CSRF-Token header
+            - mobile/desktop: refreshToken provided in request body, new refreshToken returned in response
+        - name: X-CSRF-Token
+          in: header
+          schema:
+            type: string
+          description: CSRF token received from login/register response (required for web clients only)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+                  description: Refresh token (required for mobile/desktop clients only)
       responses:
         '200':
           description: Token refreshed successfully
@@ -541,7 +593,12 @@ paths:
                     type: string
                   csrfToken:
                     type: string
-                    description: New CSRF token for subsequent refresh requests
+                    nullable: true
+                    description: New CSRF token for subsequent refresh requests (web clients only)
+                  refreshToken:
+                    type: string
+                    nullable: true
+                    description: New refresh token for mobile/desktop clients (must be persisted for next refresh)
         '401':
           description: No refresh token provided or user not found
         '403':
@@ -753,6 +810,17 @@ paths:
         Otherwise, a default success page is displayed.
       tags:
         - Client
+      parameters:
+        - name: client_type
+          in: query
+          schema:
+            type: string
+            enum: [web, mobile, desktop]
+            default: web
+          description: |
+            Client type determines how refresh tokens are returned:
+            - web: Refresh token stored in httpOnly cookie, csrfToken returned in response
+            - mobile/desktop: refreshToken returned directly in response body
       requestBody:
         required: true
         content:
@@ -786,7 +854,12 @@ paths:
                     description: JWT authentication token
                   csrfToken:
                     type: string
-                    description: CSRF token for use with refresh endpoint
+                    nullable: true
+                    description: CSRF token for use with refresh endpoint (web clients only)
+                  refreshToken:
+                    type: string
+                    nullable: true
+                    description: Refresh token for mobile/desktop clients (null for web clients)
                   redirectTo:
                     type: string
                     format: uri
@@ -1119,8 +1192,15 @@ paths:
 
   /api/auth/oauth/{provider}:
     get:
-      summary: Initiate OAuth flow
-      description: Generate OAuth authorization URL for any supported provider
+      summary: Initiate OAuth flow (PKCE)
+      description: |
+        Generate OAuth authorization URL for any supported provider using PKCE flow.
+
+        For mobile/desktop clients using PKCE:
+        1. Generate code_verifier (random string, 43-128 chars)
+        2. Generate code_challenge = Base64URL(SHA256(code_verifier))
+        3. Call this endpoint with code_challenge
+        4. After OAuth callback, use /api/auth/oauth/exchange with code_verifier
       tags:
         - Client
       parameters:
@@ -1136,7 +1216,16 @@ paths:
           schema:
             type: string
             format: uri
-          description: URL to redirect after authentication
+          description: URL to redirect after authentication (receives insforge_code parameter)
+        - name: code_challenge
+          in: query
+          required: false
+          schema:
+            type: string
+          description: |
+            PKCE code challenge for mobile/desktop clients.
+            Generate using: Base64URL(SHA256(code_verifier))
+            Required for secure token exchange in native apps.
       responses:
         '200':
           description: OAuth authorization URL
@@ -1148,10 +1237,74 @@ paths:
                   authUrl:
                     type: string
                     format: uri
+                    description: URL to redirect user for OAuth provider login
         '400':
           description: Invalid request or provider not supported
         '500':
           description: OAuth not configured
+
+  /api/auth/oauth/exchange:
+    post:
+      summary: Exchange OAuth code for tokens (PKCE)
+      description: |
+        Exchange the insforge_code (received from OAuth callback) for access and refresh tokens.
+
+        This endpoint is used for PKCE flow in mobile/desktop clients:
+        1. After OAuth callback, your redirect_uri receives `insforge_code` parameter
+        2. Call this endpoint with the code and your original code_verifier
+        3. Receive access token and refresh token in response
+
+        The code_verifier must match the code_challenge sent during OAuth initiation.
+      tags:
+        - Client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+                - code_verifier
+              properties:
+                code:
+                  type: string
+                  description: The insforge_code received from OAuth callback redirect
+                  example: "abc123..."
+                code_verifier:
+                  type: string
+                  description: |
+                    The original code_verifier used to generate code_challenge.
+                    Must be 43-128 characters, using [A-Za-z0-9-._~]
+                  example: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+      responses:
+        '200':
+          description: Tokens exchanged successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/UserResponse'
+                  accessToken:
+                    type: string
+                    description: JWT access token for API authentication
+                  refreshToken:
+                    type: string
+                    description: Refresh token for obtaining new access tokens
+        '400':
+          description: Invalid request - missing code or code_verifier
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid or expired code, or code_verifier mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/auth/oauth/shared/callback/{state}:
     get:
@@ -1193,7 +1346,12 @@ paths:
   /api/auth/oauth/{provider}/callback:
     get:
       summary: Provider-specific OAuth callback (GET)
-      description: OAuth callback endpoint for provider-specific flows (most providers use GET)
+      description: |
+        OAuth callback endpoint for provider-specific flows (most providers use GET).
+
+        Response varies based on the original OAuth initiation:
+        - With code_challenge (PKCE): Redirects with `insforge_code` for exchange endpoint
+        - Without code_challenge (web): Redirects with `access_token` and sets httpOnly cookie
       tags:
         - Client
       parameters:
@@ -1213,7 +1371,7 @@ paths:
           required: true
           schema:
             type: string
-          description: JWT state with redirect URI
+          description: JWT state with redirect URI and optional code_challenge
         - name: token
           in: query
           schema:
@@ -1221,17 +1379,25 @@ paths:
           description: Direct ID token (for some providers)
       responses:
         '302':
-          description: Redirect to application with access token
+          description: |
+            Redirect to application.
+            - PKCE flow: redirect_uri?insforge_code={code}&user_id={id}&email={email}&name={name}
+            - Web flow: redirect_uri?access_token={token}&user_id={id}&email={email}&name={name}&csrf_token={csrf}
           headers:
             Location:
               schema:
                 type: string
                 format: uri
-                description: Redirect URL with access_token, user_id, email, name, and csrf_token query params
+                description: Redirect URL with authentication parameters
 
     post:
       summary: Provider-specific OAuth callback (POST)
-      description: OAuth callback endpoint for providers that use POST (e.g., Apple with form_post response mode)
+      description: |
+        OAuth callback endpoint for providers that use POST (e.g., Apple with form_post response mode).
+
+        Response varies based on the original OAuth initiation:
+        - With code_challenge (PKCE): Redirects with `insforge_code` for exchange endpoint
+        - Without code_challenge (web): Redirects with `access_token` and sets httpOnly cookie
       tags:
         - Client
       parameters:
@@ -1255,19 +1421,22 @@ paths:
                   description: Authorization code from OAuth provider
                 state:
                   type: string
-                  description: JWT state with redirect URI
+                  description: JWT state with redirect URI and optional code_challenge
                 id_token:
                   type: string
                   description: ID token (for Apple Sign In)
       responses:
         '302':
-          description: Redirect to application with access token
+          description: |
+            Redirect to application.
+            - PKCE flow: redirect_uri?insforge_code={code}&user_id={id}&email={email}&name={name}
+            - Web flow: redirect_uri?access_token={token}&user_id={id}&email={email}&name={name}&csrf_token={csrf}
           headers:
             Location:
               schema:
                 type: string
                 format: uri
-                description: Redirect URL with access_token, user_id, email, name, and csrf_token query params
+                description: Redirect URL with authentication parameters
 
 components:
   securitySchemes:
