@@ -287,10 +287,10 @@ export const updateOAuthConfigRequestSchema = oAuthConfigSchema
   .partial();
 
 /**
- * Base64url character validation regex (RFC 7636)
- * Allows: A-Z, a-z, 0-9, -, _ (no padding)
+ * PKCE character validation regex (RFC 7636 unreserved characters)
+ * Allows: A-Z, a-z, 0-9, -, ., _, ~ (no padding)
  */
-const base64urlRegex = /^[A-Za-z0-9_-]+$/;
+const pkceRegex = /^[A-Za-z0-9._~-]+$/;
 
 /**
  * GET /api/auth/oauth/:provider - Initialize OAuth flow
@@ -305,7 +305,7 @@ export const oAuthInitRequestSchema = z.object({
     .string()
     .min(43, 'Code challenge must be at least 43 characters')
     .max(128, 'Code challenge must be at most 128 characters')
-    .regex(base64urlRegex, 'Code challenge must be base64url encoded'),
+    .regex(pkceRegex, 'Code challenge must be base64url encoded'),
 });
 
 /**
@@ -320,7 +320,7 @@ export const oAuthCodeExchangeRequestSchema = z.object({
     .string()
     .min(43, 'Code verifier must be at least 43 characters')
     .max(128, 'Code verifier must be at most 128 characters')
-    .regex(base64urlRegex, 'Code verifier must be base64url encoded'),
+    .regex(pkceRegex, 'Code verifier must be base64url encoded'),
 });
 
 /**
