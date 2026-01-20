@@ -11,9 +11,6 @@ import { StorageProvider } from '@/providers/storage/base.provider.js';
 import { LocalStorageProvider } from '@/providers/storage/local.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
 import logger from '@/utils/logger.js';
-import { ADMIN_ID } from '@/utils/constants.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
 import { escapeSqlLikePattern, escapeRegexPattern } from '@/utils/validations.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
 
@@ -153,7 +150,8 @@ export class StorageService {
     bucket: string,
     originalKey: string,
     file: Express.Multer.File,
-    userId?: string
+    userId?: string,
+    role?: string
   ): Promise<StorageFileSchema> {
     this.validateBucketName(bucket);
     this.validateKey(originalKey);
@@ -166,6 +164,15 @@ export class StorageService {
 
     const client = await this.getPool().connect();
     try {
+      await client.query('BEGIN');
+
+      // Set user ID for auth.uid() function used by RLS policies (transaction-local)
+      await client.query("SELECT set_config('request.jwt.claim.sub', $1, true)", [userId || '']);
+
+      // Switch to non-superuser role so RLS policies are enforced (transaction-local)
+      const dbRole = role || 'anon';
+      await client.query(`SET LOCAL ROLE ${dbRole}`);
+
       // Save metadata to database and return the timestamp in one operation
       const result = await client.query(
         `
@@ -173,18 +180,14 @@ export class StorageService {
         VALUES ($1, $2, $3, $4, $5)
         RETURNING uploaded_at as "uploadedAt"
       `,
-        [
-          bucket,
-          finalKey,
-          file.size,
-          file.mimetype || null,
-          userId && userId !== ADMIN_ID ? userId : null,
-        ]
+        [bucket, finalKey, file.size, file.mimetype || null, userId || null]
       );
 
       if (!result.rows[0]) {
         throw new Error(`Failed to retrieve upload timestamp for ${bucket}/${finalKey}`);
       }
+
+      await client.query('COMMIT');
 
       return {
         bucket,
@@ -194,6 +197,9 @@ export class StorageService {
         uploadedAt: result.rows[0].uploadedAt,
         url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(finalKey)}`,
       };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
     } finally {
       client.release();
     }
@@ -239,46 +245,40 @@ export class StorageService {
     bucket: string,
     key: string,
     userId?: string,
-    isAdmin?: boolean
+    role?: string
   ): Promise<boolean> {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
     const client = await this.getPool().connect();
     try {
-      // Check permissions
-      if (!isAdmin) {
-        const fileResult = await client.query(
-          'SELECT uploaded_by FROM storage.objects WHERE bucket = $1 AND key = $2',
-          [bucket, key]
-        );
+      await client.query('BEGIN');
 
-        const file = fileResult.rows[0] as { uploaded_by: string | null } | undefined;
+      // Set user ID for auth.uid() function used by RLS policies (transaction-local)
+      await client.query("SELECT set_config('request.jwt.claim.sub', $1, true)", [userId || '']);
 
-        if (!file) {
-          return false; // File doesn't exist
-        }
+      // Switch to non-superuser role so RLS policies are enforced (transaction-local)
+      const dbRole = role || 'anon';
+      await client.query(`SET LOCAL ROLE ${dbRole}`);
 
-        // Check if user owns the file
-        if (userId && file.uploaded_by !== userId) {
-          throw new AppError(
-            'Permission denied: You can only delete files you uploaded',
-            403,
-            ERROR_CODES.FORBIDDEN
-          );
-        }
-      }
-
-      // Delete file using backend
-      await this.provider.deleteObject(bucket, key);
-
-      // Delete from database
+      // Delete from database (RLS policies will be applied)
       const result = await client.query(
         'DELETE FROM storage.objects WHERE bucket = $1 AND key = $2',
         [bucket, key]
       );
 
-      return result.rowCount !== null && result.rowCount > 0;
+      await client.query('COMMIT');
+
+      // If delete succeeded in DB, also delete from storage provider
+      if (result.rowCount !== null && result.rowCount > 0) {
+        await this.provider.deleteObject(bucket, key);
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
     } finally {
       client.release();
     }
@@ -488,7 +488,8 @@ export class StorageService {
       contentType?: string;
       etag?: string;
     },
-    userId?: string
+    userId?: string,
+    role?: string
   ): Promise<StorageFileSchema> {
     this.validateBucketName(bucket);
     this.validateKey(key);
@@ -501,6 +502,15 @@ export class StorageService {
 
     const client = await this.getPool().connect();
     try {
+      await client.query('BEGIN');
+
+      // Set user ID for auth.uid() function used by RLS policies (transaction-local)
+      await client.query("SELECT set_config('request.jwt.claim.sub', $1, true)", [userId || '']);
+
+      // Switch to non-superuser role so RLS policies are enforced (transaction-local)
+      const dbRole = role || 'anon';
+      await client.query(`SET LOCAL ROLE ${dbRole}`);
+
       // Check if already confirmed
       const existingResult = await client.query(
         'SELECT key FROM storage.objects WHERE bucket = $1 AND key = $2',
@@ -518,18 +528,14 @@ export class StorageService {
         VALUES ($1, $2, $3, $4, $5)
         RETURNING uploaded_at as "uploadedAt"
       `,
-        [
-          bucket,
-          key,
-          metadata.size,
-          metadata.contentType || null,
-          userId && userId !== ADMIN_ID ? userId : null,
-        ]
+        [bucket, key, metadata.size, metadata.contentType || null, userId || null]
       );
 
       if (!result.rows[0]) {
         throw new Error(`Failed to retrieve upload timestamp for ${bucket}/${key}`);
       }
+
+      await client.query('COMMIT');
 
       return {
         bucket,
@@ -539,6 +545,9 @@ export class StorageService {
         uploadedAt: result.rows[0].uploadedAt,
         url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`,
       };
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
     } finally {
       client.release();
     }

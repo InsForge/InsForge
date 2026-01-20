@@ -243,65 +243,19 @@ router.put(
       if (!req.file) {
         throw new AppError('File is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
-
       const storageService = StorageService.getInstance();
       const storedFile = await storageService.putObject(
         bucketName,
         objectKey,
         req.file,
-        req.user?.id
+        req.user?.id,
+        req.user?.role
       );
 
       successResponse(res, storedFile, 201);
     } catch (error) {
       if (error instanceof Error && error.message.includes('already exists')) {
         next(new AppError(error.message, 409, ERROR_CODES.ALREADY_EXISTS));
-      } else if (error instanceof Error && error.message.includes('Invalid')) {
-        next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
-      } else {
-        next(error);
-      }
-    }
-  }
-);
-
-// POST /api/storage/buckets/:bucketName/objects - Upload object with server-generated key (requires auth)
-router.post(
-  '/buckets/:bucketName/objects',
-  verifyUser,
-  upload.single('file'),
-  handleUploadError,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const { bucketName } = req.params;
-
-      if (!req.file) {
-        throw new AppError('File is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
-      }
-
-      const storageService = StorageService.getInstance();
-
-      // Generate a unique key for the object using service
-      const objectKey = storageService.generateObjectKey(req.file.originalname);
-
-      const storedFile = await storageService.putObject(
-        bucketName,
-        objectKey,
-        req.file,
-        req.user?.id
-      );
-
-      successResponse(res, storedFile, 201);
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('does not exist')) {
-        next(
-          new AppError(
-            'Bucket does not exist',
-            404,
-            ERROR_CODES.NOT_FOUND,
-            'Create the bucket first using POST /api/storage/buckets'
-          )
-        );
       } else if (error instanceof Error && error.message.includes('Invalid')) {
         next(new AppError(error.message, 400, ERROR_CODES.STORAGE_INVALID_PARAMETER));
       } else {
@@ -417,13 +371,13 @@ router.delete(
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
-      // Delete specific object
+      // Delete specific object (RLS policies applied via user context)
       const storageService = StorageService.getInstance();
       const deleted = await storageService.deleteObject(
         bucketName,
         objectKey,
         req.user?.id,
-        req.user?.role === 'project_admin'
+        req.user?.role
       );
 
       if (!deleted) {
@@ -494,7 +448,8 @@ router.post(
           contentType,
           etag,
         },
-        req.user?.id
+        req.user?.id,
+        req.user?.role
       );
 
       successResponse(res, fileInfo, 201);

@@ -10,48 +10,63 @@ import { OAuthProvidersSchema, aiConfigurationInputSchema } from '@insforge/shar
 import { z } from 'zod';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { fetchS3Config } from '@/utils/s3-config-loader.js';
-import { ADMIN_ID } from '@/utils/constants.js';
+import { ADMIN_ID, ANON_ID } from '@/utils/constants.js';
 
 /**
- * Seeds the admin user if it doesn't exist in the database
- * Creates an admin user with is_project_admin = true
+ * Seeds system users (admin and anon) if they don't exist in the database
  */
-async function seedAdminUser(adminEmail: string, adminPassword: string): Promise<void> {
-  if (!adminEmail || !adminPassword) {
-    logger.warn('⚠️ Admin credentials not configured - check ADMIN_EMAIL and ADMIN_PASSWORD');
-    return;
-  }
-
+async function seedSystemUsers(adminEmail: string, adminPassword: string): Promise<void> {
   const dbManager = DatabaseManager.getInstance();
   const pool = dbManager.getPool();
   const client = await pool.connect();
 
   try {
-    // Check if admin user already exists
-    const existingAdmin = await client.query('SELECT id FROM auth.users WHERE id = $1', [ADMIN_ID]);
+    // Seed admin user
+    if (adminEmail && adminPassword) {
+      const existingAdmin = await client.query('SELECT id FROM auth.users WHERE id = $1', [
+        ADMIN_ID,
+      ]);
 
-    if (existingAdmin.rows.length > 0) {
-      logger.info(`✅ Admin configured: ${adminEmail}`);
-      return;
+      if (existingAdmin.rows.length > 0) {
+        logger.info(`✅ Admin configured: ${adminEmail}`);
+      } else {
+        const hashedPassword = await bcrypt.hash(adminPassword, 10);
+        const profile = JSON.stringify({ name: 'Administrator' });
+
+        await client.query(
+          `INSERT INTO auth.users (id, email, password, profile, email_verified, is_project_admin, is_anonymous, created_at, updated_at)
+           VALUES ($1, $2, $3, $4::jsonb, true, true, false, NOW(), NOW())
+           ON CONFLICT (id) DO NOTHING`,
+          [ADMIN_ID, adminEmail, hashedPassword, profile]
+        );
+
+        logger.info(`✅ Admin user seeded: ${adminEmail}`);
+      }
+    } else {
+      logger.warn('⚠️ Admin credentials not configured - check ADMIN_EMAIL and ADMIN_PASSWORD');
     }
 
-    // Hash password and create admin user
-    const hashedPassword = await bcrypt.hash(adminPassword, 10);
-    const profile = JSON.stringify({ name: 'Administrator' });
+    // Seed anon user
+    const existingAnon = await client.query('SELECT id FROM auth.users WHERE id = $1', [ANON_ID]);
 
-    await client.query(
-      `INSERT INTO auth.users (id, email, password, profile, email_verified, is_project_admin, is_anonymous, created_at, updated_at)
-       VALUES ($1, $2, $3, $4::jsonb, true, true, false, NOW(), NOW())
-       ON CONFLICT (id) DO NOTHING`,
-      [ADMIN_ID, adminEmail, hashedPassword, profile]
-    );
+    if (existingAnon.rows.length > 0) {
+      logger.info(`✅ Anon user configured`);
+    } else {
+      const profile = JSON.stringify({ name: 'Anonymous' });
 
-    logger.info(`✅ Admin user seeded: ${adminEmail}`);
+      await client.query(
+        `INSERT INTO auth.users (id, email, password, profile, email_verified, is_project_admin, is_anonymous, created_at, updated_at)
+         VALUES ($1, $2, NULL, $3::jsonb, false, false, true, NOW(), NOW())
+         ON CONFLICT (id) DO NOTHING`,
+        [ANON_ID, 'anon@example.com', profile]
+      );
+
+      logger.info(`✅ Anon user seeded`);
+    }
   } catch (error) {
-    logger.error('Failed to seed admin user', {
+    logger.error('Failed to seed system users', {
       error: error instanceof Error ? error.message : String(error),
     });
-    // Don't throw - this is not critical for app startup if admin already exists
   } finally {
     client.release();
   }
@@ -262,8 +277,8 @@ export async function seedBackend(): Promise<void> {
   try {
     logger.info(`\n🚀 Insforge Backend Starting...`);
 
-    // Seed admin user if not exists
-    await seedAdminUser(adminEmail, adminPassword);
+    // Seed system users (admin and anon) if not exists
+    await seedSystemUsers(adminEmail, adminPassword);
 
     // Initialize API key (from env or generate)
     const apiKey = await secretService.initializeApiKey();
