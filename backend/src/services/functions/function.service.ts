@@ -64,19 +64,23 @@ export class FunctionService {
 
       const functions = result.rows;
 
-      // Check if Deno runtime is healthy
+      // Check runtime availability: Subhosting configured = always available, otherwise check local runtime
       let runtimeHealthy = false;
-      try {
-        const denoUrl = process.env.DENO_RUNTIME_URL || 'http://localhost:7133';
-        const healthResponse = await fetch(`${denoUrl}/health`, {
-          method: 'GET',
-          signal: AbortSignal.timeout(2000), // 2 second timeout
-        });
-        runtimeHealthy = healthResponse.ok;
-      } catch (error) {
-        logger.debug('Deno runtime health check failed', {
-          error: error instanceof Error ? error.message : String(error),
-        });
+      if (this.isSubhostingConfigured()) {
+        runtimeHealthy = true;
+      } else {
+        try {
+          const denoUrl = process.env.DENO_RUNTIME_URL || 'http://localhost:7133';
+          const healthResponse = await fetch(`${denoUrl}/health`, {
+            method: 'GET',
+            signal: AbortSignal.timeout(2000), // 2 second timeout
+          });
+          runtimeHealthy = healthResponse.ok;
+        } catch (error) {
+          logger.debug('Deno runtime health check failed', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
 
       return {
