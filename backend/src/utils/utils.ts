@@ -112,3 +112,22 @@ export function generateNumericCode(length: number): string {
 export function generateSecureToken(bytes: number = 32): string {
   return crypto.randomBytes(bytes).toString('hex');
 }
+
+/**
+ * Client type for authentication endpoints
+ * - web: Browser-based clients (default) - uses httpOnly cookies for refresh tokens
+ * - mobile: Mobile app clients - refresh token returned in response body
+ * - desktop: Desktop app clients - refresh token returned in response body
+ */
+export type ClientType = 'web' | 'mobile' | 'desktop';
+
+/**
+ * Parse and validate client_type query parameter
+ * Returns 'web' as default if not provided or invalid
+ */
+export function parseClientType(value: unknown): ClientType {
+  if (value === 'mobile' || value === 'desktop') {
+    return value;
+  }
+  return 'web';
+}
