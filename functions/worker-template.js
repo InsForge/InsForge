@@ -8,7 +8,7 @@
 /* global self, Request, Deno */
 
 // Import SDK at worker level - this will be available to all functions
-import { createClient } from 'npm:@insforge/sdk';
+import { createClient } from 'npm:@insforge/sdk@1.1.2-edge.1';
 // Import base64 utilities for encoding/decoding
 import { encodeBase64, decodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
 
