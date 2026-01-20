@@ -159,7 +159,7 @@ export function PrimaryMenu({
         <div className="flex-1" />
 
         {/* Bottom items */}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 pr-2">
           {bottomItems?.map((item) => (
             <BottomMenuItem key={item.id} item={item} />
           ))}
