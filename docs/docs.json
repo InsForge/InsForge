@@ -98,7 +98,7 @@
         ]
       },
       {
-        "tab": "SDK & Samples",
+        "tab": "SDK & Examples",
         "groups": [
           {
             "group": "TypeScript",
@@ -171,7 +171,7 @@
             ]
           },
           {
-            "group": "Samples",
+            "group": "Examples",
             "pages": ["examples/overview"]
           }
         ]
