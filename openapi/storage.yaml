@@ -94,6 +94,48 @@ paths:
                 nextActions: "Choose a different bucket name"
 
   /api/storage/buckets/{bucketName}:
+    delete:
+      summary: Delete Bucket
+      description: Delete an entire bucket and all its objects
+      tags:
+        - Admin
+      security:
+        - apiKey: []
+      parameters:
+        - name: bucketName
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_-]+$'
+          example: avatars
+      responses:
+        '200':
+          description: Bucket deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  nextActions:
+                    type: string
+              example:
+                message: "Bucket deleted successfully"
+                nextActions: "You can use POST /api/storage/buckets to create a new bucket, and GET /api/storage/buckets/:bucketName/objects to list the objects in the bucket."
+        '404':
+          description: Bucket not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "BUCKET_NOT_FOUND"
+                message: "Bucket 'nonexistent' does not exist"
+                statusCode: 404
+                nextActions: "Check bucket name and try again"
+
     patch:
       summary: Update Bucket
       tags:
@@ -191,6 +233,13 @@ paths:
             type: integer
             minimum: 0
             default: 0
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Search objects by key (partial match)
+          example: profile
       responses:
         '200':
           description: List of objects in bucket
@@ -238,44 +287,6 @@ paths:
                   total: 2
                 nextActions: "You can use PUT /api/storage/buckets/:bucketName/objects/:objectKey to upload with a specific key, or POST /api/storage/buckets/:bucketName/objects to upload with auto-generated key, and GET /api/storage/buckets/:bucketName/objects/:objectKey to download an object."
 
-    delete:
-      summary: Delete Bucket
-      tags:
-        - Admin
-      security:
-        - apiKey: []
-      parameters:
-        - name: bucketName
-          in: path
-          required: true
-          schema:
-            type: string
-            pattern: '^[a-zA-Z0-9_-]+$'
-          example: avatars
-      responses:
-        '200':
-          description: Bucket deleted successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-              example:
-                message: "Bucket deleted successfully"
-        '404':
-          description: Bucket not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error: "BUCKET_NOT_FOUND"
-                message: "Bucket 'nonexistent' does not exist"
-                statusCode: 404
-                nextActions: "Check bucket name and try again"
-    
     post:
       summary: Upload Object with Auto-Generated Key
       tags:

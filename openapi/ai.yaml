@@ -262,12 +262,32 @@ paths:
         '500':
           description: Failed to fetch config usage records
 
+  /api/ai/credits:
+    get:
+      summary: Get remaining credits
+      description: Get remaining credits for the current API key from OpenRouter
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Remaining credits information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditsResponse'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Failed to fetch credits
+
   /api/ai/models:
     get:
       summary: Get all available AI models
       description: Returns list of all available text and image models from OpenRouter
       tags:
-        - Client
+        - Admin
       security:
         - bearerAuth: []
       responses:
@@ -329,7 +349,7 @@ paths:
             schema:
               $ref: '#/components/schemas/ImageGenerationOptions'
       responses:
-        '201':
+        '200':
           description: Images generated successfully
           content:
             application/json:
@@ -809,6 +829,16 @@ components:
           items:
             type: string
             enum: [text, image]
+
+    CreditsResponse:
+      type: object
+      properties:
+        credits:
+          type: number
+          description: Remaining credits balance
+        usage:
+          type: number
+          description: Total usage amount
 
     ErrorResponse:
       type: object

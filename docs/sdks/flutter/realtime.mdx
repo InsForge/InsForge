@@ -1,0 +1,562 @@
+---
+title: Realtime SDK Reference
+description: Real-time subscriptions and messaging with the InsForge Flutter SDK
+---
+
+<Info>
+  **Coming Soon** - The Flutter SDK is currently in development. This documentation serves as a preview of the planned API.
+</Info>
+
+## Installation
+
+```dart
+import 'package:insforge/insforge.dart';
+
+final insforge = InsForgeClient(
+  baseUrl: 'https://your-app.insforge.app',
+  anonKey: 'your-anon-key',
+);
+```
+
+## connect()
+
+Establish a WebSocket connection to the realtime server.
+
+### Example
+
+```dart
+try {
+  await insforge.realtime.connect();
+  print('Connected: ${insforge.realtime.isConnected}');
+} catch (e) {
+  print('Connection failed: $e');
+}
+```
+
+---
+
+## subscribe()
+
+Subscribe to a channel to receive events.
+
+### Example
+
+```dart
+final result = await insforge.realtime.subscribe('orders:123');
+
+if (result.ok) {
+  print('Subscribed to: ${result.channel}');
+} else {
+  print('Failed: ${result.error?.message}');
+}
+```
+
+---
+
+## unsubscribe()
+
+Unsubscribe from a channel.
+
+### Example
+
+```dart
+insforge.realtime.unsubscribe('orders:123');
+```
+
+---
+
+## publish()
+
+Publish a message to a channel.
+
+### Example
+
+```dart
+await insforge.realtime.publish(
+  channel: 'orders:123',
+  event: 'status_changed',
+  payload: {
+    'status': 'shipped',
+    'trackingNumber': 'ABC123',
+  },
+);
+```
+
+---
+
+## on()
+
+Listen for events.
+
+### Example
+
+```dart
+// Listen for custom events
+insforge.realtime.on('order_updated', (payload) {
+  print('Order updated: $payload');
+});
+
+// Connection events
+insforge.realtime.onConnect(() {
+  print('Connected! Socket ID: ${insforge.realtime.socketId}');
+});
+
+insforge.realtime.onDisconnect((reason) {
+  print('Disconnected: $reason');
+});
+
+insforge.realtime.onError((error) {
+  print('Error: ${error.code} - ${error.message}');
+});
+```
+
+---
+
+## off()
+
+Remove an event listener.
+
+### Example
+
+```dart
+void handleOrderUpdate(dynamic payload) {
+  print('Order updated: $payload');
+}
+
+// Add listener
+insforge.realtime.on('order_updated', handleOrderUpdate);
+
+// Remove listener later
+insforge.realtime.off('order_updated', handleOrderUpdate);
+```
+
+---
+
+## once()
+
+Listen for an event only once.
+
+### Example
+
+```dart
+insforge.realtime.once('order_completed', (payload) {
+  print('Order completed: $payload');
+  // Listener is automatically removed
+});
+```
+
+---
+
+## disconnect()
+
+Disconnect from the realtime server.
+
+### Example
+
+```dart
+insforge.realtime.disconnect();
+```
+
+---
+
+## Properties
+
+```dart
+// Check connection status
+if (insforge.realtime.isConnected) {
+  print('Connected');
+}
+
+// Get connection state
+print(insforge.realtime.connectionState);
+// ConnectionState.connected, connecting, disconnected
+
+// Get socket ID
+final socketId = insforge.realtime.socketId;
+if (socketId != null) {
+  print('Socket ID: $socketId');
+}
+
+// Get subscribed channels
+final channels = insforge.realtime.subscribedChannels;
+print('Channels: $channels');
+```
+
+---
+
+## Stream Support
+
+```dart
+// Observe events as Stream
+final orderUpdates = insforge.realtime.eventStream<Map<String, dynamic>>(
+  'order_updated',
+);
+
+orderUpdates.listen((payload) {
+  print('Order updated: $payload');
+});
+
+// Connection state as Stream
+insforge.realtime.connectionStateStream.listen((state) {
+  switch (state) {
+    case ConnectionState.connected:
+      print('Connected');
+      break;
+    case ConnectionState.connecting:
+      print('Connecting...');
+      break;
+    case ConnectionState.disconnected:
+      print('Disconnected');
+      break;
+  }
+});
+```
+
+---
+
+## Flutter Widget Integration
+
+### Chat Room Screen
+
+```dart
+class ChatRoomScreen extends StatefulWidget {
+  final String roomId;
+
+  const ChatRoomScreen({required this.roomId});
+
+  @override
+  _ChatRoomScreenState createState() => _ChatRoomScreenState();
+}
+
+class _ChatRoomScreenState extends State<ChatRoomScreen> {
+  final List<Map<String, dynamic>> _messages = [];
+  final TextEditingController _controller = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  bool _isConnected = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _connect();
+  }
+
+  Future<void> _connect() async {
+    try {
+      await insforge.realtime.connect();
+      await insforge.realtime.subscribe('chat:${widget.roomId}');
+
+      setState(() {
+        _isConnected = true;
+      });
+
+      insforge.realtime.on('new_message', (payload) {
+        setState(() {
+          _messages.add(payload);
+        });
+        _scrollToBottom();
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Connection error: $e')),
+      );
+    }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  Future<void> _sendMessage() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+
+    _controller.clear();
+
+    await insforge.realtime.publish(
+      channel: 'chat:${widget.roomId}',
+      event: 'new_message',
+      payload: {
+        'sender': currentUser.name,
+        'text': text,
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    insforge.realtime.unsubscribe('chat:${widget.roomId}');
+    insforge.realtime.disconnect();
+    _controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Chat Room'),
+        actions: [
+          Icon(
+            Icons.circle,
+            color: _isConnected ? Colors.green : Colors.red,
+            size: 12,
+          ),
+          SizedBox(width: 16),
+        ],
+      ),
+      body: Column(
+        children: [
+          if (!_isConnected)
+            Container(
+              color: Colors.yellow,
+              padding: EdgeInsets.all(8),
+              child: Row(
+                children: [
+                  CircularProgressIndicator(strokeWidth: 2),
+                  SizedBox(width: 8),
+                  Text('Connecting...'),
+                ],
+              ),
+            ),
+          Expanded(
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: EdgeInsets.all(16),
+              itemCount: _messages.length,
+              itemBuilder: (context, index) {
+                final message = _messages[index];
+                return ChatMessageTile(message: message);
+              },
+            ),
+          ),
+          Container(
+            padding: EdgeInsets.all(8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    decoration: InputDecoration(
+                      hintText: 'Type a message...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                    ),
+                    onSubmitted: (_) => _sendMessage(),
+                  ),
+                ),
+                SizedBox(width: 8),
+                IconButton(
+                  icon: Icon(Icons.send),
+                  onPressed: _isConnected ? _sendMessage : null,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ChatMessageTile extends StatelessWidget {
+  final Map<String, dynamic> message;
+
+  const ChatMessageTile({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    final isMe = message['sender'] == currentUser.name;
+
+    return Align(
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: EdgeInsets.symmetric(vertical: 4),
+        padding: EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isMe ? Colors.blue : Colors.grey[300],
+          borderRadius: BorderRadius.circular(16),
+        ),
+        constraints: BoxConstraints(maxWidth: 280),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (!isMe)
+              Text(
+                message['sender'],
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            Text(
+              message['text'],
+              style: TextStyle(
+                color: isMe ? Colors.white : Colors.black,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+### Order Tracking Screen
+
+```dart
+class OrderTrackingScreen extends StatefulWidget {
+  final String orderId;
+
+  const OrderTrackingScreen({required this.orderId});
+
+  @override
+  _OrderTrackingScreenState createState() => _OrderTrackingScreenState();
+}
+
+class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
+  String _status = 'pending';
+  List<Map<String, dynamic>> _updates = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _subscribeToUpdates();
+  }
+
+  Future<void> _subscribeToUpdates() async {
+    try {
+      await insforge.realtime.connect();
+      await insforge.realtime.subscribe('order:${widget.orderId}');
+
+      insforge.realtime.on('status_changed', (payload) {
+        setState(() {
+          _status = payload['status'];
+          _updates.add(payload);
+        });
+      });
+    } catch (e) {
+      print('Error: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    insforge.realtime.unsubscribe('order:${widget.orderId}');
+    insforge.realtime.disconnect();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Order Tracking')),
+      body: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Status: $_status',
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Updates',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: _updates.length,
+                itemBuilder: (context, index) {
+                  final update = _updates[index];
+                  return Card(
+                    child: ListTile(
+                      leading: Icon(Icons.update),
+                      title: Text(update['status']),
+                      subtitle: Text(update['timestamp'] ?? ''),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+---
+
+## Riverpod Integration
+
+```dart
+// Define providers
+final realtimeConnectionProvider = StreamProvider<ConnectionState>((ref) {
+  return insforge.realtime.connectionStateStream;
+});
+
+final chatMessagesProvider = StreamProvider.family<List<Map>, String>((ref, roomId) async* {
+  await insforge.realtime.connect();
+  await insforge.realtime.subscribe('chat:$roomId');
+
+  final messages = <Map>[];
+
+  await for (final message in insforge.realtime.eventStream('new_message')) {
+    messages.add(message);
+    yield List.from(messages);
+  }
+});
+
+// Use in widget
+class ChatScreen extends ConsumerWidget {
+  final String roomId;
+
+  const ChatScreen({required this.roomId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final connectionState = ref.watch(realtimeConnectionProvider);
+    final messagesAsync = ref.watch(chatMessagesProvider(roomId));
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Chat'),
+        actions: [
+          connectionState.when(
+            data: (state) => Icon(
+              Icons.circle,
+              color: state == ConnectionState.connected
+                  ? Colors.green
+                  : Colors.red,
+            ),
+            loading: () => CircularProgressIndicator(),
+            error: (_, __) => Icon(Icons.error, color: Colors.red),
+          ),
+        ],
+      ),
+      body: messagesAsync.when(
+        data: (messages) => ListView.builder(
+          itemCount: messages.length,
+          itemBuilder: (context, index) => ChatMessageTile(
+            message: messages[index],
+          ),
+        ),
+        loading: () => Center(child: CircularProgressIndicator()),
+        error: (error, _) => Center(child: Text('Error: $error')),
+      ),
+    );
+  }
+}
+```

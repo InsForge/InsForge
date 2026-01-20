@@ -1,0 +1,382 @@
+---
+title: Functions API Reference
+description: Serverless edge functions via REST API
+---
+
+## Overview
+
+The Functions API provides endpoints for invoking and managing serverless functions running in a Deno runtime.
+
+## Headers
+
+```bash
+Content-Type: application/json
+```
+
+For authenticated function invocations:
+```bash
+Authorization: Bearer your-jwt-token-or-anon-key
+```
+
+For admin endpoints:
+```bash
+Authorization: Bearer admin-jwt-token-Or-API-Key
+```
+
+---
+
+## Invoke Function
+
+Execute a deployed function.
+
+```
+POST /functions/{slug}
+```
+
+<Note>
+Note: Function invocation uses `/functions/{slug}` (without `/api` prefix), not `/api/functions/{slug}`.
+</Note>
+
+### Path Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `slug` | string | Function slug identifier |
+
+### Request Body
+
+Any JSON payload that the function expects.
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/functions/hello-world" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "John"
+  }'
+```
+
+### Response
+
+The response depends on what the function returns:
+
+```json
+{
+  "message": "Hello, John!"
+}
+```
+
+---
+
+## Admin Endpoints
+
+These endpoints require admin authentication.
+
+### List All Functions
+
+```
+GET /api/functions
+```
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/functions" \
+  -H "Authorization: Bearer admin-jwt-token-or-api-key"
+```
+
+### Response
+
+```json
+[
+  {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "slug": "hello-world",
+    "name": "Hello World Function",
+    "description": "Returns a greeting message",
+    "status": "active",
+    "created_at": "2024-01-21T10:30:00Z",
+    "updated_at": "2024-01-21T10:35:00Z",
+    "deployed_at": "2024-01-21T10:35:00Z"
+  },
+  {
+    "id": "223e4567-e89b-12d3-a456-426614174001",
+    "slug": "process-webhook",
+    "name": "Webhook Processor",
+    "description": "Processes incoming webhooks",
+    "status": "draft",
+    "created_at": "2024-01-22T14:20:00Z",
+    "updated_at": "2024-01-22T14:20:00Z",
+    "deployed_at": null
+  }
+]
+```
+
+---
+
+### Get Function Details
+
+```
+GET /api/functions/{slug}
+```
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/functions/hello-world" \
+  -H "Authorization: Bearer admin-jwt-token-or-api-key"
+```
+
+### Response
+
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "slug": "hello-world",
+  "name": "Hello World Function",
+  "description": "Returns a greeting message",
+  "code": "export default async function(request) {\n  const { name = 'World' } = await request.json();\n  return new Response(\n    JSON.stringify({ message: `Hello, ${name}!` }),\n    { headers: { 'Content-Type': 'application/json' } }\n  );\n}",
+  "status": "active",
+  "created_at": "2024-01-21T10:30:00Z",
+  "updated_at": "2024-01-21T10:35:00Z",
+  "deployed_at": "2024-01-21T10:35:00Z"
+}
+```
+
+---
+
+### Create Function
+
+<Note>
+Currently, InsForge only supports JavaScript/TypeScript functions running in a Deno environment.
+</Note>
+
+```
+POST /api/functions
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Display name for the function |
+| `code` | string | Yes | JavaScript/TypeScript code |
+| `slug` | string | No | URL-friendly identifier (auto-generated if not provided) |
+| `description` | string | No | Description of the function |
+| `status` | string | No | `draft` or `active` (default: `active`) |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/functions" \
+  -H "Authorization: Bearer admin-jwt-token-or-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Hello World Function",
+    "slug": "hello-world",
+    "description": "Returns a personalized greeting",
+    "code": "export default async function(request) {\n  const { name = \"World\" } = await request.json();\n  return new Response(\n    JSON.stringify({ message: `Hello, ${name}!` }),\n    { headers: { \"Content-Type\": \"application/json\" } }\n  );\n}",
+    "status": "active"
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "function": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "slug": "hello-world",
+    "name": "Hello World Function",
+    "description": "Returns a personalized greeting",
+    "status": "active",
+    "created_at": "2024-01-21T10:30:00Z"
+  }
+}
+```
+
+---
+
+### Update Function
+
+```
+PUT /api/functions/{slug}
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | No | Updated display name |
+| `code` | string | No | Updated function code |
+| `description` | string | No | Updated description |
+| `status` | string | No | `draft`, `active`, or `error` |
+
+### Example
+
+```bash
+curl -X PUT "https://your-app.insforge.app/api/functions/hello-world" \
+  -H "Authorization: Bearer admin-jwt-token-or-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Hello World Function v2",
+    "code": "export default async function(request) {\n  const { name = \"World\" } = await request.json();\n  return new Response(\n    JSON.stringify({ message: `Hello, ${name}! Welcome to v2.`, version: 2 }),\n    { headers: { \"Content-Type\": \"application/json\" } }\n  );\n}"
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "function": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "slug": "hello-world",
+    "name": "Hello World Function v2",
+    "description": "Returns a personalized greeting",
+    "status": "active",
+    "updated_at": "2024-01-21T11:00:00Z"
+  }
+}
+```
+
+---
+
+### Delete Function
+
+```
+DELETE /api/functions/{slug}
+```
+
+### Example
+
+```bash
+curl -X DELETE "https://your-app.insforge.app/api/functions/old-function" \
+  -H "Authorization: Bearer admin-jwt-token-or-api-key"
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "Function old-function deleted successfully"
+}
+```
+
+---
+
+## Function Code Structure
+
+Functions must export a default async function that receives a `Request` object and returns a `Response`:
+
+```javascript
+export default async function(request) {
+  // Parse request body
+  const body = await request.json();
+
+  // Process request
+  const result = { message: `Hello, ${body.name}!` };
+
+  // Return response
+  return new Response(
+    JSON.stringify(result),
+    {
+      headers: { 'Content-Type': 'application/json' },
+      status: 200
+    }
+  );
+}
+```
+
+### Accessing Request Data
+
+```javascript
+export default async function(request) {
+  // Get JSON body
+  const body = await request.json();
+
+  // Get headers
+  const authHeader = request.headers.get('Authorization');
+
+  // Get query parameters
+  const url = new URL(request.url);
+  const param = url.searchParams.get('param');
+
+  // Get request method
+  const method = request.method;
+
+  return new Response(JSON.stringify({ body, authHeader, param, method }));
+}
+```
+
+---
+
+## Function Status
+
+| Status | Description |
+|--------|-------------|
+| `draft` | Function is saved but not deployed |
+| `active` | Function is deployed and can be invoked |
+| `error` | Function has a deployment error |
+
+---
+
+## Error Responses
+
+### Function Not Found (404)
+
+```json
+{
+  "error": "Function not found"
+}
+```
+
+### Function Not Active (404)
+
+```json
+{
+  "error": "Function not found or not active"
+}
+```
+
+### Execution Error (502)
+
+When the Deno runtime fails to execute the function:
+
+```json
+{
+  "error": "Failed to connect to Deno runtime"
+}
+```
+
+### Function Runtime Error (500)
+
+When the function code throws an error:
+
+```json
+{
+  "error": "Function execution failed",
+  "message": "TypeError: Cannot read property 'name' of undefined"
+}
+```
+
+### Slug Already Exists (409)
+
+```json
+{
+  "error": "Function with this slug already exists",
+  "details": "duplicate key value violates unique constraint"
+}
+```
+
+### Dangerous Code Detected (400)
+
+```json
+{
+  "error": "Code contains potentially dangerous patterns",
+  "pattern": "/Deno\\.run/i"
+}
+```

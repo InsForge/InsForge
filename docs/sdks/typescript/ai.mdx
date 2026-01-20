@@ -1,0 +1,506 @@
+---
+title: AI SDK Reference
+description: AI chat completions, web search, file parsing, and image generation with the InsForge TypeScript SDK
+---
+
+## Installation
+
+<CodeGroup>
+```bash npm
+npm install @insforge/sdk@latest
+```
+
+```bash yarn
+yarn add @insforge/sdk@latest
+```
+
+```bash pnpm
+pnpm add @insforge/sdk@latest
+```
+</CodeGroup>
+
+```typescript
+import { createClient } from '@insforge/sdk';
+
+const insforge = createClient({
+  baseUrl: 'https://your-app.insforge.app',
+  anonKey: 'your-anon-key'
+});
+```
+
+## chat.completions.create()
+
+Create AI chat completions with streaming support, web search, file parsing, and extended reasoning.
+
+### Parameters
+
+- `model` (string, required) - AI model (e.g., 'anthropic/claude-3.5-haiku', 'openai/gpt-4')
+- `messages` (array, required) - Array of message objects with text, images, or files
+- `temperature` (number, optional) - Sampling temperature 0-2
+- `maxTokens` (number, optional) - Max tokens to generate
+- `topP` (number, optional) - Top-p sampling 0-1
+- `stream` (boolean, optional) - Enable streaming mode
+- `webSearch` (object, optional) - Enable web search capabilities
+- `fileParser` (object, optional) - Enable file/PDF parsing
+- `thinking` (boolean, optional) - Enable extended reasoning mode (Anthropic models)
+
+### Returns (non-streaming)
+
+```typescript
+{
+  id: string,
+  object: 'chat.completion',
+  created: number,
+  model: string,
+  choices: [{
+    index: number,
+    message: {
+      role: "assistant",
+      content: string,
+      annotations?: UrlCitationAnnotation[]  // Present when web search is used
+    },
+    finish_reason: string
+  }],
+  usage: { prompt_tokens: number, completion_tokens: number, total_tokens: number }
+}
+```
+
+### Returns (streaming)
+
+```typescript
+AsyncIterableIterator<{
+  id: string;
+  object: 'chat.completion.chunk';
+  choices: [
+    {
+      delta: { content: string };
+      finish_reason: string | null;
+    },
+  ];
+}>;
+```
+
+### Example (Basic)
+
+```typescript
+const completion = await insforge.ai.chat.completions.create({
+  model: 'anthropic/claude-3.5-haiku',
+  messages: [
+    { role: 'user', content: 'What is the capital of France?' }
+  ],
+});
+
+console.log(completion.choices[0].message.content);
+// "The capital of France is Paris."
+```
+
+### Example (With Images)
+
+```typescript
+const completion = await insforge.ai.chat.completions.create({
+  model: 'anthropic/claude-3.5-haiku',
+  messages: [
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'What do you see in this image?' },
+        {
+          type: 'image_url',
+          image_url: {
+            url: 'https://example.com/photo.jpg', // or base64: 'data:image/jpeg;base64,...'
+          },
+        },
+      ],
+    },
+  ],
+});
+
+console.log(completion.choices[0].message.content);
+```
+
+### Example (With Web Search)
+
+```typescript
+const completion = await insforge.ai.chat.completions.create({
+  model: 'openai/gpt-4',
+  messages: [
+    { role: 'user', content: 'What are the latest news about AI?' }
+  ],
+  webSearch: {
+    enabled: true,
+    maxResults: 5,        // 1-10, default: 5
+    engine: 'native'      // 'native' or 'exa'
+  }
+});
+
+console.log(completion.choices[0].message.content);
+
+// Access URL citations from search results
+const annotations = completion.choices[0].message.annotations;
+if (annotations) {
+  annotations.forEach(annotation => {
+    console.log(`Source: ${annotation.urlCitation.title} - ${annotation.urlCitation.url}`);
+  });
+}
+```
+
+### Example (With PDF Files)
+
+```typescript
+const completion = await insforge.ai.chat.completions.create({
+  model: 'anthropic/claude-3.5-sonnet',
+  messages: [
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'Summarize this document' },
+        {
+          type: 'file',
+          file: {
+            filename: 'report.pdf',
+            file_data: 'https://example.com/report.pdf'  // URL or base64
+          }
+        }
+      ],
+    },
+  ],
+  fileParser: {
+    enabled: true,
+    pdf: {
+      engine: 'mistral-ocr'  // 'pdf-text', 'mistral-ocr', or 'native'
+    }
+  }
+});
+
+console.log(completion.choices[0].message.content);
+```
+
+### Example (With Extended Reasoning)
+
+```typescript
+const completion = await insforge.ai.chat.completions.create({
+  model: 'anthropic/claude-3.5-sonnet',
+  messages: [
+    { role: 'user', content: 'Solve this complex math problem step by step...' }
+  ],
+  thinking: true
+});
+
+console.log(completion.choices[0].message.content);
+```
+
+### Example (Combined Features)
+
+```typescript
+const completion = await insforge.ai.chat.completions.create({
+  model: 'openai/gpt-4',
+  messages: [
+    { role: 'user', content: 'Research and summarize the latest developments in quantum computing' }
+  ],
+  webSearch: { enabled: true, maxResults: 5 },
+  thinking: true
+});
+
+console.log(completion.choices[0].message.content);
+
+// Access citations
+completion.choices[0].message.annotations?.forEach(annotation => {
+  console.log(`- ${annotation.urlCitation.title}: ${annotation.urlCitation.url}`);
+});
+```
+
+### Example (Streaming)
+
+```typescript
+const stream = await insforge.ai.chat.completions.create({
+  model: 'openai/gpt-4',
+  messages: [{ role: 'user', content: 'Tell me a story' }],
+  stream: true,
+});
+
+for await (const chunk of stream) {
+  if (chunk.choices[0]?.delta?.content) {
+    process.stdout.write(chunk.choices[0].delta.content);
+  }
+}
+```
+
+### Example (Streaming with Web Search)
+
+```typescript
+const stream = await insforge.ai.chat.completions.create({
+  model: 'openai/gpt-4',
+  messages: [{ role: 'user', content: 'What is happening in tech news today?' }],
+  stream: true,
+  webSearch: { enabled: true, maxResults: 3 }
+});
+
+for await (const chunk of stream) {
+  if (chunk.choices[0]?.delta?.content) {
+    process.stdout.write(chunk.choices[0].delta.content);
+  }
+}
+```
+
+### Output (non-streaming)
+
+```json
+{
+  "id": "chatcmpl-1705315200000",
+  "object": "chat.completion",
+  "created": 1705315200,
+  "model": "anthropic/claude-3.5-haiku",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "The capital of France is Paris.",
+        "annotations": [
+          {
+            "type": "url_citation",
+            "urlCitation": {
+              "url": "https://example.com/article",
+              "title": "Article Title",
+              "startIndex": 0,
+              "endIndex": 30
+            }
+          }
+        ]
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 24,
+    "completion_tokens": 8,
+    "total_tokens": 32
+  }
+}
+```
+
+### Output (streaming)
+
+```json
+{
+  "id": "chatcmpl-1705315200000",
+  "object": "chat.completion.chunk",
+  "choices": [
+    {
+      "delta": { "content": "Once upon" },
+      "finish_reason": null
+    }
+  ]
+}
+```
+
+---
+
+## images.generate()
+
+Generate images using AI models.
+
+### Parameters
+
+- `model` (string, required) - Image model (e.g., 'google/gemini-2.5-flash-image-preview')
+- `prompt` (string, required) - Text description of image
+- `images` (array, optional) - Input images for image-to-image (url or base64)
+- `width` (number, optional) - Image width in pixels
+- `height` (number, optional) - Image height in pixels
+- `size` (string, optional) - Predefined size ('1024x1024', '512x512')
+- `numImages` (number, optional) - Number of images to generate
+- `quality` (string, optional) - Image quality: "standard" or "hd"
+- `style` (string, optional) - Image style: "vivid" or "natural"
+
+### Returns
+
+```typescript
+{
+  created: number,
+  data: ImageData[],
+  usage?: TokenUsage
+}
+
+// ImageData type
+interface ImageData {
+  b64_json?: string,  // Base64 encoded image
+  content?: string    // Text response from model
+}
+```
+
+### Example
+
+```typescript
+const response = await insforge.ai.images.generate({
+  model: 'google/gemini-2.5-flash-image-preview',
+  prompt: 'A serene mountain landscape at sunset',
+  size: '1024x1024',
+});
+
+// Get base64 image and upload to storage
+const base64Image = response.data[0].b64_json;
+const buffer = Buffer.from(base64Image, 'base64');
+const blob = new Blob([buffer], { type: 'image/png' });
+
+const { data: uploadData } = await insforge.storage.from('ai-images').uploadAuto(blob);
+
+// Save URL to database
+await insforge.database.from('generated_images').insert([
+  {
+    prompt: 'A serene mountain landscape',
+    image_url: uploadData.url,
+  },
+]);
+```
+
+### Output
+
+```json
+{
+  "created": 1705315200,
+  "data": [
+    {
+      "b64_json": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      "content": "A beautiful mountain landscape at sunset with orange and purple hues."
+    }
+  ],
+  "usage": {
+    "total_tokens": 150,
+    "input_tokens": 20,
+    "output_tokens": 130
+  }
+}
+```
+
+---
+
+## Types Reference
+
+### Plugin Configuration
+
+```typescript
+// Web search plugin configuration
+interface WebSearchPlugin {
+  enabled: boolean;
+  maxResults?: number;      // 1-10, default: 5
+  engine?: 'native' | 'exa';
+  searchPrompt?: string;    // Custom prompt for search results
+}
+
+// PDF parser configuration
+interface PdfParserConfig {
+  engine?: 'pdf-text' | 'mistral-ocr' | 'native';
+}
+
+// File parser plugin configuration
+interface FileParserPlugin {
+  enabled: boolean;
+  pdf?: PdfParserConfig;
+}
+```
+
+### Message Content Types
+
+```typescript
+// Text content
+interface TextContent {
+  type: 'text';
+  text: string;
+}
+
+// Image content (OpenAI-compatible)
+interface ImageUrlContent {
+  type: 'image_url';
+  image_url: {
+    url: string;  // URL or base64 data URI
+  };
+}
+
+// File content (for PDFs and documents)
+interface FileContent {
+  type: 'file';
+  file: {
+    filename: string;
+    file_data: string;  // URL or base64
+  };
+}
+
+// Message content can be string or array of content parts
+type MessageContent = string | ContentPart[];
+type ContentPart = TextContent | ImageUrlContent | FileContent;
+
+// Chat message
+interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: MessageContent;
+}
+```
+
+### Annotations
+
+```typescript
+// URL citation from web search results
+interface UrlCitation {
+  url: string;
+  title?: string;
+  content?: string;
+  startIndex?: number;
+  endIndex?: number;
+}
+
+// Annotation containing URL citation
+interface UrlCitationAnnotation {
+  type: 'url_citation';
+  urlCitation: UrlCitation;
+}
+```
+
+### Chat Completion Response
+
+```typescript
+interface ChatCompletionResponse {
+  id: string;
+  object: 'chat.completion';
+  created: number;
+  model: string;
+  choices: ChatChoice[];
+  usage: TokenUsage;
+}
+
+interface ChatChoice {
+  index: number;
+  message: {
+    role: 'assistant';
+    content: string;
+    annotations?: UrlCitationAnnotation[];
+  };
+  finish_reason: string;
+}
+
+interface TokenUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+}
+```
+
+### Image Generation Response
+
+```typescript
+interface ImageGenerationResponse {
+  created: number;
+  data: ImageData[];
+  usage?: ImageTokenUsage;
+}
+
+interface ImageData {
+  b64_json?: string;
+  content?: string;
+}
+
+interface ImageTokenUsage {
+  total_tokens: number;
+  input_tokens: number;
+  output_tokens: number;
+}
+```

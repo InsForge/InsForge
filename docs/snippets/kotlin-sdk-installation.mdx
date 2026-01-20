@@ -1,0 +1,262 @@
+1. Add InsForge dependencies to your project
+
+<Tabs>
+  <Tab title="Maven Central">
+    build.gradle.kts:
+    ```kotlin
+    repositories {
+        mavenLocal() // For local development
+        mavenCentral()
+    }
+
+    dependencies {
+        implementation("dev.insforge:insforge-kotlin:0.1.3")
+    }
+    ```
+  </Tab>
+  <Tab title="GitHub Packages">
+    First, create a GitHub Personal Access Token:
+    - Go to GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+    - Select permission: `read:packages`
+
+    Then configure your project using one of the following methods:
+
+    <AccordionGroup>
+      <Accordion title="Option A: Environment Variables">
+        settings.gradle.kts (or build.gradle.kts):
+        ```kotlin
+        repositories {
+            mavenCentral()
+            maven {
+                url = uri("https://maven.pkg.github.com/InsForge/insforge-kotlin")
+                credentials {
+                    username = System.getenv("GITHUB_USER") ?: ""
+                    password = System.getenv("GITHUB_TOKEN") ?: ""
+                }
+            }
+        }
+        ```
+
+        build.gradle.kts:
+        ```kotlin
+        dependencies {
+            implementation("dev.insforge:insforge-kotlin:0.1.3")
+        }
+        ```
+
+        Set environment variables before building:
+        ```bash
+        export GITHUB_USER="your-github-username"
+        export GITHUB_TOKEN="your-personal-access-token"
+        ```
+      </Accordion>
+      <Accordion title="Option B: gradle.properties (Local Development)">
+        Add credentials to your global Gradle properties file:
+
+        ~/.gradle/gradle.properties:
+        ```properties
+        gpr.user=your-github-username
+        gpr.token=ghp_xxxxxxxxxxxx
+        ```
+
+        settings.gradle.kts:
+        ```kotlin
+        repositories {
+            mavenCentral()
+            maven {
+                url = uri("https://maven.pkg.github.com/InsForge/insforge-kotlin")
+                credentials {
+                    username = providers.gradleProperty("gpr.user").orNull ?: ""
+                    password = providers.gradleProperty("gpr.token").orNull ?: ""
+                }
+            }
+        }
+        ```
+
+        build.gradle.kts:
+        ```kotlin
+        dependencies {
+            implementation("dev.insforge:insforge-kotlin:0.1.1")
+        }
+        ```
+
+        <Note>
+          The `~/.gradle/gradle.properties` file is stored outside your project, so credentials won't be accidentally committed to version control.
+        </Note>
+      </Accordion>
+    </AccordionGroup>
+  </Tab>
+</Tabs>
+
+2. Initialize InsForge SDK
+
+```kotlin
+import dev.insforge.createInsforgeClient
+import dev.insforge.auth.Auth
+import dev.insforge.database.Database
+import dev.insforge.storage.Storage
+import dev.insforge.functions.Functions
+import dev.insforge.realtime.Realtime
+import dev.insforge.ai.AI
+
+val client = createInsforgeClient(
+    baseUrl = "https://your-app.insforge.app",
+    anonKey = "your-api-key"
+) {
+    install(Auth)
+    install(Database)
+    install(Storage)
+    install(Functions)
+    install(Realtime) {
+        autoReconnect = true
+        reconnectDelay = 5000
+    }
+    install(AI)
+}
+```
+
+3. Enable Logging (Optional)
+
+For debugging, you can configure the SDK log level:
+
+```kotlin
+import dev.insforge.InsforgeLogLevel
+
+val client = createInsforgeClient(
+    baseUrl = "https://your-app.insforge.app",
+    anonKey = "your-api-key"
+) {
+    // DEBUG: logs request method/URL and response status
+    // VERBOSE: logs full headers and request/response bodies
+    logLevel = InsforgeLogLevel.DEBUG
+
+    install(Auth)
+    install(Database)
+    // ... other modules
+}
+```
+
+| Log Level | Description |
+|-----------|-------------|
+| `NONE` | No logging (default, recommended for production) |
+| `ERROR` | Only errors |
+| `WARN` | Warnings and errors |
+| `INFO` | Informational messages |
+| `DEBUG` | Debug info (request method, URL, response status) |
+| `VERBOSE` | Full details (headers, request/response bodies) |
+
+<Note>
+  Use `NONE` or `ERROR` in production to avoid exposing sensitive data in logs.
+</Note>
+
+### Android Initialization
+
+1. Initialize InsForge SDK (With Local Storage and Browser Launcher for OAuth)
+
+```kotlin
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import dev.insforge.createInsforgeClient
+import dev.insforge.ai.AI
+import dev.insforge.auth.Auth
+import dev.insforge.database.Database
+import dev.insforge.functions.Functions
+import dev.insforge.realtime.Realtime
+import dev.insforge.storage.Storage
+import dev.insforge.auth.BrowserLauncher
+import dev.insforge.auth.SessionStorage
+
+class InsforgeManager(private val context: Context) {
+    
+    val client = createInsforgeClient(
+        baseUrl = "https://your-app.insforge.app",
+        anonKey = "your-anon-key"
+    ) {
+        install(Auth) {
+            // 1. config BrowserLauncher (for OAuth)
+            browserLauncher = BrowserLauncher { url ->
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+            }
+            
+            // 2. enable session persistence
+            persistSession = true
+            
+            // 3. config SessionStorage (use SharedPreferences)
+            sessionStorage = object : SessionStorage {
+                private val prefs = context.getSharedPreferences(
+                    "insforge_auth", 
+                    Context.MODE_PRIVATE
+                )
+                
+                override suspend fun save(key: String, value: String) {
+                    prefs.edit().putString(key, value).apply()
+                }
+                
+                override suspend fun get(key: String): String? {
+                    return prefs.getString(key, null)
+                }
+                
+                override suspend fun remove(key: String) {
+                    prefs.edit().remove(key).apply()
+                }
+            }
+        }
+        // Install Database module
+        install(Database)
+
+        // Install Realtime module for real-time subscriptions
+        install(Realtime) {
+            debug = true
+        }
+        // Install other modules
+        install(Storage)
+        install(Functions)
+        install(AI)
+    }
+}
+```
+
+2. Use Jetpack DataStore for Session Storage (Optional)
+
+```kotlin
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+
+val Context.authDataStore: DataStore<Preferences> by preferencesDataStore(name = "insforge_auth")
+
+class DataStoreSessionStorage(private val context: Context) : SessionStorage {
+    
+    override suspend fun save(key: String, value: String) {
+        context.authDataStore.edit { prefs ->
+            prefs[stringPreferencesKey(key)] = value
+        }
+    }
+    
+    override suspend fun get(key: String): String? {
+        return context.authDataStore.data.map { prefs ->
+            prefs[stringPreferencesKey(key)]
+        }.first()
+    }
+    
+    override suspend fun remove(key: String) {
+        context.authDataStore.edit { prefs ->
+            prefs.remove(stringPreferencesKey(key))
+        }
+    }
+}
+
+// Then use it in your InsForge client
+install(Auth) {
+    browserLauncher = ...
+    persistSession = true
+    sessionStorage = DataStoreSessionStorage(context)
+}
+```

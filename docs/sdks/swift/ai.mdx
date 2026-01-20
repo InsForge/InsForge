@@ -1,0 +1,625 @@
+---
+title: AI SDK Reference
+description: AI chat completions, web search, file parsing, and image generation with the InsForge Swift SDK
+---
+
+import SwiftSdkInstallation from '/snippets/swift-sdk-installation.mdx';
+
+## Installation
+
+<SwiftSdkInstallation />
+
+## chatCompletion()
+
+Generate AI chat completions.
+
+### Parameters
+
+- `model` (String) - AI model (e.g., "anthropic/claude-3.5-haiku", "openai/gpt-4")
+- `messages` ([ChatMessage]) - Array of chat messages
+- `stream` (Bool, optional) - Enable streaming mode (default: false)
+- `temperature` (Double, optional) - Sampling temperature 0-2
+- `maxTokens` (Int, optional) - Max tokens to generate
+- `topP` (Double, optional) - Top-p sampling parameter
+- `systemPrompt` (String, optional) - System prompt for the conversation
+- `webSearch` (WebSearchPlugin?, optional) - Enable web search capabilities
+- `fileParser` (FileParserPlugin?, optional) - Enable file/PDF parsing
+- `thinking` (Bool?, optional) - Enable extended reasoning mode (Anthropic models only)
+
+### Returns
+
+```swift
+ChatCompletionResponse
+```
+
+### Example
+
+```swift
+let response = try await insforge.ai.chatCompletion(
+    model: "anthropic/claude-3.5-haiku",
+    messages: [
+        ChatMessage(role: .user, content: "What is the capital of France?")
+    ]
+)
+
+print(response.text)
+// "The capital of France is Paris."
+
+// Access metadata
+if let metadata = response.metadata {
+    print("Model: \(metadata.model)")
+    if let usage = metadata.usage {
+        print("Tokens used: \(usage.totalTokens)")
+    }
+}
+
+// Access annotations if available (from web search)
+if let annotations = response.annotations {
+    for annotation in annotations {
+        print("Citation: \(annotation.urlCitation.url)")
+        if let title = annotation.urlCitation.title {
+            print("Title: \(title)")
+        }
+    }
+}
+```
+
+### Example with System Prompt
+
+```swift
+let response = try await insforge.ai.chatCompletion(
+    model: "anthropic/claude-3.5-haiku",
+    messages: [
+        ChatMessage(role: .user, content: "Write a haiku about coding")
+    ],
+    temperature: 0.7,
+    maxTokens: 100,
+    systemPrompt: "You are a creative poet who writes in haiku format."
+)
+
+print(response.text)
+```
+
+### Example with Conversation History
+
+```swift
+let response = try await insforge.ai.chatCompletion(
+    model: "openai/gpt-4",
+    messages: [
+        ChatMessage(role: .system, content: "You are a helpful assistant."),
+        ChatMessage(role: .user, content: "What is 2 + 2?"),
+        ChatMessage(role: .assistant, content: "2 + 2 equals 4."),
+        ChatMessage(role: .user, content: "What about 3 + 3?")
+    ]
+)
+
+print(response.text)
+```
+
+### Example with Web Search
+
+```swift
+let response = try await insforge.ai.chatCompletion(
+    model: "openai/gpt-4",
+    messages: [
+        ChatMessage(role: .user, content: "What's the latest news about AI?")
+    ],
+    webSearch: WebSearchPlugin(
+        enabled: true,
+        maxResults: 5,
+        engine: .native
+    )
+)
+
+print(response.text)
+
+// Access URL citations from search results
+if let annotations = response.annotations {
+    for annotation in annotations {
+        print("Source: \(annotation.urlCitation.title ?? "Unknown") - \(annotation.urlCitation.url)")
+    }
+}
+```
+
+### Example with PDF Parsing
+
+```swift
+let response = try await insforge.ai.chatCompletion(
+    model: "openai/gpt-4",
+    messages: [
+        ChatMessage(role: .user, content: "Summarize this PDF document...")
+    ],
+    fileParser: FileParserPlugin(
+        enabled: true,
+        pdf: PdfParserConfig(engine: .mistralOcr)
+    )
+)
+
+print(response.text)
+```
+
+### Example with Extended Reasoning (Thinking)
+
+```swift
+let response = try await insforge.ai.chatCompletion(
+    model: "anthropic/claude-3-opus",
+    messages: [
+        ChatMessage(role: .user, content: "Solve this complex problem step by step...")
+    ],
+    thinking: true
+)
+
+print(response.text)
+```
+
+### Example with Combined Features
+
+```swift
+let response = try await insforge.ai.chatCompletion(
+    model: "openai/gpt-4",
+    messages: messages,
+    webSearch: WebSearchPlugin(enabled: true, maxResults: 3),
+    fileParser: FileParserPlugin(enabled: true),
+    thinking: true
+)
+
+print(response.text)
+```
+
+---
+
+## generateImage()
+
+Generate images using AI models.
+
+### Parameters
+
+- `model` (String) - Image generation model
+- `prompt` (String) - Text description of the image to generate
+
+### Returns
+
+```swift
+ImageGenerationResponse
+```
+
+### Example
+
+```swift
+let response = try await insforge.ai.generateImage(
+    model: "google/gemini-2.5-flash-image-preview",
+    prompt: "A serene mountain landscape at sunset"
+)
+
+// Access generated images
+for image in response.images {
+    print("Image URL: \(image.imageUrl)")
+    print("Type: \(image.type)")
+}
+
+// Get image count
+print("Generated \(response.imageCount) images")
+
+// Access metadata
+if let metadata = response.metadata {
+    print("Model: \(metadata.model)")
+    if let revisedPrompt = metadata.revisedPrompt {
+        print("Revised prompt: \(revisedPrompt)")
+    }
+}
+```
+
+### Example with Storage Upload
+
+```swift
+let response = try await insforge.ai.generateImage(
+    model: "google/gemini-2.5-flash-image-preview",
+    prompt: "A futuristic city skyline"
+)
+
+// Download and upload to storage
+if let firstImage = response.images.first {
+    // Fetch image data from URL
+    let imageURL = URL(string: firstImage.imageUrl)!
+    let (imageData, _) = try await URLSession.shared.data(from: imageURL)
+
+    // Upload to storage
+    let file = try await insforge.storage
+        .from("ai-images")
+        .upload(
+            data: imageData,
+            fileName: "generated-image.png",
+            options: FileOptions(contentType: "image/png")
+        )
+
+    // Save to database
+    struct GeneratedImage: Codable {
+        let prompt: String
+        let imageUrl: String
+        let model: String?
+    }
+
+    let _: [GeneratedImage] = try await insforge.database
+        .from("generated_images")
+        .insert(GeneratedImage(
+            prompt: "A futuristic city skyline",
+            imageUrl: file.url,
+            model: response.model
+        ))
+}
+```
+
+---
+
+## listModels()
+
+List available AI models.
+
+### Returns
+
+```swift
+ListModelsResponse
+```
+
+### Example
+
+```swift
+let models = try await insforge.ai.listModels()
+
+// List text generation models
+print("Text Models:")
+for provider in models.text {
+    print("  Provider: \(provider.provider) (configured: \(provider.configured))")
+    for model in provider.models {
+        print("    - \(model.id)")
+        print("      Input: \(model.inputModality)")
+        print("      Output: \(model.outputModality)")
+        print("      Price level: \(model.priceLevel)")
+    }
+}
+
+// List image generation models
+print("\nImage Models:")
+for provider in models.image {
+    print("  Provider: \(provider.provider)")
+    for model in provider.models {
+        print("    - \(model.id)")
+    }
+}
+```
+
+---
+
+## SwiftUI Integration
+
+### Chat View
+
+```swift
+import SwiftUI
+
+struct ChatView: View {
+    @State private var messages: [ChatMessage] = []
+    @State private var inputText = ""
+    @State private var isLoading = false
+    @State private var responseText = ""
+
+    var body: some View {
+        VStack {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 12) {
+                    ForEach(Array(messages.enumerated()), id: \.offset) { _, message in
+                        ChatBubble(message: message)
+                    }
+
+                    if !responseText.isEmpty {
+                        Text(responseText)
+                            .padding()
+                            .background(Color.gray.opacity(0.2))
+                            .cornerRadius(8)
+                    }
+                }
+                .padding()
+            }
+
+            HStack {
+                TextField("Message", text: $inputText)
+                    .textFieldStyle(.roundedBorder)
+
+                Button(action: sendMessage) {
+                    Image(systemName: "paperplane.fill")
+                }
+                .disabled(inputText.isEmpty || isLoading)
+            }
+            .padding()
+        }
+    }
+
+    func sendMessage() {
+        let userMessage = ChatMessage(role: .user, content: inputText)
+        messages.append(userMessage)
+        inputText = ""
+        isLoading = true
+
+        Task {
+            do {
+                let response = try await insforge.ai.chatCompletion(
+                    model: "anthropic/claude-3.5-haiku",
+                    messages: messages
+                )
+
+                let assistantMessage = ChatMessage(role: .assistant, content: response.text)
+                messages.append(assistantMessage)
+            } catch {
+                print("Error: \(error)")
+            }
+            isLoading = false
+        }
+    }
+}
+
+struct ChatBubble: View {
+    let message: ChatMessage
+
+    var body: some View {
+        HStack {
+            if message.role == .assistant {
+                Spacer()
+            }
+
+            Text(message.content)
+                .padding()
+                .background(message.role == .user ? Color.blue : Color.gray.opacity(0.2))
+                .foregroundColor(message.role == .user ? .white : .primary)
+                .cornerRadius(12)
+
+            if message.role == .user {
+                Spacer()
+            }
+        }
+    }
+}
+```
+
+### Image Generation View
+
+```swift
+struct ImageGenerationView: View {
+    @State private var prompt = ""
+    @State private var generatedImageURL: String?
+    @State private var isGenerating = false
+
+    var body: some View {
+        VStack(spacing: 20) {
+            TextField("Describe your image...", text: $prompt)
+                .textFieldStyle(.roundedBorder)
+
+            Button("Generate Image") {
+                Task {
+                    await generateImage()
+                }
+            }
+            .disabled(prompt.isEmpty || isGenerating)
+
+            if isGenerating {
+                ProgressView("Generating...")
+            }
+
+            if let imageURL = generatedImageURL,
+               let url = URL(string: imageURL) {
+                AsyncImage(url: url) { image in
+                    image
+                        .resizable()
+                        .scaledToFit()
+                } placeholder: {
+                    ProgressView()
+                }
+                .frame(maxHeight: 300)
+            }
+        }
+        .padding()
+    }
+
+    func generateImage() async {
+        isGenerating = true
+
+        do {
+            let response = try await insforge.ai.generateImage(
+                model: "google/gemini-2.5-flash-image-preview",
+                prompt: prompt
+            )
+
+            if let firstImage = response.images.first {
+                await MainActor.run {
+                    generatedImageURL = firstImage.imageUrl
+                }
+            }
+        } catch {
+            print("Generation failed: \(error)")
+        }
+
+        isGenerating = false
+    }
+}
+```
+
+---
+
+## Models Reference
+
+### Enums
+
+```swift
+// Search engine options for web search
+public enum WebSearchEngine: String, Codable {
+    case native
+    case exa
+}
+
+// PDF processing engine options
+public enum PdfEngine: String, Codable {
+    case pdfText = "pdf-text"
+    case mistralOcr = "mistral-ocr"
+    case native
+}
+```
+
+### Plugin Configuration
+
+```swift
+// Web search plugin configuration
+public struct WebSearchPlugin: Codable, Sendable {
+    let enabled: Bool
+    let engine: WebSearchEngine?
+    let maxResults: Int?          // 1-10, default: 5
+    let searchPrompt: String?     // Custom prompt for search results
+
+    init(
+        enabled: Bool = true,
+        engine: WebSearchEngine? = nil,
+        maxResults: Int? = nil,
+        searchPrompt: String? = nil
+    )
+}
+
+// PDF parser configuration
+public struct PdfParserConfig: Codable, Sendable {
+    let engine: PdfEngine?
+
+    init(engine: PdfEngine? = nil)
+}
+
+// File parser plugin configuration
+public struct FileParserPlugin: Codable, Sendable {
+    let enabled: Bool
+    let pdf: PdfParserConfig?
+
+    init(enabled: Bool = true, pdf: PdfParserConfig? = nil)
+}
+```
+
+### ChatMessage
+
+```swift
+public struct ChatMessage: Codable, Sendable {
+    let role: Role
+    let content: String
+
+    enum Role: String, Codable {
+        case user
+        case assistant
+        case system
+    }
+}
+```
+
+### ChatCompletionResponse
+
+```swift
+public struct ChatCompletionResponse: Codable, Sendable {
+    let text: String                              // The generated response text
+    let annotations: [UrlCitationAnnotation]?     // URL citations from web search
+    let metadata: Metadata?
+
+    // Computed properties
+    var content: String { text }  // Alias for text
+    var success: Bool             // True if text is not empty
+
+    struct Metadata: Codable {
+        let model: String
+        let usage: TokenUsage?
+    }
+}
+```
+
+### Annotations
+
+```swift
+// URL citation information from web search results
+public struct UrlCitation: Codable, Sendable {
+    let url: String
+    let title: String?
+    let content: String?
+    let startIndex: Int?
+    let endIndex: Int?
+}
+
+// Annotation containing URL citation
+public struct UrlCitationAnnotation: Codable, Sendable {
+    let type: String              // "url_citation"
+    let urlCitation: UrlCitation
+}
+```
+
+### TokenUsage
+
+```swift
+public struct TokenUsage: Codable, Sendable {
+    let promptTokens: Int
+    let completionTokens: Int
+    let totalTokens: Int
+}
+```
+
+### ImageGenerationResponse
+
+```swift
+public struct ImageGenerationResponse: Codable, Sendable {
+    let model: String?
+    let images: [ImageMessage]
+    let text: String?
+    let count: Int?
+    let metadata: Metadata?
+
+    // Computed property
+    var imageCount: Int           // count ?? images.count
+
+    struct Metadata: Codable {
+        let model: String
+        let revisedPrompt: String?
+        let usage: TokenUsage?
+    }
+}
+```
+
+### ImageMessage
+
+```swift
+public struct ImageMessage: Codable, Sendable {
+    let type: String
+    let imageUrl: String
+
+    // Computed property
+    var url: String { imageUrl }  // Alias for imageUrl
+}
+```
+
+### AIModel
+
+```swift
+public struct AIModel: Codable, Sendable {
+    let id: String
+    let modelId: String
+    let provider: String
+    let inputModality: [String]   // e.g., ["text"], ["text", "image"]
+    let outputModality: [String]  // e.g., ["text"], ["image"]
+    let priceLevel: Int
+
+    // Computed properties
+    var name: String { id }
+}
+```
+
+### ListModelsResponse
+
+```swift
+public struct ListModelsResponse: Codable, Sendable {
+    let text: [ModelProvider]     // Text generation models
+    let image: [ModelProvider]    // Image generation models
+
+    struct ModelProvider: Codable {
+        let provider: String
+        let configured: Bool
+        let models: [AIModel]
+    }
+}
+```

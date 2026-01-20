@@ -76,6 +76,10 @@ paths:
                             type: string
                             enum: [CASCADE, SET NULL, NO ACTION, RESTRICT]
                             default: NO ACTION
+                rlsEnabled:
+                  type: boolean
+                  default: false
+                  description: Enable Row Level Security on the table
       responses:
         '201':
           description: Table created
@@ -114,7 +118,7 @@ paths:
                 statusCode: 422
                 nextActions: "Use one of the valid field types"
 
-  /api/database/tables/{tableName}:
+  /api/database/tables/{tableName}/schema:
     get:
       summary: Get Table Schema
       tags:
@@ -204,6 +208,7 @@ paths:
                 message: "Table 'nonexistent' does not exist"
                 statusCode: 404
                 nextActions: "Check table name and try again"
+
     patch:
       summary: Update Table Schema
       tags:
@@ -391,6 +396,8 @@ paths:
                 message: "Table 'nonexistent' does not exist"
                 statusCode: 404
                 nextActions: "Check table name and try again"
+
+  /api/database/tables/{tableName}:
     delete:
       summary: Delete Table
       tags:

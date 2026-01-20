@@ -1,0 +1,449 @@
+---
+title: Storage SDK Reference
+description: File upload, download, and management with the InsForge Kotlin SDK
+---
+
+import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
+
+## Installation
+
+<KotlinSdkInstallation />
+
+## from()
+
+Get a bucket instance for file operations.
+
+### Example
+
+```kotlin
+val bucket = insforge.storage.from("images")
+```
+
+---
+
+## upload()
+
+Upload a file with a specific path/key.
+
+### Parameters
+
+- `path` (String) - File path/key in the bucket
+- `data` (ByteArray) - File content as bytes
+- `options` (DSL block, optional) - Upload options
+
+### UploadOptions
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `contentType` | String? | MIME type (e.g., "image/jpeg") |
+| `upsert` | Boolean | Overwrite if file exists (default: false) |
+| `metadata` | `Map\<String, String\>?` | Custom metadata |
+
+### Example
+
+```kotlin
+// Basic upload
+val imageData = bitmap.toByteArray()
+val result = insforge.storage
+    .from("images")
+    .upload("posts/post-123/cover.jpg", imageData)
+
+Log.d("Storage", "Uploaded: ${result.url}")
+
+// Upload with options
+val result = insforge.storage
+    .from("images")
+    .upload("posts/post-123/cover.jpg", imageData) {
+        contentType = "image/jpeg"
+        upsert = true  // Overwrite if exists
+        metadata = mapOf("userId" to "123")
+    }
+
+// Using bracket syntax
+val result = insforge.storage["images"]
+    .upload("avatars/user-123.jpg", imageData) {
+        contentType = "image/jpeg"
+    }
+```
+
+### Upload from Android Uri
+
+Developers can use the following function to upload files from an Android Uri:
+
+```kotlin
+// Android Uri Upload sample:
+suspend fun uploadFromUri(
+    bucket: BucketApi,
+    uri: Uri,
+    context: Context,
+    path: String
+): FileUploadResponse {
+    val data = context.contentResolver.openInputStream(uri)?.use {
+        it.readBytes()
+    } ?: throw IllegalArgumentException("Cannot read Uri")
+
+    val contentType = context.contentResolver.getType(uri)
+
+    return bucket.upload(path, data) {
+        this.contentType = contentType
+    }
+}
+```
+
+---
+
+## uploadWithAutoKey()
+
+Upload a file with auto-generated unique key.
+
+### Parameters
+
+- `filename` (String) - Original filename (used for extension detection)
+- `data` (ByteArray) - File content as bytes
+- `options` (DSL block, optional) - Upload options
+
+### Example
+
+```kotlin
+val imageData = bitmap.toByteArray()
+val result = insforge.storage
+    .from("uploads")
+    .uploadWithAutoKey("photo.jpg", imageData) {
+        contentType = "image/jpeg"
+    }
+
+Log.d("Storage", "Auto-generated key: ${result.key}")
+Log.d("Storage", "URL: ${result.url}")
+
+// Save to database
+insforge.database
+    .from("posts")
+    .insertTyped(listOf(
+        Post(
+            imageUrl = result.url,
+            imageKey = result.key,
+            userId = userId
+        )
+    ))
+    .returning()
+    .execute<Post>()
+```
+
+---
+
+## download()
+
+Download a file as ByteArray.
+
+### Example
+
+```kotlin
+// Download file
+val data = insforge.storage
+    .from("images")
+    .download(path = "posts/post-123/cover.jpg")
+
+// Convert to Bitmap
+val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
+imageView.setImageBitmap(bitmap)
+```
+
+---
+
+## delete()
+
+Delete a file from storage.
+
+### Example
+
+```kotlin
+// Get the file key from database
+val posts = insforge.database
+    .from("posts")
+    .select("image_key")
+    .eq("id", "post-123")
+    .execute<Post>()  // Returns List<Post>
+
+val post = posts.firstOrNull() ?: return
+
+// Delete from storage
+insforge.storage
+    .from("images")
+    .delete(post.imageKey)
+
+// Clear database reference
+insforge.database
+    .from("posts")
+    .update(buildJsonObject {
+        put("image_url", JsonNull)
+        put("image_key", JsonNull)
+    })
+    .eq("id", "post-123")
+    .execute<Post>()
+```
+
+---
+
+## createSignedUrl()
+
+Create a signed URL for temporary access to a file.
+
+### Parameters
+
+- `path` (String) - File path in the bucket
+- `expiresIn` (Int) - Expiration time in seconds
+
+### Example
+
+```kotlin
+// Create a signed URL (expires in 1 hour)
+val url = insforge.storage
+    .from("images")
+    .createSignedUrl("posts/post-123/cover.jpg", expiresIn = 3600)
+
+Log.d("Storage", "Signed URL: $url")
+```
+
+---
+
+## getDownloadUrl()
+
+Get a download URL for a file.
+
+### Example
+
+```kotlin
+val strategy = insforge.storage
+    .from("images")
+    .getDownloadUrl("posts/post-123/cover.jpg")
+
+Log.d("Storage", "Download URL: ${strategy.url}")
+```
+
+---
+
+## list()
+
+List files in a bucket with optional filtering.
+
+### BucketListFilter Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `prefix` | String? | Filter by path prefix |
+| `limit` | Int | Maximum results (default: 100) |
+| `offset` | Int | Pagination offset (default: 0) |
+| `sortBy` | String? | Sort field |
+| `sortOrder` | SortOrder | ASC or DESC (default: ASC) |
+
+### Example
+
+```kotlin
+// List all files in bucket
+val files = insforge.storage
+    .from("images")
+    .list()
+
+files.forEach { file ->
+    Log.d("Storage", "File: ${file.name}, Size: ${file.metadata?.size}")
+}
+
+// List with filters
+val files = insforge.storage
+    .from("images")
+    .list {
+        prefix = "posts/"
+        limit = 50
+        offset = 0
+        sortBy = "created_at"
+        sortOrder = SortOrder.DESC
+    }
+```
+
+---
+
+## Bucket Management
+
+### listBuckets()
+
+List all storage buckets.
+
+```kotlin
+val buckets = insforge.storage.listBuckets()
+
+buckets.forEach { bucket ->
+    Log.d("Storage", "Bucket: ${bucket.id}, Public: ${bucket.isPublic}")
+}
+```
+
+### createBucket()
+
+Create a new storage bucket.
+
+```kotlin
+val bucket = insforge.storage.createBucket("my-bucket") {
+    isPublic = true
+}
+
+Log.d("Storage", "Created bucket: ${bucket.id}")
+```
+
+### updateBucket()
+
+Update bucket settings.
+
+```kotlin
+insforge.storage.updateBucket("my-bucket") {
+    isPublic = false
+}
+```
+
+### deleteBucket()
+
+Delete a storage bucket.
+
+```kotlin
+insforge.storage.deleteBucket("my-bucket")
+```
+
+---
+
+## Advanced Upload
+
+### getUploadStrategy()
+
+Get upload strategy for large files or resumable uploads.
+
+```kotlin
+val strategy = insforge.storage
+    .from("videos")
+    .getUploadStrategy("videos/large-file.mp4", fileSize = 100_000_000)
+
+// Use strategy.url for upload
+Log.d("Storage", "Upload URL: ${strategy.url}")
+```
+
+### confirmUpload()
+
+Confirm a completed upload.
+
+```kotlin
+insforge.storage
+    .from("videos")
+    .confirmUpload("videos/large-file.mp4")
+```
+
+---
+
+## Jetpack Compose Integration
+
+### Image Picker with Upload
+
+```kotlin
+@Composable
+fun ImageUploadScreen() {
+    var uploadedUrl by remember { mutableStateOf<String?>(null) }
+    var isUploading by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // Helper function to read Uri as ByteArray
+    fun Uri.toByteArray(context: Context): ByteArray {
+        return context.contentResolver.openInputStream(this)?.use {
+            it.readBytes()
+        } ?: byteArrayOf()
+    }
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            scope.launch {
+                isUploading = true
+                try {
+                    // Read Uri to ByteArray
+                    val imageData = it.toByteArray(context)
+
+                    val result = insforge.storage
+                        .from("photos")
+                        .uploadWithAutoKey("photo.jpg", imageData) {
+                            contentType = "image/jpeg"
+                        }
+                    uploadedUrl = result.url
+                } catch (e: Exception) {
+                    Log.e("Upload", "Failed: ${e.message}")
+                } finally {
+                    isUploading = false
+                }
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Button(onClick = { imagePickerLauncher.launch("image/*") }) {
+            Text("Select Photo")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (isUploading) {
+            CircularProgressIndicator()
+            Text("Uploading...")
+        }
+
+        uploadedUrl?.let { url ->
+            AsyncImage(
+                model = url,
+                contentDescription = "Uploaded image",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+            )
+        }
+    }
+}
+```
+
+### Async Image with InsForge
+
+```kotlin
+@Composable
+fun InsForgeImage(
+    bucket: String,
+    path: String,
+    modifier: Modifier = Modifier
+) {
+    var imageData by remember { mutableStateOf<ByteArray?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(bucket, path) {
+        try {
+            imageData = insforge.storage
+                .from(bucket)
+                .download(path)
+        } catch (e: Exception) {
+            Log.e("InsForgeImage", "Failed to load: ${e.message}")
+        } finally {
+            isLoading = false
+        }
+    }
+
+    if (isLoading) {
+        CircularProgressIndicator(modifier = modifier)
+    } else {
+        imageData?.let { data ->
+            val bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = null,
+                modifier = modifier
+            )
+        }
+    }
+}
+```

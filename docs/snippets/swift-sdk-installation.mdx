@@ -1,0 +1,60 @@
+Add InsForge to your Swift Package Manager dependencies:
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/insforge/insforge-swift.git", from: "0.0.4")
+]
+```
+
+```swift
+import InsForge
+
+let insforge = InsForgeClient(
+    baseURL: URL(string: "https://your-app.insforge.app")!,
+    anonKey: "your-anon-key"
+)
+```
+
+### Enable Logging (Optional)
+
+For debugging, you can configure the SDK log level and destination:
+
+```swift
+let options = InsForgeClientOptions(
+    global: .init(
+        logLevel: .debug,
+        logDestination: .osLog,
+        logSubsystem: "com.example.MyApp"
+    )
+)
+
+let insforge = InsForgeClient(
+    baseURL: URL(string: "https://your-app.insforge.app")!,
+    anonKey: "your-anon-key",
+    options: options
+)
+```
+
+**Log Levels:**
+
+| Level | Description |
+|-------|-------------|
+| `.trace` | Most verbose, includes all internal details |
+| `.debug` | Detailed information for debugging |
+| `.info` | General operational information (default) |
+| `.warning` | Warnings that don't prevent operation |
+| `.error` | Errors that affect functionality |
+| `.critical` | Critical failures |
+
+**Log Destinations:**
+
+| Destination | Description |
+|-------------|-------------|
+| `.console` | Standard output (print) |
+| `.osLog` | Apple's unified logging system (recommended for iOS/macOS) |
+| `.none` | Disable logging |
+| `.custom` | Provide your own LogHandler factory |
+
+<Note>
+  Use `.info` or `.error` in production to avoid exposing sensitive data in logs.
+</Note>

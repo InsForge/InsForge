@@ -1,0 +1,999 @@
+---
+title: Authentication API Reference
+description: User authentication and session management via REST API
+---
+
+## Overview
+
+The Authentication API provides endpoints for user registration, login, email verification, password reset, and OAuth integration.
+
+## Headers
+
+For authenticated function invocations:
+```bash
+Authorization: Bearer your-jwt-token-or-anon-key
+Content-Type: application/json
+```
+
+For admin endpoints:
+```bash
+Authorization: Bearer admin-jwt-token-Or-API-Key
+Content-Type: application/json
+```
+
+---
+
+## Register User
+
+Create a new user account.
+
+```
+POST /api/auth/users
+```
+
+### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `client_type` | string | No | Client type: `web` (default), `mobile`, or `desktop` |
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | Yes | User email address |
+| `password` | string | Yes | Password (must meet configured requirements) |
+| `name` | string | No | User display name |
+
+### Example (Web Client)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/users" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword123",
+    "name": "John Doe"
+  }'
+```
+
+### Example (Mobile/Desktop Client)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/users?client_type=mobile" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword123",
+    "name": "John Doe"
+  }'
+```
+
+### Response (Web Client)
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": false,
+    "providers": ["email"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "csrfToken": "abc123...",
+  "requireEmailVerification": false
+}
+```
+
+### Response (Mobile/Desktop Client)
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": false,
+    "providers": ["email"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs...",
+  "requireEmailVerification": false
+}
+```
+
+<Note>
+- For **web clients**: A `csrfToken` is returned and the refresh token is stored in an httpOnly cookie.
+- For **mobile/desktop clients**: A `refreshToken` is returned directly in the response. Store it securely on the device.
+- If `requireEmailVerification` is `true`, `accessToken` and tokens will be `null` and the user must verify their email before logging in.
+</Note>
+
+---
+
+## Sign In
+
+Authenticate user and get access token.
+
+```
+POST /api/auth/sessions
+```
+
+### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `client_type` | string | No | Client type: `web` (default), `mobile`, or `desktop` |
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | Yes | User email address |
+| `password` | string | Yes | User password |
+
+### Example (Web Client)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/sessions" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword123"
+  }'
+```
+
+### Example (Mobile/Desktop Client)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword123"
+  }'
+```
+
+### Response (Web Client)
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true,
+    "providers": ["email"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "csrfToken": "abc123..."
+}
+```
+
+### Response (Mobile/Desktop Client)
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true,
+    "providers": ["email"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+<Note>
+- For **web clients**: A `csrfToken` is returned and the refresh token is stored in an httpOnly cookie. Include the `csrfToken` in the `X-CSRF-Token` header when calling `/api/auth/refresh`.
+- For **mobile/desktop clients**: A `refreshToken` is returned directly. Store it securely on the device and include it in the request body when calling `/api/auth/refresh`.
+</Note>
+
+---
+
+## Refresh Token
+
+Refresh access token using refresh token.
+
+```
+POST /api/auth/refresh
+```
+
+### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `client_type` | string | No | Client type: `web` (default), `mobile`, or `desktop` |
+
+### Headers (Web Client)
+
+| Header | Type | Required | Description |
+|--------|------|----------|-------------|
+| `X-CSRF-Token` | string | Yes | CSRF token received from login/register response |
+
+### Request Body (Mobile/Desktop Client)
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `refreshToken` | string | Yes | Refresh token received from login/register response |
+
+### Example (Web Client)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/refresh" \
+  -H "X-CSRF-Token: abc123..." \
+  --cookie "refresh_token=..."
+```
+
+### Example (Mobile/Desktop Client)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/refresh?client_type=mobile" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
+  }'
+```
+
+### Response (Web Client)
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true,
+    "providers": ["email"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "csrfToken": "def456..."
+}
+```
+
+### Response (Mobile/Desktop Client)
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true,
+    "providers": ["email"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+<Note>
+Token rotation is implemented for security:
+- **Web clients**: Each refresh returns a new `csrfToken` that must be used for subsequent refresh requests.
+- **Mobile/Desktop clients**: Each refresh returns a new `refreshToken`. You must persist this new token and use it for the next refresh. Update the `accessToken` in memory.
+</Note>
+
+---
+
+## Logout
+
+Logout and clear refresh token cookie.
+
+```
+POST /api/auth/logout
+```
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/logout"
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "Logged out successfully"
+}
+```
+
+---
+
+## Get Current User
+
+Get the currently authenticated user's info from JWT token.
+
+```
+GET /api/auth/sessions/current
+```
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/auth/sessions/current" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### Response
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "role": "authenticated"
+  }
+}
+```
+
+---
+
+## Update Profile
+
+Update the current user's profile.
+
+```
+PATCH /api/auth/profiles/current
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `profile` | object | Yes | Profile data (name, avatar_url, custom fields) |
+
+### Example
+
+```bash
+curl -X PATCH "https://your-app.insforge.app/api/auth/profiles/current" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "profile": {
+      "name": "John Doe",
+      "avatar_url": "https://example.com/avatar.jpg"
+    }
+  }'
+```
+
+### Response
+
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "profile": {
+    "name": "John Doe",
+    "avatar_url": "https://example.com/avatar.jpg"
+  }
+}
+```
+
+---
+
+## Get User Profile
+
+Get public profile information for a user by ID.
+
+```
+GET /api/auth/profiles/{userId}
+```
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/auth/profiles/123e4567-e89b-12d3-a456-426614174000"
+```
+
+### Response
+
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "profile": {
+    "name": "John Doe",
+    "avatar_url": "https://example.com/avatar.jpg"
+  }
+}
+```
+
+---
+
+## Email Verification
+
+### Send Verification Email
+
+```
+POST /api/auth/email/send-verification
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | Yes | User email address |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/send-verification" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com"}'
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "If your email is registered, we have sent you a verification code/link."
+}
+```
+
+### Verify Email
+
+```
+POST /api/auth/email/verify
+```
+
+### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `client_type` | string | No | Client type: `web` (default), `mobile`, or `desktop` |
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | For code method | User email address |
+| `otp` | string | Yes | 6-digit code or 64-char token from link |
+
+### Example (Web Client)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/verify" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "otp": "123456"
+  }'
+```
+
+### Example (Mobile/Desktop Client)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/verify?client_type=mobile" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "otp": "123456"
+  }'
+```
+
+### Response (Web Client)
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "csrfToken": "abc123..."
+}
+```
+
+### Response (Mobile/Desktop Client)
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+---
+
+## Password Reset
+
+### Send Reset Email
+
+```
+POST /api/auth/email/send-reset-password
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | Yes | User email address |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/send-reset-password" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com"}'
+```
+
+### Exchange Code for Token (Code Method Only)
+
+```
+POST /api/auth/email/exchange-reset-password-token
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | Yes | User email address |
+| `code` | string | Yes | 6-digit code from email |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/exchange-reset-password-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "code": "123456"
+  }'
+```
+
+### Response
+
+```json
+{
+  "token": "abc123...",
+  "expiresAt": "2024-01-15T11:00:00Z"
+}
+```
+
+### Reset Password
+
+```
+POST /api/auth/email/reset-password
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `newPassword` | string | Yes | New password |
+| `otp` | string | Yes | Reset token (from exchange endpoint or magic link) |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/email/reset-password" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "newPassword": "newSecurePassword123",
+    "otp": "abc123..."
+  }'
+```
+
+### Response
+
+```json
+{
+  "message": "Password reset successfully"
+}
+```
+
+---
+
+## OAuth Authentication
+
+OAuth authentication now uses the PKCE (Proof Key for Code Exchange) flow for enhanced security. Instead of returning tokens directly in the redirect URL, an authorization code is returned which must be exchanged for tokens.
+
+### Initiate OAuth Flow
+
+```
+GET /api/auth/oauth/{provider}
+```
+
+### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `redirect_uri` | string | Yes | URL to redirect after authentication |
+| `code_challenge` | string | Yes | PKCE code challenge (Base64 URL-encoded SHA256 hash of code_verifier) |
+
+### Supported Providers
+
+- `google`
+- `github`
+- `discord`
+- `linkedin`
+- `facebook`
+- `apple`
+- `microsoft`
+- `x`
+- `spotify`
+
+### Example
+
+```bash
+# Generate code_verifier (random string, 43-128 characters)
+CODE_VERIFIER=$(openssl rand -base64 32 | tr -d '=' | tr '/+' '_-')
+
+# Generate code_challenge (SHA256 hash of code_verifier, Base64 URL-encoded)
+CODE_CHALLENGE=$(echo -n $CODE_VERIFIER | openssl dgst -sha256 -binary | base64 | tr -d '=' | tr '/+' '_-')
+
+curl "https://your-app.insforge.app/api/auth/oauth/google?redirect_uri=https://myapp.com/callback&code_challenge=$CODE_CHALLENGE"
+```
+
+### Response
+
+```json
+{
+  "authUrl": "https://accounts.google.com/o/oauth2/v2/auth?client_id=..."
+}
+```
+
+### OAuth Callback
+
+After the user authenticates with the provider, they will be redirected to your `redirect_uri` with an authorization code:
+
+```
+https://myapp.com/callback?insforge_code=abc123...
+```
+
+<Note>
+The `insforge_code` is a temporary authorization code that must be exchanged for tokens using the `/api/auth/oauth/exchange` endpoint.
+</Note>
+
+---
+
+### Exchange Code for Tokens
+
+Exchange the authorization code for access and refresh tokens (PKCE flow).
+
+```
+POST /api/auth/oauth/exchange
+```
+
+### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `client_type` | string | No | Client type: `web` (default), `mobile`, or `desktop` |
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `code` | string | Yes | The `insforge_code` received in the callback |
+| `code_verifier` | string | Yes | The original code_verifier used to generate the code_challenge |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/oauth/exchange?client_type=mobile" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code": "abc123...",
+    "code_verifier": "your-original-code-verifier"
+  }'
+```
+
+### Response
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "user@example.com",
+    "emailVerified": true,
+    "providers": ["google"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs...",
+  "redirectTo": "https://myapp.com/dashboard"
+}
+```
+
+<Note>
+- For **web clients**: The `refreshToken` will be `null` and a `csrfToken` is returned instead. The refresh token is stored in an httpOnly cookie.
+- For **mobile/desktop clients**: A `refreshToken` is returned directly. Store it securely on the device.
+</Note>
+
+---
+
+### OAuth via Auth Component (Sign-In Page)
+
+You can also use the hosted sign-in page for OAuth authentication, which follows the same PKCE flow.
+
+```
+GET /{baseURL}/auth/sign-in
+```
+
+### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `redirect` | string | Yes | URL-encoded redirect URI |
+| `client_type` | string | No | Client type: `web` (default), `mobile`, or `desktop` |
+| `code_challenge` | string | Yes | PKCE code challenge |
+
+### Example
+
+```bash
+# URL-encode the redirect URI
+REDIRECT_URI=$(python3 -c "import urllib.parse; print(urllib.parse.quote('https://myapp.com/callback'))")
+
+# Open in browser or WebView
+open "https://your-app.insforge.app/auth/sign-in?redirect=$REDIRECT_URI&client_type=mobile&code_challenge=$CODE_CHALLENGE"
+```
+
+### Callback
+
+After successful authentication, the user will be redirected to your redirect URI with an authorization code:
+
+```
+https://myapp.com/callback?insforge_code=abc123...
+```
+
+Then exchange the code for tokens using `/api/auth/oauth/exchange` as described above.
+
+---
+
+### Complete OAuth Flow Example (Mobile/Desktop)
+
+```swift
+// 1. Generate PKCE code verifier and challenge
+let codeVerifier = generateRandomString(length: 43)
+let codeChallenge = sha256(codeVerifier).base64URLEncoded()
+
+// 2. Initiate OAuth flow
+let authURL = "https://your-app.insforge.app/api/auth/oauth/google" +
+    "?redirect_uri=myapp://callback" +
+    "&code_challenge=\(codeChallenge)"
+
+// 3. Open browser/WebView and wait for callback
+// User completes authentication...
+
+// 4. Handle callback with insforge_code
+// myapp://callback?insforge_code=abc123...
+
+// 5. Exchange code for tokens
+let response = POST("/api/auth/oauth/exchange?client_type=mobile", body: {
+    "code": insforgeCode,
+    "code_verifier": codeVerifier
+})
+
+// 6. Store tokens
+accessToken = response.accessToken
+refreshToken = response.refreshToken  // Persist securely
+```
+
+---
+
+## Public Configuration
+
+Get public authentication settings (no auth required).
+
+```
+GET /api/auth/public-config
+```
+
+### Example
+
+```bash
+curl "https://your-app.insforge.app/api/auth/public-config"
+```
+
+### Response
+
+```json
+{
+  "oAuthProviders": [
+    {"provider": "google", "useSharedKey": true},
+    {"provider": "github", "useSharedKey": false}
+  ],
+  "requireEmailVerification": true,
+  "passwordMinLength": 8,
+  "requireNumber": true,
+  "requireLowercase": true,
+  "requireUppercase": false,
+  "requireSpecialChar": false,
+  "verifyEmailMethod": "code",
+  "resetPasswordMethod": "link"
+}
+```
+
+---
+
+## Admin Endpoints
+
+These endpoints require `project_admin` role.
+
+### List All Users
+
+```
+GET /api/auth/users?offset=0&limit=10&search=john
+```
+
+### Get User by ID
+
+```
+GET /api/auth/users/{userId}
+```
+
+### Delete Users
+
+```bash
+curl -X DELETE "https://your-app.insforge.app/api/auth/users" \
+  -H "Authorization: Bearer admin-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{"userIds": ["user-id-1", "user-id-2"]}'
+```
+
+### Generate Anonymous Token
+
+```
+POST /api/auth/tokens/anon
+```
+
+### Get Auth Configuration
+
+Get current authentication settings (admin only).
+
+```
+GET /api/auth/config
+```
+
+#### Example
+
+```bash
+curl "https://your-app.insforge.app/api/auth/config" \
+  -H "Authorization: Bearer admin-jwt-token"
+```
+
+#### Response
+
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "requireEmailVerification": true,
+  "passwordMinLength": 8,
+  "requireNumber": true,
+  "requireLowercase": true,
+  "requireUppercase": false,
+  "requireSpecialChar": false,
+  "verifyEmailMethod": "code",
+  "resetPasswordMethod": "link",
+  "verifyEmailRedirectTo": "https://myapp.com/verify-success",
+  "resetPasswordRedirectTo": "https://myapp.com/reset-success",
+  "signInRedirectTo": "https://myapp.com/dashboard",
+  "createdAt": "2024-01-15T10:30:00Z",
+  "updatedAt": "2024-01-15T10:30:00Z"
+}
+```
+
+### Update Auth Configuration
+
+Update authentication settings (admin only).
+
+```
+PUT /api/auth/config
+```
+
+#### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `requireEmailVerification` | boolean | No | Whether email verification is required |
+| `passwordMinLength` | integer | No | Minimum password length (4-128) |
+| `requireNumber` | boolean | No | Require numbers in password |
+| `requireLowercase` | boolean | No | Require lowercase in password |
+| `requireUppercase` | boolean | No | Require uppercase in password |
+| `requireSpecialChar` | boolean | No | Require special characters in password |
+| `verifyEmailMethod` | string | No | Email verification method (`code` or `link`) |
+| `resetPasswordMethod` | string | No | Password reset method (`code` or `link`) |
+| `verifyEmailRedirectTo` | string | No | Redirect URL after email verification |
+| `resetPasswordRedirectTo` | string | No | Redirect URL after password reset |
+| `signInRedirectTo` | string | No | Redirect URL after sign in |
+
+#### Example
+
+```bash
+curl -X PUT "https://your-app.insforge.app/api/auth/config" \
+  -H "Authorization: Bearer admin-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "requireEmailVerification": true,
+    "passwordMinLength": 10,
+    "verifyEmailMethod": "link"
+  }'
+```
+
+### Exchange Admin Session
+
+Exchange a cloud provider authorization code for an admin session.
+
+```
+POST /api/auth/admin/sessions/exchange
+```
+
+#### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `code` | string | Yes | Authorization code or JWT from Insforge Cloud |
+
+#### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/admin/sessions/exchange" \
+  -H "Content-Type: application/json" \
+  -d '{"code": "eyJhbGciOiJIUzI1NiIs..."}'
+```
+
+#### Response
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "admin@example.com",
+    "role": "project_admin"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+---
+
+## Error Responses
+
+### Invalid Credentials (401)
+
+```json
+{
+  "error": "INVALID_CREDENTIALS",
+  "message": "Invalid email or password",
+  "statusCode": 401,
+  "nextActions": "Check your email and password"
+}
+```
+
+### User Already Exists (409)
+
+```json
+{
+  "error": "USER_EXISTS",
+  "message": "User with this email already exists",
+  "statusCode": 409,
+  "nextActions": "Use a different email or sign in"
+}
+```
+
+### Email Not Verified (403)
+
+```json
+{
+  "error": "EMAIL_NOT_VERIFIED",
+  "message": "Please verify your email before signing in",
+  "statusCode": 403,
+  "nextActions": "Check your inbox for verification email"
+}
+```

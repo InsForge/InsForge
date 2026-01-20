@@ -1,0 +1,766 @@
+---
+title: Authentication SDK Reference
+description: User authentication and profile management with the InsForge Kotlin SDK
+---
+
+import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
+
+
+## Installation
+
+<KotlinSdkInstallation />
+
+## signUp()
+
+Create a new user account with email and password.
+
+### Example
+
+```kotlin
+try {
+    val result = client.auth.signUp(
+        email = "user@example.com",
+        password = "secure_password123",
+        name = "John Doe"
+    )
+
+    result.user?.let { user ->
+        Log.d("Auth", "User created: ${user.email}")
+    }
+} catch (e: InsforgeHttpException) {
+    Log.e("Auth", "Sign up failed: ${e.message}")
+}
+```
+
+---
+
+## signIn()
+
+Sign in an existing user with email and password.
+
+### Example
+
+```kotlin
+try {
+    val result = client.auth.signIn(
+        email = "user@example.com",
+        password = "secure_password123"
+    )
+
+    result.user?.let { user ->
+        Log.d("Auth", "Welcome back, ${user.profile?.name ?: user.email}")
+    }
+} catch (e: InsforgeHttpException) {
+    Log.e("Auth", "Sign in failed: ${e.message}")
+}
+```
+
+---
+
+## signOut()
+
+Sign out the current user.
+
+### Example
+
+```kotlin
+try {
+    client.auth.signOut()
+    Log.d("Auth", "User signed out")
+} catch (e: InsforgeException) {
+    Log.e("Auth", "Sign out failed: ${e.message}")
+}
+```
+
+---
+
+## signInWithDefaultPage()
+
+InsForge provides a hosted authentication page that supports:
+- **OAuth Providers**: Google, GitHub, Discord, LinkedIn, Facebook, Instagram, TikTok, Apple, X (Twitter), Spotify, Microsoft
+- **Email + Password**: Traditional email/password authentication
+
+Start authentication flow with the hosted authentication page.
+
+<Note>
+For direct OAuth provider authentication without the hosted page, use [signInWithOAuthPage()](#signinwithoauthpage) instead.
+</Note>
+
+### Example
+
+1. Configure App Link / Deep Link Callback
+
+Configure your callback Activity in AndroidManifest.xml:
+
+- Option A: Custom URL Scheme (for Development)
+
+```xml
+<activity
+    android:name=".AuthCallbackActivity"
+    android:launchMode="singleTask"
+    android:exported="true">
+    <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="yourapp" android:host="auth" android:path="/callback" />
+    </intent-filter>
+</activity>
+```
+
+- Option B: App Links (for Production)
+
+```xml
+<activity
+    android:name=".AuthCallbackActivity"
+    android:launchMode="singleTask"
+    android:exported="true">
+    <intent-filter android:autoVerify="true">
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="https" android:host="yourdomain.com" android:path="/auth/callback" />
+    </intent-filter>
+</activity>
+```
+
+2. Initiate OAuth Login
+
+```kotlin
+// Call in your login screen
+fun startLogin() {
+    // Use Custom URL Scheme
+    client.auth.signInWithDefaultPage("yourapp://auth/callback")
+
+    // Or use App Links
+    // client.auth.signInWithDefaultPage("https://yourdomain.com/auth/callback")
+}
+```
+
+3. Handle OAuth Callback
+
+```kotlin
+class AuthCallbackActivity : AppCompatActivity() {
+    
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        handleIntent(intent)
+    }
+    
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        intent?.let { handleIntent(it) }
+    }
+    
+    private fun handleIntent(intent: Intent) {
+        intent.data?.let { uri ->
+            lifecycleScope.launch {
+                try {
+                    // Callback URL handled by SDK
+                    val result = client.auth.handleAuthCallback(uri.toString())
+                    
+                    // Auth success, navigate to main screen
+                    Toast.makeText(this@AuthCallbackActivity, 
+                        "Success: ${result.email}", Toast.LENGTH_SHORT).show()
+                    
+                    startActivity(Intent(this@AuthCallbackActivity, MainActivity::class.java))
+                    finish()
+                    
+                } catch (e: Exception) {
+                    // Handle error
+                    Toast.makeText(this@AuthCallbackActivity,
+                        "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    finish()
+                }
+            }
+        }
+    }
+}
+```
+
+### Android App Links Setup
+
+**Step 1: Create assetlinks.json**
+
+Create a file named `assetlinks.json`:
+
+```json
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.yourcompany.yourapp",
+      "sha256_cert_fingerprints": [
+        "14:6D:E9:83:C5:73:06:50:D8:EE:B9:95:2F:34:FC:64:16:A0:83:42:E6:1D:BE:A8:8A:04:96:B2:3F:CF:44:E5"
+      ]
+    }
+  }
+]
+```
+
+Replace:
+- `package_name`: Your app's package name
+- `sha256_cert_fingerprints`: Your app's signing certificate SHA256 fingerprint
+
+**Get SHA256 Fingerprint**:
+
+```bash
+# Debug keystore
+keytool -list -v -keystore ~/.android/debug.keystore \
+  -alias androiddebugkey -storepass android -keypass android \
+  | grep "SHA256:"
+
+# Release keystore
+keytool -list -v -keystore your-release-key.keystore \
+  -alias your-key-alias \
+  | grep "SHA256:"
+```
+
+**Step 2: Host the file**
+
+Upload to:
+```
+https://yourdomain.com/.well-known/assetlinks.json
+```
+
+**Verify hosting**:
+```bash
+curl https://yourdomain.com/.well-known/assetlinks.json
+# Should return your JSON configuration
+```
+
+**Step 3: Configure AndroidManifest.xml**
+
+```xml
+<activity android:name=".MainActivity">
+    <intent-filter android:autoVerify="true">
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data
+            android:scheme="https"
+            android:host="yourdomain.com"
+            android:pathPrefix="/auth" />
+    </intent-filter>
+</activity>
+```
+
+#### Verification Tools
+
+**Android App Links**:
+```bash
+adb shell am start -a android.intent.action.VIEW \
+  -d "https://yourdomain.com/auth/callback?access_token=test"
+```
+
+### Recommendation by Platform
+
+| Platform | Development | Production |
+|----------|-------------|------------|
+| **macOS Desktop** | Custom URL Scheme | Custom URL Scheme |
+| **iOS Mobile** | Custom URL Scheme | Universal Links ⭐️ |
+| **Android Mobile** | Custom URI Scheme | App Links ⭐️ |
+
+---
+
+## signInWithOAuthPage()
+
+Sign in directly with a specific OAuth provider. Unlike `signInWithDefaultPage()` which shows a hosted page with all options, this method opens the OAuth provider's authentication page directly in the system browser.
+
+### Supported Providers
+
+```kotlin
+enum class OAuthProvider(val value: String) {
+    GOOGLE("google"),
+    GITHUB("github"),
+    DISCORD("discord"),
+    LINKEDIN("linkedin"),
+    FACEBOOK("facebook"),
+    INSTAGRAM("instagram"),
+    TIKTOK("tiktok"),
+    APPLE("apple"),
+    X("x"),
+    SPOTIFY("spotify"),
+    MICROSOFT("microsoft")
+}
+```
+
+### Parameters
+
+- `provider` (`OAuthProvider`) - The OAuth provider to authenticate with
+- `redirectUri` (`String`) - Callback URL where InsForge will redirect after authentication
+
+### Returns
+
+```kotlin
+String  // The OAuth authorization URL (also opens in browser automatically)
+```
+
+### Example
+
+1. Configure BrowserLauncher
+
+When creating the InsForge client, configure the `browserLauncher` to handle opening URLs:
+
+```kotlin
+val client = createInsforgeClient(baseURL, anonKey) {
+    install(Auth) {
+        browserLauncher = BrowserLauncher { url ->
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            context.startActivity(intent)
+        }
+        persistSession = true
+        sessionStorage = mySessionStorage
+    }
+}
+```
+
+2. Configure App Link / Deep Link Callback
+
+Configure your callback Activity in AndroidManifest.xml (same as `signInWithDefaultPage`):
+
+- Option A: Custom URL Scheme (for Development)
+
+```xml
+<activity
+    android:name=".AuthCallbackActivity"
+    android:launchMode="singleTask"
+    android:exported="true">
+    <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="yourapp" android:host="auth" android:path="/callback" />
+    </intent-filter>
+</activity>
+```
+
+- Option B: App Links (for Production)
+
+```xml
+<activity
+    android:name=".AuthCallbackActivity"
+    android:launchMode="singleTask"
+    android:exported="true">
+    <intent-filter android:autoVerify="true">
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="https" android:host="yourdomain.com" android:path="/auth/callback" />
+    </intent-filter>
+</activity>
+```
+
+3. Initiate OAuth Login with Specific Provider
+
+```kotlin
+// Start OAuth flow with Google
+fun startGoogleLogin() {
+    lifecycleScope.launch {
+        val authUrl = client.auth.signInWithOAuthPage(
+            OAuthProvider.GOOGLE,
+            "yourapp://auth/callback"
+        )
+        // Browser opens automatically via browserLauncher
+    }
+}
+
+// Start OAuth flow with GitHub
+fun startGitHubLogin() {
+    lifecycleScope.launch {
+        client.auth.signInWithOAuthPage(
+            OAuthProvider.GITHUB,
+            "yourapp://auth/callback"
+        )
+    }
+}
+```
+
+4. Handle OAuth Callback
+
+```kotlin
+class AuthCallbackActivity : AppCompatActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        handleIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        intent?.let { handleIntent(it) }
+    }
+
+    private fun handleIntent(intent: Intent) {
+        intent.data?.let { uri ->
+            lifecycleScope.launch {
+                try {
+                    // Callback URL handled by SDK
+                    val result = client.auth.handleAuthCallback(uri.toString())
+
+                    // Auth success, navigate to main screen
+                    Toast.makeText(this@AuthCallbackActivity,
+                        "Success: ${result.email}", Toast.LENGTH_SHORT).show()
+
+                    startActivity(Intent(this@AuthCallbackActivity, MainActivity::class.java))
+                    finish()
+
+                } catch (e: Exception) {
+                    // Handle error
+                    Toast.makeText(this@AuthCallbackActivity,
+                        "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    finish()
+                }
+            }
+        }
+    }
+}
+```
+
+### Authentication Flow
+
+```
+1. App calls signInWithOAuthPage(provider, redirectUri)
+2. SDK fetches the OAuth authorization URL from InsForge
+3. SDK automatically opens the OAuth URL in system browser
+4. User authenticates with the provider (Google, GitHub, etc.)
+5. Provider redirects to InsForge, then InsForge redirects to your callback URL
+6. Android intercepts callback URL (via Custom URL Scheme or App Links)
+7. App calls handleAuthCallback(url)
+8. SDK creates session, updates auth state, and persists token
+```
+
+### Jetpack Compose Example
+
+```kotlin
+@Composable
+fun OAuthLoginScreen() {
+    val scope = rememberCoroutineScope()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "Sign in with",
+            style = MaterialTheme.typography.headlineSmall
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Google Sign In
+        Button(
+            onClick = {
+                scope.launch {
+                    client.auth.signInWithOAuthPage(
+                        OAuthProvider.GOOGLE,
+                        "yourapp://auth/callback"
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Continue with Google")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // GitHub Sign In
+        Button(
+            onClick = {
+                scope.launch {
+                    client.auth.signInWithOAuthPage(
+                        OAuthProvider.GITHUB,
+                        "yourapp://auth/callback"
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Continue with GitHub")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Discord Sign In
+        Button(
+            onClick = {
+                scope.launch {
+                    client.auth.signInWithOAuthPage(
+                        OAuthProvider.DISCORD,
+                        "yourapp://auth/callback"
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Continue with Discord")
+        }
+    }
+}
+```
+
+<Note>
+The `browserLauncher` must be configured when installing the Auth module. If not configured, `signInWithOAuthPage()` will throw an `IllegalStateException`.
+</Note>
+
+---
+
+## getCurrentUser()
+
+Fetch the current authenticated user from the server. This is a suspend function that makes a network request.
+
+### Returns
+
+```kotlin
+CurrentUserResponse  // Contains user data from server
+```
+
+### Example
+
+```kotlin
+try {
+    val response = client.auth.getCurrentUser()
+    Log.d("Auth", "Email: ${response.email}")
+    Log.d("Auth", "Name: ${response.profile?.name ?: "N/A"}")
+} catch (e: InsforgeHttpException) {
+    Log.e("Auth", "Failed to get user: ${e.message}")
+}
+```
+
+<Note>
+This method makes a network request to fetch user data. For accessing locally cached user state, use `currentUser` StateFlow instead.
+</Note>
+
+---
+
+## currentSession
+
+A `StateFlow` property that holds the current session from local storage.
+
+### Type
+
+```kotlin
+val currentSession: StateFlow<Session?>
+```
+
+### Example
+
+```kotlin
+// Access current session value
+client.auth.currentSession.value?.let { session ->
+    Log.d("Auth", "Session active for user: ${session.user.email}")
+}
+
+// Observe session changes
+lifecycleScope.launch {
+    client.auth.currentSession.collect { session ->
+        if (session != null) {
+            Log.d("Auth", "Session active: ${session.user.email}")
+        } else {
+            Log.d("Auth", "No active session")
+        }
+    }
+}
+```
+
+---
+
+## updateProfile()
+
+Update current user's profile.
+
+### Parameters
+
+- `profile` (`Map\<String, Any\>`) - Profile fields to update
+
+### Returns
+
+```kotlin
+ProfileResponse  // Updated profile data
+```
+
+### Example
+
+```kotlin
+try {
+    val result = client.auth.updateProfile(
+        mapOf(
+            "name" to "JohnDev",
+            "bio" to "Android Developer",
+            "avatar_url" to "https://example.com/avatar.jpg"
+        )
+    )
+    Log.d("Auth", "Profile updated: ${result.name}")
+} catch (e: InsforgeHttpException) {
+    Log.e("Auth", "Update failed: ${e.message}")
+}
+```
+
+---
+
+## currentUser
+
+A `StateFlow` property that holds the current authenticated user state.
+
+### Type
+
+```kotlin
+val currentUser: StateFlow<User?>
+```
+
+### Example
+
+```kotlin
+// Observe auth state as Flow
+lifecycleScope.launch {
+    client.auth.currentUser.collect { user ->
+        if (user != null) {
+            Log.d("Auth", "User signed in: ${user.email}")
+        } else {
+            Log.d("Auth", "User signed out")
+        }
+    }
+}
+
+// Access current user value directly
+val user = client.auth.currentUser.value
+```
+
+---
+
+## Jetpack Compose Integration
+
+```kotlin
+@Composable
+fun AuthScreen() {
+    val currentUser by client.auth.currentUser.collectAsState()
+
+    when {
+        currentUser != null -> DashboardScreen(user = currentUser!!)
+        else -> LoginScreen()
+    }
+}
+
+@Composable
+fun LoginScreen() {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Email") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Password") },
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        error?.let {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(it, color = MaterialTheme.colorScheme.error)
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = {
+                scope.launch {
+                    isLoading = true
+                    error = null
+                    try {
+                        client.auth.signIn(email, password)
+                    } catch (e: InsforgeHttpException) {
+                        error = e.message
+                    } finally {
+                        isLoading = false
+                    }
+                }
+            },
+            enabled = !isLoading,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            } else {
+                Text("Sign In")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // OAuth button
+        Button(
+            onClick = {
+                client.auth.signInWithDefaultPage("yourapp://auth/callback")
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Sign In with OAuth")
+        }
+    }
+}
+```
+
+---
+
+## Error Handling
+
+```kotlin
+import dev.insforge.exceptions.InsforgeHttpException
+import dev.insforge.exceptions.InsforgeException
+
+try {
+    val result = client.auth.signIn(email, password)
+} catch (e: InsforgeHttpException) {
+    // HTTP errors from API with error codes
+    when (e.error) {
+        "INVALID_CREDENTIALS" -> showError("Invalid email or password")
+        "USER_NOT_FOUND" -> showError("User not found")
+        "EMAIL_NOT_VERIFIED" -> showError("Please verify your email")
+        "INVALID_EMAIL" -> showError("Invalid email format")
+        "WEAK_PASSWORD" -> showError("Password is too weak")
+        else -> showError("Error: ${e.message}")
+    }
+} catch (e: InsforgeException) {
+    // Other SDK errors (network, parsing, etc.)
+    showError("Error: ${e.message}")
+}
+```
+
+### Common Error Codes
+
+| Error Code | Description |
+|------------|-------------|
+| `INVALID_CREDENTIALS` | Email or password is incorrect |
+| `USER_NOT_FOUND` | No user with this email exists |
+| `EMAIL_NOT_VERIFIED` | Email verification required |
+| `INVALID_EMAIL` | Email format is invalid |
+| `WEAK_PASSWORD` | Password doesn't meet requirements |
+| `USER_ALREADY_EXISTS` | Email is already registered |
+| `SESSION_EXPIRED` | Session has expired, re-login required |

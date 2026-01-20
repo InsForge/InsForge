@@ -1,0 +1,788 @@
+---
+title: Realtime SDK Reference
+description: Real-time subscriptions and messaging with the InsForge Kotlin SDK
+---
+
+import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
+
+## Installation
+
+<KotlinSdkInstallation />
+
+---
+
+## connect()
+
+Establish a WebSocket connection to the realtime server.
+
+### Example
+
+```kotlin
+// Connect to Realtime server
+client.realtime.connect()
+
+// Check connection status
+println("Connected: ${client.realtime.isConnected}")
+println("Socket ID: ${client.realtime.socketId}")
+```
+
+### Monitor Connection State
+
+```kotlin
+// Monitor connection state using Flow
+client.realtime.connectionState.collect { state ->
+    when (state) {
+        is Realtime.ConnectionState.Connected -> println("Connected")
+        is Realtime.ConnectionState.Disconnected -> println("Disconnected")
+        is Realtime.ConnectionState.Connecting -> println("Connecting...")
+        is Realtime.ConnectionState.Error -> println("Error: ${state.message}")
+    }
+}
+```
+
+---
+
+## disconnect()
+
+Disconnect from the realtime server.
+
+### Example
+
+```kotlin
+client.realtime.disconnect()
+
+// Verify disconnection
+println("Connected: ${client.realtime.isConnected}")  // false
+println("Socket ID: ${client.realtime.socketId}")      // null
+```
+
+---
+
+## subscribe()
+
+Subscribe to a channel to receive events.
+
+### Parameters
+
+- `channel` (String) - The channel name to subscribe to
+
+### Returns
+
+```kotlin
+SubscribeResponse(
+    ok: Boolean,
+    channel: String,
+    error: SubscribeError?  // null if ok is true
+)
+```
+
+### Example
+
+```kotlin
+client.realtime.connect()
+
+val response = client.realtime.subscribe("todos")
+
+if (response.ok) {
+    println("Subscribed to channel: ${response.channel}")
+} else {
+    println("Subscribe failed: ${response.error?.message}")
+}
+```
+
+### Auto-Connect
+
+If not connected, `subscribe()` will automatically establish a connection first:
+
+```kotlin
+// No need to call connect() first
+val response = client.realtime.subscribe("todos")
+
+// Client is now connected and subscribed
+println("Connected: ${client.realtime.isConnected}")  // true
+```
+
+### Subscribe to Multiple Channels
+
+```kotlin
+client.realtime.connect()
+
+val todosResponse = client.realtime.subscribe("todos")
+val chatResponse = client.realtime.subscribe("chat")
+val notificationsResponse = client.realtime.subscribe("notifications")
+
+// Get list of subscribed channels
+val channels = client.realtime.getSubscribedChannels()
+println("Subscribed channels: $channels")
+```
+
+---
+
+## unsubscribe()
+
+Unsubscribe from a channel.
+
+### Example
+
+```kotlin
+client.realtime.unsubscribe("todos")
+
+// Verify unsubscription
+val channels = client.realtime.getSubscribedChannels()
+println("Still subscribed: ${channels.contains("todos")}")  // false
+```
+
+---
+
+## on()
+
+Register an event listener for a specific event type.
+
+### Parameters
+
+- `event` (String) - The event name to listen for (e.g., "INSERT", "UPDATE", "DELETE")
+- `callback` (EventCallback&lt;T&gt;) - Callback function that receives the event data
+
+### Example (Listen for INSERT Events)
+
+```kotlin
+import dev.insforge.realtime.models.SocketMessage
+
+client.realtime.connect()
+client.realtime.subscribe("todos")
+
+// Register INSERT event listener
+client.realtime.on<SocketMessage>("INSERT") { message ->
+    message?.let {
+        println("INSERT event received:")
+        println("  Channel: ${it.channel}")
+        println("  MessageId: ${it.messageId}")
+        println("  Payload: ${it.payload}")
+    }
+}
+```
+
+### Example (Listen for UPDATE Events)
+
+```kotlin
+client.realtime.on<SocketMessage>("UPDATE") { message ->
+    message?.let {
+        println("UPDATE event received:")
+        println("  Channel: ${it.channel}")
+        println("  Payload: ${it.payload}")
+    }
+}
+```
+
+### Example (Listen for DELETE Events)
+
+```kotlin
+client.realtime.on<SocketMessage>("DELETE") { message ->
+    message?.let {
+        println("DELETE event received:")
+        println("  Channel: ${it.channel}")
+        println("  Payload: ${it.payload}")
+    }
+}
+```
+
+### Example (Listen for Multiple Event Types)
+
+```kotlin
+client.realtime.connect()
+client.realtime.subscribe("todos")
+
+// Register listeners for all CRUD events
+listOf("INSERT", "UPDATE", "DELETE").forEach { eventType ->
+    client.realtime.on<SocketMessage>(eventType) { message ->
+        message?.let {
+            println("$eventType event: ${it.payload}")
+        }
+    }
+}
+```
+
+---
+
+## off()
+
+Remove an event listener.
+
+### Example
+
+```kotlin
+val callback = Realtime.EventCallback<SocketMessage> { message ->
+    println("Event received: $message")
+}
+
+// Register listener
+client.realtime.on("INSERT", callback)
+
+// Later, remove the listener
+client.realtime.off("INSERT", callback)
+```
+
+---
+
+## once()
+
+Register a one-time event listener that automatically removes itself after the first event.
+
+### Example
+
+```kotlin
+client.realtime.once<SocketMessage>("INSERT") { message ->
+    println("Received first INSERT event: ${message?.payload}")
+    // Listener is automatically removed after this
+}
+```
+
+---
+
+## publish()
+
+Publish a message to a channel.
+
+<Note>
+You must be subscribed to a channel before publishing messages to it.
+</Note>
+
+### Parameters
+
+- `channel` (String) - The channel name to publish to
+- `event` (String) - The event name
+- `payload` (Any) - The message payload
+
+### Example
+
+```kotlin
+client.realtime.connect()
+client.realtime.subscribe("chat")
+
+// Publish a message
+client.realtime.publish(
+    channel = "chat",
+    event = "message",
+    payload = mapOf(
+        "text" to "Hello from Kotlin SDK",
+        "timestamp" to System.currentTimeMillis()
+    )
+)
+```
+
+### Error Handling
+
+```kotlin
+// Publishing without connection throws an error
+try {
+    client.realtime.publish("channel", "event", mapOf("test" to "data"))
+} catch (e: IllegalStateException) {
+    println("Error: ${e.message}")  // Not connected
+}
+```
+
+---
+
+## getSubscribedChannels()
+
+Get the list of currently subscribed channels.
+
+### Example
+
+```kotlin
+client.realtime.connect()
+client.realtime.subscribe("todos")
+client.realtime.subscribe("chat")
+
+val channels = client.realtime.getSubscribedChannels()
+println("Subscribed to: $channels")  // [todos, chat]
+```
+
+---
+
+## Database Change Monitoring
+
+Listen to real-time database changes triggered by INSERT, UPDATE, and DELETE operations.
+
+### Complete CRUD Example
+
+```kotlin
+import dev.insforge.realtime.models.SocketMessage
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.addJsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+
+// Connect and subscribe
+client.realtime.connect()
+client.realtime.subscribe("todos")
+
+// Track all events
+val allEvents = mutableListOf<Pair<String, SocketMessage>>()
+
+// Register listeners for all event types
+listOf("INSERT", "UPDATE", "DELETE").forEach { eventType ->
+    client.realtime.on<SocketMessage>(eventType) { message ->
+        message?.let {
+            println("$eventType event received:")
+            println("  Payload: ${it.payload}")
+            allEvents.add(eventType to it)
+        }
+    }
+}
+
+// Step 1: INSERT
+val insertData = buildJsonArray {
+    addJsonObject {
+        put("title", "New Todo")
+        put("is_completed", false)
+        put("user_id", userId)
+    }
+}
+val inserted = client.database.from("todos")
+    .insert(insertData)
+    .returning()
+    .execute<JsonObject>()
+
+val todoId = inserted.first()["id"].toString().removeSurrounding("\"")
+
+// Step 2: UPDATE
+val updateData = buildJsonObject {
+    put("title", "Updated Todo")
+    put("is_completed", true)
+}
+client.database.from("todos")
+    .eq("id", todoId)
+    .update(updateData)
+    .execute<JsonObject>()
+
+// Step 3: DELETE
+client.database.from("todos")
+    .eq("id", todoId)
+    .delete()
+    .execute<JsonObject>()
+
+// Summary
+println("Total events: ${allEvents.size}")
+println("INSERT: ${allEvents.count { it.first == "INSERT" }}")
+println("UPDATE: ${allEvents.count { it.first == "UPDATE" }}")
+println("DELETE: ${allEvents.count { it.first == "DELETE" }}")
+
+// Cleanup
+client.realtime.disconnect()
+```
+
+### Monitor INSERT Events
+
+```kotlin
+client.realtime.connect()
+client.realtime.subscribe("todos")
+
+client.realtime.on<SocketMessage>("INSERT") { message ->
+    message?.let {
+        println("New todo created:")
+        println("  ${it.payload}")
+    }
+}
+
+// Insert a new todo
+val insertData = buildJsonArray {
+    addJsonObject {
+        put("title", "New Todo ${System.currentTimeMillis()}")
+        put("is_completed", false)
+        put("user_id", userId)
+    }
+}
+
+client.database.from("todos")
+    .insert(insertData)
+    .returning()
+    .execute<JsonObject>()
+```
+
+### Monitor UPDATE Events
+
+```kotlin
+client.realtime.connect()
+client.realtime.subscribe("todos")
+
+client.realtime.on<SocketMessage>("UPDATE") { message ->
+    message?.let {
+        println("Todo updated:")
+        println("  ${it.payload}")
+    }
+}
+
+// Update an existing todo
+val updateData = buildJsonObject {
+    put("title", "Updated Title")
+    put("is_completed", true)
+}
+
+client.database.from("todos")
+    .eq("id", todoId)
+    .update(updateData)
+    .execute<JsonObject>()
+```
+
+### Monitor DELETE Events
+
+```kotlin
+client.realtime.connect()
+client.realtime.subscribe("todos")
+
+client.realtime.on<SocketMessage>("DELETE") { message ->
+    message?.let {
+        println("Todo deleted:")
+        println("  ${it.payload}")
+    }
+}
+
+// Delete a todo
+client.database.from("todos")
+    .eq("id", todoId)
+    .delete()
+    .execute<JsonObject>()
+```
+
+---
+
+## Jetpack Compose Integration
+
+### Real-time Todo List
+
+```kotlin
+@Composable
+fun RealtimeTodoScreen() {
+    val viewModel: TodoViewModel = viewModel()
+    val todos by viewModel.todos.collectAsState()
+    val isConnected by viewModel.isConnected.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.connect()
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.disconnect()
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Connection status
+        if (!isConnected) {
+            Text(
+                "Connecting...",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.Yellow)
+                    .padding(8.dp)
+            )
+        }
+
+        LazyColumn {
+            items(todos) { todo ->
+                TodoItem(todo = todo)
+            }
+        }
+    }
+}
+
+class TodoViewModel : ViewModel() {
+    private val _todos = MutableStateFlow<List<Todo>>(emptyList())
+    val todos: StateFlow<List<Todo>> = _todos.asStateFlow()
+
+    private val _isConnected = MutableStateFlow(false)
+    val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
+
+    @Serializable
+    data class Todo(
+        val id: String,
+        val title: String,
+        @SerialName("is_completed") val isCompleted: Boolean
+    )
+
+    fun connect() {
+        viewModelScope.launch {
+            client.realtime.connect()
+            client.realtime.subscribe("todos")
+            _isConnected.value = true
+
+            // Listen for INSERT events
+            client.realtime.on<SocketMessage>("INSERT") { message ->
+                message?.let {
+                    // Parse and add new todo
+                    val payload = it.payload
+                    // Update _todos
+                }
+            }
+
+            // Listen for UPDATE events
+            client.realtime.on<SocketMessage>("UPDATE") { message ->
+                message?.let {
+                    // Parse and update todo in list
+                }
+            }
+
+            // Listen for DELETE events
+            client.realtime.on<SocketMessage>("DELETE") { message ->
+                message?.let {
+                    // Remove todo from list
+                }
+            }
+        }
+    }
+
+    fun disconnect() {
+        viewModelScope.launch {
+            client.realtime.disconnect()
+            _isConnected.value = false
+        }
+    }
+}
+```
+
+### Chat Room with Publish/Subscribe
+
+```kotlin
+@Composable
+fun ChatRoomScreen(roomId: String) {
+    val viewModel: ChatViewModel = viewModel()
+    val messages by viewModel.messages.collectAsState()
+    val isConnected by viewModel.isConnected.collectAsState()
+    var inputText by remember { mutableStateOf("") }
+
+    DisposableEffect(roomId) {
+        viewModel.connect(roomId)
+        onDispose {
+            viewModel.disconnect()
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Connection status
+        if (!isConnected) {
+            Text(
+                "Connecting...",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.Yellow)
+                    .padding(8.dp)
+            )
+        }
+
+        // Messages list
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .padding(16.dp),
+            reverseLayout = true
+        ) {
+            items(messages.reversed()) { message ->
+                ChatMessageItem(message = message)
+            }
+        }
+
+        // Input field
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            OutlinedTextField(
+                value = inputText,
+                onValueChange = { inputText = it },
+                modifier = Modifier.weight(1f),
+                placeholder = { Text("Message") }
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            IconButton(
+                onClick = {
+                    viewModel.sendMessage(inputText)
+                    inputText = ""
+                },
+                enabled = inputText.isNotBlank() && isConnected
+            ) {
+                Icon(Icons.Default.Send, "Send")
+            }
+        }
+    }
+}
+
+class ChatViewModel : ViewModel() {
+    private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
+    val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
+
+    private val _isConnected = MutableStateFlow(false)
+    val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
+
+    private var channelName: String? = null
+
+    data class ChatMessage(
+        val sender: String,
+        val text: String,
+        val timestamp: Long
+    )
+
+    fun connect(roomId: String) {
+        channelName = "chat:$roomId"
+
+        viewModelScope.launch {
+            try {
+                val response = client.realtime.subscribe(channelName!!)
+
+                if (response.ok) {
+                    _isConnected.value = true
+
+                    // Listen for new messages
+                    client.realtime.on<SocketMessage>("message") { message ->
+                        message?.let {
+                            // Parse message from payload and add to list
+                            val payload = it.payload
+                            // _messages.value = _messages.value + parsedMessage
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("Chat", "Connection error: ${e.message}")
+            }
+        }
+    }
+
+    fun sendMessage(text: String) {
+        val channel = channelName ?: return
+
+        viewModelScope.launch {
+            try {
+                client.realtime.publish(
+                    channel = channel,
+                    event = "message",
+                    payload = mapOf(
+                        "sender" to currentUser.name,
+                        "text" to text,
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                )
+            } catch (e: Exception) {
+                Log.e("Chat", "Send failed: ${e.message}")
+            }
+        }
+    }
+
+    fun disconnect() {
+        viewModelScope.launch {
+            channelName?.let { client.realtime.unsubscribe(it) }
+            client.realtime.disconnect()
+            _isConnected.value = false
+        }
+    }
+}
+```
+
+---
+
+## API Reference
+
+### Realtime Class
+
+| Property / Method | Type | Description |
+|-------------------|------|-------------|
+| `connect()` | `suspend fun` | Connect to WebSocket server |
+| `disconnect()` | `suspend fun` | Disconnect from server |
+| `subscribe(channel)` | `suspend fun` | Subscribe to a channel |
+| `unsubscribe(channel)` | `fun` | Unsubscribe from a channel |
+| `publish(channel, event, payload)` | `suspend fun` | Publish message to channel |
+| `on(event, callback)` | `fun` | Register event listener |
+| `off(event, callback)` | `fun` | Remove event listener |
+| `once(event, callback)` | `fun` | Register one-time listener |
+| `getSubscribedChannels()` | `fun` | Get subscribed channel list |
+| `isConnected` | `Boolean` | Current connection status |
+| `socketId` | `String?` | Current socket ID |
+| `connectionState` | `StateFlow<ConnectionState>` | Connection state Flow |
+
+### ConnectionState
+
+| State | Description |
+|-------|-------------|
+| `Disconnected` | Not connected to server |
+| `Connecting` | Connection in progress |
+| `Connected` | Connected to server |
+| `Error(message)` | Connection error occurred |
+
+### SubscribeResponse
+
+```kotlin
+data class SubscribeResponse(
+    val ok: Boolean,
+    val channel: String,
+    val error: SubscribeError?
+)
+
+data class SubscribeError(
+    val code: String,
+    val message: String
+)
+```
+
+### SocketMessage
+
+```kotlin
+data class SocketMessage(
+    val channel: String,
+    val messageId: String,
+    val senderType: String,
+    val senderId: String?,
+    val payload: JsonObject
+)
+```
+
+### EventCallback
+
+```kotlin
+fun interface EventCallback<T> {
+    fun onEvent(data: T?)
+}
+```
+
+---
+
+## Best Practices
+
+1. **Always disconnect when done**: Call `disconnect()` in `onDispose` or `onDestroy` to clean up resources.
+
+2. **Check subscribe response**: Always verify `response.ok` before assuming subscription succeeded.
+
+3. **Handle connection state**: Monitor `connectionState` Flow to handle reconnection scenarios.
+
+4. **Use typed callbacks**: Specify the expected type in `on<T>()` for type-safe event handling.
+
+5. **Subscribe before publish**: You must subscribe to a channel before publishing messages to it.
+
+6. **Remove listeners when not needed**: Use `off()` to remove listeners and prevent memory leaks.
+
+---
+
+## Error Handling
+
+```kotlin
+import dev.insforge.exceptions.InsforgeException
+
+try {
+    client.realtime.connect()
+    val response = client.realtime.subscribe("todos")
+
+    if (!response.ok) {
+        when (response.error?.code) {
+            "UNAUTHORIZED" -> println("Not authorized to subscribe")
+            "CHANNEL_NOT_FOUND" -> println("Channel does not exist")
+            else -> println("Subscribe failed: ${response.error?.message}")
+        }
+    }
+} catch (e: InsforgeException) {
+    println("Realtime error: ${e.message}")
+} catch (e: IllegalStateException) {
+    println("Invalid state: ${e.message}")
+}
+```

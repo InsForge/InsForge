@@ -1,0 +1,412 @@
+---
+title: Database SDK Reference
+description: Type-safe database operations using the InsForge Kotlin SDK
+---
+
+import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
+
+
+## Installation
+
+<KotlinSdkInstallation />
+
+## insert()
+
+Insert new records into a table.
+
+### Examples
+
+```kotlin
+// Define your data class
+@Serializable
+data class Post(
+    val id: String? = null,
+    val title: String,
+    val content: String,
+    @SerialName("created_at")
+    val createdAt: String? = null
+)
+
+// Single insert (must wrap in list)
+val post = Post(title = "Hello World", content = "My first post!")
+val result = insforge.database
+    .from("posts")
+    .insertTyped(listOf(post))
+    .returning()
+    .execute<Post>()  // Returns List<Post>
+
+// Bulk insert
+val posts = listOf(
+    Post(title = "First Post", content = "Hello everyone!"),
+    Post(title = "Second Post", content = "Another update.")
+)
+val result = insforge.database
+    .from("posts")
+    .insertTyped(posts)
+    .returning()
+    .execute<Post>()  // Returns List<Post>
+```
+
+---
+
+## update()
+
+Update existing records in a table.
+
+### Examples
+
+```kotlin
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+
+// Update by ID (using JsonPrimitive)
+val result = insforge.database
+    .from("posts")
+    .update(mapOf("title" to JsonPrimitive("Updated Title")))
+    .eq("id", postId)
+    .returning()
+    .execute<Post>()  // Returns List<Post>
+
+// Update by ID (using buildJsonObject)
+val result = insforge.database
+    .from("posts")
+    .update(buildJsonObject { put("title", "Updated Title") })
+    .eq("id", postId)
+    .returning()
+    .execute<Post>()  // Returns List<Post>
+
+// Update multiple
+val result = insforge.database
+    .from("tasks")
+    .update(buildJsonObject { put("status", "completed") })
+    .`in`("id", listOf("task-1", "task-2"))
+    .returning()
+    .execute<Task>()  // Returns List<Task>
+```
+
+---
+
+## delete()
+
+Delete records from a table.
+
+### Examples
+
+```kotlin
+// Delete by ID
+insforge.database
+    .from("posts")
+    .delete()
+    .eq("id", postId)
+    .execute()
+
+// Delete with filter
+insforge.database
+    .from("sessions")
+    .delete()
+    .lt("expires_at", Date())
+    .execute()
+```
+
+---
+
+## select()
+
+Query records from a table.
+
+### Examples
+
+```kotlin
+// Get all posts
+val posts = insforge.database
+    .from("posts")
+    .select()
+    .execute<Post>()  // Returns List<Post>
+
+// Specific columns
+val posts = insforge.database
+    .from("posts")
+    .select("id, title, content")
+    .execute<Post>()  // Returns List<Post>
+
+// With relationships (typed)
+@Serializable
+data class PostWithComments(
+    val id: String,
+    val title: String,
+    val content: String,
+    val comments: List<Comment>
+)
+
+val posts = insforge.database
+    .from("posts")
+    .select("*, comments(id, content)")
+    .execute<PostWithComments>()  // Returns List<PostWithComments>
+```
+
+---
+
+## executeRaw()
+
+Execute SELECT query and return raw JSON array. Use this method when you need to work with dynamic/untyped data, such as queries with joins that return nested objects.
+
+### Examples
+
+```kotlin
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+
+// Query with relationships - raw JSON access
+val result = insforge.database
+    .from("tweets")
+    .select("id, content, profiles!tweets_user_id_fkey(username)")
+    .executeRaw()  // Returns JsonArray
+
+result.forEach { element ->
+    val obj = element.jsonObject
+    val id = obj["id"]?.jsonPrimitive?.content
+    val content = obj["content"]?.jsonPrimitive?.content
+    val profile = obj["profiles"]?.jsonObject
+    val username = profile?.get("username")?.jsonPrimitive?.content
+
+    println("Tweet by $username: $content")
+}
+
+// Dynamic queries where structure is unknown
+val rawData = insforge.database
+    .from("dynamic_table")
+    .select()
+    .executeRaw()
+
+// Process raw JSON as needed
+rawData.forEach { element ->
+    val obj = element.jsonObject
+    obj.keys.forEach { key ->
+        println("$key: ${obj[key]}")
+    }
+}
+```
+
+---
+
+## rpc()
+
+Call PostgreSQL stored functions (RPC - Remote Procedure Call). This method allows you to directly invoke SQL functions defined in your database.
+
+### Signature
+
+```kotlin
+// Typed RPC call - deserializes response to specified type
+suspend inline fun <reified T> rpc(
+    functionName: String,
+    args: Map<String, Any?>? = null
+): T
+
+// Raw RPC call - returns JsonElement for dynamic processing
+suspend fun rpcRaw(
+    functionName: String,
+    args: Map<String, Any?>? = null
+): JsonElement
+```
+
+### Parameters
+
+- `functionName` (String) - Name of the PostgreSQL function to call
+- `args` (`Map\<String, Any?\>?`, optional) - Arguments to pass to the function
+
+### Implementation Details
+
+- **No arguments**: Uses GET request to `/api/database/rpc/{functionName}`
+- **With arguments**: Uses POST request with JSON body to `/api/database/rpc/{functionName}`
+
+### Examples
+
+```kotlin
+// Define response data classes
+@Serializable
+data class UserStats(
+    val totalPosts: Int,
+    val totalLikes: Int,
+    val joinedAt: String
+)
+
+@Serializable
+data class User(
+    val id: String,
+    val name: String,
+    val email: String
+)
+
+// Call function with parameters
+val stats = insforge.database.rpc<UserStats>(
+    "get_user_stats",
+    mapOf("user_id" to 123)
+)
+println("Total posts: ${stats.totalPosts}")
+
+// Call function without parameters
+val users = insforge.database.rpc<List<User>>("get_all_active_users")
+users.forEach { user ->
+    println("User: ${user.name}")
+}
+
+// Call function returning a single value
+val count = insforge.database.rpc<Int>("count_active_posts")
+println("Active posts: $count")
+
+// Call function with multiple parameters
+val result = insforge.database.rpc<List<Post>>(
+    "search_posts",
+    mapOf(
+        "search_term" to "kotlin",
+        "limit" to 10,
+        "offset" to 0
+    )
+)
+```
+
+### rpcRaw() Examples
+
+Use `rpcRaw()` when the return type is dynamic or unknown at compile time.
+
+```kotlin
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+
+// Get raw JSON response
+val result = insforge.database.rpcRaw(
+    "some_dynamic_function",
+    mapOf("param" to "value")
+)
+
+// Process based on actual response structure
+when (result) {
+    is JsonArray -> {
+        result.forEach { element ->
+            val obj = element.jsonObject
+            println("Item: ${obj["name"]?.jsonPrimitive?.content}")
+        }
+    }
+    is JsonObject -> {
+        println("Single result: ${result["data"]}")
+    }
+    is JsonPrimitive -> {
+        println("Value: ${result.content}")
+    }
+}
+
+// Handle complex nested structures
+val complexResult = insforge.database.rpcRaw("get_dashboard_data")
+val dashboard = complexResult.jsonObject
+val userCount = dashboard["user_count"]?.jsonPrimitive?.int
+val recentPosts = dashboard["recent_posts"]?.jsonArray
+```
+
+---
+
+## Filters
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| `.eq(column, value)` | Equals | `.eq("status", "active")` |
+| `.neq(column, value)` | Not equals | `.neq("status", "banned")` |
+| `.gt(column, value)` | Greater than | `.gt("age", 18)` |
+| `.gte(column, value)` | Greater than or equal | `.gte("price", 100)` |
+| `.lt(column, value)` | Less than | `.lt("stock", 10)` |
+| `.lte(column, value)` | Less than or equal | `.lte("priority", 3)` |
+| `.like(column, pattern)` | Case-sensitive pattern | `.like("name", "%Widget%")` |
+| `.ilike(column, pattern)` | Case-insensitive pattern | `.ilike("email", "%@gmail.com")` |
+| `.in(column, list)` | Value in list | `.in("status", listOf("pending", "active"))` |
+| `.isNull(column)` | Is null | `.isNull("deleted_at")` |
+
+```kotlin
+// Chain multiple filters
+val products = insforge.database
+    .from("products")
+    .select()
+    .eq("category", "electronics")
+    .gte("price", 50)
+    .lte("price", 500)
+    .execute<Product>()  // Returns List<Product>
+```
+
+---
+
+## Modifiers
+
+| Modifier | Description | Example |
+|----------|-------------|---------|
+| `.order(column, ascending)` | Sort results | `.order("created_at", ascending = false)` |
+| `.limit(count)` | Limit rows | `.limit(10)` |
+| `.range(from, to)` | Pagination | `.range(0, 9)` |
+
+```kotlin
+// Pagination with sorting
+val posts = insforge.database
+    .from("posts")
+    .select()
+    .order("created_at", ascending = false)
+    .range(0, 9)
+    .limit(10)
+    .execute<Post>()  // Returns List<Post>
+```
+
+---
+
+## Jetpack Compose Integration
+
+```kotlin
+@Composable
+fun PostListScreen() {
+    var posts by remember { mutableStateOf<List<Post>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        try {
+            posts = insforge.database
+                .from("posts")
+                .select()
+                .order("created_at", ascending = false)
+                .execute<Post>()  // Returns List<Post>
+        } catch (e: Exception) {
+            Log.e("PostList", "Error loading posts", e)
+        } finally {
+            isLoading = false
+        }
+    }
+
+    if (isLoading) {
+        CircularProgressIndicator()
+    } else {
+        LazyColumn {
+            items(posts) { post ->
+                PostItem(post = post)
+            }
+        }
+    }
+}
+
+@Composable
+fun PostItem(post: Post) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = post.title,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = post.content,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
+}
+```
