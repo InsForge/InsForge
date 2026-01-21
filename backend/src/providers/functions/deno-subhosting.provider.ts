@@ -396,13 +396,6 @@ export class DenoSubhostingProvider {
   }
 
   /**
-   * Clear cached credentials (no-op, credentials come from env vars)
-   */
-  clearCredentials(): void {
-    // No-op - credentials are read from env vars each time
-  }
-
-  /**
    * Poll deployment until it reaches a final status (success or failed)
    * Returns the final deployment result with build logs if failed
    */
