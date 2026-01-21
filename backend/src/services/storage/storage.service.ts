@@ -13,7 +13,6 @@ import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
 import logger from '@/utils/logger.js';
 import { escapeSqlLikePattern, escapeRegexPattern } from '@/utils/validations.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
-import { ANON_ID } from '@/utils/constants.js';
 
 const DEFAULT_LIST_LIMIT = 100;
 const GIGABYTE_IN_BYTES = 1024 * 1024 * 1024;
@@ -230,11 +229,6 @@ export class StorageService {
   ): Promise<boolean> {
     this.validateBucketName(bucket);
     this.validateKey(key);
-
-    // Anon users and users without ID cannot delete (unless admin)
-    if (!isAdmin && (!userId || userId === ANON_ID)) {
-      return false;
-    }
 
     // Admin can delete any object, non-admin can only delete their own uploads
     const result = isAdmin
