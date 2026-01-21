@@ -167,12 +167,10 @@ export class StorageService {
     try {
       await client.query('BEGIN');
 
-      // Set user ID for auth.uid() function used by RLS policies (transaction-local)
-      await client.query("SELECT set_config('request.jwt.claim.sub', $1, true)", [userId || '']);
-
-      // Switch to non-superuser role so RLS policies are enforced (transaction-local)
+      // Set JWT claims for RLS policies (transaction-local)
       const dbRole = role || 'anon';
-      await client.query(`SET LOCAL ROLE ${dbRole}`);
+      await client.query("SELECT set_config('request.jwt.claim.sub', $1, true)", [userId || '']);
+      await client.query("SELECT set_config('request.jwt.claim.role', $1, true)", [dbRole]);
 
       // Save metadata to database and return the timestamp in one operation
       const result = await client.query(
@@ -255,12 +253,10 @@ export class StorageService {
     try {
       await client.query('BEGIN');
 
-      // Set user ID for auth.uid() function used by RLS policies (transaction-local)
-      await client.query("SELECT set_config('request.jwt.claim.sub', $1, true)", [userId || '']);
-
-      // Switch to non-superuser role so RLS policies are enforced (transaction-local)
+      // Set JWT claims for RLS policies (transaction-local)
       const dbRole = role || 'anon';
-      await client.query(`SET LOCAL ROLE ${dbRole}`);
+      await client.query("SELECT set_config('request.jwt.claim.sub', $1, true)", [userId || '']);
+      await client.query("SELECT set_config('request.jwt.claim.role', $1, true)", [dbRole]);
 
       // Delete from database (RLS policies will be applied)
       const result = await client.query(
@@ -505,12 +501,10 @@ export class StorageService {
     try {
       await client.query('BEGIN');
 
-      // Set user ID for auth.uid() function used by RLS policies (transaction-local)
-      await client.query("SELECT set_config('request.jwt.claim.sub', $1, true)", [userId || '']);
-
-      // Switch to non-superuser role so RLS policies are enforced (transaction-local)
+      // Set JWT claims for RLS policies (transaction-local)
       const dbRole = role || 'anon';
-      await client.query(`SET LOCAL ROLE ${dbRole}`);
+      await client.query("SELECT set_config('request.jwt.claim.sub', $1, true)", [userId || '']);
+      await client.query("SELECT set_config('request.jwt.claim.role', $1, true)", [dbRole]);
 
       // Check if already confirmed
       const existingResult = await client.query(
