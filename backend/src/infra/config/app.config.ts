@@ -25,6 +25,7 @@ export interface AppConfig {
   denoSubhosting: {
     token: string;
     organizationId: string;
+    domain: string;
   };
 }
 
@@ -55,5 +56,6 @@ export const config: AppConfig = {
   denoSubhosting: {
     token: process.env.DENO_SUBHOSTING_TOKEN || '',
     organizationId: process.env.DENO_SUBHOSTING_ORG_ID || '',
+    domain: 'functions.insforge.app',
   },
 };
