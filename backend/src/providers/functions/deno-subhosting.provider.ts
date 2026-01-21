@@ -282,7 +282,9 @@ export class DenoSubhostingProvider {
         projectId: data.projectId,
         status: data.status,
         url:
-          data.domains.length > 0 ? `https://${data.domains[0]}` : `https://${projectId}.${config.denoSubhosting.domain}`,
+          data.domains.length > 0
+            ? `https://${data.domains[0]}`
+            : `https://${projectId}.${config.denoSubhosting.domain}`,
         createdAt: new Date(data.createdAt),
       };
     } catch (error) {
