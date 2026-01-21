@@ -3,12 +3,13 @@ import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from './error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
+import { RoleSchema } from '@insforge/shared-schemas';
 
 export interface AuthRequest extends Request {
   user?: {
     id: string;
     email: string;
-    role: string;
+    role: RoleSchema;
   };
   authenticated?: boolean;
   apiKey?: string;
@@ -43,7 +44,10 @@ export function extractApiKey(req: AuthRequest): string | null {
 }
 
 // Helper function to set user on request
-function setRequestUser(req: AuthRequest, payload: { sub: string; email: string; role: string }) {
+function setRequestUser(
+  req: AuthRequest,
+  payload: { sub: string; email: string; role: RoleSchema }
+) {
   req.user = {
     id: payload.sub,
     email: payload.email,

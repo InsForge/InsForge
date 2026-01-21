@@ -6,6 +6,7 @@ import {
   StorageBucketSchema,
   StorageFileSchema,
   StorageMetadataSchema,
+  RoleSchema,
 } from '@insforge/shared-schemas';
 import { StorageProvider } from '@/providers/storage/base.provider.js';
 import { LocalStorageProvider } from '@/providers/storage/local.provider.js';
@@ -151,7 +152,7 @@ export class StorageService {
     originalKey: string,
     file: Express.Multer.File,
     userId?: string,
-    role?: string
+    role?: RoleSchema
   ): Promise<StorageFileSchema> {
     this.validateBucketName(bucket);
     this.validateKey(originalKey);
@@ -245,7 +246,7 @@ export class StorageService {
     bucket: string,
     key: string,
     userId?: string,
-    role?: string
+    role?: RoleSchema
   ): Promise<boolean> {
     this.validateBucketName(bucket);
     this.validateKey(key);
@@ -489,7 +490,7 @@ export class StorageService {
       etag?: string;
     },
     userId?: string,
-    role?: string
+    role?: RoleSchema
   ): Promise<StorageFileSchema> {
     this.validateBucketName(bucket);
     this.validateKey(key);
