@@ -238,7 +238,7 @@ export class DenoSubhostingProvider {
         // Pass secrets directly as env vars - accessible via Deno.env.get('KEY')
         envVars: secrets,
         // Use template variable for stable subdomain (Subhosting resolves this)
-        domains: ['{project.name}.deno.dev'],
+        domains: [`{project.name}.${config.denoSubhosting.domain}`],
       };
 
       const response = await fetchWithTimeout(
@@ -282,7 +282,7 @@ export class DenoSubhostingProvider {
         projectId: data.projectId,
         status: data.status,
         url:
-          data.domains.length > 0 ? `https://${data.domains[0]}` : `https://${projectId}.deno.dev`,
+          data.domains.length > 0 ? `https://${data.domains[0]}` : `https://${projectId}.${config.denoSubhosting.domain}`,
         createdAt: new Date(data.createdAt),
       };
     } catch (error) {

@@ -369,11 +369,9 @@ export class FunctionService {
 
   /**
    * Get the Deno Subhosting project ID for this InsForge instance
-   * Format: {app_key}-functions (max 26 chars for Deno Subhosting)
    */
   private getDenoProjectId(): string {
-    const appKey = process.env.APP_KEY || process.env.PROJECT_ID || 'local';
-    return `${appKey}-functions`;
+    return process.env.APP_KEY || 'local';
   }
 
   /**
