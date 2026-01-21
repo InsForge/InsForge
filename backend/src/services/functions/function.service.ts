@@ -637,19 +637,32 @@ export class FunctionService {
 
   /**
    * Get all active secrets for function injection
+   * Note: INSFORGE_INTERNAL_URL is replaced with INSFORGE_BASE_URL value
+   * since internal URLs don't work from Deno Subhosting
    */
   private async getFunctionSecrets(): Promise<Record<string, string>> {
     try {
       const secrets = await this.secretService.listSecrets();
       const secretMap: Record<string, string> = {};
+      let baseUrlValue: string | null = null;
 
+      // First pass: collect secrets and get INSFORGE_BASE_URL value
       for (const secret of secrets) {
         if (secret.isActive) {
           const value = await this.secretService.getSecretByKey(secret.key);
           if (value) {
+            if (secret.key === 'INSFORGE_BASE_URL') {
+              baseUrlValue = value;
+            }
             secretMap[secret.key] = value;
           }
         }
+      }
+
+      // Replace INSFORGE_INTERNAL_URL with INSFORGE_BASE_URL value
+      // so existing functions using internal URL still work
+      if (baseUrlValue && secretMap['INSFORGE_INTERNAL_URL']) {
+        secretMap['INSFORGE_INTERNAL_URL'] = baseUrlValue;
       }
 
       return secretMap;
