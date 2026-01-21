@@ -6,7 +6,6 @@ import {
   StorageBucketSchema,
   StorageFileSchema,
   StorageMetadataSchema,
-  RoleSchema,
 } from '@insforge/shared-schemas';
 import { StorageProvider } from '@/providers/storage/base.provider.js';
 import { LocalStorageProvider } from '@/providers/storage/local.provider.js';
@@ -14,6 +13,7 @@ import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
 import logger from '@/utils/logger.js';
 import { escapeSqlLikePattern, escapeRegexPattern } from '@/utils/validations.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
+import { ANON_ID } from '@/utils/constants.js';
 
 const DEFAULT_LIST_LIMIT = 100;
 const GIGABYTE_IN_BYTES = 1024 * 1024 * 1024;
@@ -151,8 +151,7 @@ export class StorageService {
     bucket: string,
     originalKey: string,
     file: Express.Multer.File,
-    userId?: string,
-    role?: RoleSchema
+    userId?: string
   ): Promise<StorageFileSchema> {
     this.validateBucketName(bucket);
     this.validateKey(originalKey);
@@ -163,45 +162,28 @@ export class StorageService {
     // Save file using backend
     await this.provider.putObject(bucket, finalKey, file);
 
-    const client = await this.getPool().connect();
-    try {
-      await client.query('BEGIN');
+    // Save metadata to database and return the timestamp in one operation
+    const result = await this.getPool().query(
+      `
+      INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING uploaded_at as "uploadedAt"
+    `,
+      [bucket, finalKey, file.size, file.mimetype || null, userId || null]
+    );
 
-      // Set JWT claims for RLS policies (transaction-local)
-      const dbRole = role || 'anon';
-      await client.query("SELECT set_config('request.jwt.claim.sub', $1, true)", [userId || '']);
-      await client.query("SELECT set_config('request.jwt.claim.role', $1, true)", [dbRole]);
-
-      // Save metadata to database and return the timestamp in one operation
-      const result = await client.query(
-        `
-        INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING uploaded_at as "uploadedAt"
-      `,
-        [bucket, finalKey, file.size, file.mimetype || null, userId || null]
-      );
-
-      if (!result.rows[0]) {
-        throw new Error(`Failed to retrieve upload timestamp for ${bucket}/${finalKey}`);
-      }
-
-      await client.query('COMMIT');
-
-      return {
-        bucket,
-        key: finalKey,
-        size: file.size,
-        mimeType: file.mimetype,
-        uploadedAt: result.rows[0].uploadedAt,
-        url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(finalKey)}`,
-      };
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => {});
-      throw error;
-    } finally {
-      client.release();
+    if (!result.rows[0]) {
+      throw new Error(`Failed to retrieve upload timestamp for ${bucket}/${finalKey}`);
     }
+
+    return {
+      bucket,
+      key: finalKey,
+      size: file.size,
+      mimeType: file.mimetype,
+      uploadedAt: result.rows[0].uploadedAt,
+      url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(finalKey)}`,
+    };
   }
 
   async getObject(
@@ -243,42 +225,35 @@ export class StorageService {
   async deleteObject(
     bucket: string,
     key: string,
-    userId?: string,
-    role?: RoleSchema
+    userId: string,
+    isAdmin: boolean
   ): Promise<boolean> {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
-    const client = await this.getPool().connect();
-    try {
-      await client.query('BEGIN');
-
-      // Set JWT claims for RLS policies (transaction-local)
-      const dbRole = role || 'anon';
-      await client.query("SELECT set_config('request.jwt.claim.sub', $1, true)", [userId || '']);
-      await client.query("SELECT set_config('request.jwt.claim.role', $1, true)", [dbRole]);
-
-      // Delete from database (RLS policies will be applied)
-      const result = await client.query(
-        'DELETE FROM storage.objects WHERE bucket = $1 AND key = $2',
-        [bucket, key]
-      );
-
-      await client.query('COMMIT');
-
-      // If delete succeeded in DB, also delete from storage provider
-      if (result.rowCount !== null && result.rowCount > 0) {
-        await this.provider.deleteObject(bucket, key);
-        return true;
-      }
-
+    // Anon users and users without ID cannot delete (unless admin)
+    if (!isAdmin && (!userId || userId === ANON_ID)) {
       return false;
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => {});
-      throw error;
-    } finally {
-      client.release();
     }
+
+    // Admin can delete any object, non-admin can only delete their own uploads
+    const result = isAdmin
+      ? await this.getPool().query('DELETE FROM storage.objects WHERE bucket = $1 AND key = $2', [
+          bucket,
+          key,
+        ])
+      : await this.getPool().query(
+          'DELETE FROM storage.objects WHERE bucket = $1 AND key = $2 AND uploaded_by = $3',
+          [bucket, key, userId]
+        );
+
+    // If delete succeeded in DB, also delete from storage provider
+    if (result.rowCount !== null && result.rowCount > 0) {
+      await this.provider.deleteObject(bucket, key);
+      return true;
+    }
+
+    return false;
   }
 
   async listObjects(
@@ -485,8 +460,7 @@ export class StorageService {
       contentType?: string;
       etag?: string;
     },
-    userId?: string,
-    role?: RoleSchema
+    userId?: string
   ): Promise<StorageFileSchema> {
     this.validateBucketName(bucket);
     this.validateKey(key);
@@ -497,55 +471,38 @@ export class StorageService {
       throw new Error(`Upload not found for key "${key}" in bucket "${bucket}"`);
     }
 
-    const client = await this.getPool().connect();
-    try {
-      await client.query('BEGIN');
+    // Check if already confirmed
+    const existingResult = await this.getPool().query(
+      'SELECT key FROM storage.objects WHERE bucket = $1 AND key = $2',
+      [bucket, key]
+    );
 
-      // Set JWT claims for RLS policies (transaction-local)
-      const dbRole = role || 'anon';
-      await client.query("SELECT set_config('request.jwt.claim.sub', $1, true)", [userId || '']);
-      await client.query("SELECT set_config('request.jwt.claim.role', $1, true)", [dbRole]);
-
-      // Check if already confirmed
-      const existingResult = await client.query(
-        'SELECT key FROM storage.objects WHERE bucket = $1 AND key = $2',
-        [bucket, key]
-      );
-
-      if (existingResult.rows[0]) {
-        throw new Error(`File "${key}" already confirmed in bucket "${bucket}"`);
-      }
-
-      // Save metadata to database and return the timestamp in one operation
-      const result = await client.query(
-        `
-        INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING uploaded_at as "uploadedAt"
-      `,
-        [bucket, key, metadata.size, metadata.contentType || null, userId || null]
-      );
-
-      if (!result.rows[0]) {
-        throw new Error(`Failed to retrieve upload timestamp for ${bucket}/${key}`);
-      }
-
-      await client.query('COMMIT');
-
-      return {
-        bucket,
-        key,
-        size: metadata.size,
-        mimeType: metadata.contentType,
-        uploadedAt: result.rows[0].uploadedAt,
-        url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`,
-      };
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => {});
-      throw error;
-    } finally {
-      client.release();
+    if (existingResult.rows[0]) {
+      throw new Error(`File "${key}" already confirmed in bucket "${bucket}"`);
     }
+
+    // Save metadata to database and return the timestamp in one operation
+    const result = await this.getPool().query(
+      `
+      INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING uploaded_at as "uploadedAt"
+    `,
+      [bucket, key, metadata.size, metadata.contentType || null, userId || null]
+    );
+
+    if (!result.rows[0]) {
+      throw new Error(`Failed to retrieve upload timestamp for ${bucket}/${key}`);
+    }
+
+    return {
+      bucket,
+      key,
+      size: metadata.size,
+      mimeType: metadata.contentType,
+      uploadedAt: result.rows[0].uploadedAt,
+      url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`,
+    };
   }
 
   /**

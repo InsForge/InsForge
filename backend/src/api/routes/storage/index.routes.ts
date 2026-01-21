@@ -248,8 +248,7 @@ router.put(
         bucketName,
         objectKey,
         req.file,
-        req.user?.id,
-        req.user?.role
+        req.user?.id
       );
 
       successResponse(res, storedFile, 201);
@@ -371,13 +370,12 @@ router.delete(
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
-      // Delete specific object (RLS policies applied via user context)
       const storageService = StorageService.getInstance();
       const deleted = await storageService.deleteObject(
         bucketName,
         objectKey,
-        req.user?.id,
-        req.user?.role
+        req.user?.id || '',
+        !!req.apiKey || req.user?.role === 'project_admin'
       );
 
       if (!deleted) {
@@ -448,8 +446,7 @@ router.post(
           contentType,
           etag,
         },
-        req.user?.id,
-        req.user?.role
+        req.user?.id
       );
 
       successResponse(res, fileInfo, 201);
