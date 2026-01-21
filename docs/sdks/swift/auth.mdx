@@ -37,6 +37,21 @@ do {
 }
 ```
 
+
+### Email Verification
+
+For users who register with email, the InsForge backend provides three options:
+
+1. **No email verification** - Users can sign in immediately after registration.
+2. **Link-based verification** - Users must open their email and click the verification link before they can sign in.
+3. **Code-based verification** - The InsForge backend sends a 6-digit verification code to the user's email. The client app needs to display a verification screen where users can enter the code, then call `AuthClient#verifyEmail` to complete verification. Only after this can users sign in with email + password.
+
+If the registration response is:
+```json
+{"accessToken": null, "requireEmailVerification": true}
+```
+This indicates that verification via option 2 or 3 is required before the user can sign in.
+
 ---
 
 ## signIn()
@@ -64,6 +79,14 @@ do {
     print("Sign in failed: \(error)")
 }
 ```
+
+### Email Verification
+
+If the sign in response is:
+```json
+{"error":"FORBIDDEN","message":"Email verification required","statusCode":403,"nextActions":"Please verify your email address before logging in"}
+```
+This indicates that verification via option 2 or 3 (link or code, see [signUp()](#email-verification)) is required before the user can sign in.
 
 ---
 
