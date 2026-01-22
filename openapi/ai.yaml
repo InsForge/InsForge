@@ -388,6 +388,34 @@ paths:
         '500':
           description: Failed to generate image
 
+  /api/ai/embeddings:
+    post:
+      summary: Generate embeddings
+      description: Generate vector embeddings for text input using specified embedding model
+      tags:
+        - Client
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbeddingsRequest'
+      responses:
+        '200':
+          description: Embeddings generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddingsResponse'
+        '400':
+          description: Invalid request - missing model or input
+        '401':
+          description: Unauthorized
+        '500':
+          description: Failed to generate embeddings
+
 components:
   securitySchemes:
     bearerAuth:
@@ -839,6 +867,72 @@ components:
         usage:
           type: number
           description: Total usage amount
+
+    EmbeddingsRequest:
+      type: object
+      required:
+        - model
+        - input
+      properties:
+        model:
+          type: string
+          description: Embedding model identifier
+          example: google/gemini-embedding-001
+        input:
+          oneOf:
+            - type: string
+              description: Single text input to embed
+            - type: array
+              items:
+                type: string
+              description: Array of text inputs to embed
+          example: "Hello world"
+        encoding_format:
+          type: string
+          enum: [float, base64]
+          default: float
+          description: The format to return the embeddings in. Can be either float or base64.
+        dimensions:
+          type: integer
+          minimum: 0
+          description: The number of dimensions the resulting output embeddings should have. Only supported in certain models.
+
+    EmbeddingsResponse:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [list]
+          description: Object type, always "list"
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmbeddingObject'
+        metadata:
+          type: object
+          properties:
+            model:
+              type: string
+              description: The model used for embedding
+              example: text-embedding-ada-002
+            usage:
+              $ref: '#/components/schemas/TokenUsage'
+
+    EmbeddingObject:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [embedding]
+          description: Object type, always "embedding"
+        embedding:
+          type: array
+          items:
+            type: number
+          description: The embedding vector (array of floats)
+        index:
+          type: integer
+          description: Index of this embedding in the input array
 
     ErrorResponse:
       type: object
