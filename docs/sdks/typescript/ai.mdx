@@ -296,6 +296,175 @@ for await (const chunk of stream) {
 
 ---
 
+## embeddings.create()
+
+Generate vector embeddings for text input using AI models.
+
+### Parameters
+
+- `model` (string, required) - Embedding model (e.g., 'openai/text-embedding-3-small')
+- `input` (string | string[], required) - Text input(s) to embed
+- `encoding_format` ('float' | 'base64', optional) - Output format (default: 'float')
+- `dimensions` (number, optional) - Number of dimensions for the output embeddings
+
+### Returns
+
+```typescript
+{
+  object: 'list',
+  data: EmbeddingObject[],
+  metadata?: {
+    model: string,
+    usage?: {
+      promptTokens?: number,
+      totalTokens?: number
+    }
+  }
+}
+
+// EmbeddingObject type
+interface EmbeddingObject {
+  object: 'embedding',
+  embedding: number[] | string,  // number[] for float, string for base64
+  index: number
+}
+```
+
+### Example (Single Text)
+
+```typescript
+const response = await insforge.ai.embeddings.create({
+  model: 'openai/text-embedding-3-small',
+  input: 'Hello world'
+});
+
+console.log(response.data[0].embedding);  // number[]
+console.log(`Dimensions: ${response.data[0].embedding.length}`);
+console.log(`Model: ${response.metadata?.model}`);
+```
+
+### Example (Multiple Texts)
+
+```typescript
+const response = await insforge.ai.embeddings.create({
+  model: 'openai/text-embedding-3-small',
+  input: ['Hello world', 'Goodbye world', 'How are you?']
+});
+
+response.data.forEach((item, index) => {
+  console.log(`Text ${index}: ${item.embedding.length} dimensions`);
+});
+```
+
+### Example (With Custom Dimensions)
+
+```typescript
+const response = await insforge.ai.embeddings.create({
+  model: 'openai/text-embedding-3-small',
+  input: 'Hello world',
+  dimensions: 256
+});
+
+console.log(`Embedding dimensions: ${response.data[0].embedding.length}`);  // 256
+```
+
+### Example (Base64 Encoding)
+
+```typescript
+const response = await insforge.ai.embeddings.create({
+  model: 'openai/text-embedding-3-small',
+  input: 'Hello world',
+  encoding_format: 'base64'
+});
+
+// Embedding is returned as base64 string
+const base64Embedding = response.data[0].embedding as string;
+console.log(`Base64 embedding: ${base64Embedding.substring(0, 50)}...`);
+```
+
+### Example (Semantic Search)
+
+```typescript
+// Generate embeddings for documents
+const documents = [
+  'TypeScript is a typed superset of JavaScript',
+  'React is a library for building user interfaces',
+  'Node.js is a JavaScript runtime'
+];
+
+const docEmbeddings = await insforge.ai.embeddings.create({
+  model: 'openai/text-embedding-3-small',
+  input: documents
+});
+
+// Generate embedding for query
+const queryEmbedding = await insforge.ai.embeddings.create({
+  model: 'openai/text-embedding-3-small',
+  input: 'frontend development'
+});
+
+// Calculate cosine similarity
+function cosineSimilarity(a: number[], b: number[]): number {
+  const dotProduct = a.reduce((sum, val, i) => sum + val * b[i], 0);
+  const normA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
+  const normB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
+  return dotProduct / (normA * normB);
+}
+
+// Find most similar document
+const queryVector = queryEmbedding.data[0].embedding as number[];
+const similarities = docEmbeddings.data.map((item, index) => ({
+  index,
+  similarity: cosineSimilarity(queryVector, item.embedding as number[])
+}));
+
+const mostSimilar = similarities.sort((a, b) => b.similarity - a.similarity)[0];
+console.log(`Most similar: ${documents[mostSimilar.index]}`);
+```
+
+### Example (Store Embeddings in Database)
+
+```typescript
+// Generate and store embeddings for content
+const content = 'This is an important document about AI.';
+
+const response = await insforge.ai.embeddings.create({
+  model: 'openai/text-embedding-3-small',
+  input: content
+});
+
+// Store in database with pgvector
+await insforge.database.from('documents').insert([{
+  content,
+  embedding: response.data[0].embedding,  // Store as vector
+  created_at: new Date().toISOString()
+}]);
+```
+
+### Output
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "object": "embedding",
+      "embedding": [0.0023, -0.0142, 0.0234, ...],
+      "index": 0
+    }
+  ],
+  "metadata": {
+    "model": "openai/text-embedding-3-small",
+    "usage": {
+      "promptTokens": 2,
+      "totalTokens": 2
+    }
+  }
+}
+```
+
+---
+
 ## images.generate()
 
 Generate images using AI models.
@@ -481,6 +650,32 @@ interface TokenUsage {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
+}
+```
+
+### Embeddings Response
+
+```typescript
+interface EmbeddingsResponse {
+  object: 'list';
+  data: EmbeddingObject[];
+  metadata?: EmbeddingsMetadata;
+}
+
+interface EmbeddingObject {
+  object: 'embedding';
+  embedding: number[] | string;  // number[] for float, string for base64
+  index: number;
+}
+
+interface EmbeddingsMetadata {
+  model: string;
+  usage?: EmbeddingsUsage;
+}
+
+interface EmbeddingsUsage {
+  promptTokens?: number;
+  totalTokens?: number;
 }
 ```
 

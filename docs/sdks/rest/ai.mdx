@@ -285,6 +285,120 @@ Check the URL format to determine how to handle the image.
 
 ---
 
+## Generate Embeddings
+
+Generate vector embeddings for text input using AI models.
+
+```
+POST /api/ai/embeddings
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `model` | string | Yes | Embedding model identifier (e.g., `openai/text-embedding-3-small`) |
+| `input` | string \| string[] | Yes | Single text or array of texts to embed |
+| `encoding_format` | string | No | Output format: `float` (default) or `base64` |
+| `dimensions` | integer | No | Number of dimensions for output embeddings (model-dependent) |
+
+### Example (Single Text)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/ai/embeddings" \
+  -H "Authorization: Bearer your-jwt-token-or-anon-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/text-embedding-3-small",
+    "input": "Hello world"
+  }'
+```
+
+### Example (Multiple Texts)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/ai/embeddings" \
+  -H "Authorization: Bearer your-jwt-token-or-anon-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/text-embedding-3-small",
+    "input": ["Hello world", "Goodbye world", "How are you?"]
+  }'
+```
+
+### Example (With Custom Dimensions)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/ai/embeddings" \
+  -H "Authorization: Bearer your-jwt-token-or-anon-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/text-embedding-3-small",
+    "input": "Hello world",
+    "dimensions": 256
+  }'
+```
+
+### Response
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "object": "embedding",
+      "embedding": [0.0023, -0.0142, 0.0234, 0.0156, ...],
+      "index": 0
+    }
+  ],
+  "metadata": {
+    "model": "openai/text-embedding-3-small",
+    "usage": {
+      "promptTokens": 2,
+      "totalTokens": 2
+    }
+  }
+}
+```
+
+### Response (Multiple Texts)
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "object": "embedding",
+      "embedding": [0.0023, -0.0142, ...],
+      "index": 0
+    },
+    {
+      "object": "embedding",
+      "embedding": [0.0045, -0.0089, ...],
+      "index": 1
+    },
+    {
+      "object": "embedding",
+      "embedding": [0.0012, -0.0234, ...],
+      "index": 2
+    }
+  ],
+  "metadata": {
+    "model": "openai/text-embedding-3-small",
+    "usage": {
+      "promptTokens": 8,
+      "totalTokens": 8
+    }
+  }
+}
+```
+
+<Note>
+When using `encoding_format: "base64"`, the `embedding` field will be a base64-encoded string instead of an array of numbers. This can reduce response size for large embeddings.
+</Note>
+
+---
+
 ## Get Remaining Credits
 
 Get remaining credits for the current API key from OpenRouter. **Requires admin authentication.**
@@ -467,3 +581,11 @@ GET /api/ai/usage?startDate=2024-01-01&endDate=2024-01-31&limit=50&offset=0
 |----------|----------|-------------|
 | `openai/dall-e-3` | OpenAI | High-quality image generation |
 | `google/gemini-2.5-flash-image-preview` | Google | Multimodal image generation |
+
+### Embedding Models
+
+| Model ID | Provider | Description |
+|----------|----------|-------------|
+| `openai/text-embedding-3-small` | OpenAI | Fast, efficient embedding model |
+| `openai/text-embedding-3-large` | OpenAI | Higher quality embeddings |
+| `google/gemini-embedding-001` | Google | Google's embedding model |

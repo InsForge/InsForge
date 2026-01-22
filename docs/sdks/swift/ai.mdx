@@ -168,6 +168,108 @@ print(response.text)
 
 ---
 
+## generateEmbeddings()
+
+Generate vector embeddings for text input using AI models.
+
+### Parameters
+
+- `model` (String) - Embedding model identifier (e.g., "google/gemini-embedding-001")
+- `input` (EmbeddingInput) - Text input to embed (single or multiple)
+- `encodingFormat` (EmbeddingEncodingFormat?, optional) - Output format (.float or .base64)
+- `dimensions` (Int?, optional) - Number of dimensions for the output embeddings
+
+### Returns
+
+```swift
+EmbeddingsResponse
+```
+
+### Example (Single Text)
+
+```swift
+let response = try await insforge.ai.generateEmbeddings(
+    model: "google/gemini-embedding-001",
+    input: .single("Hello world")
+)
+
+print("Generated \(response.data.count) embedding(s)")
+print("Dimensions: \(response.data.first?.embedding.count ?? 0)")
+
+if let metadata = response.metadata {
+    print("Model: \(metadata.model)")
+}
+```
+
+### Example (Multiple Texts)
+
+```swift
+let response = try await insforge.ai.generateEmbeddings(
+    model: "google/gemini-embedding-001",
+    input: .multiple(["Hello", "World", "How are you?"])
+)
+
+for embedding in response.data {
+    print("Index \(embedding.index): \(embedding.embedding.count) dimensions")
+}
+```
+
+### Example (With Optional Parameters)
+
+```swift
+let response = try await insforge.ai.generateEmbeddings(
+    model: "google/gemini-embedding-001",
+    input: .single("Hello world"),
+    encodingFormat: .float,
+    dimensions: 768
+)
+
+print("Embedding dimensions: \(response.data.first?.embedding.count ?? 0)")  // 768
+```
+
+### Example (Semantic Search)
+
+```swift
+// Generate embeddings for documents
+let documents = [
+    "Swift is a powerful programming language",
+    "iOS development with SwiftUI",
+    "Machine learning with Core ML"
+]
+
+let docEmbeddings = try await insforge.ai.generateEmbeddings(
+    model: "google/gemini-embedding-001",
+    input: .multiple(documents)
+)
+
+// Generate embedding for query
+let queryEmbedding = try await insforge.ai.generateEmbeddings(
+    model: "google/gemini-embedding-001",
+    input: .single("mobile app development")
+)
+
+// Calculate cosine similarity
+func cosineSimilarity(_ a: [Double], _ b: [Double]) -> Double {
+    let dotProduct = zip(a, b).map(*).reduce(0, +)
+    let normA = sqrt(a.map { $0 * $0 }.reduce(0, +))
+    let normB = sqrt(b.map { $0 * $0 }.reduce(0, +))
+    return dotProduct / (normA * normB)
+}
+
+// Find most similar document
+if let queryVector = queryEmbedding.data.first?.embedding {
+    let similarities = docEmbeddings.data.enumerated().map { index, embedding in
+        (index: index, similarity: cosineSimilarity(queryVector, embedding.embedding))
+    }
+
+    if let mostSimilar = similarities.max(by: { $0.similarity < $1.similarity }) {
+        print("Most similar: \(documents[mostSimilar.index])")
+    }
+}
+```
+
+---
+
 ## generateImage()
 
 Generate images using AI models.
@@ -557,6 +659,44 @@ public struct TokenUsage: Codable, Sendable {
     let promptTokens: Int
     let completionTokens: Int
     let totalTokens: Int
+}
+```
+
+### EmbeddingsResponse
+
+```swift
+// Encoding format options for embeddings
+public enum EmbeddingEncodingFormat: String, Codable, Sendable {
+    case float
+    case base64
+}
+
+// Input type for embeddings (single or multiple texts)
+public enum EmbeddingInput: Sendable {
+    case single(String)
+    case multiple([String])
+}
+
+public struct EmbeddingsResponse: Codable, Sendable {
+    let object: String            // "list"
+    let data: [EmbeddingObject]
+    let metadata: Metadata?
+
+    struct Metadata: Codable {
+        let model: String
+        let usage: EmbeddingsUsage?
+    }
+}
+
+public struct EmbeddingObject: Codable, Sendable {
+    let object: String            // "embedding"
+    let embedding: [Double]       // or String for base64 format
+    let index: Int
+}
+
+public struct EmbeddingsUsage: Codable, Sendable {
+    let promptTokens: Int?
+    let totalTokens: Int?
 }
 ```
 
