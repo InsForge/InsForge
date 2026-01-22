@@ -55,10 +55,14 @@ export class EmbeddingService {
 
       // Track usage if config is available
       if (aiConfig?.id && tokenUsage) {
-        await this.aiUsageService.trackEmbeddingUsage(
+        const outputTokens = Math.max(
+          0,
+          (tokenUsage.totalTokens || 0) - (tokenUsage.promptTokens || 0)
+        );
+        await this.aiUsageService.trackChatUsage(
           aiConfig.id,
           tokenUsage.promptTokens,
-          tokenUsage.totalTokens,
+          outputTokens,
           options.model // pass the actual model ID used
         );
       }
