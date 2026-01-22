@@ -96,7 +96,7 @@ export class AIUsageService {
     totalTokens?: number,
     modelId?: string
   ): Promise<{ id: string }> {
-    const outputTokens = (totalTokens || 0) - (inputTokens || 0);
+    const outputTokens = Math.max(0, (totalTokens || 0) - (inputTokens || 0));
     try {
       const usageResult = await this.getPool().query(
         `INSERT INTO ai.usage (config_id, input_tokens, output_tokens, model_id)
