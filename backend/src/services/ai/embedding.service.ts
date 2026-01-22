@@ -1,7 +1,7 @@
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import type { EmbeddingsRequest, EmbeddingsResponse } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
-import { AIConfigService } from './ai-config.service';
+import { AIConfigService } from './ai-config.service.js';
 import { AIUsageService } from './ai-usage.service.js';
 
 export class EmbeddingService {
