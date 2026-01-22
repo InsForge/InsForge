@@ -70,6 +70,21 @@ Once status is `READY`, the `url` column contains the live deployment URL.
 SELECT url FROM system.deployments WHERE id = '<deployment-id>';
 ```
 
+## SPA Routing (React, Vue, etc.)
+
+Add `vercel.json` to your project root:
+
+```json
+{
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+```
+
 ## Quick Reference
 
 | Task | Tool | Command |

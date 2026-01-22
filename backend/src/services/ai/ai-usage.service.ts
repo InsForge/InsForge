@@ -74,7 +74,7 @@ export class AIUsageService {
         [configId, inputTokens || null, outputTokens || null, modelId || null]
       );
 
-      logger.info('Chat usage tracked', {
+      logger.debug('Chat usage tracked', {
         id: usageResult.rows[0].id,
         configId,
         inputTokens,
@@ -113,7 +113,7 @@ export class AIUsageService {
         ]
       );
 
-      logger.info('Image usage tracked', {
+      logger.debug('Image usage tracked', {
         id: usageResult.rows[0].id,
         configId,
         imageCount,

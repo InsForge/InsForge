@@ -608,8 +608,8 @@ export class AuthService {
 
     // Use a fixed admin ID for the system administrator
 
-    // Return admin user with JWT token - no database interaction
-    const accessToken = this.tokenManager.generateToken({
+    // Return admin user with JWT token (24h expiration) - no database interaction
+    const accessToken = this.tokenManager.generateAdminToken({
       sub: ADMIN_ID,
       email,
       role: 'project_admin',
@@ -640,8 +640,8 @@ export class AuthService {
       // If verification succeeds, extract user info and generate internal token
       const email = payload['email'] || payload['sub'] || 'admin@insforge.local';
 
-      // Generate internal access token
-      const accessToken = this.tokenManager.generateToken({
+      // Generate internal access token (24h expiration)
+      const accessToken = this.tokenManager.generateAdminToken({
         sub: ADMIN_ID,
         email: email as string,
         role: 'project_admin',

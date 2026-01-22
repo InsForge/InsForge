@@ -15,8 +15,10 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 import { RealtimeAuthService } from '@/services/realtime/realtime-auth.service.js';
 import { RealtimeMessageService } from '@/services/realtime/realtime-message.service.js';
+import { SecretService } from '@/services/secrets/secret.service.js';
 
 const tokenManager = TokenManager.getInstance();
+const secretService = SecretService.getInstance();
 
 /**
  * SocketManager - Industrial-grade Socket.IO implementation
@@ -65,9 +67,42 @@ export class SocketManager {
     }
 
     // Authentication middleware
-    this.io.use((socket, next) => {
+    this.io.use(async (socket, next) => {
       try {
         const token = socket.handshake.auth.token;
+        const apiKey = socket.handshake.auth.apiKey;
+
+        // Try API key authentication first
+        if (apiKey) {
+          const isValid = await secretService.verifyApiKey(apiKey);
+          if (isValid) {
+            socket.data.user = {
+              id: 'api-key-client',
+              email: 'api-key@client',
+              role: 'project_admin',
+            };
+            logger.debug('Socket authenticated via API key');
+            return next();
+          }
+          // If API key provided but invalid, reject
+          throw new AppError(
+            'Invalid API key',
+            401,
+            ERROR_CODES.AUTH_INVALID_API_KEY,
+            NEXT_ACTION.CHECK_API_KEY
+          );
+        }
+
+        // Fall back to JWT token authentication
+        if (!token) {
+          throw new AppError(
+            'No authentication provided',
+            401,
+            ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+            NEXT_ACTION.CHECK_TOKEN
+          );
+        }
+
         const payload = tokenManager.verifyToken(token);
         if (!payload.role) {
           throw new AppError(
@@ -84,15 +119,19 @@ export class SocketManager {
         };
 
         next();
-      } catch {
-        next(
-          new AppError(
-            'Invalid token',
-            401,
-            ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-            NEXT_ACTION.CHECK_TOKEN
-          )
-        );
+      } catch (error) {
+        if (error instanceof AppError) {
+          next(error);
+        } else {
+          next(
+            new AppError(
+              'Invalid authentication',
+              401,
+              ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+              NEXT_ACTION.CHECK_TOKEN
+            )
+          );
+        }
       }
     });
   }

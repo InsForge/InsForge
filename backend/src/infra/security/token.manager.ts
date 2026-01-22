@@ -7,6 +7,7 @@ import type { TokenPayloadSchema } from '@insforge/shared-schemas';
 
 const JWT_SECRET = process.env.JWT_SECRET ?? '';
 const JWT_EXPIRES_IN = '15m';
+const ADMIN_SESSION_EXPIRES_IN = '24h';
 const REFRESH_TOKEN_EXPIRES_IN = '7d';
 
 /**
@@ -50,7 +51,7 @@ export class TokenManager {
   }
 
   /**
-   * Generate JWT access token for users and admins
+   * Generate JWT access token for regular users (expires in 15m)
    */
   generateToken(payload: TokenPayloadSchema): string {
     return jwt.sign(payload, JWT_SECRET, {
@@ -60,10 +61,21 @@ export class TokenManager {
   }
 
   /**
-   * Generate admin JWT token (never expires)
+   * Generate admin token (expires in 24h)
+   * Used for admin dashboard login
+   */
+  generateAdminToken(payload: TokenPayloadSchema): string {
+    return jwt.sign(payload, JWT_SECRET, {
+      algorithm: 'HS256',
+      expiresIn: ADMIN_SESSION_EXPIRES_IN,
+    });
+  }
+
+  /**
+   * Generate API key token (never expires)
    * Used for internal API key authenticated requests to PostgREST
    */
-  generateAdminToken(): string {
+  generateApiKeyToken(): string {
     const payload = {
       sub: 'project-admin-with-api-key',
       email: 'project-admin@email.com',
