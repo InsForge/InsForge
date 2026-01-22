@@ -193,36 +193,37 @@ else
     echo "Error: $body"
 fi
 
-# Step 9: Test POST upload with auto-generated key
-print_info "9️⃣  Testing POST upload with auto-generated key..."
-echo "This is a test file for POST upload" > /tmp/post-test.txt
-response=$(curl -s -w "\n%{http_code}" -X POST "${API_BASE_URL}/storage/buckets/${PUBLIC_BUCKET}/objects" \
+# Step 9: Test PUT upload with specified key
+print_info "9️⃣  Testing PUT upload with specified key..."
+echo "This is a test file for PUT upload" > /tmp/put-test.txt
+PUT_TEST_KEY="put-test-$(date +%s).txt"
+response=$(curl -s -w "\n%{http_code}" -X PUT "${API_BASE_URL}/storage/buckets/${PUBLIC_BUCKET}/objects/${PUT_TEST_KEY}" \
   -H "Authorization: Bearer ${api_key}" \
-  -F "file=@/tmp/post-test.txt")
+  -F "file=@/tmp/put-test.txt")
 
 body=$(echo "$response" | sed '$d')
 status=$(echo "$response" | tail -n 1)
 
 if [ "$status" -ge 200 ] && [ "$status" -lt 300 ]; then
-    print_success "File uploaded via POST with auto-generated key ($status)"
+    print_success "File uploaded via PUT with specified key ($status)"
     if command -v jq &> /dev/null && echo "$body" | jq . >/dev/null 2>&1; then
         echo "$body" | jq '.'
-        # Extract the generated key for verification
-        generated_key=$(echo "$body" | jq -r '.key')
-        echo "   📝 Generated key: $generated_key"
-        # Test downloading the file with generated key
-        HTTP_CODE=$(curl -s -L -o /tmp/post-download.txt -w "%{http_code}" "${API_BASE_URL}/storage/buckets/${PUBLIC_BUCKET}/objects/${generated_key}")
+        # Extract the key for verification
+        uploaded_key=$(echo "$body" | jq -r '.key')
+        echo "   📝 Uploaded key: $uploaded_key"
+        # Test downloading the file
+        HTTP_CODE=$(curl -s -L -o /tmp/put-download.txt -w "%{http_code}" "${API_BASE_URL}/storage/buckets/${PUBLIC_BUCKET}/objects/${uploaded_key}")
         if [ "$HTTP_CODE" -eq 200 ]; then
-            print_success "Downloaded file with generated key!"
-            echo "   📄 Content: $(cat /tmp/post-download.txt)"
+            print_success "Downloaded file with key!"
+            echo "   📄 Content: $(cat /tmp/put-download.txt)"
         else
-            print_fail "Could not download file with generated key (Status: ${HTTP_CODE})"
+            print_fail "Could not download file with key (Status: ${HTTP_CODE})"
         fi
     else
         echo "Response: $body"
     fi
 else
-    print_fail "POST upload failed ($status)"
+    print_fail "PUT upload failed ($status)"
     echo "Error: $body"
 fi
 
@@ -259,7 +260,7 @@ fi
 
 # Cleanup temp files only
 print_info "🧹 Cleaning up temp files..."
-rm -f /tmp/public-test.txt /tmp/private-test.txt /tmp/public-response.txt /tmp/private-response.txt /tmp/private-auth-response.txt /tmp/post-test.txt /tmp/post-download.txt
+rm -f /tmp/public-test.txt /tmp/private-test.txt /tmp/public-response.txt /tmp/private-response.txt /tmp/private-auth-response.txt /tmp/put-test.txt /tmp/put-download.txt
 
 print_success "✨ Public/Private bucket test completed!"
 # Note: Buckets will be cleaned up automatically on exit via test-config.sh

@@ -417,13 +417,12 @@ router.delete(
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
-      // Delete specific object
       const storageService = StorageService.getInstance();
       const deleted = await storageService.deleteObject(
         bucketName,
         objectKey,
-        req.user?.id,
-        req.user?.role === 'project_admin'
+        req.user?.id || '',
+        !!req.apiKey || req.user?.role === 'project_admin'
       );
 
       if (!deleted) {

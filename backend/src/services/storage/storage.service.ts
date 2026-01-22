@@ -11,9 +11,6 @@ import { StorageProvider } from '@/providers/storage/base.provider.js';
 import { LocalStorageProvider } from '@/providers/storage/local.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
 import logger from '@/utils/logger.js';
-import { ADMIN_ID } from '@/utils/constants.js';
-import { AppError } from '@/api/middlewares/error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
 import { escapeSqlLikePattern, escapeRegexPattern } from '@/utils/validations.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
 
@@ -164,39 +161,28 @@ export class StorageService {
     // Save file using backend
     await this.provider.putObject(bucket, finalKey, file);
 
-    const client = await this.getPool().connect();
-    try {
-      // Save metadata to database and return the timestamp in one operation
-      const result = await client.query(
-        `
-        INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING uploaded_at as "uploadedAt"
-      `,
-        [
-          bucket,
-          finalKey,
-          file.size,
-          file.mimetype || null,
-          userId && userId !== ADMIN_ID ? userId : null,
-        ]
-      );
+    // Save metadata to database and return the timestamp in one operation
+    const result = await this.getPool().query(
+      `
+      INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING uploaded_at as "uploadedAt"
+    `,
+      [bucket, finalKey, file.size, file.mimetype || null, userId || null]
+    );
 
-      if (!result.rows[0]) {
-        throw new Error(`Failed to retrieve upload timestamp for ${bucket}/${finalKey}`);
-      }
-
-      return {
-        bucket,
-        key: finalKey,
-        size: file.size,
-        mimeType: file.mimetype,
-        uploadedAt: result.rows[0].uploadedAt,
-        url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(finalKey)}`,
-      };
-    } finally {
-      client.release();
+    if (!result.rows[0]) {
+      throw new Error(`Failed to retrieve upload timestamp for ${bucket}/${finalKey}`);
     }
+
+    return {
+      bucket,
+      key: finalKey,
+      size: file.size,
+      mimeType: file.mimetype,
+      uploadedAt: result.rows[0].uploadedAt,
+      url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(finalKey)}`,
+    };
   }
 
   async getObject(
@@ -238,50 +224,30 @@ export class StorageService {
   async deleteObject(
     bucket: string,
     key: string,
-    userId?: string,
-    isAdmin?: boolean
+    userId: string,
+    isAdmin: boolean
   ): Promise<boolean> {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
-    const client = await this.getPool().connect();
-    try {
-      // Check permissions
-      if (!isAdmin) {
-        const fileResult = await client.query(
-          'SELECT uploaded_by FROM storage.objects WHERE bucket = $1 AND key = $2',
-          [bucket, key]
+    // Admin can delete any object, non-admin can only delete their own uploads
+    const result = isAdmin
+      ? await this.getPool().query('DELETE FROM storage.objects WHERE bucket = $1 AND key = $2', [
+          bucket,
+          key,
+        ])
+      : await this.getPool().query(
+          'DELETE FROM storage.objects WHERE bucket = $1 AND key = $2 AND uploaded_by = $3',
+          [bucket, key, userId]
         );
 
-        const file = fileResult.rows[0] as { uploaded_by: string | null } | undefined;
-
-        if (!file) {
-          return false; // File doesn't exist
-        }
-
-        // Check if user owns the file
-        if (userId && file.uploaded_by !== userId) {
-          throw new AppError(
-            'Permission denied: You can only delete files you uploaded',
-            403,
-            ERROR_CODES.FORBIDDEN
-          );
-        }
-      }
-
-      // Delete file using backend
+    // If delete succeeded in DB, also delete from storage provider
+    if (result.rowCount !== null && result.rowCount > 0) {
       await this.provider.deleteObject(bucket, key);
-
-      // Delete from database
-      const result = await client.query(
-        'DELETE FROM storage.objects WHERE bucket = $1 AND key = $2',
-        [bucket, key]
-      );
-
-      return result.rowCount !== null && result.rowCount > 0;
-    } finally {
-      client.release();
+      return true;
     }
+
+    return false;
   }
 
   async listObjects(
@@ -499,49 +465,38 @@ export class StorageService {
       throw new Error(`Upload not found for key "${key}" in bucket "${bucket}"`);
     }
 
-    const client = await this.getPool().connect();
-    try {
-      // Check if already confirmed
-      const existingResult = await client.query(
-        'SELECT key FROM storage.objects WHERE bucket = $1 AND key = $2',
-        [bucket, key]
-      );
+    // Check if already confirmed
+    const existingResult = await this.getPool().query(
+      'SELECT key FROM storage.objects WHERE bucket = $1 AND key = $2',
+      [bucket, key]
+    );
 
-      if (existingResult.rows[0]) {
-        throw new Error(`File "${key}" already confirmed in bucket "${bucket}"`);
-      }
-
-      // Save metadata to database and return the timestamp in one operation
-      const result = await client.query(
-        `
-        INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING uploaded_at as "uploadedAt"
-      `,
-        [
-          bucket,
-          key,
-          metadata.size,
-          metadata.contentType || null,
-          userId && userId !== ADMIN_ID ? userId : null,
-        ]
-      );
-
-      if (!result.rows[0]) {
-        throw new Error(`Failed to retrieve upload timestamp for ${bucket}/${key}`);
-      }
-
-      return {
-        bucket,
-        key,
-        size: metadata.size,
-        mimeType: metadata.contentType,
-        uploadedAt: result.rows[0].uploadedAt,
-        url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`,
-      };
-    } finally {
-      client.release();
+    if (existingResult.rows[0]) {
+      throw new Error(`File "${key}" already confirmed in bucket "${bucket}"`);
     }
+
+    // Save metadata to database and return the timestamp in one operation
+    const result = await this.getPool().query(
+      `
+      INSERT INTO storage.objects (bucket, key, size, mime_type, uploaded_by)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING uploaded_at as "uploadedAt"
+    `,
+      [bucket, key, metadata.size, metadata.contentType || null, userId || null]
+    );
+
+    if (!result.rows[0]) {
+      throw new Error(`Failed to retrieve upload timestamp for ${bucket}/${key}`);
+    }
+
+    return {
+      bucket,
+      key,
+      size: metadata.size,
+      mimeType: metadata.contentType,
+      uploadedAt: result.rows[0].uploadedAt,
+      url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`,
+    };
   }
 
   /**
