@@ -1,4 +1,5 @@
 const API_BASE = '/api';
+const CSRF_COOKIE_NAME = 'insforge_csrf';
 
 interface ApiError extends Error {
   response?: {
@@ -8,50 +9,100 @@ interface ApiError extends Error {
 }
 
 export class ApiClient {
-  private token: string | null = null;
+  private accessToken: string | null = null;
   private onAuthError?: () => void;
+  private refreshPromise: Promise<boolean> | null = null;
 
-  constructor() {
-    this.token = localStorage.getItem('insforge_token');
+  setAccessToken(token: string) {
+    this.accessToken = token;
   }
 
-  setToken(token: string) {
-    this.token = token;
-    localStorage.setItem('insforge_token', token);
+  setCsrfToken(csrfToken: string) {
+    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toUTCString();
+    document.cookie = `${CSRF_COOKIE_NAME}=${encodeURIComponent(csrfToken)}; expires=${expires}; path=/; SameSite=Lax`;
   }
 
-  clearToken() {
-    this.token = null;
-    localStorage.removeItem('insforge_token');
+  clearTokens() {
+    this.accessToken = null;
+    document.cookie = `${CSRF_COOKIE_NAME}=; max-age=0; path=/; SameSite=Lax`;
   }
 
-  getToken() {
-    return this.token;
+  getAccessToken() {
+    return this.accessToken;
+  }
+
+  getCsrfToken() {
+    const match = document.cookie.match(new RegExp(`(?:^|; )${CSRF_COOKIE_NAME}=([^;]*)`));
+    return match ? decodeURIComponent(match[1]) : null;
   }
 
   setAuthErrorHandler(handler?: () => void) {
     this.onAuthError = handler;
   }
 
-  request(
+  async refreshAccessToken(): Promise<boolean> {
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.refreshPromise = (async () => {
+      const csrfToken = this.getCsrfToken();
+      if (!csrfToken) {
+        return false;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/auth/refresh`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken,
+          },
+          credentials: 'include',
+        });
+
+        if (!response.ok) {
+          return false;
+        }
+
+        const data = await response.json();
+        if (data.accessToken) {
+          this.setAccessToken(data.accessToken);
+          if (data.csrfToken) {
+            this.setCsrfToken(data.csrfToken);
+          }
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    })();
+
+    try {
+      return await this.refreshPromise;
+    } finally {
+      this.refreshPromise = null;
+    }
+  }
+
+  request<T = unknown>(
     endpoint: string,
     options: RequestInit & {
       returnFullResponse?: boolean;
       skipAuth?: boolean;
+      skipRefresh?: boolean;
     } = {}
-  ) {
+  ): Promise<T> {
     const url = `${API_BASE}${endpoint}`;
-    const { returnFullResponse, skipAuth, ...fetchOptions } = options;
+    const { skipAuth, skipRefresh, ...fetchOptions } = options;
 
-    // Initial request attempt
-    const makeRequest = async () => {
-      // Merge headers properly to preserve Content-Type when body is present
+    const makeRequest = async (isRetry = false): Promise<T> => {
       const headers: Record<string, string> = {
-        ...(!skipAuth && this.token && { Authorization: `Bearer ${this.token}` }),
+        ...(!skipAuth && this.accessToken && { Authorization: `Bearer ${this.accessToken}` }),
         ...((fetchOptions.headers as Record<string, string>) || {}),
       };
 
-      // Ensure Content-Type is set for JSON bodies
       if (fetchOptions.body && typeof fetchOptions.body === 'string') {
         headers['Content-Type'] = headers['Content-Type'] || 'application/json';
       }
@@ -59,6 +110,7 @@ export class ApiClient {
       const config: RequestInit = {
         ...fetchOptions,
         headers,
+        credentials: 'include',
       };
 
       const response = await fetch(url, config);
@@ -68,41 +120,34 @@ export class ApiClient {
         try {
           errorData = await response.json();
         } catch {
-          // If parsing JSON fails, throw a generic error
           const error: ApiError = new Error(`HTTP ${response.status}: ${response.statusText}`);
           error.response = { data: null, status: response.status };
           throw error;
         }
 
-        // Handle authentication errors
-        if (response.status === 401 && !skipAuth) {
-          // Clear token and notify auth context
-          this.clearToken();
+        if (response.status === 401 && !skipAuth && !skipRefresh && !isRetry) {
+          const refreshed = await this.refreshAccessToken();
+          if (refreshed) {
+            return makeRequest(true);
+          }
+          this.clearTokens();
           if (this.onAuthError) {
             this.onAuthError();
           }
         }
 
-        // Handle traditional REST error format
         if (errorData.error && errorData.message) {
           const error: ApiError = new Error(errorData.message);
-          error.response = {
-            data: errorData,
-            status: response.status,
-          };
+          error.response = { data: errorData, status: response.status };
           throw error;
         }
 
-        // Fallback for other error formats
         const error: ApiError = new Error(`HTTP ${response.status}: ${JSON.stringify(errorData)}`);
-        error.response = {
-          data: errorData,
-          status: response.status,
-        };
+        error.response = { data: errorData, status: response.status };
         throw error;
       }
+
       const text = await response.text();
-      // compatible with empty response
       let responseData = null;
       try {
         responseData = text ? JSON.parse(text) : null;
@@ -110,7 +155,6 @@ export class ApiClient {
         responseData = text;
       }
 
-      // Check for Content-Range header and extract pagination if present
       const contentRange = response.headers.get('content-range');
       if (contentRange && Array.isArray(responseData)) {
         const match = contentRange.match(/(\d+)-(\d+)\/(\d+|\*)/);
@@ -118,46 +162,26 @@ export class ApiClient {
           const start = parseInt(match[1]);
           const end = parseInt(match[2]);
           const total = match[3] === '*' ? responseData.length : parseInt(match[3]);
-
-          const pagination = {
-            offset: start,
-            limit: end - start + 1,
-            total,
-          };
-
           return {
             data: responseData,
-            pagination,
-          };
-        } else {
-          return {
-            data: responseData,
-            pagination: {
-              offset: 0,
-              limit: 0,
-              total: 0,
-            },
-          };
+            pagination: { offset: start, limit: end - start + 1, total },
+          } as T;
         }
+        return {
+          data: responseData,
+          pagination: { offset: 0, limit: 0, total: 0 },
+        } as T;
       }
 
-      // If full response is requested, return it as-is
-      if (returnFullResponse) {
-        return responseData;
-      }
-
-      // Traditional REST format - return response directly
-      return responseData;
+      return responseData as T;
     };
 
     return makeRequest();
   }
 
-  // Helper method to add authorization header with token
   withAccessToken(headers: Record<string, string> = {}) {
-    return this.token ? { ...headers, Authorization: `Bearer ${this.token}` } : headers;
+    return this.accessToken ? { ...headers, Authorization: `Bearer ${this.accessToken}` } : headers;
   }
 }
 
-// Singleton instance
 export const apiClient = new ApiClient();

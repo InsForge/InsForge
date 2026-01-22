@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { userService } from '@/features/auth/services/user.service';
+import { loginService } from '@/features/login/services/login.service';
 
 interface UseUsersOptions {
   pageSize?: number;
@@ -43,7 +44,7 @@ export function useUsers(options: UseUsersOptions = {}) {
 
   // Get current user
   const getCurrentUser = useCallback(async () => {
-    return await userService.getCurrentUser();
+    return await loginService.getCurrentUser();
   }, []);
 
   // Register user mutation

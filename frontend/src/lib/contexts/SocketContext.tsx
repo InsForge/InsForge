@@ -197,7 +197,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
 
   // Monitor authentication state and token changes
   useEffect(() => {
-    const token = apiClient.getToken();
+    const token = apiClient.getAccessToken();
 
     if (isAuthenticated && token) {
       // Connect when authenticated with a valid token

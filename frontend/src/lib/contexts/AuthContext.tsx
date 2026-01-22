@@ -1,23 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api/client';
-import { userService } from '@/features/auth/services/user.service';
-
-export interface User {
-  id: string;
-  email: string;
-  name?: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import { loginService } from '@/features/login/services/login.service';
+import type { UserSchema } from '@insforge/shared-schemas';
 
 interface AuthContextType {
-  user: User | null;
+  user: UserSchema | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   loginWithPassword: (email: string, password: string) => Promise<boolean>;
   loginWithAuthorizationCode: (token: string) => Promise<boolean>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
   error: Error | null;
 }
@@ -37,7 +29,7 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserSchema | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
@@ -48,11 +40,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsAuthenticated(false);
   }, []);
 
-  // Set up auth error handler
   useEffect(() => {
-    apiClient.setAuthErrorHandler(handleAuthError);
+    loginService.setAuthErrorHandler(handleAuthError);
     return () => {
-      apiClient.setAuthErrorHandler(undefined);
+      loginService.setAuthErrorHandler(undefined);
     };
   }, [handleAuthError]);
 
@@ -60,9 +51,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
       setError(null);
-      const currentUser = await userService.getCurrentUser();
+
+      const currentUser = await loginService.getCurrentUser();
       setUser(currentUser);
-      setIsAuthenticated(true);
+      setIsAuthenticated(!!currentUser);
       return currentUser;
     } catch (err) {
       setUser(null);
@@ -70,7 +62,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (err instanceof Error && !err.message.includes('401')) {
         setError(err);
       }
-      apiClient.clearToken();
       return null;
     } finally {
       setIsLoading(false);
@@ -91,15 +82,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     async (email: string, password: string): Promise<boolean> => {
       try {
         setError(null);
-        const data = await apiClient.request('/auth/admin/sessions', {
-          method: 'POST',
-          body: JSON.stringify({ email, password }),
-        });
-
-        apiClient.setToken(data.accessToken);
-        setUser(data.user);
+        const result = await loginService.loginWithPassword(email, password);
+        setUser(result.user);
         setIsAuthenticated(true);
-
         await invalidateAuthQueries();
         return true;
       } catch (err) {
@@ -114,15 +99,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     async (code: string): Promise<boolean> => {
       try {
         setError(null);
-        const data = await apiClient.request('/auth/admin/sessions/exchange', {
-          method: 'POST',
-          body: JSON.stringify({ code }),
-        });
-
-        apiClient.setToken(data.accessToken);
-        setUser(data.user);
+        const result = await loginService.loginWithAuthorizationCode(code);
+        setUser(result.user);
         setIsAuthenticated(true);
-
         await invalidateAuthQueries();
         return true;
       } catch (err) {
@@ -133,8 +112,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     [invalidateAuthQueries]
   );
 
-  const logout = useCallback(() => {
-    apiClient.clearToken();
+  const logout = useCallback(async () => {
+    await loginService.logout();
     setUser(null);
     setIsAuthenticated(false);
     setError(null);
@@ -144,7 +123,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     await checkAuthStatus();
   }, [checkAuthStatus]);
 
-  // Check auth status on mount
   useEffect(() => {
     void checkAuthStatus();
   }, [checkAuthStatus]);

@@ -1,19 +1,14 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 
-/**
- * Cookie names
- */
 export const REFRESH_TOKEN_COOKIE_NAME = 'insforge_refresh_token';
 
 /**
- * Set an auth cookie on response
- * @param name - Cookie name
- * @param value - Cookie value
+ * Set refresh token cookie on response
  */
-export function setAuthCookie(req: Request, res: Response, name: string, value: string): void {
-  res.cookie(name, value, {
+export function setRefreshTokenCookie(res: Response, value: string): void {
+  res.cookie(REFRESH_TOKEN_COOKIE_NAME, value, {
     httpOnly: true,
-    secure: req.secure,
+    secure: true,
     sameSite: 'none',
     path: '/api/auth',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
@@ -21,13 +16,13 @@ export function setAuthCookie(req: Request, res: Response, name: string, value: 
 }
 
 /**
- * Clear an auth cookie on response
+ * Clear refresh token cookie on response
  * IMPORTANT: Must use the same options (especially path) as when setting the cookie
  */
-export function clearAuthCookie(req: Request, res: Response, name: string): void {
-  res.clearCookie(name, {
+export function clearRefreshTokenCookie(res: Response): void {
+  res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, {
     httpOnly: true,
-    secure: req.secure,
+    secure: true,
     sameSite: 'none',
     path: '/api/auth',
   });

@@ -6,8 +6,7 @@ import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 import type { TokenPayloadSchema } from '@insforge/shared-schemas';
 
 const JWT_SECRET = process.env.JWT_SECRET ?? '';
-const JWT_EXPIRES_IN = '15m';
-const ADMIN_SESSION_EXPIRES_IN = '24h';
+const ACCESS_TOKEN_EXPIRES_IN = '30s'; // TODO: change to 15m after testing
 const REFRESH_TOKEN_EXPIRES_IN = '7d';
 
 /**
@@ -51,23 +50,12 @@ export class TokenManager {
   }
 
   /**
-   * Generate JWT access token for regular users (expires in 15m)
+   * Generate JWT access token
    */
-  generateToken(payload: TokenPayloadSchema): string {
+  generateAccessToken(payload: TokenPayloadSchema): string {
     return jwt.sign(payload, JWT_SECRET, {
       algorithm: 'HS256',
-      expiresIn: JWT_EXPIRES_IN,
-    });
-  }
-
-  /**
-   * Generate admin token (expires in 24h)
-   * Used for admin dashboard login
-   */
-  generateAdminToken(payload: TokenPayloadSchema): string {
-    return jwt.sign(payload, JWT_SECRET, {
-      algorithm: 'HS256',
-      expiresIn: ADMIN_SESSION_EXPIRES_IN,
+      expiresIn: ACCESS_TOKEN_EXPIRES_IN,
     });
   }
 
