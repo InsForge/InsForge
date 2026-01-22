@@ -330,7 +330,7 @@ interface EmbeddingObject {
 }
 ```
 
-### Example (Single Text)
+### Example
 
 ```typescript
 const response = await insforge.ai.embeddings.create({
@@ -341,85 +341,6 @@ const response = await insforge.ai.embeddings.create({
 console.log(response.data[0].embedding);  // number[]
 console.log(`Dimensions: ${response.data[0].embedding.length}`);
 console.log(`Model: ${response.metadata?.model}`);
-```
-
-### Example (Multiple Texts)
-
-```typescript
-const response = await insforge.ai.embeddings.create({
-  model: 'openai/text-embedding-3-small',
-  input: ['Hello world', 'Goodbye world', 'How are you?']
-});
-
-response.data.forEach((item, index) => {
-  console.log(`Text ${index}: ${item.embedding.length} dimensions`);
-});
-```
-
-### Example (With Custom Dimensions)
-
-```typescript
-const response = await insforge.ai.embeddings.create({
-  model: 'openai/text-embedding-3-small',
-  input: 'Hello world',
-  dimensions: 256
-});
-
-console.log(`Embedding dimensions: ${response.data[0].embedding.length}`);  // 256
-```
-
-### Example (Base64 Encoding)
-
-```typescript
-const response = await insforge.ai.embeddings.create({
-  model: 'openai/text-embedding-3-small',
-  input: 'Hello world',
-  encoding_format: 'base64'
-});
-
-// Embedding is returned as base64 string
-const base64Embedding = response.data[0].embedding as string;
-console.log(`Base64 embedding: ${base64Embedding.substring(0, 50)}...`);
-```
-
-### Example (Semantic Search)
-
-```typescript
-// Generate embeddings for documents
-const documents = [
-  'TypeScript is a typed superset of JavaScript',
-  'React is a library for building user interfaces',
-  'Node.js is a JavaScript runtime'
-];
-
-const docEmbeddings = await insforge.ai.embeddings.create({
-  model: 'openai/text-embedding-3-small',
-  input: documents
-});
-
-// Generate embedding for query
-const queryEmbedding = await insforge.ai.embeddings.create({
-  model: 'openai/text-embedding-3-small',
-  input: 'frontend development'
-});
-
-// Calculate cosine similarity
-function cosineSimilarity(a: number[], b: number[]): number {
-  const dotProduct = a.reduce((sum, val, i) => sum + val * b[i], 0);
-  const normA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
-  const normB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
-  return dotProduct / (normA * normB);
-}
-
-// Find most similar document
-const queryVector = queryEmbedding.data[0].embedding as number[];
-const similarities = docEmbeddings.data.map((item, index) => ({
-  index,
-  similarity: cosineSimilarity(queryVector, item.embedding as number[])
-}));
-
-const mostSimilar = similarities.sort((a, b) => b.similarity - a.similarity)[0];
-console.log(`Most similar: ${documents[mostSimilar.index]}`);
 ```
 
 ### Example (Store Embeddings in Database)

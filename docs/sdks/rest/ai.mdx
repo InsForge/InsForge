@@ -302,7 +302,7 @@ POST /api/ai/embeddings
 | `encoding_format` | string | No | Output format: `float` (default) or `base64` |
 | `dimensions` | integer | No | Number of dimensions for output embeddings (model-dependent) |
 
-### Example (Single Text)
+### Example
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/ai/embeddings" \
@@ -311,31 +311,6 @@ curl -X POST "https://your-app.insforge.app/api/ai/embeddings" \
   -d '{
     "model": "openai/text-embedding-3-small",
     "input": "Hello world"
-  }'
-```
-
-### Example (Multiple Texts)
-
-```bash
-curl -X POST "https://your-app.insforge.app/api/ai/embeddings" \
-  -H "Authorization: Bearer your-jwt-token-or-anon-key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "openai/text-embedding-3-small",
-    "input": ["Hello world", "Goodbye world", "How are you?"]
-  }'
-```
-
-### Example (With Custom Dimensions)
-
-```bash
-curl -X POST "https://your-app.insforge.app/api/ai/embeddings" \
-  -H "Authorization: Bearer your-jwt-token-or-anon-key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "openai/text-embedding-3-small",
-    "input": "Hello world",
-    "dimensions": 256
   }'
 ```
 
