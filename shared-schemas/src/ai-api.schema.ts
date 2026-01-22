@@ -156,6 +156,37 @@ export const chatCompletionResponseSchema = z.object({
     .optional(),
 });
 
+// ============= Embeddings Schemas =============
+
+export const embeddingsRequestSchema = z.object({
+  model: z.string(),
+  input: z.union([z.string(), z.array(z.string())]),
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  encoding_format: z.enum(['float', 'base64']).optional().default('float'),
+});
+
+export const embeddingObjectSchema = z.object({
+  object: z.literal('embedding'),
+  embedding: z.array(z.number()),
+  index: z.number(),
+});
+
+export const embeddingsResponseSchema = z.object({
+  object: z.literal('list'),
+  data: z.array(embeddingObjectSchema),
+  metadata: z
+    .object({
+      model: z.string(),
+      usage: z
+        .object({
+          promptTokens: z.number().optional(),
+          totalTokens: z.number().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
 // ============= Image Generation Schemas =============
 
 export const imageGenerationRequestSchema = z.object({
@@ -244,6 +275,9 @@ export type ChatCompletionRequest = z.infer<typeof chatCompletionRequestSchema>;
 export type ChatCompletionResponse = z.infer<typeof chatCompletionResponseSchema>;
 export type ImageGenerationRequest = z.infer<typeof imageGenerationRequestSchema>;
 export type ImageGenerationResponse = z.infer<typeof imageGenerationResponseSchema>;
+export type EmbeddingsRequest = z.infer<typeof embeddingsRequestSchema>;
+export type EmbeddingObject = z.infer<typeof embeddingObjectSchema>;
+export type EmbeddingsResponse = z.infer<typeof embeddingsResponseSchema>;
 export type AIModelSchema = z.infer<typeof aiModelSchema>;
 export type CreateAIConfigurationRequest = z.infer<typeof createAIConfigurationRequestSchema>;
 export type UpdateAIConfigurationRequest = z.infer<typeof updateAIConfigurationRequestSchema>;

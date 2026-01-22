@@ -2,6 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { ChatCompletionService } from '@/services/ai/chat-completion.service.js';
 import { AuthRequest, verifyAdmin, verifyUser } from '../../middlewares/auth.js';
 import { ImageGenerationService } from '@/services/ai/image-generation.service.js';
+import { EmbeddingService } from '@/services/ai/embedding.service.js';
 import { AIModelService } from '@/services/ai/ai-model.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -18,6 +19,7 @@ import {
   getAIUsageSummaryRequestSchema,
   chatCompletionRequestSchema,
   imageGenerationRequestSchema,
+  embeddingsRequestSchema,
 } from '@insforge/shared-schemas';
 
 const router = Router();
@@ -471,5 +473,43 @@ router.get('/credits', verifyAdmin, async (req: AuthRequest, res: Response, next
     next(error);
   }
 });
+
+/**
+ * POST /api/ai/embeddings
+ * Generate embeddings for text input
+ */
+router.post(
+  '/embeddings',
+  verifyUser,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validationResult = embeddingsRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const embeddingService = EmbeddingService.getInstance();
+      const result = await embeddingService.createEmbeddings(validationResult.data);
+
+      successResponse(res, result);
+    } catch (error) {
+      if (error instanceof AppError) {
+        next(error);
+      } else {
+        next(
+          new AppError(
+            error instanceof Error ? error.message : 'Failed to generate embeddings',
+            500,
+            ERROR_CODES.INTERNAL_ERROR
+          )
+        );
+      }
+    }
+  }
+);
 
 export { router as aiRouter };

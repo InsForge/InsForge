@@ -90,6 +90,37 @@ export class AIUsageService {
     }
   }
 
+  async trackEmbeddingUsage(
+    configId: string,
+    inputTokens?: number,
+    totalTokens?: number,
+    modelId?: string
+  ): Promise<{ id: string }> {
+    const outputTokens = (totalTokens || 0) - (inputTokens || 0);
+    try {
+      const usageResult = await this.getPool().query(
+        `INSERT INTO ai.usage (config_id, input_tokens, output_tokens, model_id)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id`,
+        [configId, inputTokens || null, outputTokens || null, modelId || null]
+      );
+
+      logger.info('Embedding usage tracked', {
+        id: usageResult.rows[0].id,
+        configId,
+        inputTokens,
+        outputTokens,
+        totalTokens,
+        modelId,
+      });
+
+      return { id: usageResult.rows[0].id };
+    } catch (error) {
+      logger.error('Failed to track embedding usage', { error, configId });
+      throw new Error('Failed to track embedding usage');
+    }
+  }
+
   async trackImageGenerationUsage(
     configId: string,
     imageCount: number,
