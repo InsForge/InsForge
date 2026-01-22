@@ -68,7 +68,7 @@ export class EmbeddingService {
         object: 'list',
         data: response.data.map((item) => ({
           object: 'embedding' as const,
-          embedding: item.embedding as number[],
+          embedding: item.embedding as number[] | string,
           index: item.index,
         })),
         metadata: {

@@ -168,7 +168,8 @@ export const embeddingsRequestSchema = z.object({
 
 export const embeddingObjectSchema = z.object({
   object: z.literal('embedding'),
-  embedding: z.array(z.number()),
+  // Embedding can be number[] (float format) or string (base64 format)
+  embedding: z.union([z.array(z.number()), z.string()]),
   index: z.number(),
 });
 
