@@ -163,6 +163,7 @@ export const embeddingsRequestSchema = z.object({
   input: z.union([z.string(), z.array(z.string())]),
   // eslint-disable-next-line @typescript-eslint/naming-convention
   encoding_format: z.enum(['float', 'base64']).optional().default('float'),
+  dimensions: z.number().int().min(0).optional(),
 });
 
 export const embeddingObjectSchema = z.object({

@@ -892,6 +892,10 @@ components:
           enum: [float, base64]
           default: float
           description: The format to return the embeddings in. Can be either float or base64.
+        dimensions:
+          type: integer
+          minimum: 0
+          description: The number of dimensions the resulting output embeddings should have. Only supported in certain models.
 
     EmbeddingsResponse:
       type: object
