@@ -5,28 +5,9 @@ description: Real-time subscriptions and messaging with the InsForge TypeScript 
 
 ## Installation
 
-<CodeGroup>
-```bash npm
-npm install @insforge/sdk@latest
-```
+import Installation from '/snippets/sdk-installation.mdx';
 
-```bash yarn
-yarn add @insforge/sdk@latest
-```
-
-```bash pnpm
-pnpm add @insforge/sdk@latest
-```
-</CodeGroup>
-
-```typescript
-import { createClient } from '@insforge/sdk';
-
-const insforge = createClient({
-  baseUrl: 'https://your-app.insforge.app',
-  anonKey: 'your-anon-key'
-});
-```
+<Installation />
 
 ## connect()
 
@@ -48,7 +29,7 @@ The connection will timeout after **10 seconds** if the server is unreachable, r
 
 ### Example
 
-```typescript
+```javascript
 try {
   await insforge.realtime.connect()
   console.log('Connected:', insforge.realtime.isConnected)
@@ -87,7 +68,7 @@ By default, all users can subscribe to any channel. If RLS is enabled on `realti
 
 ### Example
 
-```typescript
+```javascript
 await insforge.realtime.connect()
 const response = await insforge.realtime.subscribe('orders:123')
 
@@ -97,8 +78,7 @@ if (response.ok) {
   console.error('Failed:', response.error?.message)
 }
 
-// Subscribe to another channel
-const response2 = await insforge.realtime.subscribe('orders:456')
+const response = await insforge.realtime.subscribe('orders:456')
 ```
 
 ### Output (Success)
@@ -148,7 +128,7 @@ Unsubscribe from a channel. This is a fire-and-forget operation.
 
 ### Example
 
-```typescript
+```javascript
 insforge.realtime.unsubscribe('orders:123')
 ```
 
@@ -170,7 +150,7 @@ You must be subscribed to a channel before publishing to it. If RLS is enabled o
 
 ### Example
 
-```typescript
+```javascript
 await insforge.realtime.publish('orders:123', 'status_changed', {
   status: 'shipped',
   trackingNumber: 'ABC123'
@@ -199,7 +179,7 @@ Listen for events.
 
 ### Example
 
-```typescript
+```javascript
 // Custom events
 insforge.realtime.on('order_updated', (payload) => {
   console.log('Order updated:', payload)
@@ -288,7 +268,7 @@ Remove an event listener.
 
 ### Example
 
-```typescript
+```javascript
 function handleOrderUpdate(payload) {
   console.log('Order updated:', payload)
 }
@@ -313,7 +293,7 @@ Listen for an event only once, then automatically remove the listener.
 
 ### Example
 
-```typescript
+```javascript
 // Wait for a single event
 insforge.realtime.once('order_completed', (payload) => {
   console.log('Order completed:', payload)
@@ -334,7 +314,7 @@ Disconnect from the realtime server and clear all subscriptions.
 
 ### Example
 
-```typescript
+```javascript
 insforge.realtime.disconnect()
 ```
 
@@ -346,7 +326,7 @@ insforge.realtime.disconnect()
 
 Check if connected to the realtime server.
 
-```typescript
+```javascript
 if (insforge.realtime.isConnected) {
   console.log('Connected')
 }
@@ -360,7 +340,7 @@ Get the current connection state.
 type ConnectionState = 'disconnected' | 'connecting' | 'connected'
 ```
 
-```typescript
+```javascript
 console.log(insforge.realtime.connectionState) // 'connected'
 ```
 
@@ -368,7 +348,7 @@ console.log(insforge.realtime.connectionState) // 'connected'
 
 Get the socket ID (available when connected).
 
-```typescript
+```javascript
 console.log(insforge.realtime.socketId) // 'abc123xyz'
 ```
 
@@ -376,7 +356,7 @@ console.log(insforge.realtime.socketId) // 'abc123xyz'
 
 Get all currently subscribed channels.
 
-```typescript
+```javascript
 const channels = insforge.realtime.getSubscribedChannels()
 console.log(channels) // ['orders:123', 'chat:room-1']
 ```
@@ -387,7 +367,7 @@ console.log(channels) // ['orders:123', 'chat:room-1']
 
 ### Chat Room
 
-```typescript
+```javascript
 const insforge = createClient({ baseUrl: 'https://your-app.insforge.app' })
 
 // Setup error handling

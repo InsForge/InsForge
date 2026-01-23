@@ -5,28 +5,9 @@ description: File upload, download, and management with the InsForge TypeScript 
 
 ## Installation
 
-<CodeGroup>
-```bash npm
-npm install @insforge/sdk@latest
-```
+import Installation from '/snippets/sdk-installation.mdx';
 
-```bash yarn
-yarn add @insforge/sdk@latest
-```
-
-```bash pnpm
-pnpm add @insforge/sdk@latest
-```
-</CodeGroup>
-
-```typescript
-import { createClient } from '@insforge/sdk';
-
-const insforge = createClient({
-  baseUrl: 'https://your-app.insforge.app',
-  anonKey: 'your-anon-key'
-});
-```
+<Installation />
 
 ## from()
 
@@ -44,7 +25,7 @@ StorageBucket // Instance with upload, uploadAuto, download, remove methods
 
 ### Example
 
-```typescript
+```javascript
 const bucket = insforge.storage.from('images')
 ```
 
@@ -81,7 +62,7 @@ If a file with the same key exists, backend auto-renames it. Always use the retu
 
 ### Example
 
-```typescript
+```javascript
 const { data, error } = await insforge.storage
   .from('images')
   .upload('posts/post-123/cover.jpg', fileObject)
@@ -140,7 +121,7 @@ Upload a file with auto-generated unique key.
 
 ### Example
 
-```typescript
+```javascript
 const { data, error } = await insforge.storage
   .from('uploads')
   .uploadAuto(fileObject)
@@ -192,7 +173,7 @@ Download a file as Blob.
 
 ### Example
 
-```typescript
+```javascript
 // 1. Get the file key from your database
 const { data: post, error: dbError } = await insforge.database
   .from('posts')
@@ -241,7 +222,7 @@ Delete a file from storage.
 
 ### Example
 
-```typescript
+```javascript
 // 1. Get the file key from your database
 const { data: post, error: dbError } = await insforge.database
   .from('posts')

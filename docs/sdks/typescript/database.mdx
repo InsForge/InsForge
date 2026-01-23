@@ -5,28 +5,9 @@ description: Type-safe database operations using the InsForge TypeScript SDK
 
 ## Installation
 
-<CodeGroup>
-```bash npm
-npm install @insforge/sdk@latest
-```
+import Installation from '/snippets/sdk-installation.mdx';
 
-```bash yarn
-yarn add @insforge/sdk@latest
-```
-
-```bash pnpm
-pnpm add @insforge/sdk@latest
-```
-</CodeGroup>
-
-```typescript
-import { createClient } from '@insforge/sdk';
-
-const insforge = createClient({
-  baseUrl: 'https://your-app.insforge.app',
-  anonKey: 'your-anon-key'
-});
-```
+<Installation />
 
 ## insert()
 
@@ -54,14 +35,14 @@ Chain `.select()` after `.insert()` to return the inserted data
 ### Examples
 
 <CodeGroup>
-```typescript Single insert
+```javascript Single insert
 const { data, error } = await insforge.database
   .from('posts')
   .insert({ title: 'Hello World', content: 'My first post!' })
   .select()
 ```
 
-```typescript Bulk insert
+```javascript Bulk insert
 const { data, error } = await insforge.database
   .from('posts')
   .insert([
@@ -111,7 +92,7 @@ Always use filters like `.eq()` or `.in()` to specify which rows to update
 ### Examples
 
 <CodeGroup>
-```typescript Update by ID
+```javascript Update by ID
 const { data, error } = await insforge.database
   .from('posts')
   .update({ title: 'Updated Title' })
@@ -119,7 +100,7 @@ const { data, error } = await insforge.database
   .select()
 ```
 
-```typescript Update multiple
+```javascript Update multiple
 const { data, error } = await insforge.database
   .from('tasks')
   .update({ status: 'completed' })
@@ -166,14 +147,14 @@ Always use filters to specify which rows to delete
 ### Examples
 
 <CodeGroup>
-```typescript Delete by ID
+```javascript Delete by ID
 const { error } = await insforge.database
   .from('posts')
   .delete()
   .eq('id', postId)
 ```
 
-```typescript Delete with filter
+```javascript Delete with filter
 const { error } = await insforge.database
   .from('sessions')
   .delete()
@@ -215,19 +196,19 @@ Query records from a table or view.
 ### Examples
 
 <CodeGroup>
-```typescript Get all
+```javascript Get all
 const { data, error } = await insforge.database
   .from('posts')
   .select()
 ```
 
-```typescript Specific columns
+```javascript Specific columns
 const { data, error } = await insforge.database
   .from('posts')
   .select('id, title, content')
 ```
 
-```typescript With relationships
+```javascript With relationships
 const { data, error } = await insforge.database
   .from('posts')
   .select('*, comments(id, content)')
@@ -265,7 +246,7 @@ Chain filters to narrow down query results. All filters take `(column, value)` a
 | `.in(column, array)` | Value in array | `.in('status', ['pending', 'active'])` |
 | `.is(column, value)` | Exactly equals (for null checks) | `.is('deleted_at', null)` |
 
-```typescript
+```javascript
 // Example: Chain multiple filters
 const { data } = await insforge.database
   .from('products')
@@ -290,7 +271,7 @@ Control how query results are returned.
 | `.single()` | Return object instead of array (throws if multiple) | `.single()` |
 | `.maybeSingle()` | Return object or null (no error) | `.maybeSingle()` |
 
-```typescript
+```javascript
 // Example: Pagination with sorting
 const { data } = await insforge.database
   .from('posts')
@@ -305,7 +286,7 @@ const { data } = await insforge.database
 
 ### Pagination with Count
 
-```typescript
+```javascript
 const page = 1;
 const pageSize = 10;
 const from = (page - 1) * pageSize;
@@ -334,7 +315,7 @@ console.log(`Page ${page}: ${data.length} of ${count} total`)
 
 ### Filtered Search
 
-```typescript
+```javascript
 const { data } = await insforge.database
   .from('products')
   .select('id, name, price, category')
@@ -361,7 +342,7 @@ const { data } = await insforge.database
 Combine database queries with `useUser()` or `useAuth()` hooks to fetch user-specific data:
 
 ```tsx
-import { useUser } from '@insforge/react'; // or '@insforge/nextjs'
+import { useUser } from '@insforge/react'; // or '@insforge/react-router'
 import { insforge } from './lib/insforge';
 import { useEffect, useState } from 'react';
 
