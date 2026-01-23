@@ -29,7 +29,7 @@ export function CodeBlock({
     return (
       <div
         className={cn(
-          'bg-gray-100 dark:bg-neutral-900 rounded p-3 w-full overflow-hidden',
+          'bg-gray-100 dark:bg-neutral-900 rounded p-3 w-full overflow-hidden text-gray-900 dark:text-neutral-300 text-sm leading-6 break-all whitespace-pre-wrap',
           className
         )}
       >
@@ -54,7 +54,7 @@ export function CodeBlock({
           )}
         </div>
         {/* Code text */}
-        <p className="text-gray-900 dark:text-neutral-300 text-sm leading-6 break-all whitespace-pre-wrap">
+        <p>
           {code}
         </p>
       </div>
