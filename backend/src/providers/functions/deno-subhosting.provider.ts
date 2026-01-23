@@ -63,12 +63,6 @@ export const functionDeploymentResultSchema = z.object({
   status: deploymentStatusSchema,
   url: z.string().nullable(),
   createdAt: z.coerce.date(),
-  error: z
-    .object({
-      code: z.string(),
-      message: z.string(),
-    })
-    .optional(),
 });
 
 export type FunctionDeploymentResult = z.infer<typeof functionDeploymentResultSchema>;
@@ -80,6 +74,8 @@ interface DenoSubhostingAsset {
 }
 
 // Schema for Deno Subhosting API response
+// Note: Deno doesn't return error details in deployment response
+// Error info comes from build logs endpoint
 const denoSubhostingApiResponseSchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -406,9 +402,6 @@ export class DenoSubhostingProvider {
   ): Promise<{
     status: 'success' | 'failed';
     url: string | null;
-    errorMessage?: string;
-    errorFile?: string;
-    errorFunction?: string;
     buildLogs?: string[];
   }> {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -422,17 +415,13 @@ export class DenoSubhostingProvider {
       }
 
       if (deployment.status === 'failed') {
-        // Fetch build logs to get error details
-        const logs = await this.getDeploymentLogs(deploymentId);
-        const errorDetails = this.parseErrorFromLogs(logs);
+        // Fetch build logs - this is where error details come from
+        const buildLogs = await this.getDeploymentLogs(deploymentId);
 
         return {
           status: 'failed',
           url: null,
-          errorMessage: errorDetails.message,
-          errorFile: errorDetails.file,
-          errorFunction: errorDetails.function,
-          buildLogs: logs,
+          buildLogs,
         };
       }
 
@@ -444,38 +433,7 @@ export class DenoSubhostingProvider {
     return {
       status: 'failed',
       url: null,
-      errorMessage: 'Deployment timed out',
-    };
-  }
-
-  /**
-   * Parse error details from build logs
-   */
-  private parseErrorFromLogs(logs: string[]): {
-    message?: string;
-    file?: string;
-    function?: string;
-  } {
-    // Find error log entry
-    const errorLog = logs.find((log) => log.includes('[error]'));
-    if (!errorLog) {
-      return {};
-    }
-
-    const message = errorLog.replace('[error] ', '');
-
-    // Try to extract file path: "at file:///src/functions/sdk-test.ts:3:10"
-    const fileMatch = message.match(/file:\/\/\/src\/([^\s:]+)/);
-    const file = fileMatch ? fileMatch[1] : undefined;
-
-    // Extract function slug if it's a function file
-    const funcMatch = file?.match(/functions\/([^.]+)\.ts/);
-    const func = funcMatch ? funcMatch[1] : undefined;
-
-    return {
-      message,
-      file,
-      function: func,
+      buildLogs: ['Deployment timed out'],
     };
   }
 

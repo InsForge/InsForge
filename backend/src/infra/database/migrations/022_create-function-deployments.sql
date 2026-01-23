@@ -6,10 +6,8 @@ CREATE TABLE IF NOT EXISTS functions.deployments (
   url TEXT,                               -- deployment URL
   function_count INT,
   functions JSONB,                        -- array of function slugs
-  error_message TEXT,
-  error_file TEXT,                        -- e.g., "functions/sdk-test.ts" or "main.ts"
-  error_function TEXT,                    -- parsed function slug if applicable
-  build_logs JSONB,
+  error_message TEXT,                     -- error message from Deno API
+  build_logs JSONB,                       -- raw build logs for debugging
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
