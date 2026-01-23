@@ -56,9 +56,11 @@ export class ApiClient {
     const { skipAuth, skipRefresh, ...fetchOptions } = options;
 
     const makeRequest = async (isRetry = false) => {
+      // Spread order: fetchOptions.headers first, then this.accessToken LAST
+      // This ensures retry uses the fresh token, not the stale one from original headers
       const headers: Record<string, string> = {
-        ...(!skipAuth && this.accessToken && { Authorization: `Bearer ${this.accessToken}` }),
         ...((fetchOptions.headers as Record<string, string>) || {}),
+        ...(!skipAuth && this.accessToken && { Authorization: `Bearer ${this.accessToken}` }),
       };
 
       if (fetchOptions.body && typeof fetchOptions.body === 'string') {

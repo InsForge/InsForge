@@ -4,7 +4,7 @@ import { loginService } from '@/features/login/services/login.service';
 import { partnershipService } from '@/features/login/services/partnership.service';
 import { apiClient } from '@/lib/api/client';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
-import { isInsForgeCloudProject } from '@/lib/utils/utils';
+import { isInsForgeCloudProject, isIframe } from '@/lib/utils/utils';
 import type { UserSchema } from '@insforge/shared-schemas';
 
 const CLOUD_AUTH_TIMEOUT = 30000;
@@ -147,8 +147,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Access token refresh handler
   useEffect(() => {
     const handleRefreshAccessToken = (): Promise<boolean> => {
-      if (isInsForgeCloudProject()) {
-        // Cloud: request new auth code from parent, persistent listener will handle it
+      if (isIframe()) {
+        // In iframe: request new auth code from parent, persistent listener will handle it
         return new Promise<boolean>((resolve) => {
           pendingRefreshRef.current = {
             resolve,
@@ -160,7 +160,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           postMessageToParent({ type: 'REQUEST_AUTHORIZATION_CODE' });
         });
       } else {
-        // Non-cloud: use cookie-based refresh
+        // Not in iframe: use cookie-based refresh
         return loginService.refreshAccessToken();
       }
     };

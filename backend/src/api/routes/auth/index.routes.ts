@@ -388,7 +388,13 @@ router.post('/admin/sessions/exchange', async (req: Request, res: Response, next
     const result: CreateAdminSessionResponse =
       await authService.adminLoginWithAuthorizationCode(code);
 
-    successResponse(res, result);
+    // Set refresh token as httpOnly cookie + CSRF token for web clients
+    const tokenManager = TokenManager.getInstance();
+    const refreshToken = tokenManager.generateRefreshToken(result.user.id);
+    setRefreshTokenCookie(res, refreshToken);
+    const csrfToken = tokenManager.generateCsrfToken(refreshToken);
+
+    successResponse(res, { ...result, csrfToken });
   } catch (error) {
     if (error instanceof AppError) {
       next(error);
