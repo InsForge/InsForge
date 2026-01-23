@@ -37,6 +37,8 @@ Create a new user account with email and password.
 - `email` (string, required) - User's email address
 - `password` (string, required) - User's password
 - `name` (string, optional) - User's display name
+- `options` (object, optional) - Additional options
+  - `emailRedirectTo` (string, optional) - Custom URL to redirect to after email verification. It's a fallback if you didn't set default redirect URL configured in your dashboard.
 
 ### Returns
 
@@ -448,11 +450,165 @@ const { data, error } = await insforge.auth.setProfile({
 
 ---
 
+## sendResetPasswordEmail()
+
+Send password reset email using the method configured in auth settings (`resetPasswordMethod`). When method is `code`, sends a 6-digit numeric code for two-step flow. When method is `link`, sends a magic link.
+
+<Note>
+  This endpoint prevents user enumeration by returning success even if the email doesn't exist.
+</Note>
+
+### Parameters
+
+- `email` (string, required) - User's email address
+
+### Returns
+
+```typescript
+{
+  data: { success: boolean, message: string } | null,
+  error: Error | null
+}
+```
+
+### Example
+
+```javascript
+const { data, error } = await insforge.auth.sendResetPasswordEmail({
+  email: 'user@example.com',
+});
+
+if (data?.success) {
+  console.log('Password reset email sent!');
+}
+```
+
+### Output
+
+```json
+{
+  "data": {
+    "success": true,
+    "message": "Password reset email sent"
+  },
+  "error": null
+}
+```
+
+---
+
+## exchangeResetPasswordToken()
+
+Exchange a 6-digit reset password code for a reset token. This is step 1 of the two-step password reset flow (only used when `resetPasswordMethod` is `code`).
+
+<Note>
+  This endpoint is not used when `resetPasswordMethod` is `link` (magic link flow is direct).
+</Note>
+
+### Parameters
+
+- `email` (string, required) - User's email address
+- `code` (string, required) - 6-digit code from the email
+
+### Returns
+
+```typescript
+{
+  data: { token: string, expiresAt: string } | null,
+  error: Error | null
+}
+```
+
+### Example
+
+```javascript
+const { data, error } = await insforge.auth.exchangeResetPasswordToken({
+  email: 'user@example.com',
+  code: '123456',
+});
+
+if (data) {
+  // Use token to reset password
+  await insforge.auth.resetPassword({
+    newPassword: 'newSecurePassword123',
+    otp: data.token,
+  });
+}
+```
+
+### Output
+
+```json
+{
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expiresAt": "2024-01-15T11:00:00Z"
+  },
+  "error": null
+}
+```
+
+---
+
+## resetPassword()
+
+Reset user password with a token. The token can be:
+- **Magic link token**: 64-character hex token from `sendResetPasswordEmail` when method is `link`
+- **Reset token**: From `exchangeResetPasswordToken` after code verification when method is `code`
+
+### Parameters
+
+- `newPassword` (string, required) - New password for the user
+- `otp` (string, required) - Reset token or magic link token
+
+### Returns
+
+```typescript
+{
+  data: { message: string, redirectTo?: string } | null,
+  error: Error | null
+}
+```
+
+### Example
+
+```javascript
+// Code method flow: after exchangeResetPasswordToken
+const { data, error } = await insforge.auth.resetPassword({
+  newPassword: 'newSecurePassword123',
+  otp: resetToken, // Token from exchangeResetPasswordToken
+});
+
+// Link method flow: token from URL params
+const { data, error } = await insforge.auth.resetPassword({
+  newPassword: 'newSecurePassword123',
+  otp: 'a1b2c3d4e5f6...', // 64-character token from magic link URL
+});
+
+if (data) {
+  console.log('Password reset successful!');
+}
+```
+
+### Output
+
+```json
+{
+  "data": {
+    "message": "Password reset successfully",
+    "redirectTo": "https://app.example.com/login"
+  },
+  "error": null
+}
+```
+
+---
+
 ## Error Handling
 
 All auth methods return structured errors:
 
-```typescript
+```javascript
 const { data, error } = await insforge.auth.signInWithPassword({
   email: 'user@example.com',
   password: 'wrong_password',
