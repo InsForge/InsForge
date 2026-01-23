@@ -54,9 +54,7 @@ export function CodeBlock({
           )}
         </div>
         {/* Code text */}
-        <p>
-          {code}
-        </p>
+        <p>{code}</p>
       </div>
     );
   }

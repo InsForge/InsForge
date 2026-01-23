@@ -1,5 +1,11 @@
 import { useCallback } from 'react';
 import VSCodeLogo from '@/assets/logos/vscode.svg?react';
+import CursorLogo from '@/assets/logos/cursor.svg?react';
+import TraeLogo from '@/assets/logos/trae.svg?react';
+import AntigravityLogo from '@/assets/logos/antigravity.svg?react';
+import QoderLogo from '@/assets/logos/qoder.svg?react';
+import WindsurfLogo from '@/assets/logos/windsurf.svg?react';
+import KiroLogo from '@/assets/logos/kiro.svg?react';
 import { cn } from '@/lib/utils/utils';
 
 interface IDEOption {
@@ -15,6 +21,42 @@ const IDE_OPTIONS: IDEOption[] = [
     name: 'VS Code',
     logo: <VSCodeLogo className="w-7 h-7" />,
     installUrl: 'vscode:extension/insforge.insforge',
+  },
+  {
+    id: 'cursor',
+    name: 'Cursor',
+    logo: <CursorLogo className="w-8 h-8" />,
+    installUrl: 'cursor:extension/insforge.insforge',
+  },
+  {
+    id: 'trae',
+    name: 'Trae',
+    logo: <TraeLogo className="w-8 h-8" />,
+    installUrl: 'trae:extension/insforge.insforge',
+  },
+  {
+    id: 'antigravity',
+    name: 'Antigravity',
+    logo: <AntigravityLogo className="w-7 h-7" />,
+    installUrl: 'antigravity:extension/insforge.insforge',
+  },
+  {
+    id: 'qoder',
+    name: 'Qoder',
+    logo: <QoderLogo className="w-7 h-7" />,
+    installUrl: 'qoder:extension/insforge.insforge',
+  },
+  {
+    id: 'windsurf',
+    name: 'Windsurf',
+    logo: <WindsurfLogo className="w-9 h-9 dark:text-white" />,
+    installUrl: 'windsurf:extension/insforge.insforge',
+  },
+  {
+    id: 'kiro',
+    name: 'Kiro',
+    logo: <KiroLogo className="w-8 h-8" />,
+    installUrl: 'kiro:extension/insforge.insforge',
   },
 ];
 
