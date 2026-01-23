@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useApiKey } from '@/lib/hooks/useMetadata';
-import { getBackendUrl } from '@/lib/utils/utils';
+import { getBackendUrl, isInsForgeCloudProject } from '@/lib/utils/utils';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { useSocket, ServerEvents } from '@/lib/contexts/SocketContext';
 import { OnboardingStep } from './OnboardingStep';
@@ -12,11 +12,9 @@ import { ExtensionSetupStep } from './steps/ExtensionSetupStep';
 import { HelpSection } from './HelpSection';
 import { InstallMethodTabs, DEFAULT_OVERLAY_TABS, type InstallMethod } from './InstallMethodTabs';
 import { MCP_AGENTS } from './mcp/helpers';
-import { Button } from '@/components';
 
 export function OnboardingOverlay() {
   const location = useLocation();
-  const navigate = useNavigate();
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
   const appUrl = getBackendUrl();
   const { hasCompletedOnboarding, isLoading: isMcpLoading } = useMcpUsage();
@@ -28,10 +26,10 @@ export function OnboardingOverlay() {
 
   const displayApiKey = isApiKeyLoading ? 'ik_' + '*'.repeat(32) : apiKey || '';
 
+  const isCloudEnvironment = isInsForgeCloudProject();
   const isLoading = isApiKeyLoading || isMcpLoading;
-  const shouldShow = !isLoading && !hasCompletedOnboarding;
+  const shouldShow = isCloudEnvironment && !isLoading && !hasCompletedOnboarding;
   const isOnDashboardPage = location.pathname === '/dashboard';
-  const isOnSettingsPage = location.pathname === '/dashboard/settings';
 
   // Listen for MCP connection events to auto-advance to step 2
   useEffect(() => {
@@ -53,29 +51,9 @@ export function OnboardingOverlay() {
     return null;
   }
 
-  if (isOnSettingsPage) {
+  // If on dashboard page, don't show the onboarding overlay
+  if (!isOnDashboardPage) {
     return <></>;
-  }
-
-  // If not on dashboard page, show semi-transparent overlay with redirect prompt
-  if (!isOnDashboardPage && !isOnSettingsPage) {
-    return (
-      <div className="absolute inset-0 z-50 bg-black/30 flex flex-col justify-end">
-        <div className="w-120 mb-10 mx-auto rounded-lg dark:bg-[#333333] bg-neutral-100 border border-gray-200 dark:border-neutral-700 pl-4 pr-3 py-3 flex items-center justify-between">
-          <span className="dark:text-neutral-300 text-gray-700 text-base font-medium">
-            Connect Project to get started
-          </span>
-          <Button
-            onClick={() => {
-              void navigate('/dashboard');
-            }}
-            className="h-8 px-3 rounded-md dark:bg-emerald-300 bg-black dark:text-black text-white text-sm font-medium hover:bg-black/80 dark:hover:bg-emerald-400"
-          >
-            Connect Project
-          </Button>
-        </div>
-      </div>
-    );
   }
 
   // Main onboarding overlay for /dashboard page

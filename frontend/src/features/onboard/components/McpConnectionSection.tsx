@@ -167,7 +167,11 @@ export function McpConnectionSection({
             Send the prompt below to your AI coding agent to verify the connection.
           </p>
         </div>
-        <CodeBlock code={testPrompt} label="prompt" className="bg-gray-100 dark:bg-neutral-900 break-normal" />
+        <CodeBlock
+          code={testPrompt}
+          label="prompt"
+          className="bg-gray-100 dark:bg-neutral-900 break-normal"
+        />
       </div>
     </div>
   );
