@@ -118,77 +118,6 @@ const completion = await insforge.ai.chat.completions.create({
 console.log(completion.choices[0].message.content);
 ```
 
-### Example (With Web Search)
-
-```typescript
-const completion = await insforge.ai.chat.completions.create({
-  model: 'openai/gpt-4',
-  messages: [
-    { role: 'user', content: 'What are the latest news about AI?' }
-  ],
-  webSearch: {
-    enabled: true,
-    maxResults: 5,        // 1-10, default: 5
-    engine: 'native'      // 'native' or 'exa'
-  }
-});
-
-console.log(completion.choices[0].message.content);
-
-// Access URL citations from search results
-const annotations = completion.choices[0].message.annotations;
-if (annotations) {
-  annotations.forEach(annotation => {
-    console.log(`Source: ${annotation.urlCitation.title} - ${annotation.urlCitation.url}`);
-  });
-}
-```
-
-### Example (With PDF Files)
-
-```typescript
-const completion = await insforge.ai.chat.completions.create({
-  model: 'anthropic/claude-3.5-sonnet',
-  messages: [
-    {
-      role: 'user',
-      content: [
-        { type: 'text', text: 'Summarize this document' },
-        {
-          type: 'file',
-          file: {
-            filename: 'report.pdf',
-            file_data: 'https://example.com/report.pdf'  // URL or base64
-          }
-        }
-      ],
-    },
-  ],
-  fileParser: {
-    enabled: true,
-    pdf: {
-      engine: 'mistral-ocr'  // 'pdf-text', 'mistral-ocr', or 'native'
-    }
-  }
-});
-
-console.log(completion.choices[0].message.content);
-```
-
-### Example (With Extended Reasoning)
-
-```typescript
-const completion = await insforge.ai.chat.completions.create({
-  model: 'anthropic/claude-3.5-sonnet',
-  messages: [
-    { role: 'user', content: 'Solve this complex math problem step by step...' }
-  ],
-  thinking: true
-});
-
-console.log(completion.choices[0].message.content);
-```
-
 ### Example (Combined Features)
 
 ```typescript
@@ -216,23 +145,6 @@ const stream = await insforge.ai.chat.completions.create({
   model: 'openai/gpt-4',
   messages: [{ role: 'user', content: 'Tell me a story' }],
   stream: true,
-});
-
-for await (const chunk of stream) {
-  if (chunk.choices[0]?.delta?.content) {
-    process.stdout.write(chunk.choices[0].delta.content);
-  }
-}
-```
-
-### Example (Streaming with Web Search)
-
-```typescript
-const stream = await insforge.ai.chat.completions.create({
-  model: 'openai/gpt-4',
-  messages: [{ role: 'user', content: 'What is happening in tech news today?' }],
-  stream: true,
-  webSearch: { enabled: true, maxResults: 3 }
 });
 
 for await (const chunk of stream) {
