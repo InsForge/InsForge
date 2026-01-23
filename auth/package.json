@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@insforge/react": "^1.1.4",
+    "@insforge/react": "^1.1.5",
     "@insforge/sdk": "^1.1.2",
     "clsx": "^2.1.1",
     "react": "^19.2.1",
