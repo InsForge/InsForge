@@ -41,8 +41,12 @@ Create AI chat completions with streaming support, web search, file parsing, and
 - `topP` (number, optional) - Top-p sampling 0-1
 - `stream` (boolean, optional) - Enable streaming mode
 - `webSearch` (object, optional) - Enable web search capabilities
+  - `enabled` (boolean) - Enable web search
+  - `maxResults` (number, optional) - Maximum number of search results to include
 - `fileParser` (object, optional) - Enable file/PDF parsing
-- `thinking` (boolean, optional) - Enable extended reasoning mode (Anthropic models)
+  - `enabled` (boolean) - Enable file parsing
+  - `pdf` (object, optional) - PDF processing options
+    - `engine` ('pdf-text' | 'mistral-ocr' | 'native', optional) - Processing engine. Defaults to native if supported, otherwise mistral-ocr
 
 ### Returns (non-streaming)
 
@@ -124,15 +128,27 @@ console.log(completion.choices[0].message.content);
 const completion = await insforge.ai.chat.completions.create({
   model: 'anthropic/claude-sonnet-4.5',
   messages: [
-    { role: 'user', content: 'Research and summarize the latest developments in quantum computing' }
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'Analyze this research paper and find related recent news' },
+        {
+          type: 'file',
+          file: {
+            filename: 'research-paper.pdf',
+            file_data: 'https://example.com/research-paper.pdf'  // or base64: 'data:application/pdf;base64,...'
+          }
+        }
+      ]
+    }
   ],
-  webSearch: { enabled: true, maxResults: 5 },
-  thinking: true
+  fileParser: { enabled: true },
+  webSearch: { enabled: true, maxResults: 5 }
 });
 
 console.log(completion.choices[0].message.content);
 
-// Access citations
+// Access web search citations
 completion.choices[0].message.annotations?.forEach(annotation => {
   console.log(`- ${annotation.urlCitation.title}: ${annotation.urlCitation.url}`);
 });
