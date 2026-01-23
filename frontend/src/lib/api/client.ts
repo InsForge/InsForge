@@ -11,7 +11,7 @@ interface ApiError extends Error {
 export class ApiClient {
   private accessToken: string | null = null;
   private onAuthError?: () => void;
-  private refreshPromise: Promise<boolean> | null = null;
+  private onRefreshAccessToken?: () => Promise<boolean>;
 
   setAccessToken(token: string) {
     this.accessToken = token;
@@ -40,64 +40,22 @@ export class ApiClient {
     this.onAuthError = handler;
   }
 
-  async refreshAccessToken(): Promise<boolean> {
-    if (this.refreshPromise) {
-      return this.refreshPromise;
-    }
-
-    this.refreshPromise = (async () => {
-      const csrfToken = this.getCsrfToken();
-      if (!csrfToken) {
-        return false;
-      }
-
-      try {
-        const response = await fetch(`${API_BASE}/auth/refresh`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': csrfToken,
-          },
-          credentials: 'include',
-        });
-
-        if (!response.ok) {
-          return false;
-        }
-
-        const data = await response.json();
-        if (data.accessToken) {
-          this.setAccessToken(data.accessToken);
-          if (data.csrfToken) {
-            this.setCsrfToken(data.csrfToken);
-          }
-          return true;
-        }
-        return false;
-      } catch {
-        return false;
-      }
-    })();
-
-    try {
-      return await this.refreshPromise;
-    } finally {
-      this.refreshPromise = null;
-    }
+  setRefreshAccessTokenHandler(handler?: () => Promise<boolean>) {
+    this.onRefreshAccessToken = handler;
   }
 
-  request<T = unknown>(
+  request(
     endpoint: string,
     options: RequestInit & {
       returnFullResponse?: boolean;
       skipAuth?: boolean;
       skipRefresh?: boolean;
     } = {}
-  ): Promise<T> {
+  ) {
     const url = `${API_BASE}${endpoint}`;
     const { skipAuth, skipRefresh, ...fetchOptions } = options;
 
-    const makeRequest = async (isRetry = false): Promise<T> => {
+    const makeRequest = async (isRetry = false) => {
       const headers: Record<string, string> = {
         ...(!skipAuth && this.accessToken && { Authorization: `Bearer ${this.accessToken}` }),
         ...((fetchOptions.headers as Record<string, string>) || {}),
@@ -126,14 +84,12 @@ export class ApiClient {
         }
 
         if (response.status === 401 && !skipAuth && !skipRefresh && !isRetry) {
-          const refreshed = await this.refreshAccessToken();
+          const refreshed = await this.onRefreshAccessToken?.();
           if (refreshed) {
             return makeRequest(true);
           }
           this.clearTokens();
-          if (this.onAuthError) {
-            this.onAuthError();
-          }
+          this.onAuthError?.();
         }
 
         if (errorData.error && errorData.message) {
@@ -165,15 +121,15 @@ export class ApiClient {
           return {
             data: responseData,
             pagination: { offset: start, limit: end - start + 1, total },
-          } as T;
+          };
         }
         return {
           data: responseData,
           pagination: { offset: 0, limit: 0, total: 0 },
-        } as T;
+        };
       }
 
-      return responseData as T;
+      return responseData;
     };
 
     return makeRequest();

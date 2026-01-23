@@ -1,14 +1,20 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { loginService } from '@/features/login/services/login.service';
+import { partnershipService } from '@/features/login/services/partnership.service';
+import { apiClient } from '@/lib/api/client';
+import { postMessageToParent } from '@/lib/utils/cloudMessaging';
+import { isInsForgeCloudProject } from '@/lib/utils/utils';
 import type { UserSchema } from '@insforge/shared-schemas';
+
+const CLOUD_AUTH_TIMEOUT = 30000;
 
 interface AuthContextType {
   user: UserSchema | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   loginWithPassword: (email: string, password: string) => Promise<boolean>;
-  loginWithAuthorizationCode: (token: string) => Promise<boolean>;
+  loginWithAuthorizationCode: (code: string) => Promise<boolean>;
   logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
   error: Error | null;
@@ -35,6 +41,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [error, setError] = useState<Error | null>(null);
   const queryClient = useQueryClient();
 
+  // Ref for pending refresh request (used by persistent listener)
+  const pendingRefreshRef = useRef<{
+    resolve: (success: boolean) => void;
+    timeoutId: ReturnType<typeof setTimeout>;
+  } | null>(null);
+
   const handleAuthError = useCallback(() => {
     setUser(null);
     setIsAuthenticated(false);
@@ -46,6 +58,118 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       loginService.setAuthErrorHandler(undefined);
     };
   }, [handleAuthError]);
+
+  const invalidateAuthQueries = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['apiKey'] }),
+      queryClient.invalidateQueries({ queryKey: ['metadata'] }),
+      queryClient.invalidateQueries({ queryKey: ['users'] }),
+      queryClient.invalidateQueries({ queryKey: ['tables'] }),
+      queryClient.invalidateQueries({ queryKey: ['mcp-usage'] }),
+    ]);
+  }, [queryClient]);
+
+  const loginWithAuthorizationCode = useCallback(
+    async (code: string): Promise<boolean> => {
+      try {
+        setError(null);
+        const result = await loginService.loginWithAuthorizationCode(code);
+        setUser(result.user);
+        setIsAuthenticated(true);
+        await invalidateAuthQueries();
+        return true;
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error('Authorization code exchange failed'));
+        return false;
+      }
+    },
+    [invalidateAuthQueries]
+  );
+
+  // Handle AUTHORIZATION_CODE from parent window
+  const handleAuthorizationCode = useCallback(
+    async (code: string, origin: string) => {
+      const success = await loginWithAuthorizationCode(code);
+
+      // Resolve pending refresh if any
+      if (pendingRefreshRef.current) {
+        clearTimeout(pendingRefreshRef.current.timeoutId);
+        pendingRefreshRef.current.resolve(success);
+        pendingRefreshRef.current = null;
+      }
+
+      // Notify parent
+      if (success) {
+        postMessageToParent({ type: 'AUTH_SUCCESS' }, origin);
+      } else {
+        postMessageToParent(
+          { type: 'AUTH_ERROR', message: 'Authorization code validation failed' },
+          origin
+        );
+      }
+    },
+    [loginWithAuthorizationCode]
+  );
+
+  // Persistent AUTHORIZATION_CODE listener for cloud projects
+  useEffect(() => {
+    if (!isInsForgeCloudProject()) {
+      return;
+    }
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type !== 'AUTHORIZATION_CODE' || !event.data?.code) {
+        return;
+      }
+
+      // Validate origin - allow insforge.dev, *.insforge.dev, and partner domains
+      const isInsforgeOrigin =
+        event.origin.endsWith('.insforge.dev') || event.origin === 'https://insforge.dev';
+
+      if (isInsforgeOrigin) {
+        void handleAuthorizationCode(event.data.code, event.origin);
+      } else {
+        // Check partner origins asynchronously
+        void partnershipService.fetchConfig().then((config) => {
+          if (config?.partner_sites?.includes(event.origin)) {
+            void handleAuthorizationCode(event.data.code, event.origin);
+          }
+        });
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [handleAuthorizationCode]);
+
+  // Access token refresh handler
+  useEffect(() => {
+    const handleRefreshAccessToken = (): Promise<boolean> => {
+      if (isInsForgeCloudProject()) {
+        // Cloud: request new auth code from parent, persistent listener will handle it
+        return new Promise<boolean>((resolve) => {
+          pendingRefreshRef.current = {
+            resolve,
+            timeoutId: setTimeout(() => {
+              pendingRefreshRef.current = null;
+              resolve(false);
+            }, CLOUD_AUTH_TIMEOUT),
+          };
+          postMessageToParent({ type: 'REQUEST_AUTHORIZATION_CODE' });
+        });
+      } else {
+        // Non-cloud: use cookie-based refresh
+        return loginService.refreshAccessToken();
+      }
+    };
+
+    apiClient.setRefreshAccessTokenHandler(handleRefreshAccessToken);
+    return () => {
+      apiClient.setRefreshAccessTokenHandler(undefined);
+    };
+  }, []);
 
   const checkAuthStatus = useCallback(async () => {
     try {
@@ -68,16 +192,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
-  const invalidateAuthQueries = useCallback(async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['apiKey'] }),
-      queryClient.invalidateQueries({ queryKey: ['metadata'] }),
-      queryClient.invalidateQueries({ queryKey: ['users'] }),
-      queryClient.invalidateQueries({ queryKey: ['tables'] }),
-      queryClient.invalidateQueries({ queryKey: ['mcp-usage'] }),
-    ]);
-  }, [queryClient]);
-
   const loginWithPassword = useCallback(
     async (email: string, password: string): Promise<boolean> => {
       try {
@@ -89,23 +203,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return true;
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Login failed'));
-        return false;
-      }
-    },
-    [invalidateAuthQueries]
-  );
-
-  const loginWithAuthorizationCode = useCallback(
-    async (code: string): Promise<boolean> => {
-      try {
-        setError(null);
-        const result = await loginService.loginWithAuthorizationCode(code);
-        setUser(result.user);
-        setIsAuthenticated(true);
-        await invalidateAuthQueries();
-        return true;
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error('Authorization code exchange failed'));
         return false;
       }
     },

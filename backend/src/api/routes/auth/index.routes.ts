@@ -372,7 +372,7 @@ router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-// POST /api/auth/admin/sessions/exchange - Create admin session (web only)
+// POST /api/auth/admin/sessions/exchange - Exchange authorization code for admin session
 router.post('/admin/sessions/exchange', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validationResult = exchangeAdminSessionRequestSchema.safeParse(req.body);
@@ -388,18 +388,7 @@ router.post('/admin/sessions/exchange', async (req: Request, res: Response, next
     const result: CreateAdminSessionResponse =
       await authService.adminLoginWithAuthorizationCode(code);
 
-    // Set refresh token as httpOnly cookie + CSRF token for web clients
-    const tokenManager = TokenManager.getInstance();
-    const refreshToken = tokenManager.generateRefreshToken(result.user!.id);
-    setRefreshTokenCookie(res, refreshToken);
-    const csrfToken = tokenManager.generateCsrfToken(refreshToken);
-
-    const response = {
-      ...result,
-      csrfToken,
-    };
-
-    successResponse(res, response);
+    successResponse(res, result);
   } catch (error) {
     if (error instanceof AppError) {
       next(error);
@@ -433,7 +422,7 @@ router.post('/admin/sessions', (req: Request, res: Response, next: NextFunction)
 
     // Set refresh token as httpOnly cookie + CSRF token for web clients
     const tokenManager = TokenManager.getInstance();
-    const refreshToken = tokenManager.generateRefreshToken(result.user!.id);
+    const refreshToken = tokenManager.generateRefreshToken(result.user.id);
     setRefreshTokenCookie(res, refreshToken);
     const csrfToken = tokenManager.generateCsrfToken(refreshToken);
 

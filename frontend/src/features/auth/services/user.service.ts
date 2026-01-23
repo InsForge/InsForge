@@ -26,10 +26,7 @@ export class UserService {
       url += `?${params.toString()}`;
     }
 
-    const response = await apiClient.request<{
-      data: UserSchema[];
-      pagination: { offset: number; limit: number; total: number };
-    }>(url);
+    const response = await apiClient.request(url);
 
     return {
       users: response.data,
@@ -38,18 +35,18 @@ export class UserService {
   }
 
   async getUser(id: string): Promise<UserSchema> {
-    return apiClient.request<UserSchema>(`/auth/users/${id}`);
+    return apiClient.request(`/auth/users/${id}`);
   }
 
   async register(email: string, password: string, name?: string): Promise<CreateUserResponse> {
-    return apiClient.request<CreateUserResponse>('/auth/users', {
+    return apiClient.request('/auth/users', {
       method: 'POST',
       body: JSON.stringify({ email, password, name }),
     });
   }
 
   async deleteUsers(userIds: string[]): Promise<DeleteUsersResponse> {
-    return apiClient.request<DeleteUsersResponse>('/auth/users', {
+    return apiClient.request('/auth/users', {
       method: 'DELETE',
       body: JSON.stringify({ userIds }),
     });
