@@ -6,10 +6,10 @@ const TEST_PROMPT =
 export function VerifyConnectionStep() {
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-neutral-400 text-sm leading-6">
+      <p className="dark:text-neutral-400 text-gray-500 text-sm leading-6">
         Send the prompt below to your AI coding agent to verify the connection.
       </p>
-      <CodeBlock code={TEST_PROMPT} label="prompt" className="bg-neutral-900" />
+      <CodeBlock code={TEST_PROMPT} label="prompt" className="bg-neutral-200 dark:bg-neutral-900 break-normal" />
     </div>
   );
 }
