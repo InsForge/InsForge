@@ -450,13 +450,14 @@ export class FunctionService {
     try {
       const result = await this.denoSubhostingProvider.waitForDeployment(deploymentId);
 
+      // Extract first error from build logs if available
+      const errorMessage = result.buildLogs?.find((log) => log.includes('[error]'));
+
       // Update deployment record with final status
       await this.updateDeployment(deploymentId, {
         status: result.status,
         url: result.url,
-        errorMessage: result.errorMessage,
-        errorFile: result.errorFile,
-        errorFunction: result.errorFunction,
+        errorMessage,
         buildLogs: result.buildLogs,
       });
 
@@ -473,9 +474,8 @@ export class FunctionService {
       } else {
         logger.error('Deno Subhosting deployment failed', {
           deploymentId,
-          errorMessage: result.errorMessage,
-          errorFile: result.errorFile,
-          errorFunction: result.errorFunction,
+          errorMessage,
+          buildLogs: result.buildLogs,
         });
       }
     } catch (error) {
@@ -520,21 +520,17 @@ export class FunctionService {
       status: string;
       url: string | null;
       errorMessage?: string;
-      errorFile?: string;
-      errorFunction?: string;
       buildLogs?: string[];
     }
   ): Promise<void> {
     await this.getPool().query(
       `UPDATE functions.deployments
-       SET status = $1, url = $2, error_message = $3, error_file = $4, error_function = $5, build_logs = $6
-       WHERE id = $7`,
+       SET status = $1, url = $2, error_message = $3, build_logs = $4
+       WHERE id = $5`,
       [
         update.status,
         update.url,
         update.errorMessage || null,
-        update.errorFile || null,
-        update.errorFunction || null,
         update.buildLogs ? JSON.stringify(update.buildLogs) : null,
         deploymentId,
       ]
