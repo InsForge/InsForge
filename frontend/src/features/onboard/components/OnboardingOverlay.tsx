@@ -47,13 +47,9 @@ export function OnboardingOverlay() {
     };
   }, [socket]);
 
-  if (!shouldShow) {
+  // If not on dashboard page or not in cloud environment, don't show the onboarding overlay
+  if (!shouldShow || !isOnDashboardPage) {
     return null;
-  }
-
-  // If on dashboard page, don't show the onboarding overlay
-  if (!isOnDashboardPage) {
-    return <></>;
   }
 
   // Main onboarding overlay for /dashboard page

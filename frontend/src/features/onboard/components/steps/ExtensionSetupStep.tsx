@@ -15,6 +15,7 @@ export function ExtensionSetupStep() {
           muted
           playsInline
           className="w-full h-full object-cover"
+          aria-label="Demo of installing the InsForge extension"
         />
       </div>
     </div>
