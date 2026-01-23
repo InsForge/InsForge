@@ -24,6 +24,7 @@ export function VerifyConnectionStep() {
           muted
           playsInline
           className="w-full h-full object-cover"
+          aria-label="Demo of verifying connection with an AI coding agent"
         />
       </div>
     </div>
