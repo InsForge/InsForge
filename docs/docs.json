@@ -111,6 +111,7 @@
               "sdks/typescript/functions",
               "sdks/typescript/ai",
               "sdks/typescript/realtime",
+              "sdks/typescript/email",
               {
                 "group": "UI Components",
                 "pages": [

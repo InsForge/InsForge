@@ -5,28 +5,9 @@ description: Invoke serverless functions with the InsForge TypeScript SDK
 
 ## Installation
 
-<CodeGroup>
-```bash npm
-npm install @insforge/sdk@latest
-```
+import Installation from '/snippets/sdk-installation.mdx';
 
-```bash yarn
-yarn add @insforge/sdk@latest
-```
-
-```bash pnpm
-pnpm add @insforge/sdk@latest
-```
-</CodeGroup>
-
-```typescript
-import { createClient } from '@insforge/sdk';
-
-const insforge = createClient({
-  baseUrl: 'https://your-app.insforge.app',
-  anonKey: 'your-anon-key'
-});
-```
+<Installation />
 
 ## invoke()
 
@@ -54,7 +35,7 @@ SDK automatically includes authentication token from logged-in user.
 
 ### Example (POST with body)
 
-```typescript
+```javascript
 const { data, error } = await insforge.functions.invoke('hello-world', {
   body: { name: 'World', greeting: 'Hello' }
 })
@@ -76,7 +57,7 @@ console.log(data)
 
 ### Example (GET request)
 
-```typescript
+```javascript
 const { data, error } = await insforge.functions.invoke('get-stats', {
   method: 'GET'
 })
@@ -98,7 +79,7 @@ console.log(data)
 
 ### Example (With custom headers)
 
-```typescript
+```javascript
 const { data, error } = await insforge.functions.invoke('api-endpoint', {
   method: 'PUT',
   body: { id: '123', status: 'active' },
@@ -122,7 +103,7 @@ const { data, error } = await insforge.functions.invoke('api-endpoint', {
 
 ### Example 1: Public Function (No Authentication Required)
 
-```typescript
+```javascript
 // Use anon token for public data access
 // No import needed - createClient is injected by the worker template
 module.exports = async function(request) {
@@ -157,7 +138,7 @@ module.exports = async function(request) {
 
 ### Example 2: Authenticated Function (Access User Data)
 
-```typescript
+```javascript
 // Use functionToken to access authenticated user's data
 // No import needed - createClient is injected by the worker template
 module.exports = async function(request) {

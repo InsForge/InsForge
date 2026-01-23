@@ -5,28 +5,9 @@ description: User authentication and profile management with the InsForge TypeSc
 
 ## Installation
 
-<CodeGroup>
-```bash npm
-npm install @insforge/sdk@latest
-```
+import Installation from '/snippets/sdk-installation.mdx';
 
-```bash yarn
-yarn add @insforge/sdk@latest
-```
-
-```bash pnpm
-pnpm add @insforge/sdk@latest
-```
-</CodeGroup>
-
-```typescript
-import { createClient } from '@insforge/sdk';
-
-const insforge = createClient({
-  baseUrl: 'https://your-app.insforge.app',
-  anonKey: 'your-anon-key'
-});
-```
+<Installation />
 
 ## signUp()
 
@@ -45,23 +26,37 @@ Create a new user account with email and password.
 ```typescript
 {
   data: {
-    user: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata },
-    accessToken: string,
-    requireEmailVerification: boolean,
-    csrfToken: string
+    user?: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata },
+    accessToken: string | null,
+    requireEmailVerification?: boolean,
+    redirectTo?: string,
+    csrfToken?: string | null
   } | null,
   error: Error | null
 }
 ```
 
+<Note>
+  When `requireEmailVerification` is true, `accessToken` will be null until the user verifies their email. InsForge sends a verification email with either a link or a 6-digit code, based on your dashboard configuration (`verifyEmailMethod`). For code verification, implement a page that prompts the user to enter the code (see [verifyEmail()](#verifyemail)). For link verification, redirect users to the sign-in page—the insforge backend handles verification automatically when the link is clicked.
+</Note>
+
 ### Example
 
-```typescript
+```javascript
 const { data, error } = await insforge.auth.signUp({
   email: 'user@example.com',
   password: 'secure_password123',
   name: 'John Doe',
 });
+
+if (data?.requireEmailVerification) {
+  // For code verification: redirect to page where user enters the 6-digit code
+  // For link verification: redirect to sign-in page to await email link click
+  console.log('Please verify your email');
+} else if (data?.accessToken) {
+  // User is signed in (email verification disabled)
+  console.log('Welcome!', data.user.email);
+}
 ```
 
 ### Output
@@ -72,19 +67,20 @@ const { data, error } = await insforge.auth.signUp({
     "user": {
       "id": "usr_abc123",
       "email": "user@example.com",
-      "emailVerified": true,
-      "providers": ["google"],
+      "emailVerified": false,
+      "providers": ["email"],
       "createdAt": "2024-01-15T10:00:00Z",
       "updatedAt": "2024-01-15T10:00:00Z",
       "profile": {
         "name": "John Doe",
-        "avatar_url": "https://example.com/jane.jpg"
+        "avatar_url": null
       },
       "metadata": {}
     },
     "requireEmailVerification": true,
-    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "csrfToken": "5758d38259fb..."
+    "accessToken": null,
+    "redirectTo": "https://app.example.com/verify-email",
+    "csrfToken": null
   },
   "error": null
 }
@@ -108,7 +104,8 @@ Sign in an existing user with email and password.
   data: {
     user: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata },
     accessToken: string,
-    csrfToken: string
+    redirectTo?: string,
+    csrfToken?: string | null
   } | null,
   error: Error | null
 }
@@ -116,11 +113,19 @@ Sign in an existing user with email and password.
 
 ### Example
 
-```typescript
+```javascript
 const { data, error } = await insforge.auth.signInWithPassword({
   email: 'user@example.com',
   password: 'secure_password123',
 });
+
+if (data) {
+  console.log('Signed in as:', data.user.email);
+  // Optional: redirect to configured URL
+  if (data.redirectTo) {
+    window.location.href = data.redirectTo;
+  }
+}
 ```
 
 ### Output
@@ -132,7 +137,7 @@ const { data, error } = await insforge.auth.signInWithPassword({
       "id": "usr_abc123",
       "email": "user@example.com",
       "emailVerified": true,
-      "providers": ["google"],
+      "providers": ["email"],
       "createdAt": "2024-01-15T10:00:00Z",
       "updatedAt": "2024-01-15T10:00:00Z",
       "profile": {
@@ -142,6 +147,7 @@ const { data, error } = await insforge.auth.signInWithPassword({
       "metadata": {}
     },
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "redirectTo": "https://app.example.com/dashboard",
     "csrfToken": "5758d38259fb..."
   },
   "error": null
@@ -176,7 +182,7 @@ Start OAuth authentication flow with supported providers (Google, GitHub, Micros
 
 ### Example
 
-```typescript
+```javascript
 // Default: auto-redirect
 await insforge.auth.signInWithOAuth({
   provider: 'google',
@@ -225,7 +231,7 @@ None
 
 ### Example
 
-```typescript
+```javascript
 const { error } = await insforge.auth.signOut();
 ```
 
@@ -239,64 +245,9 @@ const { error } = await insforge.auth.signOut();
 
 ---
 
-## getCurrentUser()
-
-Get authenticated user with profile data from users table.
-
-### Parameters
-
-None
-
-### Returns
-
-```typescript
-{
-  data: {
-    user: { id, email, emailVerified, providers, profile, metadata, createdAt, updatedAt }
-  } | null,
-  error: Error | null
-}
-```
-
-### Example
-
-```typescript
-const { data, error } = await insforge.auth.getCurrentUser();
-
-if (data) {
-  console.log(data.user.email); // Auth info
-  console.log(data.user.profile.name); // Profile from users table
-}
-```
-
-### Output
-
-```json
-{
-  "data": {
-    "user": {
-      "id": "usr_abc123",
-      "email": "user@example.com",
-      "emailVerified": true,
-      "providers": ["google"],
-      "createdAt": "2024-01-15T10:00:00Z",
-      "updatedAt": "2024-01-15T10:00:00Z",
-      "profile": {
-        "name": "John Doe",
-        "avatar_url": "https://example.com/avatar.jpg"
-      },
-      "metadata": {}
-    }
-  },
-  "error": null
-}
-```
-
----
-
 ## getCurrentSession()
 
-Get current session from local storage (no API call).
+Get the current session. If no active session exists, attempts to refresh using the httpOnly cookie. Call this on app initialization to restore user sessions automatically.
 
 ### Parameters
 
@@ -309,7 +260,8 @@ None
   data: {
     session: {
       accessToken: string,
-      user: { id, email, profile, ... }
+      user: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata },
+      expiresAt?: Date
     } | null
   },
   error: Error | null
@@ -318,11 +270,17 @@ None
 
 ### Example
 
-```typescript
+```javascript
 const { data, error } = await insforge.auth.getCurrentSession();
 
 if (data.session) {
   console.log('Token:', data.session.accessToken);
+  console.log('User:', data.session.user.email);
+
+  // Check if session is expired
+  if (data.session.expiresAt && new Date() > data.session.expiresAt) {
+    console.log('Session expired');
+  }
 }
 ```
 
@@ -333,13 +291,14 @@ if (data.session) {
   "data": {
     "session": {
       "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "expiresAt": "2024-01-22T10:00:00.000Z",
       "user": {
         "id": "usr_abc123",
         "email": "user@example.com",
         "emailVerified": true,
-        "createdAt": "2025-12-22T19:13:08.586Z",
-        "updatedAt": "2025-12-22T19:13:08.586Z",
-        "providers": ["google"],
+        "createdAt": "2024-01-15T10:00:00Z",
+        "updatedAt": "2024-01-15T10:00:00Z",
+        "providers": ["email"],
         "profile": {
           "name": "John Doe",
           "avatar_url": "https://example.com/avatar.jpg"
@@ -356,7 +315,7 @@ if (data.session) {
 
 ## getProfile()
 
-Get any user's public profile by ID.
+Get any user's public profile by ID. Returns a flat profile object with all fields at the top level.
 
 ### Parameters
 
@@ -366,17 +325,27 @@ Get any user's public profile by ID.
 
 ```typescript
 {
-  data: { id, profile: { name, avatar_url, ... } } | null,
+  data: {
+    id: string,
+    name?: string,
+    avatar_url?: string,
+    createdAt?: string,
+    updatedAt?: string,
+    ...customFields
+  } | null,
   error: Error | null
 }
 ```
 
 ### Example
 
-```typescript
+```javascript
 const { data, error } = await insforge.auth.getProfile('usr_xyz789');
 
-console.log(data.profile.name);
+if (data) {
+  console.log(data.name);
+  console.log(data.avatar_url);
+}
 ```
 
 ### Output
@@ -385,10 +354,11 @@ console.log(data.profile.name);
 {
   "data": {
     "id": "usr_xyz789",
-    "profile": {
-      "name": "John Doe",
-      "avatar_url": "https://example.com/jane.jpg"
-    }
+    "name": "John Doe",
+    "avatar_url": "https://example.com/avatar.jpg",
+    "bio": "Full-stack developer",
+    "createdAt": "2024-01-15T10:00:00Z",
+    "updatedAt": "2024-01-15T10:00:00Z"
   },
   "error": null
 }
@@ -398,7 +368,7 @@ console.log(data.profile.name);
 
 ## setProfile()
 
-Update current user's profile in users table (supports any dynamic fields).
+Update current user's profile in users table. Supports any dynamic fields and returns the updated profile as a flat object.
 
 ### Parameters
 
@@ -408,21 +378,26 @@ Update current user's profile in users table (supports any dynamic fields).
 
 - `name` (predefined, string) - User's display name
 - `avatar_url` (predefined, string) - Profile picture URL
-- `bio` (custom, string) - User biography
-- `birthday` (custom, string) - Birth date (YYYY-MM-DD format)
 
 ### Returns
 
 ```typescript
 {
-  data: { id, ...profile_fields } | null,
+  data: {
+    id: string,
+    name?: string,
+    avatar_url?: string,
+    createdAt?: string,
+    updatedAt?: string,
+    ...customFields
+  } | null,
   error: Error | null
 }
 ```
 
 ### Example
 
-```typescript
+```javascript
 const { data, error } = await insforge.auth.setProfile({
   name: 'JohnDev',
   bio: 'Full-stack developer',
@@ -437,12 +412,126 @@ const { data, error } = await insforge.auth.setProfile({
 {
   "data": {
     "id": "usr_abc123",
-    "profile": {
-      "name": "JohnDev",
-      "avatar_url": "https://example.com/avatar.jpg",
-      "bio": "Full-stack developer",
-      "custom_field": "any value"
-    }
+    "name": "JohnDev",
+    "avatar_url": "https://example.com/avatar.jpg",
+    "bio": "Full-stack developer",
+    "custom_field": "any value",
+    "createdAt": "2024-01-15T10:00:00Z",
+    "updatedAt": "2024-01-15T12:30:00Z"
+  },
+  "error": null
+}
+```
+
+---
+
+## resendVerificationEmail()
+
+Resend email verification when the previous OTP has expired or was not received. Uses the method configured in auth settings (`verifyEmailMethod`). When method is `code`, sends a 6-digit numeric code. When method is `link`, sends a magic link.
+
+<Note>
+  This endpoint prevents user enumeration by returning success even if the email doesn't exist.
+</Note>
+
+### Parameters
+
+- `email` (string, required) - User's email address
+- `options` (object, optional) - Additional options
+  - `emailRedirectTo` (string, optional) - Custom URL to redirect to after email verification. It's a fallback if you didn't set default redirect URL configured in your dashboard.
+
+### Returns
+
+```typescript
+{
+  data: { success: boolean, message: string } | null,
+  error: Error | null
+}
+```
+
+### Example
+
+```javascript
+const { data, error } = await insforge.auth.resendVerificationEmail({
+  email: 'user@example.com',
+});
+
+if (data?.success) {
+  console.log('Verification email sent!');
+}
+```
+
+### Output
+
+```json
+{
+  "data": {
+    "success": true,
+    "message": "Verification email sent"
+  },
+  "error": null
+}
+```
+
+---
+
+## verifyEmail()
+
+Verify email address using the method configured in auth settings (`verifyEmailMethod`):
+- **Code verification**: Provide both `email` and `otp` (6-digit numeric code)
+- **Link verification**: Provide only `otp` (64-character hex token from magic link)
+
+Successfully verified users will receive a session token.
+
+### Parameters
+
+- `email` (string, optional) - User's email address (required for code verification)
+- `otp` (string, required) - 6-digit code or 64-character token from magic link
+
+### Returns
+
+```typescript
+{
+  data: {
+    accessToken: string,
+    user: { id, email, emailVerified, ... },
+    redirectTo?: string
+  } | null,
+  error: Error | null
+}
+```
+
+### Example
+
+```javascript
+// Code verification (when verifyEmailMethod is 'code')
+const { data, error } = await insforge.auth.verifyEmail({
+  email: 'user@example.com',
+  otp: '123456',
+});
+
+// Link verification (when verifyEmailMethod is 'link')
+// Token is extracted from the magic link URL
+const { data, error } = await insforge.auth.verifyEmail({
+  otp: 'a1b2c3d4e5f6...', // 64-character token from URL
+});
+
+if (data) {
+  console.log('Email verified!', data.accessToken);
+}
+```
+
+### Output
+
+```json
+{
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "user": {
+      "id": "usr_abc123",
+      "email": "user@example.com",
+      "emailVerified": true
+    },
+    "redirectTo": "https://app.example.com/dashboard"
   },
   "error": null
 }
