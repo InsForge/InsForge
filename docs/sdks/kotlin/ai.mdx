@@ -304,6 +304,104 @@ client.ai.chatCompletionStream(
 
 ---
 
+## generateEmbeddings()
+
+Generate vector embeddings for text input using AI models.
+
+### Parameters
+
+- `model` (String) - Embedding model identifier (e.g., "google/gemini-embedding-001")
+- `input` (String?, optional) - Single text input to embed
+- `inputs` (List\<String\>?, optional) - Multiple text inputs to embed
+- `encodingFormat` (EmbeddingEncodingFormat?, optional) - Output format (FLOAT or BASE64)
+- `dimensions` (Int?, optional) - Number of dimensions for the output embeddings
+
+### Returns
+
+```kotlin
+EmbeddingsResponse
+```
+
+### Example (Single Text)
+
+```kotlin
+val response = client.ai.generateEmbeddings(
+    model = "google/gemini-embedding-001",
+    input = "Hello world"
+)
+
+println("Generated ${response.data.size} embedding(s)")
+println("Dimensions: ${response.data.first().embedding.size}")
+println("Model: ${response.metadata?.model}")
+```
+
+### Example (Multiple Texts)
+
+```kotlin
+val response = client.ai.generateEmbeddings(
+    model = "google/gemini-embedding-001",
+    inputs = listOf("Hello", "World", "How are you?")
+)
+
+response.data.forEachIndexed { index, embedding ->
+    println("Embedding $index: ${embedding.embedding.take(5)}...")  // First 5 dimensions
+}
+```
+
+### Example (With Optional Parameters)
+
+```kotlin
+val response = client.ai.generateEmbeddings(
+    model = "google/gemini-embedding-001",
+    input = "Hello world",
+    encodingFormat = EmbeddingEncodingFormat.FLOAT,
+    dimensions = 512
+)
+
+println("Embedding dimensions: ${response.data.first().embedding.size}")  // 512
+```
+
+### Example (Semantic Search)
+
+```kotlin
+// Generate embeddings for documents
+val documents = listOf(
+    "Kotlin is a modern programming language",
+    "Android development with Jetpack Compose",
+    "Machine learning with TensorFlow"
+)
+
+val docEmbeddings = client.ai.generateEmbeddings(
+    model = "google/gemini-embedding-001",
+    inputs = documents
+)
+
+// Generate embedding for query
+val queryEmbedding = client.ai.generateEmbeddings(
+    model = "google/gemini-embedding-001",
+    input = "mobile app development"
+)
+
+// Calculate cosine similarity (simplified)
+fun cosineSimilarity(a: List<Double>, b: List<Double>): Double {
+    val dotProduct = a.zip(b).sumOf { it.first * it.second }
+    val normA = sqrt(a.sumOf { it * it })
+    val normB = sqrt(b.sumOf { it * it })
+    return dotProduct / (normA * normB)
+}
+
+// Find most similar document
+val queryVector = queryEmbedding.data.first().embedding
+val similarities = docEmbeddings.data.mapIndexed { index, embedding ->
+    index to cosineSimilarity(queryVector, embedding.embedding)
+}
+
+val mostSimilar = similarities.maxByOrNull { it.second }
+println("Most similar: ${documents[mostSimilar!!.first]}")
+```
+
+---
+
 ## generateImage()
 
 Generate images using AI models.
@@ -756,6 +854,42 @@ data class UrlCitation(
 data class UrlCitationAnnotation(
     val type: String,  // "url_citation"
     @SerialName("url_citation") val urlCitation: UrlCitation
+)
+```
+
+### EmbeddingsResponse
+
+```kotlin
+// Encoding format options for embeddings
+enum class EmbeddingEncodingFormat {
+    @SerialName("float") FLOAT,
+    @SerialName("base64") BASE64
+}
+
+@Serializable
+data class EmbeddingsResponse(
+    val `object`: String,  // "list"
+    val data: List\<EmbeddingObject\>,
+    val metadata: EmbeddingsMetadata? = null
+)
+
+@Serializable
+data class EmbeddingObject(
+    val `object`: String,  // "embedding"
+    val embedding: List\<Double\>,  // or String for base64 format
+    val index: Int
+)
+
+@Serializable
+data class EmbeddingsMetadata(
+    val model: String,
+    val usage: EmbeddingsUsage? = null
+)
+
+@Serializable
+data class EmbeddingsUsage(
+    @SerialName("prompt_tokens") val promptTokens: Int? = null,
+    @SerialName("total_tokens") val totalTokens: Int? = null
 )
 ```
 

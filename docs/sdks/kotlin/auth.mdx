@@ -14,7 +14,38 @@ import KotlinSdkInstallation from '/snippets/kotlin-sdk-installation.mdx';
 
 Create a new user account with email and password.
 
-### Example
+### Parameters
+
+- `email` (String) - User's email address
+- `password` (String) - User's password
+- `name` (String?, optional) - User's display name
+
+### Returns
+
+```kotlin
+SignUpResponse
+```
+
+### SignUpResponse
+
+```kotlin
+data class SignUpResponse(
+    /** User object (null when email verification is required) */
+    val user: User? = null,
+    /** Access token (null when email verification is required) */
+    val accessToken: String? = null,
+    /** Indicates if email verification is required before sign-in */
+    val requireEmailVerification: Boolean = false,
+    /** Redirect URL (if applicable) */
+    val redirectTo: String? = null,
+    /** CSRF token (if applicable) */
+    val csrfToken: String? = null,
+    /** Refresh token (null when email verification is required) */
+    val refreshToken: String? = null
+)
+```
+
+### Example (Basic)
 
 ```kotlin
 try {
@@ -24,13 +55,291 @@ try {
         name = "John Doe"
     )
 
-    result.user?.let { user ->
-        Log.d("Auth", "User created: ${user.email}")
+    if (result.requireEmailVerification) {
+        // Email verification required - show verification screen
+        showEmailVerificationScreen(email = "user@example.com")
+    } else {
+        result.user?.let { user ->
+            // Sign up successful, no verification needed
+            Log.d("Auth", "Welcome, ${user.profile?.name ?: user.email}!")
+            navigateToDashboard()
+        }
     }
 } catch (e: InsforgeHttpException) {
     Log.e("Auth", "Sign up failed: ${e.message}")
 }
 ```
+
+### Example (Complete Flow with Verification)
+
+```kotlin
+class AuthViewModel : ViewModel() {
+
+    // Sign up and handle verification requirement
+    suspend fun signUp(email: String, password: String, name: String?) {
+        try {
+            val result = client.auth.signUp(
+                email = email,
+                password = password,
+                name = name
+            )
+
+            if (result.requireEmailVerification) {
+                // Show verification code input screen
+                // User will receive a 6-digit code via email
+                _uiState.value = AuthUiState.RequiresVerification(email)
+            } else if (result.accessToken != null) {
+                // Registration complete, user is signed in
+                _uiState.value = AuthUiState.Authenticated
+            }
+        } catch (e: InsforgeHttpException) {
+            _uiState.value = AuthUiState.Error(e.message ?: "Sign up failed")
+        }
+    }
+
+    // Verify email with 6-digit code
+    suspend fun verifyEmail(email: String, code: String) {
+        try {
+            client.auth.verifyEmail(email = email, code = code)
+            // Verification successful, user can now sign in
+            _uiState.value = AuthUiState.VerificationSuccess
+        } catch (e: InsforgeHttpException) {
+            _uiState.value = AuthUiState.Error("Invalid verification code")
+        }
+    }
+
+    // Resend verification code
+    suspend fun resendVerificationCode(email: String) {
+        try {
+            client.auth.resendVerificationEmail(email = email)
+            // Show success message
+        } catch (e: InsforgeHttpException) {
+            _uiState.value = AuthUiState.Error("Failed to resend code")
+        }
+    }
+}
+
+sealed class AuthUiState {
+    object Initial : AuthUiState()
+    object Authenticated : AuthUiState()
+    object VerificationSuccess : AuthUiState()
+    data class RequiresVerification(val email: String) : AuthUiState()
+    data class Error(val message: String) : AuthUiState()
+}
+```
+
+### Example (Jetpack Compose with State Handling)
+
+```kotlin
+@Composable
+fun SignUpScreen(
+    onNavigateToDashboard: () -> Unit,
+    onNavigateToSignIn: () -> Unit
+) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
+    var showVerification by remember { mutableStateOf(false) }
+    var verificationCode by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    if (showVerification) {
+        // Verification code input screen
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "Verify Your Email",
+                style = MaterialTheme.typography.headlineMedium
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Enter the 6-digit code sent to $email",
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            OutlinedTextField(
+                value = verificationCode,
+                onValueChange = { verificationCode = it },
+                label = { Text("Verification Code") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            errorMessage?.let {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(it, color = MaterialTheme.colorScheme.error)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = {
+                    scope.launch {
+                        isLoading = true
+                        errorMessage = null
+                        try {
+                            client.auth.verifyEmail(email = email, code = verificationCode)
+                            onNavigateToSignIn()
+                        } catch (e: InsforgeHttpException) {
+                            errorMessage = "Invalid verification code"
+                        } finally {
+                            isLoading = false
+                        }
+                    }
+                },
+                enabled = !isLoading && verificationCode.length == 6,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text("Verify")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            TextButton(
+                onClick = {
+                    scope.launch {
+                        try {
+                            client.auth.resendVerificationEmail(email = email)
+                            // Show toast: "Verification code sent"
+                        } catch (e: InsforgeHttpException) {
+                            errorMessage = "Failed to resend code"
+                        }
+                    }
+                }
+            ) {
+                Text("Resend Code")
+            }
+        }
+    } else {
+        // Sign up form
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "Create Account",
+                style = MaterialTheme.typography.headlineMedium
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Name (optional)") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                label = { Text("Email") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Password") },
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            errorMessage?.let {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(it, color = MaterialTheme.colorScheme.error)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = {
+                    scope.launch {
+                        isLoading = true
+                        errorMessage = null
+                        try {
+                            val result = client.auth.signUp(
+                                email = email,
+                                password = password,
+                                name = name.ifBlank { null }
+                            )
+
+                            if (result.requireEmailVerification) {
+                                showVerification = true
+                            } else if (result.accessToken != null) {
+                                onNavigateToDashboard()
+                            }
+                        } catch (e: InsforgeHttpException) {
+                            errorMessage = e.message
+                        } finally {
+                            isLoading = false
+                        }
+                    }
+                },
+                enabled = !isLoading && email.isNotBlank() && password.isNotBlank(),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text("Sign Up")
+                }
+            }
+        }
+    }
+}
+```
+
+### Email Verification
+
+For users who register with email, the InsForge backend provides three options:
+
+1. **No email verification** - Users can sign in immediately after registration. `SignUpResponse` will have `accessToken != null`.
+2. **Link-based verification** - Users must open their email and click the verification link before they can sign in.
+3. **Code-based verification** - The InsForge backend sends a 6-digit verification code to the user's email. The client app needs to display a verification screen where users can enter the code, then call `verifyEmail(email, code)` to complete verification. Only after this can users sign in with email + password.
+
+When `requireEmailVerification` is `true`, the response will have:
+- `accessToken = null`
+- `user = null`
+- `requireEmailVerification = true`
+
+This indicates that verification via option 2 or 3 is required before the user can sign in.
+
+### Related Methods
+
+| Method | Description |
+|--------|-------------|
+| `verifyEmail(email, code)` | Verify email with 6-digit code |
+| `resendVerificationEmail(email)` | Resend verification code to email |
 
 ---
 
@@ -54,6 +363,14 @@ try {
     Log.e("Auth", "Sign in failed: ${e.message}")
 }
 ```
+
+### Email Verification
+
+If the sign in response is:
+```json
+{"error":"FORBIDDEN","message":"Email verification required","statusCode":403,"nextActions":"Please verify your email address before logging in"}
+```
+This indicates that verification via option 2 or 3 (link or code, see [signUp()](#email-verification)) is required before the user can sign in.
 
 ---
 

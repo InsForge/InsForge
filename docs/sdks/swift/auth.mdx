@@ -19,7 +19,33 @@ Create a new user account with email and password.
 - `password` (String) - User's password
 - `name` (String, optional) - User's display name
 
-### Example
+### Returns
+
+```swift
+SignUpResponse
+```
+
+### SignUpResponse
+
+```swift
+public struct SignUpResponse: Codable, Sendable {
+    /// User object (nil when email verification is required)
+    public let user: User?
+    /// Access token (nil when email verification is required)
+    public let accessToken: String?
+    /// Refresh token (nil when email verification is required)
+    public let refreshToken: String?
+    /// Indicates if email verification is required before sign-in
+    public let requireEmailVerification: Bool?
+
+    /// Check if email verification is required
+    public var needsEmailVerification: Bool
+    /// Check if sign up completed with session (no verification required)
+    public var hasSession: Bool
+}
+```
+
+### Example (Basic)
 
 ```swift
 do {
@@ -29,13 +55,191 @@ do {
         name: "John Doe"
     )
 
-    if let user = result.user {
-        print("User created: \(user.email)")
+    if result.needsEmailVerification {
+        // Email verification required - show verification screen
+        showEmailVerificationScreen()
+    } else if let user = result.user {
+        // Sign up successful, no verification needed
+        print("Welcome, \(user.profile?.name ?? user.email)!")
     }
 } catch {
     print("Sign up failed: \(error)")
 }
 ```
+
+### Example (Complete Flow with Verification)
+
+```swift
+func handleSignUp(email: String, password: String, name: String?) async {
+    do {
+        let result = try await insforge.auth.signUp(
+            email: email,
+            password: password,
+            name: name
+        )
+
+        if result.needsEmailVerification {
+            // Show verification code input screen
+            // User will receive a 6-digit code via email
+            showEmailVerificationScreen(email: email)
+        } else if result.hasSession {
+            // Registration complete, user is signed in
+            navigateToDashboard()
+        }
+    } catch {
+        showError(error.localizedDescription)
+    }
+}
+
+// Called when user enters the verification code
+func handleVerifyEmail(email: String, code: String) async {
+    do {
+        try await insforge.auth.verifyEmail(email: email, code: code)
+        // Verification successful, user can now sign in
+        navigateToSignIn()
+    } catch {
+        showError("Invalid verification code")
+    }
+}
+
+// Called when user requests a new verification code
+func handleResendCode(email: String) async {
+    do {
+        try await insforge.auth.resendVerificationEmail(email: email)
+        showMessage("Verification code sent to \(email)")
+    } catch {
+        showError("Failed to resend verification code")
+    }
+}
+```
+
+### Example (SwiftUI with State Handling)
+
+```swift
+struct SignUpView: View {
+    @State private var email = ""
+    @State private var password = ""
+    @State private var name = ""
+    @State private var showVerification = false
+    @State private var verificationCode = ""
+    @State private var errorMessage: String?
+
+    var body: some View {
+        if showVerification {
+            // Verification code input screen
+            VStack(spacing: 20) {
+                Text("Verify Your Email")
+                    .font(.title)
+
+                Text("Enter the 6-digit code sent to \(email)")
+                    .foregroundColor(.secondary)
+
+                TextField("Verification Code", text: $verificationCode)
+                    .textFieldStyle(.roundedBorder)
+                    .keyboardType(.numberPad)
+
+                Button("Verify") {
+                    Task {
+                        await verifyEmail()
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button("Resend Code") {
+                    Task {
+                        await resendCode()
+                    }
+                }
+            }
+            .padding()
+        } else {
+            // Sign up form
+            VStack(spacing: 20) {
+                TextField("Name", text: $name)
+                    .textFieldStyle(.roundedBorder)
+
+                TextField("Email", text: $email)
+                    .textFieldStyle(.roundedBorder)
+                    .autocapitalization(.none)
+
+                SecureField("Password", text: $password)
+                    .textFieldStyle(.roundedBorder)
+
+                if let error = errorMessage {
+                    Text(error)
+                        .foregroundColor(.red)
+                        .font(.caption)
+                }
+
+                Button("Sign Up") {
+                    Task {
+                        await signUp()
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .padding()
+        }
+    }
+
+    func signUp() async {
+        do {
+            let result = try await insforge.auth.signUp(
+                email: email,
+                password: password,
+                name: name.isEmpty ? nil : name
+            )
+
+            if result.needsEmailVerification {
+                showVerification = true
+            } else if result.hasSession {
+                // Navigate to main app
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func verifyEmail() async {
+        do {
+            try await insforge.auth.verifyEmail(email: email, code: verificationCode)
+            // Navigate to sign in or main app
+        } catch {
+            errorMessage = "Invalid verification code"
+        }
+    }
+
+    func resendCode() async {
+        do {
+            try await insforge.auth.resendVerificationEmail(email: email)
+        } catch {
+            errorMessage = "Failed to resend code"
+        }
+    }
+}
+```
+
+### Email Verification
+
+For users who register with email, the InsForge backend provides three options:
+
+1. **No email verification** - Users can sign in immediately after registration. `SignUpResponse` will have `hasSession = true`.
+2. **Link-based verification** - Users must open their email and click the verification link before they can sign in.
+3. **Code-based verification** - The InsForge backend sends a 6-digit verification code to the user's email. The client app needs to display a verification screen where users can enter the code, then call `verifyEmail(email:code:)` to complete verification. Only after this can users sign in with email + password.
+
+When `requireEmailVerification` is `true`, the response will have:
+- `accessToken = nil`
+- `user = nil`
+- `needsEmailVerification = true`
+
+This indicates that verification via option 2 or 3 is required before the user can sign in.
+
+### Related Methods
+
+| Method | Description |
+|--------|-------------|
+| `verifyEmail(email:code:)` | Verify email with 6-digit code |
+| `resendVerificationEmail(email:)` | Resend verification code to email |
 
 ---
 
@@ -64,6 +268,14 @@ do {
     print("Sign in failed: \(error)")
 }
 ```
+
+### Email Verification
+
+If the sign in response is:
+```json
+{"error":"FORBIDDEN","message":"Email verification required","statusCode":403,"nextActions":"Please verify your email address before logging in"}
+```
+This indicates that verification via option 2 or 3 (link or code, see [signUp()](#email-verification)) is required before the user can sign in.
 
 ---
 
