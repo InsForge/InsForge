@@ -6,7 +6,7 @@ import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 import type { TokenPayloadSchema } from '@insforge/shared-schemas';
 
 const JWT_SECRET = process.env.JWT_SECRET ?? '';
-const ACCESS_TOKEN_EXPIRES_IN = '30s'; // TODO: change to 15m after testing
+const ACCESS_TOKEN_EXPIRES_IN = '15m';
 const REFRESH_TOKEN_EXPIRES_IN = '7d';
 
 /**

@@ -168,6 +168,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     apiClient.setRefreshAccessTokenHandler(handleRefreshAccessToken);
     return () => {
       apiClient.setRefreshAccessTokenHandler(undefined);
+      // Clear any pending refresh timeout
+      if (pendingRefreshRef.current) {
+        clearTimeout(pendingRefreshRef.current.timeoutId);
+        pendingRefreshRef.current = null;
+      }
     };
   }, []);
 
