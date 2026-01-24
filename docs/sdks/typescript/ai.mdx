@@ -250,7 +250,7 @@ Generate images using AI models.
 
 ### Parameters
 
-- `model` (string, required) - Image model (e.g., 'google/gemini-2.5-flash-image-preview')
+- `model` (string, required) - Image model (e.g., 'google/gemini-3-pro-image-preview')
 - `prompt` (string, required) - Text description of image
 - `images` (array, optional) - Input images for image-to-image (url or base64)
 - `width` (number, optional) - Image width in pixels
@@ -280,7 +280,7 @@ interface ImageData {
 
 ```typescript
 const response = await insforge.ai.images.generate({
-  model: 'google/gemini-2.5-flash-image-preview',
+  model: 'google/gemini-3-pro-image-preview',
   prompt: 'A serene mountain landscape at sunset',
   size: '1024x1024',
 });
