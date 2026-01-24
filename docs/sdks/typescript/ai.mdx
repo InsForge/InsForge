@@ -48,6 +48,10 @@ Create AI chat completions with streaming support, web search, file parsing, and
   - `pdf` (object, optional) - PDF processing options
     - `engine` ('pdf-text' | 'mistral-ocr' | 'native', optional) - Processing engine. Defaults to native if supported, otherwise mistral-ocr
 
+<Note>
+File URLs must be publicly accessible. Storage buckets must be public, or use base64 for private files.
+</Note>
+
 ### Returns (non-streaming)
 
 ```typescript
