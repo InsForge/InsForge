@@ -1,21 +1,30 @@
-import { MCP_SETUP_BASE_URL } from './mcp/helpers';
+import { MCP_SETUP_BASE_URL, EXTENSION_DOCS_URL } from './mcp/helpers';
 import DiscordIcon from '@/assets/logos/discord.svg?react';
+import { cn } from '@/lib/utils/utils';
+import type { InstallMethod } from './InstallMethodTabs';
 
 interface HelpSectionProps {
   agentSlug?: string;
+  installMethod?: InstallMethod;
+  className?: string;
 }
 
-export function HelpSection({ agentSlug }: HelpSectionProps) {
-  const guideUrl = agentSlug ? `${MCP_SETUP_BASE_URL}#${agentSlug}` : MCP_SETUP_BASE_URL;
+export function HelpSection({ agentSlug, installMethod, className }: HelpSectionProps) {
+  const guideUrl =
+    installMethod === 'extension'
+      ? EXTENSION_DOCS_URL
+      : agentSlug
+        ? `${MCP_SETUP_BASE_URL}#${agentSlug}`
+        : MCP_SETUP_BASE_URL;
 
   return (
-    <div className="px-4 py-3 rounded-lg bg-[#333333] inline-flex items-center gap-1">
+    <div className={cn('inline-flex items-center gap-1', className)}>
       <span className="text-gray-500 dark:text-neutral-400 text-sm leading-6">Need help? View</span>
       <a
         href={guideUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-sm leading-6 font-medium text-white"
+        className="text-sm leading-6 font-medium text-black dark:text-white"
       >
         Step by Step Guide
       </a>
