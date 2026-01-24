@@ -41,8 +41,16 @@ Create AI chat completions with streaming support, web search, file parsing, and
 - `topP` (number, optional) - Top-p sampling 0-1
 - `stream` (boolean, optional) - Enable streaming mode
 - `webSearch` (object, optional) - Enable web search capabilities
+  - `enabled` (boolean) - Enable web search
+  - `maxResults` (number, optional) - Maximum number of search results to include
 - `fileParser` (object, optional) - Enable file/PDF parsing
-- `thinking` (boolean, optional) - Enable extended reasoning mode (Anthropic models)
+  - `enabled` (boolean) - Enable file parsing
+  - `pdf` (object, optional) - PDF processing options
+    - `engine` ('pdf-text' | 'mistral-ocr' | 'native', optional) - Processing engine. Defaults to native if supported, otherwise mistral-ocr
+
+<Note>
+File URLs must be publicly accessible. Storage buckets must be public, or use base64 for private files.
+</Note>
 
 ### Returns (non-streaming)
 
@@ -122,17 +130,29 @@ console.log(completion.choices[0].message.content);
 
 ```typescript
 const completion = await insforge.ai.chat.completions.create({
-  model: 'openai/gpt-4',
+  model: 'anthropic/claude-sonnet-4.5',
   messages: [
-    { role: 'user', content: 'Research and summarize the latest developments in quantum computing' }
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'Analyze this research paper and find related recent news' },
+        {
+          type: 'file',
+          file: {
+            filename: 'research-paper.pdf',
+            file_data: 'https://example.com/research-paper.pdf'  // or base64: 'data:application/pdf;base64,...'
+          }
+        }
+      ]
+    }
   ],
-  webSearch: { enabled: true, maxResults: 5 },
-  thinking: true
+  fileParser: { enabled: true },
+  webSearch: { enabled: true, maxResults: 5 }
 });
 
 console.log(completion.choices[0].message.content);
 
-// Access citations
+// Access web search citations
 completion.choices[0].message.annotations?.forEach(annotation => {
   console.log(`- ${annotation.urlCitation.title}: ${annotation.urlCitation.url}`);
 });
@@ -151,58 +171,6 @@ for await (const chunk of stream) {
   if (chunk.choices[0]?.delta?.content) {
     process.stdout.write(chunk.choices[0].delta.content);
   }
-}
-```
-
-### Output (non-streaming)
-
-```json
-{
-  "id": "chatcmpl-1705315200000",
-  "object": "chat.completion",
-  "created": 1705315200,
-  "model": "anthropic/claude-3.5-haiku",
-  "choices": [
-    {
-      "index": 0,
-      "message": {
-        "role": "assistant",
-        "content": "The capital of France is Paris.",
-        "annotations": [
-          {
-            "type": "url_citation",
-            "urlCitation": {
-              "url": "https://example.com/article",
-              "title": "Article Title",
-              "startIndex": 0,
-              "endIndex": 30
-            }
-          }
-        ]
-      },
-      "finish_reason": "stop"
-    }
-  ],
-  "usage": {
-    "prompt_tokens": 24,
-    "completion_tokens": 8,
-    "total_tokens": 32
-  }
-}
-```
-
-### Output (streaming)
-
-```json
-{
-  "id": "chatcmpl-1705315200000",
-  "object": "chat.completion.chunk",
-  "choices": [
-    {
-      "delta": { "content": "Once upon" },
-      "finish_reason": null
-    }
-  ]
 }
 ```
 
@@ -274,28 +242,6 @@ await insforge.database.from('documents').insert([{
 }]);
 ```
 
-### Output
-
-```json
-{
-  "object": "list",
-  "data": [
-    {
-      "object": "embedding",
-      "embedding": [0.0023, -0.0142, 0.0234, ...],
-      "index": 0
-    }
-  ],
-  "metadata": {
-    "model": "openai/text-embedding-3-small",
-    "usage": {
-      "promptTokens": 2,
-      "totalTokens": 2
-    }
-  }
-}
-```
-
 ---
 
 ## images.generate()
@@ -304,7 +250,7 @@ Generate images using AI models.
 
 ### Parameters
 
-- `model` (string, required) - Image model (e.g., 'google/gemini-2.5-flash-image-preview')
+- `model` (string, required) - Image model (e.g., 'google/gemini-3-pro-image-preview')
 - `prompt` (string, required) - Text description of image
 - `images` (array, optional) - Input images for image-to-image (url or base64)
 - `width` (number, optional) - Image width in pixels
@@ -334,7 +280,7 @@ interface ImageData {
 
 ```typescript
 const response = await insforge.ai.images.generate({
-  model: 'google/gemini-2.5-flash-image-preview',
+  model: 'google/gemini-3-pro-image-preview',
   prompt: 'A serene mountain landscape at sunset',
   size: '1024x1024',
 });
@@ -355,180 +301,3 @@ await insforge.database.from('generated_images').insert([
 ]);
 ```
 
-### Output
-
-```json
-{
-  "created": 1705315200,
-  "data": [
-    {
-      "b64_json": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-      "content": "A beautiful mountain landscape at sunset with orange and purple hues."
-    }
-  ],
-  "usage": {
-    "total_tokens": 150,
-    "input_tokens": 20,
-    "output_tokens": 130
-  }
-}
-```
-
----
-
-## Types Reference
-
-### Plugin Configuration
-
-```typescript
-// Web search plugin configuration
-interface WebSearchPlugin {
-  enabled: boolean;
-  maxResults?: number;      // 1-10, default: 5
-  engine?: 'native' | 'exa';
-  searchPrompt?: string;    // Custom prompt for search results
-}
-
-// PDF parser configuration
-interface PdfParserConfig {
-  engine?: 'pdf-text' | 'mistral-ocr' | 'native';
-}
-
-// File parser plugin configuration
-interface FileParserPlugin {
-  enabled: boolean;
-  pdf?: PdfParserConfig;
-}
-```
-
-### Message Content Types
-
-```typescript
-// Text content
-interface TextContent {
-  type: 'text';
-  text: string;
-}
-
-// Image content (OpenAI-compatible)
-interface ImageUrlContent {
-  type: 'image_url';
-  image_url: {
-    url: string;  // URL or base64 data URI
-  };
-}
-
-// File content (for PDFs and documents)
-interface FileContent {
-  type: 'file';
-  file: {
-    filename: string;
-    file_data: string;  // URL or base64
-  };
-}
-
-// Message content can be string or array of content parts
-type MessageContent = string | ContentPart[];
-type ContentPart = TextContent | ImageUrlContent | FileContent;
-
-// Chat message
-interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: MessageContent;
-}
-```
-
-### Annotations
-
-```typescript
-// URL citation from web search results
-interface UrlCitation {
-  url: string;
-  title?: string;
-  content?: string;
-  startIndex?: number;
-  endIndex?: number;
-}
-
-// Annotation containing URL citation
-interface UrlCitationAnnotation {
-  type: 'url_citation';
-  urlCitation: UrlCitation;
-}
-```
-
-### Chat Completion Response
-
-```typescript
-interface ChatCompletionResponse {
-  id: string;
-  object: 'chat.completion';
-  created: number;
-  model: string;
-  choices: ChatChoice[];
-  usage: TokenUsage;
-}
-
-interface ChatChoice {
-  index: number;
-  message: {
-    role: 'assistant';
-    content: string;
-    annotations?: UrlCitationAnnotation[];
-  };
-  finish_reason: string;
-}
-
-interface TokenUsage {
-  prompt_tokens: number;
-  completion_tokens: number;
-  total_tokens: number;
-}
-```
-
-### Embeddings Response
-
-```typescript
-interface EmbeddingsResponse {
-  object: 'list';
-  data: EmbeddingObject[];
-  metadata?: EmbeddingsMetadata;
-}
-
-interface EmbeddingObject {
-  object: 'embedding';
-  embedding: number[] | string;  // number[] for float, string for base64
-  index: number;
-}
-
-interface EmbeddingsMetadata {
-  model: string;
-  usage?: EmbeddingsUsage;
-}
-
-interface EmbeddingsUsage {
-  promptTokens?: number;
-  totalTokens?: number;
-}
-```
-
-### Image Generation Response
-
-```typescript
-interface ImageGenerationResponse {
-  created: number;
-  data: ImageData[];
-  usage?: ImageTokenUsage;
-}
-
-interface ImageData {
-  b64_json?: string;
-  content?: string;
-}
-
-interface ImageTokenUsage {
-  total_tokens: number;
-  input_tokens: number;
-  output_tokens: number;
-}
-```
