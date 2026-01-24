@@ -81,6 +81,7 @@ export function OnboardingModal() {
             )}
             <HelpSection
               agentSlug={selectedAgentSlug}
+              installMethod={installMethod}
               className={installMethod === 'terminal' ? 'mt-4' : ''}
             />
           </div>

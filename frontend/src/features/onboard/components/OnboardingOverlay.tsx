@@ -120,6 +120,7 @@ export function OnboardingOverlay() {
         <div className="sticky bottom-6 left-0 right-0 flex flex-col items-center">
           <HelpSection
             agentSlug={selectedAgentSlug}
+            installMethod={installMethod}
             className="px-4 py-3 rounded-lg dark:bg-[#333333] bg-neutral-100"
           />
         </div>

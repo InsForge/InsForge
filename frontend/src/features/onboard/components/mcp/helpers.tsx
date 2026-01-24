@@ -7,6 +7,7 @@ export interface MCPAgent {
 }
 
 export const MCP_SETUP_BASE_URL = 'https://docs.insforge.dev/mcp-setup';
+export const EXTENSION_DOCS_URL = 'https://docs.insforge.dev/vscode-extension';
 
 import TraeLogo from '@/assets/logos/trae.svg?react';
 import CursorLogo from '@/assets/logos/cursor.svg?react';

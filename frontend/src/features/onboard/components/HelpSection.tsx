@@ -1,14 +1,21 @@
-import { MCP_SETUP_BASE_URL } from './mcp/helpers';
+import { MCP_SETUP_BASE_URL, EXTENSION_DOCS_URL } from './mcp/helpers';
 import DiscordIcon from '@/assets/logos/discord.svg?react';
 import { cn } from '@/lib/utils/utils';
+import type { InstallMethod } from './InstallMethodTabs';
 
 interface HelpSectionProps {
   agentSlug?: string;
+  installMethod?: InstallMethod;
   className?: string;
 }
 
-export function HelpSection({ agentSlug, className }: HelpSectionProps) {
-  const guideUrl = agentSlug ? `${MCP_SETUP_BASE_URL}#${agentSlug}` : MCP_SETUP_BASE_URL;
+export function HelpSection({ agentSlug, installMethod, className }: HelpSectionProps) {
+  const guideUrl =
+    installMethod === 'extension'
+      ? EXTENSION_DOCS_URL
+      : agentSlug
+        ? `${MCP_SETUP_BASE_URL}#${agentSlug}`
+        : MCP_SETUP_BASE_URL;
 
   return (
     <div className={cn('inline-flex items-center gap-1', className)}>
