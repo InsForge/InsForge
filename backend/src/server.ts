@@ -236,7 +236,9 @@ export async function createApp() {
       //   so we must not tell the client it's still compressed
       const responseHeaders: Record<string, string> = {};
       for (const [key, value] of response.headers.entries()) {
-        if (['transfer-encoding', 'content-length', 'connection', 'content-encoding'].includes(key)) {
+        if (
+          ['transfer-encoding', 'content-length', 'connection', 'content-encoding'].includes(key)
+        ) {
           continue;
         }
         responseHeaders[key] = value;
