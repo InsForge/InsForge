@@ -229,6 +229,40 @@ const { data, error } = await insforge.database
 
 ---
 
+## rpc()
+
+Call PostgreSQL stored functions (RPC - Remote Procedure Call).
+
+### Parameters
+
+- `functionName` (string, required) - Name of the PostgreSQL function to call
+- `args` (object, optional) - Arguments to pass to the function
+
+### Returns
+
+```typescript
+{
+  data: T | T[] | null,
+  error: Error | null
+}
+```
+
+### Examples
+
+<CodeGroup>
+```javascript With parameters
+const { data, error } = await insforge.database
+  .rpc('get_user_stats', { user_id: '123' })
+```
+
+```javascript Without parameters
+const { data, error } = await insforge.database
+  .rpc('get_all_active_users')
+```
+</CodeGroup>
+
+---
+
 ## Filters
 
 Chain filters to narrow down query results. All filters take `(column, value)` as parameters.
