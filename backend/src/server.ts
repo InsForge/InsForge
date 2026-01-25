@@ -194,6 +194,7 @@ export async function createApp() {
   app.use('/api', apiRouter);
 
   // Proxy function execution to Deno Subhosting or local runtime
+  // this logic is used for backward compatibility, we will let the sdk directly call the edge function
   app.all('/functions/:slug', async (req: Request, res: Response) => {
     const { slug } = req.params;
 
@@ -225,11 +226,23 @@ export async function createApp() {
         body: ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body),
       });
 
+      // Read response as raw bytes to preserve binary data (images, PDFs, etc.)
+      const responseBody = Buffer.from(await response.arrayBuffer());
+
+      // Forward response headers, excluding hop-by-hop headers that the proxy
+      // should not forward (transfer-encoding, content-length are recalculated
+      // by Express, connection is specific to each hop)
+      const responseHeaders: Record<string, string> = {};
+      for (const [key, value] of response.headers.entries()) {
+        if (['transfer-encoding', 'content-length', 'connection'].includes(key)) continue;
+        responseHeaders[key] = value;
+      }
+
       res
         .status(response.status)
-        .set('Content-Type', response.headers.get('content-type') || 'application/json')
+        .set(responseHeaders)
         .set('Access-Control-Allow-Origin', '*')
-        .send(await response.text());
+        .send(responseBody);
     } catch (error) {
       logger.error('Failed to proxy function', { slug, error: String(error) });
       res.status(502).json({ error: error instanceof Error ? error.message : String(error) });
