@@ -27,6 +27,15 @@ export function ZoomedVideo({ src, className, 'aria-label': ariaLabel }: ZoomedV
       <div
         className={cn('relative group cursor-pointer rounded overflow-hidden', className)}
         onClick={() => setIsOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsOpen(true);
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-label={ariaLabel ? `Expand video: ${ariaLabel}` : 'Expand video'}
       >
         <video
           ref={thumbnailRef}

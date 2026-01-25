@@ -162,7 +162,7 @@ export default function AIPage() {
           )}
         </div>
         <p className="text-sm leading-6 text-neutral-500 dark:text-neutral-400">
-          Your backend has connected to following models, start building LLM-powered features.
+          Your backend has connected to the following models, start building LLM-powered features.
         </p>
       </div>
 
