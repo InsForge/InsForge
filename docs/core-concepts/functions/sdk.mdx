@@ -160,9 +160,9 @@ export default async function(req: Request): Promise<Response> {
     edgeFunctionToken: userToken
   });
 
-  // Get authenticated session
-  const { data: sessionData, error: sessionError } = await client.auth.getCurrentSession();
-  if (sessionError || !sessionData?.session?.userId) {
+  // Get authenticated user
+  const { data: userData } = await client.auth.getCurrentUser();
+  if (!userData?.user?.id) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -171,7 +171,7 @@ export default async function(req: Request): Promise<Response> {
 
   // Access user's private data or create records with user_id
   await client.database.from('user_posts').insert([{
-    user_id: sessionData.session.userId,
+    user_id: userData.user.id,
     content: 'My post'
   }]);
 
