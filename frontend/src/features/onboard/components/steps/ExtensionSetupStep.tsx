@@ -1,3 +1,4 @@
+import { ZoomedVideo } from '@/components';
 import extensionInstallVideo from '@/assets/videos/extension_install.mp4';
 
 export function ExtensionSetupStep() {
@@ -6,18 +7,12 @@ export function ExtensionSetupStep() {
       <p className="dark:text-neutral-400 text-gray-500 text-sm leading-6">
         Follow the video guide to complete the setup in the extension.
       </p>
-      {/* Video Container */}
-      <div className="w-full rounded overflow-hidden">
-        <video
-          src={extensionInstallVideo}
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="w-full h-full object-cover"
-          aria-label="Demo of installing the InsForge extension"
-        />
-      </div>
+      {/* Video Container - Click to expand */}
+      <ZoomedVideo
+        src={extensionInstallVideo}
+        className="w-full"
+        aria-label="Demo of installing the InsForge extension"
+      />
     </div>
   );
 }

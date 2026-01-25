@@ -172,7 +172,7 @@ export const staticMenuItems: PrimaryMenuItem[] = [
   },
   {
     id: 'ai',
-    label: 'AI Router',
+    label: 'Model Gateway',
     href: '/dashboard/ai',
     icon: Sparkles,
     sectionEnd: true,
