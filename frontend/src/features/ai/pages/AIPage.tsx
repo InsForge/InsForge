@@ -114,7 +114,7 @@ export default function AIPage() {
         if (config) {
           const shouldDelete = await confirm({
             title: 'Disable AI Model',
-            description: `Are you sure you want to disable ${model.modelId.split('/')[1]}? This will remove the configuration.`,
+            description: `Are you sure you want to disable ${model.modelId.split('/')[1]}? This will remove the model.`,
             confirmText: 'Disable',
             destructive: true,
           });
@@ -152,7 +152,9 @@ export default function AIPage() {
       {/* Header Section - Fixed */}
       <div className="max-w-[1080px] mx-auto w-full flex flex-col gap-2 flex-shrink-0">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold text-black dark:text-white leading-7">AI Router</h1>
+          <h1 className="text-xl font-semibold text-black dark:text-white leading-7">
+            Model Gateway
+          </h1>
           {credits?.remaining && (
             <span className="text-sm font-normal text-neutral-700 dark:text-emerald-300 mt-[2.5px]">
               {formatCredits(credits.remaining)} credit{credits.remaining !== 1 ? 's' : ''} left
@@ -160,7 +162,7 @@ export default function AIPage() {
           )}
         </div>
         <p className="text-sm leading-6 text-neutral-500 dark:text-neutral-400">
-          Your models are ready — build LLM-powered features or add more integration.
+          Your backend has connected to following models, start building LLM-powered features.
         </p>
       </div>
 

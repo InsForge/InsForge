@@ -1,4 +1,4 @@
-import { CodeBlock } from '@/components';
+import { CodeBlock, ZoomedVideo } from '@/components';
 import verifyConnectionVideo from '@/assets/videos/terminal_install.mp4';
 
 const TEST_PROMPT =
@@ -15,18 +15,12 @@ export function VerifyConnectionStep() {
         label="prompt"
         className="bg-neutral-200 dark:bg-neutral-900 break-normal"
       />
-      {/* Video Container */}
-      <div className="w-full rounded overflow-hidden mt-2">
-        <video
-          src={verifyConnectionVideo}
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="w-full h-full object-cover"
-          aria-label="Demo of verifying connection with an AI coding agent"
-        />
-      </div>
+      {/* Video Container - Click to expand */}
+      <ZoomedVideo
+        src={verifyConnectionVideo}
+        className="w-full mt-2"
+        aria-label="Demo of verifying connection with an AI coding agent"
+      />
     </div>
   );
 }

@@ -54,10 +54,10 @@ export function useAIConfigs(options: UseAIConfigsOptions = {}) {
     mutationFn: (data: CreateAIConfigurationRequest) => aiService.createConfiguration(data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['ai-configurations'] });
-      showToast('AI configuration created successfully', 'success');
+      showToast('Model added successfully', 'success');
     },
     onError: (error: Error) => {
-      showToast(`Failed to create configuration: ${error.message}`, 'error');
+      showToast(`Failed to add model: ${error.message}`, 'error');
     },
   });
 
@@ -67,10 +67,10 @@ export function useAIConfigs(options: UseAIConfigsOptions = {}) {
       aiService.updateConfiguration(id, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['ai-configurations'] });
-      showToast('AI configuration updated successfully', 'success');
+      showToast('Model updated successfully', 'success');
     },
     onError: (error: Error) => {
-      showToast(`Failed to update configuration: ${error.message}`, 'error');
+      showToast(`Failed to update model: ${error.message}`, 'error');
     },
   });
 
@@ -79,10 +79,10 @@ export function useAIConfigs(options: UseAIConfigsOptions = {}) {
     mutationFn: (id: string) => aiService.deleteConfiguration(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['ai-configurations'] });
-      showToast('AI configuration deleted successfully', 'success');
+      showToast('Model deleted successfully', 'success');
     },
     onError: (error: Error) => {
-      showToast(`Failed to delete configuration: ${error.message}`, 'error');
+      showToast(`Failed to delete model: ${error.message}`, 'error');
     },
   });
 
