@@ -229,12 +229,14 @@ export async function createApp() {
       // Read response as raw bytes to preserve binary data (images, PDFs, etc.)
       const responseBody = Buffer.from(await response.arrayBuffer());
 
-      // Forward response headers, excluding hop-by-hop headers that the proxy
-      // should not forward (transfer-encoding, content-length are recalculated
-      // by Express, connection is specific to each hop)
+      // Forward response headers, excluding:
+      // - transfer-encoding, content-length: recalculated by Express
+      // - connection: hop-by-hop header
+      // - content-encoding: node-fetch already decompresses the response,
+      //   so we must not tell the client it's still compressed
       const responseHeaders: Record<string, string> = {};
       for (const [key, value] of response.headers.entries()) {
-        if (['transfer-encoding', 'content-length', 'connection'].includes(key)) {
+        if (['transfer-encoding', 'content-length', 'connection', 'content-encoding'].includes(key)) {
           continue;
         }
         responseHeaders[key] = value;
