@@ -13,27 +13,35 @@ InsForge provides unified AI capabilities through OpenRouter, giving you access 
 graph TB
     Client[Client Application] --> SDK[InsForge SDK]
     SDK --> AIAPI[AI API]
-    
+
     AIAPI --> OpenRouter[OpenRouter API]
     AIAPI --> DB[(PostgreSQL)]
-    
-    OpenRouter --> Anthropic[Anthropic<br/>Claude Models]
-    OpenRouter --> OpenAI[OpenAI<br/>GPT Models]
-    OpenRouter --> Google[Google<br/>Gemini]
-    
+
+    OpenRouter --> OpenAI[OpenAI]
+    OpenRouter --> Anthropic[Anthropic]
+    OpenRouter --> Google[Google]
+    OpenRouter --> XAI[X-AI]
+    OpenRouter --> DeepSeek[DeepSeek]
+    OpenRouter --> Minimax[Minimax]
+    OpenRouter --> ZAI[Z-AI]
+
     DB --> Config[AI Configurations]
     DB --> Usage[Usage Tracking]
-    
+
     AIAPI --> Stream[SSE Streaming]
-    
+
     style Client fill:#1e293b,stroke:#475569,color:#e2e8f0
     style SDK fill:#1e40af,stroke:#3b82f6,color:#dbeafe
     style AIAPI fill:#166534,stroke:#22c55e,color:#dcfce7
     style OpenRouter fill:#c2410c,stroke:#fb923c,color:#fed7aa
     style DB fill:#0e7490,stroke:#06b6d4,color:#cffafe
-    style Anthropic fill:#6b21a8,stroke:#a855f7,color:#f3e8ff
     style OpenAI fill:#be185d,stroke:#ec4899,color:#fce7f3
+    style Anthropic fill:#6b21a8,stroke:#a855f7,color:#f3e8ff
     style Google fill:#a16207,stroke:#facc15,color:#fef3c7
+    style XAI fill:#1e40af,stroke:#3b82f6,color:#dbeafe
+    style DeepSeek fill:#166534,stroke:#22c55e,color:#dcfce7
+    style Minimax fill:#9333ea,stroke:#c084fc,color:#f3e8ff
+    style ZAI fill:#0891b2,stroke:#22d3ee,color:#cffafe
     style Config fill:#0e7490,stroke:#22d3ee,color:#cffafe
     style Usage fill:#0e7490,stroke:#22d3ee,color:#cffafe
     style Stream fill:#166534,stroke:#4ade80,color:#dcfce7
@@ -49,6 +57,37 @@ graph TB
 | **Configuration** | PostgreSQL | Store system prompts per project |
 | **Usage Tracking** | PostgreSQL | Monitor token usage |
 | **Response Format** | JSON/SSE | Standard and streaming responses |
+
+## Supported Models
+
+InsForge provides access to models from multiple AI providers through our unified gateway. Use the format `provider/model` when specifying a model in SDK calls.
+
+| Provider | Models |
+|----------|--------|
+| **OpenAI** | `openai/gpt-5.2`, `openai/gpt-5`, `openai/gpt-5-mini`, `openai/gpt-4o`, `openai/gpt-4o-mini` |
+| **Anthropic** | `anthropic/claude-opus-4.5`, `anthropic/claude-haiku-4.5`, `anthropic/claude-opus-4.1`, `anthropic/claude-sonnet-4.5`, `anthropic/claude-sonnet-4`, `anthropic/claude-3.5-haiku` |
+| **Google** | `google/gemini-2.0-flash-001`, `google/gemini-2.5-flash-lite`, `google/gemini-2.5-flash-image-preview`, `google/gemini-2.5-pro`, `google/gemini-3-pro-image-preview`, `google/gemini-3-flash-preview` |
+| **X-AI** | `x-ai/grok-4`, `x-ai/grok-4-fast`, `x-ai/grok-4.1-fast` |
+| **DeepSeek** | `deepseek/deepseek-v3.2`, `deepseek/deepseek-v3.2-exp`, `deepseek/deepseek-chat`, `deepseek/deepseek-r1` |
+| **Minimax** | `minimax/minimax-m2.1` |
+| **Z-AI** | `z-ai/glm-4.7`, `z-ai/glm-4.6` |
+
+<Note>
+Model availability may vary. Use the `GET /api/ai/models` endpoint or `get-backend-metadata` MCP tool to get the current list of available models for your backend.
+</Note>
+
+## Capabilities
+
+| Capability | Description |
+|------------|-------------|
+| **Chat Completions** | Multi-turn conversations with streaming support |
+| **Web Search** | Augment responses with real-time web results and citations |
+| **PDF/File Parsing** | Process PDFs and documents directly in chat (pdf-text, mistral-ocr, native engines) |
+| **Image Vision** | Analyze and describe images in conversations |
+| **Embeddings** | Generate vector embeddings for semantic search |
+| **Image Generation** | Create images from text prompts |
+
+See SDK references for implementation details: [TypeScript](/sdks/typescript/ai) | [Swift](/sdks/swift/ai) | [Kotlin](/sdks/kotlin/ai) | [Flutter](/sdks/flutter/ai)
 
 ## OpenRouter Integration
 

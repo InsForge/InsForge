@@ -13,7 +13,7 @@ Create AI chat completions with streaming support.
 
 ### Parameters
 
-- `model` (string, required) - AI model (e.g., 'anthropic/claude-3.5-haiku', 'openai/gpt-4'), call `mcp__insforge__get-backend-metadata` tool to get available models
+- `model` (string, required) - AI model in `provider/model` format. See [Supported Models](/core-concepts/ai/architecture#supported-models) for the full list
 - `messages` (array, required) - Array of message objects with text, image, or audio content
 - `temperature` (number, optional) - Sampling temperature 0-2
 - `maxTokens` (number, optional) - Max tokens to generate
