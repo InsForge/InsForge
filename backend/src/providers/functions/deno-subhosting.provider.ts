@@ -3,7 +3,7 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { config } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
 import { z } from 'zod';
-import fetch from 'node-fetch';
+import fetch, { RequestInit, Response } from 'node-fetch';
 
 const DENO_SUBHOSTING_API_BASE = 'https://api.deno.com/v1';
 const DEFAULT_TIMEOUT_MS = 10000;
