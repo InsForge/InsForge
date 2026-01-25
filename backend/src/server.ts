@@ -234,7 +234,9 @@ export async function createApp() {
       // by Express, connection is specific to each hop)
       const responseHeaders: Record<string, string> = {};
       for (const [key, value] of response.headers.entries()) {
-        if (['transfer-encoding', 'content-length', 'connection'].includes(key)) continue;
+        if (['transfer-encoding', 'content-length', 'connection'].includes(key)) {
+          continue;
+        }
         responseHeaders[key] = value;
       }
 
