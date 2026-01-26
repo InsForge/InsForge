@@ -80,6 +80,9 @@ services:
       - POSTGREST_BASE_URL=http://postgrest:3000
       # Deno Runtime URL for serverless functions
       - DENO_RUNTIME_URL=http://deno:7133
+      # Deno Subhosting Configuration
+      - DENO_SUBHOSTING_TOKEN=${DENO_SUBHOSTING_TOKEN:-}
+      - DENO_SUBHOSTING_ORG_ID=${DENO_SUBHOSTING_ORG_ID:-}
       # Storage Configuration
       - AWS_S3_BUCKET=${AWS_S3_BUCKET:-}
       - AWS_REGION=${AWS_REGION:-}

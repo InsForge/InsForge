@@ -22,6 +22,11 @@ export interface AppConfig {
     cloudFrontKeyPairId: string;
     cloudFrontPrivateKey: string;
   };
+  denoSubhosting: {
+    token: string;
+    organizationId: string;
+    domain: string;
+  };
 }
 
 export const config: AppConfig = {
@@ -47,5 +52,10 @@ export const config: AppConfig = {
     cloudFrontUrl: process.env.AWS_CLOUDFRONT_URL || '',
     cloudFrontKeyPairId: process.env.AWS_CLOUDFRONT_KEY_PAIR_ID || '',
     cloudFrontPrivateKey: process.env.AWS_CLOUDFRONT_PRIVATE_KEY || '',
+  },
+  denoSubhosting: {
+    token: process.env.DENO_SUBHOSTING_TOKEN || '',
+    organizationId: process.env.DENO_SUBHOSTING_ORG_ID || '',
+    domain: 'functions.insforge.app',
   },
 };

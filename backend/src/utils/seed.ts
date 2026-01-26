@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { AIConfigService } from '@/services/ai/ai-config.service.js';
-import { isCloudEnvironment } from '@/utils/environment.js';
+import { isCloudEnvironment, getApiBaseUrl } from '@/utils/environment.js';
 import logger from '@/utils/logger.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
@@ -333,6 +333,18 @@ export async function seedBackend(): Promise<void> {
         value: anonToken,
       });
       logger.info('✅ ANON_KEY secret initialized');
+    }
+
+    // Add INSFORGE_BASE_URL for edge functions to call back to API
+    const existingBaseUrlSecret = await secretService.getSecretByKey('INSFORGE_BASE_URL');
+
+    if (existingBaseUrlSecret === null) {
+      await secretService.createSecret({
+        key: 'INSFORGE_BASE_URL',
+        isReserved: true,
+        value: getApiBaseUrl(),
+      });
+      logger.info('✅ INSFORGE_BASE_URL secret initialized');
     }
 
     logger.info(`API key generated: ${apiKey}`);

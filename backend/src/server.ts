@@ -24,7 +24,7 @@ import { errorMiddleware } from '@/api/middlewares/error.js';
 import { destroyEmailCooldownInterval } from '@/api/middlewares/rate-limiters.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { RealtimeManager } from '@/infra/realtime/realtime.manager.js';
-import fetch, { HeadersInit } from 'node-fetch';
+import fetch from 'node-fetch';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { LogService } from '@/services/logs/log.service.js';
 import { StorageService } from '@/services/storage/storage.service.js';
@@ -33,6 +33,7 @@ import { OAuthPKCEService } from '@/services/auth/oauth-pkce.service.js';
 import { seedBackend } from '@/utils/seed.js';
 import logger from '@/utils/logger.js';
 import { initSqlParser } from '@/utils/sql-parser.js';
+import { FunctionService } from '@/services/functions/function.service.js';
 import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 const __filename = fileURLToPath(import.meta.url);
@@ -192,42 +193,65 @@ export async function createApp() {
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);
 
-  // Proxy function execution to Deno runtime
+  // Proxy function execution to Deno Subhosting or local runtime
+  // this logic is used for backward compatibility, we will let the sdk directly call the edge function
   app.all('/functions/:slug', async (req: Request, res: Response) => {
+    const { slug } = req.params;
+
     try {
-      const { slug } = req.params;
-      const denoUrl = process.env.DENO_RUNTIME_URL || 'http://localhost:7133';
+      const functionService = FunctionService.getInstance();
+      const localRuntime = process.env.DENO_RUNTIME_URL || 'http://localhost:7133';
 
-      // Simple direct proxy - just pass everything through
-      const response = await fetch(
-        `${denoUrl}/${slug}${req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : ''}`,
-        {
-          method: req.method,
-          headers: req.headers as HeadersInit,
-          body: ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body),
+      // Get target base URL: prefer Subhosting deployment, fallback to local runtime
+      const baseUrl =
+        (functionService.isSubhostingConfigured() && (await functionService.getDeploymentUrl())) ||
+        localRuntime;
+
+      // Build target URL with query string
+      const targetUrl = new URL(`/${slug}`, baseUrl);
+      targetUrl.search = new URL(req.url, `http://${req.headers.host}`).search;
+
+      // Build headers, filtering out non-string values and overriding host
+      const headers: Record<string, string> = {};
+      for (const [key, value] of Object.entries(req.headers)) {
+        if (typeof value === 'string') {
+          headers[key] = value;
         }
-      );
+      }
+      headers.host = targetUrl.host;
 
-      // Get response text
-      const responseText = await response.text();
+      const response = await fetch(targetUrl, {
+        method: req.method,
+        headers,
+        body: ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body),
+      });
+
+      // Read response as raw bytes to preserve binary data (images, PDFs, etc.)
+      const responseBody = Buffer.from(await response.arrayBuffer());
+
+      // Forward response headers, excluding:
+      // - transfer-encoding, content-length: recalculated by Express
+      // - connection: hop-by-hop header
+      // - content-encoding: node-fetch already decompresses the response,
+      //   so we must not tell the client it's still compressed
+      const responseHeaders: Record<string, string> = {};
+      for (const [key, value] of response.headers.entries()) {
+        if (
+          ['transfer-encoding', 'content-length', 'connection', 'content-encoding'].includes(key)
+        ) {
+          continue;
+        }
+        responseHeaders[key] = value;
+      }
 
       res
         .status(response.status)
-        .set('Content-Type', response.headers.get('content-type') || 'application/json')
+        .set(responseHeaders)
         .set('Access-Control-Allow-Origin', '*')
-        .send(responseText);
+        .send(responseBody);
     } catch (error) {
-      logger.error('Failed to proxy to Deno runtime', {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        slug: req.params.slug,
-      });
-
-      // Return the actual error from Deno or connection error
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      res.status(502).json({
-        error: errorMessage,
-      });
+      logger.error('Failed to proxy function', { slug, error: String(error) });
+      res.status(502).json({ error: error instanceof Error ? error.message : String(error) });
     }
   });
 
@@ -293,6 +317,14 @@ async function initializeServer() {
     // Initialize RealtimeManager (pg_notify listener)
     const realtimeManager = RealtimeManager.getInstance();
     await realtimeManager.initialize();
+
+    // Sync existing functions to Deno Subhosting (non-blocking)
+    const functionService = FunctionService.getInstance();
+    functionService.syncDeployment().catch((err) => {
+      logger.error('Failed to sync functions to Deno Subhosting', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
   } catch (error) {
     logger.error('Failed to initialize server', {
       error: error instanceof Error ? error.message : String(error),

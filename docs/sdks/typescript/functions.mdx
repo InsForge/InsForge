@@ -103,23 +103,23 @@ const { data, error } = await insforge.functions.invoke('api-endpoint', {
 
 ### Example 1: Public Function (No Authentication Required)
 
-```javascript
-// Use anon token for public data access
-// No import needed - createClient is injected by the worker template
-module.exports = async function(request) {
+```typescript
+import { createClient } from 'npm:@insforge/sdk';
+
+export default async function(req: Request): Promise<Response> {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization'
   };
 
-  if (request.method === 'OPTIONS') {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   // Create client with anon token - no authentication needed
   const client = createClient({
-    baseUrl: Deno.env.get('INSFORGE_INTERNAL_URL') || 'http://insforge:7130',
+    baseUrl: Deno.env.get('INSFORGE_BASE_URL'),
     anonKey: Deno.env.get('ANON_KEY')
   });
 
@@ -138,27 +138,27 @@ module.exports = async function(request) {
 
 ### Example 2: Authenticated Function (Access User Data)
 
-```javascript
-// Use functionToken to access authenticated user's data
-// No import needed - createClient is injected by the worker template
-module.exports = async function(request) {
+```typescript
+import { createClient } from 'npm:@insforge/sdk';
+
+export default async function(req: Request): Promise<Response> {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization'
   };
 
-  if (request.method === 'OPTIONS') {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   // Extract token from request headers
-  const authHeader = request.headers.get('Authorization');
+  const authHeader = req.headers.get('Authorization');
   const userToken = authHeader ? authHeader.replace('Bearer ', '') : null;
 
   // Create client with user's token for authenticated access
   const client = createClient({
-    baseUrl: Deno.env.get('INSFORGE_INTERNAL_URL') || 'http://insforge:7130',
+    baseUrl: Deno.env.get('INSFORGE_BASE_URL'),
     edgeFunctionToken: userToken
   });
 
