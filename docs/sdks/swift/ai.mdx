@@ -64,6 +64,49 @@ if let annotations = response.annotations {
 }
 ```
 
+### Multimodal Messages
+
+The SDK supports multimodal messages with images, PDFs, and audio. You can use either simple text content (backward compatible) or an array of content parts.
+
+```swift
+// Simple text message (backward compatible)
+let textMessage = ChatMessage(role: .user, content: "Hello!")
+
+// Message with image
+let imageMessage = ChatMessage(role: .user, content: [
+    .text("What is in this image?"),
+    .image(url: "https://example.com/image.jpg", detail: .high)
+])
+
+// Message with PDF file
+let fileMessage = ChatMessage(role: .user, content: [
+    .text("Summarize this document"),
+    .file(filename: "doc.pdf", fileData: "https://example.com/doc.pdf")
+])
+
+// Message with audio
+let audioMessage = ChatMessage(role: .user, content: [
+    .text("Transcribe this audio"),
+    .audio(data: "base64encodeddata", format: .mp3)
+])
+```
+
+### Example with Image Analysis
+
+```swift
+let response = try await insforge.ai.chatCompletion(
+    model: "anthropic/claude-sonnet-4.5",
+    messages: [
+        ChatMessage(role: .user, content: [
+            .text("Describe what you see in this image"),
+            .image(url: "https://example.com/photo.jpg", detail: .high)
+        ])
+    ]
+)
+
+print(response.text)
+```
+
 ### Example with System Prompt
 
 ```swift
@@ -124,15 +167,40 @@ if let annotations = response.annotations {
 ### Example with PDF Parsing
 
 ```swift
+// Include PDF file in the message content
 let response = try await insforge.ai.chatCompletion(
-    model: "openai/gpt-4",
+    model: "anthropic/claude-sonnet-4.5",
     messages: [
-        ChatMessage(role: .user, content: "Summarize this PDF document...")
+        ChatMessage(role: .user, content: [
+            .text("Summarize this document"),
+            .file(filename: "report.pdf", fileData: "https://example.com/report.pdf")
+        ])
     ],
     fileParser: FileParserPlugin(
         enabled: true,
         pdf: PdfParserConfig(engine: .mistralOcr)
     )
+)
+
+print(response.text)
+```
+
+### Example with Base64 Encoded PDF
+
+```swift
+// Load PDF from local file and encode as base64
+let pdfData = try Data(contentsOf: localPdfURL)
+let base64PDF = "data:application/pdf;base64,\(pdfData.base64EncodedString())"
+
+let response = try await insforge.ai.chatCompletion(
+    model: "anthropic/claude-sonnet-4.5",
+    messages: [
+        ChatMessage(role: .user, content: [
+            .text("What are the key points in this document?"),
+            .file(filename: "document.pdf", fileData: base64PDF)
+        ])
+    ],
+    fileParser: FileParserPlugin(enabled: true)
 )
 
 print(response.text)
@@ -604,13 +672,51 @@ public struct FileParserPlugin: Codable, Sendable {
 ```swift
 public struct ChatMessage: Codable, Sendable {
     let role: Role
-    let content: String
+    let content: MessageContent
 
     enum Role: String, Codable {
         case user
         case assistant
         case system
     }
+
+    // Initialize with simple text (backward compatible)
+    init(role: Role, content: String)
+
+    // Initialize with multimodal content
+    init(role: Role, content: [ContentPart])
+}
+
+// Content can be simple text or multimodal parts
+public enum MessageContent: Codable, Sendable {
+    case text(String)
+    case parts([ContentPart])
+}
+
+// Multimodal content parts
+public enum ContentPart: Codable, Sendable {
+    case text(String)
+    case image(url: String, detail: ImageDetail? = nil)
+    case file(filename: String, fileData: String)
+    case audio(data: String, format: AudioFormat)
+}
+
+// Image detail level
+public enum ImageDetail: String, Codable, Sendable {
+    case auto
+    case low
+    case high
+}
+
+// Supported audio formats
+public enum AudioFormat: String, Codable, Sendable {
+    case wav
+    case mp3
+    case aiff
+    case aac
+    case ogg
+    case flac
+    case m4a
 }
 ```
 

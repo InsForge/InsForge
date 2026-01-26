@@ -56,7 +56,7 @@ ChatCompletionResponse
 val response = client.ai.chatCompletion(
     model = "anthropic/claude-3.5-haiku",
     messages = listOf(
-        ChatMessage(role = "user", content = "What is the capital of France?")
+        ChatMessage.user("What is the capital of France?")
     )
 )
 
@@ -69,14 +69,39 @@ response.annotations?.forEach { annotation ->
 }
 ```
 
+### Multimodal Messages
+
+The SDK supports multimodal messages with images, PDFs, and audio.
+
+```kotlin
+// Simple text message (backward compatible)
+val response = client.ai.chatCompletion(
+    model = "openai/gpt-4",
+    messages = listOf(ChatMessage.user("Hello!"))
+)
+
+// Custom multimodal message with multiple content parts
+val customMessage = ChatMessage.multimodal(
+    "user",
+    TextContent(text = "Describe these images"),
+    ImageContent(imageUrl = ImageUrlConfig(url = "https://example.com/1.jpg")),
+    ImageContent(imageUrl = ImageUrlConfig(url = "https://example.com/2.jpg"))
+)
+
+val response = client.ai.chatCompletion(
+    model = "anthropic/claude-sonnet-4.5",
+    messages = listOf(customMessage)
+)
+```
+
 ### Example (With Parameters)
 
 ```kotlin
 val response = client.ai.chatCompletion(
     model = "openai/gpt-4",
     messages = listOf(
-        ChatMessage(role = "system", content = "You are a helpful assistant."),
-        ChatMessage(role = "user", content = "Explain quantum computing in simple terms")
+        ChatMessage.system("You are a helpful assistant."),
+        ChatMessage.user("Explain quantum computing in simple terms")
     ),
     temperature = 0.7,
     maxTokens = 1000
@@ -91,17 +116,17 @@ println(response.text)
 val conversationHistory = mutableListOf<ChatMessage>()
 
 // First message
-conversationHistory.add(ChatMessage(role = "user", content = "What is Kotlin?"))
+conversationHistory.add(ChatMessage.user("What is Kotlin?"))
 
 val response1 = client.ai.chatCompletion(
     model = "anthropic/claude-3.5-haiku",
     messages = conversationHistory
 )
 
-conversationHistory.add(ChatMessage(role = "assistant", content = response1.text))
+conversationHistory.add(ChatMessage.assistant(response1.text))
 
 // Follow-up
-conversationHistory.add(ChatMessage(role = "user", content = "What are its main features?"))
+conversationHistory.add(ChatMessage.user("What are its main features?"))
 
 val response2 = client.ai.chatCompletion(
     model = "anthropic/claude-3.5-haiku",
@@ -117,7 +142,7 @@ println(response2.text)
 val response = client.ai.chatCompletion(
     model = "openai/gpt-4",
     messages = listOf(
-        ChatMessage(role = "user", content = "What are the latest news about AI?")
+        ChatMessage.user("What are the latest news about AI?")
     ),
     webSearch = WebSearchPlugin(
         enabled = true,
@@ -137,18 +162,39 @@ response.annotations?.forEach { annotation ->
 ### Example (With PDF Parsing)
 
 ```kotlin
-val response = client.ai.chatCompletion(
-    model = "openai/gpt-4",
-    messages = listOf(
-        ChatMessage(role = "user", content = "Summarize the content of this PDF")
-    ),
+// Using the convenience method
+val response = client.ai.chatCompletionWithFile(
+    model = "anthropic/claude-sonnet-4.5",
+    text = "Summarize the content of this PDF",
+    filename = "document.pdf",
+    fileData = "https://example.com/document.pdf",
+    pdfEngine = PdfEngine.MISTRAL_OCR
+)
+
+println(response.text)
+
+// Or using custom multimodal message
+val pdfMessage = ChatMessage.multimodal(
+    "user",
+    TextContent(text = "Summarize this document"),
+    FileContent(
+        file = FileConfig(
+            filename = "document.pdf",
+            fileData = "https://example.com/document.pdf"
+        )
+    )
+)
+
+val response2 = client.ai.chatCompletion(
+    model = "anthropic/claude-sonnet-4.5",
+    messages = listOf(pdfMessage),
     fileParser = FileParserPlugin(
         enabled = true,
         pdf = PdfParserConfig(engine = PdfEngine.MISTRAL_OCR)
     )
 )
 
-println(response.text)
+println(response2.text)
 ```
 
 ### Example (With Extended Reasoning)
@@ -157,7 +203,7 @@ println(response.text)
 val response = client.ai.chatCompletion(
     model = "anthropic/claude-3.5-sonnet",
     messages = listOf(
-        ChatMessage(role = "user", content = "Solve this complex math problem step by step...")
+        ChatMessage.user("Solve this complex math problem step by step...")
     ),
     thinking = true
 )
@@ -174,6 +220,94 @@ val response = client.ai.chatCompletion(
     webSearch = WebSearchPlugin(enabled = true, maxResults = 3),
     fileParser = FileParserPlugin(enabled = true),
     thinking = true
+)
+
+println(response.text)
+```
+
+---
+
+## chatCompletionWithImages()
+
+Convenience method for chat completion with image analysis.
+
+### Parameters
+
+- `model` (String) - Model identifier (must support vision, e.g., "openai/gpt-4-vision")
+- `text` (String) - Text prompt to accompany the images
+- `imageUrls` (List\<String\>) - List of image URLs to analyze
+- `temperature` (Double?, optional) - Sampling temperature
+- `maxTokens` (Int?, optional) - Maximum tokens to generate
+
+### Example
+
+```kotlin
+val response = client.ai.chatCompletionWithImages(
+    model = "openai/gpt-4-vision",
+    text = "What is in this image?",
+    imageUrls = listOf("https://example.com/image.jpg")
+)
+
+println(response.text)
+```
+
+### Example (Multiple Images)
+
+```kotlin
+val response = client.ai.chatCompletionWithImages(
+    model = "anthropic/claude-sonnet-4.5",
+    text = "Compare these two images and describe the differences",
+    imageUrls = listOf(
+        "https://example.com/image1.jpg",
+        "https://example.com/image2.jpg"
+    )
+)
+
+println(response.text)
+```
+
+---
+
+## chatCompletionWithFile()
+
+Convenience method for chat completion with file (PDF) analysis.
+
+### Parameters
+
+- `model` (String) - Model identifier
+- `text` (String) - Text prompt to accompany the file
+- `filename` (String) - Name of the file (e.g., "report.pdf")
+- `fileData` (String) - File URL or base64-encoded data URL
+- `pdfEngine` (PdfEngine?, optional) - PDF processing engine
+- `temperature` (Double?, optional) - Sampling temperature
+- `maxTokens` (Int?, optional) - Maximum tokens to generate
+
+### Example (URL)
+
+```kotlin
+val response = client.ai.chatCompletionWithFile(
+    model = "anthropic/claude-sonnet-4.5",
+    text = "Summarize this document",
+    filename = "report.pdf",
+    fileData = "https://example.com/report.pdf",
+    pdfEngine = PdfEngine.MISTRAL_OCR
+)
+
+println(response.text)
+```
+
+### Example (Base64 Encoded)
+
+```kotlin
+// Load PDF from local file
+val pdfBytes = File("document.pdf").readBytes()
+val base64Data = "data:application/pdf;base64,${Base64.encodeToString(pdfBytes, Base64.NO_WRAP)}"
+
+val response = client.ai.chatCompletionWithFile(
+    model = "anthropic/claude-sonnet-4.5",
+    text = "What are the key points in this document?",
+    filename = "document.pdf",
+    fileData = base64Data
 )
 
 println(response.text)
@@ -808,8 +942,100 @@ data class FileParserPlugin(
 @Serializable
 data class ChatMessage(
     val role: String,  // "user", "assistant", "system"
-    val content: String
+    val content: MessageContent  // String or List<ContentPart>
+) {
+    companion object {
+        // Create a simple text message
+        fun user(content: String): ChatMessage
+        fun assistant(content: String): ChatMessage
+        fun system(content: String): ChatMessage
+
+        // Create a multimodal message with multiple content parts
+        fun multimodal(role: String, vararg parts: ContentPart): ChatMessage
+    }
+}
+
+// Content can be simple text or multimodal parts
+@Serializable
+sealed class MessageContent {
+    @Serializable
+    data class Text(val value: String) : MessageContent()
+
+    @Serializable
+    data class Parts(val parts: List<ContentPart>) : MessageContent()
+}
+```
+
+### Content Parts (Multimodal)
+
+```kotlin
+// Base sealed class for content parts
+@Serializable
+sealed class ContentPart
+
+// Text content
+@Serializable
+data class TextContent(
+    val type: String = "text",
+    val text: String
+) : ContentPart()
+
+// Image content
+@Serializable
+data class ImageContent(
+    val type: String = "image_url",
+    @SerialName("image_url") val imageUrl: ImageUrlConfig
+) : ContentPart()
+
+@Serializable
+data class ImageUrlConfig(
+    val url: String,
+    val detail: ImageDetail? = null  // "auto", "low", "high"
 )
+
+@Serializable
+enum class ImageDetail {
+    @SerialName("auto") AUTO,
+    @SerialName("low") LOW,
+    @SerialName("high") HIGH
+}
+
+// File content (for PDFs and documents)
+@Serializable
+data class FileContent(
+    val type: String = "file",
+    val file: FileConfig
+) : ContentPart()
+
+@Serializable
+data class FileConfig(
+    val filename: String,
+    @SerialName("file_data") val fileData: String  // URL or base64 data URL
+)
+
+// Audio content
+@Serializable
+data class AudioContent(
+    val type: String = "input_audio",
+    @SerialName("input_audio") val inputAudio: AudioConfig
+) : ContentPart()
+
+@Serializable
+data class AudioConfig(
+    val data: String,  // Base64 encoded audio
+    val format: AudioFormat  // "wav", "mp3", etc.
+)
+
+@Serializable
+enum class AudioFormat {
+    @SerialName("wav") WAV,
+    @SerialName("mp3") MP3,
+    @SerialName("aiff") AIFF,
+    @SerialName("aac") AAC,
+    @SerialName("ogg") OGG,
+    @SerialName("flac") FLAC,
+    @SerialName("m4a") M4A
+}
 ```
 
 ### ChatCompletionResponse
