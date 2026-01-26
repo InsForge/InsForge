@@ -6,10 +6,8 @@ import { AppError } from '@/api/middlewares/error.js';
 import {
   type StoreConversationRequest,
   type SearchConversationsRequest,
-  type SearchMessagesRequest,
   type ConversationWithMessagesSchema,
   type ConversationSearchResultSchema,
-  type MessageSearchResultSchema,
 } from '@insforge/shared-schemas';
 import { randomUUID } from 'crypto';
 
@@ -96,84 +94,63 @@ export class MemoryService {
   }
 
   /**
-   * Store a new conversation with messages and generate embeddings.
+   * Store a new conversation with messages and generate summary embedding.
+   * Messages are stored as JSONB - only the summary is embedded.
    */
   async storeConversation(
     userId: string,
     data: StoreConversationRequest
   ): Promise<{ id: string; title: string | null; messageCount: number }> {
-    const client = await this.dbManager.getPool().connect();
-
     try {
-      await client.query('BEGIN');
-
-      const embeddingModel = await this.getEmbeddingModel(data.embeddingModel);
+      const embeddingModel = this.getEmbeddingModel(data.embeddingModel);
       const conversationId = randomUUID();
 
-      // Generate conversation summary embedding
+      // Generate conversation summary embedding (only 1 embedding call)
       const summaryText = this.generateConversationSummary(data.messages, data.title);
       const summaryEmbedding = await this.generateEmbedding(summaryText, embeddingModel);
 
-      // Insert conversation
-      const insertConversationSql = `
-        INSERT INTO memory.conversations (
-          id, user_id, title, metadata, summary_embedding, summary_text, message_count
-        ) VALUES ($1, $2, $3, $4, $5::vector, $6, $7)
+      // Prepare messages as JSONB
+      const messagesJson = data.messages.map((msg, index) => ({
+        role: msg.role,
+        content: msg.content,
+        position: index,
+        metadata: msg.metadata || {},
+      }));
+
+      const sql = `
+        INSERT INTO public.memory_conversations (
+          id, user_id, title, messages, metadata, summary_embedding, summary_text, message_count
+        ) VALUES ($1, $2, $3, $4, $5, $6::vector, $7, $8)
         RETURNING id, title, message_count AS "messageCount"
       `;
 
-      const conversationResult = await client.query(insertConversationSql, [
-        conversationId,
-        userId,
-        data.title || null,
-        JSON.stringify(data.metadata || {}),
-        JSON.stringify(summaryEmbedding),
-        summaryText,
-        data.messages.length,
-      ]);
-
-      // Generate embeddings for each message and insert
-      for (let i = 0; i < data.messages.length; i++) {
-        const msg = data.messages[i];
-        const messageId = randomUUID();
-        const messageEmbedding = await this.generateEmbedding(msg.content, embeddingModel);
-
-        const insertMessageSql = `
-          INSERT INTO memory.messages (
-            id, conversation_id, role, content, embedding, position, metadata
-          ) VALUES ($1, $2, $3, $4, $5::vector, $6, $7)
-        `;
-
-        await client.query(insertMessageSql, [
-          messageId,
+      const result = await this.dbManager
+        .getPool()
+        .query(sql, [
           conversationId,
-          msg.role,
-          msg.content,
-          JSON.stringify(messageEmbedding),
-          i,
-          JSON.stringify(msg.metadata || {}),
+          userId,
+          data.title || null,
+          JSON.stringify(messagesJson),
+          JSON.stringify(data.metadata || {}),
+          JSON.stringify(summaryEmbedding),
+          summaryText,
+          data.messages.length,
         ]);
-      }
 
-      await client.query('COMMIT');
-
-      logger.info('Stored conversation with messages', {
+      logger.info('Stored conversation', {
         conversationId,
         userId,
         messageCount: data.messages.length,
       });
 
       return {
-        id: conversationResult.rows[0].id,
-        title: conversationResult.rows[0].title,
-        messageCount: conversationResult.rows[0].messageCount,
+        id: result.rows[0].id,
+        title: result.rows[0].title,
+        messageCount: result.rows[0].messageCount,
       };
     } catch (error) {
-      await client.query('ROLLBACK');
       logger.error('Error storing conversation', { error, userId });
       throw error;
-    } finally {
-      client.release();
     }
   }
 
@@ -185,22 +162,24 @@ export class MemoryService {
     data: SearchConversationsRequest
   ): Promise<ConversationSearchResultSchema[]> {
     try {
-      const embeddingModel = await this.getEmbeddingModel(data.embeddingModel);
+      const embeddingModel = this.getEmbeddingModel(data.embeddingModel);
       const queryEmbedding = await this.generateEmbedding(data.query, embeddingModel);
 
       const sql = `
-        SELECT * FROM memory.search_conversations(
+        SELECT * FROM public.search_memory_conversations(
           $1, $2::vector, $3, $4, $5
         )
       `;
 
-      const result = await this.dbManager.getPool().query(sql, [
-        userId,
-        JSON.stringify(queryEmbedding),
-        data.limit || 10,
-        data.threshold || 0,
-        data.metadataFilter ? JSON.stringify(data.metadataFilter) : null,
-      ]);
+      const result = await this.dbManager
+        .getPool()
+        .query(sql, [
+          userId,
+          JSON.stringify(queryEmbedding),
+          data.limit || 10,
+          data.threshold || 0,
+          data.metadataFilter ? JSON.stringify(data.metadataFilter) : null,
+        ]);
 
       const conversations = result.rows.map((row) => ({
         id: row.id,
@@ -227,57 +206,6 @@ export class MemoryService {
   }
 
   /**
-   * Search messages by semantic similarity.
-   */
-  async searchMessages(
-    userId: string,
-    data: SearchMessagesRequest
-  ): Promise<MessageSearchResultSchema[]> {
-    try {
-      const embeddingModel = await this.getEmbeddingModel(data.embeddingModel);
-      const queryEmbedding = await this.generateEmbedding(data.query, embeddingModel);
-
-      const sql = `
-        SELECT * FROM memory.search_messages(
-          $1, $2::vector, $3, $4, $5
-        )
-      `;
-
-      const result = await this.dbManager.getPool().query(sql, [
-        userId,
-        JSON.stringify(queryEmbedding),
-        data.conversationId || null,
-        data.limit || 10,
-        data.threshold || 0,
-      ]);
-
-      const messages = result.rows.map((row) => ({
-        id: row.id,
-        conversationId: row.conversation_id,
-        conversationTitle: row.conversation_title,
-        role: row.role as 'user' | 'assistant' | 'system' | 'tool',
-        content: row.content,
-        position: row.position,
-        metadata: row.metadata,
-        similarity: row.similarity,
-        createdAt: this.toISOString(row.created_at),
-      }));
-
-      logger.info('Message search completed', {
-        userId,
-        resultCount: messages.length,
-        conversationId: data.conversationId,
-        query: data.query.substring(0, 50),
-      });
-
-      return messages;
-    } catch (error) {
-      logger.error('Error searching messages', { error, userId });
-      throw error;
-    }
-  }
-
-  /**
    * Get a conversation with all its messages.
    */
   async getConversation(
@@ -285,40 +213,38 @@ export class MemoryService {
     conversationId: string
   ): Promise<ConversationWithMessagesSchema | null> {
     try {
-      const sql = `SELECT * FROM memory.get_conversation_with_messages($1, $2)`;
+      const sql = `SELECT * FROM public.get_memory_conversation($1, $2)`;
 
       const result = await this.dbManager.getPool().query(sql, [userId, conversationId]);
 
-      if (result.rows.length === 0 || !result.rows[0].conversation) {
+      if (result.rows.length === 0) {
         return null;
       }
 
-      const conv = result.rows[0].conversation;
+      const row = result.rows[0];
 
       return {
-        id: conv.id,
-        userId: conv.userId,
-        title: conv.title,
-        metadata: conv.metadata,
-        summaryText: conv.summaryText,
-        messageCount: conv.messageCount,
-        createdAt: this.toISOString(conv.createdAt),
-        updatedAt: this.toISOString(conv.updatedAt),
-        messages: (conv.messages || []).map(
+        id: row.id,
+        userId: row.user_id,
+        title: row.title,
+        metadata: row.metadata,
+        summaryText: row.summary_text,
+        messageCount: row.message_count,
+        createdAt: this.toISOString(row.created_at),
+        updatedAt: this.toISOString(row.updated_at),
+        messages: (row.messages || []).map(
           (m: {
-            id: string;
             role: string;
             content: string;
             position: number;
             metadata: Record<string, unknown>;
-            createdAt: string | Date;
           }) => ({
-            id: m.id,
+            id: `${row.id}-${m.position}`, // Generate ID from conversation + position
             role: m.role as 'user' | 'assistant' | 'system' | 'tool',
             content: m.content,
             position: m.position,
             metadata: m.metadata,
-            createdAt: this.toISOString(m.createdAt),
+            createdAt: this.toISOString(row.created_at), // Use conversation timestamp
           })
         ),
       };
@@ -329,12 +255,12 @@ export class MemoryService {
   }
 
   /**
-   * Delete a conversation and all its messages.
+   * Delete a conversation.
    */
   async deleteConversation(userId: string, conversationId: string): Promise<void> {
     try {
       const sql = `
-        DELETE FROM memory.conversations
+        DELETE FROM public.memory_conversations
         WHERE id = $1 AND user_id = $2
       `;
 
