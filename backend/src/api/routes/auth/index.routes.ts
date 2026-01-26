@@ -257,6 +257,53 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
   }
 });
 
+// POST /api/auth/id-token - Sign in with ID token from native SDK (Google One Tap, etc.)
+// Query params: client_type (optional) - 'web' (default), 'mobile', or 'desktop'
+router.post('/id-token', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const clientType = parseClientType(req.query.client_type);
+
+    const { provider, token } = req.body;
+
+    // Validate input
+    if (!provider || typeof provider !== 'string') {
+      throw new AppError('Provider is required', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
+    if (provider !== 'google') {
+      throw new AppError(
+        `Provider ${provider} is not supported for ID token sign-in. Supported: google`,
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    if (!token || typeof token !== 'string') {
+      throw new AppError('Token is required', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
+    // Sign in with ID token
+    const result: CreateSessionResponse = await authService.signInWithIdToken(provider, token);
+
+    // Set refresh token based on client type
+    const tokenManager = TokenManager.getInstance();
+    const refreshToken = tokenManager.generateRefreshToken(result.user.id);
+
+    if (clientType === 'web') {
+      // Web clients: use httpOnly cookie + CSRF token
+      setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+      result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
+    } else {
+      // Mobile/Desktop clients: return refresh token in response body
+      result.refreshToken = refreshToken;
+    }
+
+    successResponse(res, result);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // POST /api/auth/refresh - Refresh access token
 // Query params: client_type (optional) - 'web' (default), 'mobile', or 'desktop'
 // Web clients: uses httpOnly cookie + X-CSRF-Token header
