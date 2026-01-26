@@ -151,58 +151,71 @@ val client = createInsforgeClient(
 
 ### Android Initialization
 
-1. Initialize InsForge SDK (With Local Storage and Browser Launcher for OAuth)
+1. Add Chrome Custom Tabs dependency to your `build.gradle.kts`:
+
+```kotlin
+dependencies {
+    implementation("androidx.browser:browser:1.7.0")
+}
+```
+
+2. Initialize InsForge SDK (With Chrome Custom Tabs and Session Storage)
 
 ```kotlin
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
+import androidx.browser.customtabs.CustomTabsIntent
 import dev.insforge.createInsforgeClient
 import dev.insforge.ai.AI
 import dev.insforge.auth.Auth
+import dev.insforge.auth.BrowserLauncher
+import dev.insforge.auth.ClientType
+import dev.insforge.auth.SessionStorage
 import dev.insforge.database.Database
 import dev.insforge.functions.Functions
 import dev.insforge.realtime.Realtime
 import dev.insforge.storage.Storage
-import dev.insforge.auth.BrowserLauncher
-import dev.insforge.auth.SessionStorage
 
 class InsforgeManager(private val context: Context) {
-    
+
     val client = createInsforgeClient(
         baseUrl = "https://your-app.insforge.app",
         anonKey = "your-anon-key"
     ) {
         install(Auth) {
-            // 1. config BrowserLauncher (for OAuth)
+            // 1. Chrome Custom Tabs - opens in-app, similar to iOS ASWebAuthenticationSession
             browserLauncher = BrowserLauncher { url ->
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(intent)
+                val customTabsIntent = CustomTabsIntent.Builder()
+                    .setShowTitle(true)
+                    .build()
+                customTabsIntent.launchUrl(context, Uri.parse(url))
             }
-            
+
             // 2. enable session persistence
             persistSession = true
-            
+
             // 3. config SessionStorage (use SharedPreferences)
             sessionStorage = object : SessionStorage {
                 private val prefs = context.getSharedPreferences(
-                    "insforge_auth", 
+                    "insforge_auth",
                     Context.MODE_PRIVATE
                 )
-                
+
                 override suspend fun save(key: String, value: String) {
                     prefs.edit().putString(key, value).apply()
                 }
-                
+
                 override suspend fun get(key: String): String? {
                     return prefs.getString(key, null)
                 }
-                
+
                 override suspend fun remove(key: String) {
                     prefs.edit().remove(key).apply()
                 }
             }
+
+            // 4. set client type for mobile
+            clientType = ClientType.MOBILE
         }
         // Install Database module
         install(Database)
@@ -219,7 +232,7 @@ class InsforgeManager(private val context: Context) {
 }
 ```
 
-2. Use Jetpack DataStore for Session Storage (Optional)
+3. Use Jetpack DataStore for Session Storage (Optional)
 
 ```kotlin
 import androidx.datastore.core.DataStore
