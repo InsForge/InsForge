@@ -700,7 +700,7 @@ export class AuthService {
       await pool.query(
         'UPDATE auth.user_providers SET updated_at = CURRENT_TIMESTAMP WHERE provider = $1 AND provider_account_id = $2',
         [provider, providerId]
-      );f
+      );
 
       // Update email_verified to true if not already verified (OAuth login means email is trusted)
       await pool.query(
@@ -990,10 +990,7 @@ export class AuthService {
    * Sign in with ID token from native SDK (Google One Tap, Sign in with Apple, etc.)
    * Verifies the ID token with the provider and creates/finds the user
    */
-  async signInWithIdToken(
-    provider: 'google',
-    idToken: string
-  ): Promise<CreateSessionResponse> {
+  async signInWithIdToken(provider: 'google', idToken: string): Promise<CreateSessionResponse> {
     if (provider !== 'google') {
       throw new AppError(
         `Provider ${provider} is not supported for ID token sign-in`,
