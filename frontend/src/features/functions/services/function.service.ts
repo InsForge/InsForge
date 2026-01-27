@@ -10,6 +10,7 @@ export class FunctionService {
     return {
       functions: Array.isArray(response.functions) ? response.functions : [],
       runtime: response.runtime || { status: 'unavailable' },
+      deploymentUrl: response.deploymentUrl ?? null,
     };
   }
 
