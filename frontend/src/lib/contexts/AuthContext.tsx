@@ -92,8 +92,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Handle AUTHORIZATION_CODE from parent window
   const handleAuthorizationCode = useCallback(
     async (code: string, origin: string) => {
-      // Skip if already authenticated or auth is in progress
-      if (isAuthenticated || authInProgressRef.current) {
+      // Skip if auth is in progress (deduplication)
+      // Skip if already authenticated, unless there's a pending refresh request
+      if (authInProgressRef.current || (isAuthenticated && !pendingRefreshRef.current)) {
         return;
       }
       authInProgressRef.current = true;
