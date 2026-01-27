@@ -464,13 +464,34 @@ struct ChatView: View {
 struct ChatBubble: View {
     let message: ChatMessage
 
+    // Extract display text from MessageContent
+    private var displayText: String {
+        switch message.content {
+        case .text(let text):
+            return text
+        case .parts(let parts):
+            return parts.compactMap { part -> String? in
+                switch part {
+                case .text(let text):
+                    return text
+                case .image:
+                    return "[Image]"
+                case .file(let filename, _):
+                    return "[File: \(filename)]"
+                case .audio:
+                    return "[Audio]"
+                }
+            }.joined(separator: " ")
+        }
+    }
+
     var body: some View {
         HStack {
             if message.role == .assistant {
                 Spacer()
             }
 
-            Text(message.content)
+            Text(displayText)
                 .padding()
                 .background(message.role == .user ? Color.blue : Color.gray.opacity(0.2))
                 .foregroundColor(message.role == .user ? .white : .primary)

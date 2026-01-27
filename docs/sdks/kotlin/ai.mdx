@@ -304,7 +304,7 @@ Convenience method for chat completion with web search enabled.
 val response = client.ai.chatCompletionWithWebSearch(
     model = "openai/gpt-4o",
     messages = listOf(
-        ChatMessage(role = "user", content = "What are today's top news headlines?")
+        ChatMessage(role = "user", content = MessageContent.Text("What are today's top news headlines?"))
     ),
     maxResults = 5
 )
