@@ -996,7 +996,30 @@ export class AuthService {
     switch (provider) {
       case 'google': {
         // Verify the ID token with Google's public keys
-        const googleUserInfo = await this.googleOAuthProvider.verifyToken(idToken);
+        let googleUserInfo;
+        try {
+          googleUserInfo = await this.googleOAuthProvider.verifyToken(idToken);
+        } catch (error) {
+          logger.error('Failed to verify Google ID token:', error);
+          throw new AppError('Failed to verify Google ID token', 400, ERROR_CODES.INVALID_INPUT);
+        }
+
+        // Validate required claims (sub is always present, email may be empty if scope wasn't granted)
+        if (!googleUserInfo.sub) {
+          throw new AppError(
+            'Invalid Google ID token: missing sub claim',
+            400,
+            ERROR_CODES.INVALID_INPUT
+          );
+        }
+        if (!googleUserInfo.email) {
+          throw new AppError(
+            'Invalid Google ID token: missing email claim',
+            400,
+            ERROR_CODES.INVALID_INPUT
+          );
+        }
+
         const userName = googleUserInfo.name || googleUserInfo.email.split('@')[0];
         userData = {
           provider: 'google',
