@@ -10,7 +10,7 @@ import {
   TooltipTrigger,
 } from '@/components';
 import { useConfirm } from '@/lib/hooks/useConfirm';
-import { useRealtime } from '../hooks/useRealtime';
+import { useRealtimeChannels } from '../hooks/useRealtimeChannels';
 import { ChannelRow } from '../components/ChannelRow';
 import { EditChannelModal } from '../components/EditChannelModal';
 import RealtimeEmptyState from '../components/RealtimeEmptyState';
@@ -29,7 +29,7 @@ export default function RealtimeChannelsPage() {
     isUpdating,
     deleteChannel,
     isDeleting,
-  } = useRealtime();
+  } = useRealtimeChannels();
 
   const { confirm, confirmDialogProps } = useConfirm();
 

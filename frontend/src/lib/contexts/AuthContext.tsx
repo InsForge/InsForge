@@ -41,7 +41,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [error, setError] = useState<Error | null>(null);
   const queryClient = useQueryClient();
 
-  // Ref for pending refresh request (used by persistent listener)
+  // Ref for pending refresh request (resolves when AUTHORIZATION_CODE is received)
   const pendingRefreshRef = useRef<{
     resolve: (success: boolean) => void;
     timeoutId: ReturnType<typeof setTimeout>;
@@ -165,7 +165,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // In iframe: request new auth code from parent, persistent listener will handle it
         return new Promise<boolean>((resolve) => {
           pendingRefreshRef.current = {
-            resolve,
+            resolve: (success: boolean) => {
+              pendingRefreshRef.current = null;
+              resolve(success);
+            },
             timeoutId: setTimeout(() => {
               pendingRefreshRef.current = null;
               resolve(false);

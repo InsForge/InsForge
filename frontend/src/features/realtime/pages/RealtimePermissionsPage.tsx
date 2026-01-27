@@ -7,7 +7,7 @@ import {
   EmptyState,
 } from '@/components';
 import { SQLModal, SQLCellButton } from '@/features/database';
-import { useRealtime } from '../hooks/useRealtime';
+import { useRealtimePermissions } from '../hooks/useRealtimePermissions';
 import type { RlsPolicy } from '../services/realtime.service';
 import { cn } from '@/lib/utils/utils';
 
@@ -38,7 +38,7 @@ export default function RealtimePermissionsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('subscribe');
   const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
 
-  const { permissions, isLoadingPermissions: isLoading, permissionsError: error } = useRealtime();
+  const { permissions, isLoadingPermissions: isLoading, permissionsError: error } = useRealtimePermissions();
 
   const subscribePolicies = useMemo(
     () => (permissions ? mapPoliciesToRows(permissions.subscribe.policies) : []),

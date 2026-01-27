@@ -12,6 +12,7 @@ export class ApiClient {
   private accessToken: string | null = null;
   private onAuthError?: () => void;
   private onRefreshAccessToken?: () => Promise<boolean>;
+  private refreshPromise: Promise<boolean> | null = null;
 
   setAccessToken(token: string) {
     this.accessToken = token;
@@ -86,7 +87,14 @@ export class ApiClient {
         }
 
         if (response.status === 401 && !skipAuth && !skipRefresh && !isRetry) {
-          const refreshed = await this.onRefreshAccessToken?.();
+          // Queue behind existing refresh or start a new one
+          if (!this.refreshPromise && this.onRefreshAccessToken) {
+            this.refreshPromise = this.onRefreshAccessToken().finally(() => {
+              this.refreshPromise = null;
+            });
+          }
+
+          const refreshed = await this.refreshPromise;
           if (refreshed) {
             return makeRequest(true);
           }
