@@ -38,7 +38,11 @@ export default function RealtimePermissionsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('subscribe');
   const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
 
-  const { permissions, isLoadingPermissions: isLoading, permissionsError: error } = useRealtimePermissions();
+  const {
+    permissions,
+    isLoadingPermissions: isLoading,
+    permissionsError: error,
+  } = useRealtimePermissions();
 
   const subscribePolicies = useMemo(
     () => (permissions ? mapPoliciesToRows(permissions.subscribe.policies) : []),
