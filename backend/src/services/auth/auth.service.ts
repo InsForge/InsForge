@@ -987,30 +987,44 @@ export class AuthService {
   }
 
   /**
-   * Sign in with ID token from native SDK (Google One Tap, Sign in with Apple, etc.)
-   * Verifies the ID token with the provider and creates/finds the user
+   * Sign in with ID token from native SDK (Google One Tap, etc.)
+   * Limited to Google for now to unblock customer ask, can extend to other providers later as needed.
    */
   async signInWithIdToken(provider: 'google', idToken: string): Promise<CreateSessionResponse> {
-    if (provider !== 'google') {
-      throw new AppError(
-        `Provider ${provider} is not supported for ID token sign-in`,
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
+    let userData: OAuthUserData;
+
+    switch (provider) {
+      case 'google': {
+        // Verify the ID token with Google's public keys
+        const googleUserInfo = await this.googleOAuthProvider.verifyToken(idToken);
+        const userName = googleUserInfo.name || googleUserInfo.email.split('@')[0];
+        userData = {
+          provider: 'google',
+          providerId: googleUserInfo.sub,
+          email: googleUserInfo.email,
+          userName,
+          avatarUrl: googleUserInfo.picture || '',
+          identityData: googleUserInfo,
+        };
+        break;
+      }
+
+      default:
+        throw new AppError(
+          `Provider ${provider} is not supported for ID token sign-in. Supported: google`,
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
     }
 
-    // Verify the ID token with Google
-    const googleUserInfo = await this.googleOAuthProvider.verifyToken(idToken);
-
-    // Transform to generic format and create/find user
-    const userName = googleUserInfo.name || googleUserInfo.email.split('@')[0];
+    // Create or find the user and return session
     return this.findOrCreateThirdPartyUser(
-      'google',
-      googleUserInfo.sub,
-      googleUserInfo.email,
-      userName,
-      googleUserInfo.picture || '',
-      googleUserInfo
+      userData.provider,
+      userData.providerId,
+      userData.email,
+      userData.userName,
+      userData.avatarUrl,
+      userData.identityData
     );
   }
 
