@@ -47,6 +47,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     timeoutId: ReturnType<typeof setTimeout>;
   } | null>(null);
 
+  // Ref to track if auth is in progress (prevents duplicate AUTHORIZATION_CODE processing)
+  const authInProgressRef = useRef<boolean>(false);
+
   const handleAuthError = useCallback(() => {
     setUser(null);
     setIsAuthenticated(false);
@@ -89,26 +92,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Handle AUTHORIZATION_CODE from parent window
   const handleAuthorizationCode = useCallback(
     async (code: string, origin: string) => {
-      const success = await loginWithAuthorizationCode(code);
-
-      // Resolve pending refresh if any
-      if (pendingRefreshRef.current) {
-        clearTimeout(pendingRefreshRef.current.timeoutId);
-        pendingRefreshRef.current.resolve(success);
-        pendingRefreshRef.current = null;
+      // Skip if already authenticated or auth is in progress
+      if (isAuthenticated || authInProgressRef.current) {
+        return;
       }
+      authInProgressRef.current = true;
 
-      // Notify parent
-      if (success) {
-        postMessageToParent({ type: 'AUTH_SUCCESS' }, origin);
-      } else {
-        postMessageToParent(
-          { type: 'AUTH_ERROR', message: 'Authorization code validation failed' },
-          origin
-        );
+      try {
+        const success = await loginWithAuthorizationCode(code);
+
+        // Resolve pending refresh if any
+        if (pendingRefreshRef.current) {
+          clearTimeout(pendingRefreshRef.current.timeoutId);
+          pendingRefreshRef.current.resolve(success);
+          pendingRefreshRef.current = null;
+        }
+
+        // Notify parent
+        if (success) {
+          postMessageToParent({ type: 'AUTH_SUCCESS' }, origin);
+        } else {
+          postMessageToParent(
+            { type: 'AUTH_ERROR', message: 'Authorization code validation failed' },
+            origin
+          );
+        }
+      } finally {
+        authInProgressRef.current = false;
       }
     },
-    [loginWithAuthorizationCode]
+    [isAuthenticated, loginWithAuthorizationCode]
   );
 
   // Persistent AUTHORIZATION_CODE listener for cloud projects

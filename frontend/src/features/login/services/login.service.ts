@@ -67,8 +67,12 @@ export class LoginService {
   }
 
   async getCurrentUser(): Promise<UserSchema | null> {
-    const response = await apiClient.request('/auth/sessions/current');
-    return response.user;
+    try {
+      const response = await apiClient.request('/auth/sessions/current');
+      return response.user;
+    } catch {
+      return null;
+    }
   }
 
   async refreshAccessToken(): Promise<boolean> {
