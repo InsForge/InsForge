@@ -21,9 +21,10 @@ export function useFunctions() {
     staleTime: 2 * 60 * 1000, // Cache for 2 minutes
   });
 
-  // Extract functions and runtime status from response
+  // Extract functions, runtime status, and deployment URL from response
   const functions = useMemo(() => functionsData?.functions || [], [functionsData]);
   const runtimeStatus = useMemo(() => functionsData?.runtime?.status || 'running', [functionsData]);
+  const deploymentUrl = useMemo(() => functionsData?.deploymentUrl || null, [functionsData]);
 
   // Function to fetch and set selected function details
   const selectFunction = useCallback(
@@ -78,6 +79,7 @@ export function useFunctions() {
     functionsCount: displayFunctions.length,
     selectedFunction,
     isViewingDetail,
+    deploymentUrl,
 
     // Runtime status
     runtimeStatus,

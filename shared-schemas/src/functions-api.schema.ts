@@ -27,6 +27,7 @@ export const listFunctionsResponseSchema = z.object({
   runtime: z.object({
     status: z.enum(['running', 'unavailable']),
   }),
+  deploymentUrl: z.string().nullable().optional(),
 });
 
 export type UploadFunctionRequest = z.infer<typeof uploadFunctionRequestSchema>;

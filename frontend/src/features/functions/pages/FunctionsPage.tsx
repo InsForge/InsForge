@@ -27,6 +27,7 @@ export default function FunctionsPage() {
     selectFunction,
     clearSelection,
     refetch,
+    deploymentUrl,
   } = useFunctions();
 
   const handleRefresh = async () => {
@@ -123,6 +124,7 @@ export default function FunctionsPage() {
                   function={func}
                   onClick={() => void selectFunction(func)}
                   className="cols-span-full"
+                  deploymentUrl={deploymentUrl}
                 />
               ))}
             </>
