@@ -84,9 +84,7 @@ export class FunctionService {
       }
 
       // Get deployment URL for cloud mode
-      const deploymentUrl = this.isSubhostingConfigured()
-        ? await this.getDeploymentUrl()
-        : null;
+      const deploymentUrl = this.isSubhostingConfigured() ? await this.getDeploymentUrl() : null;
 
       return {
         functions,

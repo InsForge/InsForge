@@ -9,7 +9,12 @@ interface FunctionRowProps {
   deploymentUrl?: string | null;
 }
 
-export function FunctionRow({ function: func, onClick, className, deploymentUrl }: FunctionRowProps) {
+export function FunctionRow({
+  function: func,
+  onClick,
+  className,
+  deploymentUrl,
+}: FunctionRowProps) {
   // Use deployment URL if available (cloud mode), otherwise fall back to proxy URL
   const functionUrl = deploymentUrl
     ? `${deploymentUrl}/${func.slug}`
