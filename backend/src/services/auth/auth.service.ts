@@ -179,7 +179,7 @@ export class AuthService {
     }
 
     // Email verification not required, provide access token for immediate login
-    const accessToken = this.tokenManager.generateToken({
+    const accessToken = this.tokenManager.generateAccessToken({
       sub: userId,
       email,
       role: 'authenticated',
@@ -222,7 +222,7 @@ export class AuthService {
     }
 
     const user = this.transformUserRecordToSchema(dbUser);
-    const accessToken = this.tokenManager.generateToken({
+    const accessToken = this.tokenManager.generateAccessToken({
       sub: dbUser.id,
       email: dbUser.email,
       role: 'authenticated',
@@ -348,7 +348,7 @@ export class AuthService {
         throw new Error('User not found after verification');
       }
       const user = this.transformUserRecordToSchema(dbUser);
-      const accessToken = this.tokenManager.generateToken({
+      const accessToken = this.tokenManager.generateAccessToken({
         sub: dbUser.id,
         email: dbUser.email,
         role: 'authenticated',
@@ -414,7 +414,7 @@ export class AuthService {
         throw new Error('User not found after verification');
       }
       const user = this.transformUserRecordToSchema(dbUser);
-      const accessToken = this.tokenManager.generateToken({
+      const accessToken = this.tokenManager.generateAccessToken({
         sub: dbUser.id,
         email: dbUser.email,
         role: 'authenticated',
@@ -609,7 +609,7 @@ export class AuthService {
     // Use a fixed admin ID for the system administrator
 
     // Return admin user with JWT token (24h expiration) - no database interaction
-    const accessToken = this.tokenManager.generateAdminToken({
+    const accessToken = this.tokenManager.generateAccessToken({
       sub: ADMIN_ID,
       email,
       role: 'project_admin',
@@ -641,7 +641,7 @@ export class AuthService {
       const email = payload['email'] || payload['sub'] || 'admin@insforge.local';
 
       // Generate internal access token (24h expiration)
-      const accessToken = this.tokenManager.generateAdminToken({
+      const accessToken = this.tokenManager.generateAccessToken({
         sub: ADMIN_ID,
         email: email as string,
         role: 'project_admin',
@@ -714,7 +714,7 @@ export class AuthService {
       }
 
       const user = this.transformUserRecordToSchema(dbUser);
-      const accessToken = this.tokenManager.generateToken({
+      const accessToken = this.tokenManager.generateAccessToken({
         sub: user.id,
         email: user.email,
         role: 'authenticated',
@@ -755,7 +755,7 @@ export class AuthService {
       }
 
       const user = this.transformUserRecordToSchema(dbUser);
-      const accessToken = this.tokenManager.generateToken({
+      const accessToken = this.tokenManager.generateAccessToken({
         sub: existingUser.id,
         email: existingUser.email,
         role: 'authenticated',
@@ -837,7 +837,7 @@ export class AuthService {
         metadata: null,
       };
 
-      const accessToken = this.tokenManager.generateToken({
+      const accessToken = this.tokenManager.generateAccessToken({
         sub: userId,
         email,
         role: 'authenticated',
@@ -1018,10 +1018,9 @@ export class AuthService {
   }
 
   /**
-   * Get user by ID (helper method for internal use)
-   * @private
+   * Get user by ID (returns raw database record with is_project_admin field)
    */
-  private async getUserById(userId: string): Promise<UserRecord | null> {
+  async getUserById(userId: string): Promise<UserRecord | null> {
     const pool = this.getPool();
     const result = await pool.query(
       `
@@ -1050,9 +1049,8 @@ export class AuthService {
 
   /**
    * Transform database user record to API response format (snake_case to camelCase + provider logic)
-   * @private
    */
-  private transformUserRecordToSchema(dbUser: UserRecord): UserSchema {
+  transformUserRecordToSchema(dbUser: UserRecord): UserSchema {
     const providers: string[] = [];
 
     // Add social providers if any

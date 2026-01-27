@@ -1,84 +1,13 @@
-﻿import { useCallback, useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LockIcon } from 'lucide-react';
 import { useAuth } from '@/lib/contexts/AuthContext';
-import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
-import { usePartnerOrigin } from '../hooks/usePartnerOrigin';
 
 export default function CloudLoginPage() {
   const navigate = useNavigate();
-  const { loginWithAuthorizationCode, isAuthenticated } = useAuth();
+  const { isAuthenticated, error } = useAuth();
   const { isLoading: isMcpUsageLoading } = useMcpUsage();
-  const { isPartnerOrigin } = usePartnerOrigin();
-  const [authError, setAuthError] = useState<string | null>(null);
-  // Handle authorization code from postMessage
-  const onAuthorizationCodeReceived = useCallback(
-    async (event: MessageEvent) => {
-      try {
-        // Validate origin - allow insforge.dev, *.insforge.dev, and partner domains
-        const isInsforgeOrigin =
-          event.origin.endsWith('.insforge.dev') || event.origin === 'https://insforge.dev';
-
-        if (!isInsforgeOrigin) {
-          const isPartner = await isPartnerOrigin(event.origin);
-          if (!isPartner) {
-            console.warn('Received message from unauthorized origin:', event.origin);
-            return;
-          }
-        }
-
-        const authorizationCode = event.data.code;
-
-        setAuthError(null);
-        // Exchange the authorization code for an access token
-        const success = await loginWithAuthorizationCode(authorizationCode);
-        if (success) {
-          // Notify parent of success
-          postMessageToParent(
-            {
-              type: 'AUTH_SUCCESS',
-            },
-            event.origin
-          );
-        } else {
-          setAuthError('The authorization code may have expired or already been used.');
-          postMessageToParent(
-            {
-              type: 'AUTH_ERROR',
-              message: 'Authorization code validation failed',
-            },
-            event.origin
-          );
-        }
-      } catch (error) {
-        console.error('Authorization code exchange failed:', error);
-        setAuthError('The authorization code may have expired or already been used.');
-        postMessageToParent(
-          {
-            type: 'AUTH_ERROR',
-            message: 'Authorization code validation failed',
-          },
-          event.origin
-        );
-      }
-    },
-    [loginWithAuthorizationCode, isPartnerOrigin]
-  );
-
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'AUTHORIZATION_CODE' && event.data?.code) {
-        void onAuthorizationCodeReceived(event);
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-
-    return () => {
-      window.removeEventListener('message', handleMessage);
-    };
-  }, [onAuthorizationCodeReceived]);
 
   useEffect(() => {
     if (isAuthenticated && !isMcpUsageLoading) {
@@ -87,13 +16,13 @@ export default function CloudLoginPage() {
   }, [isAuthenticated, isMcpUsageLoading, navigate]);
 
   // Show error state if authentication failed
-  if (authError) {
+  if (error) {
     return (
       <div className="min-h-screen bg-neutral-800 flex items-center justify-center px-4">
         <div className="text-center text-white">
           <LockIcon className="h-12 w-12 mx-auto mb-4 text-red-400" />
           <h2 className="text-xl font-semibold mb-2">Authentication Failed</h2>
-          <p className="text-gray-400 text-sm max-w-md">{authError}</p>
+          <p className="text-gray-400 text-sm max-w-md">{error.message}</p>
         </div>
       </div>
     );

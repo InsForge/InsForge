@@ -9,7 +9,7 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin } from '@/api/middlewares/auth.js';
-import { setAuthCookie, REFRESH_TOKEN_COOKIE_NAME } from '@/utils/cookies.js';
+import { setRefreshTokenCookie } from '@/utils/cookies.js';
 import { parseClientType } from '@/utils/utils.js';
 import logger from '@/utils/logger.js';
 import jwt from 'jsonwebtoken';
@@ -523,7 +523,7 @@ router.post('/exchange', async (req: Request, res: Response, next: NextFunction)
 
     if (clientType === 'web') {
       // Web clients: use httpOnly cookie + CSRF token
-      setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+      setRefreshTokenCookie(res, refreshToken);
       const csrfToken = tokenManager.generateCsrfToken(refreshToken);
 
       successResponse(res, {

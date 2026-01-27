@@ -1,5 +1,5 @@
 import { apiClient } from '@/lib/api/client';
-import { UserSchema } from '@insforge/shared-schemas';
+import type { UserSchema, CreateUserResponse, DeleteUsersResponse } from '@insforge/shared-schemas';
 
 export class UserService {
   /**
@@ -26,10 +26,7 @@ export class UserService {
       url += `?${params.toString()}`;
     }
 
-    const response: {
-      data: UserSchema[];
-      pagination: { offset: number; limit: number; total: number };
-    } = await apiClient.request(url);
+    const response = await apiClient.request(url);
 
     return {
       users: response.data,
@@ -37,25 +34,18 @@ export class UserService {
     };
   }
 
-  async getUser(id: string) {
-    return await apiClient.request(`/auth/users/${id}`);
+  async getUser(id: string): Promise<UserSchema> {
+    return apiClient.request(`/auth/users/${id}`);
   }
 
-  async getCurrentUser() {
-    const response = await apiClient.request('/auth/sessions/current');
-    return response.user;
-  }
-
-  async register(email: string, password: string, name?: string) {
-    const response = await apiClient.request('/auth/users', {
+  async register(email: string, password: string, name?: string): Promise<CreateUserResponse> {
+    return apiClient.request('/auth/users', {
       method: 'POST',
       body: JSON.stringify({ email, password, name }),
     });
-
-    return response;
   }
 
-  async deleteUsers(userIds: string[]) {
+  async deleteUsers(userIds: string[]): Promise<DeleteUsersResponse> {
     return apiClient.request('/auth/users', {
       method: 'DELETE',
       body: JSON.stringify({ userIds }),

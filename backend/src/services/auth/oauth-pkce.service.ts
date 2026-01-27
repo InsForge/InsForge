@@ -148,7 +148,7 @@ export class OAuthPKCEService {
       throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
     }
 
-    const accessToken = tokenManager.generateToken({
+    const accessToken = tokenManager.generateAccessToken({
       sub: user.id,
       email: user.email,
       role: 'authenticated',

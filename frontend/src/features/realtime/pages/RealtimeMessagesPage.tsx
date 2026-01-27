@@ -10,7 +10,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components';
-import { useRealtime } from '../hooks/useRealtime';
+import { useRealtimeMessages } from '../hooks/useRealtimeMessages';
 import { MessageRow } from '../components/MessageRow';
 import RealtimeEmptyState from '../components/RealtimeEmptyState';
 import type { RealtimeMessage } from '../services/realtime.service';
@@ -28,7 +28,7 @@ export default function RealtimeMessagesPage() {
     messagesTotalCount,
     messagesTotalPages,
     setMessagesPage,
-  } = useRealtime();
+  } = useRealtimeMessages();
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

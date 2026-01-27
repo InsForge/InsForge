@@ -210,7 +210,7 @@ export const resetPasswordResponseSchema = z.object({
 /**
  * Response for POST /api/auth/admin/sessions
  */
-export const createAdminSessionResponseSchema = createUserResponseSchema;
+export const createAdminSessionResponseSchema = createSessionResponseSchema;
 
 /**
  * Response for GET /api/auth/sessions/current
