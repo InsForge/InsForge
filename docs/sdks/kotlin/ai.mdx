@@ -35,14 +35,13 @@ Create an AI chat completion.
 
 ### Parameters
 
-- `model` (String) - Model identifier (e.g., "anthropic/claude-3.5-haiku")
+- `model` (String) - Model identifier (e.g., "anthropic/claude-3.5-haiku", "openai/gpt-4o")
 - `messages` (`List<ChatMessage>`) - Conversation messages
 - `temperature` (Double?, optional) - Sampling temperature (0.0-2.0)
 - `maxTokens` (Int?, optional) - Maximum tokens to generate
 - `systemPrompt` (String?, optional) - System prompt
 - `webSearch` (WebSearchPlugin?, optional) - Enable web search capabilities
 - `fileParser` (FileParserPlugin?, optional) - Enable file/PDF parsing
-- `thinking` (Boolean?, optional) - Enable extended reasoning mode
 
 ### Returns
 
@@ -201,7 +200,7 @@ println(response2.text)
 
 ```kotlin
 val response = client.ai.chatCompletion(
-    model = "anthropic/claude-3.5-sonnet",
+    model = "anthropic/claude-sonnet-4.5",
     messages = listOf(
         ChatMessage.user("Solve this complex math problem step by step...")
     ),
@@ -215,7 +214,7 @@ println(response.text)
 
 ```kotlin
 val response = client.ai.chatCompletion(
-    model = "openai/gpt-4",
+    model = "openai/gpt-4o",
     messages = messages,
     webSearch = WebSearchPlugin(enabled = true, maxResults = 3),
     fileParser = FileParserPlugin(enabled = true),
@@ -243,24 +242,9 @@ Convenience method for chat completion with image analysis.
 
 ```kotlin
 val response = client.ai.chatCompletionWithImages(
-    model = "openai/gpt-4-vision",
+    model = "openai/gpt-4o",
     text = "What is in this image?",
     imageUrls = listOf("https://example.com/image.jpg")
-)
-
-println(response.text)
-```
-
-### Example (Multiple Images)
-
-```kotlin
-val response = client.ai.chatCompletionWithImages(
-    model = "anthropic/claude-sonnet-4.5",
-    text = "Compare these two images and describe the differences",
-    imageUrls = listOf(
-        "https://example.com/image1.jpg",
-        "https://example.com/image2.jpg"
-    )
 )
 
 println(response.text)
@@ -281,20 +265,6 @@ Convenience method for chat completion with file (PDF) analysis.
 - `pdfEngine` (PdfEngine?, optional) - PDF processing engine
 - `temperature` (Double?, optional) - Sampling temperature
 - `maxTokens` (Int?, optional) - Maximum tokens to generate
-
-### Example (URL)
-
-```kotlin
-val response = client.ai.chatCompletionWithFile(
-    model = "anthropic/claude-sonnet-4.5",
-    text = "Summarize this document",
-    filename = "report.pdf",
-    fileData = "https://example.com/report.pdf",
-    pdfEngine = PdfEngine.MISTRAL_OCR
-)
-
-println(response.text)
-```
 
 ### Example (Base64 Encoded)
 
@@ -332,7 +302,7 @@ Convenience method for chat completion with web search enabled.
 
 ```kotlin
 val response = client.ai.chatCompletionWithWebSearch(
-    model = "openai/gpt-4",
+    model = "openai/gpt-4o",
     messages = listOf(
         ChatMessage(role = "user", content = "What are today's top news headlines?")
     ),
@@ -345,32 +315,6 @@ println(response.text)
 response.annotations?.forEach { annotation ->
     println("- ${annotation.urlCitation.title}: ${annotation.urlCitation.url}")
 }
-```
-
----
-
-## chatCompletionWithThinking()
-
-Convenience method for chat completion with extended reasoning mode enabled.
-
-### Parameters
-
-- `model` (String) - Model identifier
-- `messages` (`List<ChatMessage>`) - Conversation messages
-- `temperature` (Double?, optional) - Sampling temperature
-- `maxTokens` (Int?, optional) - Maximum tokens to generate
-
-### Example
-
-```kotlin
-val response = client.ai.chatCompletionWithThinking(
-    model = "anthropic/claude-3.5-sonnet",
-    messages = listOf(
-        ChatMessage(role = "user", content = "Analyze this complex problem and provide a detailed solution...")
-    )
-)
-
-println(response.text)
 ```
 
 ---
@@ -408,7 +352,7 @@ client.ai.chatCompletionStream(
 val fullResponse = StringBuilder()
 
 client.ai.chatCompletionStream(
-    model = "openai/gpt-4",
+    model = "openai/gpt-4o",
     messages = listOf(
         ChatMessage(role = "user", content = "Explain quantum computing")
     ),
@@ -426,7 +370,7 @@ println("Complete response: $fullResponse")
 
 ```kotlin
 client.ai.chatCompletionStream(
-    model = "openai/gpt-4",
+    model = "openai/gpt-4o",
     messages = listOf(
         ChatMessage(role = "user", content = "What's happening in tech news today?")
     ),
@@ -581,7 +525,7 @@ response.images.forEach { image ->
 
 ```kotlin
 val response = client.ai.generateImage(
-    model = "openai/dall-e-3",
+    model = "google/gemini-2.5-flash-image-preview",
     prompt = "A futuristic city skyline"
 )
 

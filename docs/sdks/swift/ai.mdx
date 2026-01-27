@@ -15,7 +15,7 @@ Generate AI chat completions.
 
 ### Parameters
 
-- `model` (String) - AI model (e.g., "anthropic/claude-3.5-haiku", "openai/gpt-4")
+- `model` (String) - AI model (e.g., "anthropic/claude-3.5-haiku", "openai/gpt-4o")
 - `messages` ([ChatMessage]) - Array of chat messages
 - `stream` (Bool, optional) - Enable streaming mode (default: false)
 - `temperature` (Double, optional) - Sampling temperature 0-2
@@ -24,7 +24,6 @@ Generate AI chat completions.
 - `systemPrompt` (String, optional) - System prompt for the conversation
 - `webSearch` (WebSearchPlugin?, optional) - Enable web search capabilities
 - `fileParser` (FileParserPlugin?, optional) - Enable file/PDF parsing
-- `thinking` (Bool?, optional) - Enable extended reasoning mode (Anthropic models only)
 
 ### Returns
 
@@ -123,27 +122,11 @@ let response = try await insforge.ai.chatCompletion(
 print(response.text)
 ```
 
-### Example with Conversation History
-
-```swift
-let response = try await insforge.ai.chatCompletion(
-    model: "openai/gpt-4",
-    messages: [
-        ChatMessage(role: .system, content: "You are a helpful assistant."),
-        ChatMessage(role: .user, content: "What is 2 + 2?"),
-        ChatMessage(role: .assistant, content: "2 + 2 equals 4."),
-        ChatMessage(role: .user, content: "What about 3 + 3?")
-    ]
-)
-
-print(response.text)
-```
-
 ### Example with Web Search
 
 ```swift
 let response = try await insforge.ai.chatCompletion(
-    model: "openai/gpt-4",
+    model: "openai/gpt-4o",
     messages: [
         ChatMessage(role: .user, content: "What's the latest news about AI?")
     ],
@@ -180,55 +163,6 @@ let response = try await insforge.ai.chatCompletion(
         enabled: true,
         pdf: PdfParserConfig(engine: .mistralOcr)
     )
-)
-
-print(response.text)
-```
-
-### Example with Base64 Encoded PDF
-
-```swift
-// Load PDF from local file and encode as base64
-let pdfData = try Data(contentsOf: localPdfURL)
-let base64PDF = "data:application/pdf;base64,\(pdfData.base64EncodedString())"
-
-let response = try await insforge.ai.chatCompletion(
-    model: "anthropic/claude-sonnet-4.5",
-    messages: [
-        ChatMessage(role: .user, content: [
-            .text("What are the key points in this document?"),
-            .file(filename: "document.pdf", fileData: base64PDF)
-        ])
-    ],
-    fileParser: FileParserPlugin(enabled: true)
-)
-
-print(response.text)
-```
-
-### Example with Extended Reasoning (Thinking)
-
-```swift
-let response = try await insforge.ai.chatCompletion(
-    model: "anthropic/claude-3-opus",
-    messages: [
-        ChatMessage(role: .user, content: "Solve this complex problem step by step...")
-    ],
-    thinking: true
-)
-
-print(response.text)
-```
-
-### Example with Combined Features
-
-```swift
-let response = try await insforge.ai.chatCompletion(
-    model: "openai/gpt-4",
-    messages: messages,
-    webSearch: WebSearchPlugin(enabled: true, maxResults: 3),
-    fileParser: FileParserPlugin(enabled: true),
-    thinking: true
 )
 
 print(response.text)
