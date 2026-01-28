@@ -14,12 +14,13 @@ import CursorLogo from '@/assets/logos/cursor.svg?react';
 import ClaudeLogo from '@/assets/logos/claude_code.svg?react';
 import WindsurfLogo from '@/assets/logos/windsurf.svg?react';
 import ClineLogo from '@/assets/logos/cline.svg?react';
-import RooCodeLogo from '@/assets/logos/roo_code.svg';
 import QoderLogo from '@/assets/logos/qoder.svg?react';
 import CopilotLogo from '@/assets/logos/copilot.svg?react';
 import AntigravityLogo from '@/assets/logos/antigravity.svg?react';
 import OpenAILogo from '@/assets/logos/openai.svg?react';
 import KiroLogo from '@/assets/logos/kiro.svg?react';
+import RooCodeLogo from '@/assets/logos/roo_code.svg?react';
+import OpenCodeLogo from '@/assets/logos/opencode.svg?react';
 import { getBackendUrl } from '@/lib/utils/utils';
 // import CodexLogo from '@/assets/logos/openai.svg?react';
 
@@ -64,7 +65,7 @@ export const MCP_AGENTS: MCPAgent[] = [
     id: 'roocode',
     slug: 'roo-code',
     displayName: 'Roo Code',
-    logo: <img src={RooCodeLogo} alt="" className="dark:invert" />,
+    logo: <RooCodeLogo className="w-5 h-5 dark:text-white" />,
   },
   {
     id: 'qoder',
@@ -95,6 +96,12 @@ export const MCP_AGENTS: MCPAgent[] = [
     slug: 'kiro',
     displayName: 'Kiro',
     logo: <KiroLogo className="w-5 h-5 dark:text-white" />,
+  },
+  {
+    id: 'opencode',
+    slug: 'opencode',
+    displayName: 'OpenCode',
+    logo: <OpenCodeLogo className="w-5 h-5 dark:text-white" />,
   },
   {
     id: 'mcp',
