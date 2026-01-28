@@ -1459,9 +1459,22 @@ components:
         email:
           type: string
           format: email
+        profile:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: User profile data (name, avatar_url, and custom fields)
+          properties:
+            name:
+              type: string
+            avatar_url:
+              type: string
+              format: uri
         metadata:
           type: object
+          nullable: true
           additionalProperties: true
+          description: System metadata (device ID, login IP, etc.)
         emailVerified:
           type: boolean
         providers:
