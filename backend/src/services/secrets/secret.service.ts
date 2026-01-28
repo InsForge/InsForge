@@ -346,7 +346,11 @@ export class SecretService {
   /**
    * Rotate a secret (create new value, keep old for grace period)
    */
-  async rotateSecret(id: string, newValue: string, gracePeriodHours: number = 24): Promise<{ newId: string }> {
+  async rotateSecret(
+    id: string,
+    newValue: string,
+    gracePeriodHours: number = 24
+  ): Promise<{ newId: string }> {
     const client = await this.getPool().connect();
     try {
       await client.query('BEGIN');
@@ -473,7 +477,9 @@ export class SecretService {
    * Rotate API key with grace period for old key
    * Old key remains valid for specified grace period (default 24 hours)
    */
-  async rotateApiKey(gracePeriodHours: number = 24): Promise<{ newApiKey: string; oldKeyExpiresAt: Date }> {
+  async rotateApiKey(
+    gracePeriodHours: number = 24
+  ): Promise<{ newApiKey: string; oldKeyExpiresAt: Date }> {
     const client = await this.getPool().connect();
     try {
       await client.query('BEGIN');
