@@ -441,6 +441,7 @@ export class SecretService {
     }
 
     // Check rotated API keys in grace period (API_KEY_OLD_* with expires_at > NOW)
+    let rows: { value_ciphertext: string }[] = [];
     try {
       const result = await this.getPool().query(
         `SELECT value_ciphertext FROM system.secrets
@@ -450,20 +451,27 @@ export class SecretService {
          AND expires_at > NOW()`,
         []
       );
+      rows = result.rows;
+    } catch (error) {
+      logger.error('Failed to query grace-period API keys', { error });
+      return false;
+    }
 
-      for (const row of result.rows) {
+    const valueBuffer = Buffer.from(apiKey);
+    for (const row of rows) {
+      try {
         const decryptedValue = EncryptionManager.decrypt(row.value_ciphertext);
         const decryptedBuffer = Buffer.from(decryptedValue);
-        const valueBuffer = Buffer.from(apiKey);
         if (
           decryptedBuffer.length === valueBuffer.length &&
           crypto.timingSafeEqual(decryptedBuffer, valueBuffer)
         ) {
           return true;
         }
+      } catch (error) {
+        logger.error('Failed to decrypt grace-period API key', { error });
+        continue;
       }
-    } catch (error) {
-      logger.error('Failed to check grace-period API keys', { error });
     }
 
     return false;
