@@ -11,6 +11,7 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { AppError } from '@/api/middlewares/error.js';
 import type { AppMetadataSchema } from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';
+import { AuditService } from '@/services/logs/audit.service.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { CloudDatabaseProvider } from '@/providers/database/cloud.provider.js';
 
@@ -124,6 +125,49 @@ router.get('/api-key', async (req: AuthRequest, res: Response, next: NextFunctio
     const apiKey = await secretService.getSecretByKey('API_KEY');
 
     successResponse(res, { apiKey: apiKey });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Rotate/Regenerate API key (admin only)
+router.post('/api-key/rotate', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const secretService = SecretService.getInstance();
+    const auditService = AuditService.getInstance();
+
+    // Optional grace period in hours (default: 24, 0 for immediate revocation)
+    const gracePeriodHours = req.body.gracePeriodHours ?? 24;
+
+    // Rotate the API key
+    const newApiKey = await secretService.rotateApiKey(gracePeriodHours);
+
+    // Log audit
+    await auditService.log({
+      actor: req.user?.email || 'api-key',
+      action: 'ROTATE_API_KEY',
+      module: 'SECRETS',
+      details: {
+        key: 'API_KEY',
+        gracePeriodHours,
+      },
+      ip_address: req.ip,
+    });
+
+    const message =
+      gracePeriodHours === 0
+        ? 'API key has been rotated successfully. The old key has been immediately revoked.'
+        : `API key has been rotated successfully. The old key will be invalid after ${gracePeriodHours} hours.`;
+
+    successResponse(
+      res,
+      {
+        success: true,
+        message,
+        apiKey: newApiKey,
+      },
+      200
+    );
   } catch (error) {
     next(error);
   }

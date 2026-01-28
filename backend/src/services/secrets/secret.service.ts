@@ -32,6 +32,17 @@ export class SecretService {
     return SecretService.instance;
   }
 
+  /**
+   * Reset the singleton instance and pool cache (for testing only)
+   * @internal
+   */
+  public static resetForTesting(): void {
+    if (SecretService.instance) {
+      SecretService.instance.pool = null;
+    }
+    SecretService.instance = null as unknown as SecretService;
+  }
+
   private getPool(): Pool {
     if (!this.pool) {
       this.pool = DatabaseManager.getInstance().getPool();
@@ -345,8 +356,15 @@ export class SecretService {
 
   /**
    * Rotate a secret (create new value, keep old for grace period)
+   * @param id - The ID of the secret to rotate
+   * @param newValue - The new value for the secret
+   * @param gracePeriodHours - Grace period in hours before old secret expires (default: 24). Use 0 for immediate revocation.
    */
-  async rotateSecret(id: string, newValue: string): Promise<{ newId: string }> {
+  async rotateSecret(
+    id: string,
+    newValue: string,
+    gracePeriodHours: number = 24
+  ): Promise<{ newId: string }> {
     const client = await this.getPool().connect();
     try {
       await client.query('BEGIN');
@@ -361,13 +379,24 @@ export class SecretService {
 
       const secretKey = oldSecretResult.rows[0].key;
 
-      await client.query(
-        `UPDATE system.secrets
-         SET is_active = false,
-             expires_at = NOW() + INTERVAL '24 hours'
-         WHERE id = $1`,
-        [id]
-      );
+      // Deactivate the old secret with configurable grace period
+      if (gracePeriodHours === 0) {
+        await client.query(
+          `UPDATE system.secrets
+           SET is_active = false,
+               expires_at = NOW()
+           WHERE id = $1`,
+          [id]
+        );
+      } else {
+        await client.query(
+          `UPDATE system.secrets
+           SET is_active = false,
+               expires_at = NOW() + INTERVAL '1 hour' * $2
+           WHERE id = $1`,
+          [id, gracePeriodHours]
+        );
+      }
 
       const encryptedValue = EncryptionManager.encrypt(newValue);
       const newSecretResult = await client.query(
@@ -379,17 +408,99 @@ export class SecretService {
 
       await client.query('COMMIT');
 
-      logger.info('Secret rotated', {
-        oldId: id,
-        newId: newSecretResult.rows[0].id,
-        key: secretKey,
-      });
+      try {
+        logger.info('Secret rotated', {
+          oldId: id,
+          newId: newSecretResult.rows[0].id,
+          key: secretKey,
+        });
+      } catch (logError) {
+        logger.error('Failed to log secret rotation', { error: logError });
+      }
 
       return { newId: newSecretResult.rows[0].id };
     } catch (error) {
       await client.query('ROLLBACK');
       logger.error('Failed to rotate secret', { error, id });
       throw new Error('Failed to rotate secret');
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Rotate API key (deactivate old, generate new)
+   * @param gracePeriodHours - Grace period in hours before old key expires (default: 24). Use 0 for immediate revocation.
+   * @returns The new API key
+   */
+  async rotateApiKey(gracePeriodHours: number = 24): Promise<string> {
+    const client = await this.getPool().connect();
+    try {
+      await client.query('BEGIN');
+
+      // Find the currently active API_KEY secret
+      const oldSecretResult = await client.query(
+        `SELECT id FROM system.secrets 
+         WHERE key = 'API_KEY' 
+         AND is_active = true 
+         AND (expires_at IS NULL OR expires_at > NOW())
+         ORDER BY created_at DESC
+         LIMIT 1`
+      );
+
+      if (!oldSecretResult.rows.length) {
+        throw new Error('No active API key found to rotate');
+      }
+
+      const oldSecretId = oldSecretResult.rows[0].id;
+
+      // Deactivate the old API key with configurable grace period
+      if (gracePeriodHours === 0) {
+        await client.query(
+          `UPDATE system.secrets
+           SET is_active = false,
+               expires_at = NOW()
+           WHERE id = $1`,
+          [oldSecretId]
+        );
+      } else {
+        await client.query(
+          `UPDATE system.secrets
+           SET is_active = false,
+               expires_at = NOW() + INTERVAL '1 hour' * $2
+           WHERE id = $1`,
+          [oldSecretId, gracePeriodHours]
+        );
+      }
+
+      // Generate new API key
+      const newApiKey = this.generateApiKey();
+      const encryptedValue = EncryptionManager.encrypt(newApiKey);
+
+      // Create new active API key
+      const newSecretResult = await client.query(
+        `INSERT INTO system.secrets (key, value_ciphertext, is_reserved)
+         VALUES ('API_KEY', $1, true)
+         RETURNING id`,
+        [encryptedValue]
+      );
+
+      await client.query('COMMIT');
+
+      try {
+        logger.info('API key rotated', {
+          oldId: oldSecretId,
+          newId: newSecretResult.rows[0].id,
+        });
+      } catch (logError) {
+        logger.error('Failed to log API key rotation', { error: logError });
+      }
+
+      return newApiKey;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Failed to rotate API key', { error });
+      throw new Error('Failed to rotate API key');
     } finally {
       client.release();
     }
