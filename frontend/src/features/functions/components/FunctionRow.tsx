@@ -6,10 +6,19 @@ interface FunctionRowProps {
   function: FunctionSchema;
   onClick: () => void;
   className?: string;
+  deploymentUrl?: string | null;
 }
 
-export function FunctionRow({ function: func, onClick, className }: FunctionRowProps) {
-  const functionUrl = `${getBackendUrl()}/functions/${func.slug}`;
+export function FunctionRow({
+  function: func,
+  onClick,
+  className,
+  deploymentUrl,
+}: FunctionRowProps) {
+  // Use deployment URL if available (cloud mode), otherwise fall back to proxy URL
+  const functionUrl = deploymentUrl
+    ? `${deploymentUrl}/${func.slug}`
+    : `${getBackendUrl()}/functions/${func.slug}`;
 
   return (
     <div
