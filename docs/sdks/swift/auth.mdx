@@ -45,28 +45,6 @@ public struct SignUpResponse: Codable, Sendable {
 }
 ```
 
-### Example (Basic)
-
-```swift
-do {
-    let result = try await insforge.auth.signUp(
-        email: "user@example.com",
-        password: "secure_password123",
-        name: "John Doe"
-    )
-
-    if result.needsEmailVerification {
-        // Email verification required - show verification screen
-        showEmailVerificationScreen()
-    } else if let user = result.user {
-        // Sign up successful, no verification needed
-        print("Welcome, \(user.profile?.name ?? user.email)!")
-    }
-} catch {
-    print("Sign up failed: \(error)")
-}
-```
-
 ### Example (Complete Flow with Verification)
 
 ```swift
@@ -109,112 +87,6 @@ func handleResendCode(email: String) async {
         showMessage("Verification code sent to \(email)")
     } catch {
         showError("Failed to resend verification code")
-    }
-}
-```
-
-### Example (SwiftUI with State Handling)
-
-```swift
-struct SignUpView: View {
-    @State private var email = ""
-    @State private var password = ""
-    @State private var name = ""
-    @State private var showVerification = false
-    @State private var verificationCode = ""
-    @State private var errorMessage: String?
-
-    var body: some View {
-        if showVerification {
-            // Verification code input screen
-            VStack(spacing: 20) {
-                Text("Verify Your Email")
-                    .font(.title)
-
-                Text("Enter the 6-digit code sent to \(email)")
-                    .foregroundColor(.secondary)
-
-                TextField("Verification Code", text: $verificationCode)
-                    .textFieldStyle(.roundedBorder)
-                    .keyboardType(.numberPad)
-
-                Button("Verify") {
-                    Task {
-                        await verifyEmail()
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-
-                Button("Resend Code") {
-                    Task {
-                        await resendCode()
-                    }
-                }
-            }
-            .padding()
-        } else {
-            // Sign up form
-            VStack(spacing: 20) {
-                TextField("Name", text: $name)
-                    .textFieldStyle(.roundedBorder)
-
-                TextField("Email", text: $email)
-                    .textFieldStyle(.roundedBorder)
-                    .autocapitalization(.none)
-
-                SecureField("Password", text: $password)
-                    .textFieldStyle(.roundedBorder)
-
-                if let error = errorMessage {
-                    Text(error)
-                        .foregroundColor(.red)
-                        .font(.caption)
-                }
-
-                Button("Sign Up") {
-                    Task {
-                        await signUp()
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            .padding()
-        }
-    }
-
-    func signUp() async {
-        do {
-            let result = try await insforge.auth.signUp(
-                email: email,
-                password: password,
-                name: name.isEmpty ? nil : name
-            )
-
-            if result.needsEmailVerification {
-                showVerification = true
-            } else if result.hasSession {
-                // Navigate to main app
-            }
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    func verifyEmail() async {
-        do {
-            try await insforge.auth.verifyEmail(email: email, code: verificationCode)
-            // Navigate to sign in or main app
-        } catch {
-            errorMessage = "Invalid verification code"
-        }
-    }
-
-    func resendCode() async {
-        do {
-            try await insforge.auth.resendVerificationEmail(email: email)
-        } catch {
-            errorMessage = "Failed to resend code"
-        }
     }
 }
 ```
@@ -317,21 +189,6 @@ do {
 
 ---
 
-## getSession()
-
-Get current session from local storage.
-
-### Example
-
-```swift
-if let session = insforge.auth.getSession() {
-    print("Access token: \(session.accessToken)")
-    print("User: \(session.user.email)")
-}
-```
-
----
-
 ## setProfile()
 
 Update current user's profile.
@@ -348,6 +205,106 @@ do {
     print("Profile updated")
 } catch {
     print("Update failed: \(error)")
+}
+```
+
+---
+
+## Password Reset
+
+InsForge supports two password reset methods, configured in the backend:
+
+- **Code method**: User receives a 6-digit code via email, verifies it to get a reset token, then resets password
+- **Link method**: User receives a magic link via email containing the reset token, then resets password directly
+
+### sendPasswordReset()
+
+Send a password reset email to the user. The email will contain either a 6-digit code or a magic link depending on the backend configuration.
+
+#### Parameters
+
+- `email` (String) - User's email address
+
+#### Example
+
+```swift
+do {
+    try await insforge.auth.sendPasswordReset(email: "user@example.com")
+    // Show message to check email
+    showMessage("If your email is registered, you will receive a password reset email.")
+} catch {
+    print("Failed to send reset email: \(error)")
+}
+```
+
+---
+
+### exchangeResetPasswordToken()
+
+Exchange a 6-digit reset code for a reset token. **This method is only used with the code-based reset flow.**
+
+#### Parameters
+
+- `email` (String) - User's email address
+- `code` (String) - 6-digit numeric code received via email
+
+#### Returns
+
+```swift
+ResetPasswordTokenResponse
+```
+
+#### ResetPasswordTokenResponse
+
+```swift
+public struct ResetPasswordTokenResponse: Codable, Sendable {
+    /// Reset token to use with resetPassword()
+    public let token: String
+    /// Token expiration timestamp
+    public let expiresAt: Date?
+}
+```
+
+#### Example
+
+```swift
+do {
+    let response = try await insforge.auth.exchangeResetPasswordToken(
+        email: "user@example.com",
+        code: "123456"
+    )
+    // Store the token and proceed to password reset screen
+    let resetToken = response.token
+    showPasswordResetScreen(token: resetToken)
+} catch {
+    print("Invalid or expired code: \(error)")
+}
+```
+
+---
+
+### resetPassword()
+
+Reset the user's password using a reset token.
+
+#### Parameters
+
+- `otp` (String) - Reset token (from `exchangeResetPasswordToken()` for code flow, or from magic link URL for link flow)
+- `newPassword` (String) - New password meeting the configured requirements
+
+#### Example
+
+```swift
+do {
+    try await insforge.auth.resetPassword(
+        otp: resetToken,
+        newPassword: "newSecurePassword123"
+    )
+    // Password reset successful
+    showMessage("Password reset successfully. You can now sign in.")
+    navigateToSignIn()
+} catch {
+    print("Password reset failed: \(error)")
 }
 ```
 
@@ -377,22 +334,6 @@ AuthResponse
 
 Returns `AuthResponse` containing the authenticated user and session tokens.
 
-### Authentication Flow
-
-The SDK uses `ASWebAuthenticationSession` to present a secure in-app authentication browser. This provides a seamless experience where authentication completes automatically.
-
-```
-1. App calls signInWithDefaultView(redirectTo:)
-   ↓
-2. SDK opens in-app authentication browser (ASWebAuthenticationSession)
-   ↓
-3. User authenticates (OAuth or email+password)
-   ↓
-4. SDK automatically handles callback and creates session
-   ↓
-5. Method returns AuthResponse with user data
-```
-
 ### Implementation
 
 InsForge SDK supports two callback URL methods:
@@ -401,17 +342,6 @@ InsForge SDK supports two callback URL methods:
 2. **Universal Links (iOS) / App Links (Android)** - Recommended for production mobile apps
 
 #### Option 1: Custom URL Scheme (Recommended for Development)
-
-##### Advantages
-- ✅ Simple configuration
-- ✅ Works immediately without server setup
-- ✅ Perfect for development and testing
-- ✅ Ideal for macOS desktop apps
-
-##### Disadvantages
-- ⚠️ Any app can register the same scheme (security risk)
-- ⚠️ Shows browser redirect prompt on mobile
-- ⚠️ Not recommended for production mobile apps
 
 ##### Configuration
 
@@ -440,95 +370,7 @@ print("Authenticated: \(response.user.email)")
 
 #### Option 2: Universal Links / App Links (Recommended for Production)
 
-##### Advantages
-- ✅ **Secure** - Only your app can handle your domain
-- ✅ **Better UX** - Opens app directly without browser prompt
-- ✅ **Fallback** - Opens website if app not installed
-- ✅ **Industry standard** - Used by Supabase, Auth0, Firebase
-
-##### Disadvantages
-- ⚠️ Requires web server configuration
-- ⚠️ Need to host configuration files
-- ⚠️ More setup steps
-
-##### iOS Universal Links Setup
-
-**Step 1: Create apple-app-site-association file**
-
-Create a file named `apple-app-site-association` (no extension) on your web server:
-
-```json
-{
-  "applinks": {
-    "apps": [],
-    "details": [
-      {
-        "appID": "TEAM_ID.BUNDLE_ID",
-        "paths": [
-          "/auth/callback",
-          "/auth/*"
-        ]
-      }
-    ]
-  }
-}
-```
-
-Replace:
-- `TEAM_ID`: Your Apple Developer Team ID (10 alphanumeric characters, found in [Apple Developer Account](https://developer.apple.com/account))
-- `BUNDLE_ID`: Your app's Bundle Identifier (e.g., `com.yourcompany.yourapp`)
-
-**Step 2: Host the file**
-
-Upload to your web server at:
-```
-https://yourdomain.com/.well-known/apple-app-site-association
-```
-
-**Requirements**:
-- ✅ Must use HTTPS
-- ✅ No `.json` file extension
-- ✅ Content-Type must be `application/json`
-- ✅ Max file size: 128 KB
-
-**Verify hosting**:
-```bash
-curl -I https://yourdomain.com/.well-known/apple-app-site-association
-# Should return: Content-Type: application/json
-```
-
-**Step 3: Configure Xcode**
-
-1. Open your project in Xcode
-2. Select your target → **Signing & Capabilities**
-3. Click **+ Capability** → Add **Associated Domains**
-4. Add domain:
-   ```
-   applinks:yourdomain.com
-   ```
-
-**Step 4: Use Universal Links**
-
-```swift
-let response = try await client.auth.signInWithDefaultView(
-    redirectTo: "https://yourdomain.com/auth/callback"
-)
-print("Authenticated: \(response.user.email)")
-```
-
-##### Verification Tools
-
-**iOS Universal Links**:
-- [Apple Universal Links Validator](https://branch.io/resources/aasa-validator/)
-- [Search Apple's CDN](https://app-site-association.cdn-apple.com/a/v1/yourdomain.com)
-
-#### Recommendation by Platform
-
-| Platform | Development | Production |
-|----------|-------------|------------|
-| **macOS Desktop** | Custom URL Scheme | Custom URL Scheme |
-| **iOS Mobile** | Custom URL Scheme | Universal Links ⭐️ |
-| **Android Mobile** | Custom URI Scheme | App Links ⭐️ |
+You can find the documentation for setting up Universal Links / App Links from Apple and Google.
 
 ---
 
@@ -573,15 +415,10 @@ Returns `AuthResponse` containing the authenticated user and session tokens.
 
 ```
 1. App calls signInWithOAuthView(provider:redirectTo:)
-   ↓
 2. SDK fetches the OAuth authorization URL from InsForge
-   ↓
 3. SDK opens in-app authentication browser (ASWebAuthenticationSession)
-   ↓
 4. User authenticates with the provider (Google, GitHub, etc.)
-   ↓
 5. SDK automatically handles callback and creates session
-   ↓
 6. Method returns AuthResponse with user data
 ```
 
@@ -623,50 +460,6 @@ struct LoginView: View {
             }
             .buttonStyle(.bordered)
 
-            // GitHub Sign In
-            Button {
-                Task {
-                    do {
-                        let response = try await client.auth.signInWithOAuthView(
-                            provider: .github,
-                            redirectTo: "yourapp://auth/callback"
-                        )
-                        currentUser = response.user
-                    } catch {
-                        errorMessage = error.localizedDescription
-                    }
-                }
-            } label: {
-                HStack {
-                    Image(systemName: "chevron.left.forwardslash.chevron.right")
-                    Text("Continue with GitHub")
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-
-            // Apple Sign In
-            Button {
-                Task {
-                    do {
-                        let response = try await client.auth.signInWithOAuthView(
-                            provider: .apple,
-                            redirectTo: "yourapp://auth/callback"
-                        )
-                        currentUser = response.user
-                    } catch {
-                        errorMessage = error.localizedDescription
-                    }
-                }
-            } label: {
-                HStack {
-                    Image(systemName: "apple.logo")
-                    Text("Continue with Apple")
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-
             if let error = errorMessage {
                 Text(error)
                     .foregroundColor(.red)
@@ -674,298 +467,13 @@ struct LoginView: View {
             }
         }
         .padding()
-    }
-}
-```
-
-#### Complete App Example
-
-```swift
-import SwiftUI
-import InsForge
-
-@main
-struct YourApp: App {
-    let client = InsForgeClient(
-        baseURL: URL(string: "https://your-instance.insforge.app")!,
-        anonKey: "your-api-key"
-    )
-
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-                .environmentObject(client)
-                .onOpenURL { url in
-                    // Only needed for external browser fallback mode
-                    // ASWebAuthenticationSession handles callbacks automatically
-                    Task {
-                        do {
-                            let response = try await client.auth.handleAuthCallback(url)
-                            print("Authenticated: \(response.user.email)")
-                        } catch {
-                            print("Auth failed: \(error)")
-                        }
-                    }
-                }
-        }
-    }
-}
-
-struct ContentView: View {
-    @EnvironmentObject var client: InsForgeClient
-    @State private var currentUser: User?
-
-    var body: some View {
-        if let user = currentUser {
-            DashboardView(user: user)
-        } else {
-            OAuthLoginView(onAuthenticated: { user in
-                currentUser = user
-            })
-        }
-    }
-}
-
-struct OAuthLoginView: View {
-    @EnvironmentObject var client: InsForgeClient
-    @State private var errorMessage: String?
-    let onAuthenticated: (User) -> Void
-
-    var body: some View {
-        VStack(spacing: 20) {
-            Text("Welcome")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-
-            Text("Sign in to continue")
-                .foregroundColor(.secondary)
-
-            VStack(spacing: 12) {
-                // Google
-                OAuthButton(
-                    provider: .google,
-                    title: "Continue with Google",
-                    icon: "g.circle.fill"
-                )
-
-                // GitHub
-                OAuthButton(
-                    provider: .github,
-                    title: "Continue with GitHub",
-                    icon: "chevron.left.forwardslash.chevron.right"
-                )
-
-                // Discord
-                OAuthButton(
-                    provider: .discord,
-                    title: "Continue with Discord",
-                    icon: "bubble.left.fill"
-                )
-
-                // Apple
-                OAuthButton(
-                    provider: .apple,
-                    title: "Continue with Apple",
-                    icon: "apple.logo"
-                )
-            }
-
-            if let error = errorMessage {
-                Text(error)
-                    .foregroundColor(.red)
-                    .font(.caption)
-            }
-        }
-        .padding()
-    }
-
-    @ViewBuilder
-    func OAuthButton(provider: OAuthProvider, title: String, icon: String) -> some View {
-        Button {
-            Task {
-                do {
-                    // ASWebAuthenticationSession returns AuthResponse directly
-                    if let response = try await client.auth.signInWithOAuthView(
-                        provider: provider,
-                        redirectTo: "yourapp://auth/callback"
-                    ) {
-                        // Authentication completed via in-app browser
-                        onAuthenticated(response.user)
-                    }
-                    // If nil, external browser was used - callback handled via onOpenURL
-
-                    // For production with Universal Links:
-                    // if let response = try await client.auth.signInWithOAuthView(
-                    //     provider: provider,
-                    //     redirectTo: "https://yourdomain.com/auth/callback"
-                    // ) {
-                    //     onAuthenticated(response.user)
-                    // }
-                } catch {
-                    errorMessage = error.localizedDescription
-                }
-            }
-        } label: {
-            HStack {
-                Image(systemName: icon)
-                Text(title)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-        }
-        .buttonStyle(.bordered)
     }
 }
 ```
 
 ### URL Scheme Configuration
 
-The callback URL configuration is the same as `signInWithDefaultView()`. You can use either:
-
-#### Custom URL Scheme (Development)
-
-**Info.plist**:
-```xml
-<key>CFBundleURLTypes</key>
-<array>
-    <dict>
-        <key>CFBundleURLSchemes</key>
-        <array>
-            <string>yourapp</string>
-        </array>
-        <key>CFBundleURLName</key>
-        <string>com.yourcompany.yourapp</string>
-    </dict>
-</array>
-```
-
-#### Universal Links (Production)
-
-See the [Universal Links Setup](#option-2-universal-links--app-links-recommended-for-production) section above for detailed configuration.
-
----
-
-### Callback URL Parameters
-
-When authentication succeeds, InsForge redirects to your callback URL with these parameters:
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `access_token` | String | JWT access token for API requests |
-| `user_id` | String | User's unique ID |
-| `email` | String | User's email address |
-| `name` | String? | User's display name (if available) |
-| `csrf_token` | String? | CSRF protection token |
-
-**Example**:
-```
-yourapp://auth/callback?access_token=eyJhbG...&user_id=123e4567-e89b...&email=user@example.com&name=John+Doe
-```
-
-### Security Best Practices
-
-#### Production Checklist
-
-- ✅ Use **ASWebAuthenticationSession** (default on iOS 12+/macOS 10.15+) for secure in-app authentication
-- ✅ Use **Universal Links** (iOS) or **App Links** (Android) for callback URLs in production
-- ✅ Use **HTTPS** for all production URLs (`baseURL` and redirect URLs)
-- ✅ Store API keys securely (use Keychain, never commit to source control)
-- ✅ Validate callback URLs before processing
-- ✅ Implement proper SSL certificate pinning for sensitive apps
-
-#### ASWebAuthenticationSession Benefits
-
-The SDK uses `ASWebAuthenticationSession` which provides:
-
-| Feature | Benefit |
-|---------|---------|
-| **Secure Browser** | Isolated from app's WebView, cookies shared with Safari |
-| **Automatic Callback** | No need for URL scheme hijacking concerns |
-| **Session Isolation** | Authentication data protected from the app |
-| **User Trust** | Shows Apple's authentication sheet UI |
-| **PKCE Support** | Enhanced OAuth security built-in |
-
-#### Why Universal Links are Recommended for Production
-
-1. **Domain Verification**: Apple verifies you own the domain by checking the hosted configuration file
-2. **Unique Mapping**: Only one app per domain can handle universal links
-3. **HTTPS Required**: Protects against man-in-the-middle attacks
-4. **Better UX**: Seamless experience without redirect prompts
-
----
-
-## SwiftUI Integration
-
-```swift
-import SwiftUI
-import InsForge
-
-struct ContentView: View {
-    @StateObject private var authState = InsForgeAuthState()
-
-    var body: some View {
-        Group {
-            if authState.isLoading {
-                ProgressView()
-            } else if let user = authState.user {
-                DashboardView(user: user)
-            } else {
-                LoginView()
-            }
-        }
-        .environmentObject(authState)
-    }
-}
-
-struct LoginView: View {
-    @EnvironmentObject var authState: InsForgeAuthState
-    @State private var email = ""
-    @State private var password = ""
-    @State private var errorMessage: String?
-
-    var body: some View {
-        VStack(spacing: 20) {
-            TextField("Email", text: $email)
-                .textFieldStyle(.roundedBorder)
-                .autocapitalization(.none)
-
-            SecureField("Password", text: $password)
-                .textFieldStyle(.roundedBorder)
-
-            if let errorMessage {
-                Text(errorMessage)
-                    .foregroundColor(.red)
-                    .font(.caption)
-            }
-
-            Button("Sign In") {
-                Task {
-                    do {
-                        try await authState.signIn(email: email, password: password)
-                    } catch {
-                        errorMessage = error.localizedDescription
-                    }
-                }
-            }
-            .buttonStyle(.borderedProminent)
-
-            // OAuth buttons
-            SignInWithAppleButton { request in
-                request.requestedScopes = [.email, .fullName]
-            } onCompletion: { result in
-                Task {
-                    do {
-                        try await authState.signInWithApple(result: result)
-                    } catch {
-                        errorMessage = error.localizedDescription
-                    }
-                }
-            }
-        }
-        .padding()
-    }
-}
-```
+The callback URL configuration is the same as `signInWithDefaultView()`. 
 
 ---
 
