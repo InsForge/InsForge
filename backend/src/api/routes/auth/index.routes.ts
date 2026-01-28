@@ -291,7 +291,7 @@ router.post('/id-token', async (req: Request, res: Response, next: NextFunction)
 
     if (clientType === 'web') {
       // Web clients: use httpOnly cookie + CSRF token
-      setAuthCookie(req, res, REFRESH_TOKEN_COOKIE_NAME, refreshToken);
+      setRefreshTokenCookie(res, refreshToken);
       result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
     } else {
       // Mobile/Desktop clients: return refresh token in response body
