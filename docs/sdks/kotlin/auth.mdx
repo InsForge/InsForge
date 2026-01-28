@@ -45,31 +45,6 @@ data class SignUpResponse(
 )
 ```
 
-### Example (Basic)
-
-```kotlin
-try {
-    val result = client.auth.signUp(
-        email = "user@example.com",
-        password = "secure_password123",
-        name = "John Doe"
-    )
-
-    if (result.requireEmailVerification) {
-        // Email verification required - show verification screen
-        showEmailVerificationScreen(email = "user@example.com")
-    } else {
-        result.user?.let { user ->
-            // Sign up successful, no verification needed
-            Log.d("Auth", "Welcome, ${user.profile?.name ?: user.email}!")
-            navigateToDashboard()
-        }
-    }
-} catch (e: InsforgeHttpException) {
-    Log.e("Auth", "Sign up failed: ${e.message}")
-}
-```
-
 ### Example (Complete Flow with Verification)
 
 ```kotlin
@@ -125,197 +100,6 @@ sealed class AuthUiState {
     object VerificationSuccess : AuthUiState()
     data class RequiresVerification(val email: String) : AuthUiState()
     data class Error(val message: String) : AuthUiState()
-}
-```
-
-### Example (Jetpack Compose with State Handling)
-
-```kotlin
-@Composable
-fun SignUpScreen(
-    onNavigateToDashboard: () -> Unit,
-    onNavigateToSignIn: () -> Unit
-) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf("") }
-    var showVerification by remember { mutableStateOf(false) }
-    var verificationCode by remember { mutableStateOf("") }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isLoading by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-
-    if (showVerification) {
-        // Verification code input screen
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = "Verify Your Email",
-                style = MaterialTheme.typography.headlineMedium
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Enter the 6-digit code sent to $email",
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            OutlinedTextField(
-                value = verificationCode,
-                onValueChange = { verificationCode = it },
-                label = { Text("Verification Code") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            errorMessage?.let {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(it, color = MaterialTheme.colorScheme.error)
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Button(
-                onClick = {
-                    scope.launch {
-                        isLoading = true
-                        errorMessage = null
-                        try {
-                            client.auth.verifyEmail(email = email, code = verificationCode)
-                            onNavigateToSignIn()
-                        } catch (e: InsforgeHttpException) {
-                            errorMessage = "Invalid verification code"
-                        } finally {
-                            isLoading = false
-                        }
-                    }
-                },
-                enabled = !isLoading && verificationCode.length == 6,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    Text("Verify")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            TextButton(
-                onClick = {
-                    scope.launch {
-                        try {
-                            client.auth.resendVerificationEmail(email = email)
-                            // Show toast: "Verification code sent"
-                        } catch (e: InsforgeHttpException) {
-                            errorMessage = "Failed to resend code"
-                        }
-                    }
-                }
-            ) {
-                Text("Resend Code")
-            }
-        }
-    } else {
-        // Sign up form
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = "Create Account",
-                style = MaterialTheme.typography.headlineMedium
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Name (optional)") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
-                label = { Text("Email") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Password") },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            errorMessage?.let {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(it, color = MaterialTheme.colorScheme.error)
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Button(
-                onClick = {
-                    scope.launch {
-                        isLoading = true
-                        errorMessage = null
-                        try {
-                            val result = client.auth.signUp(
-                                email = email,
-                                password = password,
-                                name = name.ifBlank { null }
-                            )
-
-                            if (result.requireEmailVerification) {
-                                showVerification = true
-                            } else if (result.accessToken != null) {
-                                onNavigateToDashboard()
-                            }
-                        } catch (e: InsforgeHttpException) {
-                            errorMessage = e.message
-                        } finally {
-                            isLoading = false
-                        }
-                    }
-                },
-                enabled = !isLoading && email.isNotBlank() && password.isNotBlank(),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    Text("Sign Up")
-                }
-            }
-        }
-    }
 }
 ```
 
@@ -495,90 +279,6 @@ class AuthCallbackActivity : AppCompatActivity() {
 }
 ```
 
-### Android App Links Setup
-
-**Step 1: Create assetlinks.json**
-
-Create a file named `assetlinks.json`:
-
-```json
-[
-  {
-    "relation": ["delegate_permission/common.handle_all_urls"],
-    "target": {
-      "namespace": "android_app",
-      "package_name": "com.yourcompany.yourapp",
-      "sha256_cert_fingerprints": [
-        "14:6D:E9:83:C5:73:06:50:D8:EE:B9:95:2F:34:FC:64:16:A0:83:42:E6:1D:BE:A8:8A:04:96:B2:3F:CF:44:E5"
-      ]
-    }
-  }
-]
-```
-
-Replace:
-- `package_name`: Your app's package name
-- `sha256_cert_fingerprints`: Your app's signing certificate SHA256 fingerprint
-
-**Get SHA256 Fingerprint**:
-
-```bash
-# Debug keystore
-keytool -list -v -keystore ~/.android/debug.keystore \
-  -alias androiddebugkey -storepass android -keypass android \
-  | grep "SHA256:"
-
-# Release keystore
-keytool -list -v -keystore your-release-key.keystore \
-  -alias your-key-alias \
-  | grep "SHA256:"
-```
-
-**Step 2: Host the file**
-
-Upload to:
-```
-https://yourdomain.com/.well-known/assetlinks.json
-```
-
-**Verify hosting**:
-```bash
-curl https://yourdomain.com/.well-known/assetlinks.json
-# Should return your JSON configuration
-```
-
-**Step 3: Configure AndroidManifest.xml**
-
-```xml
-<activity android:name=".MainActivity">
-    <intent-filter android:autoVerify="true">
-        <action android:name="android.intent.action.VIEW" />
-        <category android:name="android.intent.category.DEFAULT" />
-        <category android:name="android.intent.category.BROWSABLE" />
-        <data
-            android:scheme="https"
-            android:host="yourdomain.com"
-            android:pathPrefix="/auth" />
-    </intent-filter>
-</activity>
-```
-
-#### Verification Tools
-
-**Android App Links**:
-```bash
-adb shell am start -a android.intent.action.VIEW \
-  -d "https://yourdomain.com/auth/callback?access_token=test"
-```
-
-### Recommendation by Platform
-
-| Platform | Development | Production |
-|----------|-------------|------------|
-| **macOS Desktop** | Custom URL Scheme | Custom URL Scheme |
-| **iOS Mobile** | Custom URL Scheme | Universal Links ⭐️ |
-| **Android Mobile** | Custom URI Scheme | App Links ⭐️ |
-
 ---
 
 ## signInWithOAuthPage()
@@ -624,8 +324,16 @@ When creating the InsForge client, configure the `browserLauncher` to handle ope
 val client = createInsforgeClient(baseURL, anonKey) {
     install(Auth) {
         browserLauncher = BrowserLauncher { url ->
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-            context.startActivity(intent)
+            val customTabsIntent = CustomTabsIntent.Builder()
+                .setShowTitle(true)
+                .build()
+            // Handle non-Activity context safely
+            if (context is Activity) {
+                customTabsIntent.launchUrl(context, Uri.parse(url))
+            } else {
+                customTabsIntent.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                customTabsIntent.launchUrl(context, Uri.parse(url))
+            }
         }
         persistSession = true
         sessionStorage = mySessionStorage
@@ -635,39 +343,7 @@ val client = createInsforgeClient(baseURL, anonKey) {
 
 2. Configure App Link / Deep Link Callback
 
-Configure your callback Activity in AndroidManifest.xml (same as `signInWithDefaultPage`):
-
-- Option A: Custom URL Scheme (for Development)
-
-```xml
-<activity
-    android:name=".AuthCallbackActivity"
-    android:launchMode="singleTask"
-    android:exported="true">
-    <intent-filter>
-        <action android:name="android.intent.action.VIEW" />
-        <category android:name="android.intent.category.DEFAULT" />
-        <category android:name="android.intent.category.BROWSABLE" />
-        <data android:scheme="yourapp" android:host="auth" android:path="/callback" />
-    </intent-filter>
-</activity>
-```
-
-- Option B: App Links (for Production)
-
-```xml
-<activity
-    android:name=".AuthCallbackActivity"
-    android:launchMode="singleTask"
-    android:exported="true">
-    <intent-filter android:autoVerify="true">
-        <action android:name="android.intent.action.VIEW" />
-        <category android:name="android.intent.category.DEFAULT" />
-        <category android:name="android.intent.category.BROWSABLE" />
-        <data android:scheme="https" android:host="yourdomain.com" android:path="/auth/callback" />
-    </intent-filter>
-</activity>
-```
+Same as `signInWithDefaultPage()`.
 
 3. Initiate OAuth Login with Specific Provider
 
@@ -682,148 +358,11 @@ fun startGoogleLogin() {
         // Browser opens automatically via browserLauncher
     }
 }
-
-// Start OAuth flow with GitHub
-fun startGitHubLogin() {
-    lifecycleScope.launch {
-        client.auth.signInWithOAuthPage(
-            OAuthProvider.GITHUB,
-            "yourapp://auth/callback"
-        )
-    }
-}
 ```
 
 4. Handle OAuth Callback
 
-```kotlin
-class AuthCallbackActivity : AppCompatActivity() {
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        handleIntent(intent)
-    }
-
-    override fun onNewIntent(intent: Intent?) {
-        super.onNewIntent(intent)
-        intent?.let { handleIntent(it) }
-    }
-
-    private fun handleIntent(intent: Intent) {
-        intent.data?.let { uri ->
-            lifecycleScope.launch {
-                try {
-                    // Callback URL handled by SDK
-                    val result = client.auth.handleAuthCallback(uri.toString())
-
-                    // Auth success, navigate to main screen
-                    Toast.makeText(this@AuthCallbackActivity,
-                        "Success: ${result.email}", Toast.LENGTH_SHORT).show()
-
-                    startActivity(Intent(this@AuthCallbackActivity, MainActivity::class.java))
-                    finish()
-
-                } catch (e: Exception) {
-                    // Handle error
-                    Toast.makeText(this@AuthCallbackActivity,
-                        "Failed: ${e.message}", Toast.LENGTH_LONG).show()
-                    finish()
-                }
-            }
-        }
-    }
-}
-```
-
-### Authentication Flow
-
-```
-1. App calls signInWithOAuthPage(provider, redirectUri)
-2. SDK fetches the OAuth authorization URL from InsForge
-3. SDK automatically opens the OAuth URL in system browser
-4. User authenticates with the provider (Google, GitHub, etc.)
-5. Provider redirects to InsForge, then InsForge redirects to your callback URL
-6. Android intercepts callback URL (via Custom URL Scheme or App Links)
-7. App calls handleAuthCallback(url)
-8. SDK creates session, updates auth state, and persists token
-```
-
-### Jetpack Compose Example
-
-```kotlin
-@Composable
-fun OAuthLoginScreen() {
-    val scope = rememberCoroutineScope()
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "Sign in with",
-            style = MaterialTheme.typography.headlineSmall
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Google Sign In
-        Button(
-            onClick = {
-                scope.launch {
-                    client.auth.signInWithOAuthPage(
-                        OAuthProvider.GOOGLE,
-                        "yourapp://auth/callback"
-                    )
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Continue with Google")
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // GitHub Sign In
-        Button(
-            onClick = {
-                scope.launch {
-                    client.auth.signInWithOAuthPage(
-                        OAuthProvider.GITHUB,
-                        "yourapp://auth/callback"
-                    )
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Continue with GitHub")
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Discord Sign In
-        Button(
-            onClick = {
-                scope.launch {
-                    client.auth.signInWithOAuthPage(
-                        OAuthProvider.DISCORD,
-                        "yourapp://auth/callback"
-                    )
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Continue with Discord")
-        }
-    }
-}
-```
-
-<Note>
-The `browserLauncher` must be configured when installing the Auth module. If not configured, `signInWithOAuthPage()` will throw an `IllegalStateException`.
-</Note>
+Same as `signInWithDefaultPage()`.
 
 ---
 
@@ -852,38 +391,6 @@ try {
 <Note>
 This method makes a network request to fetch user data. For accessing locally cached user state, use `currentUser` StateFlow instead.
 </Note>
-
----
-
-## currentSession
-
-A `StateFlow` property that holds the current session from local storage.
-
-### Type
-
-```kotlin
-val currentSession: StateFlow<Session?>
-```
-
-### Example
-
-```kotlin
-// Access current session value
-client.auth.currentSession.value?.let { session ->
-    Log.d("Auth", "Session active for user: ${session.user.email}")
-}
-
-// Observe session changes
-lifecycleScope.launch {
-    client.auth.currentSession.collect { session ->
-        if (session != null) {
-            Log.d("Auth", "Session active: ${session.user.email}")
-        } else {
-            Log.d("Auth", "No active session")
-        }
-    }
-}
-```
 
 ---
 
@@ -920,127 +427,101 @@ try {
 
 ---
 
-## currentUser
+## Password Reset
 
-A `StateFlow` property that holds the current authenticated user state.
+InsForge supports two password reset methods, configured in the backend:
 
-### Type
+- **Code method**: User receives a 6-digit code via email, verifies it to get a reset token, then resets password
+- **Link method**: User receives a magic link via email containing the reset token, then resets password directly
+
+### sendPasswordReset()
+
+Send a password reset email to the user. The email will contain either a 6-digit code or a magic link depending on the backend configuration.
+
+#### Parameters
+
+- `email` (String) - User's email address
+
+#### Example
 
 ```kotlin
-val currentUser: StateFlow<User?>
-```
-
-### Example
-
-```kotlin
-// Observe auth state as Flow
-lifecycleScope.launch {
-    client.auth.currentUser.collect { user ->
-        if (user != null) {
-            Log.d("Auth", "User signed in: ${user.email}")
-        } else {
-            Log.d("Auth", "User signed out")
-        }
-    }
+try {
+    client.auth.sendPasswordReset(email = "user@example.com")
+    // Show message to check email
+    showMessage("If your email is registered, you will receive a password reset email.")
+} catch (e: InsforgeHttpException) {
+    Log.e("Auth", "Failed to send reset email: ${e.message}")
 }
-
-// Access current user value directly
-val user = client.auth.currentUser.value
 ```
 
 ---
 
-## Jetpack Compose Integration
+### exchangeResetPasswordToken()
+
+Exchange a 6-digit reset code for a reset token. **This method is only used with the code-based reset flow.**
+
+#### Parameters
+
+- `email` (String) - User's email address
+- `code` (String) - 6-digit numeric code received via email
+
+#### Returns
 
 ```kotlin
-@Composable
-fun AuthScreen() {
-    val currentUser by client.auth.currentUser.collectAsState()
+ResetTokenResponse
+```
 
-    when {
-        currentUser != null -> DashboardScreen(user = currentUser!!)
-        else -> LoginScreen()
-    }
+#### ResetTokenResponse
+
+```kotlin
+data class ResetTokenResponse(
+    /** Reset token to use with resetPassword() */
+    val token: String,
+    /** Token expiration timestamp */
+    val expiresAt: String?
+)
+```
+
+#### Example
+
+```kotlin
+try {
+    val response = client.auth.exchangeResetPasswordToken(
+        email = "user@example.com",
+        code = "123456"
+    )
+    // Store the token and proceed to password reset screen
+    val resetToken = response.token
+    showPasswordResetScreen(token = resetToken)
+} catch (e: InsforgeHttpException) {
+    Log.e("Auth", "Invalid or expired code: ${e.message}")
 }
+```
 
-@Composable
-fun LoginScreen() {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
+---
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Email") },
-            modifier = Modifier.fillMaxWidth()
-        )
+### resetPassword()
 
-        Spacer(modifier = Modifier.height(8.dp))
+Reset the user's password using a reset token.
 
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Password") },
-            visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth()
-        )
+#### Parameters
 
-        error?.let {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(it, color = MaterialTheme.colorScheme.error)
-        }
+- `newPassword` (String) - New password meeting the configured requirements
+- `otp` (String) - Reset token (from `exchangeResetPasswordToken()` for code flow, or from magic link URL for link flow)
 
-        Spacer(modifier = Modifier.height(16.dp))
+#### Example
 
-        Button(
-            onClick = {
-                scope.launch {
-                    isLoading = true
-                    error = null
-                    try {
-                        client.auth.signIn(email, password)
-                    } catch (e: InsforgeHttpException) {
-                        error = e.message
-                    } finally {
-                        isLoading = false
-                    }
-                }
-            },
-            enabled = !isLoading,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-            } else {
-                Text("Sign In")
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // OAuth button
-        Button(
-            onClick = {
-                client.auth.signInWithDefaultPage("yourapp://auth/callback")
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Sign In with OAuth")
-        }
-    }
+```kotlin
+try {
+    client.auth.resetPassword(
+        newPassword = "newSecurePassword123",
+        otp = resetToken
+    )
+    // Password reset successful
+    showMessage("Password reset successfully. You can now sign in.")
+    navigateToSignIn()
+} catch (e: InsforgeHttpException) {
+    Log.e("Auth", "Password reset failed: ${e.message}")
 }
 ```
 
