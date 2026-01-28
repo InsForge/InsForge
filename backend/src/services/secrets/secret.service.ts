@@ -346,7 +346,7 @@ export class SecretService {
   /**
    * Rotate a secret (create new value, keep old for grace period)
    */
-  async rotateSecret(id: string, newValue: string): Promise<{ newId: string }> {
+  async rotateSecret(id: string, newValue: string, gracePeriodHours: number = 24): Promise<{ newId: string }> {
     const client = await this.getPool().connect();
     try {
       await client.query('BEGIN');
@@ -364,7 +364,7 @@ export class SecretService {
       await client.query(
         `UPDATE system.secrets
          SET is_active = false,
-             expires_at = NOW() + INTERVAL '24 hours'
+             expires_at = NOW() + INTERVAL '${gracePeriodHours} hours'
          WHERE id = $1`,
         [id]
       );
@@ -427,12 +427,104 @@ export class SecretService {
 
   /**
    * Verify API key against database
+   * Checks both active key and rotated keys in grace period
    */
   async verifyApiKey(apiKey: string): Promise<boolean> {
     if (!apiKey) {
       return false;
     }
-    return this.checkSecretByKey('API_KEY', apiKey);
+
+    // Check active API_KEY first
+    const activeMatch = await this.checkSecretByKey('API_KEY', apiKey);
+    if (activeMatch) {
+      return true;
+    }
+
+    // Check rotated API keys in grace period (API_KEY_OLD_* with expires_at > NOW)
+    try {
+      const result = await this.getPool().query(
+        `SELECT value_ciphertext FROM system.secrets
+         WHERE key LIKE 'API_KEY_OLD_%'
+         AND is_active = true
+         AND expires_at IS NOT NULL
+         AND expires_at > NOW()`,
+        []
+      );
+
+      for (const row of result.rows) {
+        const decryptedValue = EncryptionManager.decrypt(row.value_ciphertext);
+        const decryptedBuffer = Buffer.from(decryptedValue);
+        const valueBuffer = Buffer.from(apiKey);
+        if (
+          decryptedBuffer.length === valueBuffer.length &&
+          crypto.timingSafeEqual(decryptedBuffer, valueBuffer)
+        ) {
+          return true;
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to check grace-period API keys', { error });
+    }
+
+    return false;
+  }
+
+  /**
+   * Rotate API key with grace period for old key
+   * Old key remains valid for specified grace period (default 24 hours)
+   */
+  async rotateApiKey(gracePeriodHours: number = 24): Promise<{ newApiKey: string; oldKeyExpiresAt: Date }> {
+    const client = await this.getPool().connect();
+    try {
+      await client.query('BEGIN');
+
+      // Get current API key
+      const currentResult = await client.query(
+        `SELECT id, value_ciphertext FROM system.secrets
+         WHERE key = 'API_KEY' AND is_active = true`,
+        []
+      );
+
+      if (!currentResult.rows.length) {
+        throw new Error('No active API key found');
+      }
+
+      const oldKeyId = currentResult.rows[0].id;
+      const oldKeyExpiresAt = new Date(Date.now() + gracePeriodHours * 60 * 60 * 1000);
+
+      // Rename old key to API_KEY_OLD_<timestamp> for grace period
+      const gracePeriodKey = `API_KEY_OLD_${Date.now()}`;
+      await client.query(
+        `UPDATE system.secrets
+         SET key = $1, expires_at = $2
+         WHERE id = $3`,
+        [gracePeriodKey, oldKeyExpiresAt, oldKeyId]
+      );
+
+      // Generate and insert new API key
+      const newApiKey = this.generateApiKey();
+      const newKeyEncrypted = EncryptionManager.encrypt(newApiKey);
+      await client.query(
+        `INSERT INTO system.secrets (key, value_ciphertext, is_active, is_reserved)
+         VALUES ('API_KEY', $1, true, true)`,
+        [newKeyEncrypted]
+      );
+
+      await client.query('COMMIT');
+
+      logger.info('API key rotated successfully', {
+        gracePeriodKey,
+        oldKeyExpiresAt: oldKeyExpiresAt.toISOString(),
+      });
+
+      return { newApiKey, oldKeyExpiresAt };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Failed to rotate API key', { error });
+      throw new Error('Failed to rotate API key');
+    } finally {
+      client.release();
+    }
   }
 
   /**

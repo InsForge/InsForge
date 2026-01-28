@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Info, Plug, ChartBarBig } from 'lucide-react';
+import { Info, Plug, ChartBarBig, RefreshCw } from 'lucide-react';
 import { CopyButton, TooltipProvider, Input, Button, ConfirmDialog } from '@/components';
 import { useApiKey } from '@/lib/hooks/useMetadata';
 import { useConfirm } from '@/lib/hooks/useConfirm';
+import { metadataService } from '@/lib/services/metadata.service';
 import {
   cn,
   getBackendUrl,
@@ -73,8 +74,9 @@ export default function SettingsPage() {
   const [isVersionOutdated, setIsVersionOutdated] = useState(false);
   const [isUpdatingVersion, setIsUpdatingVersion] = useState(false);
 
-  const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
+  const { apiKey, isLoading: isApiKeyLoading, refetch: refetchApiKey } = useApiKey();
   const { confirm, confirmDialogProps } = useConfirm();
+  const [isRotatingApiKey, setIsRotatingApiKey] = useState(false);
   const isCloud = isInsForgeCloudProject();
   const isInIframe = isIframe();
   const projectUrl = window.location.origin;
@@ -177,6 +179,31 @@ export default function SettingsPage() {
     postMessageToParent({ type: 'UPDATE_PROJECT_VERSION' }, '*');
   };
 
+  const handleRotateApiKey = async () => {
+    const confirmed = await confirm({
+      title: 'Rotate API Key',
+      description:
+        'This will generate a new API key. The current key will remain valid for 24 hours to allow time for migration. Are you sure you want to proceed?',
+      confirmText: 'Rotate Key',
+      cancelText: 'Cancel',
+      destructive: true,
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsRotatingApiKey(true);
+    try {
+      await metadataService.rotateApiKey(24);
+      await refetchApiKey();
+    } catch (error) {
+      console.error('Failed to rotate API key:', error);
+    } finally {
+      setIsRotatingApiKey(false);
+    }
+  };
+
   return (
     <>
       <ConfirmDialog {...confirmDialogProps} />
@@ -275,22 +302,34 @@ export default function SettingsPage() {
                         API Key
                       </label>
                       <div className="flex-1 flex flex-col gap-1">
-                        <div
-                          className={cn(
-                            'h-9 flex items-center justify-between gap-2 text-sm bg-gray-100 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 pl-3 pr-2 rounded-lg',
-                            isApiKeyLoading && 'animate-pulse'
-                          )}
-                        >
-                          <span className="font-mono text-gray-900 dark:text-white">
-                            {isApiKeyLoading ? '•'.repeat(35) : maskedApiKey || 'Not available'}
-                          </span>
-                          {!isApiKeyLoading && apiKey && (
-                            <CopyButton
-                              text={apiKey}
-                              showText={false}
-                              className="h-6 w-6 p-1 min-w-0 shrink-0 text-black dark:text-white bg-white dark:bg-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-600 border-none"
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={cn(
+                              'flex-1 h-9 flex items-center justify-between gap-2 text-sm bg-gray-100 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 pl-3 pr-2 rounded-lg',
+                              isApiKeyLoading && 'animate-pulse'
+                            )}
+                          >
+                            <span className="font-mono text-gray-900 dark:text-white">
+                              {isApiKeyLoading ? '•'.repeat(35) : maskedApiKey || 'Not available'}
+                            </span>
+                            {!isApiKeyLoading && apiKey && (
+                              <CopyButton
+                                text={apiKey}
+                                showText={false}
+                                className="h-6 w-6 p-1 min-w-0 shrink-0 text-black dark:text-white bg-white dark:bg-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-600 border-none"
+                              />
+                            )}
+                          </div>
+                          <Button
+                            onClick={() => void handleRotateApiKey()}
+                            disabled={isApiKeyLoading || isRotatingApiKey}
+                            className="h-9 flex items-center gap-2 text-white dark:text-black bg-black dark:bg-emerald-300 hover:opacity-90 px-3 py-2 rounded-lg disabled:opacity-40"
+                          >
+                            <RefreshCw
+                              className={cn('w-4 h-4', isRotatingApiKey && 'animate-spin')}
                             />
-                          )}
+                            {isRotatingApiKey ? 'Rotating...' : 'Rotate'}
+                          </Button>
                         </div>
                         <p className="text-xs text-gray-500 dark:text-neutral-400">
                           This key has full access control to your project and should be kept

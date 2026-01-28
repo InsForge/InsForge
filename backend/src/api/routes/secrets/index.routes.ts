@@ -173,6 +173,43 @@ router.put('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next: N
 });
 
 /**
+ * Rotate API key with grace period
+ * POST /api/secrets/api-key/rotate
+ */
+router.post(
+  '/api-key/rotate',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { gracePeriodHours } = req.body;
+
+      const result = await secretService.rotateApiKey(gracePeriodHours);
+
+      // Log audit
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'ROTATE_API_KEY',
+        module: 'SECRETS',
+        details: {
+          oldKeyExpiresAt: result.oldKeyExpiresAt.toISOString(),
+          gracePeriodHours: gracePeriodHours || 24,
+        },
+        ip_address: req.ip,
+      });
+
+      successResponse(res, {
+        success: true,
+        message: 'API key rotated successfully. Old key will remain valid during grace period.',
+        apiKey: result.newApiKey,
+        oldKeyExpiresAt: result.oldKeyExpiresAt.toISOString(),
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * Delete a secret (mark as inactive)
  * DELETE /api/secrets/:key
  */
