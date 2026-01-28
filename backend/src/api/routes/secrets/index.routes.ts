@@ -1,4 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
@@ -6,6 +7,10 @@ import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
+
+const RotateApiKeySchema = z.object({
+  gracePeriodHours: z.coerce.number().int().nonnegative().max(168).optional(),
+});
 
 const router = Router();
 const secretService = SecretService.getInstance();
@@ -181,8 +186,16 @@ router.post(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const { gracePeriodHours } = req.body;
+      const parseResult = RotateApiKeySchema.safeParse(req.body);
+      if (!parseResult.success) {
+        throw new AppError(
+          `Invalid request: ${parseResult.error.errors.map((e) => e.message).join(', ')}`,
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
 
+      const { gracePeriodHours } = parseResult.data;
       const result = await secretService.rotateApiKey(gracePeriodHours);
 
       // Log audit
@@ -192,7 +205,7 @@ router.post(
         module: 'SECRETS',
         details: {
           oldKeyExpiresAt: result.oldKeyExpiresAt.toISOString(),
-          gracePeriodHours: gracePeriodHours || 24,
+          gracePeriodHours: gracePeriodHours ?? 24,
         },
         ip_address: req.ip,
       });

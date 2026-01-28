@@ -346,11 +346,7 @@ export class SecretService {
   /**
    * Rotate a secret (create new value, keep old for grace period)
    */
-  async rotateSecret(
-    id: string,
-    newValue: string,
-    gracePeriodHours: number = 24
-  ): Promise<{ newId: string }> {
+  async rotateSecret(id: string, newValue: string): Promise<{ newId: string }> {
     const client = await this.getPool().connect();
     try {
       await client.query('BEGIN');
@@ -368,7 +364,7 @@ export class SecretService {
       await client.query(
         `UPDATE system.secrets
          SET is_active = false,
-             expires_at = NOW() + INTERVAL '${gracePeriodHours} hours'
+             expires_at = NOW() + INTERVAL '24 hours'
          WHERE id = $1`,
         [id]
       );

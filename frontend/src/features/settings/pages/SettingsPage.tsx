@@ -4,6 +4,7 @@ import { Info, Plug, ChartBarBig, RefreshCw } from 'lucide-react';
 import { CopyButton, TooltipProvider, Input, Button, ConfirmDialog } from '@/components';
 import { useApiKey } from '@/lib/hooks/useMetadata';
 import { useConfirm } from '@/lib/hooks/useConfirm';
+import { useToast } from '@/lib/hooks/useToast';
 import { metadataService } from '@/lib/services/metadata.service';
 import {
   cn,
@@ -76,6 +77,7 @@ export default function SettingsPage() {
 
   const { apiKey, isLoading: isApiKeyLoading, refetch: refetchApiKey } = useApiKey();
   const { confirm, confirmDialogProps } = useConfirm();
+  const { showToast } = useToast();
   const [isRotatingApiKey, setIsRotatingApiKey] = useState(false);
   const isCloud = isInsForgeCloudProject();
   const isInIframe = isIframe();
@@ -197,8 +199,11 @@ export default function SettingsPage() {
     try {
       await metadataService.rotateApiKey(24);
       await refetchApiKey();
+      showToast('API key rotated successfully', 'success');
     } catch (error) {
-      console.error('Failed to rotate API key:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to rotate API key — please try again';
+      showToast(errorMessage, 'error');
     } finally {
       setIsRotatingApiKey(false);
     }
