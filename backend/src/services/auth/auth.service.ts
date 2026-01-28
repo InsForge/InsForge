@@ -987,6 +987,71 @@ export class AuthService {
   }
 
   /**
+   * Sign in with ID token from native SDK (Google One Tap, etc.)
+   * Limited to Google for now to unblock customer ask, can extend to other providers later as needed.
+   */
+  async signInWithIdToken(provider: 'google', idToken: string): Promise<CreateSessionResponse> {
+    let userData: OAuthUserData;
+
+    switch (provider) {
+      case 'google': {
+        // Verify the ID token with Google's public keys
+        let googleUserInfo;
+        try {
+          googleUserInfo = await this.googleOAuthProvider.verifyToken(idToken);
+        } catch (error) {
+          logger.error('Failed to verify Google ID token:', error);
+          throw new AppError('Failed to verify Google ID token', 400, ERROR_CODES.INVALID_INPUT);
+        }
+
+        // Validate required claims (sub is always present, email may be empty if scope wasn't granted)
+        if (!googleUserInfo.sub) {
+          throw new AppError(
+            'Invalid Google ID token: missing sub claim',
+            400,
+            ERROR_CODES.INVALID_INPUT
+          );
+        }
+        if (!googleUserInfo.email) {
+          throw new AppError(
+            'Invalid Google ID token: missing email claim',
+            400,
+            ERROR_CODES.INVALID_INPUT
+          );
+        }
+
+        const userName = googleUserInfo.name || googleUserInfo.email.split('@')[0];
+        userData = {
+          provider: 'google',
+          providerId: googleUserInfo.sub,
+          email: googleUserInfo.email,
+          userName,
+          avatarUrl: googleUserInfo.picture || '',
+          identityData: googleUserInfo,
+        };
+        break;
+      }
+
+      default:
+        throw new AppError(
+          `Provider ${provider} is not supported for ID token sign-in. Supported: google`,
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+    }
+
+    // Create or find the user and return session
+    return this.findOrCreateThirdPartyUser(
+      userData.provider,
+      userData.providerId,
+      userData.email,
+      userData.userName,
+      userData.avatarUrl,
+      userData.identityData
+    );
+  }
+
+  /**
    * Get user by email (helper method for internal use)
    * @private
    */
