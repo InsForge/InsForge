@@ -476,6 +476,15 @@ export class SecretService {
   async rotateApiKey(
     gracePeriodHours: number = 24
   ): Promise<{ newApiKey: string; oldKeyExpiresAt: Date }> {
+    // Validate gracePeriodHours
+    const isValidHours =
+      typeof gracePeriodHours === 'number' &&
+      Number.isFinite(gracePeriodHours) &&
+      gracePeriodHours >= 0;
+    const validatedHours = isValidHours ? gracePeriodHours : 24;
+
+    const oldKeyExpiresAt = new Date(Date.now() + validatedHours * 60 * 60 * 1000);
+
     const client = await this.getPool().connect();
     try {
       await client.query('BEGIN');
@@ -492,7 +501,6 @@ export class SecretService {
       }
 
       const oldKeyId = currentResult.rows[0].id;
-      const oldKeyExpiresAt = new Date(Date.now() + gracePeriodHours * 60 * 60 * 1000);
 
       // Rename old key to API_KEY_OLD_<timestamp> for grace period
       const gracePeriodKey = `API_KEY_OLD_${Date.now()}`;
