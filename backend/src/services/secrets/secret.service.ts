@@ -427,12 +427,122 @@ export class SecretService {
 
   /**
    * Verify API key against database
+   * Checks both active key and rotated keys in grace period
    */
   async verifyApiKey(apiKey: string): Promise<boolean> {
     if (!apiKey) {
       return false;
     }
-    return this.checkSecretByKey('API_KEY', apiKey);
+
+    // Check active API_KEY first
+    const activeMatch = await this.checkSecretByKey('API_KEY', apiKey);
+    if (activeMatch) {
+      return true;
+    }
+
+    // Check rotated API keys in grace period (API_KEY_OLD_* with expires_at > NOW)
+    let rows: { value_ciphertext: string }[] = [];
+    try {
+      const result = await this.getPool().query(
+        `SELECT value_ciphertext FROM system.secrets
+         WHERE key LIKE 'API_KEY_OLD_%'
+         AND is_active = true
+         AND expires_at IS NOT NULL
+         AND expires_at > NOW()`,
+        []
+      );
+      rows = result.rows;
+    } catch (error) {
+      logger.error('Failed to query grace-period API keys', { error });
+      return false;
+    }
+
+    const valueBuffer = Buffer.from(apiKey);
+    for (const row of rows) {
+      try {
+        const decryptedValue = EncryptionManager.decrypt(row.value_ciphertext);
+        const decryptedBuffer = Buffer.from(decryptedValue);
+        if (
+          decryptedBuffer.length === valueBuffer.length &&
+          crypto.timingSafeEqual(decryptedBuffer, valueBuffer)
+        ) {
+          return true;
+        }
+      } catch (error) {
+        logger.error('Failed to decrypt grace-period API key', { error });
+        continue;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Rotate API key with grace period for old key
+   * Old key remains valid for specified grace period (default 24 hours)
+   */
+  async rotateApiKey(
+    gracePeriodHours: number = 24
+  ): Promise<{ newApiKey: string; oldKeyExpiresAt: Date }> {
+    // Validate gracePeriodHours
+    const isValidHours =
+      typeof gracePeriodHours === 'number' &&
+      Number.isFinite(gracePeriodHours) &&
+      gracePeriodHours >= 0;
+    const validatedHours = isValidHours ? gracePeriodHours : 24;
+
+    const oldKeyExpiresAt = new Date(Date.now() + validatedHours * 60 * 60 * 1000);
+
+    const client = await this.getPool().connect();
+    try {
+      await client.query('BEGIN');
+
+      // Get current API key
+      const currentResult = await client.query(
+        `SELECT id, value_ciphertext FROM system.secrets
+         WHERE key = 'API_KEY' AND is_active = true`,
+        []
+      );
+
+      if (!currentResult.rows.length) {
+        throw new Error('No active API key found');
+      }
+
+      const oldKeyId = currentResult.rows[0].id;
+
+      // Rename old key to API_KEY_OLD_<timestamp> for grace period
+      const gracePeriodKey = `API_KEY_OLD_${Date.now()}`;
+      await client.query(
+        `UPDATE system.secrets
+         SET key = $1, expires_at = $2
+         WHERE id = $3`,
+        [gracePeriodKey, oldKeyExpiresAt, oldKeyId]
+      );
+
+      // Generate and insert new API key
+      const newApiKey = this.generateApiKey();
+      const newKeyEncrypted = EncryptionManager.encrypt(newApiKey);
+      await client.query(
+        `INSERT INTO system.secrets (key, value_ciphertext, is_active, is_reserved)
+         VALUES ('API_KEY', $1, true, true)`,
+        [newKeyEncrypted]
+      );
+
+      await client.query('COMMIT');
+
+      logger.info('API key rotated successfully', {
+        gracePeriodKey,
+        oldKeyExpiresAt: oldKeyExpiresAt.toISOString(),
+      });
+
+      return { newApiKey, oldKeyExpiresAt };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Failed to rotate API key', { error });
+      throw new Error('Failed to rotate API key');
+    } finally {
+      client.release();
+    }
   }
 
   /**

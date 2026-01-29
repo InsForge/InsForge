@@ -6,6 +6,13 @@ import {
   DatabasePasswordInfo,
 } from '@insforge/shared-schemas';
 
+export interface RotateApiKeyResponse {
+  success: boolean;
+  message: string;
+  apiKey: string;
+  oldKeyExpiresAt: string;
+}
+
 export class MetadataService {
   async fetchApiKey(): Promise<string> {
     const data: ApiKeyResponse = await apiClient.request('/metadata/api-key');
@@ -27,6 +34,14 @@ export class MetadataService {
   async getDatabasePassword(): Promise<DatabasePasswordInfo> {
     return apiClient.request('/metadata/database-password', {
       headers: apiClient.withAccessToken(),
+    });
+  }
+
+  async rotateApiKey(gracePeriodHours: number = 24): Promise<RotateApiKeyResponse> {
+    return apiClient.request('/secrets/api-key/rotate', {
+      method: 'POST',
+      headers: apiClient.withAccessToken(),
+      body: JSON.stringify({ gracePeriodHours }),
     });
   }
 }
