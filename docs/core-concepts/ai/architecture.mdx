@@ -24,6 +24,7 @@ graph TB
     OpenRouter --> DeepSeek[DeepSeek]
     OpenRouter --> Minimax[Minimax]
     OpenRouter --> ZAI[Z-AI]
+    OpenRouter --> Kimi[Kimi]
 
     DB --> Config[AI Configurations]
     DB --> Usage[Usage Tracking]
@@ -42,6 +43,7 @@ graph TB
     style DeepSeek fill:#166534,stroke:#22c55e,color:#dcfce7
     style Minimax fill:#9333ea,stroke:#c084fc,color:#f3e8ff
     style ZAI fill:#0891b2,stroke:#22d3ee,color:#cffafe
+    style Kimi fill:#7c3aed,stroke:#a78bfa,color:#ede9fe
     style Config fill:#0e7490,stroke:#22d3ee,color:#cffafe
     style Usage fill:#0e7490,stroke:#22d3ee,color:#cffafe
     style Stream fill:#166534,stroke:#4ade80,color:#dcfce7
@@ -71,6 +73,7 @@ InsForge provides access to models from multiple AI providers through our unifie
 | **DeepSeek** | `deepseek/deepseek-v3.2`, `deepseek/deepseek-v3.2-exp`, `deepseek/deepseek-chat`, `deepseek/deepseek-r1` |
 | **Minimax** | `minimax/minimax-m2.1` |
 | **Z-AI** | `z-ai/glm-4.7`, `z-ai/glm-4.6` |
+| **Kimi** | `moonshotai/kimi-k2.5` |
 
 <Note>
 Model availability may vary. Use the `GET /api/ai/models` endpoint or `get-backend-metadata` MCP tool to get the current list of available models for your backend.
