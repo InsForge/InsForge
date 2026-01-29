@@ -21,7 +21,8 @@ export function CursorDeeplinkGenerator({
   }, [apiKey, os]);
 
   const handleOpenInCursor = useCallback(() => {
-    trackPostHog('onboarding_install_clicked', {
+    trackPostHog('onboarding_action_taken', {
+      action_type: 'install mcp',
       method: 'terminal',
       agent_id: 'cursor',
       install_type: 'deeplink',

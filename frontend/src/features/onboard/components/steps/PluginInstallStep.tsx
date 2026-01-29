@@ -76,7 +76,8 @@ export function PluginInstallStep({
 }: PluginInstallStepProps) {
   const handleInstall = useCallback(
     (ide: IDEOption) => {
-      trackPostHog('onboarding_ide_selected', {
+      trackPostHog('onboarding_action_taken', {
+        action_type: 'install ide extension',
         experiment_variant: experimentVariant,
         ide_id: ide.id,
         ide_name: ide.name,
