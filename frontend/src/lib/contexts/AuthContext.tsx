@@ -140,7 +140,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const isInsforgeOrigin =
         event.origin.endsWith('.insforge.dev') || event.origin === 'https://insforge.dev';
 
-      if (true) {
+      if (isInsforgeOrigin) {
         void handleAuthorizationCode(event.data.code, event.origin);
       } else {
         // Check partner origins asynchronously
