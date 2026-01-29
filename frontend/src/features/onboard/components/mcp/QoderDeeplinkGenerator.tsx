@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { createMCPServerConfig, type PlatformType } from './helpers';
 import QoderLogo from '@/assets/logos/qoder.svg?react';
 import { getBackendUrl } from '@/lib/utils/utils';
+import { trackPostHog } from '@/lib/analytics/posthog';
 
 interface QoderDeeplinkGeneratorProps {
   apiKey?: string;
@@ -20,9 +21,14 @@ export function QoderDeeplinkGenerator({
     return `qoder://aicoding.aicoding-deeplink/mcp/add?name=insforge&config=${encodeURIComponent(base64Config)}`;
   }, [apiKey, os]);
 
-  const handleOpenInQoder = () => {
+  const handleOpenInQoder = useCallback(() => {
+    trackPostHog('onboarding_install_clicked', {
+      method: 'terminal',
+      agent_id: 'qoder',
+      install_type: 'deeplink',
+    });
     window.open(deeplink, '_blank');
-  };
+  }, [deeplink]);
 
   return (
     <button
