@@ -75,10 +75,11 @@ export function OnboardingOverlay() {
   const handleMethodChange = useCallback(
     (newMethod: InstallMethod) => {
       if (newMethod !== installMethod) {
-        trackPostHog('onboarding_method_switched', {
+        trackPostHog('onboarding_action_taken', {
+          action_type: 'switch install method',
           experiment_variant: variant,
-          from_method: installMethod,
-          to_method: newMethod,
+          method: installMethod,
+          new_method: newMethod,
         });
         methodSwitchTime.current = Date.now();
       }
@@ -89,7 +90,8 @@ export function OnboardingOverlay() {
 
   // Track command copied
   const handleCommandCopied = useCallback(() => {
-    trackPostHog('onboarding_command_copied', {
+    trackPostHog('onboarding_action_taken', {
+      action_type: 'copy command',
       experiment_variant: variant,
       method: installMethod,
       agent_id: selectedAgentId,

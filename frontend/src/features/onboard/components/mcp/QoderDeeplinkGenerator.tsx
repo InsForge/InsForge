@@ -22,7 +22,8 @@ export function QoderDeeplinkGenerator({
   }, [apiKey, os]);
 
   const handleOpenInQoder = useCallback(() => {
-    trackPostHog('onboarding_install_clicked', {
+    trackPostHog('onboarding_action_taken', {
+      action_type: 'install mcp',
       method: 'terminal',
       agent_id: 'qoder',
       install_type: 'deeplink',

@@ -41,9 +41,10 @@ export function OnboardingStep({
   };
 
   const handleNext = () => {
-    trackPostHog('onboarding_next_clicked', {
+    trackPostHog('onboarding_action_taken', {
+      action_type: 'next step',
       experiment_variant: experimentVariant,
-      current_step: stepNumber,
+      step: stepNumber,
       method: installMethod,
     });
 
