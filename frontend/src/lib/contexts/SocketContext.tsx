@@ -310,11 +310,6 @@ export function SocketProvider({ children }: SocketProviderProps) {
       const toolName = message.tool_name as string;
       const timestamp = message.created_at as string;
 
-      trackPostHog('mcp_connection_received', {
-        experiment_variant: getFeatureFlag('onboarding-method-experiment'),
-        tool_name: toolName,
-      });
-
       // Notify parent window (for cloud onboarding)
       postMessageToParent({
         type: 'MCP_CONNECTION_STATUS',
