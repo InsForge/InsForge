@@ -2,6 +2,8 @@ import { useState, useEffect, ReactNode } from 'react';
 import { ChevronDown, ChevronRight, CircleCheckBig, Circle } from 'lucide-react';
 import { cn } from '@/lib/utils/utils';
 import { Button } from '@/components';
+import { trackPostHog } from '@/lib/analytics/posthog';
+import type { InstallMethod } from './InstallMethodTabs';
 
 interface OnboardingStepProps {
   stepNumber: number;
@@ -9,6 +11,8 @@ interface OnboardingStepProps {
   isCompleted: boolean;
   children: ReactNode;
   onNext?: () => void;
+  experimentVariant?: 'control' | 'test';
+  installMethod?: InstallMethod;
 }
 
 export function OnboardingStep({
@@ -17,6 +21,8 @@ export function OnboardingStep({
   isCompleted,
   children,
   onNext,
+  experimentVariant,
+  installMethod,
 }: OnboardingStepProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -35,6 +41,12 @@ export function OnboardingStep({
   };
 
   const handleNext = () => {
+    trackPostHog('onboarding_next_clicked', {
+      experiment_variant: experimentVariant,
+      current_step: stepNumber,
+      method: installMethod,
+    });
+
     onNext?.();
     setIsExpanded(false);
   };

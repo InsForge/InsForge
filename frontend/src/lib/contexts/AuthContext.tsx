@@ -136,11 +136,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return;
       }
 
-      // Validate origin - allow insforge.dev, *.insforge.dev, and partner domains
+      // Validate origin - allow insforge.dev, *.insforge.dev, localhost (dev), and partner domains
       const isInsforgeOrigin =
         event.origin.endsWith('.insforge.dev') || event.origin === 'https://insforge.dev';
+      const isLocalDevOrigin =
+        event.origin.startsWith('http://localhost:');
 
-      if (isInsforgeOrigin) {
+      if (isInsforgeOrigin || isLocalDevOrigin) {
         void handleAuthorizationCode(event.data.code, event.origin);
       } else {
         // Check partner origins asynchronously

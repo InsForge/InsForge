@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { ChevronDown } from 'lucide-react';
 import {
   CodeBlock,
@@ -18,6 +18,7 @@ interface InstallStepProps {
   appUrl: string;
   isLoading?: boolean;
   onAgentChange?: (agent: MCPAgent) => void;
+  onCommandCopied?: () => void;
 }
 
 export function InstallStep({
@@ -25,13 +26,17 @@ export function InstallStep({
   appUrl,
   isLoading = false,
   onAgentChange,
+  onCommandCopied,
 }: InstallStepProps) {
   const [selectedAgent, setSelectedAgent] = useState<MCPAgent>(MCP_AGENTS[0]);
 
-  const handleAgentChange = (agent: MCPAgent) => {
-    setSelectedAgent(agent);
-    onAgentChange?.(agent);
-  };
+  const handleAgentChange = useCallback(
+    (agent: MCPAgent) => {
+      setSelectedAgent(agent);
+      onAgentChange?.(agent);
+    },
+    [onAgentChange]
+  );
 
   const installCommand = useMemo(() => {
     return GenerateInstallCommand(selectedAgent, apiKey);
@@ -115,6 +120,7 @@ export function InstallStep({
               text={mcpJsonConfig}
               showText={false}
               className="h-6 w-6 p-1 bg-white dark:bg-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-600 border-none rounded-md shadow-sm min-w-0 text-black dark:text-white"
+              onCopy={onCommandCopied}
             />
           </div>
           {/* Scrollable content */}
@@ -129,6 +135,7 @@ export function InstallStep({
           code={installCommand}
           label="Terminal Command"
           className={cn(isLoading && 'animate-pulse', 'bg-neutral-200 dark:bg-neutral-900')}
+          onCopy={onCommandCopied}
         />
       ) : null}
     </div>

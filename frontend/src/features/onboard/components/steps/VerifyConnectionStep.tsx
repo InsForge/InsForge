@@ -4,7 +4,11 @@ import verifyConnectionVideo from '@/assets/videos/terminal_install.mp4';
 const TEST_PROMPT =
   "I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to learn about InsForge instructions.";
 
-export function VerifyConnectionStep() {
+interface VerifyConnectionStepProps {
+  onPromptCopied?: () => void;
+}
+
+export function VerifyConnectionStep({ onPromptCopied }: VerifyConnectionStepProps) {
   return (
     <div className="flex flex-col gap-2">
       <p className="dark:text-neutral-400 text-gray-500 text-sm leading-6">
@@ -14,6 +18,7 @@ export function VerifyConnectionStep() {
         code={TEST_PROMPT}
         label="prompt"
         className="bg-neutral-200 dark:bg-neutral-900 break-normal"
+        onCopy={onPromptCopied}
       />
       {/* Video Container - Click to expand */}
       <ZoomedVideo

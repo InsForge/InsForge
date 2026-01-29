@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { createMCPServerConfig, type PlatformType } from './helpers';
 import CursorLogo from '@/assets/logos/cursor.svg?react';
 import { getBackendUrl } from '@/lib/utils/utils';
+import { trackPostHog } from '@/lib/analytics/posthog';
 
 interface CursorDeeplinkGeneratorProps {
   apiKey?: string;
@@ -19,9 +20,14 @@ export function CursorDeeplinkGenerator({
     return `cursor://anysphere.cursor-deeplink/mcp/install?name=insforge&config=${encodeURIComponent(base64Config)}`;
   }, [apiKey, os]);
 
-  const handleOpenInCursor = () => {
+  const handleOpenInCursor = useCallback(() => {
+    trackPostHog('onboarding_install_clicked', {
+      method: 'terminal',
+      agent_id: 'cursor',
+      install_type: 'deeplink',
+    });
     window.open(deeplink, '_blank');
-  };
+  }, [deeplink]);
 
   return (
     <button
