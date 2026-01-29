@@ -36,6 +36,8 @@ export class S3StorageProvider implements StorageProvider {
     const s3Config: {
       region: string;
       credentials?: { accessKeyId: string; secretAccessKey: string };
+      endpoint?: string;
+      forcePathStyle?: boolean;
     } = {
       region: this.region,
     };
@@ -45,6 +47,13 @@ export class S3StorageProvider implements StorageProvider {
         accessKeyId: process.env.AWS_ACCESS_KEY_ID,
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
       };
+    }
+
+    // Support MinIO or other S3-compatible endpoints
+    if (process.env.AWS_ENDPOINT_URL) {
+      s3Config.endpoint = process.env.AWS_ENDPOINT_URL;
+      // MinIO requires path-style URLs
+      s3Config.forcePathStyle = true;
     }
 
     this.s3Client = new S3Client(s3Config);
