@@ -185,7 +185,7 @@ export default function SettingsPage() {
     const confirmed = await confirm({
       title: 'Rotate API Key',
       description:
-        'This will generate a new API key. The current key will remain valid for 24 hours to allow time for migration. Are you sure you want to proceed?',
+        'This will generate a new API key. The current key will remain valid for 1 hour to allow time for migration. Are you sure you want to proceed?',
       confirmText: 'Rotate Key',
       cancelText: 'Cancel',
       destructive: true,
@@ -197,7 +197,7 @@ export default function SettingsPage() {
 
     setIsRotatingApiKey(true);
     try {
-      await metadataService.rotateApiKey(24);
+      await metadataService.rotateApiKey(1);
       await refetchApiKey();
       showToast('API key rotated successfully', 'success');
     } catch (error) {
