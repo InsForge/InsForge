@@ -88,10 +88,20 @@ export function OnboardingOverlay() {
     [installMethod, variant]
   );
 
-  // Track command copied
-  const handleCommandCopied = useCallback(() => {
+  // Track install command copied
+  const handleInstallaionCommandCopied = useCallback(() => {
     trackPostHog('onboarding_action_taken', {
       action_type: 'copy command',
+      experiment_variant: variant,
+      method: installMethod,
+      agent_id: selectedAgentId,
+    });
+  }, [variant, installMethod, selectedAgentId]);
+
+  // Track verify connection command copied
+  const handleVerifyConnectionCommandCopied = useCallback(() => {
+    trackPostHog('onboarding_action_taken', {
+      action_type: 'copy verify connection command',
       experiment_variant: variant,
       method: installMethod,
       agent_id: selectedAgentId,
@@ -200,7 +210,7 @@ export function OnboardingOverlay() {
                   appUrl={appUrl}
                   isLoading={isApiKeyLoading}
                   onAgentChange={handleAgentChange}
-                  onCommandCopied={handleCommandCopied}
+                  onCommandCopied={handleInstallaionCommandCopied}
                 />
               )}
               {installMethod === 'extension' && <PluginInstallStep showDescription />}
@@ -214,7 +224,7 @@ export function OnboardingOverlay() {
                 experimentVariant={variant as 'control' | 'test'}
                 installMethod={installMethod}
               >
-                <VerifyConnectionStep onPromptCopied={handleCommandCopied} />
+                <VerifyConnectionStep onPromptCopied={handleVerifyConnectionCommandCopied} />
               </OnboardingStep>
             )}
 
