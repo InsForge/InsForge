@@ -3,7 +3,7 @@ import { PostHogProvider } from 'posthog-js/react';
 import { useEffect, useRef } from 'react';
 import { isIframe } from '@/lib/utils/utils';
 
-const POSTHOG_KEY = import.meta.env.VITE_PUBLIC_POSTHOG_KEY || '';
+const POSTHOG_KEY = "phc_u7dbRTsO6iP39Fvy8R1M1TicnKNepNLExfw6ZuEq6AG";
 
 if (POSTHOG_KEY) {
   try {
@@ -36,7 +36,7 @@ export const PostHogAnalyticsProvider = ({ children }: { children: React.ReactNo
         const { userId, email, name } = event.data;
         if (userId) {
           posthog.identify(userId, { email, name });
-          getFeatureFlag('onboarding-method-experiment');
+          getFeatureFlag('onboard-experiment');
         }
       }
     };
