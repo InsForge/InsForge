@@ -27,7 +27,7 @@ export function OnboardingOverlay() {
   const { socket } = useSocket();
 
   // Get experiment variant from PostHog
-  const variant = getFeatureFlag('onboarding-method-experiment');
+  const variant = getFeatureFlag('onboard-experiment');
 
   // Refs for tracking
   const hasTrackedOverlayView = useRef(false);
@@ -203,6 +203,7 @@ export function OnboardingOverlay() {
               isCompleted={isStep1Completed}
               onNext={markStep1Completed}
               installMethod={installMethod}
+              experimentVariant={variant as 'control' | 'test'}
             >
               {installMethod === 'terminal' && (
                 <InstallStep

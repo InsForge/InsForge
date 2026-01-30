@@ -1,6 +1,6 @@
 import posthog from 'posthog-js';
 import { PostHogProvider } from 'posthog-js/react';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { isIframe } from '@/lib/utils/utils';
 
 const POSTHOG_KEY = import.meta.env.VITE_PUBLIC_POSTHOG_KEY || '';
@@ -16,35 +16,66 @@ if (POSTHOG_KEY) {
       },
     });
   } catch (error) {
-    console.error('Error initializing PostHog', error);
+    console.error('[PostHog] ❌ Error initializing PostHog', error);
   }
 }
 
-export const PostHogAnalyticsProvider = ({ children }: { children: React.ReactNode }) => {
-  const hasRequestedUserInfo = useRef(false);
+// Module-level flag to survive React StrictMode remounts
+let hasIdentifiedUser = false;
 
-  // Request user info from parent window for identification (iframe only)
+export const PostHogAnalyticsProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
-    if (!isIframe() || !POSTHOG_KEY || hasRequestedUserInfo.current) {
+    if (!isIframe() || !POSTHOG_KEY) {
       return;
     }
 
-    hasRequestedUserInfo.current = true;
-
     const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'USER_INFO') {
-        const { userId, email, name } = event.data;
-        if (userId) {
-          posthog.identify(userId, { email, name });
-          getFeatureFlag('onboarding-method-experiment');
-        }
+      console.warn('[PostHog] handleMessage received', {
+        origin: event.origin,
+        type: event.data?.type,
+        data: event.data,
+      });
+
+      // Verify message type
+      if (event.data?.type !== 'USER_INFO') {
+        return;
+      }
+
+      const { userId, email, name } = event.data;
+      // Prevent duplicate identification
+      if (hasIdentifiedUser) {
+        return;
+      }
+
+      posthog.identify(userId, { email, name });
+      hasIdentifiedUser = true;
+      getFeatureFlag('onboard-experiment');
+    };
+
+    // Always add listener
+    window.addEventListener('message', handleMessage);
+
+    // Send request (with retry for StrictMode timing issues)
+    const sendRequest = () => {
+      if (!hasIdentifiedUser) {
+        window.parent.postMessage({ type: 'REQUEST_USER_INFO' }, '*');
       }
     };
 
-    window.addEventListener('message', handleMessage);
-    window.parent.postMessage({ type: 'REQUEST_USER_INFO' }, '*');
+    // Send immediately
+    sendRequest();
 
-    return () => window.removeEventListener('message', handleMessage);
+    // Retry after a short delay in case of StrictMode timing issues
+    const retryTimeout = setTimeout(() => {
+      if (!hasIdentifiedUser) {
+        sendRequest();
+      }
+    }, 500);
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      clearTimeout(retryTimeout);
+    };
   }, []);
 
   if (POSTHOG_KEY) {

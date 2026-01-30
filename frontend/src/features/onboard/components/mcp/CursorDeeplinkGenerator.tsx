@@ -2,7 +2,7 @@ import { useMemo, useCallback } from 'react';
 import { createMCPServerConfig, type PlatformType } from './helpers';
 import CursorLogo from '@/assets/logos/cursor.svg?react';
 import { getBackendUrl } from '@/lib/utils/utils';
-import { trackPostHog } from '@/lib/analytics/posthog';
+import { trackPostHog, getFeatureFlag } from '@/lib/analytics/posthog';
 
 interface CursorDeeplinkGeneratorProps {
   apiKey?: string;
@@ -21,8 +21,10 @@ export function CursorDeeplinkGenerator({
   }, [apiKey, os]);
 
   const handleOpenInCursor = useCallback(() => {
+    const variant = getFeatureFlag('onboard-experiment');
     trackPostHog('onboarding_action_taken', {
       action_type: 'install mcp',
+      experiment_variant: variant,
       method: 'terminal',
       agent_id: 'cursor',
       install_type: 'deeplink',

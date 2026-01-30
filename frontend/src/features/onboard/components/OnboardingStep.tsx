@@ -11,7 +11,7 @@ interface OnboardingStepProps {
   isCompleted: boolean;
   children: ReactNode;
   onNext?: () => void;
-  experimentVariant?: 'control' | 'test';
+  experimentVariant: 'control' | 'test';
   installMethod?: InstallMethod;
 }
 
