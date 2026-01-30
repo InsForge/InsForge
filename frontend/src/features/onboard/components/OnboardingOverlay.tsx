@@ -118,17 +118,20 @@ export function OnboardingOverlay() {
   }, [variant, installMethod]);
 
   // Track agent selection
-  const handleAgentChange = useCallback((agent: { id: string; slug: string }) => {
-    trackPostHog('onboarding_action_taken', {
-      action_type: 'select mcp agent',
-      experiment_variant: variant,
-      method: installMethod,
-      agent_id: agent.id,
-      agent_slug: agent.slug,
-    });
-    setSelectedAgentSlug(agent.slug);
-    setSelectedAgentId(agent.id);
-  }, [variant, installMethod]);
+  const handleAgentChange = useCallback(
+    (agent: { id: string; slug: string }) => {
+      trackPostHog('onboarding_action_taken', {
+        action_type: 'select mcp agent',
+        experiment_variant: variant,
+        method: installMethod,
+        agent_id: agent.id,
+        agent_slug: agent.slug,
+      });
+      setSelectedAgentSlug(agent.slug);
+      setSelectedAgentId(agent.id);
+    },
+    [variant, installMethod]
+  );
 
   const displayApiKey = isApiKeyLoading ? 'ik_' + '*'.repeat(32) : apiKey || '';
 

@@ -68,7 +68,10 @@ export function InstallStep({
       <div className="flex items-center gap-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="w-40 bg-gray-100 dark:bg-[rgba(0,0,0,0.12)] border border-gray-300 dark:border-[rgba(255,255,255,0.24)] rounded flex items-center justify-between px-2 py-1 cursor-pointer" onClick={onTrigerClick}>
+            <button
+              className="w-40 bg-gray-100 dark:bg-[rgba(0,0,0,0.12)] border border-gray-300 dark:border-[rgba(255,255,255,0.24)] rounded flex items-center justify-between px-2 py-1 cursor-pointer"
+              onClick={onTrigerClick}
+            >
               <div className="flex items-center gap-2">
                 {selectedAgent.logo && (
                   <div className="w-6 h-6 flex items-center justify-center">
