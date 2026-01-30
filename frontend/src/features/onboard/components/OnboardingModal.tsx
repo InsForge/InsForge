@@ -6,7 +6,7 @@ import { PluginInstallStep } from './steps/PluginInstallStep';
 import { InstallMethodTabs, DEFAULT_MODAL_TABS, type InstallMethod } from './InstallMethodTabs';
 import { MCP_AGENTS } from './mcp/helpers';
 import { useApiKey } from '@/lib/hooks/useMetadata';
-import { getBackendUrl } from '@/lib/utils/utils';
+import { getBackendUrl, isInsForgeCloudProject } from '@/lib/utils/utils';
 import { HelpSection } from './HelpSection';
 import { useModal } from '@/lib/hooks/useModal';
 
@@ -58,12 +58,12 @@ export function OnboardingModal() {
             <h3 className="text-gray-900 dark:text-white text-2xl font-semibold leading-8 tracking-[-0.144px]">
               Connect Project
             </h3>
-            <InstallMethodTabs
+            {isInsForgeCloudProject() && <InstallMethodTabs
               tabs={DEFAULT_MODAL_TABS}
               value={installMethod}
               onChange={setInstallMethod}
               className="dark:bg-neutral-900 bg-neutral-200"
-            />
+            />}
           </div>
 
           {/* Tab Content */}
