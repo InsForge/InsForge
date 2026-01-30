@@ -8,8 +8,7 @@
   </a>
 
   <p>
-    <b>InsForge:</b> The backend built for AI-assisted development.<br />
-    Connect InsForge with any agent. Add authentication, database, storage, functions, and AI integrations to your app in seconds.
+    The backend built for agentic coding.<br />
   </p>
 
   <p>
@@ -26,33 +25,68 @@
   </p>
 </div>
 
-## Key Features & Use Cases
+## InsForge
+InsForge is a backend development platform built for AI coding agents and AI code editors. It exposes backend primitives like databases, auth, storage, and functions through a semantic layer that agents can understand, reason about, and operate end to end.
 
-### Core Features:
-- **Authentication** - Complete user management system
-- **Database** - Flexible data storage and retrieval
-- **Storage** - File management and organization
-- **AI Integration** - Chat completions and image generation (OpenAI-compatible)
-- **Serverless Functions** - Scalable compute power
-- **Site Deployment** *(coming soon)* - Easy application deployment
+### How it works
+InsForge acts as a semantic layer between AI coding agents and backend primitives. It performs backend context engineering so agents can understand, operate, and inspect backend systems.
 
-### Use Cases: Building full-stack applications using natural language
-- **Connect AI agents to InsForge** - Enable Claude, GPT, or other AI agents to manage your backend
+- **Fetch backend context**: Agents can fetch documentation and available operations for the backend primitives they use.
+- **Configure primitives**: Agents can configure backend primitives directly.
+- **Inspect backend state**: Backend state and logs are exposed through structured schemas.
 
-## Prompt Examples:
+```mermaid
+graph TB
 
-<td align="center">
-  <img src="assets/userflow.png" alt="userFlow">
-  <br>
-</td>
+    subgraph TOP[" "]
+        AG[AI Coding Agents]
+    end
 
-## Quickstart TLDR;
+    subgraph MID[" "]
+        SL[InsForge Semantic Layer]
+    end
 
-### 1. Install and run InsForge
+    AG --> SL
 
-**Use Docker (Recommended)**  
+    SL --> AUTH[Authentication]
+    SL --> DB[Database]
+    SL --> ST[Storage]
+    SL --> EF[Edge Functions]
+    SL --> MG[Model Gateway]
+    SL --> DEP[Deployment]
+
+    classDef bar fill:#0b0f14,stroke:#30363d,stroke-width:1px,color:#ffffff
+    classDef card fill:#161b22,stroke:#30363d,stroke-width:1px,color:#ffffff
+
+    class AG,SL bar
+    class AUTH,DB,ST,EF,MG,DEP card
+
+    style TOP fill:transparent,stroke:transparent
+    style MID fill:transparent,stroke:transparent
+
+    linkStyle default stroke:#30363d,stroke-width:1px
+```
+
+### Core Products:
+- **Authentication**: User management, authentication, and sessions
+- **Database**: Postgres relational database
+- **Storage**: S3 compatible file storage
+- **Model Gateway**: OpenAI compatible API across multiple LLM providers
+- **Edge Functions**: Serverless code running on the edge
+- **Site Deployment**: Site build and deployment
+
+
+## Quickstart
+
+### Cloud-hosted: [insforge.dev](https://insforge.dev)
+
+<a href="https://insforge.dev" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/insforge.dev-181818?logo=data:image/svg%2bxml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjI0MCIgdmlld0JveD0iMCAwIDI0MCAyNDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTI2LjExODQgMTAxLjZDMjMuMjkzOSA5OC43ODMzIDIzLjI5MzkgOTQuMjE2NiAyNi4xMTg0IDkxLjRMOTcuNzE2NyAyMEwyMDAgMjBMNzcuMjYgMTQyLjRDNzQuNDM1NSAxNDUuMjE3IDY5Ljg1NjIgMTQ1LjIxNyA2Ny4wMzE3IDE0Mi40TDI2LjExODQgMTAxLjZaIiBmaWxsPSJ3aGl0ZSIvPjxwYXRoIGQ9Ik0xNTUuMjUxIDc3LjM3NUwyMDAgMTIyVjIyNEwxMDQuMTA5IDEyOC4zNzVMMTU1LjI1MSA3Ny4zNzVaIiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPgo=&logoColor=white" alt="InsForge.dev"></a>
+
+### Self-hosted: Docker Compose
+
 Prerequisites: [Docker](https://www.docker.com/) + [Node.js](https://nodejs.org/)
 
+**1. Setup**
 ```bash
 # Run with Docker
 git clone https://github.com/insforge/insforge.git
@@ -61,93 +95,22 @@ cp .env.example .env
 docker compose up
 ```
 
-### 2. Connect an AI Agent
+**2. Connect InsForge MCP**
 
-Visit InsForge Dashboard (default: http://localhost:7131), log in, and follow the "Connect" guide, and set up your MCP.
+Open http://localhost:7131
 
-<div align="center">
-  <table>
-    <tr>
-      <td align="center">
-        <img src="assets/signin.png" alt="Sign In">
-        <br>
-        <em>Sign in to InsForge</em>
-      </td>
-      <td align="center">
-        <img src="assets/mcpInstallv2.png" alt="MCP Configuration">
-        <br>
-        <em>Configure MCP connection</em>
-      </td>
-    </tr>
-  </table>
-</div>
-
-### 3. Test the Connection
-
-In your agent, send:
-```
-I'm using InsForge as my backend platform, fetch InsForge instruction doc to learn more about InsForge.
-```
+Follow the steps to connect InsForge MCP Server
 
 <div align="center">
-  <img src="assets/sampleResponse.png" alt="Successful Connection Response" width="600">
-  <br>
-  <em>Sample successful response calling insforge MCP tools</em>
+  <img src="assets/connect.png" alt="Connect InsForge MCP" width="600">
 </div>
 
-### 4. Start Using InsForge
+**3. Verify installation**
 
-Start building your project in a new directory! Build your next todo app, Instagram clone, or online platform in seconds!
-
-**Sample Project Prompt:**
-
-"Build an app similar to Reddit with community-based discussion threads using InsForge as the backend platform that has these features:
-- Has a "Communities" list where users can browse or create communities
-- Each community has its own posts feed
-- Users can create posts with a title and body (text or image upload to InsForge storage)
-- Users can comment on posts and reply to other comments
-- Allows upvoting and downvoting for both posts and comments
-- Shows vote counts and comment counts for each post"
-
-## Architecture
-
-```mermaid
-graph TD
-    subgraph agents[" "]
-        A1[Claude]
-        A2[Cursor]
-        A3[Windsurf]
-        A4[Coding Agent]
-    end
-
-    A1 --> MCP[Model Context Protocol]
-    A2 --> MCP
-    A3 --> MCP
-    A4 --> MCP
-
-    MCP -->|fetch-docs| INS[InsForge Instructions]
-
-    MCP -->|create-bucket| S[Storage]
-    MCP --> AUTH[Auth]
-    MCP -->|run-raw-sql| DB[Database]
-    MCP -->|create-function| EF[Edge Function]
-    MCP --> AI[AI Integration]
-
-    style agents fill:#1a1a1a,stroke:#666,color:#fff
-    style MCP fill:#000,stroke:#666,color:#fff
-    style INS fill:#4a5568,stroke:#666,color:#fff
-    style S fill:#4a5568,stroke:#666,color:#fff
-    style AUTH fill:#4a5568,stroke:#666,color:#fff
-    style DB fill:#4a5568,stroke:#666,color:#fff
-    style EF fill:#4a5568,stroke:#666,color:#fff
-    style AI fill:#4a5568,stroke:#666,color:#fff
-    style A1 fill:#4a5568,stroke:#666,color:#fff
-    style A2 fill:#4a5568,stroke:#666,color:#fff
-    style A3 fill:#4a5568,stroke:#666,color:#fff
-    style A4 fill:#4a5568,stroke:#666,color:#fff
+To verify the connection, send the following prompt to your agent:
 ```
-
-
+I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to learn about InsForge instructions.
+```
 
 ## Contributing
 
