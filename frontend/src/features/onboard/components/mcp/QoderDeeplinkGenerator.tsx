@@ -22,7 +22,7 @@ export function QoderDeeplinkGenerator({
   }, [apiKey, os]);
 
   const handleOpenInQoder = useCallback(() => {
-    const variant = getFeatureFlag('onboard-experiment');
+    const variant = getFeatureFlag('onboard-test-2');
     trackPostHog('onboarding_action_taken', {
       action_type: 'install mcp',
       experiment_variant: variant,

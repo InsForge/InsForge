@@ -222,7 +222,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
       postMessageToParent({ type: 'ONBOARDING_SUCCESS' });
 
       trackPostHog('onboarding_completed', {
-        experiment_variant: getFeatureFlag('onboard-experiment'),
+        experiment_variant: getFeatureFlag('onboard-test-2'),
         tool_name: toolName,
       });
     }
