@@ -27,7 +27,7 @@ export function OnboardingOverlay() {
   const { socket } = useSocket();
 
   // Get experiment variant from PostHog
-  const variant = getFeatureFlag('onboard-experiment');
+  const variant = getFeatureFlag('onboard-test-2');
 
   // Refs for tracking
   const hasTrackedOverlayView = useRef(false);
