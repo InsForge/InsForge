@@ -89,7 +89,7 @@ export function OnboardingOverlay() {
   );
 
   // Track install command copied
-  const handleInstallaionCommandCopied = useCallback(() => {
+  const handleInstallationCommandCopied = useCallback(() => {
     trackPostHog('onboarding_action_taken', {
       action_type: 'copy command',
       experiment_variant: variant,
@@ -211,7 +211,7 @@ export function OnboardingOverlay() {
                   appUrl={appUrl}
                   isLoading={isApiKeyLoading}
                   onAgentChange={handleAgentChange}
-                  onCommandCopied={handleInstallaionCommandCopied}
+                  onCommandCopied={handleInstallationCommandCopied}
                 />
               )}
               {installMethod === 'extension' && <PluginInstallStep showDescription />}

@@ -30,19 +30,11 @@ export const PostHogAnalyticsProvider = ({ children }: { children: React.ReactNo
     }
 
     const handleMessage = (event: MessageEvent) => {
-      console.warn('[PostHog] handleMessage received', {
-        origin: event.origin,
-        type: event.data?.type,
-        data: event.data,
-      });
-
-      // Verify message type
       if (event.data?.type !== 'USER_INFO') {
         return;
       }
 
       const { userId, email, name } = event.data;
-      // Prevent duplicate identification
       if (hasIdentifiedUser) {
         return;
       }
