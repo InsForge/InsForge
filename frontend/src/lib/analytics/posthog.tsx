@@ -41,7 +41,6 @@ export const PostHogAnalyticsProvider = ({ children }: { children: React.ReactNo
 
       posthog.identify(userId, { email, name });
       hasIdentifiedUser = true;
-      getFeatureFlag('onboard-experiment');
     };
 
     window.addEventListener('message', handleMessage);
