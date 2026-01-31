@@ -16,6 +16,7 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 import type { SocketMessage } from '@insforge/shared-schemas';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
+import { trackPostHog, getFeatureFlag } from '@/lib/analytics/posthog';
 
 // ============================================================================
 // Types & Enums
@@ -216,9 +217,14 @@ export function SocketProvider({ children }: SocketProviderProps) {
   }, [disconnect]);
 
   // Send onboarding success only on first MCP connection
-  const onMcpConnectedSuccess = useEffectEvent(() => {
+  const onMcpConnectedSuccess = useEffectEvent((toolName: string) => {
     if (mcpUsageCount === 0) {
       postMessageToParent({ type: 'ONBOARDING_SUCCESS' });
+
+      trackPostHog('onboarding_completed', {
+        experiment_variant: getFeatureFlag('onboarding-method-experiment'),
+        tool_name: toolName,
+      });
     }
   });
 
@@ -301,15 +307,18 @@ export function SocketProvider({ children }: SocketProviderProps) {
     const handleMcpConnected = (message: SocketMessage) => {
       void queryClient.invalidateQueries({ queryKey: ['mcp-usage'] });
 
+      const toolName = message.tool_name as string;
+      const timestamp = message.created_at as string;
+
       // Notify parent window (for cloud onboarding)
       postMessageToParent({
         type: 'MCP_CONNECTION_STATUS',
         connected: true,
-        tool_name: message.tool_name as string,
-        timestamp: message.created_at as string,
+        tool_name: toolName,
+        timestamp: timestamp,
       });
 
-      onMcpConnectedSuccess();
+      onMcpConnectedSuccess(toolName);
     };
 
     socket.on(ServerEvents.DATA_UPDATE, handleDataUpdate);

@@ -7,6 +7,7 @@ import QoderLogo from '@/assets/logos/qoder.svg?react';
 import WindsurfLogo from '@/assets/logos/windsurf.svg?react';
 import KiroLogo from '@/assets/logos/kiro.svg?react';
 import { cn } from '@/lib/utils/utils';
+import { trackPostHog } from '@/lib/analytics/posthog';
 
 interface IDEOption {
   id: string;
@@ -64,16 +65,27 @@ interface PluginInstallStepProps {
   showDescription?: boolean;
   cardClassName?: string;
   className?: string;
+  experimentVariant?: 'control' | 'test';
 }
 
 export function PluginInstallStep({
   showDescription,
   cardClassName,
   className,
+  experimentVariant,
 }: PluginInstallStepProps) {
-  const handleInstall = useCallback((ide: IDEOption) => {
-    window.location.href = ide.installUrl;
-  }, []);
+  const handleInstall = useCallback(
+    (ide: IDEOption) => {
+      trackPostHog('onboarding_action_taken', {
+        action_type: 'install ide extension',
+        experiment_variant: experimentVariant,
+        ide_id: ide.id,
+        ide_name: ide.name,
+      });
+      window.location.href = ide.installUrl;
+    },
+    [experimentVariant]
+  );
 
   return (
     <div className={cn('flex flex-col gap-4', className)}>

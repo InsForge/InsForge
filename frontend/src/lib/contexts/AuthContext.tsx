@@ -136,7 +136,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return;
       }
 
-      // Validate origin - allow insforge.dev, *.insforge.dev, and partner domains
+      // Validate origin - allow insforge.dev, *.insforge.dev and partner domains
       const isInsforgeOrigin =
         event.origin.endsWith('.insforge.dev') || event.origin === 'https://insforge.dev';
 

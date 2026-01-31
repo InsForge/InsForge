@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { ChevronDown } from 'lucide-react';
 import {
   CodeBlock,
@@ -18,6 +18,8 @@ interface InstallStepProps {
   appUrl: string;
   isLoading?: boolean;
   onAgentChange?: (agent: MCPAgent) => void;
+  onTrigerClick?: () => void;
+  onCommandCopied?: () => void;
 }
 
 export function InstallStep({
@@ -25,13 +27,18 @@ export function InstallStep({
   appUrl,
   isLoading = false,
   onAgentChange,
+  onTrigerClick,
+  onCommandCopied,
 }: InstallStepProps) {
   const [selectedAgent, setSelectedAgent] = useState<MCPAgent>(MCP_AGENTS[0]);
 
-  const handleAgentChange = (agent: MCPAgent) => {
-    setSelectedAgent(agent);
-    onAgentChange?.(agent);
-  };
+  const handleAgentChange = useCallback(
+    (agent: MCPAgent) => {
+      setSelectedAgent(agent);
+      onAgentChange?.(agent);
+    },
+    [onAgentChange]
+  );
 
   const installCommand = useMemo(() => {
     return GenerateInstallCommand(selectedAgent, apiKey);
@@ -61,7 +68,10 @@ export function InstallStep({
       <div className="flex items-center gap-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="w-40 bg-gray-100 dark:bg-[rgba(0,0,0,0.12)] border border-gray-300 dark:border-[rgba(255,255,255,0.24)] rounded flex items-center justify-between px-2 py-1 cursor-pointer">
+            <button
+              className="w-40 bg-gray-100 dark:bg-[rgba(0,0,0,0.12)] border border-gray-300 dark:border-[rgba(255,255,255,0.24)] rounded flex items-center justify-between px-2 py-1 cursor-pointer"
+              onClick={onTrigerClick}
+            >
               <div className="flex items-center gap-2">
                 {selectedAgent.logo && (
                   <div className="w-6 h-6 flex items-center justify-center">
@@ -115,6 +125,7 @@ export function InstallStep({
               text={mcpJsonConfig}
               showText={false}
               className="h-6 w-6 p-1 bg-white dark:bg-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-600 border-none rounded-md shadow-sm min-w-0 text-black dark:text-white"
+              onCopy={onCommandCopied}
             />
           </div>
           {/* Scrollable content */}
@@ -129,6 +140,7 @@ export function InstallStep({
           code={installCommand}
           label="Terminal Command"
           className={cn(isLoading && 'animate-pulse', 'bg-neutral-200 dark:bg-neutral-900')}
+          onCopy={onCommandCopied}
         />
       ) : null}
     </div>
