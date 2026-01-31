@@ -244,7 +244,7 @@ router.delete('/:key', verifyAdmin, async (req: AuthRequest, res: Response, next
     }
 
     // Mark as inactive instead of hard delete
-    const success = await secretService.deleteSecret(secret.id);
+    const success = await secretService.updateSecret(secret.id, { isActive: false });
 
     if (!success) {
       throw new AppError(`Failed to delete secret: ${key}`, 500, ERROR_CODES.INTERNAL_ERROR);
