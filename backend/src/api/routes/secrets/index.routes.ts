@@ -91,7 +91,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
     const secrets = await secretService.listSecrets();
     const secret = secrets.find((s) => s.key === key);
 
-    let result: { id: string; };
+    let result: { id: string };
 
     if (secret !== null && secret?.isActive) {
       throw new AppError(`Secret already exists: ${key}`, 409, ERROR_CODES.INVALID_INPUT);
