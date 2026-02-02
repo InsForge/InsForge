@@ -95,6 +95,44 @@ export const deleteEnvVarResponseSchema = z.object({
   message: z.string(),
 });
 
+// ============================================================================
+// Custom Slug/Domain Management API
+// ============================================================================
+
+/**
+ * Request to update the custom slug
+ */
+export const updateSlugRequestSchema = z.object({
+  slug: z
+    .string()
+    .trim()
+    .min(3, 'slug must be at least 3 characters')
+    .max(63, 'slug must be at most 63 characters')
+    .regex(
+      /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/,
+      'slug must be lowercase alphanumeric with hyphens, not starting or ending with hyphen'
+    )
+    .nullable(),
+});
+
+/**
+ * Response from updating the custom slug
+ */
+export const updateSlugResponseSchema = z.object({
+  success: z.boolean(),
+  slug: z.string().nullable(),
+  domain: z.string().nullable(),
+});
+
+/**
+ * Response from getting deployment metadata
+ */
+export const deploymentMetadataResponseSchema = z.object({
+  currentDeploymentId: z.string().uuid().nullable(),
+  defaultDomainUrl: z.string().nullable(),
+  customDomainUrl: z.string().nullable(),
+});
+
 export type ProjectSettings = z.infer<typeof projectSettingsSchema>;
 export type EnvVar = z.infer<typeof envVarSchema>;
 export type CreateDeploymentResponse = z.infer<typeof createDeploymentResponseSchema>;
@@ -106,3 +144,6 @@ export type ListEnvVarsResponse = z.infer<typeof listEnvVarsResponseSchema>;
 export type UpsertEnvVarRequest = z.infer<typeof upsertEnvVarRequestSchema>;
 export type UpsertEnvVarResponse = z.infer<typeof upsertEnvVarResponseSchema>;
 export type DeleteEnvVarResponse = z.infer<typeof deleteEnvVarResponseSchema>;
+export type UpdateSlugRequest = z.infer<typeof updateSlugRequestSchema>;
+export type UpdateSlugResponse = z.infer<typeof updateSlugResponseSchema>;
+export type DeploymentMetadataResponse = z.infer<typeof deploymentMetadataResponseSchema>;

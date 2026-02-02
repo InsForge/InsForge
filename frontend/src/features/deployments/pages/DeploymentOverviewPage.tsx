@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ExternalLink, Copy, Check } from 'lucide-react';
 import { Button, Skeleton } from '@/components';
 import { useDeployments } from '../hooks/useDeployments';
+import { useDeploymentMetadata } from '../hooks/useDeploymentMetadata';
 import { formatTime } from '@/lib/utils/utils';
 
 const statusColors: Record<string, string> = {
@@ -19,6 +20,7 @@ const DEPLOY_PROMPT = 'Deploy my app to InsForge';
 export default function DeploymentOverviewPage() {
   const [copied, setCopied] = useState(false);
   const { deployments, isLoadingDeployments } = useDeployments();
+  const { customDomainUrl } = useDeploymentMetadata();
 
   // Get the latest READY deployment (the current production deployment)
   const latestReadyDeployment = deployments.find((d) => d.status === 'READY') ?? null;
@@ -189,23 +191,36 @@ export default function DeploymentOverviewPage() {
                 </div>
 
                 {/* Domains - Full width */}
-                <div className="flex flex-col">
+                <div className="flex flex-col gap-1">
                   <p className="text-sm text-muted-foreground dark:text-neutral-400 leading-6">
                     Domains
                   </p>
-                  {deploymentUrl ? (
-                    <a
-                      href={deploymentUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-zinc-950 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1"
-                    >
-                      {latestReadyDeployment.url}
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  ) : (
-                    <p className="text-sm text-zinc-950 dark:text-white">—</p>
-                  )}
+                  <div className="flex flex-col gap-1">
+                    {customDomainUrl && (
+                      <a
+                        href={customDomainUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-zinc-950 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1"
+                      >
+                        {customDomainUrl}
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                    {deploymentUrl ? (
+                      <a
+                        href={deploymentUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-zinc-950 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1"
+                      >
+                        {latestReadyDeployment.url}
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    ) : (
+                      <p className="text-sm text-zinc-950 dark:text-white">—</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

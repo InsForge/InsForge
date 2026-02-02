@@ -13,6 +13,7 @@ interface CloudCredentialsResponse {
   bearer_token: string;
   expires_at: string;
   webhook_secret: string | null;
+  slug: string | null;
 }
 
 interface VercelCredentials {
@@ -20,6 +21,7 @@ interface VercelCredentials {
   teamId: string;
   projectId: string;
   expiresAt: Date | null;
+  slug: string | null;
 }
 
 export interface VercelDeploymentResult {
@@ -116,7 +118,7 @@ export class VercelProvider {
       );
     }
 
-    return { token, teamId, projectId, expiresAt: null };
+    return { token, teamId, projectId, expiresAt: null, slug: null };
   }
 
   /**
@@ -179,6 +181,7 @@ export class VercelProvider {
           teamId: data.team_id,
           projectId: data.vercel_project_id,
           expiresAt: new Date(data.expires_at),
+          slug: data.slug,
         };
 
         logger.info('Successfully fetched Vercel credentials from cloud', {
@@ -470,6 +473,27 @@ export class VercelProvider {
     this.cloudCredentials = undefined;
     this.fetchPromise = null;
     logger.info('Vercel credentials cache cleared');
+  }
+
+  /**
+   * Get the current custom slug from cached credentials
+   * Returns null if not in cloud environment or no slug is set
+   */
+  async getSlug(): Promise<string | null> {
+    if (!isCloudEnvironment()) {
+      return null;
+    }
+    const credentials = await this.getCredentials();
+    return credentials.slug;
+  }
+
+  /**
+   * Get the custom domain URL based on the slug
+   * Returns null if no slug is set
+   */
+  async getCustomDomainUrl(): Promise<string | null> {
+    const slug = await this.getSlug();
+    return slug ? `https://${slug}.insforge.site` : null;
   }
 
   /**

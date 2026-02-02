@@ -241,5 +241,10 @@ export const deploymentsMenuItem: PrimaryMenuItem = {
       label: 'Environment Variables',
       href: '/dashboard/deployments/env-vars',
     },
+    {
+      id: 'deployment-domains',
+      label: 'Domains',
+      href: '/dashboard/deployments/domains',
+    },
   ],
 };

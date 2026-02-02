@@ -9,6 +9,9 @@ import type {
   UpsertEnvVarRequest,
   UpsertEnvVarResponse,
   DeleteEnvVarResponse,
+  UpdateSlugRequest,
+  UpdateSlugResponse,
+  DeploymentMetadataResponse,
 } from '@insforge/shared-schemas';
 
 export type {
@@ -20,6 +23,9 @@ export type {
   UpsertEnvVarRequest,
   UpsertEnvVarResponse,
   DeleteEnvVarResponse,
+  UpdateSlugRequest,
+  UpdateSlugResponse,
+  DeploymentMetadataResponse,
 };
 
 export class DeploymentsService {
@@ -95,6 +101,28 @@ export class DeploymentsService {
   async deleteEnvVar(id: string): Promise<DeleteEnvVarResponse> {
     return apiClient.request(`/deployments/env-vars/${encodeURIComponent(id)}`, {
       method: 'DELETE',
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  // ============================================================================
+  // Custom Slug/Domain
+  // ============================================================================
+
+  async updateSlug(slug: string | null): Promise<UpdateSlugResponse> {
+    return apiClient.request('/deployments/slug', {
+      method: 'PUT',
+      headers: apiClient.withAccessToken(),
+      body: JSON.stringify({ slug }),
+    });
+  }
+
+  // ============================================================================
+  // Metadata
+  // ============================================================================
+
+  async getMetadata(): Promise<DeploymentMetadataResponse> {
+    return apiClient.request('/deployments/metadata', {
       headers: apiClient.withAccessToken(),
     });
   }
