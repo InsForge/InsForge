@@ -48,10 +48,7 @@ export function EnvVarRow({ envVar, onEdit, onDelete, className }: EnvVarRowProp
       <div className="grid grid-cols-12 h-full items-center">
         {/* Key Column */}
         <div className="col-span-4 min-w-0 px-3 py-1.5">
-          <p
-            className="text-sm text-zinc-950 dark:text-white truncate"
-            title={envVar.key}
-          >
+          <p className="text-sm text-zinc-950 dark:text-white truncate" title={envVar.key}>
             {envVar.key}
           </p>
         </div>
@@ -65,11 +62,7 @@ export function EnvVarRow({ envVar, onEdit, onDelete, className }: EnvVarRowProp
             className="h-6 w-6 p-1 text-neutral-500 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-600 shrink-0"
             title={isValueVisible ? 'Hide value' : 'Show value'}
           >
-            {isValueVisible ? (
-              <EyeOff className="w-4 h-4" />
-            ) : (
-              <Eye className="w-4 h-4" />
-            )}
+            {isValueVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </Button>
           <span
             className={cn(

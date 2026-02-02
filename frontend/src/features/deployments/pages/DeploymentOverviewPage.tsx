@@ -160,7 +160,9 @@ export default function DeploymentOverviewPage() {
                       <span
                         className={`inline-flex items-center justify-center h-5 px-2 rounded text-xs font-medium text-white ${statusColor}`}
                       >
-                        {latestReadyDeployment.status === 'READY' ? 'Ready' : latestReadyDeployment.status}
+                        {latestReadyDeployment.status === 'READY'
+                          ? 'Ready'
+                          : latestReadyDeployment.status}
                       </span>
                     </div>
                   </div>

@@ -52,9 +52,7 @@ export function EnvVarDialog({
       <DialogContent className="max-w-md p-0 gap-0 bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-3 border-b border-neutral-200 dark:border-neutral-700">
-          <h2 className="text-lg font-semibold text-zinc-950 dark:text-white leading-7">
-            {title}
-          </h2>
+          <h2 className="text-lg font-semibold text-zinc-950 dark:text-white leading-7">{title}</h2>
         </div>
 
         {/* Form */}

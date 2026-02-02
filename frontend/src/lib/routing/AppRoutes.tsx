@@ -99,7 +99,10 @@ export function AppRoutes() {
                   path="/dashboard/deployments"
                   element={<Navigate to="/dashboard/deployments/overview" replace />}
                 />
-                <Route path="/dashboard/deployments/overview" element={<DeploymentOverviewPage />} />
+                <Route
+                  path="/dashboard/deployments/overview"
+                  element={<DeploymentOverviewPage />}
+                />
                 <Route path="/dashboard/deployments/logs" element={<DeploymentLogsPage />} />
                 <Route path="/dashboard/deployments/env-vars" element={<DeploymentEnvVarsPage />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
