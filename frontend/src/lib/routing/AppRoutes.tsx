@@ -27,7 +27,9 @@ import PoliciesPage from '@/features/database/pages/PoliciesPage';
 import TemplatesPage from '@/features/database/pages/TemplatesPage';
 import AuditsPage from '@/features/logs/pages/AuditsPage';
 import SettingsPage from '@/features/settings/pages/SettingsPage';
-import DeploymentsPage from '@/features/deployments/pages/DeploymentsPage';
+import DeploymentLogsPage from '@/features/deployments/pages/DeploymentLogsPage';
+import DeploymentOverviewPage from '@/features/deployments/pages/DeploymentOverviewPage';
+import DeploymentEnvVarsPage from '@/features/deployments/pages/DeploymentEnvVarsPage';
 
 export function AppRoutes() {
   return (
@@ -93,7 +95,13 @@ export function AppRoutes() {
                   element={<RealtimePermissionsPage />}
                 />
                 <Route path="/dashboard/settings" element={<SettingsPage />} />
-                <Route path="/dashboard/deployments" element={<DeploymentsPage />} />
+                <Route
+                  path="/dashboard/deployments"
+                  element={<Navigate to="/dashboard/deployments/overview" replace />}
+                />
+                <Route path="/dashboard/deployments/overview" element={<DeploymentOverviewPage />} />
+                <Route path="/dashboard/deployments/logs" element={<DeploymentLogsPage />} />
+                <Route path="/dashboard/deployments/env-vars" element={<DeploymentEnvVarsPage />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </Layout>

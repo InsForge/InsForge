@@ -225,4 +225,21 @@ export const deploymentsMenuItem: PrimaryMenuItem = {
   label: 'Deployments',
   href: '/dashboard/deployments',
   icon: Rocket,
+  secondaryMenu: [
+    {
+      id: 'deployment-overview',
+      label: 'Overview',
+      href: '/dashboard/deployments/overview',
+    },
+    {
+      id: 'deployment-logs',
+      label: 'Deployment Logs',
+      href: '/dashboard/deployments/logs',
+    },
+    {
+      id: 'deployment-env-vars',
+      label: 'Environment Variables',
+      href: '/dashboard/deployments/env-vars',
+    },
+  ],
 };

@@ -395,6 +395,75 @@ export class VercelProvider {
   }
 
   /**
+   * Get all environment variables for the project with full metadata
+   * GET /v9/projects/:id/env?decrypt=true
+   */
+  async listEnvironmentVariables(): Promise<
+    Array<{
+      id: string;
+      key: string;
+      value: string;
+      target: string[];
+      type: string;
+      createdAt?: number;
+      updatedAt?: number;
+    }>
+  > {
+    const credentials = await this.getCredentials();
+
+    try {
+      const response = await axios.get(
+        `https://api.vercel.com/v9/projects/${credentials.projectId}/env?teamId=${credentials.teamId}&decrypt=true`,
+        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      );
+
+      const data = response.data as {
+        envs?: Array<{
+          id: string;
+          key: string;
+          value: string;
+          target: string[];
+          type: string;
+          createdAt?: number;
+          updatedAt?: number;
+        }>;
+      };
+      return data.envs || [];
+    } catch (error) {
+      logger.error('Failed to list environment variables', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new AppError('Failed to list environment variables', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+  }
+
+  /**
+   * Delete an environment variable by its Vercel ID
+   * DELETE /v9/projects/:id/env/:envId
+   */
+  async deleteEnvironmentVariable(envId: string): Promise<void> {
+    const credentials = await this.getCredentials();
+
+    try {
+      await axios.delete(
+        `https://api.vercel.com/v9/projects/${credentials.projectId}/env/${envId}?teamId=${credentials.teamId}`,
+        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      );
+
+      logger.info('Environment variable deleted', { envId });
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        throw new AppError(`Environment variable not found: ${envId}`, 404, ERROR_CODES.NOT_FOUND);
+      }
+      logger.error('Failed to delete environment variable', {
+        error: error instanceof Error ? error.message : String(error),
+        envId,
+      });
+      throw new AppError('Failed to delete environment variable', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+  }
+
+  /**
    * Clear cached credentials
    */
   clearCredentials(): void {

@@ -6,10 +6,14 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse, paginatedResponse } from '@/utils/response.js';
 import { startDeploymentRequestSchema } from '@insforge/shared-schemas';
+import { envVarsRouter } from './env-vars.routes.js';
 
 const router = Router();
 const deploymentService = DeploymentService.getInstance();
 const auditService = AuditService.getInstance();
+
+// Mount sub-routers first to avoid conflicts with parameterized routes
+router.use('/env-vars', envVarsRouter);
 
 /**
  * Create a new deployment record with WAITING status

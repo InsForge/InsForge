@@ -4,9 +4,23 @@ import type {
   CreateDeploymentResponse,
   StartDeploymentRequest,
   ListDeploymentsResponse,
+  DeploymentEnvVar,
+  ListEnvVarsResponse,
+  UpsertEnvVarRequest,
+  UpsertEnvVarResponse,
+  DeleteEnvVarResponse,
 } from '@insforge/shared-schemas';
 
-export type { DeploymentSchema, CreateDeploymentResponse, ListDeploymentsResponse };
+export type {
+  DeploymentSchema,
+  CreateDeploymentResponse,
+  ListDeploymentsResponse,
+  DeploymentEnvVar,
+  ListEnvVarsResponse,
+  UpsertEnvVarRequest,
+  UpsertEnvVarResponse,
+  DeleteEnvVarResponse,
+};
 
 export class DeploymentsService {
   // ============================================================================
@@ -55,6 +69,32 @@ export class DeploymentsService {
   async cancelDeployment(id: string): Promise<void> {
     return apiClient.request(`/deployments/${id}/cancel`, {
       method: 'POST',
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  // ============================================================================
+  // Environment Variables
+  // ============================================================================
+
+  async listEnvVars(): Promise<DeploymentEnvVar[]> {
+    const data = (await apiClient.request('/deployments/env-vars', {
+      headers: apiClient.withAccessToken(),
+    })) as ListEnvVarsResponse;
+    return data.envVars;
+  }
+
+  async upsertEnvVar(input: UpsertEnvVarRequest): Promise<UpsertEnvVarResponse> {
+    return apiClient.request('/deployments/env-vars', {
+      method: 'POST',
+      headers: apiClient.withAccessToken(),
+      body: JSON.stringify(input),
+    });
+  }
+
+  async deleteEnvVar(id: string): Promise<DeleteEnvVarResponse> {
+    return apiClient.request(`/deployments/env-vars/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
       headers: apiClient.withAccessToken(),
     });
   }

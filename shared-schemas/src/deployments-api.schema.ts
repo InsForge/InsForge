@@ -47,9 +47,62 @@ export const listDeploymentsResponseSchema = z.object({
   }),
 });
 
+// ============================================================================
+// Environment Variables Management API
+// ============================================================================
+
+/**
+ * Full environment variable schema (from Vercel API with metadata)
+ */
+export const deploymentEnvVarSchema = z.object({
+  id: z.string(), // Vercel env var ID (needed for delete)
+  key: z.string(),
+  value: z.string(),
+  target: z.array(z.enum(['production', 'preview', 'development'])),
+  type: z.enum(['plain', 'encrypted', 'secret', 'sensitive']),
+  createdAt: z.number().optional(), // Unix timestamp
+  updatedAt: z.number().optional(), // Unix timestamp
+});
+
+/**
+ * Response from listing environment variables
+ */
+export const listEnvVarsResponseSchema = z.object({
+  envVars: z.array(deploymentEnvVarSchema),
+});
+
+/**
+ * Request to create or update an environment variable
+ */
+export const upsertEnvVarRequestSchema = z.object({
+  key: z.string().min(1),
+  value: z.string().min(1),
+});
+
+/**
+ * Response from upserting an environment variable
+ */
+export const upsertEnvVarResponseSchema = z.object({
+  success: z.literal(true),
+  message: z.string(),
+});
+
+/**
+ * Response from deleting an environment variable
+ */
+export const deleteEnvVarResponseSchema = z.object({
+  success: z.literal(true),
+  message: z.string(),
+});
+
 export type ProjectSettings = z.infer<typeof projectSettingsSchema>;
 export type EnvVar = z.infer<typeof envVarSchema>;
 export type CreateDeploymentResponse = z.infer<typeof createDeploymentResponseSchema>;
 export type StartDeploymentRequest = z.infer<typeof startDeploymentRequestSchema>;
 export type StartDeploymentResponse = z.infer<typeof startDeploymentResponseSchema>;
 export type ListDeploymentsResponse = z.infer<typeof listDeploymentsResponseSchema>;
+export type DeploymentEnvVar = z.infer<typeof deploymentEnvVarSchema>;
+export type ListEnvVarsResponse = z.infer<typeof listEnvVarsResponseSchema>;
+export type UpsertEnvVarRequest = z.infer<typeof upsertEnvVarRequestSchema>;
+export type UpsertEnvVarResponse = z.infer<typeof upsertEnvVarResponseSchema>;
+export type DeleteEnvVarResponse = z.infer<typeof deleteEnvVarResponseSchema>;
