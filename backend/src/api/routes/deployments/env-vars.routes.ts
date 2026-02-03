@@ -84,6 +84,30 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
 });
 
 /**
+ * Get a single environment variable with decrypted value
+ * GET /api/deployments/env-vars/:id
+ */
+router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!deploymentService.isConfigured()) {
+      throw new AppError(
+        'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
+        503,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+
+    const { id } = req.params;
+
+    const envVar = await vercelProvider.getEnvironmentVariable(id);
+
+    successResponse(res, { envVar });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * Delete an environment variable
  * DELETE /api/deployments/env-vars/:id
  */

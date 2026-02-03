@@ -25,10 +25,11 @@ export function EnvVarDialog({
   const submitLabel = isEditMode ? 'Save' : 'Add';
 
   // Reset form when dialog opens/closes or envVar changes
+  // In edit mode, value starts empty for security - user must enter new value
   useEffect(() => {
     if (open) {
       setKey(envVar?.key ?? '');
-      setValue(envVar?.value ?? '');
+      setValue('');
     }
   }, [open, envVar]);
 

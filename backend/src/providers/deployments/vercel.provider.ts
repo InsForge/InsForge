@@ -343,7 +343,6 @@ export class VercelProvider {
 
   /**
    * Upsert environment variables for the project
-   * POST /v10/projects/:id/env
    */
   async upsertEnvironmentVariables(envVars: Array<{ key: string; value: string }>): Promise<void> {
     const credentials = await this.getCredentials();
@@ -376,14 +375,13 @@ export class VercelProvider {
 
   /**
    * Get all environment variable keys for the project
-   * GET /v9/projects/:id/env
    */
   async getEnvironmentVariableKeys(): Promise<string[]> {
     const credentials = await this.getCredentials();
 
     try {
       const response = await axios.get(
-        `https://api.vercel.com/v9/projects/${credentials.projectId}/env?teamId=${credentials.teamId}`,
+        `https://api.vercel.com/v10/projects/${credentials.projectId}/env?teamId=${credentials.teamId}`,
         { headers: { Authorization: `Bearer ${credentials.token}` } }
       );
 
@@ -398,17 +396,15 @@ export class VercelProvider {
   }
 
   /**
-   * Get all environment variables for the project with full metadata
-   * GET /v9/projects/:id/env?decrypt=true
+   * Get all environment variables for the project (without values for security)
+   * GET /v10/projects/:idOrName/env
+   * https://docs.vercel.com/docs/rest-api/reference/endpoints/projects/retrieve-the-environment-variables-of-a-project-by-id-or-name
    */
   async listEnvironmentVariables(): Promise<
     Array<{
       id: string;
       key: string;
-      value: string;
-      target: string[];
       type: string;
-      createdAt?: number;
       updatedAt?: number;
     }>
   > {
@@ -416,22 +412,31 @@ export class VercelProvider {
 
     try {
       const response = await axios.get(
-        `https://api.vercel.com/v9/projects/${credentials.projectId}/env?teamId=${credentials.teamId}&decrypt=true`,
-        { headers: { Authorization: `Bearer ${credentials.token}` } }
+        `https://api.vercel.com/v10/projects/${credentials.projectId}/env`,
+        {
+          headers: { Authorization: `Bearer ${credentials.token}` },
+          params: {
+            teamId: credentials.teamId,
+          },
+        }
       );
 
       const data = response.data as {
         envs?: Array<{
           id: string;
           key: string;
-          value: string;
-          target: string[];
           type: string;
-          createdAt?: number;
           updatedAt?: number;
         }>;
       };
-      return data.envs || [];
+
+      // Return only id, key, type, updatedAt - values are fetched separately for security
+      return (data.envs || []).map((env) => ({
+        id: env.id,
+        key: env.key,
+        type: env.type,
+        updatedAt: env.updatedAt,
+      }));
     } catch (error) {
       logger.error('Failed to list environment variables', {
         error: error instanceof Error ? error.message : String(error),
@@ -441,15 +446,66 @@ export class VercelProvider {
   }
 
   /**
+   * Get a single environment variable with its decrypted value
+   * GET /v1/projects/:idOrName/env/:id
+   * https://docs.vercel.com/docs/rest-api/reference/endpoints/projects/retrieve-the-decrypted-value-of-an-environment-variable-of-a-project-by-id
+   */
+  async getEnvironmentVariable(envId: string): Promise<{
+    id: string;
+    key: string;
+    value: string;
+    type: string;
+    updatedAt?: number;
+  }> {
+    const credentials = await this.getCredentials();
+
+    try {
+      const response = await axios.get(
+        `https://api.vercel.com/v1/projects/${credentials.projectId}/env/${envId}`,
+        {
+          headers: { Authorization: `Bearer ${credentials.token}` },
+          params: {
+            teamId: credentials.teamId,
+          },
+        }
+      );
+
+      const data = response.data as {
+        id: string;
+        key: string;
+        value: string;
+        type: string;
+        updatedAt?: number;
+      };
+
+      return {
+        id: data.id,
+        key: data.key,
+        value: data.value,
+        type: data.type,
+        updatedAt: data.updatedAt,
+      };
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        throw new AppError(`Environment variable not found: ${envId}`, 404, ERROR_CODES.NOT_FOUND);
+      }
+      logger.error('Failed to get environment variable', {
+        error: error instanceof Error ? error.message : String(error),
+        envId,
+      });
+      throw new AppError('Failed to get environment variable', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+  }
+
+  /**
    * Delete an environment variable by its Vercel ID
-   * DELETE /v9/projects/:id/env/:envId
    */
   async deleteEnvironmentVariable(envId: string): Promise<void> {
     const credentials = await this.getCredentials();
 
     try {
       await axios.delete(
-        `https://api.vercel.com/v9/projects/${credentials.projectId}/env/${envId}?teamId=${credentials.teamId}`,
+        `https://api.vercel.com/v10/projects/${credentials.projectId}/env/${envId}?teamId=${credentials.teamId}`,
         { headers: { Authorization: `Bearer ${credentials.token}` } }
       );
 

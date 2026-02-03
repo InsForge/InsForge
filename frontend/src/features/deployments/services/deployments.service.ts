@@ -5,7 +5,9 @@ import type {
   StartDeploymentRequest,
   ListDeploymentsResponse,
   DeploymentEnvVar,
+  DeploymentEnvVarWithValue,
   ListEnvVarsResponse,
+  GetEnvVarResponse,
   UpsertEnvVarRequest,
   UpsertEnvVarResponse,
   DeleteEnvVarResponse,
@@ -19,7 +21,9 @@ export type {
   CreateDeploymentResponse,
   ListDeploymentsResponse,
   DeploymentEnvVar,
+  DeploymentEnvVarWithValue,
   ListEnvVarsResponse,
+  GetEnvVarResponse,
   UpsertEnvVarRequest,
   UpsertEnvVarResponse,
   DeleteEnvVarResponse,
@@ -88,6 +92,13 @@ export class DeploymentsService {
       headers: apiClient.withAccessToken(),
     })) as ListEnvVarsResponse;
     return data.envVars;
+  }
+
+  async getEnvVar(id: string): Promise<DeploymentEnvVarWithValue> {
+    const data = (await apiClient.request(`/deployments/env-vars/${encodeURIComponent(id)}`, {
+      headers: apiClient.withAccessToken(),
+    })) as GetEnvVarResponse;
+    return data.envVar;
   }
 
   async upsertEnvVar(input: UpsertEnvVarRequest): Promise<UpsertEnvVarResponse> {

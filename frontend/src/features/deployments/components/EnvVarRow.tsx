@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Eye, EyeOff, MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, MoreVertical, Pencil, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/radix/Button';
 import {
   DropdownMenu,
@@ -8,8 +8,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components';
 import type { DeploymentEnvVar } from '@insforge/shared-schemas';
-import { cn } from '@/lib/utils/utils';
-import { formatDistance } from 'date-fns';
+import { cn, formatTime } from '@/lib/utils/utils';
+import { deploymentsService } from '../services/deployments.service';
 
 interface EnvVarRowProps {
   envVar: DeploymentEnvVar;
@@ -20,6 +20,35 @@ interface EnvVarRowProps {
 
 export function EnvVarRow({ envVar, onEdit, onDelete, className }: EnvVarRowProps) {
   const [isValueVisible, setIsValueVisible] = useState(false);
+  const [fetchedValue, setFetchedValue] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleToggleValue = async () => {
+    if (isValueVisible) {
+      setIsValueVisible(false);
+      return;
+    }
+
+    // If we already have the value cached, just show it
+    if (fetchedValue !== null) {
+      setIsValueVisible(true);
+      return;
+    }
+
+    // Fetch the value from the API
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await deploymentsService.getEnvVar(envVar.id);
+      setFetchedValue(data.value);
+      setIsValueVisible(true);
+    } catch {
+      setError('Failed to fetch value');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleEditClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -32,10 +61,10 @@ export function EnvVarRow({ envVar, onEdit, onDelete, className }: EnvVarRowProp
   };
 
   const maskedValue = '••••••••••••••';
-  const displayValue = isValueVisible ? envVar.value : maskedValue;
+  const displayValue = isValueVisible && fetchedValue !== null ? fetchedValue : maskedValue;
 
   const updatedAtText = envVar.updatedAt
-    ? formatDistance(new Date(envVar.updatedAt * 1000), new Date(), { addSuffix: true })
+    ? formatTime(new Date(envVar.updatedAt).toISOString())
     : 'N/A';
 
   return (
@@ -58,22 +87,37 @@ export function EnvVarRow({ envVar, onEdit, onDelete, className }: EnvVarRowProp
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setIsValueVisible(!isValueVisible)}
+            onClick={() => void handleToggleValue()}
+            disabled={isLoading}
             className="h-6 w-6 p-1 text-neutral-500 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-600 shrink-0"
             title={isValueVisible ? 'Hide value' : 'Show value'}
           >
-            {isValueVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : isValueVisible ? (
+              <EyeOff className="w-4 h-4" />
+            ) : (
+              <Eye className="w-4 h-4" />
+            )}
           </Button>
           <span
             className={cn(
               'text-[13px] truncate',
-              isValueVisible
-                ? 'text-zinc-950 dark:text-white font-mono'
-                : 'text-neutral-400 dark:text-neutral-500'
+              error
+                ? 'text-red-500 dark:text-red-400'
+                : isValueVisible && fetchedValue !== null
+                  ? 'text-zinc-950 dark:text-white font-mono'
+                  : 'text-neutral-400 dark:text-neutral-500'
             )}
-            title={isValueVisible ? envVar.value : 'Click eye icon to reveal'}
+            title={
+              error
+                ? error
+                : isValueVisible && fetchedValue !== null
+                  ? fetchedValue
+                  : 'Click eye icon to reveal'
+            }
           >
-            {displayValue}
+            {error || displayValue}
           </span>
         </div>
 
