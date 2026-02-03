@@ -68,8 +68,6 @@ services:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-change-this-password}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
       # PostgreSQL connection
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -78,23 +76,6 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
       - POSTGREST_BASE_URL=http://postgrest:3000
-      # Deno Runtime URL for serverless functions
-      - DENO_RUNTIME_URL=http://deno:7133
-      # Deno Subhosting Configuration
-      - DENO_SUBHOSTING_TOKEN=${DENO_SUBHOSTING_TOKEN:-}
-      - DENO_SUBHOSTING_ORG_ID=${DENO_SUBHOSTING_ORG_ID:-}
-      # Storage Configuration
-      - AWS_S3_BUCKET=${AWS_S3_BUCKET:-}
-      - AWS_REGION=${AWS_REGION:-}
-      - AWS_CLOUDFRONT_URL=${AWS_CLOUDFRONT_URL:-}
-      - AWS_CLOUDFRONT_KEY_PAIR_ID=${AWS_CLOUDFRONT_KEY_PAIR_ID:-}
-      - AWS_CLOUDFRONT_PRIVATE_KEY=${AWS_CLOUDFRONT_PRIVATE_KEY:-}
-      # Multi-tenant Cloud Configuration
-      - DEPLOYMENT_ID=${DEPLOYMENT_ID:-}
-      - PROJECT_ID=${PROJECT_ID:-}
-      - APP_KEY=${APP_KEY:-}
-      - ACCESS_API_KEY=${ACCESS_API_KEY:-}
-      - CLOUD_API_HOST=${CLOUD_API_HOST:-}
       # LLM Model API keys
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       # OAuth Configuration
@@ -117,7 +98,7 @@ services:
       # Storage directory (for local file storage when S3 is not configured)
       - STORAGE_DIR=/insforge-storage
       # Auth app URL for development proxy
-      - AUTH_APP_URL=${AUTH_APP_URL:-http://localhost:7132}
+      - AUTH_APP_URL=http://localhost:7132
     restart: unless-stopped
     volumes:
       - storage-data:/insforge-storage
@@ -137,7 +118,7 @@ services:
       - "7133:7133"
     environment:
       - PORT=7133
-      - DENO_ENV=${DENO_ENV:-development}
+      - DENO_ENV=development
       - DENO_DIR=/deno-dir
       # PostgreSQL connection
       - POSTGRES_HOST=postgres

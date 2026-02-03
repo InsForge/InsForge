@@ -120,11 +120,11 @@ I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool t
 | --- |
 | [![Deploy on Docker][docker-btn]][docker-deploy] |
 
-### One Click Deployment
+### One-click Deployment
 
 These platforms are easy to deploy with one click and come with free credits.
 
-| Railway | Zeabur | Sealos(in coming soon) |
+| Railway | Zeabur | Sealos (coming soon) |
 | --- | --- | --- |
 | [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/insforge) | [![Deploy on Zeabur](https://zeabur.com/button.svg)](https://zeabur.com/templates/Q82M3Y) | [![Deploy on Sealos](https://raw.githubusercontent.com/labring-actions/templates/main/Deploy-on-Sealos.svg)](https://template.hzh.sealos.run/deploy?templateName=insforge) |
 
@@ -174,5 +174,3 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 [docker-btn]: ./deploy/buttons/docker.png
 [docker-deploy]: ./deploy/docker-deploy.md
-[aws-btn]: ./deploy/buttons/aws.png
-[aws-deploy]: ./deploy/deploy-to-aws-ec2.md
