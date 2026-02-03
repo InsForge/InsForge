@@ -1,0 +1,159 @@
+services:
+  postgres:
+    image: ghcr.io/insforge/postgres-all:latest
+    container_name: postgres-insforge
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-insforge}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - insforge-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgrest:
+    image: postgrest/postgrest:v12.2.12
+    container_name: postgrest-insforge
+    restart: unless-stopped
+    environment:
+      PGRST_DB_URI: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
+      PGRST_OPENAPI_SERVER_PROXY_URI: http://localhost:3000
+      PGRST_DB_SCHEMA: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET:-dev-secret-please-change-in-production}
+      # Enable schema reloading via NOTIFY
+      PGRST_DB_CHANNEL_ENABLED: true
+      PGRST_DB_CHANNEL: pgrst
+    ports:
+      - "5430:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/3000'"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - insforge-network
+
+  insforge:
+    image: ghcr.io/insforge/insforge-oss:v1.5.0
+    container_name: insforge-app
+    working_dir: /app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgrest:
+        condition: service_healthy
+    ports:
+      - "7130:7130"
+      - "7131:7131"
+      - "7132:7132"
+    environment:
+      - PORT=7130
+      - PROJECT_ROOT=/app
+      - API_BASE_URL=${API_BASE_URL:-}
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-}
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-please-change-in-production}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-change-this-password}
+      # PostgreSQL connection
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-insforge}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
+      - POSTGREST_BASE_URL=http://postgrest:3000
+      # LLM Model API keys
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      # OAuth Configuration
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID:-}
+      - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET:-}
+      - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID:-}
+      - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET:-}
+      - LINKEDIN_CLIENT_ID=${LINKEDIN_CLIENT_ID:-}
+      - LINKEDIN_CLIENT_SECRET=${LINKEDIN_CLIENT_SECRET:-}
+      - X_CLIENT_ID=${X_CLIENT_ID:-}
+      - X_CLIENT_SECRET=${X_CLIENT_SECRET:-}
+      - APPLE_CLIENT_ID=${APPLE_CLIENT_ID:-}
+      - APPLE_CLIENT_SECRET=${APPLE_CLIENT_SECRET:-}
+      # Logs directory
+      - LOGS_DIR=/insforge-logs
+      # Storage directory (for local file storage when S3 is not configured)
+      - STORAGE_DIR=/insforge-storage
+      # Auth app URL for development proxy
+      - AUTH_APP_URL=http://localhost:7132
+    restart: unless-stopped
+    volumes:
+      - storage-data:/insforge-storage
+      - insforge-logs:/insforge-logs
+    networks:
+      - insforge-network
+
+  # Deno serverless runtime for edge functions
+  deno:
+    image: ghcr.io/insforge/deno-runtime:latest
+    container_name: deno-insforge
+    working_dir: /app
+    depends_on:
+      - postgres
+      - postgrest
+    ports:
+      - "7133:7133"
+    environment:
+      - PORT=7133
+      - DENO_ENV=development
+      - DENO_DIR=/deno-dir
+      # PostgreSQL connection
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-insforge}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGREST_BASE_URL=http://postgrest:3000
+      # Worker timeout (60 seconds default)
+      - WORKER_TIMEOUT_MS=${WORKER_TIMEOUT_MS:-60000}
+      # Encryption keys for decrypting function secrets
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-please-change-in-production}
+    volumes:
+      - deno_cache:/deno-dir
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:7133/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - insforge-network
+
+volumes:
+  postgres-data:
+    driver: local
+  deno_cache:
+    driver: local
+  storage-data:
+    driver: local
+  insforge-logs:
+    driver: local
+
+networks:
+  insforge-network:
+    driver: bridge
