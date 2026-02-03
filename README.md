@@ -112,6 +112,23 @@ To verify the connection, send the following prompt to your agent:
 I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to learn about InsForge instructions.
 ```
 
+## Deployment
+
+### Dockerized InsForge
+
+| Docker |
+| --- |
+| [![Deploy on Docker][docker-btn]][docker-deploy] |
+
+### One Click Deployment
+
+These platforms are easy to deploy with one click and come with free credits.
+
+| Railway | Zeabur | Sealos(in coming soon) |
+| --- | --- | --- |
+| [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/insforge) | [![Deploy on Zeabur](https://zeabur.com/button.svg)](https://zeabur.com/templates/Q82M3Y) | [![Deploy on Sealos](https://raw.githubusercontent.com/labring-actions/templates/main/Deploy-on-Sealos.svg)](https://template.hzh.sealos.run/deploy?templateName=insforge) |
+
+
 ## Contributing
 
 **Contributing**: If you're interested in contributing, you can check our guide here [CONTRIBUTING.md](CONTRIBUTING.md). We truly appreciate pull requests, all types of help are appreciated!
@@ -150,3 +167,12 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 - [Portuguese (Brazilian) / Português Brasileiro](/i18n/README.pt-BR.md)
 - [Russian | Русский](/i18n/README.ru.md)
 - [Chinese (Simplified) | 简体中文](/i18n/README.zh-CN.md)
+
+---
+
+<!-- LINK GROUPS -->
+
+[docker-btn]: ./deploy/buttons/docker.png
+[docker-deploy]: ./deploy/docker-deploy.md
+[aws-btn]: ./deploy/buttons/aws.png
+[aws-deploy]: ./deploy/deploy-to-aws-ec2.md
