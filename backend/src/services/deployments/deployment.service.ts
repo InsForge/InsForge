@@ -763,6 +763,9 @@ export class DeploymentService {
 
       const data = (await response.json()) as UpdateSlugResponse;
 
+      // Update cached slug in VercelProvider so subsequent calls get the correct value
+      this.vercelProvider.updateCachedSlug(data.slug);
+
       logger.info('Custom domain slug updated', {
         projectId,
         slug: data.slug,

@@ -532,6 +532,17 @@ export class VercelProvider {
   }
 
   /**
+   * Update the cached slug after a successful slug update
+   * This avoids refetching all credentials from the cloud API
+   */
+  updateCachedSlug(slug: string | null): void {
+    if (this.cloudCredentials) {
+      this.cloudCredentials.slug = slug;
+      logger.debug('Updated cached slug', { slug });
+    }
+  }
+
+  /**
    * Get the current custom slug from cached credentials
    * Returns null if not in cloud environment or no slug is set
    */
