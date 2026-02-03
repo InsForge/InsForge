@@ -29,13 +29,7 @@
 InsForge is a backend development platform built for AI coding agents and AI code editors. It exposes backend primitives like databases, auth, storage, and functions through a semantic layer that agents can understand, reason about, and operate end to end.
 
 <p align="center">
-<<<<<<< Updated upstream
   <video width="100%" src="https://github.com/user-attachments/assets/e4362de8-ab46-4792-8499-4f1eec42a097" controls></video>
-=======
-  <a href="https://youtu.be/bn-FDBorn5c" target="_blank" rel="noopener noreferrer">
-    <img src="https://img.youtube.com/vi/bn-FDBorn5c/maxresdefault.jpg" alt="InsForge Demo Video" width="100%">
-  </a>
->>>>>>> Stashed changes
 </p>
 
 ### How it works
