@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   postgres:
-    image: ghcr.io/insforge/postgres:v15.13.1
+    image: ghcr.io/insforge/postgres:v15.13.2
     container_name: insforge-postgres
     command: postgres -c config_file=/etc/postgresql/postgresql.conf -c app.encryption_key='${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}'
     environment:
@@ -11,9 +11,9 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-insforge}
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./docker-init/db/db-init.sql:/docker-entrypoint-initdb.d/01-init.sql
-      - ./docker-init/db/jwt.sql:/docker-entrypoint-initdb.d/02-jwt.sql
-      - ./docker-init/db/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./deploy/docker-init/db/db-init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./deploy/docker-init/db/jwt.sql:/docker-entrypoint-initdb.d/02-jwt.sql
+      - ./deploy/docker-init/db/postgresql.conf:/etc/postgresql/postgresql.conf
     ports:
       - "5432:5432"
     networks:
@@ -192,7 +192,7 @@ services:
       deno:
         condition: service_started
     volumes:
-      - ./docker-init/logs/vector.yml:/etc/vector/vector.yml:ro
+      - ./deploy/docker-init/logs/vector.yml:/etc/vector/vector.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - shared-logs:/insforge-logs
     healthcheck:

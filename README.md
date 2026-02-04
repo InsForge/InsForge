@@ -91,17 +91,23 @@ graph TB
 Prerequisites: [Docker](https://www.docker.com/) + [Node.js](https://nodejs.org/)
 
 #### 1. Setup
+
+You can run InsForge locally using Docker Compose. This will start a local InsForge instance on your machine.
+
+[![Deploy on Docker][docker-btn]][docker-deploy]
+
+Or run from source:
 ```bash
 # Run with Docker
 git clone https://github.com/insforge/insforge.git
 cd insforge
 cp .env.example .env
-docker compose up
+docker compose -f docker-compose.prod.yml up
 ```
 
 #### 2. Connect InsForge MCP
 
-Open [http://localhost:7131](http://localhost:7131)
+Open [http://localhost:7130](http://localhost:7130)
 
 Follow the steps to connect InsForge MCP Server
 
@@ -116,17 +122,9 @@ To verify the connection, send the following prompt to your agent:
 I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to learn about InsForge instructions.
 ```
 
-## Deployment
-
-### Dockerized InsForge
-
-| Docker |
-| --- |
-| [![Deploy on Docker][docker-btn]][docker-deploy] |
-
 ### One-click Deployment
 
-These platforms are easy to deploy with one click and come with free credits.
+In addition to running InsForge locally, you can also launch InsForge using a pre-configured setup. This allows you to get up and running quickly with InsForge without installing Docker on your local machine.
 
 | Railway | Zeabur | Sealos (coming soon) |
 | --- | --- | --- |
