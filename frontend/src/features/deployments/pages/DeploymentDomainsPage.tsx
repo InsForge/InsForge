@@ -178,7 +178,7 @@ export default function DeploymentDomainsPage() {
                       className="h-9 ml-2 px-3 gap-1 text-zinc-950 dark:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700"
                     >
                       {copiedDefault ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                      <span className="text-[13px]">{copiedDefault ? 'copied' : 'copy'}</span>
+                      <span className="text-[13px]">{copiedDefault ? 'Copied' : 'Copy'}</span>
                     </Button>
                     <Button
                       variant="ghost"
@@ -234,7 +234,7 @@ export default function DeploymentDomainsPage() {
                       className="h-9 ml-2 px-3 gap-1 text-zinc-950 dark:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700"
                     >
                       {copiedCustom ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                      <span className="text-[13px]">{copiedCustom ? 'copied' : 'copy'}</span>
+                      <span className="text-[13px]">{copiedCustom ? 'Copied' : 'Copy'}</span>
                     </Button>
                     <Button
                       variant="ghost"

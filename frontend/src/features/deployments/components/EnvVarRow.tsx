@@ -6,6 +6,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
 } from '@/components';
 import type { DeploymentEnvVar } from '@insforge/shared-schemas';
 import { cn, formatTime } from '@/lib/utils/utils';
@@ -23,6 +27,7 @@ export function EnvVarRow({ envVar, onEdit, onDelete, className }: EnvVarRowProp
   const [fetchedValue, setFetchedValue] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const handleToggleValue = async () => {
     if (isValueVisible) {
@@ -60,8 +65,20 @@ export function EnvVarRow({ envVar, onEdit, onDelete, className }: EnvVarRowProp
     onDelete(envVar);
   };
 
+  const handleCopyValue = async () => {
+    if (!fetchedValue) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(fetchedValue);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
   const maskedValue = '••••••••••••••';
-  const displayValue = isValueVisible && fetchedValue !== null ? fetchedValue : maskedValue;
 
   const updatedAtText = envVar.updatedAt
     ? formatTime(new Date(envVar.updatedAt).toISOString())
@@ -70,7 +87,7 @@ export function EnvVarRow({ envVar, onEdit, onDelete, className }: EnvVarRowProp
   return (
     <div
       className={cn(
-        'group h-12 px-3 bg-white hover:bg-neutral-100 dark:bg-[#333333] dark:hover:bg-neutral-700 rounded-lg border border-neutral-200 dark:border-neutral-700 transition-all',
+        'group h-12 bg-white hover:bg-neutral-100 dark:bg-[#333333] dark:hover:bg-neutral-700 rounded-lg border border-neutral-200 dark:border-neutral-700 transition-all',
         className
       )}
     >
@@ -100,25 +117,33 @@ export function EnvVarRow({ envVar, onEdit, onDelete, className }: EnvVarRowProp
               <Eye className="w-4 h-4" />
             )}
           </Button>
-          <span
-            className={cn(
-              'text-[13px] truncate',
-              error
-                ? 'text-red-500 dark:text-red-400'
-                : isValueVisible && fetchedValue !== null
-                  ? 'text-zinc-950 dark:text-white font-mono'
-                  : 'text-neutral-400 dark:text-neutral-500'
-            )}
-            title={
-              error
-                ? error
-                : isValueVisible && fetchedValue !== null
-                  ? fetchedValue
-                  : 'Click eye icon to reveal'
-            }
-          >
-            {error || displayValue}
-          </span>
+          {isValueVisible && fetchedValue !== null ? (
+            <TooltipProvider delayDuration={0}>
+              <Tooltip open={copied ? true : undefined}>
+                <TooltipTrigger asChild>
+                  <span
+                    onClick={() => void handleCopyValue()}
+                    className="text-[13px] truncate text-zinc-950 dark:text-white font-mono cursor-pointer hover:underline"
+                  >
+                    {fetchedValue}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p>{copied ? 'Copied!' : 'Click to Copy'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : (
+            <span
+              className={cn(
+                'text-[13px] truncate',
+                error ? 'text-red-500 dark:text-red-400' : 'text-neutral-400 dark:text-neutral-500'
+              )}
+              title={error ? error : 'Click eye icon to reveal'}
+            >
+              {error || maskedValue}
+            </span>
+          )}
         </div>
 
         {/* Updated At Column */}

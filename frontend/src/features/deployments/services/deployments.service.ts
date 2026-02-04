@@ -95,6 +95,31 @@ export class DeploymentsService {
   }
 
   async getEnvVar(id: string): Promise<DeploymentEnvVarWithValue> {
+    // TODO: Remove mock data after testing
+    const mockValues: Record<string, DeploymentEnvVarWithValue> = {
+      'mock-1': {
+        id: 'mock-1',
+        key: 'DATABASE_URL',
+        value: 'postgresql://user:password@localhost:5432/mydb',
+        type: 'encrypted',
+      },
+      'mock-2': {
+        id: 'mock-2',
+        key: 'API_SECRET_KEY',
+        value: 'sk_live_abc123xyz789secretkey',
+        type: 'secret',
+      },
+      'mock-3': {
+        id: 'mock-3',
+        key: 'NEXT_PUBLIC_APP_URL',
+        value: 'https://myapp.insforge.site',
+        type: 'plain',
+      },
+    };
+    if (mockValues[id]) {
+      return mockValues[id];
+    }
+
     const data = (await apiClient.request(`/deployments/env-vars/${encodeURIComponent(id)}`, {
       headers: apiClient.withAccessToken(),
     })) as GetEnvVarResponse;
