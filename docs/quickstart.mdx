@@ -3,91 +3,71 @@ title: "Quickstart"
 description: "Get InsForge running in 5 minutes"
 ---
 
-<iframe
-  width="100%"
-  height="400"
-  src="https://www.youtube.com/embed/ICZXPavNg-4"
-  title="InsForge Quickstart"
-  frameborder="0"
-  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-  allowFullScreen
-></iframe>
+## Step 1: Create your project
 
-Choose your deployment method:
+<Card title="Go to InsForge Cloud" icon="cloud" href="https://insforge.dev">
+  Visit [insforge.dev](https://insforge.dev) and create a free account
+</Card>
+
+Once logged in:
+1. Click **"Create New Project"**
+2. Your backend will be ready in ~3 seconds
+
+## Step 2: Install InsForge MCP Server
+
+Choose your preferred installation method:
 
 <Tabs>
-  <Tab title="Cloud Platform">
-    ## Get started in three steps (Cloud)
+  <Tab title="IDE Extension (Recommended)">
+    Click your IDE to install the InsForge extension directly:
 
-    ### Step 1: Create your project
-    
-    <Card title="Go to Insforge Cloud" icon="cloud" href="https://insforge.dev">
-      Visit [insforge.dev](https://insforge.dev) and create a free account
-    </Card>
-    
-    Once logged in:
-    1. Click **"Create New Project"**
-    2. Your backend will be ready in ~3 seconds
+    <CardGroup cols={2}>
+      <Card href="vscode:extension/insforge.insforge">
+        <img src="/images/logos/vscode.svg" width="18" style={{display: "inline", verticalAlign: "middle", marginRight: "8px"}} /> **VS Code**
+      </Card>
+      <Card href="cursor:extension/insforge.insforge">
+        <img src="/images/logos/cursor.svg" width="18" style={{display: "inline", verticalAlign: "middle", marginRight: "8px"}} /> **Cursor**
+      </Card>
+      <Card href="windsurf:extension/insforge.insforge">
+        <img src="/images/logos/windsurf.svg" width="18" style={{display: "inline", verticalAlign: "middle", marginRight: "8px"}} /> **Windsurf**
+      </Card>
+      <Card href="trae:extension/insforge.insforge">
+        <img src="/images/logos/trae.svg" width="18" style={{display: "inline", verticalAlign: "middle", marginRight: "8px"}} /> **Trae**
+      </Card>
+      <Card href="antigravity:extension/insforge.insforge">
+        <img src="/images/logos/antigravity.svg" width="18" style={{display: "inline", verticalAlign: "middle", marginRight: "8px"}} /> **Antigravity**
+      </Card>
+      <Card href="qoder:extension/insforge.insforge">
+        <img src="/images/logos/qoder.svg" width="18" style={{display: "inline", verticalAlign: "middle", marginRight: "8px"}} /> **Qoder**
+      </Card>
+      <Card href="kiro:extension/insforge.insforge">
+        <img src="/images/logos/kiro.svg" width="18" style={{display: "inline", verticalAlign: "middle", marginRight: "8px"}} /> **Kiro**
+      </Card>
+    </CardGroup>
 
-    ### Step 2: Connect to InsForge MCP Server
+    The extension will automatically configure MCP for your project.
+
+    For more details, see the [VS Code Extension guide](/vscode-extension).
+  </Tab>
+
+  <Tab title="Terminal Installation">
+    Install via terminal for any supported coding agent:
+
+    1. Under the **Terminal** tab in your dashboard, select your coding agent from the dropdown list
+    2. Copy the installation command and run it in your terminal
 
     <img src="/images/onboarding-mcp.png" alt="InsForge MCP Installation" />
-
-    In your project dashboard:
-    1. Choose your IDE (Cursor, Claude Code, Windsurf, Cline, etc.)
-    2. Copy the installation command - it includes your API key and URL automatically
-    3. Run the command in your terminal
-
-    Example command (yours will have your actual API key and URL):
-    ```bash
-    npx @insforge/install --client cursor \
-      --env API_KEY=ik_your_actual_api_key_here \
-      --env API_BASE_URL=https://your-app.insforge.app
-    ```
-
-    4. Test in your coding IDE by asking: "InsForge is my backend platform, what is my current backend structure?"
-
-    ### Step 3: Build your first app
-
-    Check out our [framework examples](/examples/overview) for step-by-step guides on building with:
-    - Next.js
-    - React
-    - Vue
-    - Nuxt
-    - Svelte
-
-    Or tell your AI assistant to build something:
-
-    ```
-    "Build a todo app with user authentication using Insforge as the backend"
-    ```
-
-    Your AI will automatically:
-    - Create database tables
-    - Set up authentication
-    - Handle file uploads
-    - Generate a complete frontend
-  </Tab>
-  
-  <Tab title="Local Development">
-    ## Run Insforge locally
-    
-    For local development and self-hosting instructions, please visit the official OSS repository:
-    
-    <Card title="Insforge OSS Repository" icon="github" href="https://github.com/insforge/insforge">
-      **Complete local setup guide available at:**
-      
-      https://github.com/insforge/insforge
-      
-      The repository includes:
-      - Docker setup instructions
-      - Environment configuration
-      - AI agent integration guides
-      - Troubleshooting tips
-    </Card>
-    
-    <Note>
-      Local development requires Docker and provides the same features as the cloud platform.
-    </Note>
   </Tab>
 </Tabs>
+
+Need help? Here's the [step-by-step guide](https://docs.insforge.dev/mcp-setup).
+
+## Step 3: Verify Installation
+
+Send the following prompt to your AI coding agent to verify the connection:
+
+`I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to learn about InsForge instructions.`
+
+If the connection is successful, you will see the **Connected** status indicator on your InsForge dashboard (top right corner).
+
+<img src="/images/connected-status.png" alt="Connected Status Indicator" />
