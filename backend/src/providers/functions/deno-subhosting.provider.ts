@@ -74,6 +74,35 @@ interface DenoSubhostingAsset {
   encoding: 'utf-8';
 }
 
+// App log types
+export interface AppLogQueryOptions {
+  q?: string;
+  level?: string;
+  region?: string;
+  since?: string;
+  until?: string;
+  limit?: number;
+  order?: 'asc' | 'desc';
+  cursor?: string;
+}
+
+const appLogEntrySchema = z.object({
+  time: z.string(),
+  level: z.string(),
+  message: z.string(),
+  region: z.string(),
+});
+
+export type AppLogEntry = z.infer<typeof appLogEntrySchema>;
+
+const appLogResponseSchema = z.array(appLogEntrySchema);
+
+export interface AppLogResult {
+  logs: AppLogEntry[];
+  cursor: string | null;
+  hasMore: boolean;
+}
+
 // Schema for Deno Subhosting API response
 // Note: Deno doesn't return error details in deployment response
 // Error info comes from build logs endpoint
@@ -351,6 +380,77 @@ export class DenoSubhostingProvider {
   }
 
   /**
+   * Get deployment runtime/execution logs (app logs)
+   * These are the actual console output from running functions,
+   * unlike build logs which come from the deployment process.
+   */
+  async getDeploymentAppLogs(
+    deploymentId: string,
+    options: AppLogQueryOptions = {}
+  ): Promise<AppLogResult> {
+    const credentials = this.getCredentials();
+
+    try {
+      const params = new URLSearchParams();
+      if (options.q) params.set('q', options.q);
+      if (options.level) params.set('level', options.level);
+      if (options.region) params.set('region', options.region);
+      if (options.since) params.set('since', options.since);
+      if (options.until) params.set('until', options.until);
+      if (options.limit !== undefined) params.set('limit', String(options.limit));
+      if (options.order) params.set('order', options.order);
+      if (options.cursor) params.set('cursor', options.cursor);
+
+      const queryString = params.toString();
+      const url = `${DENO_SUBHOSTING_API_BASE}/deployments/${deploymentId}/app_logs${
+        queryString ? `?${queryString}` : ''
+      }`;
+
+      const response = await fetchWithTimeout(
+        url,
+        {
+          headers: {
+            Authorization: `Bearer ${credentials.token}`,
+          },
+        },
+        15000
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new AppError(`Deployment not found: ${deploymentId}`, 404, ERROR_CODES.NOT_FOUND);
+        }
+        const errorText = await response.text();
+        throw new AppError(
+          `Failed to get app logs: ${response.status} - ${errorText}`,
+          500,
+          ERROR_CODES.INTERNAL_ERROR
+        );
+      }
+
+      const data = appLogResponseSchema.parse(await response.json());
+      const linkHeader = response.headers.get('link');
+      const cursor = this.parseCursorFromLinkHeader(linkHeader);
+
+      return {
+        logs: data,
+        cursor,
+        hasMore: cursor !== null,
+      };
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      logger.error('Failed to get deployment app logs', {
+        error: error instanceof Error ? error.message : String(error),
+        deploymentId,
+      });
+      throw new AppError('Failed to get deployment app logs', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+  }
+
+  /**
    * Get deployment build logs
    */
   async getDeploymentLogs(deploymentId: string): Promise<string[]> {
@@ -596,6 +696,21 @@ Deno.serve(async (req: Request) => {
   }
 });
 `;
+  }
+
+  /**
+   * Parse cursor from RFC 8288 Link header
+   * Expected format: <url?cursor=abc123>; rel="next"
+   */
+  private parseCursorFromLinkHeader(linkHeader: string | null): string | null {
+    if (!linkHeader) return null;
+
+    const nextMatch = linkHeader.match(/<[^>]*[?&]cursor=([^&>]+)[^>]*>;\s*rel="next"/);
+    if (nextMatch && nextMatch[1]) {
+      return decodeURIComponent(nextMatch[1]);
+    }
+
+    return null;
   }
 
   /**
