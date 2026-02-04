@@ -112,8 +112,18 @@ describe('DenoSubhostingProvider.getDeploymentAppLogs', () => {
 
   it('fetches app logs with default options', async () => {
     const mockLogs = [
-      { time: '2025-01-15T10:00:00Z', level: 'info', message: 'Hello from function', region: 'us-east1' },
-      { time: '2025-01-15T10:00:01Z', level: 'error', message: 'Something failed', region: 'us-east1' },
+      {
+        time: '2025-01-15T10:00:00Z',
+        level: 'info',
+        message: 'Hello from function',
+        region: 'us-east1',
+      },
+      {
+        time: '2025-01-15T10:00:01Z',
+        level: 'error',
+        message: 'Something failed',
+        region: 'us-east1',
+      },
     ];
 
     mockFetch.mockResolvedValue(createMockResponse(mockLogs));
@@ -161,7 +171,8 @@ describe('DenoSubhostingProvider.getDeploymentAppLogs', () => {
       { time: '2025-01-15T10:00:00Z', level: 'info', message: 'Log entry', region: 'us-east1' },
     ];
 
-    const linkHeader = '<https://api.deno.com/v1/deployments/deploy-123/app_logs?cursor=abc123>; rel="next"';
+    const linkHeader =
+      '<https://api.deno.com/v1/deployments/deploy-123/app_logs?cursor=abc123>; rel="next"';
     mockFetch.mockResolvedValue(createMockResponse(mockLogs, 200, { link: linkHeader }));
 
     const result = await provider.getDeploymentAppLogs('deploy-123');
@@ -246,7 +257,12 @@ describe('LogService.getLogsBySource with Deno Subhosting', () => {
 
     // Mock Deno API response
     const mockLogs = [
-      { time: '2025-01-15T10:00:00Z', level: 'info', message: 'Function executed', region: 'us-east1' },
+      {
+        time: '2025-01-15T10:00:00Z',
+        level: 'info',
+        message: 'Function executed',
+        region: 'us-east1',
+      },
       { time: '2025-01-15T10:00:05Z', level: 'warning', message: 'Slow query', region: 'us-east1' },
     ];
     mockFetch.mockResolvedValue(createMockResponse(mockLogs));
@@ -349,9 +365,7 @@ describe('FunctionService.getLatestSuccessfulDeploymentId', () => {
     const id = await functionService.getLatestSuccessfulDeploymentId();
 
     expect(id).toBe('deploy-success-1');
-    expect(mockPool.query).toHaveBeenCalledWith(
-      expect.stringContaining("status = 'success'")
-    );
+    expect(mockPool.query).toHaveBeenCalledWith(expect.stringContaining("status = 'success'"));
   });
 
   it('returns null when no successful deployment exists', async () => {
