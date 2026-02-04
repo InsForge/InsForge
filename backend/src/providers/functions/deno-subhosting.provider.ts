@@ -392,14 +392,30 @@ export class DenoSubhostingProvider {
 
     try {
       const params = new URLSearchParams();
-      if (options.q) params.set('q', options.q);
-      if (options.level) params.set('level', options.level);
-      if (options.region) params.set('region', options.region);
-      if (options.since) params.set('since', options.since);
-      if (options.until) params.set('until', options.until);
-      if (options.limit !== undefined) params.set('limit', String(options.limit));
-      if (options.order) params.set('order', options.order);
-      if (options.cursor) params.set('cursor', options.cursor);
+      if (options.q) {
+        params.set('q', options.q);
+      }
+      if (options.level) {
+        params.set('level', options.level);
+      }
+      if (options.region) {
+        params.set('region', options.region);
+      }
+      if (options.since) {
+        params.set('since', options.since);
+      }
+      if (options.until) {
+        params.set('until', options.until);
+      }
+      if (options.limit !== undefined) {
+        params.set('limit', String(options.limit));
+      }
+      if (options.order) {
+        params.set('order', options.order);
+      }
+      if (options.cursor) {
+        params.set('cursor', options.cursor);
+      }
 
       const queryString = params.toString();
       const url = `${DENO_SUBHOSTING_API_BASE}/deployments/${deploymentId}/app_logs${
@@ -703,7 +719,9 @@ Deno.serve(async (req: Request) => {
    * Expected format: <url?cursor=abc123>; rel="next"
    */
   private parseCursorFromLinkHeader(linkHeader: string | null): string | null {
-    if (!linkHeader) return null;
+    if (!linkHeader) {
+      return null;
+    }
 
     const nextMatch = linkHeader.match(/<[^>]*[?&]cursor=([^&>]+)[^>]*>;\s*rel="next"/);
     if (nextMatch && nextMatch[1]) {
