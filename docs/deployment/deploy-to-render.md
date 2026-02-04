@@ -57,8 +57,8 @@ Connect and run initialization scripts:
 
 ```bash
 # Download init scripts
-curl -O https://raw.githubusercontent.com/insforge/insforge/main/docker-init/db/db-init.sql
-curl -O https://raw.githubusercontent.com/insforge/insforge/main/docker-init/db/jwt.sql
+curl -O https://raw.githubusercontent.com/insforge/insforge/main/deploy/docker-init/db/db-init.sql
+curl -O https://raw.githubusercontent.com/insforge/insforge/main/deploy/docker-init/db/jwt.sql
 
 # Connect to database
 psql <your-external-database-url>

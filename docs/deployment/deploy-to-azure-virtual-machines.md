@@ -87,7 +87,7 @@ This guide provides comprehensive, step-by-step instructions for deploying, mana
     ```bash
     cd ~
     git clone https://github.com/InsForge/InsForge.git
-    cd InsForge
+    cd InsForge/deploy/docker-compose
     ```
 
 2.  **Create Environment Configuration:**
@@ -163,7 +163,7 @@ This guide provides comprehensive, step-by-step instructions for deploying, mana
     You should see a response like: `{"status":"ok", ...}`
 
 2.  **Access Dashboard:**
-    Open your browser and navigate to: `http://<your-vm-public-ip>:7131`
+    Open your browser and navigate to: `http://<your-vm-public-ip>:7130`
 
 3.  **⚠️ Important: Custom Admin Credentials Configuration**
     > 🚧 **Active Development Notice:** The credential management system is being developed. If you customize `ADMIN_EMAIL` and `ADMIN_PASSWORD` in your `.env` file (which is recommended), you must **also manually update the frontend login page** to match. This is a temporary workaround.

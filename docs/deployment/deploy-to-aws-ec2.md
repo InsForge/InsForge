@@ -109,7 +109,7 @@ sudo apt install git -y
 ```bash
 cd ~
 git clone https://github.com/insforge/insforge.git
-cd insforge
+cd insforge/deploy/docker-compose
 ```
 
 #### 4.2 Create Environment Configuration
@@ -254,7 +254,7 @@ Expected response:
 
 Open your browser and navigate to:
 ```text
-http://your-ec2-ip:7131
+http://your-ec2-ip:7130
 ```
 
 
@@ -521,7 +521,7 @@ sudo certbot renew --dry-run
 ### Database Optimization
 
 ```conf
-# Increase PostgreSQL shared_buffers (edit postgresql.conf in docker-init/db/)
+# Increase PostgreSQL shared_buffers (edit postgresql.conf in deploy/docker-init/db/)
 # Recommended: 25% of available RAM
 shared_buffers = 1GB
 effective_cache_size = 3GB
