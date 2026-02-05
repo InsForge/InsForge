@@ -24,7 +24,7 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
 
   // Build main menu items - add deployments for cloud projects
   const mainMenuItems = useMemo(() => {
-    if (isCloud || true) {
+    if (isCloud) {
       // Insert deployments after visualizer (at the end of main items)
       return [...staticMenuItems, deploymentsMenuItem];
     }
