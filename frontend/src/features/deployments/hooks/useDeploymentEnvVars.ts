@@ -5,28 +5,6 @@ import type { DeploymentEnvVar, UpsertEnvVarRequest } from '@insforge/shared-sch
 import { useToast } from '@/lib/hooks/useToast';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 
-// TODO: Remove mock data after testing
-const MOCK_ENV_VARS: DeploymentEnvVar[] = [
-  {
-    id: 'mock-1',
-    key: 'DATABASE_URL',
-    type: 'encrypted',
-    updatedAt: Date.now(),
-  },
-  {
-    id: 'mock-2',
-    key: 'API_SECRET_KEY',
-    type: 'secret',
-    updatedAt: Date.now() - 86400000, // 1 day ago
-  },
-  {
-    id: 'mock-3',
-    key: 'NEXT_PUBLIC_APP_URL',
-    type: 'plain',
-    updatedAt: Date.now() - 172800000, // 2 days ago
-  },
-];
-
 export function useDeploymentEnvVars() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
@@ -40,15 +18,7 @@ export function useDeploymentEnvVars() {
     refetch,
   } = useQuery({
     queryKey: ['deployment-env-vars'],
-    queryFn: async () => {
-      // TODO: Remove mock data after testing
-      try {
-        const realData = await deploymentsService.listEnvVars();
-        return realData.length > 0 ? realData : MOCK_ENV_VARS;
-      } catch {
-        return MOCK_ENV_VARS;
-      }
-    },
+    queryFn: () => deploymentsService.listEnvVars(),
     staleTime: 2 * 60 * 1000, // Cache for 2 minutes
     retry: false,
   });

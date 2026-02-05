@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { ExternalLink, Copy, Check, Plus, Pencil } from 'lucide-react';
-import { Button, Skeleton, Input } from '@/components';
+import { ExternalLink, Copy, Check, Plus, Pencil, Globe } from 'lucide-react';
+import { Button, Skeleton, Input, Dialog, DialogContent } from '@/components';
+import DiscordIcon from '@/assets/logos/discord.svg?react';
 import { useDeployments } from '../hooks/useDeployments';
 import { useDeploymentSlug } from '../hooks/useDeploymentSlug';
 import { useDeploymentMetadata } from '../hooks/useDeploymentMetadata';
@@ -20,6 +21,7 @@ export default function DeploymentDomainsPage() {
   const [copiedCustom, setCopiedCustom] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [customSlug, setCustomSlug] = useState('');
+  const [isOwnDomainDialogOpen, setIsOwnDomainDialogOpen] = useState(false);
 
   const { deployments, isLoadingDeployments } = useDeployments();
   const { updateSlug, isUpdating } = useDeploymentSlug();
@@ -47,8 +49,8 @@ export default function DeploymentDomainsPage() {
       await navigator.clipboard.writeText(defaultDomain);
       setCopiedDefault(true);
       setTimeout(() => setCopiedDefault(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
+    } catch {
+      showToast('Failed to copy to clipboard', 'error');
     }
   };
 
@@ -60,8 +62,8 @@ export default function DeploymentDomainsPage() {
       await navigator.clipboard.writeText(customDomainUrl);
       setCopiedCustom(true);
       setTimeout(() => setCopiedCustom(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
+    } catch {
+      showToast('Failed to copy to clipboard', 'error');
     }
   };
 
@@ -292,6 +294,48 @@ export default function DeploymentDomainsPage() {
               )}
             </div>
           </div>
+
+          {/* Add Your Own Domain */}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsOwnDomainDialogOpen(true)}
+            className="w-fit h-9 px-3 gap-1.5 bg-neutral-200 dark:bg-neutral-600 hover:bg-neutral-300 dark:hover:bg-neutral-500 text-zinc-950 dark:text-white"
+          >
+            <Globe className="w-4 h-4" />
+            <span className="text-sm font-medium">Add your own domain</span>
+          </Button>
+
+          {/* Own Domain Dialog */}
+          <Dialog open={isOwnDomainDialogOpen} onOpenChange={setIsOwnDomainDialogOpen}>
+            <DialogContent className="max-w-md p-0 gap-0 bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-3 border-b border-neutral-200 dark:border-neutral-700">
+                <h2 className="text-lg font-semibold text-zinc-950 dark:text-white leading-7">
+                  Add you own domain
+                </h2>
+              </div>
+
+              {/* Body */}
+              <div className="flex flex-col gap-4 p-6">
+                <p className="text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed">
+                  Support for bringing your own domain is currently under development. In the
+                  meantime, our team can help you set it up — just reach out on our{' '}
+                  <a
+                    href="https://discord.gg/DvBtaEc9Jz"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 align-middle"
+                  >
+                    <DiscordIcon className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+                    <span className="text-indigo-500 dark:text-indigo-400 font-medium">
+                      Discord
+                    </span>
+                  </a>
+                </p>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </div>

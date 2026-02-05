@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Eye, EyeOff, MoreVertical, Pencil, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/radix/Button';
 import {
@@ -28,6 +28,13 @@ export function EnvVarRow({ envVar, onEdit, onDelete, className }: EnvVarRowProp
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // Reset cached value when the env var is updated (e.g., after an edit)
+  useEffect(() => {
+    setFetchedValue(null);
+    setIsValueVisible(false);
+    setError(null);
+  }, [envVar.updatedAt]);
 
   const handleToggleValue = async () => {
     if (isValueVisible) {
@@ -66,7 +73,7 @@ export function EnvVarRow({ envVar, onEdit, onDelete, className }: EnvVarRowProp
   };
 
   const handleCopyValue = async () => {
-    if (!fetchedValue) {
+    if (fetchedValue === null) {
       return;
     }
     try {
