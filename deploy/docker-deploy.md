@@ -1,4 +1,4 @@
-# How to use Dockerized InsForge (for development)
+# Deploy InsForge with Docker
 
 ## Prerequisites
 
@@ -14,21 +14,19 @@ wget https://raw.githubusercontent.com/insforge/insforge/main/deploy/docker-comp
 mv .env.example .env
 ```
 
-### Step 2: Configure the .env file
-
-Edit the .env file and set the required environment variables.
-
-### Step 3: Start InsForge
+### Step 2: Start InsForge
 
 ```bash
 docker compose up -d
 ```
 
-### Step 4: Access InsForge
+### Step 3: Access InsForge
 
 Open your browser and navigate to `http://localhost:7130`, you can see the InsForge dashboard as below:
 
-![InsForge Dashboard](../assets/signin.png)
+<div align="center">
+  <img src="../assets/signin.png" alt="InsForge Dashboard" width="600">
+</div>
 
 ## Start using InsForge
 
@@ -53,11 +51,13 @@ Build your next todo app, Instagram clone, or online platform in seconds!
 
 Sample Project Prompt:
 
-"Build an app similar to Reddit with community-based discussion threads using InsForge as the backend platform that has these features:
+```
+Build an app similar to Reddit with community-based discussion threads using InsForge as the backend platform that has these features:
 
 - Has a "Communities" list where users can browse or create communities
 - Each community has its own posts feed
 - Users can create posts with a title and body (text or image upload to InsForge storage)
 - Users can comment on posts and reply to other comments
 - Allows upvoting and downvoting for both posts and comments
-- Shows vote counts and comment counts for each post"
+- Shows vote counts and comment counts for each post
+```
