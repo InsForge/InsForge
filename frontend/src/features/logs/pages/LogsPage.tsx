@@ -63,11 +63,17 @@ export default function LogsPage() {
         name: 'Logs',
         width: selectedLog ? '1fr' : '5fr',
         minWidth: 200,
-        renderCell: ({ row }) => (
-          <p className="text-sm text-gray-900 dark:text-white font-normal leading-6 truncate">
-            {String(row.eventMessage ?? '')}
-          </p>
-        ),
+        renderCell: ({ row }) => {
+          // Prioritize body.event_message since body contains the parsed log object
+          const body = row.body as Record<string, unknown> | undefined;
+          const displayMessage = (body?.event_message as string) || String(row.eventMessage ?? '');
+
+          return (
+            <p className="text-sm text-gray-900 dark:text-white font-normal leading-6 truncate">
+              {displayMessage}
+            </p>
+          );
+        },
       },
       {
         key: 'severity',
