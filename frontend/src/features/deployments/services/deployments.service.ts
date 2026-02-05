@@ -4,9 +4,33 @@ import type {
   CreateDeploymentResponse,
   StartDeploymentRequest,
   ListDeploymentsResponse,
+  DeploymentEnvVar,
+  DeploymentEnvVarWithValue,
+  ListEnvVarsResponse,
+  GetEnvVarResponse,
+  UpsertEnvVarRequest,
+  UpsertEnvVarResponse,
+  DeleteEnvVarResponse,
+  UpdateSlugRequest,
+  UpdateSlugResponse,
+  DeploymentMetadataResponse,
 } from '@insforge/shared-schemas';
 
-export type { DeploymentSchema, CreateDeploymentResponse, ListDeploymentsResponse };
+export type {
+  DeploymentSchema,
+  CreateDeploymentResponse,
+  ListDeploymentsResponse,
+  DeploymentEnvVar,
+  DeploymentEnvVarWithValue,
+  ListEnvVarsResponse,
+  GetEnvVarResponse,
+  UpsertEnvVarRequest,
+  UpsertEnvVarResponse,
+  DeleteEnvVarResponse,
+  UpdateSlugRequest,
+  UpdateSlugResponse,
+  DeploymentMetadataResponse,
+};
 
 export class DeploymentsService {
   // ============================================================================
@@ -55,6 +79,86 @@ export class DeploymentsService {
   async cancelDeployment(id: string): Promise<void> {
     return apiClient.request(`/deployments/${id}/cancel`, {
       method: 'POST',
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  // ============================================================================
+  // Environment Variables
+  // ============================================================================
+
+  async listEnvVars(): Promise<DeploymentEnvVar[]> {
+    const data = (await apiClient.request('/deployments/env-vars', {
+      headers: apiClient.withAccessToken(),
+    })) as ListEnvVarsResponse;
+    return data.envVars;
+  }
+
+  async getEnvVar(id: string): Promise<DeploymentEnvVarWithValue> {
+    // TODO: Remove mock data after testing
+    const mockValues: Record<string, DeploymentEnvVarWithValue> = {
+      'mock-1': {
+        id: 'mock-1',
+        key: 'DATABASE_URL',
+        value: 'postgresql://user:password@localhost:5432/mydb',
+        type: 'encrypted',
+      },
+      'mock-2': {
+        id: 'mock-2',
+        key: 'API_SECRET_KEY',
+        value: 'sk_live_abc123xyz789secretkey',
+        type: 'secret',
+      },
+      'mock-3': {
+        id: 'mock-3',
+        key: 'NEXT_PUBLIC_APP_URL',
+        value: 'https://myapp.insforge.site',
+        type: 'plain',
+      },
+    };
+    if (mockValues[id]) {
+      return mockValues[id];
+    }
+
+    const data = (await apiClient.request(`/deployments/env-vars/${encodeURIComponent(id)}`, {
+      headers: apiClient.withAccessToken(),
+    })) as GetEnvVarResponse;
+    return data.envVar;
+  }
+
+  async upsertEnvVar(input: UpsertEnvVarRequest): Promise<UpsertEnvVarResponse> {
+    return apiClient.request('/deployments/env-vars', {
+      method: 'POST',
+      headers: apiClient.withAccessToken(),
+      body: JSON.stringify(input),
+    });
+  }
+
+  async deleteEnvVar(id: string): Promise<DeleteEnvVarResponse> {
+    return apiClient.request(`/deployments/env-vars/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  // ============================================================================
+  // Custom Slug/Domain
+  // ============================================================================
+
+  async updateSlug(slug: string | null): Promise<UpdateSlugResponse> {
+    return apiClient.request('/deployments/slug', {
+      method: 'PUT',
+      headers: apiClient.withAccessToken(),
+      body: JSON.stringify({ slug }),
+    });
+  }
+
+  // ============================================================================
+  // Metadata
+  // ============================================================================
+
+  async getMetadata(): Promise<DeploymentMetadataResponse> {
+    return apiClient.request('/deployments/metadata', {
       headers: apiClient.withAccessToken(),
     });
   }

@@ -3,7 +3,7 @@ import type { DeploymentSchema } from '../services/deployments.service';
 
 interface DeploymentRowProps {
   deployment: DeploymentSchema;
-  onClick: () => void;
+  onClick?: () => void;
   className?: string;
 }
 
@@ -23,7 +23,8 @@ export function DeploymentRow({ deployment, onClick, className }: DeploymentRowP
   return (
     <div
       className={cn(
-        'group h-14 px-3 bg-white hover:bg-neutral-100 dark:bg-[#333333] dark:hover:bg-neutral-700 rounded-[8px] transition-all cursor-pointer',
+        'group h-14 px-3 bg-white dark:bg-[#333333] rounded-[8px] transition-all',
+        onClick && 'hover:bg-neutral-100 dark:hover:bg-neutral-700 cursor-pointer',
         className
       )}
       onClick={onClick}

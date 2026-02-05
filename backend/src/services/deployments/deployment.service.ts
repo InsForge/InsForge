@@ -1,5 +1,6 @@
 import { Pool } from 'pg';
 import AdmZip from 'adm-zip';
+import jwt from 'jsonwebtoken';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { VercelProvider } from '@/providers/deployments/vercel.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
@@ -12,9 +13,14 @@ import {
   type DeploymentStatusType,
 } from '@/types/deployments.js';
 import logger from '@/utils/logger.js';
-import type { CreateDeploymentResponse, StartDeploymentRequest } from '@insforge/shared-schemas';
+import type {
+  CreateDeploymentResponse,
+  StartDeploymentRequest,
+  UpdateSlugResponse,
+  DeploymentMetadataResponse,
+} from '@insforge/shared-schemas';
 
-export type { DeploymentRecord };
+export type { DeploymentRecord, UpdateSlugResponse, DeploymentMetadataResponse };
 
 // Deployment files are stored in a special "_deployments" bucket
 const DEPLOYMENT_BUCKET = '_deployments';
@@ -688,6 +694,132 @@ export class DeploymentService {
         500,
         ERROR_CODES.INTERNAL_ERROR
       );
+    }
+  }
+
+  /**
+   * Update the custom slug for the project
+   * Calls cloud API: PUT /sites/v1/:projectId/slug
+   */
+  async updateSlug(slug: string | null): Promise<UpdateSlugResponse> {
+    if (!isCloudEnvironment()) {
+      throw new AppError(
+        'Custom slugs are only available in cloud environment.',
+        503,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+
+    const projectId = process.env.PROJECT_ID;
+    if (!projectId) {
+      throw new AppError(
+        'PROJECT_ID not found in environment variables',
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      throw new AppError(
+        'JWT_SECRET not found in environment variables',
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+
+    try {
+      const signature = jwt.sign({ projectId }, jwtSecret, { expiresIn: '1h' });
+      const cloudApiHost = process.env.CLOUD_API_HOST || 'https://api.insforge.dev';
+
+      const response = await fetch(`${cloudApiHost}/sites/v1/${projectId}/slug`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sign: signature,
+          slug: slug,
+        }),
+      });
+
+      if (response.status === 409) {
+        const errorData = (await response.json()) as { error?: string };
+        throw new AppError(
+          errorData.error || 'Slug is already taken',
+          409,
+          ERROR_CODES.ALREADY_EXISTS
+        );
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new AppError(
+          `Failed to update slug: ${response.statusText} - ${errorText}`,
+          response.status,
+          ERROR_CODES.INTERNAL_ERROR
+        );
+      }
+
+      const data = (await response.json()) as UpdateSlugResponse;
+
+      // Update cached slug in VercelProvider so subsequent calls get the correct value
+      this.vercelProvider.updateCachedSlug(data.slug);
+
+      logger.info('Custom domain slug updated', {
+        projectId,
+        slug: data.slug,
+        domain: data.domain,
+      });
+
+      return data;
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      logger.error('Failed to update slug', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new AppError('Failed to update slug', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+  }
+
+  /**
+   * Get deployment metadata including current deployment and domain URLs
+   */
+  async getMetadata(): Promise<DeploymentMetadataResponse> {
+    try {
+      // Get the latest READY deployment
+      const result = await this.getPool().query(
+        `SELECT
+          id,
+          url
+         FROM system.deployments
+         WHERE status = 'READY'
+         ORDER BY created_at DESC
+         LIMIT 1`
+      );
+
+      const latestReadyDeployment = result.rows[0] as
+        | { id: string; url: string | null }
+        | undefined;
+
+      // Get the custom domain URL from Vercel provider (which has the slug from cloud credentials)
+      const customDomainUrl = await this.vercelProvider.getCustomDomainUrl();
+
+      return {
+        currentDeploymentId: latestReadyDeployment?.id ?? null,
+        defaultDomainUrl: latestReadyDeployment?.url ?? null,
+        customDomainUrl,
+      };
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      logger.error('Failed to get deployment metadata', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new AppError('Failed to get deployment metadata', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 }

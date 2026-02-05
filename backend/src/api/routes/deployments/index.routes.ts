@@ -5,11 +5,15 @@ import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse, paginatedResponse } from '@/utils/response.js';
-import { startDeploymentRequestSchema } from '@insforge/shared-schemas';
+import { startDeploymentRequestSchema, updateSlugRequestSchema } from '@insforge/shared-schemas';
+import { envVarsRouter } from './env-vars.routes.js';
 
 const router = Router();
 const deploymentService = DeploymentService.getInstance();
 const auditService = AuditService.getInstance();
+
+// Mount sub-routers first to avoid conflicts with parameterized routes
+router.use('/env-vars', envVarsRouter);
 
 /**
  * Create a new deployment record with WAITING status
@@ -114,6 +118,23 @@ router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextF
 });
 
 /**
+ * Get deployment metadata (current deployment, domain URLs)
+ * GET /api/deployments/metadata
+ */
+router.get(
+  '/metadata',
+  verifyAdmin,
+  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const metadata = await deploymentService.getMetadata();
+      successResponse(res, metadata);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * Get deployment by database ID
  * GET /api/deployments/:id
  */
@@ -188,5 +209,37 @@ router.post(
     }
   }
 );
+
+/**
+ * Update custom slug for the project
+ * PUT /api/deployments/slug
+ */
+router.put('/slug', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const validationResult = updateSlugRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      throw new AppError(
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const result = await deploymentService.updateSlug(validationResult.data.slug);
+
+    // Log audit
+    await auditService.log({
+      actor: req.user?.email || 'api-key',
+      action: 'UPDATE_DEPLOYMENT_SLUG',
+      module: 'DEPLOYMENTS',
+      details: { slug: result.slug, domain: result.domain },
+      ip_address: req.ip,
+    });
+
+    successResponse(res, result);
+  } catch (error) {
+    next(error);
+  }
+});
 
 export { router as deploymentsRouter };
