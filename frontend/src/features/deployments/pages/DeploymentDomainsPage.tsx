@@ -312,7 +312,7 @@ export default function DeploymentDomainsPage() {
               {/* Header */}
               <div className="flex items-center justify-between px-6 py-3 border-b border-neutral-200 dark:border-neutral-700">
                 <h2 className="text-lg font-semibold text-zinc-950 dark:text-white leading-7">
-                  Add you own domain
+                  Add your own domain
                 </h2>
               </div>
 
