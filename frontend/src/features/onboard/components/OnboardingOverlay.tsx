@@ -37,13 +37,13 @@ export function OnboardingOverlay() {
   // Determine tabs based on experiment variant
   const tabs = useMemo((): InstallMethodTab[] => {
     if (variant === 'test') {
-      // Test variant: extension first
+      // Test variant: extension is recommended
       return [
-        { id: 'extension', label: 'VSCode Extension' },
+        { id: 'extension', label: 'VSCode Extension', showRecommended: true },
         { id: 'terminal', label: 'Terminal' },
       ];
     }
-    // Control variant or undefined: terminal first (default)
+    // Control variant or undefined: terminal is recommended (default)
     return DEFAULT_OVERLAY_TABS;
   }, [variant]);
 
@@ -90,6 +90,11 @@ export function OnboardingOverlay() {
           new_method: newMethod,
         });
         methodSwitchTime.current = Date.now();
+        // Reset step to 1 when switching methods
+        setCurrentStepByMethod((prev) => ({
+          ...prev,
+          [newMethod]: 1,
+        }));
       }
       setInstallMethod(newMethod);
     },

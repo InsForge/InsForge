@@ -5,6 +5,7 @@ export type InstallMethod = 'terminal' | 'extension';
 export interface InstallMethodTab {
   id: InstallMethod;
   label: string;
+  showRecommended?: boolean;
 }
 
 interface InstallMethodTabsProps {
@@ -28,7 +29,12 @@ export function InstallMethodTabs({ tabs, value, onChange, className }: InstallM
               : 'dark:text-neutral-400 text-gray-500 dark:hover:text-white hover:text-black'
           )}
         >
-          {tab.label}
+          <span>{tab.label}</span>
+          {tab.showRecommended && (
+            <span className="px-2.5 py-0.5 text-xs leading-5 rounded-md border border-gray-200 dark:border-neutral-700 text-neutral-500 dark:text-emerald-300 bg-white dark:bg-black">
+              Recommended
+            </span>
+          )}
         </button>
       ))}
     </div>
@@ -37,11 +43,11 @@ export function InstallMethodTabs({ tabs, value, onChange, className }: InstallM
 
 // Default tab configurations
 export const DEFAULT_OVERLAY_TABS: InstallMethodTab[] = [
-  { id: 'terminal', label: 'Terminal Install' },
+  { id: 'terminal', label: 'Terminal', showRecommended: true },
   { id: 'extension', label: 'VSCode Extension' },
 ];
 
 export const DEFAULT_MODAL_TABS: InstallMethodTab[] = [
-  { id: 'terminal', label: 'Terminal Install' },
+  { id: 'terminal', label: 'Terminal' },
   { id: 'extension', label: 'VSCode Extension' },
 ];

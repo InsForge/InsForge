@@ -1,5 +1,5 @@
 import { useState, useEffect, ReactNode } from 'react';
-import { CircleCheckBig, Circle } from 'lucide-react';
+import { CircleCheckBig, Clock } from 'lucide-react';
 import { Button } from '@/components';
 import { trackPostHog } from '@/lib/analytics/posthog';
 import type { InstallMethod } from './InstallMethodTabs';
@@ -68,7 +68,7 @@ export function OnboardingStep({
             {isCompleted ? (
               <CircleCheckBig className="w-5 h-5 text-black dark:text-emerald-300" />
             ) : (
-              <Circle className="w-5 h-5 text-neutral-500" />
+              <Clock className="w-5 h-5 text-neutral-500" />
             )}
 
             {/* Step title */}
