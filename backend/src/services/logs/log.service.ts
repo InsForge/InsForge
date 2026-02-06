@@ -37,8 +37,22 @@ export class LogService {
     await this.provider.initialize();
   }
 
-  getLogSources(): Promise<LogSourceSchema[]> {
-    return this.provider.getLogSources();
+  async getLogSources(): Promise<LogSourceSchema[]> {
+    const providerSources = await this.provider.getLogSources();
+    const denoProvider = DenoSubhostingProvider.getInstance();
+    if (denoProvider.isConfigured()) {
+      // add function logs to the list of sources, if not already present
+      const idCounter = providerSources?.length + 1 || 1;
+      const alreadyExists = providerSources.some((s) => s.token === 'function-vector');
+      if (!alreadyExists) {
+        providerSources.push({
+          id: String(idCounter),
+          name: 'function.logs',
+          token: 'function-vector',
+        });
+      }
+    }
+    return providerSources;
   }
 
   async getLogsBySource(
@@ -79,31 +93,41 @@ export class LogService {
 
     const deploymentId = await functionService.getLatestSuccessfulDeploymentId();
     if (!deploymentId) {
+      logger.debug('No successful deployment found, cannot fetch function logs from Deno');
       return { logs: [], total: 0, tableName: 'deno-subhosting' };
     }
 
-    const result = await denoProvider.getDeploymentAppLogs(deploymentId, {
-      limit,
-      until: beforeTimestamp,
-      order: 'desc',
-    });
+    try {
+      const result = await denoProvider.getDeploymentAppLogs(deploymentId, {
+        limit,
+        until: beforeTimestamp,
+        order: 'desc',
+      });
 
-    const logs: LogSchema[] = result.logs.map((entry, index) => ({
-      id: `deno-${deploymentId}-${entry.time}-${index}`,
-      timestamp: entry.time,
-      eventMessage: entry.message,
-      body: {
-        level: entry.level,
-        region: entry.region,
-        message: entry.message,
-      },
-    }));
+      const logs: LogSchema[] = result.logs.map((entry, index) => ({
+        id: `deno-${deploymentId}-${entry.time}-${index}`,
+        timestamp: entry.time,
+        eventMessage: entry.message,
+        body: {
+          level: entry.level,
+          region: entry.region,
+          message: entry.message,
+        },
+      }));
 
-    return {
-      logs,
-      total: logs.length,
-      tableName: 'deno-subhosting',
-    };
+      return {
+        logs,
+        total: logs.length,
+        tableName: 'deno-subhosting',
+      };
+    } catch (error) {
+      // Log and return empty result instead of throwing to prevent hanging requests
+      logger.error('Failed to fetch function logs from Deno', {
+        error: error instanceof Error ? error.message : String(error),
+        deploymentId,
+      });
+      return { logs: [], total: 0, tableName: 'deno-subhosting' };
+    }
   }
 
   getLogSourceStats(): Promise<LogStatsSchema[]> {
