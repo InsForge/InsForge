@@ -82,8 +82,6 @@ export class CloudWatchProvider extends BaseLogProvider {
         available.push({ id: String(idCounter++), name: displayName, token: suffix });
       }
     }
-    // always add function logsource for Deno Subhosting, even if no logs are found yet.
-    available.push({ id: String(idCounter++), name: 'function.logs', token: 'function-vector' });
 
     return available;
   }
