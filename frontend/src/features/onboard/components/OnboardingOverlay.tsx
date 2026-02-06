@@ -90,6 +90,11 @@ export function OnboardingOverlay() {
           new_method: newMethod,
         });
         methodSwitchTime.current = Date.now();
+        // Reset step to 1 when switching methods
+        setCurrentStepByMethod((prev) => ({
+          ...prev,
+          [newMethod]: 1,
+        }));
       }
       setInstallMethod(newMethod);
     },
@@ -145,7 +150,7 @@ export function OnboardingOverlay() {
 
   const isCloudEnvironment = isInsForgeCloudProject();
   const isLoading = isApiKeyLoading || isMcpLoading;
-  const shouldShow = isCloudEnvironment && (isLoading || !hasCompletedOnboarding) || true;
+  const shouldShow = isCloudEnvironment && (isLoading || !hasCompletedOnboarding);
   const isOnDashboardPage = location.pathname === '/dashboard';
 
   // Track onboarding overlay viewed (once when shown)
