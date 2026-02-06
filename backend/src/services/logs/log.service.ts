@@ -68,8 +68,15 @@ export class LogService {
     // fetch app logs from Deno API instead of CloudWatch/local
     const isFunctionLogs = sourceName === 'function.logs' || sourceName === 'deno-relay-logs';
     const denoProvider = DenoSubhostingProvider.getInstance();
+    const isDenoConfigured = denoProvider.isConfigured();
 
-    if (isFunctionLogs && denoProvider.isConfigured()) {
+    logger.info('getLogsBySource called', {
+      sourceName,
+      isFunctionLogs,
+      isDenoConfigured,
+    });
+
+    if (isFunctionLogs && isDenoConfigured) {
       return this.getFunctionLogsFromDeno(limit, beforeTimestamp);
     }
 
@@ -93,8 +100,18 @@ export class LogService {
 
     const deploymentId = await functionService.getLatestSuccessfulDeploymentId();
     if (!deploymentId) {
-      logger.debug('No successful deployment found, cannot fetch function logs from Deno');
+      logger.info('No successful deployment found, cannot fetch function logs from Deno');
       return { logs: [], total: 0, tableName: 'deno-subhosting' };
+    }
+    logger.info('Fetching function logs from Deno Subhosting', {
+      deploymentId,
+      limit,
+      beforeTimestamp,
+    });
+
+    if (!beforeTimestamp) {
+      // If no beforeTimestamp provided, set it to current time to fetch latest logs
+      beforeTimestamp = new Date().toISOString();
     }
 
     try {
@@ -102,6 +119,7 @@ export class LogService {
         limit,
         until: beforeTimestamp,
         order: 'desc',
+        level: 'debug',
       });
 
       const logs: LogSchema[] = result.logs.map((entry, index) => ({
