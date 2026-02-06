@@ -557,6 +557,25 @@ export class FunctionService {
   }
 
   /**
+   * Get the latest successful deployment ID from DB
+   */
+  async getLatestSuccessfulDeploymentId(): Promise<string | null> {
+    try {
+      const result = await this.getPool().query(
+        `SELECT id FROM functions.deployments
+         WHERE status = 'success'
+         ORDER BY created_at DESC LIMIT 1`
+      );
+      return result.rows[0]?.id || null;
+    } catch (error) {
+      logger.error('Failed to get latest deployment ID', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  /**
    * Get the latest successful deployment URL (cached)
    */
   async getDeploymentUrl(): Promise<string | null> {

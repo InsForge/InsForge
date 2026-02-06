@@ -4,6 +4,8 @@ import { LocalFileProvider } from '@/providers/logs/local.provider.js';
 import { LogProvider } from '@/providers/logs/base.provider.js';
 import { LogSchema, LogSourceSchema, LogStatsSchema } from '@insforge/shared-schemas';
 import { isCloudEnvironment } from '@/utils/environment.js';
+import { DenoSubhostingProvider } from '@/providers/functions/deno-subhosting.provider.js';
+import { FunctionService } from '@/services/functions/function.service.js';
 
 export class LogService {
   private static instance: LogService;
@@ -39,7 +41,7 @@ export class LogService {
     return this.provider.getLogSources();
   }
 
-  getLogsBySource(
+  async getLogsBySource(
     sourceName: string,
     limit: number = 100,
     beforeTimestamp?: string
@@ -48,7 +50,60 @@ export class LogService {
     total: number;
     tableName: string;
   }> {
+    // When source is function.logs and Deno Subhosting is configured,
+    // fetch app logs from Deno API instead of CloudWatch/local
+    const isFunctionLogs = sourceName === 'function.logs' || sourceName === 'deno-relay-logs';
+    const denoProvider = DenoSubhostingProvider.getInstance();
+
+    if (isFunctionLogs && denoProvider.isConfigured()) {
+      return this.getFunctionLogsFromDeno(limit, beforeTimestamp);
+    }
+
     return this.provider.getLogsBySource(sourceName, limit, beforeTimestamp);
+  }
+
+  /**
+   * Fetch function runtime logs from Deno Subhosting API
+   * and convert to LogSchema format for consistent response
+   */
+  private async getFunctionLogsFromDeno(
+    limit: number,
+    beforeTimestamp?: string
+  ): Promise<{
+    logs: LogSchema[];
+    total: number;
+    tableName: string;
+  }> {
+    const functionService = FunctionService.getInstance();
+    const denoProvider = DenoSubhostingProvider.getInstance();
+
+    const deploymentId = await functionService.getLatestSuccessfulDeploymentId();
+    if (!deploymentId) {
+      return { logs: [], total: 0, tableName: 'deno-subhosting' };
+    }
+
+    const result = await denoProvider.getDeploymentAppLogs(deploymentId, {
+      limit,
+      until: beforeTimestamp,
+      order: 'desc',
+    });
+
+    const logs: LogSchema[] = result.logs.map((entry, index) => ({
+      id: `deno-${deploymentId}-${entry.time}-${index}`,
+      timestamp: entry.time,
+      eventMessage: entry.message,
+      body: {
+        level: entry.level,
+        region: entry.region,
+        message: entry.message,
+      },
+    }));
+
+    return {
+      logs,
+      total: logs.length,
+      tableName: 'deno-subhosting',
+    };
   }
 
   getLogSourceStats(): Promise<LogStatsSchema[]> {
