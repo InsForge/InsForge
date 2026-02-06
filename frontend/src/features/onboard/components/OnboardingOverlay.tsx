@@ -37,13 +37,13 @@ export function OnboardingOverlay() {
   // Determine tabs based on experiment variant
   const tabs = useMemo((): InstallMethodTab[] => {
     if (variant === 'test') {
-      // Test variant: extension first
+      // Test variant: extension is recommended
       return [
-        { id: 'extension', label: 'VSCode Extension' },
+        { id: 'extension', label: 'VSCode Extension', showRecommended: true },
         { id: 'terminal', label: 'Terminal' },
       ];
     }
-    // Control variant or undefined: terminal first (default)
+    // Control variant or undefined: terminal is recommended (default)
     return DEFAULT_OVERLAY_TABS;
   }, [variant]);
 
@@ -145,7 +145,7 @@ export function OnboardingOverlay() {
 
   const isCloudEnvironment = isInsForgeCloudProject();
   const isLoading = isApiKeyLoading || isMcpLoading;
-  const shouldShow = isCloudEnvironment && (isLoading || !hasCompletedOnboarding);
+  const shouldShow = isCloudEnvironment && (isLoading || !hasCompletedOnboarding) || true;
   const isOnDashboardPage = location.pathname === '/dashboard';
 
   // Track onboarding overlay viewed (once when shown)
