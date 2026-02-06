@@ -24,11 +24,11 @@ async function fetchWithTimeout(
   let lastError: Error | undefined;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    // add attempt while temporarily failing.
     const controller = new AbortController();
+    let timeoutId: NodeJS.Timeout | undefined;
 
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         controller.abort();
         reject(new Error(`Request to ${url} timed out after ${timeoutMs}ms`));
       }, timeoutMs);
@@ -40,9 +40,16 @@ async function fetchWithTimeout(
     });
 
     try {
-      return await Promise.race([fetchPromise, timeoutPromise]);
+      const response = await Promise.race([fetchPromise, timeoutPromise]);
+      return response;
     } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
+      // Check if this was a timeout (abort) vs other error
+      if (controller.signal.aborted) {
+        lastError = new Error(`Request to ${url} timed out after ${timeoutMs}ms`);
+      } else {
+        lastError = error instanceof Error ? error : new Error(String(error));
+      }
+
       // Retry on DNS/network errors (EAI_AGAIN, ECONNRESET, etc.)
       const isRetryable =
         lastError.message.includes('EAI_AGAIN') ||
@@ -54,6 +61,10 @@ async function fetchWithTimeout(
       }
       // Wait briefly before retry
       await new Promise((r) => setTimeout(r, 500));
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     }
   }
 
