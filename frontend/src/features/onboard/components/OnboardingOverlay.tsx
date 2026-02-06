@@ -8,7 +8,8 @@ import { OnboardingStep } from './OnboardingStep';
 import { InstallStep } from './steps/InstallStep';
 import { VerifyConnectionStep } from './steps/VerifyConnectionStep';
 import { PluginInstallStep } from './steps/PluginInstallStep';
-import { ExtensionSetupStep } from './steps/ExtensionSetupStep';
+import { OpenExtensionStep } from './steps/OpenExtensionStep';
+import { SelectAgentStep } from './steps/SelectAgentStep';
 import { HelpSection } from './HelpSection';
 import {
   InstallMethodTabs,
@@ -36,38 +37,45 @@ export function OnboardingOverlay() {
   // Determine tabs based on experiment variant
   const tabs = useMemo((): InstallMethodTab[] => {
     if (variant === 'test') {
-      // Test variant: extension is recommended
+      // Test variant: extension first
       return [
-        { id: 'extension', label: 'VSCode Extension', showRecommended: true },
+        { id: 'extension', label: 'VSCode Extension' },
         { id: 'terminal', label: 'Terminal' },
       ];
     }
-    // Control variant or undefined: terminal is recommended (default)
+    // Control variant or undefined: terminal first (default)
     return DEFAULT_OVERLAY_TABS;
   }, [variant]);
 
   // Default install method based on experiment variant
   const defaultMethod = tabs[0].id;
 
-  // Separate step completion state for each install method
-  const [step1CompletedByMethod, setStep1CompletedByMethod] = useState<
-    Record<InstallMethod, boolean>
-  >({
-    terminal: false,
-    extension: false,
+  // Track current step for each install method (1-indexed)
+  // Terminal has 2 steps, Extension has 4 steps
+  const [currentStepByMethod, setCurrentStepByMethod] = useState<Record<InstallMethod, number>>({
+    terminal: 1,
+    extension: 1,
   });
   const [selectedAgentSlug, setSelectedAgentSlug] = useState(MCP_AGENTS[0].slug);
   const [selectedAgentId, setSelectedAgentId] = useState(MCP_AGENTS[0].id);
   const [installMethod, setInstallMethod] = useState<InstallMethod>(defaultMethod);
 
-  // Helper to check if current method's step 1 is completed
-  const isStep1Completed = step1CompletedByMethod[installMethod];
+  // Get current step for the active method
+  const currentStep = currentStepByMethod[installMethod];
 
-  // Helper to mark current method's step 1 as completed
-  const markStep1Completed = useCallback(() => {
-    setStep1CompletedByMethod((prev) => ({
+  // Helper to go to next step
+  const goToNextStep = useCallback(() => {
+    setCurrentStepByMethod((prev) => ({
       ...prev,
-      [installMethod]: true,
+      [installMethod]: prev[installMethod] + 1,
+    }));
+  }, [installMethod]);
+
+  // Helper to go to previous step
+  const goToPrevStep = useCallback(() => {
+    setCurrentStepByMethod((prev) => ({
+      ...prev,
+      [installMethod]: Math.max(1, prev[installMethod] - 1),
     }));
   }, [installMethod]);
 
@@ -153,17 +161,17 @@ export function OnboardingOverlay() {
     }
   }, [shouldShow, isOnDashboardPage, isLoading, variant, defaultMethod]);
 
-  // Listen for MCP connection events to auto-advance to step 2
+  // Listen for MCP connection events to auto-advance steps
   useEffect(() => {
     if (!socket) {
       return;
     }
 
     const handleMcpConnected = () => {
-      // Mark step 1 as completed for the current install method
-      setStep1CompletedByMethod((prev) => ({
+      // Auto-advance to step 2 for terminal, or next step for extension
+      setCurrentStepByMethod((prev) => ({
         ...prev,
-        [installMethod]: true,
+        [installMethod]: prev[installMethod] + 1,
       }));
     };
 
@@ -216,49 +224,97 @@ export function OnboardingOverlay() {
 
           {/* Steps */}
           <div className="flex flex-col gap-6 pb-6">
-            <OnboardingStep
-              stepNumber={1}
-              title="Install InsForge"
-              isCompleted={isStep1Completed}
-              onNext={markStep1Completed}
-              installMethod={installMethod}
-              experimentVariant={variant as 'control' | 'test'}
-            >
-              {installMethod === 'terminal' && (
-                <InstallStep
-                  apiKey={displayApiKey}
-                  appUrl={appUrl}
-                  isLoading={isApiKeyLoading}
-                  onAgentChange={handleAgentChange}
-                  onTrigerClick={handleAgentTriggerClick}
-                  onCommandCopied={handleInstallationCommandCopied}
-                />
-              )}
-              {installMethod === 'extension' && <PluginInstallStep showDescription />}
-            </OnboardingStep>
+            {/* Terminal Flow: 2 steps */}
+            {installMethod === 'terminal' && (
+              <>
+                <OnboardingStep
+                  stepNumber={1}
+                  title="Install InsForge"
+                  isCompleted={currentStep > 1}
+                  onNext={goToNextStep}
+                  installMethod={installMethod}
+                  experimentVariant={variant as 'control' | 'test'}
+                >
+                  <InstallStep
+                    apiKey={displayApiKey}
+                    appUrl={appUrl}
+                    isLoading={isApiKeyLoading}
+                    onAgentChange={handleAgentChange}
+                    onTrigerClick={handleAgentTriggerClick}
+                    onCommandCopied={handleInstallationCommandCopied}
+                  />
+                </OnboardingStep>
 
-            {isStep1Completed && installMethod === 'terminal' && (
-              <OnboardingStep
-                stepNumber={2}
-                title="Verify Connection"
-                isCompleted={hasCompletedOnboarding}
-                experimentVariant={variant as 'control' | 'test'}
-                installMethod={installMethod}
-              >
-                <VerifyConnectionStep onPromptCopied={handleVerifyConnectionCommandCopied} />
-              </OnboardingStep>
+                {currentStep >= 2 && (
+                  <OnboardingStep
+                    stepNumber={2}
+                    title="Verify Connection"
+                    isCompleted={hasCompletedOnboarding}
+                    experimentVariant={variant as 'control' | 'test'}
+                    installMethod={installMethod}
+                    onBack={goToPrevStep}
+                  >
+                    <VerifyConnectionStep onPromptCopied={handleVerifyConnectionCommandCopied} />
+                  </OnboardingStep>
+                )}
+              </>
             )}
 
-            {isStep1Completed && installMethod === 'extension' && (
-              <OnboardingStep
-                stepNumber={2}
-                title="Finish Setup in Extension"
-                isCompleted={hasCompletedOnboarding}
-                experimentVariant={variant as 'control' | 'test'}
-                installMethod={installMethod}
-              >
-                <ExtensionSetupStep />
-              </OnboardingStep>
+            {/* Extension Flow: 4 steps */}
+            {installMethod === 'extension' && (
+              <>
+                <OnboardingStep
+                  stepNumber={1}
+                  title="Install InsForge"
+                  isCompleted={currentStep > 1}
+                  onNext={goToNextStep}
+                  installMethod={installMethod}
+                  experimentVariant={variant as 'control' | 'test'}
+                >
+                  <PluginInstallStep showDescription />
+                </OnboardingStep>
+
+                {currentStep >= 2 && (
+                  <OnboardingStep
+                    stepNumber={2}
+                    title="Open InsForge Extension"
+                    isCompleted={currentStep > 2}
+                    onNext={goToNextStep}
+                    onBack={goToPrevStep}
+                    installMethod={installMethod}
+                    experimentVariant={variant as 'control' | 'test'}
+                  >
+                    <OpenExtensionStep />
+                  </OnboardingStep>
+                )}
+
+                {currentStep >= 3 && (
+                  <OnboardingStep
+                    stepNumber={3}
+                    title="Select the Agent"
+                    isCompleted={currentStep > 3}
+                    onNext={goToNextStep}
+                    onBack={goToPrevStep}
+                    installMethod={installMethod}
+                    experimentVariant={variant as 'control' | 'test'}
+                  >
+                    <SelectAgentStep />
+                  </OnboardingStep>
+                )}
+
+                {currentStep >= 4 && (
+                  <OnboardingStep
+                    stepNumber={4}
+                    title="Verify Connection"
+                    isCompleted={hasCompletedOnboarding}
+                    onBack={goToPrevStep}
+                    installMethod={installMethod}
+                    experimentVariant={variant as 'control' | 'test'}
+                  >
+                    <VerifyConnectionStep onPromptCopied={handleVerifyConnectionCommandCopied} />
+                  </OnboardingStep>
+                )}
+              </>
             )}
           </div>
         </div>
