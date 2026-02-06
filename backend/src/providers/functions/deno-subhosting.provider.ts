@@ -13,31 +13,62 @@ const DEFAULT_TIMEOUT_MS = 10000;
 // ============================================
 
 /**
- * Fetch with timeout using AbortController
- * Throws a clear error on timeout, surfaces underlying fetch errors
+ * Fetch with timeout and retry for transient errors (DNS, network)
  */
 async function fetchWithTimeout(
   url: string,
   options: RequestInit = {},
-  timeoutMs: number = DEFAULT_TIMEOUT_MS
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+  maxRetries: number = 2
 ): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  let lastError: Error | undefined;
 
-  try {
-    const response = await fetch(url, {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const controller = new AbortController();
+    let timeoutId: NodeJS.Timeout | undefined;
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        controller.abort();
+        reject(new Error(`Request to ${url} timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+    });
+
+    const fetchPromise = fetch(url, {
       ...options,
       signal: controller.signal,
     });
-    return response;
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error(`Request to ${url} timed out after ${timeoutMs}ms`);
+
+    try {
+      const response = await Promise.race([fetchPromise, timeoutPromise]);
+      return response;
+    } catch (error) {
+      // Check if this was a timeout (abort) vs other error
+      if (controller.signal.aborted) {
+        lastError = new Error(`Request to ${url} timed out after ${timeoutMs}ms`);
+      } else {
+        lastError = error instanceof Error ? error : new Error(String(error));
+      }
+
+      // Retry on DNS/network errors (EAI_AGAIN, ECONNRESET, etc.)
+      const isRetryable =
+        lastError.message.includes('EAI_AGAIN') ||
+        lastError.message.includes('ECONNRESET') ||
+        lastError.message.includes('ETIMEDOUT');
+
+      if (!isRetryable || attempt === maxRetries) {
+        throw lastError;
+      }
+      // Wait briefly before retry
+      await new Promise((r) => setTimeout(r, 500));
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     }
-    throw error;
-  } finally {
-    clearTimeout(timeoutId);
   }
+
+  throw lastError;
 }
 
 // ============================================
@@ -427,9 +458,10 @@ export class DenoSubhostingProvider {
         {
           headers: {
             Authorization: `Bearer ${credentials.token}`,
+            Accept: 'application/x-ndjson',
           },
         },
-        15000
+        6000
       );
 
       if (!response.ok) {
@@ -444,7 +476,13 @@ export class DenoSubhostingProvider {
         );
       }
 
-      const data = appLogResponseSchema.parse(await response.json());
+      // Parse NDJSON format (newline-delimited JSON)
+      const text = await response.text();
+      const logs = text
+        .split('\n')
+        .filter((line) => line.trim())
+        .map((line) => JSON.parse(line));
+      const data = appLogResponseSchema.parse(logs);
       const linkHeader = response.headers.get('link');
       const cursor = this.parseCursorFromLinkHeader(linkHeader);
 
