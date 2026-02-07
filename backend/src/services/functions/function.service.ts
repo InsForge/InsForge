@@ -557,6 +557,24 @@ export class FunctionService {
   }
 
   /**
+   * Get the latest deployment ID from DB (regardless of status)
+   */
+  async getLatestDeploymentId(): Promise<string | null> {
+    try {
+      const result = await this.getPool().query(
+        `SELECT id FROM functions.deployments
+         ORDER BY created_at DESC LIMIT 1`
+      );
+      return result.rows[0]?.id || null;
+    } catch (error) {
+      logger.error('Failed to get latest deployment ID', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  /**
    * Get the latest successful deployment ID from DB
    */
   async getLatestSuccessfulDeploymentId(): Promise<string | null> {
@@ -568,7 +586,7 @@ export class FunctionService {
       );
       return result.rows[0]?.id || null;
     } catch (error) {
-      logger.error('Failed to get latest deployment ID', {
+      logger.error('Failed to get latest successful deployment ID', {
         error: error instanceof Error ? error.message : String(error),
       });
       return null;

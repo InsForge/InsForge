@@ -4,8 +4,18 @@ import { LocalFileProvider } from '@/providers/logs/local.provider.js';
 import { LogProvider } from '@/providers/logs/base.provider.js';
 import { LogSchema, LogSourceSchema, LogStatsSchema } from '@insforge/shared-schemas';
 import { isCloudEnvironment } from '@/utils/environment.js';
-import { DenoSubhostingProvider } from '@/providers/functions/deno-subhosting.provider.js';
+import {
+  DenoSubhostingProvider,
+  BuildLogEntry,
+} from '@/providers/functions/deno-subhosting.provider.js';
 import { FunctionService } from '@/services/functions/function.service.js';
+
+export interface GetBuildLogsResponse {
+  deploymentId: string;
+  status: 'pending' | 'success' | 'failed';
+  logs: BuildLogEntry[];
+  createdAt: string;
+}
 
 export class LogService {
   private static instance: LogService;
@@ -166,5 +176,50 @@ export class LogService {
 
   async close(): Promise<void> {
     await this.provider.close();
+  }
+
+  /**
+   * Get build logs for the latest deployment or a specific deployment
+   */
+  async getBuildLogs(deploymentId?: string): Promise<GetBuildLogsResponse | null> {
+    const denoProvider = DenoSubhostingProvider.getInstance();
+
+    if (!denoProvider.isConfigured()) {
+      logger.info('Deno Subhosting not configured, cannot fetch build logs');
+      return null;
+    }
+
+    const functionService = FunctionService.getInstance();
+
+    // If no deploymentId provided, get the latest one
+    let targetDeploymentId = deploymentId;
+    if (!targetDeploymentId) {
+      targetDeploymentId = await functionService.getLatestDeploymentId();
+      if (!targetDeploymentId) {
+        logger.info('No deployment found');
+        return null;
+      }
+    }
+
+    try {
+      // Get deployment details
+      const deployment = await denoProvider.getDeployment(targetDeploymentId);
+
+      // Get build logs
+      const logs = await denoProvider.getDeploymentBuildLogs(targetDeploymentId);
+
+      return {
+        deploymentId: targetDeploymentId,
+        status: deployment.status,
+        logs,
+        createdAt: deployment.createdAt.toISOString(),
+      };
+    } catch (error) {
+      logger.error('Failed to get build logs', {
+        error: error instanceof Error ? error.message : String(error),
+        deploymentId: targetDeploymentId,
+      });
+      return null;
+    }
   }
 }
