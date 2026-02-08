@@ -3,16 +3,11 @@ import { useSearchParams } from 'react-router-dom';
 import { Info, Plug, ChartBarBig, RefreshCw } from 'lucide-react';
 import { CopyButton, TooltipProvider, Input, Button, ConfirmDialog } from '@/components';
 import { useApiKey } from '@/lib/hooks/useMetadata';
+import { useHealth } from '@/lib/hooks/useHealth';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
 import { metadataService } from '@/lib/services/metadata.service';
-import {
-  cn,
-  getBackendUrl,
-  isInsForgeCloudProject,
-  isIframe,
-  compareVersions,
-} from '@/lib/utils/utils';
+import { cn, isInsForgeCloudProject, isIframe, compareVersions } from '@/lib/utils/utils';
 import {
   McpConnectionSection,
   ConnectionStringSection,
@@ -66,8 +61,6 @@ export default function SettingsPage() {
 
   const [activeTab, setActiveTab] = useState<TabType>(() => getInitialTab());
 
-  const [version, setVersion] = useState<string>('');
-  const [isVersionLoading, setIsVersionLoading] = useState(true);
   const [projectName, setProjectName] = useState('');
   const [originalProjectName, setOriginalProjectName] = useState('');
   const [hasNameChanged, setHasNameChanged] = useState(false);
@@ -76,6 +69,7 @@ export default function SettingsPage() {
   const [isUpdatingVersion, setIsUpdatingVersion] = useState(false);
 
   const { apiKey, isLoading: isApiKeyLoading, refetch: refetchApiKey } = useApiKey();
+  const { version, isLoading: isVersionLoading } = useHealth();
   const { confirm, confirmDialogProps } = useConfirm();
   const { showToast } = useToast();
   const [isRotatingApiKey, setIsRotatingApiKey] = useState(false);
@@ -85,26 +79,6 @@ export default function SettingsPage() {
 
   // Masked API key display
   const maskedApiKey = apiKey ? `ik_${'•'.repeat(32)}` : '';
-
-  // Fetch version on mount
-  useEffect(() => {
-    setIsVersionLoading(true);
-    const backendUrl = getBackendUrl();
-
-    fetch(`${backendUrl}/api/health`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.version) {
-          setVersion(`v${data.version}`);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to fetch version:', err);
-      })
-      .finally(() => {
-        setIsVersionLoading(false);
-      });
-  }, []);
 
   // Listen for messages from cloud parent
   useEffect(() => {
