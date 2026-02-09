@@ -123,7 +123,12 @@ export default function DeploymentOverviewPage() {
           {/* Preview Image */}
           <div className="shrink-0 w-[405px] h-[304px] bg-neutral-200 dark:bg-[#f8f8f7] rounded overflow-hidden">
             {deploymentUrl ? (
-              <div className="w-full h-full relative">
+              <a
+                href={deploymentUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full h-full relative cursor-pointer hover:opacity-90 transition-opacity"
+              >
                 <iframe
                   key={iframeKey}
                   src={deploymentUrl}
@@ -132,7 +137,7 @@ export default function DeploymentOverviewPage() {
                   sandbox="allow-scripts allow-same-origin"
                   loading="lazy"
                 />
-              </div>
+              </a>
             ) : (
               <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
                 No preview available
@@ -225,32 +230,44 @@ export default function DeploymentOverviewPage() {
     <div className="h-full flex flex-col overflow-hidden">
       <div className="flex-1 min-h-0 overflow-auto p-6">
         <div className="w-full max-w-[1080px] mx-auto flex flex-col gap-6">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-semibold text-zinc-950 dark:text-white">Overview</h1>
-            <div className="h-6 w-px bg-gray-200 dark:bg-neutral-700" />
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 p-1"
-                    onClick={() => void handleRefresh()}
-                    disabled={isLoadingDeployments || isRefreshing}
-                  >
-                    <RefreshCw
-                      className={cn(
-                        'h-5 w-5 text-zinc-400 dark:text-neutral-400',
-                        isRefreshing && 'animate-spin'
-                      )}
-                    />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-semibold text-zinc-950 dark:text-white">Overview</h1>
+              <div className="h-6 w-px bg-gray-200 dark:bg-neutral-700" />
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 p-1"
+                      onClick={() => void handleRefresh()}
+                      disabled={isLoadingDeployments || isRefreshing}
+                    >
+                      <RefreshCw
+                        className={cn(
+                          'h-5 w-5 text-zinc-400 dark:text-neutral-400',
+                          isRefreshing && 'animate-spin'
+                        )}
+                      />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            {deploymentUrl && (
+              <Button
+                asChild
+                className="h-9 px-8 bg-zinc-950 text-white hover:bg-zinc-800 dark:bg-emerald-300 dark:text-zinc-950 dark:hover:bg-emerald-400"
+              >
+                <a href={deploymentUrl} target="_blank" rel="noopener noreferrer">
+                  Visit
+                </a>
+              </Button>
+            )}
           </div>
           {renderContent()}
         </div>
