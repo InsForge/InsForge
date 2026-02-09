@@ -5,7 +5,7 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { ProcessedFormData } from '@/types/storage.js';
 
 // Constants
-const DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const DEFAULT_MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 const DEFAULT_MAX_FILES = 10;
 
 // Create multer instance with memory storage
