@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStorage } from '@/features/storage/hooks/useStorage';
+import { isInsForgeCloudProject } from '@/lib/utils/utils';
+import DiscordIcon from '@/assets/logos/discord.svg?react';
 import {
   Button,
   Dialog,
@@ -153,6 +155,32 @@ export function BucketFormDialog({
                 If enabled, files in this bucket can be accessed without authentication.
               </p>
             </div>
+
+            {/* File Size Limit - Cloud only, edit mode only */}
+            {mode === 'edit' && isInsForgeCloudProject() && (
+              <div className="flex flex-row justify-between gap-10">
+                <Label className="text-sm font-medium text-zinc-950 dark:text-zinc-300">
+                  File Size Limit
+                </Label>
+                <div className="w-70 flex flex-col gap-1">
+                  <p className="text-sm text-zinc-950 dark:text-white">10MB per file</p>
+                  <p className="text-xs font-medium text-zinc-500 dark:text-neutral-400">
+                    Need a higher limit? Reach out to us on{' '}
+                    <a
+                      href="https://discord.gg/DvBtaEc9Jz"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 align-middle"
+                    >
+                      <DiscordIcon className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
+                      <span className="text-indigo-500 dark:text-indigo-400 font-medium">
+                        Discord
+                      </span>
+                    </a>
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter className="p-6 gap-3 border-t border-zinc-200 dark:border-neutral-700">
             <Button
