@@ -15,7 +15,7 @@ import { StorageProvider } from './base.provider.js';
 import logger from '@/utils/logger.js';
 
 const ONE_HOUR_IN_SECONDS = 3600;
-const DEFAULT_MAX_UPLOAD_SIZE_BYTES = 10485760;
+const DEFAULT_MAX_UPLOAD_SIZE_BYTES = 52428800; // 50MB
 const SEVEN_DAYS_IN_SECONDS = 604800;
 
 /**
@@ -181,7 +181,7 @@ export class S3StorageProvider implements StorageProvider {
         Bucket: this.s3Bucket,
         Key: s3Key,
         Conditions: [
-          ['content-length-range', 0, metadata.size || DEFAULT_MAX_UPLOAD_SIZE_BYTES], // Max 10MB by default
+          ['content-length-range', 0, Math.min(metadata.size || DEFAULT_MAX_UPLOAD_SIZE_BYTES, DEFAULT_MAX_UPLOAD_SIZE_BYTES)],
         ],
         Expires: expiresIn,
       });
