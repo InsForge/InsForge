@@ -181,7 +181,11 @@ export class S3StorageProvider implements StorageProvider {
         Bucket: this.s3Bucket,
         Key: s3Key,
         Conditions: [
-          ['content-length-range', 0, Math.min(metadata.size || DEFAULT_MAX_UPLOAD_SIZE_BYTES, DEFAULT_MAX_UPLOAD_SIZE_BYTES)],
+          [
+            'content-length-range',
+            0,
+            Math.min(metadata.size || DEFAULT_MAX_UPLOAD_SIZE_BYTES, DEFAULT_MAX_UPLOAD_SIZE_BYTES),
+          ],
         ],
         Expires: expiresIn,
       });
