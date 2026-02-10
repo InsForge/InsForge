@@ -133,15 +133,23 @@ export default function FunctionLogsPage() {
                     key={value}
                     className="flex items-center gap-2 px-2 py-2 cursor-pointer hover:bg-zinc-100 dark:hover:bg-neutral-600 rounded-sm"
                     onClick={(e) => {
-                      e.preventDefault();
-                      setSeverityFilter(
-                        severityFilter.includes(value)
-                          ? severityFilter.filter((s) => s !== value)
-                          : [...severityFilter, value]
-                      );
+                      // Trigger checkbox click if not already clicking the checkbox
+                      const target = e.target as HTMLElement;
+                      if (target.tagName !== 'INPUT') {
+                        e.currentTarget.querySelector('input')?.click();
+                      }
                     }}
                   >
-                    <Checkbox checked={severityFilter.includes(value)} onChange={() => {}} />
+                    <Checkbox
+                      checked={severityFilter.includes(value)}
+                      onChange={() => {
+                        setSeverityFilter(
+                          severityFilter.includes(value)
+                            ? severityFilter.filter((s) => s !== value)
+                            : [...severityFilter, value]
+                        );
+                      }}
+                    />
                     <span className={color}>●</span>
                     <span className="text-zinc-950 dark:text-white text-sm">{label}</span>
                   </div>
@@ -160,7 +168,14 @@ export default function FunctionLogsPage() {
           <>
             {logsError ? (
               <div className="flex items-center justify-center h-full">
-                <EmptyState title="Error loading logs" description={String(logsError)} />
+                <EmptyState
+                  title="Error loading logs"
+                  description={
+                    logsError instanceof Error
+                      ? logsError.message
+                      : 'Failed to load logs. Please refresh or contact support.'
+                  }
+                />
               </div>
             ) : (
               <LogsDataGrid

@@ -192,13 +192,14 @@ export class LogService {
     const functionService = FunctionService.getInstance();
 
     // If no deploymentId provided, get the latest one
-    let targetDeploymentId = deploymentId;
+    let targetDeploymentId: string | undefined = deploymentId;
     if (!targetDeploymentId) {
-      targetDeploymentId = await functionService.getLatestDeploymentId();
-      if (!targetDeploymentId) {
+      const latestDeploymentId = await functionService.getLatestDeploymentId();
+      if (!latestDeploymentId) {
         logger.info('No deployment found');
         return null;
       }
+      targetDeploymentId = latestDeploymentId;
     }
 
     try {
