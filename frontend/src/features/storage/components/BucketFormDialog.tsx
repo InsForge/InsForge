@@ -163,7 +163,7 @@ export function BucketFormDialog({
                   File Size Limit
                 </Label>
                 <div className="w-70 flex flex-col gap-1">
-                  <p className="text-sm text-zinc-950 dark:text-white">10MB per file</p>
+                  <p className="text-sm text-zinc-950 dark:text-white">50MB per file</p>
                   <p className="text-xs font-medium text-zinc-500 dark:text-neutral-400">
                     Need a higher limit? Reach out to us on{' '}
                     <a
