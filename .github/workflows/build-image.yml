@@ -89,6 +89,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
+      - name: Install crane
+        uses: imjasonh/setup-crane@v0.4
+
       - name: Copy multi-arch image to ECR
         env:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
@@ -96,8 +99,5 @@ jobs:
           GHCR_IMAGE: ${{ env.GHCR_REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
           ECR_IMAGE: ${{ steps.ecr-login.outputs.registry }}/${{ env.IMAGE_NAME }}
         run: |
-          # Install crane for multi-arch image copy
-          curl -sL https://github.com/google/go-containerregistry/releases/download/v0.19.0/go-containerregistry_Linux_x86_64.tar.gz | tar xzf - crane
-
           # Copy multi-arch image from GHCR to ECR (preserves all platforms)
-          ./crane copy ${GHCR_IMAGE}:${VERSION} ${ECR_IMAGE}:${VERSION}
+          crane copy ${GHCR_IMAGE}:${VERSION} ${ECR_IMAGE}:${VERSION}
