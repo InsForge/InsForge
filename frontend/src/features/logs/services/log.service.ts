@@ -6,6 +6,18 @@ import type {
   LogStatsSchema,
 } from '@insforge/shared-schemas';
 
+export interface BuildLogEntry {
+  level: string;
+  message: string;
+}
+
+export interface GetBuildLogsResponse {
+  deploymentId: string;
+  status: 'pending' | 'success' | 'failed';
+  logs: BuildLogEntry[];
+  createdAt: string;
+}
+
 export class LogService {
   // Get all available log sources
   async getLogSources(): Promise<LogSourceSchema[]> {
@@ -70,6 +82,26 @@ export class LogService {
       records: [],
       total: 0,
     };
+  }
+
+  // Get function build logs from Deno Subhosting
+  async getFunctionBuildLogs(deploymentId?: string): Promise<GetBuildLogsResponse | null> {
+    const params = new URLSearchParams();
+    if (deploymentId) {
+      params.append('deployment_id', deploymentId);
+    }
+
+    const url = `/logs/functions/build-logs${params.toString() ? `?${params.toString()}` : ''}`;
+
+    try {
+      return await apiClient.request(url);
+    } catch (error) {
+      // Return null for 404 (no deployments) - this is expected when functions haven't been deployed
+      if (error instanceof Error && error.message.includes('404')) {
+        return null;
+      }
+      throw error;
+    }
   }
 }
 

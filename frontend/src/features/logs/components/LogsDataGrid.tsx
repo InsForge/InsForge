@@ -48,8 +48,10 @@ export function createLogsColumns(columnDefs: LogsColumnDef[]): DataGridColumn<D
 }
 
 // Logs-specific DataGrid props - generic to accept any object type
-export interface LogsDataGridProps<T = Record<string, unknown>>
-  extends Omit<DataGridProps<DataGridRowType>, 'columns' | 'data'> {
+export interface LogsDataGridProps<T = Record<string, unknown>> extends Omit<
+  DataGridProps<DataGridRowType>,
+  'columns' | 'data'
+> {
   columnDefs: LogsColumnDef[];
   data: T[];
   noPadding?: boolean;
