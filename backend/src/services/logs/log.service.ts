@@ -189,19 +189,19 @@ export class LogService {
     }
 
     const functionService = FunctionService.getInstance();
-
-    // If no deploymentId provided, get the latest one
     let targetDeploymentId: string | undefined = deploymentId;
-    if (!targetDeploymentId) {
-      const latestDeploymentId = await functionService.getLatestDeploymentId();
-      if (!latestDeploymentId) {
-        logger.info('No deployment found');
-        return null;
-      }
-      targetDeploymentId = latestDeploymentId;
-    }
 
     try {
+      // If no deploymentId provided, get the latest one
+      if (!targetDeploymentId) {
+        const latestDeploymentId = await functionService.getLatestDeploymentId();
+        if (!latestDeploymentId) {
+          logger.info('No deployment found');
+          return null;
+        }
+        targetDeploymentId = latestDeploymentId;
+      }
+
       // Get deployment details
       const deployment = await denoProvider.getDeployment(targetDeploymentId);
 
