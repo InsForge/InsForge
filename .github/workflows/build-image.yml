@@ -68,7 +68,7 @@ jobs:
   push-to-ecr:
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
     permissions:
       id-token: write
       contents: read
