@@ -2,20 +2,19 @@ import logger from '@/utils/logger.js';
 import { CloudWatchProvider } from '@/providers/logs/cloudwatch.provider.js';
 import { LocalFileProvider } from '@/providers/logs/local.provider.js';
 import { LogProvider } from '@/providers/logs/base.provider.js';
-import { LogSchema, LogSourceSchema, LogStatsSchema } from '@insforge/shared-schemas';
-import { isCloudEnvironment } from '@/utils/environment.js';
 import {
-  DenoSubhostingProvider,
-  BuildLogEntry,
-} from '@/providers/functions/deno-subhosting.provider.js';
+  LogSchema,
+  LogSourceSchema,
+  LogStatsSchema,
+  getBuildLogsResponseSchema,
+  type GetBuildLogsResponseSchema,
+} from '@insforge/shared-schemas';
+import { isCloudEnvironment } from '@/utils/environment.js';
+import { DenoSubhostingProvider } from '@/providers/functions/deno-subhosting.provider.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 
-export interface GetBuildLogsResponse {
-  deploymentId: string;
-  status: 'pending' | 'success' | 'failed';
-  logs: BuildLogEntry[];
-  createdAt: string;
-}
+// Re-export the type for backward compatibility
+export type GetBuildLogsResponse = GetBuildLogsResponseSchema;
 
 export class LogService {
   private static instance: LogService;
@@ -209,12 +208,24 @@ export class LogService {
       // Get build logs
       const logs = await denoProvider.getDeploymentBuildLogs(targetDeploymentId);
 
-      return {
+      const response = {
         deploymentId: targetDeploymentId,
         status: deployment.status,
         logs,
         createdAt: deployment.createdAt.toISOString(),
       };
+
+      // Validate response against schema
+      const parseResult = getBuildLogsResponseSchema.safeParse(response);
+      if (!parseResult.success) {
+        logger.error('Build logs response validation failed', {
+          error: parseResult.error.message,
+          deploymentId: targetDeploymentId,
+        });
+        throw new Error(`Invalid build logs response: ${parseResult.error.message}`);
+      }
+
+      return parseResult.data;
     } catch (error) {
       logger.error('Failed to get build logs', {
         error: error instanceof Error ? error.message : String(error),
