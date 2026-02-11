@@ -97,7 +97,7 @@ jobs:
       - name: Copy multi-arch image to ECR
         env:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          VERSION: ${{ github.ref_name }}
+          VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_tag || github.ref_name }}
           GHCR_IMAGE: ${{ env.GHCR_REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
           ECR_IMAGE: ${{ steps.ecr-login.outputs.registry }}/${{ env.IMAGE_NAME }}
         run: |
