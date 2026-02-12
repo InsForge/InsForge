@@ -9,6 +9,7 @@ import UsersPage from '@/features/auth/pages/UsersPage';
 import AuthMethodsPage from '@/features/auth/pages/AuthMethodsPage';
 import ConfigurationPage from '@/features/auth/pages/ConfigurationPage';
 import LogsPage from '@/features/logs/pages/LogsPage';
+import FunctionLogsPage from '@/features/logs/pages/FunctionLogsPage';
 import MCPLogsPage from '@/features/logs/pages/MCPLogsPage';
 import StoragePage from '@/features/storage/pages/StoragePage';
 import VisualizerPage from '@/features/visualizer/pages/VisualizerPage';
@@ -75,6 +76,7 @@ export function AppRoutes() {
                 />
                 <Route path="/dashboard/logs/MCP" element={<MCPLogsPage />} />
                 <Route path="/dashboard/logs/audits" element={<AuditsPage />} />
+                <Route path="/dashboard/logs/function.logs" element={<FunctionLogsPage />} />
                 <Route path="/dashboard/logs/:source" element={<LogsPage />} />
                 <Route
                   path="/dashboard/functions"

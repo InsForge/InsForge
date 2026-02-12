@@ -95,6 +95,28 @@ router.get('/stats', async (_req: AuthRequest, res: Response, next: NextFunction
   }
 });
 
+// GET /logs/functions/build-logs - Get function build logs from Deno Subhosting
+router.get('/functions/build-logs', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { deployment_id } = req.query;
+
+    const logService = LogService.getInstance();
+    const result = await logService.getBuildLogs(deployment_id as string | undefined);
+
+    if (!result) {
+      throw new AppError(
+        'Build logs not available. Deno Subhosting may not be configured or no deployments found.',
+        404,
+        ERROR_CODES.NOT_FOUND
+      );
+    }
+
+    successResponse(res, result);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /logs/search - Search across all logs or specific source
 router.get('/search', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {

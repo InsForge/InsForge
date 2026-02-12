@@ -134,6 +134,12 @@ export interface AppLogResult {
   hasMore: boolean;
 }
 
+// Build log types
+export interface BuildLogEntry {
+  level: string;
+  message: string;
+}
+
 // Schema for Deno Subhosting API response
 // Note: Deno doesn't return error details in deployment response
 // Error info comes from build logs endpoint
@@ -505,9 +511,9 @@ export class DenoSubhostingProvider {
   }
 
   /**
-   * Get deployment build logs
+   * Get deployment build logs (structured)
    */
-  async getDeploymentLogs(deploymentId: string): Promise<string[]> {
+  async getDeploymentBuildLogs(deploymentId: string): Promise<BuildLogEntry[]> {
     const credentials = this.getCredentials();
 
     try {
@@ -516,6 +522,7 @@ export class DenoSubhostingProvider {
         {
           headers: {
             Authorization: `Bearer ${credentials.token}`,
+            Accept: 'application/x-ndjson',
           },
         }
       );
@@ -532,18 +539,29 @@ export class DenoSubhostingProvider {
         .map((line) => {
           try {
             const parsed = JSON.parse(line);
-            return `[${parsed.level}] ${parsed.message}`;
+            return {
+              level: parsed.level || 'info',
+              message: parsed.message || line,
+            };
           } catch {
-            return line;
+            return { level: 'info', message: line };
           }
         });
     } catch (error) {
-      logger.warn('Failed to get deployment logs', {
+      logger.warn('Failed to get deployment build logs', {
         error: error instanceof Error ? error.message : String(error),
         deploymentId,
       });
       return [];
     }
+  }
+
+  /**
+   * Get deployment build logs (legacy string format for backwards compatibility)
+   */
+  async getDeploymentLogs(deploymentId: string): Promise<string[]> {
+    const logs = await this.getDeploymentBuildLogs(deploymentId);
+    return logs.map((log) => `[${log.level}] ${log.message}`);
   }
 
   /**

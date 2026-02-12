@@ -2,10 +2,19 @@ import logger from '@/utils/logger.js';
 import { CloudWatchProvider } from '@/providers/logs/cloudwatch.provider.js';
 import { LocalFileProvider } from '@/providers/logs/local.provider.js';
 import { LogProvider } from '@/providers/logs/base.provider.js';
-import { LogSchema, LogSourceSchema, LogStatsSchema } from '@insforge/shared-schemas';
+import {
+  LogSchema,
+  LogSourceSchema,
+  LogStatsSchema,
+  getBuildLogsResponseSchema,
+  type GetBuildLogsResponseSchema,
+} from '@insforge/shared-schemas';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { DenoSubhostingProvider } from '@/providers/functions/deno-subhosting.provider.js';
 import { FunctionService } from '@/services/functions/function.service.js';
+
+// Re-export the type for backward compatibility
+export type GetBuildLogsResponse = GetBuildLogsResponseSchema;
 
 export class LogService {
   private static instance: LogService;
@@ -166,5 +175,63 @@ export class LogService {
 
   async close(): Promise<void> {
     await this.provider.close();
+  }
+
+  /**
+   * Get build logs for the latest deployment or a specific deployment
+   */
+  async getBuildLogs(deploymentId?: string): Promise<GetBuildLogsResponse | null> {
+    const denoProvider = DenoSubhostingProvider.getInstance();
+
+    if (!denoProvider.isConfigured()) {
+      logger.info('Deno Subhosting not configured, cannot fetch build logs');
+      return null;
+    }
+
+    const functionService = FunctionService.getInstance();
+    let targetDeploymentId: string | undefined = deploymentId;
+
+    try {
+      // If no deploymentId provided, get the latest one
+      if (!targetDeploymentId) {
+        const latestDeploymentId = await functionService.getLatestDeploymentId();
+        if (!latestDeploymentId) {
+          logger.info('No deployment found');
+          return null;
+        }
+        targetDeploymentId = latestDeploymentId;
+      }
+
+      // Get deployment details
+      const deployment = await denoProvider.getDeployment(targetDeploymentId);
+
+      // Get build logs
+      const logs = await denoProvider.getDeploymentBuildLogs(targetDeploymentId);
+
+      const response = {
+        deploymentId: targetDeploymentId,
+        status: deployment.status,
+        logs,
+        createdAt: deployment.createdAt.toISOString(),
+      };
+
+      // Validate response against schema
+      const parseResult = getBuildLogsResponseSchema.safeParse(response);
+      if (!parseResult.success) {
+        logger.error('Build logs response validation failed', {
+          error: parseResult.error.message,
+          deploymentId: targetDeploymentId,
+        });
+        throw new Error(`Invalid build logs response: ${parseResult.error.message}`);
+      }
+
+      return parseResult.data;
+    } catch (error) {
+      logger.error('Failed to get build logs', {
+        error: error instanceof Error ? error.message : String(error),
+        deploymentId: targetDeploymentId,
+      });
+      return null;
+    }
   }
 }
