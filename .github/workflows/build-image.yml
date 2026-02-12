@@ -1,4 +1,4 @@
-name: Build and Push Docker Image on github container registry
+name: Build and Push Docker Image
 
 on:
   push:
@@ -12,8 +12,8 @@ on:
         default: 'v0.1.1-test'
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/insforge-oss
+  GHCR_REGISTRY: ghcr.io
+  IMAGE_NAME: insforge-oss
 
 jobs:
   build-and-push:
@@ -22,7 +22,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
-      
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -36,20 +36,20 @@ jobs:
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ${{ env.GHCR_REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      - name: Extract metadata
+      - name: Extract metadata for GHCR
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.GHCR_REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=tag
             type=raw,value=${{ github.event.inputs.test_tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
 
-      - name: Build and push Docker image
+      - name: Build and push Docker image to GHCR
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -64,3 +64,44 @@ jobs:
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
             COMMIT_SHA=${{ github.sha }}
             VITE_PUBLIC_POSTHOG_KEY=${{ secrets.POSTHOG_KEY }}
+
+  push-to-ecr:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ECR_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_ECR_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.GHCR_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT }}
+
+      - name: Install crane
+        uses: imjasonh/setup-crane@31b88efe9de28ae0ffa220711af4b60be9435f6e # v0.4
+
+      - name: Copy multi-arch image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_tag || github.ref_name }}
+          GHCR_IMAGE_RAW: ${{ env.GHCR_REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
+          ECR_IMAGE: ${{ steps.ecr-login.outputs.registry }}/${{ env.IMAGE_NAME }}
+        run: |
+          # Convert GHCR image name to lowercase (Docker requires lowercase)
+          GHCR_IMAGE=$(echo "${GHCR_IMAGE_RAW}" | tr '[:upper:]' '[:lower:]')
+          # Copy multi-arch image from GHCR to ECR (preserves all platforms)
+          crane copy ${GHCR_IMAGE}:${VERSION} ${ECR_IMAGE}:${VERSION}
