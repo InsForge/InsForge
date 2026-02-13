@@ -1,5 +1,7 @@
 # Changelog
 
+## [1.5.6](https://github.com/InsForge/insforge/compare/v1.5.5-e2e-1...v1.5.6) (2026-02-13)
+
 ## [1.5.4](https://github.com/InsForge/InsForge/compare/v1.5.3-e2e-5...v1.5.4) (2026-02-07)
 
 # [1.4.0](https://github.com/InsForge/InsForge/compare/v1.3.1-e2e.2...v1.4.0) (2025-12-19)
