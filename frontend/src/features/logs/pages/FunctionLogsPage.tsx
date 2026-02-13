@@ -1,15 +1,8 @@
 import { useMemo, useState, useCallback } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { useLogs } from '../hooks/useLogs';
-import {
-  Button,
-  Checkbox,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-  EmptyState,
-  SearchInput,
-} from '@/components';
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@insforge/ui';
+import { Checkbox, EmptyState, SearchInput } from '@/components';
 import { LogsDataGrid, type LogsColumnDef } from '../components/LogsDataGrid';
 import { SeverityBadge } from '../components/SeverityBadge';
 import { LogDetailPanel } from '../components/LogDetailPanel';

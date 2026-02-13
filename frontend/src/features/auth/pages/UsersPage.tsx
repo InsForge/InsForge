@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { UserPlus } from 'lucide-react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
+import { Button } from '@insforge/ui';
 import {
-  Button,
   ConnectCTA,
   SearchInput,
   SelectionClearButton,

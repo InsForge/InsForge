@@ -2,20 +2,17 @@ import { useState, useMemo } from 'react';
 import { RefreshCw, Search, MoreVertical, RefreshCcw, XCircle } from 'lucide-react';
 import {
   Button,
-  Input,
-  PaginationControls,
-  Skeleton,
-  Badge,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components';
+} from '@insforge/ui';
+import { Input, PaginationControls, Skeleton, Badge } from '@/components';
 import { useDeployments } from '../hooks/useDeployments';
 import type { DeploymentSchema } from '../services/deployments.service';
 import DeploymentsEmptyState from '../components/DeploymentsEmptyState';

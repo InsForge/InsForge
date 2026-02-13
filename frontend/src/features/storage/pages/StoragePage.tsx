@@ -11,13 +11,13 @@ import { BucketFormDialog } from '@/features/storage/components/BucketFormDialog
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
 import { useUploadToast } from '@/features/storage/components/UploadToast';
+import { Button } from '@insforge/ui';
 import {
   SearchInput,
   SelectionClearButton,
   DeleteActionButton,
   Alert,
   AlertDescription,
-  Button,
   ConfirmDialog,
   EmptyState,
   Tooltip,

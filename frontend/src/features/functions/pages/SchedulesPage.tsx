@@ -1,14 +1,8 @@
 import { useState, useCallback, useMemo } from 'react';
 import { ChevronRight, Plus } from 'lucide-react';
 import { useSchedules } from '@/features/functions/hooks/useSchedules';
-import {
-  Button,
-  Skeleton,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components';
+import { Button } from '@insforge/ui';
+import { Skeleton, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components';
 import { ScheduleFormDialog } from '../components/ScheduleFormDialog';
 import type { ScheduleFormSchema } from '../types';
 import { normalizeHeaders } from '../helpers';

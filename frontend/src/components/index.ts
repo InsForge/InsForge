@@ -27,6 +27,6 @@ export { PromptDialog } from './PromptDialog';
 export { SearchInput } from './SearchInput';
 export { SelectionClearButton } from './SelectionClearButton';
 export { CircularStepper, LinearStepper, VerticalStepper } from './Stepper';
-export { ThemeToggle } from './ThemeToggle';
+export { ThemeSelect } from './ThemeSelect';
 export { TypeBadge } from './TypeBadge';
 export { ZoomedVideo } from './ZoomedVideo';

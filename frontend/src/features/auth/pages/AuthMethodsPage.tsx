@@ -5,13 +5,13 @@ import { useOAuthConfig } from '@/features/auth/hooks/useOAuthConfig';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import {
   Button,
-  ConfirmDialog,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-} from '@/components';
+} from '@insforge/ui';
+import { ConfirmDialog } from '@/components';
 import type { OAuthProvidersSchema } from '@insforge/shared-schemas';
 import { oauthProviders, type OAuthProviderInfo } from '@/features/auth/helpers';
 

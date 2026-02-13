@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Info, Plug, ChartBarBig, RefreshCw } from 'lucide-react';
-import { CopyButton, TooltipProvider, Input, Button, ConfirmDialog } from '@/components';
+import { Button } from '@insforge/ui';
+import { CopyButton, TooltipProvider, Input, ConfirmDialog } from '@/components';
 import { useApiKey } from '@/lib/hooks/useMetadata';
 import { useHealth } from '@/lib/hooks/useHealth';
 import { useConfirm } from '@/lib/hooks/useConfirm';

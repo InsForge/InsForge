@@ -1,5 +1,6 @@
 import { AlertCircle } from 'lucide-react';
-import { Alert, AlertTitle, AlertDescription, Button } from '@/components';
+import { Button } from '@insforge/ui';
+import { Alert, AlertTitle, AlertDescription } from '@/components';
 import { cn } from '@/lib/utils/utils';
 
 interface ErrorStateProps {

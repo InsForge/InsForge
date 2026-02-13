@@ -1,8 +1,8 @@
 import { useState, ReactNode } from 'react';
 import { Plus, LucideIcon } from 'lucide-react';
+import { Button } from '@insforge/ui';
 import {
   ScrollArea,
-  Button,
   SearchInput,
   FeatureSidebarItem,
   Tooltip,

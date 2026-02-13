@@ -130,12 +130,14 @@ services:
       - ./frontend:/app/frontend
       - ./auth:/app/auth
       - ./shared-schemas:/app/shared-schemas
+      - ./ui:/app/ui
       - ./docs:/app/docs
       - node_modules:/app/node_modules
       - backend_node_modules:/app/backend/node_modules
       - frontend_node_modules:/app/frontend/node_modules
       - auth_node_modules:/app/auth/node_modules
       - shared_schemas_node_modules:/app/shared-schemas/node_modules
+      - ui_node_modules:/app/ui/node_modules
       - shared-logs:/insforge-logs
       - storage-data:/insforge-storage
     command: sh -c "npm install && cd backend && npm run migrate:up && cd .. && npm run dev"
@@ -228,6 +230,8 @@ volumes:
   auth_node_modules:
     driver: local
   shared_schemas_node_modules:
+    driver: local
+  ui_node_modules:
     driver: local
   deno_cache:
     driver: local

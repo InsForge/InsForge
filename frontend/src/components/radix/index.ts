@@ -1,5 +1,3 @@
-// Core radix/ui components
-export * from './Button';
 export * from './Card';
 export * from './Input';
 export * from './Form';
@@ -9,11 +7,9 @@ export * from './Skeleton';
 export * from './ScrollArea';
 export * from './Separator';
 export * from './Alert';
-export * from './DropdownMenu';
 export * from './Dialog';
 export * from './Label';
 export * from './Popover';
-export * from './Select';
 export * from './Sheet';
 export * from './Switch';
 export * from './Tooltip';

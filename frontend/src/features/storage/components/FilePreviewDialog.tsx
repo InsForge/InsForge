@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Download, ExternalLink } from 'lucide-react';
-import { Button, Dialog, DialogContent, LoadingState, TypeBadge } from '@/components';
+import { Button } from '@insforge/ui';
+import { Dialog, DialogContent, LoadingState, TypeBadge } from '@/components';
 import { useStorage } from '@/features/storage/hooks/useStorage';
 import { StorageFileSchema } from '@insforge/shared-schemas';
 

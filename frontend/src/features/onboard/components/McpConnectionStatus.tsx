@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components';
+import { Button } from '@insforge/ui';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { cn } from '@/lib/utils/utils';
 

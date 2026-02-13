@@ -1,4 +1,5 @@
-import { Button, CopyButton, Dialog, DialogContent } from '@/components';
+import { Button } from '@insforge/ui';
+import { CopyButton, Dialog, DialogContent } from '@/components';
 import { CheckCircle, Lock, Database, HardDrive, Code2, Box } from 'lucide-react';
 import type { PromptTemplate } from '../prompts';
 

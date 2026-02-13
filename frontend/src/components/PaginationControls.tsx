@@ -1,4 +1,4 @@
-import { Button } from '@/components/radix/Button';
+import { Button } from '@insforge/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export interface PaginationControlsProps {

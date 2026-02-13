@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, ReactNode } from 'react';
+import { Button } from '@insforge/ui';
 import {
-  Button,
   Dialog,
   DialogContent,
   DialogHeader,

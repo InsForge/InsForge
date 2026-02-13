@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button } from '@/components/radix/Button';
+import { Button } from '@insforge/ui';
 import { Check, Copy } from 'lucide-react';
 
 function IdCell({ value }: { value: string }) {

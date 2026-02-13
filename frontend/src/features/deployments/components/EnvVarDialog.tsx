@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Button, Input, Dialog, DialogContent } from '@/components';
+import { Button } from '@insforge/ui';
+import { Input, Dialog, DialogContent } from '@/components';
 import type { DeploymentEnvVar } from '@insforge/shared-schemas';
 
 interface EnvVarDialogProps {

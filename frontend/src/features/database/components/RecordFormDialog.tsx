@@ -3,10 +3,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertCircle } from 'lucide-react';
+import { Button } from '@insforge/ui';
 import {
   Alert,
   AlertDescription,
-  Button,
   Dialog,
   DialogContent,
   DialogHeader,

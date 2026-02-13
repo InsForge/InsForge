@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Control, Controller, FieldError, UseFormReturn } from 'react-hook-form';
 import { Calendar, Clock, Link2, X } from 'lucide-react';
+import { Button } from '@insforge/ui';
 import {
-  Button,
   Label,
   Input,
   BooleanCellEditor,

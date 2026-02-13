@@ -1,13 +1,12 @@
 import { useState, useMemo } from 'react';
 import { ChevronDown } from 'lucide-react';
 import {
-  CodeBlock,
-  CopyButton,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components';
+} from '@insforge/ui';
+import { CodeBlock, CopyButton } from '@/components';
 import { CursorDeeplinkGenerator } from './mcp/CursorDeeplinkGenerator';
 import { QoderDeeplinkGenerator } from './mcp/QoderDeeplinkGenerator';
 import { MCP_AGENTS, GenerateInstallCommand, createMCPConfig, type MCPAgent } from './mcp/helpers';

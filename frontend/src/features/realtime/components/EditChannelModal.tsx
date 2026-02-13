@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Plus, X } from 'lucide-react';
+import { Button } from '@insforge/ui';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  Button,
   Input,
   Label,
   Switch,

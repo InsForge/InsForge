@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
+import { Button } from '@insforge/ui';
 import {
-  Button,
   ConfirmDialog,
   Skeleton,
   Tooltip,

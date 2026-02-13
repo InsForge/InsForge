@@ -1,16 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Eye, EyeOff, MoreVertical, Pencil, Trash2, Loader2 } from 'lucide-react';
-import { Button } from '@/components/radix/Button';
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components';
+} from '@insforge/ui';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components';
 import type { DeploymentEnvVar } from '@insforge/shared-schemas';
 import { cn, formatTime } from '@/lib/utils/utils';
 import { deploymentsService } from '../services/deployments.service';

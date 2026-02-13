@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, Lock, AlertCircle } from 'lucide-react';
+import { Button } from '@insforge/ui';
 import {
-  Button,
   Input,
   Label,
   Alert,

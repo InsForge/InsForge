@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useStorage } from '@/features/storage/hooks/useStorage';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
 import DiscordIcon from '@/assets/logos/discord.svg?react';
+import { Button } from '@insforge/ui';
 import {
-  Button,
   Dialog,
   DialogContent,
   DialogDescription,
