@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, ButtonProps } from '@/components/radix/Button';
+import { Button, type ButtonProps } from '@insforge/ui';
 import { Loader2 } from 'lucide-react';
 
 interface ButtonWithLoadingProps extends ButtonProps {

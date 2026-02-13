@@ -1,15 +1,12 @@
 import { useState, useEffect } from 'react';
 import { LogOut, ChevronDown } from 'lucide-react';
 import {
-  Avatar,
-  AvatarFallback,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  Separator,
-  ThemeToggle,
-} from '@/components';
+} from '@insforge/ui';
+import { Avatar, AvatarFallback, Separator, ThemeSelect } from '@/components';
 import { McpConnectionStatus } from '@/features/onboard';
 import { cn } from '@/lib/utils/utils';
 import { useTheme } from '@/lib/contexts/ThemeContext';
@@ -114,8 +111,7 @@ export default function AppHeader() {
             )}
           </a>
           <Separator className="h-5 mx-2" orientation="vertical" />
-          {/* Theme Toggle */}
-          <ThemeToggle />
+          <ThemeSelect />
           <Separator className="h-5 mx-2" orientation="vertical" />
           {/* MCP Connection Status */}
           <McpConnectionStatus onConnectClick={() => setOnboardingModalOpen(true)} />

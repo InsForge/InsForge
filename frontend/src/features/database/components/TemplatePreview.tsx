@@ -1,4 +1,4 @@
-import { Button } from '@/components/radix/Button';
+import { Button } from '@insforge/ui';
 import { DatabaseTemplate } from '@/features/database/templates';
 import { SchemaVisualizer } from '@/features/visualizer/components/SchemaVisualizer';
 import { useRawSQL } from '@/features/database/hooks/useRawSQL';

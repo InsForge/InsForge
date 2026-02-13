@@ -1,16 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import {
-  Button,
-  Label,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from '@/components';
+import { Button, Select, SelectContent, SelectItem, SelectTrigger } from '@insforge/ui';
+import { Label, Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components';
 import { useTables } from '@/features/database/hooks/useTables';
 import { UseFormReturn } from 'react-hook-form';
 import { TableFormSchema, TableFormForeignKeySchema } from '../schema';
@@ -175,12 +165,8 @@ export function ForeignKeyPopover({
                         value={col.columnName}
                         disabled={col.isSystemColumn}
                       >
-                        <div className="flex flex-row items-center justify-between gap-2">
-                          <span className="truncate max-w-[160px] block">{col.columnName}</span>
-                          <span className="text-xs text-muted-foreground dark:text-neutral-400 flex-shrink-0">
-                            ({col.type})
-                          </span>
-                        </div>
+                        {col.columnName}
+                        <span className="text-xs text-muted-foreground">({col.type})</span>
                       </SelectItem>
                     ))}
                 </SelectContent>
@@ -270,24 +256,12 @@ export function ForeignKeyPopover({
                               key={col.columnName}
                               value={col.columnName}
                               disabled={isDisabled}
-                              className="relative flex items-center justify-between pr-16"
                             >
-                              <div className="flex flex-row items-center justify-between gap-2">
-                                <span
-                                  className="flex-1 truncate max-w-[180px] block"
-                                  title={col.columnName}
-                                >
-                                  {col.columnName}
-                                </span>
-                                <span className="text-xs text-muted-foreground dark:text-neutral-400">
-                                  ({col.type})
-                                </span>
-                                {rightText && (
-                                  <span className="text-right text-xs text-muted-foreground dark:text-neutral-400">
-                                    {rightText}
-                                  </span>
-                                )}
-                              </div>
+                              {col.columnName}
+                              <span className="text-xs text-muted-foreground">({col.type})</span>
+                              {rightText && (
+                                <span className="text-xs text-muted-foreground">{rightText}</span>
+                              )}
                             </SelectItem>
                           );
                         });

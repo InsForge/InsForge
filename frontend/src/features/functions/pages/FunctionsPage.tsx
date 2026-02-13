@@ -5,9 +5,9 @@ import { useFunctions } from '../hooks/useFunctions';
 import { useToast } from '@/lib/hooks/useToast';
 import { useEffect, useRef, useState } from 'react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
+import { Button } from '@insforge/ui';
 import {
   CodeEditor,
-  Button,
   Skeleton,
   Tooltip,
   TooltipContent,

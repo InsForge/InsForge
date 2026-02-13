@@ -6,7 +6,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components';
+} from '@insforge/ui';
 import { cn } from '@/lib/utils/utils';
 
 interface FeatureSidebarItemProps {

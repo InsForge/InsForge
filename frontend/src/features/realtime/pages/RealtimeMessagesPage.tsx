@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
+import { Button } from '@insforge/ui';
 import {
-  Button,
   PaginationControls,
   Skeleton,
   Tooltip,

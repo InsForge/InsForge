@@ -8,7 +8,8 @@
     "frontend",
     "auth",
     "shared-schemas",
-    "mcp"
+    "mcp",
+    "ui"
   ],
   "scripts": {
     "dev": "concurrently -n \"backend,frontend,auth\" -c \"cyan,magenta,green\" \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:auth\"",

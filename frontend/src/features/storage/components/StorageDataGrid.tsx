@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { Button } from '@insforge/ui';
 import {
   DataGrid,
   createDefaultCellRenderer,
@@ -6,7 +7,6 @@ import {
   type RenderCellProps,
   type DataGridColumn,
   type DataGridRowType,
-  Button,
 } from '@/components';
 import { Download, Eye, Trash2, Image, FileText, Music, Video, Archive, File } from 'lucide-react';
 import { StorageFileSchema } from '@insforge/shared-schemas';

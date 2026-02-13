@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react';
-import { Button } from '@/components/radix/Button';
+import { Button } from '@insforge/ui';
 import { DatabaseTemplate } from '@/features/database/templates';
 import { TemplateCard } from './TemplateCard';
 

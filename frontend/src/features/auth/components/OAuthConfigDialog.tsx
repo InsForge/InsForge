@@ -3,8 +3,8 @@ import { useForm, Controller, useFormState } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ExternalLink } from 'lucide-react';
+import { Button } from '@insforge/ui';
 import {
-  Button,
   Input,
   Switch,
   CopyButton,

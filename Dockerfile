@@ -14,6 +14,7 @@ COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
 COPY auth/package.json ./auth/
 COPY shared-schemas/package.json ./shared-schemas/
+COPY ui/package.json ./ui/
 
 # Install all dependencies - will generate Linux-compatible lock file
 RUN npm install && npm cache clean --force && rm -rf /tmp/*

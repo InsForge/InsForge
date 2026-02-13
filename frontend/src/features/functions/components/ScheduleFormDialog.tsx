@@ -11,15 +11,15 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/radix/Dialog';
-import { Button } from '@/components/radix/Button';
-import { JsonCellEditor } from '@/components/datagrid/cell-editors/JsonCellEditor';
 import {
+  Button,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/radix/Select';
+} from '@insforge/ui';
+import { JsonCellEditor } from '@/components/datagrid/cell-editors/JsonCellEditor';
 import { Alert, AlertDescription } from '@/components/radix/Alert';
 import { ScrollArea } from '@/components/radix/ScrollArea';
 import { Pencil } from 'lucide-react';

@@ -1,6 +1,6 @@
 import { useState, useEffect, ReactNode } from 'react';
 import { CircleCheckBig, Clock } from 'lucide-react';
-import { Button } from '@/components';
+import { Button } from '@insforge/ui';
 import { trackPostHog } from '@/lib/analytics/posthog';
 import type { InstallMethod } from './InstallMethodTabs';
 

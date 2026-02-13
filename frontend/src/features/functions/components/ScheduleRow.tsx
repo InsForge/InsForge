@@ -3,13 +3,13 @@ import type { ScheduleSchema } from '@insforge/shared-schemas';
 import { format } from 'date-fns';
 import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { Switch } from '@/components/radix/Switch';
-import { Button } from '@/components/radix/Button';
 import {
+  Button,
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-} from '@/components/radix/DropdownMenu';
+} from '@insforge/ui';
 import { CopyButton } from '@/components/CopyButton';
 
 interface ScheduleRowProps {

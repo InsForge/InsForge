@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link2, AlertCircle, X } from 'lucide-react';
+import { Button } from '@insforge/ui';
 import {
-  Button,
   TypeBadge,
   Popover,
   PopoverContent,

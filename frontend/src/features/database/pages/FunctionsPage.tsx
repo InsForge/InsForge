@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
+import { Button } from '@insforge/ui';
 import {
-  Button,
   EmptyState,
   SearchInput,
   DataGrid,

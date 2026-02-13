@@ -3,7 +3,8 @@ import { useCallback } from 'react';
 import { useMetadata } from '@/lib/hooks/useMetadata';
 import { useUsers } from '@/features/auth/hooks/useUsers';
 import { SchemaVisualizer, VisualizerSkeleton } from '../components';
-import { Alert, AlertDescription, Button } from '@/components';
+import { Button } from '@insforge/ui';
+import { Alert, AlertDescription } from '@/components';
 
 const VisualizerPage = () => {
   const {

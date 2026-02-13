@@ -7,7 +7,7 @@ import { ConnectionSuccessBanner, StatsCard, PromptCard, PromptDialog } from '..
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { LogsDataGrid, type LogsColumnDef } from '@/features/logs/components/LogsDataGrid';
 import { cn, formatTime } from '@/lib/utils/utils';
-import { Button } from '@/components';
+import { Button } from '@insforge/ui';
 import { quickStartPrompts, type PromptTemplate } from '../prompts';
 
 export default function DashboardPage() {

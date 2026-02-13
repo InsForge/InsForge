@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ExternalLink, Copy, Check, Plus, Pencil, Globe } from 'lucide-react';
-import { Button, Skeleton, Input, Dialog, DialogContent } from '@/components';
+import { Button } from '@insforge/ui';
+import { Skeleton, Input, Dialog, DialogContent } from '@/components';
 import DiscordIcon from '@/assets/logos/discord.svg?react';
 import { useDeployments } from '../hooks/useDeployments';
 import { useDeploymentSlug } from '../hooks/useDeploymentSlug';

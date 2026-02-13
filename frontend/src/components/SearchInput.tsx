@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Search, X } from 'lucide-react';
-import { Input, Button } from '@/components';
+import { Button } from '@insforge/ui';
+import { Input } from '@/components';
 
 interface SearchInputProps {
   value: string;

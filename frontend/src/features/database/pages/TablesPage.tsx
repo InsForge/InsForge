@@ -10,10 +10,10 @@ import { TableForm } from '@/features/database/components/TableForm';
 import { TablesEmptyState } from '@/features/database/components/TablesEmptyState';
 import { TemplatePreview } from '@/features/database/components/TemplatePreview';
 import { DATABASE_TEMPLATES, DatabaseTemplate } from '@/features/database/templates';
+import { Button } from '@insforge/ui';
 import {
   Alert,
   AlertDescription,
-  Button,
   ConfirmDialog,
   ConnectCTA,
   EmptyState,
