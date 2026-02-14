@@ -22,6 +22,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useUsers } from '@/features/auth/hooks/useUsers';
 import { AUTH_USERS_TABLE, authUsersSchema } from '../constants';
 
+const POPOVER_WIDTH = 520;
+
 interface ForeignKeyCellProps {
   value: string;
   foreignKey: {
@@ -79,10 +81,13 @@ export function ForeignKeyCell({ value, foreignKey, onJumpToTable }: ForeignKeyC
       return [];
     }
     // Use convertSchemaToColumns but disable foreign keys to prevent nested popovers
-    return convertSchemaToColumns(schema, undefined, undefined).map((col) => ({
+    const baseCols = convertSchemaToColumns(schema, undefined, undefined);
+    const containerWidth = POPOVER_WIDTH;
+    const colWidth = Math.max(200, Math.floor(containerWidth / baseCols.length));
+    return baseCols.map((col) => ({
       ...col,
-      width: 200,
-      minWidth: 200,
+      width: colWidth,
+      minWidth: colWidth,
       resizable: false,
       editable: false,
     }));
@@ -119,7 +124,8 @@ export function ForeignKeyCell({ value, foreignKey, onJumpToTable }: ForeignKeyC
         </TooltipProvider>
 
         <PopoverContent
-          className="relative w-[520px] p-0 bg-white dark:bg-[#2D2D2D] dark:border-neutral-700 overflow-hidden"
+          style={{ width: POPOVER_WIDTH }}
+          className="relative p-0 bg-white dark:bg-[#2D2D2D] dark:border-neutral-700 overflow-hidden"
           align="center"
           side="bottom"
           sideOffset={5}
