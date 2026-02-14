@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useStorage } from '@/features/storage/hooks/useStorage';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
 import DiscordIcon from '@/assets/logos/discord.svg?react';
-import { Button } from '@insforge/ui';
+import { Button, Switch } from '@insforge/ui';
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,6 @@ import {
   DialogTitle,
   Input,
   Label,
-  Switch,
 } from '@/components';
 
 interface BucketFormDialogProps {
@@ -148,7 +147,7 @@ export function BucketFormDialog({
                   id="bucket-public"
                   checked={isPublic}
                   onCheckedChange={setIsPublic}
-                  className="h-6"
+                  size="sm"
                 />
               </div>
               <p className="w-70 text-xs font-medium text-zinc-500 dark:text-neutral-400">
@@ -185,16 +184,16 @@ export function BucketFormDialog({
           <DialogFooter className="p-6 gap-3 border-t border-zinc-200 dark:border-neutral-700">
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               onClick={handleClose}
-              className="w-30 h-9 px-3 py-2 text-sm font-medium dark:bg-neutral-600 dark:text-zinc-300 dark:border-neutral-600 dark:hover:bg-neutral-700"
+              className="w-30"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={isLoading || (mode === 'create' && !bucketName.trim())}
-              className="w-30 h-9 px-3 py-2 text-sm font-medium bg-zinc-950 text-white hover:bg-zinc-800 disabled:opacity-40 dark:bg-emerald-300 dark:text-zinc-950 dark:hover:bg-emerald-400"
+              className="w-30"
             >
               {submitButtonText}
             </Button>

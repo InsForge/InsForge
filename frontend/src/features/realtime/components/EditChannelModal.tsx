@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, X } from 'lucide-react';
-import { Button } from '@insforge/ui';
+import { Button, Switch } from '@insforge/ui';
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,6 @@ import {
   DialogFooter,
   Input,
   Label,
-  Switch,
   Textarea,
 } from '@/components';
 import type { RealtimeChannel } from '../services/realtime.service';
@@ -198,7 +197,7 @@ export function EditChannelModal({
                     variant="ghost"
                     size="icon"
                     onClick={() => handleRemoveWebhook(index)}
-                    className="h-9 w-9 shrink-0 text-zinc-400 hover:text-red-500 dark:text-neutral-500 dark:hover:text-red-400"
+                    className="shrink-0"
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -209,7 +208,7 @@ export function EditChannelModal({
                 variant="ghost"
                 size="sm"
                 onClick={handleAddWebhook}
-                className="w-fit h-8 px-2 text-sm text-zinc-600 hover:text-zinc-900 dark:text-neutral-400 dark:hover:text-white"
+                className="w-fit"
               >
                 <Plus className="h-4 w-4 mr-1" />
                 Add URL
@@ -224,10 +223,10 @@ export function EditChannelModal({
         <DialogFooter className="px-6 py-4 gap-3 border-t border-zinc-200 dark:border-neutral-700">
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             onClick={() => onOpenChange(false)}
             disabled={isUpdating}
-            className="h-9 px-4 dark:bg-neutral-600 dark:text-white dark:border-transparent dark:hover:bg-neutral-700"
+            className="px-4"
           >
             Cancel
           </Button>
@@ -235,7 +234,7 @@ export function EditChannelModal({
             type="button"
             onClick={handleSave}
             disabled={!hasChanges() || isUpdating}
-            className="h-9 px-4 bg-zinc-950 text-white hover:bg-zinc-800 disabled:opacity-40 dark:bg-emerald-300 dark:text-zinc-950 dark:hover:bg-emerald-400"
+            className="px-4"
           >
             {isUpdating ? 'Saving...' : 'Save Changes'}
           </Button>

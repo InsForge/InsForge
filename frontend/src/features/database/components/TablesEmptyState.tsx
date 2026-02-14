@@ -21,7 +21,7 @@ export function TablesEmptyState({
           Create Your First Table
         </h2>
         <Button
-          className="h-9 w-50 gap-2 font-medium dark:bg-emerald-300 dark:hover:bg-emerald-400 dark:text-black"
+          className="h-9 w-50 gap-2 font-medium"
           onClick={onCreateTable}
         >
           <Plus className="w-5 h-5" />

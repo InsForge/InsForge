@@ -146,7 +146,7 @@ export function ForeignKeyPopover({
                   setNewForeignKey((prev) => ({ ...prev, columnName: value }))
                 }
               >
-                <SelectTrigger className="w-70 h-10 border-zinc-200 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+                <SelectTrigger className="w-70 h-10">
                   <span
                     className={cn(
                       'text-sm text-muted-foreground dark:text-neutral-400',
@@ -186,7 +186,7 @@ export function ForeignKeyPopover({
                   }));
                 }}
               >
-                <SelectTrigger className="w-70 h-10 border-zinc-200 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+                <SelectTrigger className="w-70 h-10">
                   <span
                     className={cn(
                       'text-sm text-muted-foreground dark:text-neutral-400',
@@ -219,7 +219,7 @@ export function ForeignKeyPopover({
                     setNewForeignKey((prev) => ({ ...prev, referenceColumn: value }))
                   }
                 >
-                  <SelectTrigger className="w-70 h-10 border-zinc-200 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+                  <SelectTrigger className="w-70 h-10">
                     <span
                       className={cn(
                         'text-sm text-muted-foreground dark:text-neutral-400',
@@ -290,7 +290,7 @@ export function ForeignKeyPopover({
                   }))
                 }
               >
-                <SelectTrigger className="w-70 h-10 border-zinc-200 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+                <SelectTrigger className="w-70 h-10">
                   <span className="text-sm text-black dark:text-white">
                     {newForeignKey.onUpdate}
                   </span>
@@ -315,7 +315,7 @@ export function ForeignKeyPopover({
                   }))
                 }
               >
-                <SelectTrigger className="w-70 h-10 border-zinc-200 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+                <SelectTrigger className="w-70 h-10">
                   <span className="text-sm text-black dark:text-white">
                     {newForeignKey.onDelete}
                   </span>

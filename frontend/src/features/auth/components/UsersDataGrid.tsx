@@ -5,7 +5,6 @@ import {
   AvatarImage,
   AvatarFallback,
   Badge,
-  Checkbox,
   DataGrid,
   createDefaultCellRenderer,
   type DataGridProps,
@@ -14,6 +13,7 @@ import {
   type SelectionCellProps,
   ConvertedValue,
 } from '@/components';
+import { Checkbox } from '@insforge/ui';
 import { cn } from '@/lib/utils/utils';
 import type { UserSchema } from '@insforge/shared-schemas';
 
@@ -203,7 +203,7 @@ const UserSelectionCell = ({
 
   return (
     <div className="flex items-center gap-2 w-full h-full">
-      <Checkbox checked={isSelected} onChange={onToggle} tabIndex={tabIndex} />
+      <Checkbox checked={isSelected} onCheckedChange={onToggle} tabIndex={tabIndex} />
       <div className="flex items-center gap-2 min-w-0 flex-1">
         <Avatar className="w-6 h-6 rounded-full flex-shrink-0">
           <AvatarImage src={avatarUrl} alt={name || 'User avatar'} className="object-cover" />

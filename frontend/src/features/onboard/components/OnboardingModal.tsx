@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Dialog, DialogContent, DialogTitle, TooltipProvider } from '@/components';
+import { TooltipProvider } from '@insforge/ui';
+import { Dialog, DialogContent, DialogTitle } from '@/components';
 import { McpConnectionSection } from './McpConnectionSection';
 import { PluginInstallStep } from './steps/PluginInstallStep';
 import { InstallMethodTabs, DEFAULT_MODAL_TABS, type InstallMethod } from './InstallMethodTabs';

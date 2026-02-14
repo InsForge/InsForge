@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Button, Select, SelectContent, SelectItem, SelectTrigger } from '@insforge/ui';
-import { Input, Switch, Checkbox } from '@/components';
+import { Button, Select, SelectContent, SelectItem, SelectTrigger, Switch, Checkbox } from '@insforge/ui';
+import { Input } from '@/components';
 import {
   updateAuthConfigRequestSchema,
   type UpdateAuthConfigRequest,
@@ -183,7 +183,7 @@ export default function ConfigurationPage() {
                                 }
                               }}
                             >
-                              <SelectTrigger className="w-full max-w-[320px] dark:bg-neutral-700 dark:border-neutral-700">
+                              <SelectTrigger className="w-full max-w-[320px]">
                                 <span className="text-black dark:text-white">
                                   {field.value === 'code' ? 'Code' : 'Link'}
                                 </span>
@@ -256,7 +256,7 @@ export default function ConfigurationPage() {
                           <label className="flex items-center gap-2 cursor-pointer">
                             <Checkbox
                               checked={field.value ?? false}
-                              onChange={(checked) => field.onChange(checked)}
+                              onCheckedChange={(checked) => field.onChange(checked)}
                             />
                             <span className="text-sm text-gray-700 dark:text-white">
                               At least 1 number
@@ -272,7 +272,7 @@ export default function ConfigurationPage() {
                           <label className="flex items-center gap-2 cursor-pointer">
                             <Checkbox
                               checked={field.value ?? false}
-                              onChange={(checked) => field.onChange(checked)}
+                              onCheckedChange={(checked) => field.onChange(checked)}
                             />
                             <span className="text-sm text-gray-700 dark:text-white">
                               At least 1 special character
@@ -288,7 +288,7 @@ export default function ConfigurationPage() {
                           <label className="flex items-center gap-2 cursor-pointer">
                             <Checkbox
                               checked={field.value ?? false}
-                              onChange={(checked) => field.onChange(checked)}
+                              onCheckedChange={(checked) => field.onChange(checked)}
                             />
                             <span className="text-sm text-gray-700 dark:text-white">
                               At least 1 lowercase character
@@ -304,7 +304,7 @@ export default function ConfigurationPage() {
                           <label className="flex items-center gap-2 cursor-pointer">
                             <Checkbox
                               checked={field.value ?? false}
-                              onChange={(checked) => field.onChange(checked)}
+                              onCheckedChange={(checked) => field.onChange(checked)}
                             />
                             <span className="text-sm text-gray-700 dark:text-white">
                               At least 1 uppercase character
@@ -338,7 +338,7 @@ export default function ConfigurationPage() {
                               }
                             }}
                           >
-                            <SelectTrigger className="w-full max-w-[320px] dark:bg-neutral-700 dark:border-neutral-700">
+                            <SelectTrigger className="w-full max-w-[320px]">
                               <span className="text-black dark:text-white">
                                 {field.value === 'code' ? 'Code' : 'Link'}
                               </span>
@@ -363,7 +363,7 @@ export default function ConfigurationPage() {
                       type="button"
                       onClick={handleReset}
                       disabled={isUpdating}
-                      className="h-10 px-6 bg-white border border-zinc-200 shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] text-zinc-950 hover:bg-zinc-50 dark:bg-neutral-600 dark:border-neutral-600 dark:text-white dark:hover:bg-neutral-700"
+                      variant="secondary" className="h-10 px-6"
                     >
                       Cancel
                     </Button>
@@ -371,7 +371,7 @@ export default function ConfigurationPage() {
                       type="button"
                       onClick={handleSubmit}
                       disabled={isUpdating}
-                      className="h-10 px-6 dark:bg-emerald-300 dark:text-black dark:hover:bg-emerald-400"
+                      className="h-10 px-6"
                     >
                       {isUpdating ? 'Saving...' : 'Save Changes'}
                     </Button>

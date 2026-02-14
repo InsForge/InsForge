@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Info, Plug, ChartBarBig, RefreshCw } from 'lucide-react';
-import { Button } from '@insforge/ui';
-import { CopyButton, TooltipProvider, Input, ConfirmDialog } from '@/components';
+import { Button, TooltipProvider } from '@insforge/ui';
+import { CopyButton, Input, ConfirmDialog } from '@/components';
 import { useApiKey } from '@/lib/hooks/useMetadata';
 import { useHealth } from '@/lib/hooks/useHealth';
 import { useConfirm } from '@/lib/hooks/useConfirm';
@@ -251,7 +251,7 @@ export default function SettingsPage() {
                             onClick={handleSaveProjectName}
                             disabled={!hasNameChanged}
                             className={cn(
-                              'h-9 text-white dark:text-black bg-black dark:bg-emerald-300 hover:opacity-90 px-3 py-2 rounded-lg',
+                              'h-9 px-3 rounded-lg',
                               !hasNameChanged && 'opacity-40'
                             )}
                           >
@@ -303,7 +303,7 @@ export default function SettingsPage() {
                           <Button
                             onClick={() => void handleRotateApiKey()}
                             disabled={isApiKeyLoading || isRotatingApiKey}
-                            className="h-9 flex items-center gap-2 text-white dark:text-black bg-black dark:bg-emerald-300 hover:opacity-90 px-3 py-2 rounded-lg disabled:opacity-40"
+                            className="h-9 gap-2 px-3 rounded-lg"
                           >
                             <RefreshCw
                               className={cn('w-4 h-4', isRotatingApiKey && 'animate-spin')}
@@ -336,7 +336,7 @@ export default function SettingsPage() {
                           <Button
                             onClick={handleUpdateVersion}
                             disabled={isUpdatingVersion}
-                            className="h-9 text-white dark:text-black bg-black dark:bg-emerald-300 hover:opacity-90 px-3 py-2 rounded-lg"
+                            className="h-9 px-3 rounded-lg"
                           >
                             {isUpdatingVersion ? 'Updating...' : 'Update'}
                           </Button>
@@ -359,7 +359,6 @@ export default function SettingsPage() {
                         <Button
                           variant="destructive"
                           onClick={() => void handleDeleteProject()}
-                          className="bg-red-600 hover:bg-red-700 text-white dark:bg-red-200 dark:hover:bg-red-300 dark:text-red-700"
                         >
                           Delete Project
                         </Button>

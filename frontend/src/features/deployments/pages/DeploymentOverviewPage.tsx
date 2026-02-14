@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ExternalLink, Copy, Check, RefreshCw } from 'lucide-react';
-import { Button } from '@insforge/ui';
-import { Skeleton, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components';
+import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
+import { Skeleton } from '@/components';
 import { useDeployments } from '../hooks/useDeployments';
 import { useDeploymentMetadata } from '../hooks/useDeploymentMetadata';
 import { useToast } from '@/lib/hooks/useToast';

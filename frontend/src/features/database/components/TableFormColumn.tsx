@@ -1,7 +1,8 @@
 import { memo } from 'react';
 import { Controller, Control } from 'react-hook-form';
 import { X, Key } from 'lucide-react';
-import { Input, Checkbox } from '@/components';
+import { Checkbox } from '@insforge/ui';
+import { Input } from '@/components';
 import { TableFormColumnSchema, TableFormSchema } from '../schema';
 import { ColumnTypeSelect } from './ColumnTypeSelect';
 
@@ -95,9 +96,9 @@ export const TableFormColumn = memo(function TableFormColumn({
           render={({ field }) => (
             <Checkbox
               checked={field.value}
-              onChange={field.onChange}
+              onCheckedChange={field.onChange}
               disabled={!isNewColumn}
-              className={`rounded border-zinc-700 shadow-sm data-[state=checked]:bg-zinc-600 data-[state=checked]:border-zinc-600 dark:bg-neutral-800 dark:text-zinc-300 dark:border-neutral-700`}
+
             />
           )}
         />
@@ -111,9 +112,9 @@ export const TableFormColumn = memo(function TableFormColumn({
           render={({ field }) => (
             <Checkbox
               checked={field.value}
-              onChange={field.onChange}
+              onCheckedChange={field.onChange}
               disabled={!isNewColumn}
-              className={`rounded border-zinc-700 shadow-sm data-[state=checked]:bg-zinc-600 data-[state=checked]:border-zinc-600 dark:bg-neutral-800 dark:text-zinc-300 dark:border-neutral-700`}
+
             />
           )}
         />

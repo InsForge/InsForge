@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
-import { Button } from '@insforge/ui';
+import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import {
   EmptyState,
   SearchInput,
@@ -8,10 +8,6 @@ import {
   type DataGridColumn,
   type DataGridRowType,
   type ConvertedValue,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
 } from '@/components';
 import { useFunctions } from '../hooks/useDatabase';
 import { SQLModal, SQLCellButton } from '../components/SQLModal';

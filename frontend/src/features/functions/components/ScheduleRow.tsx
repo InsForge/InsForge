@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils/utils';
 import type { ScheduleSchema } from '@insforge/shared-schemas';
 import { format } from 'date-fns';
 import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
-import { Switch } from '@/components/radix/Switch';
+import { Switch } from '@insforge/ui';
 import {
   Button,
   DropdownMenu,
@@ -115,8 +115,7 @@ export function ScheduleRow({
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-7 w-7 hover:bg-zinc-200 dark:hover:bg-neutral-600"
+                size="icon-sm"
                 title={`Actions for ${schedule.name}`}
               >
                 <MoreHorizontal className="h-4 w-4 text-zinc-500 dark:text-zinc-300" />
@@ -133,9 +132,9 @@ export function ScheduleRow({
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => onDelete(schedule.id)}
-                className="text-destructive dark:text-red-400"
+                className="text-destructive"
               >
-                <Trash2 className="mr-2 h-4 w-4 text-destructive dark:text-red-400" />
+                <Trash2 className="mr-2 h-4 w-4" />
                 <span>Delete</span>
               </DropdownMenuItem>
             </DropdownMenuContent>

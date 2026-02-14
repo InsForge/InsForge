@@ -1,16 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { UserPlus } from 'lucide-react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
-import { Button } from '@insforge/ui';
+import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import {
   ConnectCTA,
   SearchInput,
   SelectionClearButton,
   DeleteActionButton,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
   ConfirmDialog,
 } from '@/components';
 import { UsersDataGrid, UserFormDialog } from '@/features/auth/components';
@@ -157,8 +153,7 @@ export default function UsersPage() {
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
-                      size="icon"
-                      className="p-1 h-9 w-9"
+                      size="icon-lg"
                       onClick={() => void handleRefresh()}
                       disabled={isRefreshing}
                     >
@@ -202,7 +197,7 @@ export default function UsersPage() {
             <div className="flex items-center gap-2 ml-4">
               {selectedRows.size === 0 && (
                 <Button
-                  className="h-10 px-4 font-medium dark:bg-emerald-300 dark:text-black"
+                  className="h-10 px-4 font-medium"
                   onClick={() => setAddDialogOpen(true)}
                 >
                   <UserPlus className="h-4 w-4 mr-2" />

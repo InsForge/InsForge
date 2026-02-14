@@ -10,7 +10,7 @@ import { TableForm } from '@/features/database/components/TableForm';
 import { TablesEmptyState } from '@/features/database/components/TablesEmptyState';
 import { TemplatePreview } from '@/features/database/components/TemplatePreview';
 import { DATABASE_TEMPLATES, DatabaseTemplate } from '@/features/database/templates';
-import { Button } from '@insforge/ui';
+import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import {
   Alert,
   AlertDescription,
@@ -20,10 +20,6 @@ import {
   SearchInput,
   SelectionClearButton,
   DeleteActionButton,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
 } from '@/components';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
@@ -415,8 +411,7 @@ export default function TablesPage() {
                             <TooltipTrigger asChild>
                               <Button
                                 variant="ghost"
-                                size="icon"
-                                className="p-1 h-9 w-9"
+                                size="icon-lg"
                                 onClick={() => handleEditTable(selectedTable)}
                               >
                                 <PencilIcon className="h-5 w-5 text-zinc-400 dark:text-neutral-400" />
@@ -430,8 +425,7 @@ export default function TablesPage() {
                             <TooltipTrigger asChild>
                               <Button
                                 variant="ghost"
-                                size="icon"
-                                className="p-1 h-9 w-9"
+                                size="icon-lg"
                                 onClick={() => void handleRefresh()}
                                 disabled={isRefreshing}
                               >
@@ -482,7 +476,7 @@ export default function TablesPage() {
                             {/* Import CSV Button */}
                             <Button
                               variant="secondary"
-                              className="h-10 px-4 font-medium gap-1.5 border border-zinc-200 dark:border-neutral-600"
+                              className="h-10 px-4 font-medium gap-1.5"
                               onClick={() => fileInputRef.current?.click()}
                               disabled={isImporting}
                             >
@@ -491,7 +485,7 @@ export default function TablesPage() {
                             </Button>
                             {/* Add Record Button */}
                             <Button
-                              className="h-10 px-4 font-medium gap-1.5 dark:bg-emerald-300 dark:hover:bg-emerald-400"
+                              className="h-10 px-4 font-medium gap-1.5"
                               onClick={() => setShowRecordForm(true)}
                             >
                               <Plus className="w-5 h-5" />

@@ -98,13 +98,13 @@ export function McpConnectionSection({
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="start"
-              className="w-40 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded shadow-lg p-0"
+              className="w-40 p-0"
             >
               {MCP_AGENTS.map((agent) => (
                 <DropdownMenuItem
                   key={agent.id}
                   onSelect={() => handleAgentChange(agent)}
-                  className="flex items-center gap-2 px-2 py-2 text-gray-900 dark:text-white text-sm hover:bg-gray-100 dark:hover:bg-neutral-700 cursor-pointer"
+                  className="gap-2 cursor-pointer"
                 >
                   {agent.logo && (
                     <div className="w-6 h-6 flex items-center justify-center">{agent.logo}</div>

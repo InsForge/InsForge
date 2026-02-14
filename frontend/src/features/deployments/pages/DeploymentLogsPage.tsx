@@ -151,7 +151,7 @@ export default function DeploymentLogsPage() {
             value={statusFilter}
             onValueChange={(value) => setStatusFilter(value as DeploymentStatus)}
           >
-            <SelectTrigger className="w-[180px] h-9 bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700">
+            <SelectTrigger className="w-[180px] h-9">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>

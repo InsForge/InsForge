@@ -2,8 +2,8 @@ import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
 import { useLogs } from '../hooks/useLogs';
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@insforge/ui';
-import { Checkbox, EmptyState, SearchInput } from '@/components';
+import { Button, Checkbox, DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@insforge/ui';
+import { EmptyState, SearchInput } from '@/components';
 import { LogsDataGrid, type LogsColumnDef } from '../components/LogsDataGrid';
 import { SeverityBadge } from '../components/SeverityBadge';
 import { LogDetailPanel } from '../components/LogDetailPanel';
@@ -106,8 +106,8 @@ export default function LogsPage() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
-                variant="outline"
-                className="w-32 h-10 justify-between bg-transparent dark:bg-transparent border-gray-300 dark:border-neutral-600 text-zinc-950 dark:text-white"
+                variant="secondary" size="lg"
+                className="w-32 justify-between"
               >
                 Severity
                 <ChevronDown className="h-4 w-4 opacity-50" />
@@ -131,7 +131,7 @@ export default function LogsPage() {
                     );
                   }}
                 >
-                  <Checkbox checked={severityFilter.includes(value)} onChange={() => {}} />
+                  <Checkbox checked={severityFilter.includes(value)} onCheckedChange={() => {}} />
                   <span className={color}>●</span>
                   <span className="text-zinc-950 dark:text-white text-sm">{label}</span>
                 </div>

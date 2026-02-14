@@ -1,13 +1,9 @@
 import { useState } from 'react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
-import { Button } from '@insforge/ui';
+import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import {
   ConfirmDialog,
   Skeleton,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
 } from '@/components';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useRealtimeChannels } from '../hooks/useRealtimeChannels';

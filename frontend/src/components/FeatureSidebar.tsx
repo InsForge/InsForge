@@ -1,14 +1,10 @@
 import { useState, ReactNode } from 'react';
 import { Plus, LucideIcon } from 'lucide-react';
-import { Button } from '@insforge/ui';
+import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import {
   ScrollArea,
   SearchInput,
   FeatureSidebarItem,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
 } from '@/components';
 
 interface FeatureSidebarProps {

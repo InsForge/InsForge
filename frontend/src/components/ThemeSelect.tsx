@@ -8,7 +8,7 @@ export function ThemeSelect() {
   return (
     <Select value={theme} onValueChange={setTheme}>
       <SelectTrigger
-        className="h-9 w-9 justify-center rounded-lg border-0 bg-transparent p-0 hover:bg-gray-100 focus:ring-0 focus:ring-offset-0 dark:hover:bg-neutral-700 [&>svg]:hidden"
+        className="h-9 w-9 justify-center rounded-lg border-0 bg-transparent p-0 focus:ring-0 focus:ring-offset-0 [&>svg]:hidden"
         aria-label="Toggle theme"
       >
         <SelectValue aria-label={theme}>
