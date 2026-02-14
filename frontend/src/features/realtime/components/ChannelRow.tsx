@@ -1,6 +1,6 @@
 import { cn, formatDate } from '@/lib/utils/utils';
 import { Trash2 } from 'lucide-react';
-import { Switch } from '@/components';
+import { Switch } from '@insforge/ui';
 import type { RealtimeChannel } from '../services/realtime.service';
 
 interface ChannelRowProps {

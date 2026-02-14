@@ -26,6 +26,14 @@ export {
   SelectScrollUpButton,
   SelectScrollDownButton,
 } from './components';
+export {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from './components';
+export { Switch, switchVariants, type SwitchProps } from './components';
+export { Checkbox } from './components';
 
 // Utilities
 export { cn } from './lib';

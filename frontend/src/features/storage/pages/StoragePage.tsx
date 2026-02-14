@@ -11,7 +11,7 @@ import { BucketFormDialog } from '@/features/storage/components/BucketFormDialog
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
 import { useUploadToast } from '@/features/storage/components/UploadToast';
-import { Button } from '@insforge/ui';
+import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import {
   SearchInput,
   SelectionClearButton,
@@ -20,10 +20,6 @@ import {
   AlertDescription,
   ConfirmDialog,
   EmptyState,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
 } from '@/components';
 
 interface BucketFormState {
@@ -305,8 +301,7 @@ export default function StoragePage() {
                             <TooltipTrigger asChild>
                               <Button
                                 variant="ghost"
-                                size="icon"
-                                className="p-1 h-9 w-9"
+                                size="icon-lg"
                                 onClick={() => handleEditBucket(selectedBucket)}
                               >
                                 <PencilIcon className="h-5 w-5 text-zinc-400 dark:text-neutral-400" />
@@ -321,8 +316,7 @@ export default function StoragePage() {
                           <TooltipTrigger asChild>
                             <Button
                               variant="ghost"
-                              size="icon"
-                              className="p-1 h-9 w-9"
+                              size="icon-lg"
                               onClick={() => void handleRefresh()}
                               disabled={isRefreshing}
                             >
@@ -378,7 +372,7 @@ export default function StoragePage() {
                             style={{ display: 'none' }}
                           />
                           <Button
-                            className="h-10 px-4 font-medium gap-1.5 dark:bg-emerald-300 dark:text-zinc-950 dark:hover:bg-emerald-400"
+                            className="h-10 px-4 font-medium gap-1.5"
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isUploading}
                           >

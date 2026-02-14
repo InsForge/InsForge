@@ -1,6 +1,5 @@
 import { format } from 'date-fns';
-import { Button } from '@insforge/ui';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components';
+import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { cn } from '@/lib/utils/utils';
 
@@ -24,9 +23,10 @@ export function McpConnectionStatus({ onConnectClick }: McpConnectionStatusProps
   if (!hasCompletedOnboarding) {
     return (
       <Button
-        variant="outline"
+        variant="secondary"
+        size="lg"
         onClick={onConnectClick}
-        className="h-9 px-4 gap-2 bg-white dark:bg-transparent text-gray-900 dark:text-white border-gray-300 dark:border-neutral-600 hover:bg-gray-100 dark:hover:bg-neutral-900 rounded-full"
+        className="px-4 gap-2 rounded-full"
       >
         <div className="w-2 h-2 rounded-full bg-neutral-400" />
         <span className="text-sm">Connect</span>
@@ -40,9 +40,10 @@ export function McpConnectionStatus({ onConnectClick }: McpConnectionStatusProps
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
-            variant="outline"
+            variant="secondary"
+            size="lg"
             onClick={onConnectClick}
-            className="h-9 px-4 gap-2 bg-white dark:bg-transparent text-gray-900 dark:text-white border-gray-300 dark:border-neutral-600 hover:bg-gray-100 dark:hover:bg-neutral-900 rounded-full"
+            className="px-4 gap-2 rounded-full"
           >
             <div className="w-2 h-2 rounded-full bg-emerald-400" />
             <span className="text-sm">Connected</span>
@@ -52,8 +53,8 @@ export function McpConnectionStatus({ onConnectClick }: McpConnectionStatusProps
           side="bottom"
           sideOffset={8}
           className={cn(
-            'bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700',
-            'text-gray-700 dark:text-neutral-300 p-3 max-w-[280px]'
+            '',
+            'p-3 max-w-[280px]'
           )}
         >
           <p className="text-sm">

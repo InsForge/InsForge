@@ -85,7 +85,7 @@ export function FeatureSidebarItem({
                       e.stopPropagation();
                       onDelete();
                     }}
-                    className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400 cursor-pointer"
+                    className="text-destructive cursor-pointer"
                   >
                     <Trash2 className="mr-2 h-5 w-5 dark:text-red-400" />
                     {deleteLabel}

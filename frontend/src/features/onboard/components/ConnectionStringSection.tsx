@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { CopyButton, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
+import { CopyButton } from '@/components';
 import { ShowPasswordButton } from './ShowPasswordButton';
 import { useDatabaseConnectionString, useDatabasePassword } from '@/lib/hooks/useMetadata';
 import { cn } from '@/lib/utils/utils';

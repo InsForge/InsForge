@@ -102,7 +102,7 @@ export default function AuthMethodsPage() {
             {!allProvidersEnabled && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button className="h-8 px-2 py-0 gap-2 bg-black text-white dark:bg-neutral-600 dark:text-white hover:bg-gray-800 dark:hover:bg-neutral-500 text-sm font-medium rounded">
+                  <Button className="gap-2">
                     <Plus className="w-5 h-5" />
                     Add Provider
                     <ChevronDown className="w-4 h-4" />
@@ -136,7 +136,7 @@ export default function AuthMethodsPage() {
                       <DropdownMenuItem
                         key={provider.id}
                         disabled
-                        className="py-2 px-3 flex items-center justify-between gap-3 opacity-50 cursor-not-allowed"
+                        className="justify-between gap-3"
                       >
                         <div className="flex items-center gap-3">
                           {provider.icon}
@@ -193,9 +193,8 @@ export default function AuthMethodsPage() {
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
-                              className="h-7 w-7 p-1 text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700"
                               variant="ghost"
-                              size="sm"
+                              size="icon-sm"
                             >
                               <MoreHorizontal className="w-5 h-5" />
                             </Button>
@@ -210,7 +209,7 @@ export default function AuthMethodsPage() {
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => void deleteOAuthConfig(provider.id, provider.name)}
-                              className="py-2 px-3 flex items-center gap-3 cursor-pointer text-red-600 dark:text-red-400"
+                              className="gap-3 cursor-pointer text-destructive"
                             >
                               <Trash2 className="w-5 h-5" />
                               Delete

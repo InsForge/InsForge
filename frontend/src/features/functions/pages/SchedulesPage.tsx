@@ -1,8 +1,8 @@
 import { useState, useCallback, useMemo } from 'react';
 import { ChevronRight, Plus } from 'lucide-react';
 import { useSchedules } from '@/features/functions/hooks/useSchedules';
-import { Button } from '@insforge/ui';
-import { Skeleton, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components';
+import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
+import { Skeleton } from '@/components';
 import { ScheduleFormDialog } from '../components/ScheduleFormDialog';
 import type { ScheduleFormSchema } from '../types';
 import { normalizeHeaders } from '../helpers';
@@ -193,7 +193,7 @@ export default function SchedulesPage() {
           {/* Add button */}
           <Button
             title="Create a new schedule"
-            className="h-9 px-4 font-medium gap-1.5 dark:bg-emerald-300 dark:hover:bg-emerald-400 dark:text-black"
+            className="h-9 px-4 font-medium gap-1.5"
             onClick={() => setCreateOpen(true)}
           >
             <Plus className="w-4 h-4" />

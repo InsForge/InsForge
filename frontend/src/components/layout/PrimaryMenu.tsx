@@ -1,12 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ExternalLink, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
 import { cn } from '@/lib/utils/utils';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/radix/Tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import { PrimaryMenuItem } from '@/lib/utils/menuItems';
 
 interface PrimaryMenuProps {

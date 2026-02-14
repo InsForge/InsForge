@@ -11,8 +11,6 @@ export * from './Dialog';
 export * from './Label';
 export * from './Popover';
 export * from './Sheet';
-export * from './Switch';
-export * from './Tooltip';
 export * from './AlertDialog';
 export * from './Avatar';
 export * from './Textarea';

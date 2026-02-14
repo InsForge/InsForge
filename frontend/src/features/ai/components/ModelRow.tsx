@@ -1,4 +1,4 @@
-import { Switch } from '@/components';
+import { Switch } from '@insforge/ui';
 import { ModelOption, formatPrice, formatModality } from '../helpers';
 
 interface ModelRowProps {

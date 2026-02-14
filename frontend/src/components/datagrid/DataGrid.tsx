@@ -11,7 +11,7 @@ import ReactDataGrid, {
 } from 'react-data-grid';
 import { cn } from '@/lib/utils/utils';
 import { PaginationControls } from '../PaginationControls';
-import { Checkbox } from '../Checkbox';
+import { Checkbox } from '@insforge/ui';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import type { DataGridColumn, DataGridRow, DataGridRowType } from './datagridTypes';
 import SortableHeaderRenderer from './SortableHeader';
@@ -118,7 +118,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
             return renderSelectionCell({ row, isSelected, onToggle: handleToggle, tabIndex });
           }
 
-          return <Checkbox checked={isSelected} onChange={handleToggle} tabIndex={tabIndex} />;
+          return <Checkbox checked={isSelected} onCheckedChange={handleToggle} tabIndex={tabIndex} />;
         },
         renderHeaderCell: () => {
           const selectedCount = data.filter((row) => selectedRows.has(keyGetter(row))).length;
@@ -128,9 +128,8 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
 
           return (
             <Checkbox
-              checked={isAllSelected}
-              indeterminate={isPartiallySelected}
-              onChange={(checked) => {
+              checked={isPartiallySelected ? 'indeterminate' : isAllSelected}
+              onCheckedChange={(checked) => {
                 const newSelectedRows = new Set(selectedRows);
                 if (checked) {
                   // Select all

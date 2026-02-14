@@ -107,33 +107,6 @@
 }
 
 @layer components {
-  /* Checkbox styling */
-  input[type='checkbox'] {
-    @apply cursor-pointer;
-    accent-color: #000000;
-  }
-
-  input[type='checkbox']:checked {
-    background-color: #000000 !important;
-    border-color: #000000 !important;
-    accent-color: #000000;
-  }
-
-  input[type='checkbox']:checked:hover {
-    background-color: #1a1a1a !important;
-    border-color: #1a1a1a !important;
-  }
-
-  input[type='checkbox']:focus {
-    outline: none !important;
-    box-shadow: none !important;
-  }
-
-  input[type='checkbox']:focus-visible {
-    outline: none !important;
-    box-shadow: none !important;
-  }
-
   button {
     cursor: pointer;
   }

@@ -1,16 +1,12 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link2, AlertCircle, X } from 'lucide-react';
-import { Button } from '@insforge/ui';
+import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import {
   TypeBadge,
   Popover,
   PopoverContent,
   PopoverTrigger,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
   ConvertedValue,
   DataGrid,
 } from '@/components';

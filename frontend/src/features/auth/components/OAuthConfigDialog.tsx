@@ -3,10 +3,9 @@ import { useForm, Controller, useFormState } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ExternalLink } from 'lucide-react';
-import { Button } from '@insforge/ui';
+import { Button, Switch } from '@insforge/ui';
 import {
   Input,
-  Switch,
   CopyButton,
   Dialog,
   DialogContent,
@@ -297,8 +296,8 @@ export function OAuthConfigDialog({
             <DialogFooter className="p-6 border-t border-zinc-200 dark:border-neutral-700">
               <Button
                 type="button"
-                className="h-9 w-30 px-3 py-2 dark:bg-neutral-600 dark:text-white dark:border-transparent dark:hover:bg-neutral-700"
-                variant="outline"
+                className="w-30"
+                variant="secondary"
                 onClick={onClose}
                 disabled={saving}
               >
@@ -308,7 +307,7 @@ export function OAuthConfigDialog({
                 type="button"
                 onClick={handleSubmit}
                 disabled={isDisabled()}
-                className="h-9 w-30 px-3 py-2 dark:bg-emerald-300 dark:text-black dark:hover:bg-emerald-400"
+                className="w-30"
               >
                 {saving
                   ? providerConfig

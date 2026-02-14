@@ -9,7 +9,6 @@ export * from './radix';
 
 // Custom UI components
 export { ButtonWithLoading } from './ButtonWithLoading';
-export { Checkbox } from './Checkbox';
 export { CodeBlock } from './CodeBlock';
 export { CodeEditor } from './CodeEditor';
 export { ConfirmDialog } from './ConfirmDialog';

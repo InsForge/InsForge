@@ -30,14 +30,14 @@ export function TemplatePreview({ template, onCancel }: TemplatePreviewProps) {
           You are previewing a template
         </p>
         <Button
-          variant="outline"
+          variant="secondary"
           onClick={onCancel}
-          className="h-8 px-4 dark:bg-neutral-600 dark:text-zinc-300 dark:border-neutral-600 dark:hover:bg-neutral-700"
+          className="px-4"
         >
           Cancel
         </Button>
         <Button
-          className="h-8 px-4 font-medium bg-emerald-300 hover:bg-emerald-400 text-black dark:bg-emerald-300 dark:hover:bg-emerald-400"
+          className="px-4 font-medium"
           onClick={handleImplementTemplate}
           disabled={isPending}
         >
