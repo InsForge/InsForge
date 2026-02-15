@@ -24,7 +24,11 @@ npm-debug.log*
 .git/
 .gitignore
 *.md
-!docs/**  # Include all files in docs folder
+docs/
+!docs/agent-docs/**
+!docs/sdks/**
+!docs/snippets/**
+!docs/insforge-instructions-sdk.md
 tests/
 *.test.ts
 *.test.tsx
