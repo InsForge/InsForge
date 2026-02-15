@@ -8,11 +8,15 @@ import { ProcessedFormData } from '@/types/storage.js';
 const DEFAULT_MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 const DEFAULT_MAX_FILES = 10;
 
+/** Returns the configured max file size in bytes (env var or 50MB default) */
+export const getMaxFileSize = (): number =>
+  parseInt(process.env.MAX_FILE_SIZE || '') || DEFAULT_MAX_FILE_SIZE;
+
 // Create multer instance with memory storage
 export const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: parseInt(process.env.MAX_FILE_SIZE || '') || DEFAULT_MAX_FILE_SIZE,
+    fileSize: getMaxFileSize(),
     files: parseInt(process.env.MAX_FILES_PER_FIELD || '') || DEFAULT_MAX_FILES,
   },
 });

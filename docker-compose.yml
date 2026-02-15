@@ -70,6 +70,8 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-change-this-password}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      # Storage limits
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-}
       # PostgreSQL connection
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432

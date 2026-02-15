@@ -13,9 +13,9 @@ import { getSignedUrl as getCloudFrontSignedUrl } from '@aws-sdk/cloudfront-sign
 import { UploadStrategyResponse, DownloadStrategyResponse } from '@insforge/shared-schemas';
 import { StorageProvider } from './base.provider.js';
 import logger from '@/utils/logger.js';
+import { getMaxFileSize } from '@/api/middlewares/upload.js';
 
 const ONE_HOUR_IN_SECONDS = 3600;
-const DEFAULT_MAX_UPLOAD_SIZE_BYTES = 52428800; // 50MB
 const SEVEN_DAYS_IN_SECONDS = 604800;
 
 /**
@@ -184,7 +184,7 @@ export class S3StorageProvider implements StorageProvider {
           [
             'content-length-range',
             0,
-            Math.min(metadata.size || DEFAULT_MAX_UPLOAD_SIZE_BYTES, DEFAULT_MAX_UPLOAD_SIZE_BYTES),
+            Math.min(metadata.size || getMaxFileSize(), getMaxFileSize()),
           ],
         ],
         Expires: expiresIn,
