@@ -152,7 +152,7 @@ export function formatValueForDisplay(value: ConvertedValue, type?: ColumnType):
  * Check if a value is considered empty for database purposes
  */
 export function isEmptyValue(value: unknown): boolean {
-  return value === null || value === undefined || value === '';
+  return value === null || value === undefined;
 }
 
 export const isInsForgeCloudProject = () => {

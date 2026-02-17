@@ -35,7 +35,7 @@ function DatabaseTextCellEditor({
     (newValue: string) => {
       const oldValue = row[column.key];
 
-      if (onCellEdit && String(oldValue) !== String(newValue)) {
+      if (onCellEdit && String(oldValue ?? '') !== String(newValue)) {
         void onCellEdit(String(row[primaryKeyColumn] || ''), column.key, newValue);
       }
 
