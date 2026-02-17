@@ -45,7 +45,9 @@ export class S3StorageProvider implements StorageProvider {
     // Use S3-specific credentials as a pair, otherwise fall back to AWS credentials as a pair
     const useS3Creds = process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY;
     const accessKeyId = useS3Creds ? process.env.S3_ACCESS_KEY_ID : process.env.AWS_ACCESS_KEY_ID;
-    const secretAccessKey = useS3Creds ? process.env.S3_SECRET_ACCESS_KEY : process.env.AWS_SECRET_ACCESS_KEY;
+    const secretAccessKey = useS3Creds
+      ? process.env.S3_SECRET_ACCESS_KEY
+      : process.env.AWS_SECRET_ACCESS_KEY;
 
     if (accessKeyId && secretAccessKey) {
       s3Config.credentials = { accessKeyId, secretAccessKey };
