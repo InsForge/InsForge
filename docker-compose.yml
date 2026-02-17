@@ -70,6 +70,9 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-change-this-password}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      # S3-specific credentials (for Wasabi, MinIO, etc. — falls back to AWS_* if not set)
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}
       # Storage limits
       - MAX_FILE_SIZE=${MAX_FILE_SIZE:-}
       # PostgreSQL connection
@@ -88,6 +91,7 @@ services:
       # Storage Configuration
       - AWS_S3_BUCKET=${AWS_S3_BUCKET:-}
       - AWS_REGION=${AWS_REGION:-}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-}
       - AWS_CLOUDFRONT_URL=${AWS_CLOUDFRONT_URL:-}
       - AWS_CLOUDFRONT_KEY_PAIR_ID=${AWS_CLOUDFRONT_KEY_PAIR_ID:-}
       - AWS_CLOUDFRONT_PRIVATE_KEY=${AWS_CLOUDFRONT_PRIVATE_KEY:-}
