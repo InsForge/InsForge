@@ -42,16 +42,20 @@ export class S3StorageProvider implements StorageProvider {
       region: this.region,
     };
 
-    if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
-      s3Config.credentials = {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-      };
+    // Use S3-specific credentials as a pair, otherwise fall back to AWS credentials as a pair
+    const useS3Creds = process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY;
+    const accessKeyId = useS3Creds ? process.env.S3_ACCESS_KEY_ID : process.env.AWS_ACCESS_KEY_ID;
+    const secretAccessKey = useS3Creds
+      ? process.env.S3_SECRET_ACCESS_KEY
+      : process.env.AWS_SECRET_ACCESS_KEY;
+
+    if (accessKeyId && secretAccessKey) {
+      s3Config.credentials = { accessKeyId, secretAccessKey };
     }
 
     // Support MinIO or other S3-compatible endpoints
-    if (process.env.AWS_ENDPOINT_URL) {
-      s3Config.endpoint = process.env.AWS_ENDPOINT_URL;
+    if (process.env.S3_ENDPOINT_URL) {
+      s3Config.endpoint = process.env.S3_ENDPOINT_URL;
       // MinIO requires path-style URLs
       s3Config.forcePathStyle = true;
     }
@@ -225,8 +229,9 @@ export class S3StorageProvider implements StorageProvider {
     const cloudFrontUrl = process.env.AWS_CLOUDFRONT_URL;
 
     try {
-      // If CloudFront URL is configured, use CloudFront for downloads
-      if (cloudFrontUrl) {
+      // If CloudFront URL is configured and not using a custom S3 endpoint, use CloudFront for downloads
+      // CloudFront only works with AWS S3, not with S3-compatible providers like Wasabi/MinIO
+      if (cloudFrontUrl && !process.env.S3_ENDPOINT_URL) {
         const cloudFrontKeyPairId = process.env.AWS_CLOUDFRONT_KEY_PAIR_ID;
         const cloudFrontPrivateKey = process.env.AWS_CLOUDFRONT_PRIVATE_KEY;
 
