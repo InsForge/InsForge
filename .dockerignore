@@ -24,7 +24,7 @@ npm-debug.log*
 .git/
 .gitignore
 *.md
-docs/
+docs/**
 !docs/agent-docs/**
 !docs/sdks/**
 !docs/snippets/**
