@@ -174,10 +174,6 @@ export class RecordService {
     if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
       return { valid: false, error: 'Invalid file type. Please upload a CSV file.' };
     }
-    const maxSizeInBytes = 50 * 1024 * 1024;
-    if (file.size > maxSizeInBytes) {
-      return { valid: false, error: `File size exceeds the limit of ${maxSizeInBytes} bytes.` };
-    }
     return { valid: true };
   }
 
