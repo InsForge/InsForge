@@ -1,6 +1,5 @@
 import { Button } from '@insforge/ui';
 
-
 interface DeleteActionButtonProps {
   selectedCount: number;
   itemType: string;
@@ -14,8 +13,6 @@ export function DeleteActionButton({
   onDelete,
   className = '',
 }: DeleteActionButtonProps) {
-
-
   const getItemLabel = (count: number, type: string) => {
     const singular = type.charAt(0).toUpperCase() + type.slice(1);
     const plural =
@@ -31,11 +28,7 @@ export function DeleteActionButton({
   };
 
   return (
-    <Button
-      variant="destructive"
-      className={`h-10 px-3 text-sm ${className}`}
-      onClick={onDelete}
-    >
+    <Button variant="destructive" className={`h-10 px-3 text-sm ${className}`} onClick={onDelete}>
       Delete {selectedCount} {getItemLabel(selectedCount, itemType)}
     </Button>
   );

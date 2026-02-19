@@ -196,10 +196,7 @@ export default function UsersPage() {
             )}
             <div className="flex items-center gap-2 ml-4">
               {selectedRows.size === 0 && (
-                <Button
-                  className="h-10 px-4 font-medium"
-                  onClick={() => setAddDialogOpen(true)}
-                >
+                <Button className="h-10 px-4 font-medium" onClick={() => setAddDialogOpen(true)}>
                   <UserPlus className="h-4 w-4 mr-2" />
                   Add User
                 </Button>

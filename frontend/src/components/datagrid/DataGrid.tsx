@@ -118,7 +118,9 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
             return renderSelectionCell({ row, isSelected, onToggle: handleToggle, tabIndex });
           }
 
-          return <Checkbox checked={isSelected} onCheckedChange={handleToggle} tabIndex={tabIndex} />;
+          return (
+            <Checkbox checked={isSelected} onCheckedChange={handleToggle} tabIndex={tabIndex} />
+          );
         },
         renderHeaderCell: () => {
           const selectedCount = data.filter((row) => selectedRows.has(keyGetter(row))).length;

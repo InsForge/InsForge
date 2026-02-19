@@ -250,10 +250,7 @@ export default function SettingsPage() {
                           <Button
                             onClick={handleSaveProjectName}
                             disabled={!hasNameChanged}
-                            className={cn(
-                              'h-9 px-3 rounded-lg',
-                              !hasNameChanged && 'opacity-40'
-                            )}
+                            className={cn('h-9 px-3 rounded-lg', !hasNameChanged && 'opacity-40')}
                           >
                             Save
                           </Button>
@@ -356,10 +353,7 @@ export default function SettingsPage() {
                             Once deleted, the project cannot be recovered.
                           </p>
                         </div>
-                        <Button
-                          variant="destructive"
-                          onClick={() => void handleDeleteProject()}
-                        >
+                        <Button variant="destructive" onClick={() => void handleDeleteProject()}>
                           Delete Project
                         </Button>
                       </div>

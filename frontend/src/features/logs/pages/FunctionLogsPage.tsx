@@ -1,7 +1,13 @@
 import { useMemo, useState, useCallback } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { useLogs } from '../hooks/useLogs';
-import { Button, Checkbox, DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@insforge/ui';
+import {
+  Button,
+  Checkbox,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@insforge/ui';
 import { EmptyState, SearchInput } from '@/components';
 import { LogsDataGrid, type LogsColumnDef } from '../components/LogsDataGrid';
 import { SeverityBadge } from '../components/SeverityBadge';
@@ -108,10 +114,7 @@ export default function FunctionLogsPage() {
             />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button
-                  variant="secondary" size="lg"
-                  className="w-32 justify-between"
-                >
+                <Button variant="secondary" size="lg" className="w-32 justify-between">
                   Severity
                   <ChevronDown className="h-4 w-4 opacity-50" />
                 </Button>

@@ -6,10 +6,7 @@ import { useToast } from '@/lib/hooks/useToast';
 import { useEffect, useRef, useState } from 'react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
-import {
-  CodeEditor,
-  Skeleton,
-} from '@/components';
+import { CodeEditor, Skeleton } from '@/components';
 
 export default function FunctionsPage() {
   const toastShownRef = useRef(false);

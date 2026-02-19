@@ -1,11 +1,7 @@
 import { useState, ReactNode } from 'react';
 import { Plus, LucideIcon } from 'lucide-react';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
-import {
-  ScrollArea,
-  SearchInput,
-  FeatureSidebarItem,
-} from '@/components';
+import { ScrollArea, SearchInput, FeatureSidebarItem } from '@/components';
 
 interface FeatureSidebarProps {
   title: string;

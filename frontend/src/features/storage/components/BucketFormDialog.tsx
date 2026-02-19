@@ -181,12 +181,7 @@ export function BucketFormDialog({
             )}
           </div>
           <DialogFooter className="p-6 gap-3 border-t border-zinc-200 dark:border-neutral-700">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleClose}
-              className="w-30"
-            >
+            <Button type="button" variant="secondary" onClick={handleClose} className="w-30">
               Cancel
             </Button>
             <Button

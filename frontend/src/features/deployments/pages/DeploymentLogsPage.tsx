@@ -217,11 +217,7 @@ export default function DeploymentLogsPage() {
                       >
                         {deployment.id}
                       </span>
-                      {isCurrent && (
-                        <Badge className="shrink-0">
-                          Current
-                        </Badge>
-                      )}
+                      {isCurrent && <Badge className="shrink-0">Current</Badge>}
                     </div>
 
                     {/* Status */}

@@ -96,10 +96,7 @@ export function McpConnectionSection({
                 <ChevronDown className="w-5 h-5 text-gray-500 dark:text-neutral-400" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              className="w-40 p-0"
-            >
+            <DropdownMenuContent align="start" className="w-40 p-0">
               {MCP_AGENTS.map((agent) => (
                 <DropdownMenuItem
                   key={agent.id}

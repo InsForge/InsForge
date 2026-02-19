@@ -26,12 +26,7 @@ export {
   SelectScrollUpButton,
   SelectScrollDownButton,
 } from './components';
-export {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-  TooltipProvider,
-} from './components';
+export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './components';
 export { Switch, switchVariants, type SwitchProps } from './components';
 export { Checkbox } from './components';
 export { Badge, badgeVariants, type BadgeProps } from './components';
