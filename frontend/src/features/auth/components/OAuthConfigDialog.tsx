@@ -302,12 +302,7 @@ export function OAuthConfigDialog({
               >
                 Cancel
               </Button>
-              <Button
-                type="button"
-                onClick={handleSubmit}
-                disabled={isDisabled()}
-                className="w-30"
-              >
+              <Button type="button" onClick={handleSubmit} disabled={isDisabled()} className="w-30">
                 {saving
                   ? providerConfig
                     ? 'Updating...'

@@ -192,10 +192,7 @@ export default function AuthMethodsPage() {
 
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                            >
+                            <Button variant="ghost" size="icon-sm">
                               <MoreHorizontal className="w-5 h-5" />
                             </Button>
                           </DropdownMenuTrigger>

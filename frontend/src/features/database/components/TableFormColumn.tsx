@@ -89,7 +89,6 @@ export const TableFormColumn = memo(function TableFormColumn({
               checked={field.value}
               onCheckedChange={field.onChange}
               disabled={!isNewColumn}
-
             />
           )}
         />
@@ -105,7 +104,6 @@ export const TableFormColumn = memo(function TableFormColumn({
               checked={field.value}
               onCheckedChange={field.onChange}
               disabled={!isNewColumn}
-
             />
           )}
         />

@@ -2,10 +2,7 @@ import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
-import {
-  PaginationControls,
-  Skeleton,
-} from '@/components';
+import { PaginationControls, Skeleton } from '@/components';
 import { useRealtimeMessages } from '../hooks/useRealtimeMessages';
 import { MessageRow } from '../components/MessageRow';
 import RealtimeEmptyState from '../components/RealtimeEmptyState';

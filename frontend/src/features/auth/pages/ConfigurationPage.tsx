@@ -1,7 +1,16 @@
 import { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, Switch, Checkbox } from '@insforge/ui';
+import {
+  Button,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  Switch,
+  Checkbox,
+} from '@insforge/ui';
 import {
   updateAuthConfigRequestSchema,
   type UpdateAuthConfigRequest,
@@ -108,11 +117,7 @@ export default function ConfigurationPage() {
                       type="url"
                       placeholder="https://yourapp.com/dashboard"
                       {...form.register('signInRedirectTo')}
-                      className={
-                        form.formState.errors.signInRedirectTo
-                          ? 'border-destructive'
-                          : ''
-                      }
+                      className={form.formState.errors.signInRedirectTo ? 'border-destructive' : ''}
                     />
                     {form.formState.errors.signInRedirectTo && (
                       <span className="text-xs text-red-500">
@@ -226,9 +231,7 @@ export default function ConfigurationPage() {
                         max="128"
                         {...form.register('passwordMinLength', { valueAsNumber: true })}
                         className={
-                          form.formState.errors.passwordMinLength
-                            ? 'border-destructive'
-                            : ''
+                          form.formState.errors.passwordMinLength ? 'border-destructive' : ''
                         }
                       />
                       {form.formState.errors.passwordMinLength && (
@@ -362,7 +365,8 @@ export default function ConfigurationPage() {
                       type="button"
                       onClick={handleReset}
                       disabled={isUpdating}
-                      variant="secondary" className="h-10 px-6"
+                      variant="secondary"
+                      className="h-10 px-6"
                     >
                       Cancel
                     </Button>

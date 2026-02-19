@@ -35,10 +35,7 @@ export function BooleanCellEditor({
       onOpenChange={handleOpenChange}
     >
       <SelectTrigger
-        className={cn(
-          'w-full h-full border-0 focus:ring-0 focus:ring-offset-0 p-0',
-          className
-        )}
+        className={cn('w-full h-full border-0 focus:ring-0 focus:ring-offset-0 p-0', className)}
       >
         <span>
           {stringValue === 'true' ? 'True' : stringValue === 'false' ? 'False' : stringValue}

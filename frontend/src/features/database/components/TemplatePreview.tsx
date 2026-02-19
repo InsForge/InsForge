@@ -29,18 +29,10 @@ export function TemplatePreview({ template, onCancel }: TemplatePreviewProps) {
         <p className="text-sm font-normal text-zinc-600 dark:text-neutral-400">
           You are previewing a template
         </p>
-        <Button
-          variant="secondary"
-          onClick={onCancel}
-          className="px-4"
-        >
+        <Button variant="secondary" onClick={onCancel} className="px-4">
           Cancel
         </Button>
-        <Button
-          className="px-4 font-medium"
-          onClick={handleImplementTemplate}
-          disabled={isPending}
-        >
+        <Button className="px-4 font-medium" onClick={handleImplementTemplate} disabled={isPending}>
           {isPending ? 'Implementing...' : 'Implement Template'}
         </Button>
       </div>

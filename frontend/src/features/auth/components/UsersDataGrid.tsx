@@ -90,11 +90,7 @@ const ProviderIcon = ({ provider }: { provider: string }) => {
 
   const { label, color } = getProviderInfo(provider);
 
-  return (
-    <Badge className={cn('py-1', color)}>
-      {label}
-    </Badge>
-  );
+  return <Badge className={cn('py-1', color)}>{label}</Badge>;
 };
 
 const ProvidersCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
@@ -112,11 +108,7 @@ const ProvidersCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
       {uniqueProviders.slice(0, 2).map((provider: string, index: number) => (
         <ProviderIcon key={index} provider={provider} />
       ))}
-      {uniqueProviders.length > 2 && (
-        <Badge className="py-1">
-          +{uniqueProviders.length - 2}
-        </Badge>
-      )}
+      {uniqueProviders.length > 2 && <Badge className="py-1">+{uniqueProviders.length - 2}</Badge>}
     </div>
   );
 };

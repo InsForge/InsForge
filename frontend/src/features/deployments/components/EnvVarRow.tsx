@@ -177,10 +177,7 @@ export function EnvVarRow({ envVar, onEdit, onDelete, className }: EnvVarRowProp
                 <Pencil className="h-4 w-4 mr-2" />
                 Edit
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={handleDeleteClick}
-                className="text-destructive"
-              >
+              <DropdownMenuItem onClick={handleDeleteClick} className="text-destructive">
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete
               </DropdownMenuItem>

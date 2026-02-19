@@ -20,10 +20,7 @@ export function TablesEmptyState({
         <h2 className="text-xl font-semibold text-zinc-950 dark:text-white leading-7 tracking-[-0.1px]">
           Create Your First Table
         </h2>
-        <Button
-          className="h-9 w-50 gap-2 font-medium"
-          onClick={onCreateTable}
-        >
+        <Button className="h-9 w-50 gap-2 font-medium" onClick={onCreateTable}>
           <Plus className="w-5 h-5" />
           Create Table
         </Button>
