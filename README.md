@@ -172,6 +172,8 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ---
 
+<p align="center">⭐ <b>Star us on GitHub</b> to get notified about new releases!</p>
+
 <!-- LINK GROUPS -->
 
 [docker-btn]: ./deploy/buttons/docker.png
