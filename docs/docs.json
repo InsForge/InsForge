@@ -247,6 +247,11 @@
           "anchor": "Roadmap",
           "href": "https://feedback.insforge.dev/roadmap",
           "icon": "route"
+        },
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com/InsForge",
+          "icon": "github"
         }
       ]
     }
