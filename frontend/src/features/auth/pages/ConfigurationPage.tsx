@@ -1,8 +1,7 @@
 import { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Button, Select, SelectContent, SelectItem, SelectTrigger, Switch, Checkbox } from '@insforge/ui';
-import { Input } from '@/components';
+import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, Switch, Checkbox } from '@insforge/ui';
 import {
   updateAuthConfigRequestSchema,
   type UpdateAuthConfigRequest,
@@ -109,11 +108,11 @@ export default function ConfigurationPage() {
                       type="url"
                       placeholder="https://yourapp.com/dashboard"
                       {...form.register('signInRedirectTo')}
-                      className={`bg-white dark:bg-neutral-900 dark:placeholder:text-neutral-400 dark:border-neutral-700 dark:text-white ${
+                      className={
                         form.formState.errors.signInRedirectTo
-                          ? 'border-red-500 dark:border-red-500'
+                          ? 'border-destructive'
                           : ''
-                      }`}
+                      }
                     />
                     {form.formState.errors.signInRedirectTo && (
                       <span className="text-xs text-red-500">
@@ -226,11 +225,11 @@ export default function ConfigurationPage() {
                         min="4"
                         max="128"
                         {...form.register('passwordMinLength', { valueAsNumber: true })}
-                        className={`bg-white dark:bg-neutral-900 dark:placeholder:text-neutral-400 dark:border-neutral-700 dark:text-white ${
+                        className={
                           form.formState.errors.passwordMinLength
-                            ? 'border-red-500 dark:border-red-500'
+                            ? 'border-destructive'
                             : ''
-                        }`}
+                        }
                       />
                       {form.formState.errors.passwordMinLength && (
                         <span className="text-xs text-red-500">

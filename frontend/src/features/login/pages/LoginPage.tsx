@@ -18,9 +18,9 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  Input,
   ButtonWithLoading,
 } from '@/components';
+import { Input } from '@insforge/ui';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { loginFormSchema, LoginForm } from '@/lib/utils/schemaValidations';

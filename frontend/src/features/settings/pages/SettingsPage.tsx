@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Info, Plug, ChartBarBig, RefreshCw } from 'lucide-react';
-import { Button, TooltipProvider } from '@insforge/ui';
-import { CopyButton, Input, ConfirmDialog } from '@/components';
+import { Button, Input, TooltipProvider } from '@insforge/ui';
+import { CopyButton, ConfirmDialog } from '@/components';
 import { useApiKey } from '@/lib/hooks/useMetadata';
 import { useHealth } from '@/lib/hooks/useHealth';
 import { useConfirm } from '@/lib/hooks/useConfirm';
@@ -245,7 +245,7 @@ export default function SettingsPage() {
                             value={projectName}
                             onChange={(e) => handleProjectNameChange(e.target.value)}
                             placeholder="Project name"
-                            className="w-80 h-9 text-sm bg-gray-100 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg text-gray-900 dark:text-white"
+                            className="w-80 h-9"
                           />
                           <Button
                             onClick={handleSaveProjectName}

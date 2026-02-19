@@ -11,8 +11,10 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Badge,
+  Input,
 } from '@insforge/ui';
-import { Input, PaginationControls, Skeleton, Badge } from '@/components';
+import { PaginationControls, Skeleton } from '@/components';
 import { useDeployments } from '../hooks/useDeployments';
 import type { DeploymentSchema } from '../services/deployments.service';
 import DeploymentsEmptyState from '../components/DeploymentsEmptyState';
@@ -141,7 +143,7 @@ export default function DeploymentLogsPage() {
               placeholder="Search logs"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 pl-3 pr-9 bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 text-sm text-zinc-950 dark:text-white placeholder:text-neutral-400"
+              className="h-9 pl-3 pr-9"
             />
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-neutral-400" />
           </div>
@@ -216,10 +218,7 @@ export default function DeploymentLogsPage() {
                         {deployment.id}
                       </span>
                       {isCurrent && (
-                        <Badge
-                          variant="outline"
-                          className="h-[22px] px-2.5 bg-white dark:bg-black border-neutral-200 dark:border-neutral-700 text-xs font-medium text-zinc-950 dark:text-white shrink-0"
-                        >
+                        <Badge className="shrink-0">
                           Current
                         </Badge>
                       )}

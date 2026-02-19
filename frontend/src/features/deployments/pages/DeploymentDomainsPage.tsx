@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ExternalLink, Copy, Check, Plus, Pencil, Globe } from 'lucide-react';
-import { Button } from '@insforge/ui';
-import { Skeleton, Input, Dialog, DialogContent } from '@/components';
+import { Button, Input } from '@insforge/ui';
+import { Skeleton, Dialog, DialogContent } from '@/components';
 import DiscordIcon from '@/assets/logos/discord.svg?react';
 import { useDeployments } from '../hooks/useDeployments';
 import { useDeploymentSlug } from '../hooks/useDeploymentSlug';
@@ -214,7 +214,7 @@ export default function DeploymentDomainsPage() {
                       value={customSlug}
                       onChange={(e) => setCustomSlug(e.target.value)}
                       placeholder=""
-                      className="h-8 w-[200px] dark:bg-neutral-900 dark:text-white dark:border-neutral-700"
+                      className="h-8 w-[200px]"
                     />
                     <span className="text-[13px] text-zinc-950 dark:text-white">
                       .insforge.site

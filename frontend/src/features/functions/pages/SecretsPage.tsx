@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Button } from '@insforge/ui';
-import { Input, Skeleton, SearchInput, ConfirmDialog } from '@/components';
+import { Button, Input } from '@insforge/ui';
+import { Skeleton, SearchInput, ConfirmDialog } from '@/components';
 import { SecretRow } from '../components/SecretRow';
 import SecretEmptyState from '../components/SecretEmptyState';
 import { useSecrets } from '@/features/functions/hooks/useSecrets';
@@ -45,7 +45,6 @@ export default function SecretsPage() {
                 placeholder="e.g CLIENT_KEY"
                 value={newSecretKey}
                 onChange={(e) => setNewSecretKey(e.target.value)}
-                className="shadow-none w-full dark:bg-neutral-900 dark:text-white dark:placeholder:text-neutral-400 dark:border-neutral-700"
               />
             </div>
             <div className="flex-1">
@@ -55,7 +54,6 @@ export default function SecretsPage() {
                 type="text"
                 value={newSecretValue}
                 onChange={(e) => setNewSecretValue(e.target.value)}
-                className="shadow-none w-full dark:bg-neutral-900 dark:text-white dark:placeholder:text-neutral-400 dark:border-neutral-700"
               />
             </div>
             <Button

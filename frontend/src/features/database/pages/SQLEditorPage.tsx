@@ -1,8 +1,8 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useRawSQL } from '@/features/database/hooks/useRawSQL';
 import { useSQLEditorContext } from '@/features/database/contexts/SQLEditorContext';
-import { Button } from '@insforge/ui';
-import { Badge, CodeEditor, DataGrid, type DataGridColumn, type DataGridRow } from '@/components';
+import { Button, Badge } from '@insforge/ui';
+import { CodeEditor, DataGrid, type DataGridColumn, type DataGridRow } from '@/components';
 import { X, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils/utils';
 
@@ -328,24 +328,12 @@ export default function SQLEditorPage() {
           <div className="flex items-center gap-2">
             <h2 className="text-base font-semibold text-black dark:text-white">Results</h2>
             {isSuccess && (
-              <Badge
-                className={cn(
-                  'px-2 py-0.5 border-transparent',
-                  'bg-emerald-500/10 text-emerald-600',
-                  'dark:bg-emerald-500/20 dark:text-emerald-400'
-                )}
-              >
+              <Badge className="bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
                 Success
               </Badge>
             )}
             {isError && (
-              <Badge
-                className={cn(
-                  'px-2 py-0.5 border-transparent',
-                  'bg-red-500/10 text-red-600',
-                  'dark:bg-red-500/20 dark:text-red-400'
-                )}
-              >
+              <Badge className="bg-red-500/10 text-red-600 dark:bg-red-500/20 dark:text-red-400">
                 Error
               </Badge>
             )}

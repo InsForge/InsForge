@@ -1,8 +1,7 @@
 import { memo } from 'react';
 import { Controller, Control } from 'react-hook-form';
 import { X, Key } from 'lucide-react';
-import { Checkbox } from '@insforge/ui';
-import { Input } from '@/components';
+import { Checkbox, Input } from '@insforge/ui';
 import { TableFormColumnSchema, TableFormSchema } from '../schema';
 import { ColumnTypeSelect } from './ColumnTypeSelect';
 
@@ -39,11 +38,7 @@ export const TableFormColumn = memo(function TableFormColumn({
               <Input
                 {...field}
                 placeholder="Enter column name"
-                className={`w-full h-9 rounded-md border-zinc-200 dark:border-neutral-600 text-sm font-normal dark:placeholder:text-neutral-400 dark:focus:border-white ${
-                  isSystemColumn
-                    ? 'bg-zinc-100 text-zinc-950 dark:bg-neutral-700 dark:text-zinc-300'
-                    : 'bg-white text-zinc-950 shadow-sm dark:bg-neutral-800 dark:text-zinc-300'
-                }`}
+                className="h-9"
                 disabled={isSystemColumn}
               />
             )}
@@ -77,11 +72,7 @@ export const TableFormColumn = memo(function TableFormColumn({
             <Input
               {...field}
               placeholder="Enter default value"
-              className={`w-full h-9 rounded-md border-zinc-200 dark:border-neutral-600 text-sm font-normal placeholder:text-zinc-500 dark:placeholder:text-neutral-400 dark:focus:border-white ${
-                isSystemColumn
-                  ? 'bg-zinc-100 dark:bg-neutral-700 dark:text-zinc-300'
-                  : 'bg-white shadow-sm dark:bg-neutral-800 dark:text-zinc-300'
-              }`}
+              className="h-9"
               disabled={isSystemColumn}
             />
           )}

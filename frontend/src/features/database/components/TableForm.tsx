@@ -3,8 +3,8 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Plus, X, Link, MoveRight } from 'lucide-react';
-import { Button } from '@insforge/ui';
-import { Alert, AlertDescription, Input } from '@/components';
+import { Button, Input } from '@insforge/ui';
+import { Alert, AlertDescription } from '@/components';
 import { tableService } from '@/features/database/services/table.service';
 import {
   TableFormColumnSchema,
@@ -460,7 +460,7 @@ export function TableForm({
                 <Input
                   {...form.register('tableName')}
                   placeholder="e.g., products, orders, customers"
-                  className="h-10 rounded-md border-zinc-200 shadow-sm placeholder:text-zinc-500 dark:text-white dark:bg-neutral-900 dark:border-neutral-700 dark:placeholder:text-neutral-400"
+                  className="h-10"
                 />
                 {form.formState.errors.tableName && (
                   <p className="text-sm text-destructive dark:text-red-400">
