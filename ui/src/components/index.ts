@@ -33,3 +33,6 @@ export {
 } from './Tooltip';
 export { Switch, switchVariants, type SwitchProps } from './Switch';
 export { Checkbox } from './Checkbox';
+export { Badge, badgeVariants, type BadgeProps } from './Badge';
+export { Input } from './Input';
+export { InputField, type InputFieldProps } from './InputField';

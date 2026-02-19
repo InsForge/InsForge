@@ -3,9 +3,8 @@ import { useForm, Controller, useFormState } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ExternalLink } from 'lucide-react';
-import { Button, Switch } from '@insforge/ui';
+import { Button, Input, Switch } from '@insforge/ui';
 import {
-  Input,
   CopyButton,
   Dialog,
   DialogContent,
@@ -276,7 +275,7 @@ export function OAuthConfigDialog({
                       type="text"
                       {...form.register('clientId')}
                       placeholder={`Enter ${provider?.name.split(' ')[0]} OAuth App ID`}
-                      className="w-[340px] dark:bg-neutral-900 dark:placeholder:text-neutral-400 dark:border-neutral-700 dark:text-white"
+                      className="w-[340px]"
                     />
                   </div>
 
@@ -286,7 +285,7 @@ export function OAuthConfigDialog({
                       type="password"
                       {...form.register('clientSecret')}
                       placeholder={`Enter ${provider?.name.split(' ')[0]} OAuth App Secret`}
-                      className="w-[340px] dark:bg-neutral-900 dark:placeholder:text-neutral-400 dark:border-neutral-700 dark:text-white"
+                      className="w-[340px]"
                     />
                   </div>
                 </div>

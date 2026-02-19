@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Search, X } from 'lucide-react';
-import { Button } from '@insforge/ui';
-import { Input } from '@/components';
+import { Button, Input } from '@insforge/ui';
 
 interface SearchInputProps {
   value: string;
@@ -64,16 +63,14 @@ export function SearchInput({
   };
 
   return (
-    <div
-      className={`relative bg-white dark:bg-neutral-900 overflow-hidden rounded-md ${className || ''}`}
-    >
-      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground dark:text-zinc-300" />
+    <div className={`relative overflow-hidden rounded ${className || ''}`}>
+      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         type="text"
         placeholder={placeholder}
         value={internalValue}
         onChange={(e) => handleInputChange(e.target.value)}
-        className="pl-9 pr-9 h-10  dark:text-white dark:placeholder:text-neutral-400 dark:border-neutral-700"
+        className="pl-9 pr-9 h-10"
       />
       {internalValue && (
         <Button

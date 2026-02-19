@@ -4,7 +4,6 @@ import {
   Avatar,
   AvatarImage,
   AvatarFallback,
-  Badge,
   DataGrid,
   createDefaultCellRenderer,
   type DataGridProps,
@@ -13,7 +12,7 @@ import {
   type SelectionCellProps,
   ConvertedValue,
 } from '@/components';
-import { Checkbox } from '@insforge/ui';
+import { Badge, Checkbox } from '@insforge/ui';
 import { cn } from '@/lib/utils/utils';
 import type { UserSchema } from '@insforge/shared-schemas';
 
@@ -92,10 +91,7 @@ const ProviderIcon = ({ provider }: { provider: string }) => {
   const { label, color } = getProviderInfo(provider);
 
   return (
-    <Badge
-      variant="secondary"
-      className={cn('text-xs font-medium px-2 py-1 border border-transparent', color)}
-    >
+    <Badge className={cn('py-1', color)}>
       {label}
     </Badge>
   );
@@ -117,10 +113,7 @@ const ProvidersCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
         <ProviderIcon key={index} provider={provider} />
       ))}
       {uniqueProviders.length > 2 && (
-        <Badge
-          variant="secondary"
-          className="text-xs px-2 py-1 bg-gray-100 text-gray-600 dark:bg-neutral-800 dark:text-zinc-300 dark:border-neutral-700 border border-transparent"
-        >
+        <Badge className="py-1">
           +{uniqueProviders.length - 2}
         </Badge>
       )}

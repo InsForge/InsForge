@@ -34,6 +34,9 @@ export {
 } from './components';
 export { Switch, switchVariants, type SwitchProps } from './components';
 export { Checkbox } from './components';
+export { Badge, badgeVariants, type BadgeProps } from './components';
+export { Input } from './components';
+export { InputField, type InputFieldProps } from './components';
 
 // Utilities
 export { cn } from './lib';

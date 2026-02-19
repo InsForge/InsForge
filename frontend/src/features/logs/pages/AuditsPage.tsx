@@ -4,12 +4,11 @@ import { LogsDataGrid, type LogsColumnDef } from '@/features/logs/components/Log
 import { formatTime } from '@/lib/utils/utils';
 import { LOGS_PAGE_SIZE } from '@/features/logs/helpers';
 import { useConfirm } from '@/lib/hooks/useConfirm';
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
+import { Button, Input, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import {
   Alert,
   AlertDescription,
   ConfirmDialog,
-  Input,
 } from '@/components';
 import { useAuditLogs, useClearAuditLogs } from '@/features/logs/hooks/useAuditLogs';
 import type { GetAuditLogsRequest } from '@insforge/shared-schemas';

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useStorage } from '@/features/storage/hooks/useStorage';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
 import DiscordIcon from '@/assets/logos/discord.svg?react';
-import { Button, Switch } from '@insforge/ui';
+import { Button, Input, Switch } from '@insforge/ui';
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  Input,
   Label,
 } from '@/components';
 
