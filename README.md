@@ -80,6 +80,14 @@ graph TB
 - **Site Deployment**: Site build and deployment
 
 
+## ⭐️ Star the Repository
+
+<p align="center">
+  <video width="100%" src="https://github.com/user-attachments/assets/ba9fae8f-b2fc-4e7d-8cd4-c3b2117e7ffd" controls></video>
+</p>
+
+If you find InsForge useful or interesting, a GitHub Star ⭐️ would be greatly appreciated.
+
 ## Quickstart
 
 ### Cloud-hosted: [insforge.dev](https://insforge.dev)
