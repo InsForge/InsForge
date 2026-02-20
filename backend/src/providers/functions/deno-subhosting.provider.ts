@@ -270,21 +270,14 @@ export class DenoSubhostingProvider {
       await writeFile(join(tempDir, 'deno.json'), '{"nodeModulesDir":"auto"}', 'utf-8');
       await writeFile(join(tempDir, 'func.ts'), transformed, 'utf-8');
 
-      await execFileAsync('deno', ['check', 'func.ts'], {
+      await execFileAsync('deno', ['check', '--no-lock', 'func.ts'], {
         cwd: tempDir,
         timeout: 60_000,
+        env: { ...process.env, NO_COLOR: '1' },
       });
     } catch (error: unknown) {
       const execError = error as { stderr?: string; stdout?: string };
-      const raw = (execError.stderr || execError.stdout || '').trim();
-      const ESC = String.fromCharCode(27);
-      const ansiRegex = new RegExp(ESC + '\\[[0-9;]*m', 'g');
-      const output = raw
-        .replace(ansiRegex, '')
-        .split('\n')
-        .filter((line) => !/^(Download |Initialize |Check )/.test(line))
-        .join('\n')
-        .trim();
+      const output = (execError.stderr || execError.stdout || '').trim();
 
       if (output) {
         throw new AppError(
