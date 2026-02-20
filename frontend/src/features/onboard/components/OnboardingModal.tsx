@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { TooltipProvider } from '@insforge/ui';
-import { Dialog, DialogContent, DialogTitle } from '@/components';
+import { Dialog, DialogContent, DialogTitle, TooltipProvider } from '@insforge/ui';
 import { McpConnectionSection } from './McpConnectionSection';
 import { PluginInstallStep } from './steps/PluginInstallStep';
 import { InstallMethodTabs, DEFAULT_MODAL_TABS, type InstallMethod } from './InstallMethodTabs';
@@ -49,10 +48,8 @@ export function OnboardingModal() {
   return (
     <Dialog open={isOnboardingModalOpen} onOpenChange={handleModalClose}>
       <TooltipProvider>
-        <DialogContent className="max-w-[640px] max-h-[calc(100vh-48px)] flex flex-col bg-white dark:bg-neutral-800 dark:border-neutral-700 p-0 gap-6">
-          <DialogTitle className="sr-only tracking-[-0.144px] text-2xl">
-            Connect Project
-          </DialogTitle>
+        <DialogContent>
+          <DialogTitle>Connect Project</DialogTitle>
 
           {/* Header Section */}
           <div className="flex flex-col gap-6 px-6 pt-6 shrink-0">

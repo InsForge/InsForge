@@ -5,7 +5,6 @@ export * from './Skeleton';
 export * from './ScrollArea';
 export * from './Separator';
 export * from './Alert';
-export * from './Dialog';
 export * from './Label';
 export * from './Popover';
 export * from './Sheet';

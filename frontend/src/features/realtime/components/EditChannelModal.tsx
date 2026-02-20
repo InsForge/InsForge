@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Plus, X } from 'lucide-react';
-import { Button, Input, Switch } from '@insforge/ui';
 import {
+  Button,
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
-  Label,
-  Textarea,
-} from '@/components';
+  Input,
+  Switch,
+} from '@insforge/ui';
+import { Label, Textarea } from '@/components';
 import type { RealtimeChannel } from '../services/realtime.service';
 import type { UpdateChannelRequest } from '@insforge/shared-schemas';
 
@@ -116,11 +117,9 @@ export function EditChannelModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[560px] dark:bg-neutral-800 p-0 gap-0">
-        <DialogHeader className="px-6 py-4 border-b border-zinc-200 dark:border-neutral-700">
-          <DialogTitle className="text-lg font-semibold text-zinc-950 dark:text-white">
-            Edit Channel
-          </DialogTitle>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit Channel</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 p-6">
@@ -219,7 +218,7 @@ export function EditChannelModal({
           </div>
         </div>
 
-        <DialogFooter className="px-6 py-4 gap-3 border-t border-zinc-200 dark:border-neutral-700">
+        <DialogFooter>
           <Button
             type="button"
             variant="secondary"

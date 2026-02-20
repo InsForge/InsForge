@@ -2,16 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useStorage } from '@/features/storage/hooks/useStorage';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
 import DiscordIcon from '@/assets/logos/discord.svg?react';
-import { Button, Input, Switch } from '@insforge/ui';
 import {
+  Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  Label,
-} from '@/components';
+  Input,
+  Switch,
+} from '@insforge/ui';
+import { Label } from '@/components';
 
 interface BucketFormDialogProps {
   open: boolean;
@@ -91,14 +93,12 @@ export function BucketFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="w-[480px] p-0 border-zinc-200 shadow-[0px_1px_3px_0px_rgba(0,0,0,0.1)]">
+      <DialogContent>
         <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col">
-          <DialogHeader className="px-6 py-3 flex flex-col gap-1 justify-start border-b border-zinc-200 dark:border-neutral-700">
-            <DialogTitle className="text-lg font-semibold text-zinc-950 dark:text-white">
-              {mode === 'create' ? 'Create New Bucket' : 'Edit Bucket'}
-            </DialogTitle>
+          <DialogHeader>
+            <DialogTitle>{mode === 'create' ? 'Create New Bucket' : 'Edit Bucket'}</DialogTitle>
             {mode === 'create' && (
-              <DialogDescription className="text-sm text-zinc-500">
+              <DialogDescription>
                 Create a new storage bucket to organize your files.
               </DialogDescription>
             )}
@@ -180,7 +180,7 @@ export function BucketFormDialog({
               </div>
             )}
           </div>
-          <DialogFooter className="p-6 gap-3 border-t border-zinc-200 dark:border-neutral-700">
+          <DialogFooter>
             <Button type="button" variant="secondary" onClick={handleClose} className="w-30">
               Cancel
             </Button>

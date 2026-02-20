@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, Lock, AlertCircle } from 'lucide-react';
-import { Button, Input } from '@insforge/ui';
 import {
-  Label,
-  Alert,
-  AlertDescription,
+  Button,
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
-} from '@/components';
+  Input,
+} from '@insforge/ui';
+import { Label, Alert, AlertDescription } from '@/components';
 import ErrorIcon from '@/assets/icons/error.svg';
 import { useToast } from '@/lib/hooks/useToast';
 import { useUsers } from '@/features/auth/hooks/useUsers';
@@ -145,9 +144,9 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px] dark:bg-neutral-800 dark:text-white p-0 gap-0">
-        <DialogHeader className="px-6 py-3 border-b border-zinc-200 dark:border-neutral-700">
-          <DialogTitle className="h-7">Add User</DialogTitle>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add User</DialogTitle>
         </DialogHeader>
         <form
           onSubmit={(e) => {
@@ -227,7 +226,7 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
             )}
           </div>
           {/* Footer Buttons */}
-          <DialogFooter className="p-6 border-t border-zinc-200 dark:border-neutral-700">
+          <DialogFooter>
             <Button
               type="button"
               variant="outline"

@@ -1,6 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Button, Select, SelectContent, SelectItem, SelectTrigger } from '@insforge/ui';
-import { Label, Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components';
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from '@insforge/ui';
+import { Label } from '@/components';
 import { useTables } from '@/features/database/hooks/useTables';
 import { UseFormReturn } from 'react-hook-form';
 import { TableFormSchema, TableFormForeignKeySchema } from '../schema';
@@ -121,14 +131,12 @@ export function ForeignKeyPopover({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[520px] p-0 gap-0">
+      <DialogContent>
         <div className="flex flex-col">
           {/* Header */}
           <div className="flex flex-col gap-1 px-6 py-3 border-b border-zinc-200 dark:border-neutral-700">
-            <DialogTitle className="text-lg font-semibold dark:text-white">
-              {initialValue ? 'Edit Foreign Key' : 'Add Foreign Key'}
-            </DialogTitle>
-            <DialogDescription className="text-sm text-zinc-500 dark:text-neutral-400">
+            <DialogTitle>{initialValue ? 'Edit Foreign Key' : 'Add Foreign Key'}</DialogTitle>
+            <DialogDescription>
               {initialValue
                 ? 'Modify the relationship between tables'
                 : 'Create a relationship between this table and another table'}
