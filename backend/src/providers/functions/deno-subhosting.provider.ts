@@ -259,7 +259,9 @@ export class DenoSubhostingProvider {
    * Skips gracefully if Deno is not installed.
    */
   async checkCode(userCode: string, slug: string): Promise<void> {
-    if (!this.isConfigured()) return;
+    if (!this.isConfigured()) {
+      return;
+    }
 
     const transformed = this.transformUserCode(userCode, slug);
     const tempDir = await mkdtemp(join(tmpdir(), 'insforge-deno-check-'));
@@ -275,9 +277,9 @@ export class DenoSubhostingProvider {
     } catch (error: unknown) {
       const execError = error as { stderr?: string; stdout?: string };
       const raw = (execError.stderr || execError.stdout || '').trim();
-      // eslint-disable-next-line no-control-regex
+      const ansiRegex = new RegExp('\\x1b\\[[0-9;]*m', 'g');
       const output = raw
-        .replace(/\x1b\[[0-9;]*m/g, '')
+        .replace(ansiRegex, '')
         .split('\n')
         .filter((line) => !/^(Download |Initialize |Check )/.test(line))
         .join('\n')
