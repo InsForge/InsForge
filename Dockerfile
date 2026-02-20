@@ -1,4 +1,7 @@
-FROM node:20-alpine
+FROM node:20 AS base
+
+# Install Deno for pre-deployment type checking (deno check)
+RUN curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh
 
 WORKDIR /app
 

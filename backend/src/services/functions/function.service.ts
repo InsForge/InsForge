@@ -143,8 +143,9 @@ export class FunctionService {
       const { name, code, description, status } = data;
       const slug = data.slug || name.toLowerCase().replace(/\s+/g, '-');
 
-      // Basic security validation
+      // Validate code — regex checks + deno type check on transformed code
       this.validateCode(code);
+      await this.denoSubhostingProvider.checkCode(code, slug);
 
       // Generate UUID
       const id = crypto.randomUUID();
@@ -221,9 +222,10 @@ export class FunctionService {
         return null;
       }
 
-      // Validate code if provided
+      // Validate code if provided — regex checks + deno type check
       if (updates.code !== undefined) {
         this.validateCode(updates.code);
+        await this.denoSubhostingProvider.checkCode(updates.code, slug);
       }
 
       // Update fields
@@ -420,7 +422,6 @@ export class FunctionService {
         secrets
       );
 
-      // Save initial deployment record
       await this.saveDeployment({
         id: result.id,
         projectId: result.projectId,
@@ -436,7 +437,6 @@ export class FunctionService {
         url: result.url,
       });
 
-      // Poll for final status in background
       void this.pollDeploymentStatus(result.id, functionSlugs);
     } catch (error) {
       logger.error('Deno Subhosting deployment failed', {

@@ -49,7 +49,11 @@ services:
       - insforge-network
 
   insforge:
-    image: node:20-alpine
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: base
+    image: insforge-dev
     container_name: insforge
     working_dir: /app
     depends_on:
