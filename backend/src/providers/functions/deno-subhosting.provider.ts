@@ -273,9 +273,9 @@ export class DenoSubhostingProvider {
       const execError = error as { stderr?: string; stdout?: string };
       const raw = (execError.stderr || execError.stdout || '').trim();
       const output = raw
-        .replace(/\x1b\[[0-9;]*m/g, '')
+        .replace(/\u001b\[[0-9;]*m/g, '')
         .split('\n')
-        .filter(line => !/^(Download |Initialize |Check )/.test(line))
+        .filter((line) => !/^(Download |Initialize |Check )/.test(line))
         .join('\n')
         .trim();
 
