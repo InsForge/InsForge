@@ -4,6 +4,13 @@ import { config } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
 import { z } from 'zod';
 import fetch, { RequestInit, Response } from 'node-fetch';
+import { execFile } from 'node:child_process';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
 
 const DENO_SUBHOSTING_API_BASE = 'https://api.deno.com/v1';
 const DEFAULT_TIMEOUT_MS = 10000;
@@ -242,6 +249,51 @@ export class DenoSubhostingProvider {
     }
 
     logger.info('Deno Subhosting project created', { projectId });
+  }
+
+  /**
+   * Type-check a single function's code with `deno check`.
+   * Runs the transformed code (after legacy conversion) so it catches
+   * require(), bad imports, syntax errors, etc. before saving to DB.
+   * Skips gracefully if Deno is not installed.
+   */
+  async checkCode(userCode: string, slug: string): Promise<void> {
+    const transformed = this.transformUserCode(userCode, slug);
+    const tempDir = await mkdtemp(join(tmpdir(), 'insforge-deno-check-'));
+
+    try {
+      await writeFile(join(tempDir, 'deno.json'), '{"nodeModulesDir":"auto"}', 'utf-8');
+      await writeFile(join(tempDir, 'func.ts'), transformed, 'utf-8');
+
+      await execFileAsync('deno', ['check', 'func.ts'], {
+        cwd: tempDir,
+        timeout: 60_000,
+      });
+    } catch (error: unknown) {
+      const execError = error as { stderr?: string; stdout?: string };
+      const raw = (execError.stderr || execError.stdout || '').trim();
+      const output = raw
+        .replace(/\x1b\[[0-9;]*m/g, '')
+        .split('\n')
+        .filter(line => !/^(Download |Initialize |Check )/.test(line))
+        .join('\n')
+        .trim();
+
+      if (output) {
+        throw new AppError(
+          `Function code failed type check:\n${output}`,
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      // No output — deno binary likely missing; skip gracefully
+      logger.warn('Deno check unavailable, skipping', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      await rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    }
   }
 
   /**
