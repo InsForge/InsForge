@@ -272,8 +272,9 @@ export class DenoSubhostingProvider {
     } catch (error: unknown) {
       const execError = error as { stderr?: string; stdout?: string };
       const raw = (execError.stderr || execError.stdout || '').trim();
+      // eslint-disable-next-line no-control-regex
       const output = raw
-        .replace(/\u001b\[[0-9;]*m/g, '')
+        .replace(/\x1b\[[0-9;]*m/g, '')
         .split('\n')
         .filter((line) => !/^(Download |Initialize |Check )/.test(line))
         .join('\n')
