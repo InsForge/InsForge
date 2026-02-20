@@ -277,7 +277,8 @@ export class DenoSubhostingProvider {
     } catch (error: unknown) {
       const execError = error as { stderr?: string; stdout?: string };
       const raw = (execError.stderr || execError.stdout || '').trim();
-      const ansiRegex = new RegExp('\\x1b\\[[0-9;]*m', 'g');
+      const ESC = String.fromCharCode(27);
+      const ansiRegex = new RegExp(ESC + '\\[[0-9;]*m', 'g');
       const output = raw
         .replace(ansiRegex, '')
         .split('\n')
