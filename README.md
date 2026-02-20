@@ -166,6 +166,66 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 [![Star History Chart](https://api.star-history.com/svg?repos=InsForge/insforge&type=Date)](https://www.star-history.com/#InsForge/insforge&Date)
 
+## Badges
+
+Show your project is built with InsForge.
+
+### Made with InsForge
+
+<a href="https://insforge.dev">
+  <img
+    width="168"
+    height="30"
+    src="https://insforge.dev/badge-made-with-insforge.svg"
+    alt="Made with InsForge"
+  />
+</a>
+
+**Markdown:**
+```md
+[![Made with InsForge](https://insforge.dev/badge-made-with-insforge.svg)](https://insforge.dev)
+```
+
+**HTML:**
+```html
+<a href="https://insforge.dev">
+  <img
+    width="168"
+    height="30"
+    src="https://insforge.dev/badge-made-with-insforge.svg"
+    alt="Made with InsForge"
+  />
+</a>
+```
+
+### Made with InsForge (dark)
+
+<a href="https://insforge.dev">
+  <img
+    width="168"
+    height="30"
+    src="https://insforge.dev/badge-made-with-insforge-dark.svg"
+    alt="Made with InsForge"
+  />
+</a>
+
+**Markdown:**
+```md
+[![Made with InsForge](https://insforge.dev/badge-made-with-insforge-dark.svg)](https://insforge.dev)
+```
+
+**HTML:**
+```html
+<a href="https://insforge.dev">
+  <img
+    width="168"
+    height="30"
+    src="https://insforge.dev/badge-made-with-insforge-dark.svg"
+    alt="Made with InsForge"
+  />
+</a>
+```
+
 ## Translations
 
 - [Arabic | العربية](/i18n/README.ar.md)
