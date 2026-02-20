@@ -63,7 +63,8 @@ const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
           className={cn(
             'rounded border border-[var(--alpha-12)] bg-[var(--alpha-4)] transition-colors',
             isError && 'border-destructive',
-            !isDisabled && 'focus-within:shadow-[0_0_0_1px_rgb(var(--inverse)),0_0_0_2px_rgb(var(--foreground))]',
+            !isDisabled &&
+              'focus-within:shadow-[0_0_0_1px_rgb(var(--inverse)),0_0_0_2px_rgb(var(--foreground))]',
             isForcedFocus &&
               'shadow-[0_0_0_1px_rgb(var(--inverse)),0_0_0_2px_rgb(var(--foreground))]'
           )}
@@ -71,12 +72,17 @@ const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
           <div
             className={cn(
               'flex items-center gap-0 overflow-hidden rounded p-1.5',
-              !isDisabled && !isHover && !isPressed && 'hover:bg-[var(--alpha-8)] active:bg-[var(--alpha-16)]',
+              !isDisabled &&
+                !isHover &&
+                !isPressed &&
+                'hover:bg-[var(--alpha-8)] active:bg-[var(--alpha-16)]',
               isHover && 'bg-[var(--alpha-8)]',
               isPressed && 'bg-[var(--alpha-16)]'
             )}
           >
-            {showIcon && <div className="flex h-6 w-6 shrink-0 items-center justify-center">{leadingIcon}</div>}
+            {showIcon && (
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center">{leadingIcon}</div>
+            )}
             <input
               ref={ref}
               disabled={isDisabled}
@@ -88,7 +94,9 @@ const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
               {...props}
             />
             {showDropdown && (
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center">{trailingIcon}</div>
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center">
+                {trailingIcon}
+              </div>
             )}
           </div>
         </div>
