@@ -255,9 +255,12 @@ export class DenoSubhostingProvider {
    * Type-check a single function's code with `deno check`.
    * Runs the transformed code (after legacy conversion) so it catches
    * require(), bad imports, syntax errors, etc. before saving to DB.
+   * Only runs in cloud environments where Deno Subhosting is configured.
    * Skips gracefully if Deno is not installed.
    */
   async checkCode(userCode: string, slug: string): Promise<void> {
+    if (!this.isConfigured()) return;
+
     const transformed = this.transformUserCode(userCode, slug);
     const tempDir = await mkdtemp(join(tmpdir(), 'insforge-deno-check-'));
 
