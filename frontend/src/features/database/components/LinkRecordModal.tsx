@@ -1,10 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, ReactNode } from 'react';
-import { Button } from '@insforge/ui';
+import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from '@insforge/ui';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
   SearchInput,
   DataGrid,
   TypeBadge,
@@ -241,11 +237,9 @@ export function LinkRecordModal({
     <>
       {children(() => setOpen(true))}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-4xl h-[calc(100vh-48px)] p-0 gap-0 flex flex-col">
-          <DialogHeader className="px-6 py-3 border-b border-zinc-200 dark:border-neutral-700 flex-shrink-0 flex flex-col gap-1">
-            <DialogTitle className="text-lg font-semibold text-zinc-950 dark:text-white">
-              Link Record
-            </DialogTitle>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Link Record</DialogTitle>
             <div className="flex items-center gap-1.5">
               <span className="text-sm text-zinc-500 dark:text-neutral-400">
                 Select a record to reference from

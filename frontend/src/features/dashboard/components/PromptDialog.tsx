@@ -1,5 +1,5 @@
-import { Button } from '@insforge/ui';
-import { CopyButton, Dialog, DialogContent } from '@/components';
+import { Button, Dialog, DialogContent } from '@insforge/ui';
+import { CopyButton } from '@/components';
 import { CheckCircle, Lock, Database, HardDrive, Code2, Box } from 'lucide-react';
 import type { PromptTemplate } from '../prompts';
 
@@ -24,7 +24,7 @@ export function PromptDialog({ open, onOpenChange, promptTemplate }: PromptDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] p-0 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 overflow-y-auto">
+      <DialogContent>
         {/* Content area with border bottom */}
         <div className="flex flex-col gap-10 p-6 border-b border-gray-200 dark:border-neutral-700">
           {/* Header and Prompt Section */}

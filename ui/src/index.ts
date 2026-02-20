@@ -32,6 +32,22 @@ export { Checkbox } from './components';
 export { Badge, badgeVariants, type BadgeProps } from './components';
 export { Input } from './components';
 export { InputField, type InputFieldProps } from './components';
+export {
+  Dialog,
+  DialogTrigger,
+  DialogPortal,
+  DialogClose,
+  DialogOverlay,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogBody,
+  DialogDivider,
+  DialogFooter,
+  DialogMessage,
+  DialogCloseButton,
+} from './components';
 
 // Utilities
 export { cn } from './lib';

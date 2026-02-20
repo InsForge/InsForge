@@ -3,17 +3,15 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertCircle } from 'lucide-react';
-import { Button } from '@insforge/ui';
 import {
-  Alert,
-  AlertDescription,
+  Button,
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
-  ScrollArea,
-} from '@/components';
+} from '@insforge/ui';
+import { Alert, AlertDescription, ScrollArea } from '@/components';
 import { useRecords } from '@/features/database/hooks/useRecords';
 import { buildDynamicSchema, getInitialValues } from '@/features/database';
 import { RecordFormField } from '@/features/database/components/RecordFormField';
@@ -96,12 +94,10 @@ export function RecordFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-160 p-0 gap-0 overflow-hidden flex flex-col">
+      <DialogContent>
         <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col">
-          <DialogHeader className="px-6 py-3 border-b border-zinc-200 dark:border-neutral-700">
-            <DialogTitle className="text-lg font-semibold text-zinc-950 dark:text-white">
-              Add Record
-            </DialogTitle>
+          <DialogHeader>
+            <DialogTitle>Add Record</DialogTitle>
           </DialogHeader>
 
           <ScrollArea className="h-full max-h-[540px] overflow-auto">
@@ -126,7 +122,7 @@ export function RecordFormDialog({
             </div>
           )}
 
-          <DialogFooter className="p-6 gap-3 sm:justify-end border-t border-zinc-200 dark:border-neutral-700 shrink-0">
+          <DialogFooter>
             <Button
               type="button"
               variant="outline"

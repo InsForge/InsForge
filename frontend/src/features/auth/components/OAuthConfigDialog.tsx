@@ -3,15 +3,17 @@ import { useForm, Controller, useFormState } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ExternalLink } from 'lucide-react';
-import { Button, Input, Switch } from '@insforge/ui';
 import {
-  CopyButton,
+  Button,
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
-} from '@/components';
+  Input,
+  Switch,
+} from '@insforge/ui';
+import { CopyButton } from '@/components';
 import WarningIcon from '@/assets/icons/warning.svg';
 import {
   oAuthConfigSchema,
@@ -183,8 +185,8 @@ export function OAuthConfigDialog({
 
   return (
     <Dialog open={isOpen && !!provider} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-[700px] dark:bg-neutral-800 dark:text-white p-0 gap-0">
-        <DialogHeader className="px-6 py-3 border-b border-zinc-200 dark:border-neutral-700">
+      <DialogContent>
+        <DialogHeader>
           <DialogTitle>{provider?.name}</DialogTitle>
         </DialogHeader>
         {isLoadingProvider ? (
@@ -292,7 +294,7 @@ export function OAuthConfigDialog({
               )}
             </form>
 
-            <DialogFooter className="p-6 border-t border-zinc-200 dark:border-neutral-700">
+            <DialogFooter>
               <Button
                 type="button"
                 className="w-30"
