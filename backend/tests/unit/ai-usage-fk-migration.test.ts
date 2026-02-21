@@ -22,5 +22,11 @@ describe('AI usage FK migration', () => {
       /FOREIGN KEY\s*\(config_id\)\s*REFERENCES\s+ai\.configs\(id\)\s+ON DELETE SET NULL/i
     );
     expect(sql).toMatch(/\bCOMMIT\b\s*;/i);
+
+    const dropNotNullPos = sql.search(/ALTER COLUMN\s+config_id\s+DROP NOT NULL/i);
+    const addConstraintPos = sql.search(
+      /ADD CONSTRAINT\s+usage_config_id_fkey[\s\S]*ON DELETE SET NULL/i
+    );
+    expect(dropNotNullPos).toBeLessThan(addConstraintPos);
   });
 });
