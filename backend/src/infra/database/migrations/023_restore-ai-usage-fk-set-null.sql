@@ -8,6 +8,8 @@
 -- Keep ai.usage records for historical analytics while allowing model/config disable
 -- by deleting ai.configs and nulling ai.usage.config_id.
 
+BEGIN;
+
 -- Ensure config_id can be nulled when parent config is deleted
 ALTER TABLE ai.usage
 ALTER COLUMN config_id DROP NOT NULL;
@@ -19,3 +21,5 @@ DROP CONSTRAINT IF EXISTS usage_config_id_fkey;
 ALTER TABLE ai.usage
 ADD CONSTRAINT usage_config_id_fkey
 FOREIGN KEY (config_id) REFERENCES ai.configs(id) ON DELETE SET NULL;
+
+COMMIT;

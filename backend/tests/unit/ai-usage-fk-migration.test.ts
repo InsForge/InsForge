@@ -11,12 +11,16 @@ describe('AI usage FK migration', () => {
       '../../src/infra/database/migrations/023_restore-ai-usage-fk-set-null.sql'
     );
 
+    expect(fs.existsSync(migrationPath), `Migration file not found at: ${migrationPath}`).toBe(true);
+
     const sql = fs.readFileSync(migrationPath, 'utf8');
 
+    expect(sql).toMatch(/\bBEGIN\b\s*;/i);
     expect(sql).toMatch(/ALTER TABLE\s+ai\.usage\s+ALTER COLUMN\s+config_id\s+DROP NOT NULL/i);
     expect(sql).toMatch(/DROP CONSTRAINT\s+IF EXISTS\s+usage_config_id_fkey/i);
     expect(sql).toMatch(
       /FOREIGN KEY\s*\(config_id\)\s*REFERENCES\s+ai\.configs\(id\)\s+ON DELETE SET NULL/i
     );
+    expect(sql).toMatch(/\bCOMMIT\b\s*;/i);
   });
 });
