@@ -27,6 +27,14 @@ describe('AI usage FK migration', () => {
     const addConstraintPos = sql.search(
       /ADD CONSTRAINT\s+usage_config_id_fkey[\s\S]*ON DELETE SET NULL/i
     );
+
+    expect(dropNotNullPos, 'DROP NOT NULL pattern not found in migration SQL').toBeGreaterThanOrEqual(
+      0
+    );
+    expect(
+      addConstraintPos,
+      'ADD CONSTRAINT ... ON DELETE SET NULL pattern not found in migration SQL'
+    ).toBeGreaterThanOrEqual(0);
     expect(dropNotNullPos).toBeLessThan(addConstraintPos);
   });
 });
