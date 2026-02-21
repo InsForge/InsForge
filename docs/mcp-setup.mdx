@@ -555,10 +555,6 @@ Some MCP clients will automatically prompt you to login during setup, while othe
     ```
   </Accordion>
 
-  <Accordion title="Kiro">
-    ...
-  </Accordion>
-
   <Accordion title="Codex">
     <Note>
       If you are using Codex for the first time, you may need to enable the rmcp feature. To do so, add the following into your `~/.codex/config.toml` file:
@@ -586,8 +582,11 @@ Some MCP clients will automatically prompt you to login during setup, while othe
   </Accordion>
 
   <Accordion title="Cline">
-
-    You can follow the official [Cline documentation](https://docs.cline.bot/mcp/connecting-to-a-remote-server) to add the InsForge MCP server with parameters:
+    You can install the InsForge MCP server to your **Cline** by running the following command in your terminal:
+    ```bash
+    npx -y @smithery/cli mcp add devel/insforge --client cline
+    ```
+    Alternatively, you can follow the official [Cline documentation](https://docs.cline.bot/mcp/connecting-to-a-remote-server) to add the InsForge MCP server with parameters:
     - Server Name: `insforge`
     - Server URL: `https://mcp.insforge.dev/mcp`
     - Transport Type: `Streamable HTTP`
@@ -615,21 +614,11 @@ Some MCP clients will automatically prompt you to login during setup, while othe
     Windsurf does not currently support remote MCP servers over HTTP transport. You need to use the mcp-remote package as a proxy.
   </Accordion>
 
-  <Accordion title="Trae">
-    You can follow the official [Trae documentation](https://docs.trae.ai/ide/add-mcp-servers) to add the InsForge MCP server with parameters:
-    - Server Name: `insforge`
-    - Server URL: `https://mcp.insforge.dev/mcp`
-    - Transport Type: `Streamable HTTP`
-
-    After adding the server, you can authenticate by clicking the `Connect` button on the server card.
-  </Accordion>
-
-  <Accordion title="Qoder">
-    ...
-  </Accordion>
-
   <Accordion title="Roo Code">
-    ...
+    You can install the InsForge MCP server to your **Roo Code** by running the following command in your terminal:
+    ```bash
+    npx -y @smithery/cli mcp add devel/insforge --client roocode
+    ```
   </Accordion>
 
   <Accordion title="OpenCode">
