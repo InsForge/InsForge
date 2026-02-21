@@ -54,10 +54,10 @@ export function useAIConfigs(options: UseAIConfigsOptions = {}) {
     mutationFn: (data: CreateAIConfigurationRequest) => aiService.createConfiguration(data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['ai-configurations'] });
-      showToast('Model added successfully', 'success');
+      showToast('Model enabled successfully', 'success');
     },
     onError: (error: Error) => {
-      showToast(`Failed to add model: ${error.message}`, 'error');
+      showToast(`Failed to enable model: ${error.message}`, 'error');
     },
   });
 
@@ -79,10 +79,10 @@ export function useAIConfigs(options: UseAIConfigsOptions = {}) {
     mutationFn: (id: string) => aiService.deleteConfiguration(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['ai-configurations'] });
-      showToast('Model deleted successfully', 'success');
+      showToast('Model disabled successfully', 'success');
     },
     onError: (error: Error) => {
-      showToast(`Failed to delete model: ${error.message}`, 'error');
+      showToast(`Failed to disable model: ${error.message}`, 'error');
     },
   });
 
