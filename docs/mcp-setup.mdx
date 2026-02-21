@@ -461,7 +461,7 @@ If you prefer to configure MCP locally, select your AI coding assistant below:
 
 ## Remote MCP
 
-The fastest way to get started is with Remote MCP. A single command handles installation, authentication, and project binding automatically.
+The fastest way to get started is with Remote MCP. A single command attempts installation and will try to handle authentication and project binding, but it may still prompt you for manual authentication or project binding steps if the automatic flow cannot complete.
 
 Run the following command in your terminal:
 
@@ -471,14 +471,14 @@ npx add-mcp https://mcp.insforge.dev/mcp
 
 <Note>
   The `add-mcp` command works for most coding agents, but not all. Currently it supports: 
-  Claude Code, Claude Desktop, Codex, Cursor, Gemini Cli, Goose, Github Copilot, OpenCode, VS Code, Zed.
+  Claude Code, Claude Desktop, Codex, Cursor, Gemini CLI, Goose, GitHub Copilot, OpenCode, VS Code, Zed.
 </Note>
 
 After running the command, the system will automatically generate a configuration file for your coding agent.
 
 ### Connect and Bind Project
 
-Some MCP clients will automatically prompt you to login during setup, while others may require manual authentication steps. Either authentication method will open a browser window where you can login to your InsForge account and grant organization/project access to the MCP client.
+Some MCP clients will automatically prompt you to login during setup, while others may require manual authentication or project binding steps if the automatic flow cannot complete. Either way, authentication will open a browser window where you can login to your InsForge account and grant organization/project access to the MCP client.
 
 <AccordionGroup>
   <Accordion title="Cursor">
@@ -494,8 +494,8 @@ Some MCP clients will automatically prompt you to login during setup, while othe
     }
     ```
 
-    In menu **Preferences → Cursor Setting → Tools & MCP**, you should see InsForge MCP server is added successfully.
-    Insorge MCP server is on the status of "Needs authentication", you can click the `connect` button to authenticate.
+    In menu **Preferences → Cursor Settings → Tools & MCP**, you should see InsForge MCP server is added successfully.
+    InsForge MCP server is on the status of "Needs authentication", you can click the `connect` button to authenticate.
   </Accordion>
 
   <Accordion title="Claude Code">
@@ -575,7 +575,7 @@ Some MCP clients will automatically prompt you to login during setup, while othe
     ```
     Finally, run /mcp inside Codex to verify authentication.
 
-    Alternative, you can run the following command to install the MCP server:
+    Alternatively, you can run the following command to install the MCP server:
     ```sh
     codex mcp add insforge --url https://mcp.insforge.dev/mcp
     ```
