@@ -533,8 +533,17 @@ Some MCP clients will automatically prompt you to login during setup, while othe
   </Accordion>
 
   <Accordion title="Google Antigravity">
-    In **Extensions → MCP Servers - Installed**, you should see InsForge MCP server is added successfully.
-    Click the **Manage** button on the InsForge MCP server, select **Start Server** to authenticate.
+    Add this configuration to `~/.gemini/antigravity/mcp_config.json`:
+    ```json
+    {
+      "mcpServers": {
+        "insforge": {
+          "serverUrl": "https://mcp.insforge.dev/mcp"
+        }
+      }
+    }
+    ```
+    Then restart Antigravity, it will auto authenticate.
   </Accordion>
 
   <Accordion title="Gemini">
