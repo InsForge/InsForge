@@ -97,10 +97,7 @@ export function PrimaryMenu({
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <Link
-            to={item.href}
-            className={itemClasses}
-          >
+          <Link to={item.href} className={itemClasses}>
             {content}
           </Link>
         </TooltipTrigger>
@@ -124,7 +121,11 @@ export function PrimaryMenu({
             compact ? 'h-6 w-6' : 'h-9 w-9 p-1.5'
           )}
         >
-          {isCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
+          {isCollapsed ? (
+            <PanelLeftOpen className="h-5 w-5" />
+          ) : (
+            <PanelRightOpen className="h-5 w-5" />
+          )}
         </button>
       </TooltipTrigger>
       <TooltipContent side="right">

@@ -65,7 +65,7 @@ export const databaseSecondaryMenuItems: SecondaryMenuItem[] = [
   {
     id: 'sql-editor',
     label: 'SQL Editor',
-    href: '/dashboard/database/sql-editor',
+    href: '/dashboard/sql-editor',
   },
   {
     id: 'templates',
@@ -156,7 +156,7 @@ export const staticMenuItems: PrimaryMenuItem[] = [
   {
     id: 'sql-editor',
     label: 'SQL Editor',
-    href: '/dashboard/database/sql-editor',
+    href: '/dashboard/sql-editor',
     icon: SquarePen,
   },
   {

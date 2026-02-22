@@ -73,7 +73,11 @@ export function AppRoutes() {
                 <Route path="/dashboard/database/functions" element={<DatabaseFunctionsPage />} />
                 <Route path="/dashboard/database/triggers" element={<TriggersPage />} />
                 <Route path="/dashboard/database/policies" element={<PoliciesPage />} />
-                <Route path="/dashboard/database/sql-editor" element={<SQLEditorPage />} />
+                <Route
+                  path="/dashboard/database/sql-editor"
+                  element={<Navigate to="/dashboard/sql-editor" replace />}
+                />
+                <Route path="/dashboard/sql-editor" element={<SQLEditorPage />} />
                 <Route path="/dashboard/database/templates" element={<TemplatesPage />} />
                 <Route path="/dashboard/storage" element={<StoragePage />} />
                 <Route
