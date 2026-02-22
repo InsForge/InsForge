@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogBody,
+  DialogCloseButton,
 } from '@insforge/ui';
 import { CopyButton, ConfirmDialog } from '@/components';
 import { useApiKey } from '@/lib/hooks/useMetadata';
@@ -193,44 +194,56 @@ export default function SettingsDialog() {
     <>
       <ConfirmDialog {...confirmDialogProps} />
       <Dialog open={isSettingsDialogOpen} onOpenChange={(open) => !open && closeSettingsDialog()}>
-        <DialogContent className="max-w-[900px] h-[80vh] flex flex-col" showCloseButton>
-          <DialogHeader>
-            <DialogTitle>Project Settings</DialogTitle>
-          </DialogHeader>
-          <DialogBody className="p-0 overflow-hidden min-h-0 flex-1">
-            <div className="flex h-full">
-              {/* Sidebar Tabs */}
-              <div className="flex flex-col gap-2 w-50 shrink-0 p-4 border-r border-[var(--alpha-8)]">
-                <TabButton
-                  id="info"
-                  label="Info"
-                  icon={Info}
-                  isActive={activeTab === 'info'}
-                  onClick={() => setActiveTab('info')}
-                />
-
-              {/* Only show Usage tab in cloud environment & iframe */}
-                {isCloud && isInIframe && (
+        <DialogContent className="max-w-[900px]" showCloseButton={false}>
+          <DialogBody className="p-0">
+            <div className="flex max-h-[70vh]">
+              {/* Left Side Nav */}
+              <div className="flex flex-col w-[200px] shrink-0 border-r border-[var(--alpha-8)]">
+                <div className="px-4 py-3">
+                  <p className="text-base font-medium leading-7 text-gray-900 dark:text-white">
+                    Project Settings
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 flex-1 px-3 pb-2">
                   <TabButton
-                    id="usage"
-                    label="Usage"
-                    icon={ChartBarBig}
-                    isActive={false}
-                    onClick={handleUsageClick}
+                    id="info"
+                    label="Info"
+                    icon={Info}
+                    isActive={activeTab === 'info'}
+                    onClick={() => setActiveTab('info')}
                   />
-                )}
 
-                <TabButton
-                  id="connect"
-                  label="Connect"
-                  icon={Plug}
-                  isActive={activeTab === 'connect'}
-                  onClick={() => setActiveTab('connect')}
-                />
+                  {/* Only show Usage tab in cloud environment & iframe */}
+                  {isCloud && isInIframe && (
+                    <TabButton
+                      id="usage"
+                      label="Usage"
+                      icon={ChartBarBig}
+                      isActive={false}
+                      onClick={handleUsageClick}
+                    />
+                  )}
+
+                  <TabButton
+                    id="connect"
+                    label="Connect"
+                    icon={Plug}
+                    isActive={activeTab === 'connect'}
+                    onClick={() => setActiveTab('connect')}
+                  />
+                </div>
               </div>
 
-              {/* Main Content Area */}
-              <div className="flex-1 flex flex-col gap-6 overflow-y-auto px-6 pt-6 pb-12">
+              {/* Right Content */}
+              <div className="flex-1 flex flex-col min-w-0">
+                {/* Right Header - active tab name + close */}
+                <DialogHeader className="flex-row items-center justify-between">
+                  <DialogTitle className="capitalize">{activeTab}</DialogTitle>
+                  <DialogCloseButton />
+                </DialogHeader>
+
+                {/* Main Content Area */}
+                <div className="flex-1 flex flex-col gap-6 overflow-y-auto px-6 pt-6 pb-12">
                 {activeTab === 'info' && (
                   <>
                     <div className="flex flex-col gap-6 bg-gray-200 dark:bg-[#333333] rounded-lg p-6">
@@ -406,6 +419,7 @@ export default function SettingsDialog() {
                     </div>
                   </TooltipProvider>
                 )}
+              </div>
               </div>
             </div>
           </DialogBody>
