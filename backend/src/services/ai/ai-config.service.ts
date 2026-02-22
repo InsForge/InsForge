@@ -136,8 +136,7 @@ export class AIConfigService {
       const result = await this.getPool().query(
         `UPDATE ai.configs
          SET is_active = FALSE, updated_at = NOW()
-         WHERE id = $1
-           AND is_active = TRUE`,
+         WHERE id = $1`,
         [id]
       );
 
