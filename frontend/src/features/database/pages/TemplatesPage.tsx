@@ -11,7 +11,7 @@ export default function TemplatesPage() {
     // Create a new tab with the template's SQL query prefilled
     addTab(template.sql, template.title);
     // Navigate to the SQL Editor page
-    void navigate('/dashboard/database/sql-editor');
+    void navigate('/dashboard/sql-editor');
   };
 
   return (

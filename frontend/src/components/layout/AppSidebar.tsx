@@ -64,14 +64,6 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
         return !!matchPath({ path: '/dashboard/authentication', end: false }, pathname);
       }
 
-      // Keep SQL Editor as its own primary menu item.
-      if (
-        item.id === 'database' &&
-        matchPath({ path: '/dashboard/database/sql-editor', end: false }, pathname)
-      ) {
-        return false;
-      }
-
       const hasSecondaryMenu = !!item.secondaryMenu || item.id === 'logs';
       return matchPath({ path: item.href, end: !hasSecondaryMenu }, pathname);
     });
