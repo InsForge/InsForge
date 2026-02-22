@@ -4,7 +4,7 @@ import PencilIcon from '@/assets/icons/pencil.svg?react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import { useTables } from '@/features/database/hooks/useTables';
 import { useRecords } from '@/features/database/hooks/useRecords';
-import { TableSidebar } from '@/features/database/components/TableSidebar';
+import { DatabaseSecondaryMenu } from '@/features/database/components/DatabaseSecondaryMenu';
 import { RecordFormDialog } from '@/features/database/components/RecordFormDialog';
 import { TableForm } from '@/features/database/components/TableForm';
 import { TablesEmptyState } from '@/features/database/components/TablesEmptyState';
@@ -356,7 +356,7 @@ export default function TablesPage() {
   return (
     <div className="flex h-full bg-bg-gray dark:bg-neutral-800">
       {/* Secondary Sidebar - Table List */}
-      <TableSidebar
+      <DatabaseSecondaryMenu
         tables={tables}
         selectedTable={selectedTable || undefined}
         onTableSelect={handleSelectTable}

@@ -17,8 +17,6 @@ export { CopyButton } from './CopyButton';
 export { DeleteActionButton } from './DeleteActionButton';
 export { EmptyState } from './EmptyState';
 export { ErrorState } from './ErrorState';
-export { FeatureSidebar } from './FeatureSidebar';
-export { FeatureSidebarItem } from './FeatureSidebarItem';
 export { JsonHighlight } from './JsonHighlight';
 export { LoadingState } from './LoadingState';
 export { PaginationControls, type PaginationControlsProps } from './PaginationControls';

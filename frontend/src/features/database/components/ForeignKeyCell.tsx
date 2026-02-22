@@ -175,7 +175,7 @@ export function ForeignKeyCell({ value, foreignKey, onJumpToTable }: ForeignKeyC
                         className="h-9 px-3 py-2 text-sm font-medium dark:text-white bg-bg-gray dark:bg-neutral-600"
                         onClick={() => {
                           if (isAuthUsers) {
-                            void navigate('/dashboard/users');
+                            void navigate('/dashboard/authentication/users');
                           } else if (onJumpToTable) {
                             onJumpToTable(foreignKey.table);
                           }

@@ -22,13 +22,24 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
 
   const isCloud = isInsForgeCloudProject();
 
-  // Build main menu items - add deployments for cloud projects
+  // Build main menu items - insert deployments at the end of section 2 for cloud projects
   const mainMenuItems = useMemo(() => {
+    const items = staticMenuItems.map((item) => ({ ...item }));
+
     if (isCloud) {
-      // Insert deployments after visualizer (at the end of main items)
-      return [...staticMenuItems, deploymentsMenuItem];
+      const aiItemIndex = items.findIndex((item) => item.id === 'ai');
+      const deploymentsItem: PrimaryMenuItem = { ...deploymentsMenuItem, sectionEnd: true };
+
+      if (aiItemIndex >= 0) {
+        items[aiItemIndex] = { ...items[aiItemIndex], sectionEnd: false };
+        items.splice(aiItemIndex + 1, 0, deploymentsItem);
+        return items;
+      }
+
+      return [...items, deploymentsItem];
     }
-    return staticMenuItems;
+
+    return items;
   }, [isCloud]);
 
   // Build bottom menu items based on deployment environment
@@ -47,6 +58,20 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
       if (item.external || item.onClick) {
         return false;
       }
+
+      // Keep Authentication menu active for all authentication pages.
+      if (item.id === 'authentication') {
+        return !!matchPath({ path: '/dashboard/authentication', end: false }, pathname);
+      }
+
+      // Keep SQL Editor as its own primary menu item.
+      if (
+        item.id === 'database' &&
+        matchPath({ path: '/dashboard/database/sql-editor', end: false }, pathname)
+      ) {
+        return false;
+      }
+
       const hasSecondaryMenu = !!item.secondaryMenu || item.id === 'logs';
       return matchPath({ path: item.href, end: !hasSecondaryMenu }, pathname);
     });
@@ -55,6 +80,9 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   // Get secondary menu items (special case for logs)
   const secondaryMenuItems = activeMenu?.id === 'logs' ? logsMenuItems : activeMenu?.secondaryMenu;
   const isLoading = activeMenu?.id === 'logs' ? logsLoading : false;
+  const hideSecondaryMenu =
+    activeMenu?.id === 'database' &&
+    !!matchPath({ path: '/dashboard/database/tables', end: false }, pathname);
 
   return (
     <div className="flex h-full">
@@ -67,7 +95,7 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
       />
 
       {/* Render the secondary menu - always visible when there are items */}
-      {secondaryMenuItems && activeMenu && (
+      {secondaryMenuItems && activeMenu && !hideSecondaryMenu && (
         <SecondaryMenu title={activeMenu.label} items={secondaryMenuItems} loading={isLoading} />
       )}
     </div>
