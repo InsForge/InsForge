@@ -10,6 +10,7 @@ import {
 } from '@/lib/utils/menuItems';
 import { useLocation, matchPath } from 'react-router-dom';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
+import { useModal } from '@/lib/contexts/ModalContext';
 
 interface AppSidebarProps extends React.HTMLAttributes<HTMLElement> {
   isCollapsed: boolean;
@@ -19,6 +20,7 @@ interface AppSidebarProps extends React.HTMLAttributes<HTMLElement> {
 export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebarProps) {
   const { pathname } = useLocation();
   const { menuItems: logsMenuItems, isLoading: logsLoading } = useLogSources();
+  const { openSettingsDialog } = useModal();
 
   const isCloud = isInsForgeCloudProject();
 
@@ -45,9 +47,9 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   // Build bottom menu items based on deployment environment
   const bottomMenuItems = useMemo(() => {
     const items: PrimaryMenuItem[] = [];
-    items.push(settingsMenuItem);
+    items.push({ ...settingsMenuItem, onClick: () => openSettingsDialog() });
     return items;
-  }, []);
+  }, [openSettingsDialog]);
 
   // Find which primary menu item matches the current route
   // Items with secondary menus use prefix matching (end: false)

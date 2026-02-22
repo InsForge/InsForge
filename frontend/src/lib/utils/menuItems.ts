@@ -246,7 +246,7 @@ export const usageMenuItem: PrimaryMenuItem = {
 export const settingsMenuItem: PrimaryMenuItem = {
   id: 'settings',
   label: 'Settings',
-  href: '/dashboard/settings',
+  href: '',
   icon: Settings,
 };
 

@@ -1,12 +1,21 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { Info, Plug, ChartBarBig, RefreshCw } from 'lucide-react';
-import { Button, Input, TooltipProvider } from '@insforge/ui';
+import {
+  Button,
+  Input,
+  TooltipProvider,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+} from '@insforge/ui';
 import { CopyButton, ConfirmDialog } from '@/components';
 import { useApiKey } from '@/lib/hooks/useMetadata';
 import { useHealth } from '@/lib/hooks/useHealth';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
+import { useModal } from '@/lib/contexts/ModalContext';
 import { metadataService } from '@/lib/services/metadata.service';
 import { cn, isInsForgeCloudProject, isIframe, compareVersions } from '@/lib/utils/utils';
 import {
@@ -43,24 +52,20 @@ function TabButton({ label, icon: Icon, isActive, onClick }: TabButtonProps) {
   );
 }
 
-export default function SettingsPage() {
-  const [searchParams] = useSearchParams();
+export default function SettingsDialog() {
+  const { isSettingsDialogOpen, settingsDefaultTab, closeSettingsDialog } = useModal();
 
-  // Get initial tab from URL param, default to 'info'
-  const getInitialTab = (): TabType => {
-    const tabParam = searchParams.get('tab');
-    if (tabParam === 'connect' || tabParam === 'info') {
-      return tabParam;
-    }
-    return 'info';
-  };
-
-  // Handle usage tab click - navigates to parent usage page
   const handleUsageClick = () => {
     postMessageToParent({ type: 'NAVIGATE_TO_USAGE' }, '*');
   };
 
-  const [activeTab, setActiveTab] = useState<TabType>(() => getInitialTab());
+  const [activeTab, setActiveTab] = useState<TabType>('info');
+
+  useEffect(() => {
+    if (isSettingsDialogOpen) {
+      setActiveTab(settingsDefaultTab);
+    }
+  }, [isSettingsDialogOpen, settingsDefaultTab]);
 
   const [projectName, setProjectName] = useState('');
   const [originalProjectName, setOriginalProjectName] = useState('');
@@ -81,7 +86,7 @@ export default function SettingsPage() {
   // Masked API key display
   const maskedApiKey = apiKey ? `ik_${'•'.repeat(32)}` : '';
 
-  // Listen for messages from cloud parent
+  // Listen for messages from cloud parent 
   useEffect(() => {
     if (!isCloud || !isInIframe) {
       return;
@@ -89,7 +94,7 @@ export default function SettingsPage() {
 
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'PROJECT_INFO') {
-        // Handle project name
+                // Handle project name
         if (event.data.name) {
           setProjectName(event.data.name);
           setOriginalProjectName(event.data.name);
@@ -113,7 +118,7 @@ export default function SettingsPage() {
     return () => window.removeEventListener('message', handleMessage);
   }, [isCloud, isInIframe]);
 
-  // Compare versions when both values are available
+  // Compare versions when both values are available  
   useEffect(() => {
     if (version && latestVersion) {
       const comparison = compareVersions(version, latestVersion);
@@ -187,226 +192,225 @@ export default function SettingsPage() {
   return (
     <>
       <ConfirmDialog {...confirmDialogProps} />
-      <main className="h-full bg-bg-gray dark:bg-neutral-800 overflow-hidden py-8">
-        <div className="h-full flex flex-col gap-6 w-full max-w-[1080px] mx-auto">
-          {/* Header */}
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white tracking-[-0.1px] shrink-0">
-            Project Settings
-          </h1>
-
-          {/* Content */}
-          <div className="flex-1 flex gap-6 min-h-0 overflow-hidden">
-            {/* Sidebar Tabs - Fixed, no scroll */}
-            <div className="flex flex-col gap-2 w-50 shrink-0">
-              <TabButton
-                id="info"
-                label="Info"
-                icon={Info}
-                isActive={activeTab === 'info'}
-                onClick={() => setActiveTab('info')}
-              />
+      <Dialog open={isSettingsDialogOpen} onOpenChange={(open) => !open && closeSettingsDialog()}>
+        <DialogContent className="max-w-[900px] h-[80vh] flex flex-col" showCloseButton>
+          <DialogHeader>
+            <DialogTitle>Project Settings</DialogTitle>
+          </DialogHeader>
+          <DialogBody className="p-0 overflow-hidden min-h-0 flex-1">
+            <div className="flex h-full">
+              {/* Sidebar Tabs */}
+              <div className="flex flex-col gap-2 w-50 shrink-0 p-4 border-r border-[var(--alpha-8)]">
+                <TabButton
+                  id="info"
+                  label="Info"
+                  icon={Info}
+                  isActive={activeTab === 'info'}
+                  onClick={() => setActiveTab('info')}
+                />
 
               {/* Only show Usage tab in cloud environment & iframe */}
-              {isCloud && isInIframe && (
+                {isCloud && isInIframe && (
+                  <TabButton
+                    id="usage"
+                    label="Usage"
+                    icon={ChartBarBig}
+                    isActive={false}
+                    onClick={handleUsageClick}
+                  />
+                )}
+
                 <TabButton
-                  id="usage"
-                  label="Usage"
-                  icon={ChartBarBig}
-                  isActive={false}
-                  onClick={handleUsageClick}
+                  id="connect"
+                  label="Connect"
+                  icon={Plug}
+                  isActive={activeTab === 'connect'}
+                  onClick={() => setActiveTab('connect')}
                 />
-              )}
+              </div>
 
-              <TabButton
-                id="connect"
-                label="Connect"
-                icon={Plug}
-                isActive={activeTab === 'connect'}
-                onClick={() => setActiveTab('connect')}
-              />
-            </div>
-
-            {/* Main Content Area - Independent scroll */}
-            <div className="flex-1 flex flex-col gap-6 overflow-y-auto pb-12">
-              {activeTab === 'info' && (
-                <>
-                  <div className="flex flex-col gap-6 bg-gray-200 dark:bg-[#333333] rounded-lg p-6">
-                    <p className="text-base text-gray-900 dark:text-white">Project Information</p>
+              {/* Main Content Area */}
+              <div className="flex-1 flex flex-col gap-6 overflow-y-auto px-6 pt-6 pb-12">
+                {activeTab === 'info' && (
+                  <>
+                    <div className="flex flex-col gap-6 bg-gray-200 dark:bg-[#333333] rounded-lg p-6">
+                      <p className="text-base text-gray-900 dark:text-white">Project Information</p>
 
                     {/* Project Name */}
-                    {isCloud && isInIframe && (
+                      {isCloud && isInIframe && (
+                        <div className="flex items-start gap-10">
+                          <label className="text-sm leading-6 text-gray-900 dark:text-white w-25 shrink-0 pt-1.5">
+                            Project Name
+                          </label>
+                          <div className="flex items-center gap-3">
+                            <Input
+                              type="text"
+                              value={projectName}
+                              onChange={(e) => handleProjectNameChange(e.target.value)}
+                              placeholder="Project name"
+                              className="w-80 h-9"
+                            />
+                            <Button
+                              onClick={handleSaveProjectName}
+                              disabled={!hasNameChanged}
+                              className={cn('h-9 px-3 rounded-lg', !hasNameChanged && 'opacity-40')}
+                            >
+                              Save
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                    {/* Project URL */}
                       <div className="flex items-start gap-10">
                         <label className="text-sm leading-6 text-gray-900 dark:text-white w-25 shrink-0 pt-1.5">
-                          Project Name
+                          Project URL
                         </label>
-                        <div className="flex items-center gap-3">
-                          <Input
-                            type="text"
-                            value={projectName}
-                            onChange={(e) => handleProjectNameChange(e.target.value)}
-                            placeholder="Project name"
-                            className="w-80 h-9"
+                        <div className="flex-1 h-9 flex items-center justify-between gap-2 text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 pl-3 pr-2 rounded-lg">
+                          <span className="font-mono truncate">{projectUrl}</span>
+                          <CopyButton
+                            text={projectUrl}
+                            showText={false}
+                            className="h-6 w-6 p-1 min-w-0 shrink-0 text-black dark:text-white bg-white dark:bg-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-600 border-none"
                           />
-                          <Button
-                            onClick={handleSaveProjectName}
-                            disabled={!hasNameChanged}
-                            className={cn('h-9 px-3 rounded-lg', !hasNameChanged && 'opacity-40')}
+                        </div>
+                      </div>
+
+                    {/* API Key */}
+                      <div className="flex items-start gap-10">
+                        <label className="text-sm leading-6 text-gray-900 dark:text-white w-25 shrink-0 pt-1.5">
+                          API Key
+                        </label>
+                        <div className="flex-1 flex flex-col gap-1">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={cn(
+                                'flex-1 h-9 flex items-center justify-between gap-2 text-sm bg-gray-100 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 pl-3 pr-2 rounded-lg',
+                                isApiKeyLoading && 'animate-pulse'
+                              )}
+                            >
+                              <span className="font-mono text-gray-900 dark:text-white">
+                                {isApiKeyLoading ? '•'.repeat(35) : maskedApiKey || 'Not available'}
+                              </span>
+                              {!isApiKeyLoading && apiKey && (
+                                <CopyButton
+                                  text={apiKey}
+                                  showText={false}
+                                  className="h-6 w-6 p-1 min-w-0 shrink-0 text-black dark:text-white bg-white dark:bg-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-600 border-none"
+                                />
+                              )}
+                            </div>
+                            <Button
+                              onClick={() => void handleRotateApiKey()}
+                              disabled={isApiKeyLoading || isRotatingApiKey}
+                              className="h-9 gap-2 px-3 rounded-lg"
+                            >
+                              <RefreshCw
+                                className={cn('w-4 h-4', isRotatingApiKey && 'animate-spin')}
+                              />
+                              {isRotatingApiKey ? 'Rotating...' : 'Rotate'}
+                            </Button>
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-neutral-400">
+                            This key has full access control to your project and should be kept
+                            secure. Do not expose this key in your frontend code.
+                          </p>
+                        </div>
+                      </div>
+
+                    {/* Version */}
+                      <div className="flex items-start gap-10">
+                        <label className="text-sm leading-6 text-gray-900 dark:text-white w-25 shrink-0 pt-1.5">
+                          Version
+                        </label>
+                        <div className="flex-1 flex items-center gap-3">
+                          <div
+                            className={cn(
+                              'h-9 w-full flex items-center text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 pl-3 pr-2 rounded-lg',
+                              isVersionLoading && 'animate-pulse'
+                            )}
                           >
-                            Save
+                            {isVersionLoading ? 'Loading...' : version || 'Unknown'}
+                          </div>
+                          {isCloud && isInIframe && isVersionOutdated && (
+                            <Button
+                              onClick={handleUpdateVersion}
+                              disabled={isUpdatingVersion}
+                              className="h-9 px-3 rounded-lg"
+                            >
+                              {isUpdatingVersion ? 'Updating...' : 'Update'}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                  {/* Delete Project Section */}
+                    {isCloud && isInIframe && (
+                      <div className="flex flex-col gap-6 bg-gray-200 dark:bg-[#333333] rounded-lg p-6">
+                        <p className="text-base text-gray-900 dark:text-white">Danger Zone</p>
+                        <div className="flex items-center justify-between">
+                          <div className="flex flex-col gap-1">
+                            <p className="text-sm text-gray-900 dark:text-white">Delete Project</p>
+                            <p className="text-xs text-gray-500 dark:text-neutral-400">
+                              Once deleted, the project cannot be recovered.
+                            </p>
+                          </div>
+                          <Button variant="destructive" onClick={() => void handleDeleteProject()}>
+                            Delete Project
                           </Button>
                         </div>
                       </div>
                     )}
+                  </>
+                )}
 
-                    {/* Project URL */}
-                    <div className="flex items-start gap-10">
-                      <label className="text-sm leading-6 text-gray-900 dark:text-white w-25 shrink-0 pt-1.5">
-                        Project URL
-                      </label>
-                      <div className="flex-1 h-9 flex items-center justify-between gap-2 text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 pl-3 pr-2 rounded-lg">
-                        <span className="font-mono truncate">{projectUrl}</span>
-                        <CopyButton
-                          text={projectUrl}
-                          showText={false}
-                          className="h-6 w-6 p-1 min-w-0 shrink-0 text-black dark:text-white bg-white dark:bg-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-600 border-none"
-                        />
-                      </div>
-                    </div>
-
-                    {/* API Key */}
-                    <div className="flex items-start gap-10">
-                      <label className="text-sm leading-6 text-gray-900 dark:text-white w-25 shrink-0 pt-1.5">
-                        API Key
-                      </label>
-                      <div className="flex-1 flex flex-col gap-1">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={cn(
-                              'flex-1 h-9 flex items-center justify-between gap-2 text-sm bg-gray-100 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 pl-3 pr-2 rounded-lg',
-                              isApiKeyLoading && 'animate-pulse'
-                            )}
-                          >
-                            <span className="font-mono text-gray-900 dark:text-white">
-                              {isApiKeyLoading ? '•'.repeat(35) : maskedApiKey || 'Not available'}
-                            </span>
-                            {!isApiKeyLoading && apiKey && (
-                              <CopyButton
-                                text={apiKey}
-                                showText={false}
-                                className="h-6 w-6 p-1 min-w-0 shrink-0 text-black dark:text-white bg-white dark:bg-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-600 border-none"
-                              />
-                            )}
-                          </div>
-                          <Button
-                            onClick={() => void handleRotateApiKey()}
-                            disabled={isApiKeyLoading || isRotatingApiKey}
-                            className="h-9 gap-2 px-3 rounded-lg"
-                          >
-                            <RefreshCw
-                              className={cn('w-4 h-4', isRotatingApiKey && 'animate-spin')}
-                            />
-                            {isRotatingApiKey ? 'Rotating...' : 'Rotate'}
-                          </Button>
-                        </div>
-                        <p className="text-xs text-gray-500 dark:text-neutral-400">
-                          This key has full access control to your project and should be kept
-                          secure. Do not expose this key in your frontend code.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Version */}
-                    <div className="flex items-start gap-10">
-                      <label className="text-sm leading-6 text-gray-900 dark:text-white w-25 shrink-0 pt-1.5">
-                        Version
-                      </label>
-                      <div className="flex-1 flex items-center gap-3">
-                        <div
-                          className={cn(
-                            'h-9 w-full flex items-center text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 pl-3 pr-2 rounded-lg',
-                            isVersionLoading && 'animate-pulse'
-                          )}
-                        >
-                          {isVersionLoading ? 'Loading...' : version || 'Unknown'}
-                        </div>
-                        {isCloud && isInIframe && isVersionOutdated && (
-                          <Button
-                            onClick={handleUpdateVersion}
-                            disabled={isUpdatingVersion}
-                            className="h-9 px-3 rounded-lg"
-                          >
-                            {isUpdatingVersion ? 'Updating...' : 'Update'}
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Delete Project Section */}
-                  {isCloud && isInIframe && (
-                    <div className="flex flex-col gap-6 bg-gray-200 dark:bg-[#333333] rounded-lg p-6">
-                      <p className="text-base text-gray-900 dark:text-white">Danger Zone</p>
-                      <div className="flex items-center justify-between">
-                        <div className="flex flex-col gap-1">
-                          <p className="text-sm text-gray-900 dark:text-white">Delete Project</p>
-                          <p className="text-xs text-gray-500 dark:text-neutral-400">
-                            Once deleted, the project cannot be recovered.
-                          </p>
-                        </div>
-                        <Button variant="destructive" onClick={() => void handleDeleteProject()}>
-                          Delete Project
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {activeTab === 'connect' && (
-                <TooltipProvider>
-                  <div className="flex flex-col gap-12 mr-4">
-                    <div className="flex flex-col gap-6">
-                      <p className="text-black dark:text-white text-base">Recommended</p>
-                      {/* MCP Section */}
-                      <div className="bg-gray-200 dark:bg-[#333333] rounded-lg p-6 flex flex-col gap-6">
-                        <p className="text-base text-gray-900 dark:text-white">MCP</p>
-                        <McpConnectionSection
-                          apiKey={apiKey || ''}
-                          appUrl={projectUrl}
-                          isLoading={isApiKeyLoading}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-6">
-                      <p className="text-black dark:text-white text-base">Advanced</p>
-                      {/* Connection String Section - Only show in cloud environment */}
-                      {isCloud && (
+                {activeTab === 'connect' && (
+                  <TooltipProvider>
+                    <div className="flex flex-col gap-12 mr-4">
+                      <div className="flex flex-col gap-6">
+                        <p className="text-black dark:text-white text-base">Recommended</p>
+                        {/* MCP Section */}
                         <div className="bg-gray-200 dark:bg-[#333333] rounded-lg p-6 flex flex-col gap-6">
-                          <p className="text-base text-gray-900 dark:text-white">
-                            Connection String
-                          </p>
-                          <ConnectionStringSection />
+                          <p className="text-base text-gray-900 dark:text-white">MCP</p>
+                          <McpConnectionSection
+                            apiKey={apiKey || ''}
+                            appUrl={projectUrl}
+                            isLoading={isApiKeyLoading}
+                          />
                         </div>
-                      )}
+                      </div>
+
+                      <div className="flex flex-col gap-6">
+                        <p className="text-black dark:text-white text-base">Advanced</p>
+                      {/* Connection String Section - Only show in cloud environment */}
+                        {isCloud && (
+                          <div className="bg-gray-200 dark:bg-[#333333] rounded-lg p-6 flex flex-col gap-6">
+                            <p className="text-base text-gray-900 dark:text-white">
+                              Connection String
+                            </p>
+                            <ConnectionStringSection />
+                          </div>
+                        )}
 
                       {/* API Credentials Section */}
-                      <div className="bg-gray-200 dark:bg-[#333333] rounded-lg p-6 flex flex-col gap-6">
-                        <p className="text-base text-gray-900 dark:text-white">API Credentials</p>
-                        <ApiCredentialsSection
-                          apiKey={apiKey || ''}
-                          appUrl={projectUrl}
-                          isLoading={isApiKeyLoading}
-                        />
+                        <div className="bg-gray-200 dark:bg-[#333333] rounded-lg p-6 flex flex-col gap-6">
+                          <p className="text-base text-gray-900 dark:text-white">API Credentials</p>
+                          <ApiCredentialsSection
+                            apiKey={apiKey || ''}
+                            appUrl={projectUrl}
+                            isLoading={isApiKeyLoading}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </TooltipProvider>
-              )}
+                  </TooltipProvider>
+                )}
+              </div>
             </div>
-          </div>
-        </div>
-      </main>
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

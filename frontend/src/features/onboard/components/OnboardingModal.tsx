@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Dialog, DialogContent, DialogTitle, TooltipProvider } from '@insforge/ui';
 import { McpConnectionSection } from './McpConnectionSection';
 import { PluginInstallStep } from './steps/PluginInstallStep';
@@ -25,7 +24,7 @@ export function setOnboardingSkipped(skipped: boolean): void {
 }
 
 export function OnboardingModal() {
-  const { isOnboardingModalOpen, setOnboardingModalOpen } = useModal();
+  const { isOnboardingModalOpen, setOnboardingModalOpen, openSettingsDialog } = useModal();
   const [selectedAgentSlug, setSelectedAgentSlug] = useState(MCP_AGENTS[0].slug);
   const [installMethod, setInstallMethod] = useState<InstallMethod>(DEFAULT_MODAL_TABS[0].id);
 
@@ -88,13 +87,15 @@ export function OnboardingModal() {
 
           {/* Help Section */}
           <div className="flex items-center justify-between p-6 border-t border-gray-200 dark:border-neutral-700 shrink-0">
-            <Link
-              to="/dashboard/settings?tab=connect"
-              onClick={() => setOnboardingModalOpen(false)}
+            <button
+              onClick={() => {
+                setOnboardingModalOpen(false);
+                openSettingsDialog('connect');
+              }}
               className="flex items-center justify-center rounded px-3 h-8 bg-neutral-200 dark:bg-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-600 text-black dark:text-white border-neutral-300 dark:border-neutral-600 text-sm font-medium"
             >
               Advanced Connection
-            </Link>
+            </button>
             {/* <Button
               variant="outline"
               onClick={handleSkipOnboarding}
