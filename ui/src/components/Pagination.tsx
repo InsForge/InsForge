@@ -1,5 +1,11 @@
 import * as React from 'react';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, MoreHorizontal } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  MoreHorizontal,
+} from 'lucide-react';
 import { cn } from '../lib';
 
 type PaginationItem = number | 'ellipsis-left' | 'ellipsis-right';
@@ -72,7 +78,8 @@ export function Pagination({
   const normalizedTotalPages = Math.max(1, totalPages);
   const normalizedCurrentPage = clamp(currentPage, 1, normalizedTotalPages);
   const startRecord = totalRecords === 0 ? 0 : (normalizedCurrentPage - 1) * pageSize + 1;
-  const endRecord = totalRecords === 0 ? 0 : Math.min(normalizedCurrentPage * pageSize, totalRecords);
+  const endRecord =
+    totalRecords === 0 ? 0 : Math.min(normalizedCurrentPage * pageSize, totalRecords);
 
   const items = React.useMemo(
     () => getVisibleItems(normalizedCurrentPage, normalizedTotalPages, visiblePageCount),
