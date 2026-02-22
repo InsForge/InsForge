@@ -1,7 +1,10 @@
-import { Folder } from 'lucide-react';
-import { FeatureSidebar } from '@/components/FeatureSidebar';
-import { BucketListSkeleton } from './BucketListSkeleton';
-import { BucketEmptyState } from './BucketEmptyState';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
+import {
+  SecondaryMenu,
+  type SecondaryMenuActionButton,
+  type SecondaryMenuItemAction,
+  type SecondaryMenuListItem,
+} from '@/components/layout/SecondaryMenu';
 
 interface StorageSidebarProps {
   buckets: string[];
@@ -22,23 +25,58 @@ export function StorageSidebar({
   onEditBucket,
   onDeleteBucket,
 }: StorageSidebarProps) {
+  const bucketMenuItems: SecondaryMenuListItem[] = buckets.map((bucket) => ({
+    id: bucket,
+    label: bucket,
+    onClick: () => onBucketSelect(bucket),
+  }));
+
+  const actionButtons: SecondaryMenuActionButton[] = onNewBucket
+    ? [
+        {
+          id: 'create-bucket',
+          label: 'Create Bucket',
+          icon: Plus,
+          onClick: onNewBucket,
+        },
+      ]
+    : [];
+
+  const getItemActions = (item: SecondaryMenuListItem): SecondaryMenuItemAction[] => {
+    const actions: SecondaryMenuItemAction[] = [];
+
+    if (onEditBucket) {
+      actions.push({
+        id: `edit-${item.id}`,
+        label: 'Edit Bucket',
+        icon: Pencil,
+        onClick: () => onEditBucket(item.id),
+      });
+    }
+
+    if (onDeleteBucket) {
+      actions.push({
+        id: `delete-${item.id}`,
+        label: 'Delete Bucket',
+        icon: Trash2,
+        destructive: true,
+        onClick: () => onDeleteBucket(item.id),
+      });
+    }
+
+    return actions;
+  };
+
   return (
-    <FeatureSidebar
+    <SecondaryMenu
       title="Buckets"
-      items={buckets}
-      selectedItem={selectedBucket}
-      onItemSelect={onBucketSelect}
+      items={bucketMenuItems}
+      activeItemId={selectedBucket}
       loading={loading}
-      onNewItem={onNewBucket}
-      onEditItem={onEditBucket}
-      onDeleteItem={onDeleteBucket}
+      actionButtons={actionButtons}
+      itemActions={getItemActions}
+      showSearch
       searchPlaceholder="Search buckets..."
-      newItemTooltip="Create New Bucket"
-      editLabel="Edit Bucket"
-      deleteLabel="Delete Bucket"
-      icon={Folder}
-      renderSkeleton={() => <BucketListSkeleton />}
-      renderEmptyState={(searchTerm) => <BucketEmptyState searchTerm={searchTerm} />}
     />
   );
 }

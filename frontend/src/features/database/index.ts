@@ -1,6 +1,7 @@
 // Components
 export { TableEmptyState } from './components/TableEmptyState';
 export { TableListSkeleton } from './components/TableListSkeleton';
+export { DatabaseSecondaryMenu } from './components/DatabaseSecondaryMenu';
 export { TableSidebar } from './components/TableSidebar';
 export { TableForm } from './components/TableForm';
 export { RecordFormDialog } from './components/RecordFormDialog';

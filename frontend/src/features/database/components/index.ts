@@ -13,6 +13,7 @@ export { TableEmptyState } from './TableEmptyState';
 export { TableForm } from './TableForm';
 export { TableFormColumn } from './TableFormColumn';
 export { TableListSkeleton } from './TableListSkeleton';
+export { DatabaseSecondaryMenu, type DatabaseSecondaryMenuProps } from './DatabaseSecondaryMenu';
 export { TableSidebar } from './TableSidebar';
 export { TablesEmptyState } from './TablesEmptyState';
 export { TemplateCard } from './TemplateCard';

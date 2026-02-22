@@ -1,8 +1,11 @@
+import insforgeTailwindPreset from '@insforge/ui/tailwind-preset';
+
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: ['class'],
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}', '../ui/src/**/*.{ts,tsx}'],
   prefix: '',
+  presets: [insforgeTailwindPreset],
   theme: {
     container: {
       center: true,
@@ -12,15 +15,6 @@ export default {
       },
     },
     extend: {
-      colors: {
-        border: 'var(--border)',
-        foreground: 'rgb(var(--foreground))',
-        'muted-foreground': 'rgb(var(--muted-foreground))',
-        primary: 'rgb(var(--primary))',
-        destructive: 'rgb(var(--destructive))',
-        card: 'rgb(var(--card))',
-        toast: 'rgb(var(--toast))',
-      },
       keyframes: {
         'accordion-down': {
           from: { height: '0' },
