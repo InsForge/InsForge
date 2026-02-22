@@ -45,11 +45,22 @@ export interface DataGridProps<TRow extends DataGridRowType = DataGridRow> {
   rowKeyGetter?: (row: TRow) => string;
   className?: string;
   showSelection?: boolean;
+  selectionHeaderLabel?: string;
   showPagination?: boolean;
+  paginationRecordLabel?: string;
   showTypeBadge?: boolean;
   noPadding?: boolean;
   selectionColumnWidth?: number;
   renderSelectionCell?: (props: SelectionCellProps<TRow>) => React.ReactNode;
+  renderSelectionHeaderCell?: (props: {
+    isAllSelected: boolean;
+    isPartiallySelected: boolean;
+    onToggle: (checked: boolean | 'indeterminate') => void;
+  }) => React.ReactNode;
+  headerRowHeight?: number;
+  rowHeight?: number;
+  gridClassName?: string;
+  gridContainerClassName?: string;
   rowClass?: (row: TRow) => string | undefined;
   rightPanel?: React.ReactNode;
 }
@@ -75,11 +86,18 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
   rowKeyGetter,
   className,
   showSelection = false,
+  selectionHeaderLabel,
   showPagination = true,
+  paginationRecordLabel,
   showTypeBadge = true,
-  noPadding = false,
+  noPadding = true,
   selectionColumnWidth,
   renderSelectionCell,
+  renderSelectionHeaderCell,
+  headerRowHeight = 32,
+  rowHeight = 32,
+  gridClassName,
+  gridContainerClassName,
   rowClass,
   rightPanel,
 }: DataGridProps<TRow>) {
@@ -119,7 +137,9 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
           }
 
           return (
-            <Checkbox checked={isSelected} onCheckedChange={handleToggle} tabIndex={tabIndex} />
+            <div className="flex h-full w-full items-center">
+              <Checkbox checked={isSelected} onCheckedChange={handleToggle} tabIndex={tabIndex} />
+            </div>
           );
         },
         renderHeaderCell: () => {
@@ -127,22 +147,38 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
           const totalCount = data.length;
           const isAllSelected = totalCount > 0 && selectedCount === totalCount;
           const isPartiallySelected = selectedCount > 0 && selectedCount < totalCount;
+          const handleSelectionToggle = (checked: boolean | 'indeterminate') => {
+            const newSelectedRows = new Set(selectedRows);
+            if (checked === true || checked === 'indeterminate') {
+              // Select all
+              data.forEach((row) => newSelectedRows.add(keyGetter(row)));
+            } else {
+              // Unselect all
+              data.forEach((row) => newSelectedRows.delete(keyGetter(row)));
+            }
+            onSelectedRowsChange(newSelectedRows);
+          };
+
+          if (renderSelectionHeaderCell) {
+            return renderSelectionHeaderCell({
+              isAllSelected,
+              isPartiallySelected,
+              onToggle: handleSelectionToggle,
+            });
+          }
 
           return (
-            <Checkbox
-              checked={isPartiallySelected ? 'indeterminate' : isAllSelected}
-              onCheckedChange={(checked) => {
-                const newSelectedRows = new Set(selectedRows);
-                if (checked) {
-                  // Select all
-                  data.forEach((row) => newSelectedRows.add(keyGetter(row)));
-                } else {
-                  // Unselect all
-                  data.forEach((row) => newSelectedRows.delete(keyGetter(row)));
-                }
-                onSelectedRowsChange(newSelectedRows);
-              }}
-            />
+            <div className="flex h-full w-full items-center gap-2">
+              <Checkbox
+                checked={isPartiallySelected ? 'indeterminate' : isAllSelected}
+                onCheckedChange={handleSelectionToggle}
+              />
+              {selectionHeaderLabel && (
+                <span className="truncate text-[13px] leading-[18px] text-muted-foreground">
+                  {selectionHeaderLabel}
+                </span>
+              )}
+            </div>
           );
         },
       });
@@ -171,7 +207,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
             const displayValue = String(value ?? '');
             return (
               <div className="w-full h-full flex items-center">
-                <span className="truncate dark:text-zinc-300" title={displayValue}>
+                <span className="truncate text-foreground" title={displayValue}>
                   {displayValue}
                 </span>
               </div>
@@ -205,29 +241,29 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
     keyGetter,
     selectionColumnWidth,
     renderSelectionCell,
+    renderSelectionHeaderCell,
+    selectionHeaderLabel,
   ]);
 
   // Loading state - only show full loading screen if not sorting
   if (loading && !isSorting) {
     return (
-      <div className="h-full flex items-center justify-center bg-bg-gray dark:bg-neutral-800">
-        <div className="text-gray-500 dark:text-zinc-400">Loading...</div>
+      <div className="flex h-full items-center justify-center bg-[rgb(var(--semantic-1))]">
+        <div className="text-muted-foreground">Loading...</div>
       </div>
     );
   }
 
   return (
     <div
-      className={cn(
-        'h-full flex flex-col overflow-hidden bg-bg-gray dark:bg-neutral-800',
-        className
-      )}
+      className={cn('h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]', className)}
     >
-      <div className={cn('flex-1 overflow-hidden flex min-h-0', !noPadding && 'mx-3')}>
+      <div className={cn('flex min-h-0 flex-1 overflow-hidden', !noPadding && 'px-3')}>
         <div
           className={cn(
-            'overflow-hidden relative border border-border-gray dark:border-neutral-700 rounded-sm',
-            rightPanel ? 'rounded-r-none border-r-0' : 'flex-1'
+            'relative overflow-hidden bg-[rgb(var(--semantic-1))]',
+            rightPanel ? 'rounded-r-none' : 'flex-1',
+            gridContainerClassName
           )}
           style={rightPanel ? { width: 'calc(100% - 480px)' } : undefined}
         >
@@ -243,18 +279,21 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
             onSortColumnsChange={onSortColumnsChange}
             onCellClick={onCellClick}
             rowClass={rowClass}
-            className={`h-full fill-grid ${resolvedTheme === 'dark' ? 'rdg-dark' : 'rdg-light'}`}
-            headerRowHeight={36}
-            rowHeight={36}
+            className={cn(
+              `h-full fill-grid insforge-rdg ${resolvedTheme === 'dark' ? 'rdg-dark' : 'rdg-light'}`,
+              gridClassName
+            )}
+            headerRowHeight={headerRowHeight}
+            rowHeight={rowHeight}
             enableVirtualization={true}
             renderers={{
               noRowsFallback: emptyState ? (
-                <div className="absolute inset-x-0 top-0 mt-13 py-8 flex items-center justify-center bg-white dark:bg-neutral-800">
+                <div className="absolute inset-x-0 top-0 mt-8 flex items-center justify-center bg-[rgb(var(--semantic-1))] py-8">
                   {emptyState}
                 </div>
               ) : (
-                <div className="absolute inset-x-0 top-0 mt-13 py-8 flex items-center justify-center bg-white dark:bg-neutral-800">
-                  <div className="text-sm text-zinc-500 dark:text-zinc-400">No data to display</div>
+                <div className="absolute inset-x-0 top-0 mt-8 flex items-center justify-center bg-[rgb(var(--semantic-1))] py-8">
+                  <div className="text-sm text-muted-foreground">No data to display</div>
                 </div>
               ),
             }}
@@ -262,10 +301,10 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
 
           {/* Loading mask overlay */}
           {isRefreshing && (
-            <div className="absolute inset-0 bg-white dark:bg-neutral-800 flex items-center justify-center z-50 mt-9">
+            <div className="absolute inset-0 z-50 mt-8 flex items-center justify-center bg-[rgb(var(--semantic-1))]">
               <div className="flex items-center gap-1">
-                <div className="w-5 h-5 border-2 border-zinc-500 dark:border-neutral-700 border-t-transparent rounded-full animate-spin" />
-                <span className="text-sm text-zinc-500 dark:text-zinc-400">Loading</span>
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--alpha-12)] border-t-transparent" />
+                <span className="text-sm text-muted-foreground">Loading</span>
               </div>
             </div>
           )}
@@ -279,6 +318,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
           onPageChange={onPageChange}
           totalRecords={totalRecords}
           pageSize={pageSize}
+          recordLabel={paginationRecordLabel}
         />
       )}
     </div>
