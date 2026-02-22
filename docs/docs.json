@@ -64,7 +64,8 @@
               {
                 "group": "Functions",
                 "pages": [
-                  "core-concepts/functions/architecture"
+                  "core-concepts/functions/architecture",
+                  "core-concepts/functions/schedules"
                 ]
               },
               {
