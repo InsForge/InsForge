@@ -1,14 +1,14 @@
-import { useState, useEffect, useMemo } from 'react';
-import { UserPlus } from 'lucide-react';
-import RefreshIcon from '@/assets/icons/refresh.svg?react';
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
+import { useEffect, useMemo, useState } from 'react';
+import { CirclePlus, RefreshCw, Search } from 'lucide-react';
 import {
-  ConnectCTA,
-  SearchInput,
-  SelectionClearButton,
-  DeleteActionButton,
-  ConfirmDialog,
-} from '@/components';
+  Button,
+  Input,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@insforge/ui';
+import { ConnectCTA, SelectionClearButton, DeleteActionButton, ConfirmDialog } from '@/components';
 import { UsersDataGrid, UserFormDialog } from '@/features/auth/components';
 import { SortColumn } from 'react-data-grid';
 import { UserSchema } from '@insforge/shared-schemas';
@@ -17,6 +17,7 @@ import { useUsers } from '@/features/auth/hooks/useUsers';
 
 export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchValue, setSearchValue] = useState('');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -37,6 +38,18 @@ export default function UsersPage() {
     refetch,
     deleteUsers,
   } = useUsers({ searchQuery, pageSize });
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      const nextQuery = searchValue.trim();
+      if (nextQuery !== searchQuery) {
+        setCurrentPage(1);
+        setSearchQuery(nextQuery);
+      }
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [searchValue, searchQuery, setCurrentPage]);
 
   // Listen for refresh events
   useEffect(() => {
@@ -122,7 +135,9 @@ export default function UsersPage() {
     setIsRefreshing(true);
     try {
       setSelectedRows(new Set());
+      setSearchValue('');
       setSearchQuery('');
+      setCurrentPage(1);
       await refetch();
     } finally {
       setIsRefreshing(false);
@@ -130,101 +145,89 @@ export default function UsersPage() {
   };
 
   const emptyState = (
-    <div className="text-sm text-black dark:text-white">
+    <div className="text-sm text-foreground">
       {searchQuery ? 'No users match your search criteria' : 'No users found'}. <ConnectCTA />
     </div>
   );
 
   return (
-    <div className="h-full bg-slate-50 dark:bg-neutral-800 flex flex-col overflow-hidden">
-      <div className="flex-1 flex flex-col overflow-y-auto">
-        {/* Page Header with Title and Actions */}
-        <div className="pl-4 pr-1.5 py-1.5 h-12 dark:bg-neutral-800">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <h1 className="text-base font-bold text-black dark:text-white">Users</h1>
-
-              {/* Separator */}
-              <div className="h-6 w-px bg-gray-200 dark:bg-neutral-700" />
-
-              {/* Refresh button */}
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
+      <div className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))] px-3">
+        <div className="flex min-w-0 items-center gap-1">
+          {selectedRows.size > 0 ? (
+            <div className="flex items-center gap-2">
+              <SelectionClearButton
+                selectedCount={selectedRows.size}
+                itemType="user"
+                onClear={() => setSelectedRows(new Set())}
+              />
+              <DeleteActionButton
+                selectedCount={selectedRows.size}
+                itemType="user"
+                onDelete={() => setConfirmDeleteOpen(true)}
+              />
+            </div>
+          ) : (
+            <>
+              <h1 className="text-base font-medium leading-7 text-foreground">Users</h1>
+              <div className="mx-2 h-5 w-px bg-[var(--alpha-8)]" />
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
-                      size="icon-lg"
+                      size="icon-sm"
                       onClick={() => void handleRefresh()}
                       disabled={isRefreshing}
+                      className="text-muted-foreground"
                     >
-                      <RefreshIcon className="h-5 w-5 text-zinc-400 dark:text-neutral-400" />
+                      <RefreshCw className={isRefreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" align="center">
-                    <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
+                    <p>{isRefreshing ? 'Refreshing...' : 'Refresh users'}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-            </div>
-          </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-primary hover:text-primary"
+                onClick={() => setAddDialogOpen(true)}
+              >
+                <CirclePlus className="h-4 w-4 text-primary" />
+                Add User
+              </Button>
+            </>
+          )}
         </div>
+        <div className="relative w-[280px] max-w-full">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={searchValue}
+            onChange={(event) => setSearchValue(event.target.value)}
+            placeholder="Search users"
+            className="h-8 border-[var(--alpha-12)] bg-[var(--alpha-4)] pl-8 pr-2 text-[13px] leading-[18px]"
+          />
+        </div>
+      </div>
 
-        {/* Search Bar and Actions */}
-        <div className="pt-2 pb-4 px-3 dark:bg-neutral-800">
-          <div className="flex items-center justify-between">
-            {selectedRows.size > 0 ? (
-              <div className="flex items-center gap-3">
-                <SelectionClearButton
-                  selectedCount={selectedRows.size}
-                  itemType="user"
-                  onClear={() => setSelectedRows(new Set())}
-                />
-                <DeleteActionButton
-                  selectedCount={selectedRows.size}
-                  itemType="user"
-                  onDelete={() => setConfirmDeleteOpen(true)}
-                />
-              </div>
-            ) : (
-              <SearchInput
-                value={searchQuery}
-                onChange={setSearchQuery}
-                placeholder="Search user"
-                className="flex-1 max-w-80 dark:bg-neutral-800 dark:text-white dark:border-neutral-700"
-                debounceTime={300}
-              />
-            )}
-            <div className="flex items-center gap-2 ml-4">
-              {selectedRows.size === 0 && (
-                <Button className="h-10 px-4 font-medium" onClick={() => setAddDialogOpen(true)}>
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Add User
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="relative flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <UsersDataGrid
-              data={sortedUsers}
-              loading={isLoading}
-              isRefreshing={isRefreshing}
-              selectedRows={selectedRows}
-              onSelectedRowsChange={setSelectedRows}
-              sortColumns={sortColumns}
-              onSortColumnsChange={setSortColumns}
-              currentPage={currentPage}
-              totalPages={totalPages}
-              pageSize={pageSize}
-              totalRecords={totalUsers}
-              onPageChange={setCurrentPage}
-              emptyState={emptyState}
-            />
-          </div>
-        </div>
+      <div className="relative min-h-0 flex-1">
+        <UsersDataGrid
+          data={sortedUsers}
+          loading={isLoading}
+          isRefreshing={isRefreshing}
+          selectedRows={selectedRows}
+          onSelectedRowsChange={setSelectedRows}
+          sortColumns={sortColumns}
+          onSortColumnsChange={setSortColumns}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalRecords={totalUsers}
+          onPageChange={setCurrentPage}
+          emptyState={emptyState}
+        />
       </div>
 
       <UserFormDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />

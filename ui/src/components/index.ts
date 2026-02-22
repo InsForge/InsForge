@@ -31,6 +31,7 @@ export { Checkbox } from './Checkbox';
 export { Badge, badgeVariants, type BadgeProps } from './Badge';
 export { Input } from './Input';
 export { InputField, type InputFieldProps } from './InputField';
+export { Pagination, type PaginationProps } from './Pagination';
 export {
   Dialog,
   DialogTrigger,

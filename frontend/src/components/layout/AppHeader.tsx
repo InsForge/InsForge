@@ -75,7 +75,7 @@ export default function AppHeader() {
 
   return (
     <>
-      <div className="h-12 w-full bg-white dark:bg-neutral-800 border-b border-border-gray dark:border-neutral-700 z-50 flex items-center justify-between px-6">
+      <div className="h-12 w-full bg-semantic-2 border-b border-[var(--alpha-8)] z-50 flex items-center justify-between px-6">
         {/* Logo */}
 
         <a href="https://insforge.dev" target="_blank" rel="noopener noreferrer">

@@ -1,6 +1,6 @@
 import type { DataGridColumn, DataGridRowType } from './datagridTypes';
 import { TypeBadge } from '@/components/TypeBadge';
-import { ArrowDownWideNarrow, ArrowUpNarrowWide } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronsUpDown } from 'lucide-react';
 
 function SortableHeaderRenderer<TRow extends DataGridRowType>({
   column,
@@ -15,54 +15,28 @@ function SortableHeaderRenderer<TRow extends DataGridRowType>({
   showTypeBadge?: boolean;
   mutedHeader?: boolean;
 }) {
-  // Determine which arrow to show on hover based on current sort state
-  const getNextSortDirection = () => {
-    if (!sortDirection) {
-      return 'DESC'; // Default to DESC for first sort
-    } else if (sortDirection === 'ASC') {
-      return null;
-    } else {
-      return 'ASC';
-    }
-  };
-
-  const nextDirection = getNextSortDirection();
-
   return (
-    <div className="group w-full h-full flex items-center cursor-pointer">
-      <div className="flex flex-row gap-1 items-center">
+    <div className="group flex h-full w-full items-center">
+      <div className="flex min-w-0 items-center gap-1">
         <span
-          className={`truncate text-sm font-medium ${mutedHeader ? 'text-zinc-500 dark:text-neutral-400' : 'text-zinc-950 dark:text-zinc-300'} max-w-[120px]`}
+          className={
+            mutedHeader
+              ? 'truncate text-[13px] leading-[18px] text-muted-foreground opacity-80'
+              : 'truncate text-[13px] leading-[18px] text-muted-foreground'
+          }
           title={typeof column.name === 'string' ? column.name : ''}
         >
           {column.name}
         </span>
 
-        {columnType && showTypeBadge && (
-          <TypeBadge type={columnType} className="dark:bg-neutral-800" />
-        )}
+        {columnType && showTypeBadge && <TypeBadge type={columnType} />}
 
-        {/* Show sort arrow with hover effect */}
         {column.sortable && (
-          <div className="relative ml-0.5 w-5 h-5">
-            {sortDirection && (
-              <div className="bg-transparent p-0.5 rounded">
-                {sortDirection === 'DESC' ? (
-                  <ArrowDownWideNarrow className="h-4 w-4 text-zinc-500 dark:text-neutral-400 transition-opacity group-hover:opacity-0" />
-                ) : (
-                  <ArrowUpNarrowWide className="h-4 w-4 text-zinc-500 dark:text-neutral-400 transition-opacity group-hover:opacity-0" />
-                )}
-              </div>
-            )}
-
-            {nextDirection && (
-              <div className="absolute inset-0 invisible group-hover:visible transition-opacity bg-slate-200 border border-slate-200 dark:bg-neutral-800 dark:border-neutral-800 p-0.5 rounded w-5 h-5">
-                {nextDirection === 'DESC' ? (
-                  <ArrowDownWideNarrow className="h-4 w-4 text-zinc-500 dark:text-neutral-400" />
-                ) : (
-                  <ArrowUpNarrowWide className="h-4 w-4 text-zinc-500 dark:text-neutral-400" />
-                )}
-              </div>
+          <div className="ml-0.5 inline-flex h-4 w-4 items-center justify-center text-muted-foreground">
+            {sortDirection === 'ASC' && <ChevronUp className="h-3.5 w-3.5" />}
+            {sortDirection === 'DESC' && <ChevronDown className="h-3.5 w-3.5" />}
+            {!sortDirection && (
+              <ChevronsUpDown className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
             )}
           </div>
         )}
