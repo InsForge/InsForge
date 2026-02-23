@@ -202,7 +202,7 @@ export function StorageManager({
           onDelete={(file) => void handleDelete(file)}
           isDownloading={isDownloading}
           emptyState={
-            <div className="text-sm text-zinc-500 dark:text-zinc-400">
+            <div className="text-sm text-foreground">
               {searchQuery ? 'No files match your search criteria' : 'No files found'}.{' '}
               <ConnectCTA />
             </div>
