@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, type DragEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Upload } from 'lucide-react';
+import { Search, Upload } from 'lucide-react';
 import PencilIcon from '@/assets/icons/pencil.svg?react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import { useStorage } from '@/features/storage/hooks/useStorage';
@@ -11,9 +11,15 @@ import { BucketFormDialog } from '@/features/storage/components/BucketFormDialog
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
 import { useUploadToast } from '@/features/storage/components/UploadToast';
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import {
-  SearchInput,
+  Button,
+  Input,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@insforge/ui';
+import {
   SelectionClearButton,
   DeleteActionButton,
   Alert,
@@ -31,6 +37,7 @@ interface BucketFormState {
 export default function StoragePage() {
   const [selectedBucket, setSelectedBucket] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchValue, setSearchValue] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
@@ -79,9 +86,23 @@ export default function StoragePage() {
     setSelectedFiles(new Set());
   }, [selectedBucket]);
 
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      const nextQuery = searchValue.trim();
+      if (nextQuery !== searchQuery) {
+        setSearchQuery(nextQuery);
+      }
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [searchQuery, searchValue]);
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
+      setSelectedFiles(new Set());
+      setSearchValue('');
+      setSearchQuery('');
       await Promise.all([
         refetchBuckets(),
         queryClient.invalidateQueries({ queryKey: ['storage'] }),
@@ -255,7 +276,7 @@ export default function StoragePage() {
   const error = bucketsError;
 
   return (
-    <div className="flex h-full bg-bg-gray dark:bg-neutral-800">
+    <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
       {/* Secondary Sidebar - Bucket List */}
       <StorageSidebar
         buckets={Object.keys(bucketInfo)}
@@ -275,129 +296,120 @@ export default function StoragePage() {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+      <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          onChange={(e) => void handleFileSelect(e)}
+          className="hidden"
+          accept="*"
+          style={{ display: 'none' }}
+        />
+
         {selectedBucket && (
           <>
-            {/* Sticky Header Section */}
-            <div className="sticky top-0 z-30 bg-bg-gray dark:bg-neutral-800">
-              <div className="pl-4 pr-1.5 py-1.5 h-12">
-                {/* Page Header with Breadcrumb */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {selectedBucket && (
-                      <nav className="flex items-center text-base font-semibold">
-                        <span className="text-black dark:text-white">{selectedBucket}</span>
-                      </nav>
-                    )}
-
-                    {/* Separator */}
-                    <div className="h-6 w-px bg-gray-200 dark:bg-neutral-700" />
-
-                    {/* Action buttons group */}
-                    <div className="flex items-center gap-1">
-                      <TooltipProvider>
-                        {selectedBucket && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon-lg"
-                                onClick={() => handleEditBucket(selectedBucket)}
-                              >
-                                <PencilIcon className="h-5 w-5 text-zinc-400 dark:text-neutral-400" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom" align="center">
-                              <p>Edit Bucket</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon-lg"
-                              onClick={() => void handleRefresh()}
-                              disabled={isRefreshing}
-                            >
-                              <RefreshIcon className="h-5 w-5 text-zinc-400 dark:text-neutral-400" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom" align="center">
-                            <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
+            <div className="flex shrink-0 items-center justify-between border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
+              <div className="flex min-w-0 flex-1 items-center overflow-hidden pl-4 pr-3 py-3">
+                {selectedFiles.size > 0 ? (
+                  <div className="flex items-center gap-2">
+                    <SelectionClearButton
+                      selectedCount={selectedFiles.size}
+                      itemType="file"
+                      onClear={() => setSelectedFiles(new Set())}
+                    />
+                    <DeleteActionButton
+                      selectedCount={selectedFiles.size}
+                      itemType="file"
+                      onDelete={() => void handleBulkDeleteFiles(Array.from(selectedFiles))}
+                    />
                   </div>
-                </div>
-              </div>
-              <div className="pt-2 px-3 pb-4">
-                {/* Search Bar and Actions - only show when bucket is selected */}
-                {selectedBucket && (
-                  <div className="flex items-center justify-between">
-                    {selectedFiles.size > 0 ? (
-                      <div className="flex items-center gap-3">
-                        <SelectionClearButton
-                          selectedCount={selectedFiles.size}
-                          itemType="file"
-                          onClear={() => setSelectedFiles(new Set())}
-                        />
-                        <DeleteActionButton
-                          selectedCount={selectedFiles.size}
-                          itemType="file"
-                          onDelete={() => void handleBulkDeleteFiles(Array.from(selectedFiles))}
-                        />
-                      </div>
-                    ) : (
-                      <SearchInput
-                        value={searchQuery}
-                        onChange={setSearchQuery}
-                        placeholder="Search Files by Name"
-                        className="flex-1 max-w-80 dark:bg-neutral-800 dark:text-white dark:placeholder:text-neutral-400 dark:border-neutral-700"
-                        debounceTime={300}
-                      />
-                    )}
-                    <div className="flex items-center gap-2 ml-4">
-                      {selectedFiles.size === 0 && (
-                        <>
-                          {/* Upload File Button - moved here when no files selected */}
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            multiple
-                            onChange={(e) => void handleFileSelect(e)}
-                            className="hidden"
-                            accept="*"
-                            style={{ display: 'none' }}
-                          />
+                ) : (
+                  <>
+                    <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">
+                      {selectedBucket}
+                    </h1>
+                    <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+                      <div className="h-5 w-px bg-[var(--alpha-8)]" />
+                    </div>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
                           <Button
-                            className="h-10 px-4 font-medium gap-1.5"
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={isUploading}
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEditBucket(selectedBucket)}
+                            className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
                           >
-                            <Upload className="w-5 h-5" />
-                            {isUploading ? 'Uploading...' : 'Upload File'}
+                            <PencilIcon className="h-5 w-5" />
                           </Button>
-                        </>
-                      )}
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" align="center">
+                          <p>Edit bucket</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => void handleRefresh()}
+                            disabled={isRefreshing}
+                            className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
+                          >
+                            <RefreshIcon
+                              className={isRefreshing ? 'h-5 w-5 animate-spin' : 'h-5 w-5'}
+                            />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" align="center">
+                          <p>{isRefreshing ? 'Refreshing...' : 'Refresh files'}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+                      <div className="h-5 w-px bg-[var(--alpha-8)]" />
                     </div>
-                  </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 rounded px-1.5 text-primary hover:bg-[var(--alpha-4)] hover:text-primary active:bg-[var(--alpha-8)]"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                    >
+                      <Upload className="h-5 w-5 stroke-[1.5]" />
+                      <span className="px-1 text-sm font-medium leading-5">
+                        {isUploading ? 'Uploading...' : 'Upload File'}
+                      </span>
+                    </Button>
+                  </>
                 )}
+              </div>
+              <div className="w-[280px] shrink-0 p-3">
+                <div className="relative w-full">
+                  <Search className="pointer-events-none absolute left-1.5 top-1/2 h-6 w-6 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={searchValue}
+                    onChange={(event) => setSearchValue(event.target.value)}
+                    placeholder="Search files"
+                    className="h-9 border-[var(--alpha-12)] bg-[var(--alpha-4)] pl-8 pr-2 text-sm leading-5 placeholder:text-muted-foreground"
+                  />
+                </div>
               </div>
             </div>
 
             {/* Content (supports drag-and-drop file upload) */}
             <div
               className={
-                'relative flex-1 flex flex-col overflow-hidden' + (isDragging ? ' opacity-25' : '')
+                'relative min-h-0 flex-1 flex flex-col overflow-hidden' +
+                (isDragging ? ' opacity-25' : '')
               }
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
             >
               {error && (
-                <Alert variant="destructive" className="mb-4 mx-8 mt-4">
+                <Alert variant="destructive" className="mx-4 mt-4">
                   <AlertDescription>{String(error)}</AlertDescription>
                 </Alert>
               )}

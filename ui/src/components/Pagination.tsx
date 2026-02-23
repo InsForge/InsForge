@@ -44,10 +44,7 @@ function getVisibleItems(
   const endStartPage = totalPages - edgePageCount + 1;
 
   if (currentPage <= edgePageCount) {
-    return [
-      ...Array.from({ length: edgePageCount }, (_, index) => index + 1),
-      'ellipsis-right',
-    ];
+    return [...Array.from({ length: edgePageCount }, (_, index) => index + 1), 'ellipsis-right'];
   }
 
   if (currentPage >= totalPages - (edgePageCount - 1)) {
