@@ -74,16 +74,25 @@ const MenuDialogSideNavHeader = React.forwardRef<
 ));
 MenuDialogSideNavHeader.displayName = 'MenuDialogSideNavHeader';
 
-const MenuDialogSideNavTitle = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>(
-  ({ className, ...props }, ref) => (
-    <h2 ref={ref} className={cn('text-base font-medium leading-7 text-foreground', className)} {...props} />
-  )
-);
+const MenuDialogSideNavTitle = React.forwardRef<
+  HTMLHeadingElement,
+  React.HTMLAttributes<HTMLHeadingElement>
+>(({ className, ...props }, ref) => (
+  <h2
+    ref={ref}
+    className={cn('text-base font-medium leading-7 text-foreground', className)}
+    {...props}
+  />
+));
 MenuDialogSideNavTitle.displayName = 'MenuDialogSideNavTitle';
 
 const MenuDialogNav = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('flex min-h-0 flex-1 flex-col gap-3 px-3 pb-2', className)} {...props} />
+    <div
+      ref={ref}
+      className={cn('flex min-h-0 flex-1 flex-col gap-3 px-3 pb-2', className)}
+      {...props}
+    />
   )
 );
 MenuDialogNav.displayName = 'MenuDialogNav';
@@ -138,7 +147,10 @@ const MenuDialogHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<H
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('flex items-center gap-3 border-b border-[var(--alpha-8)] px-4 py-3', className)}
+      className={cn(
+        'flex items-center gap-3 border-b border-[var(--alpha-8)] px-4 py-3',
+        className
+      )}
       {...props}
     />
   )
@@ -161,7 +173,10 @@ const MenuDialogBody = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTM
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto border-b border-[var(--alpha-8)] p-4', className)}
+      className={cn(
+        'flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto border-b border-[var(--alpha-8)] p-4',
+        className
+      )}
       {...props}
     />
   )
@@ -170,7 +185,11 @@ MenuDialogBody.displayName = 'MenuDialogBody';
 
 const MenuDialogFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('flex items-center justify-end gap-3 p-4', className)} {...props} />
+    <div
+      ref={ref}
+      className={cn('flex items-center justify-end gap-3 p-4', className)}
+      {...props}
+    />
   )
 );
 MenuDialogFooter.displayName = 'MenuDialogFooter';
