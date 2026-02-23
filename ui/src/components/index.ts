@@ -48,3 +48,23 @@ export {
   DialogMessage,
   DialogCloseButton,
 } from './Dialog';
+export {
+  MenuDialog,
+  MenuDialogTrigger,
+  MenuDialogPortal,
+  MenuDialogClose,
+  MenuDialogOverlay,
+  MenuDialogContent,
+  MenuDialogSideNav,
+  MenuDialogSideNavHeader,
+  MenuDialogSideNavTitle,
+  MenuDialogNav,
+  MenuDialogNavList,
+  MenuDialogNavItem,
+  MenuDialogMain,
+  MenuDialogHeader,
+  MenuDialogTitle,
+  MenuDialogBody,
+  MenuDialogFooter,
+  MenuDialogCloseButton,
+} from './MenuDialog';
