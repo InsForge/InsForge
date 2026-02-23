@@ -27,7 +27,7 @@ function TimeColumn({ label, value, range, onChange, scrollRef }: TimeColumnProp
       <div className="text-xs text-muted-foreground mb-1 text-center">{label}</div>
       <div
         ref={scrollRef}
-        className="h-60 overflow-y-auto border border-border-gray dark:border-neutral-600 rounded p-1 scrollbar-thin"
+        className="h-60 overflow-y-auto border border-border-gray dark:border-neutral-600 rounded p-1"
       >
         {Array.from({ length: range }, (_, i) => (
           <button

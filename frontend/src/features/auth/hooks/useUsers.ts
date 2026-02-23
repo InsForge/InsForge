@@ -10,7 +10,7 @@ interface UseUsersOptions {
 }
 
 export function useUsers(options: UseUsersOptions = {}) {
-  const { pageSize = 20, enabled = true, searchQuery = '' } = options;
+  const { pageSize = 50, enabled = true, searchQuery = '' } = options;
   const [currentPage, setCurrentPage] = useState(1);
   const queryClient = useQueryClient();
 
