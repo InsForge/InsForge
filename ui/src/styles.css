@@ -136,3 +136,33 @@
   --toast: var(--semantic-6); /* special.toast */
   --page: var(--semantic-0); /* special.page */
 }
+
+/* ============================================================
+   SCROLLBAR
+   Figma: 2px inset + 4px thumb, rounded 2px, alpha-16 tone
+   ============================================================ */
+
+* {
+  scrollbar-color: var(--alpha-16) transparent;
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--alpha-16);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 2px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--alpha-16);
+}

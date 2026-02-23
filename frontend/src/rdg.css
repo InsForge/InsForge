@@ -4,9 +4,9 @@
 @layer base {
   :root {
     --rdg-border-color: var(--alpha-8);
-    --rdg-background-color: rgb(var(--semantic-0));
+    --rdg-background-color: rgb(var(--semantic-1));
     --rdg-row-hover-color: var(--alpha-4);
-    --rdg-background-color-edit: rgb(var(--semantic-0));
+    --rdg-background-color-edit: rgb(var(--semantic-1));
     --rdg-header-row-background-color: rgb(var(--semantic-1));
     --rdg-outline-color: rgb(var(--foreground));
     --rdg-cell-frozen-box-shadow: none;
@@ -14,9 +14,9 @@
 
   .rdg-dark {
     --rdg-border-color: var(--alpha-8);
-    --rdg-background-color: rgb(var(--semantic-0));
+    --rdg-background-color: rgb(var(--semantic-1));
     --rdg-row-hover-color: var(--alpha-4);
-    --rdg-background-color-edit: rgb(var(--semantic-0));
+    --rdg-background-color-edit: rgb(var(--semantic-1));
     --rdg-header-row-background-color: rgb(var(--semantic-1));
     --rdg-outline-color: rgb(var(--foreground));
     --rdg-cell-frozen-box-shadow: none;
@@ -37,6 +37,10 @@
   background-color: var(--rdg-header-row-background-color) !important;
   font-weight: 400;
   color: rgb(var(--muted-foreground));
+}
+
+.rdg-row {
+  background-color: rgb(var(--semantic-0));
 }
 
 .rdg-row:hover,
@@ -79,25 +83,6 @@
 
 .rdg-header-row .rdg-cell[aria-sort] {
   cursor: pointer;
-}
-
-/* Custom scrollbar for react-data-grid */
-.rdg-viewport::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.rdg-viewport::-webkit-scrollbar-track {
-  background: var(--alpha-4);
-}
-
-.rdg-viewport::-webkit-scrollbar-thumb {
-  background: var(--alpha-12);
-  border-radius: 4px;
-}
-
-.rdg-viewport::-webkit-scrollbar-thumb:hover {
-  background: var(--alpha-16);
 }
 
 /* Prevent accidental interactions while dragging columns */

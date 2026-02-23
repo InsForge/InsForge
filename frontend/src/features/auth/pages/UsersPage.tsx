@@ -26,8 +26,8 @@ export default function UsersPage() {
 
   const { showToast } = useToast();
 
-  // Default page size of 20 records per page
-  const pageSize = 20;
+  // Default page size of 50 records per page
+  const pageSize = 50;
   const {
     users,
     totalUsers,
@@ -152,8 +152,8 @@ export default function UsersPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <div className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))] px-3">
-        <div className="flex min-w-0 items-center gap-1">
+      <div className="flex shrink-0 items-center justify-between border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
+        <div className="flex min-w-0 flex-1 items-center overflow-hidden pl-4 pr-3 py-3">
           {selectedRows.size > 0 ? (
             <div className="flex items-center gap-2">
               <SelectionClearButton
@@ -169,19 +169,27 @@ export default function UsersPage() {
             </div>
           ) : (
             <>
-              <h1 className="text-base font-medium leading-7 text-foreground">Users</h1>
-              <div className="mx-2 h-5 w-px bg-[var(--alpha-8)]" />
+              <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">Users</h1>
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+                <div className="h-5 w-px bg-[var(--alpha-8)]" />
+              </div>
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
-                      size="icon-sm"
+                      size="icon"
                       onClick={() => void handleRefresh()}
                       disabled={isRefreshing}
-                      className="text-muted-foreground"
+                      className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
                     >
-                      <RefreshCw className={isRefreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+                      <RefreshCw
+                        className={
+                          isRefreshing
+                            ? 'h-5 w-5 animate-spin stroke-[1.5]'
+                            : 'h-5 w-5 stroke-[1.5]'
+                        }
+                      />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" align="center">
@@ -189,26 +197,31 @@ export default function UsersPage() {
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+                <div className="h-5 w-px bg-[var(--alpha-8)]" />
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 px-2 text-primary hover:text-primary"
+                className="h-9 rounded px-1.5 text-primary hover:bg-[var(--alpha-4)] hover:text-primary active:bg-[var(--alpha-8)]"
                 onClick={() => setAddDialogOpen(true)}
               >
-                <CirclePlus className="h-4 w-4 text-primary" />
-                Add User
+                <CirclePlus className="h-6 w-6 stroke-[1.5] text-primary" />
+                <span className="px-1 text-sm font-medium leading-5">Add User</span>
               </Button>
             </>
           )}
         </div>
-        <div className="relative w-[280px] max-w-full">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={searchValue}
-            onChange={(event) => setSearchValue(event.target.value)}
-            placeholder="Search users"
-            className="h-8 border-[var(--alpha-12)] bg-[var(--alpha-4)] pl-8 pr-2 text-[13px] leading-[18px]"
-          />
+        <div className="w-[280px] shrink-0 p-3">
+          <div className="relative w-full">
+            <Search className="pointer-events-none absolute left-1.5 top-1/2 h-6 w-6 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={searchValue}
+              onChange={(event) => setSearchValue(event.target.value)}
+              placeholder="Search users"
+              className="h-9 border-[var(--alpha-12)] bg-[var(--alpha-4)] pl-8 pr-2 text-sm leading-5 placeholder:text-muted-foreground"
+            />
+          </div>
         </div>
       </div>
 

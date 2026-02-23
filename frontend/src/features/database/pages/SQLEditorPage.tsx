@@ -184,7 +184,7 @@ export default function SQLEditorPage() {
         <div className="w-full flex flex-col">
           {/* Tabs Section */}
           <div className="w-full flex items-end overflow-hidden">
-            <div className="flex items-end overflow-x-auto overflow-y-hidden scrollbar-hide">
+            <div className="flex items-end overflow-x-auto overflow-y-hidden">
               {tabs.map((tab) => {
                 const isActive = tab.id === activeTabId;
                 return (

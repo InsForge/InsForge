@@ -28,7 +28,11 @@ export function DeleteActionButton({
   };
 
   return (
-    <Button variant="destructive" className={`h-10 px-3 text-sm ${className}`} onClick={onDelete}>
+    <Button
+      variant="destructive"
+      className={`h-8 rounded px-2 text-sm leading-5 whitespace-nowrap ${className}`}
+      onClick={onDelete}
+    >
       Delete {selectedCount} {getItemLabel(selectedCount, itemType)}
     </Button>
   );
