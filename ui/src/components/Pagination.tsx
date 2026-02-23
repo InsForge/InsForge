@@ -9,6 +9,7 @@ import {
 import { cn } from '../lib';
 
 type PaginationItem = number | 'ellipsis-left' | 'ellipsis-right';
+const FIXED_CENTER_SLOT_COUNT = 5;
 
 export interface PaginationProps extends React.HTMLAttributes<HTMLDivElement> {
   currentPage?: number;
@@ -27,41 +28,36 @@ function clamp(value: number, min: number, max: number) {
 function getVisibleItems(
   currentPage: number,
   totalPages: number,
-  visiblePageCount: number
+  centerSlotCount: number
 ): PaginationItem[] {
-  const pageCount = Math.max(1, visiblePageCount);
-  const half = Math.floor(pageCount / 2);
+  const slots = Math.max(1, centerSlotCount);
 
-  let start = currentPage - half;
-  let end = currentPage + half;
-
-  if (start < 1) {
-    end += 1 - start;
-    start = 1;
+  if (totalPages <= slots) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
   }
 
-  if (end > totalPages) {
-    start -= end - totalPages;
-    end = totalPages;
+  // For 5 center slots:
+  // start: 1 2 3 4 ...
+  // middle: ... p-1 p p+1 ...
+  // end: ... n-3 n-2 n-1 n
+  const edgePageCount = slots - 1;
+  const endStartPage = totalPages - edgePageCount + 1;
+
+  if (currentPage <= edgePageCount) {
+    return [
+      ...Array.from({ length: edgePageCount }, (_, index) => index + 1),
+      'ellipsis-right',
+    ];
   }
 
-  start = Math.max(1, start);
-
-  const items: PaginationItem[] = [];
-
-  if (start > 1) {
-    items.push('ellipsis-left');
+  if (currentPage >= totalPages - (edgePageCount - 1)) {
+    return [
+      'ellipsis-left',
+      ...Array.from({ length: edgePageCount }, (_, index) => endStartPage + index),
+    ];
   }
 
-  for (let page = start; page <= end; page += 1) {
-    items.push(page);
-  }
-
-  if (end < totalPages) {
-    items.push('ellipsis-right');
-  }
-
-  return items;
+  return ['ellipsis-left', currentPage - 1, currentPage, currentPage + 1, 'ellipsis-right'];
 }
 
 export function Pagination({
@@ -71,7 +67,7 @@ export function Pagination({
   totalRecords = 0,
   pageSize = 100,
   recordLabel = 'users',
-  visiblePageCount = 3,
+  visiblePageCount = FIXED_CENTER_SLOT_COUNT,
   onPageChange,
   ...props
 }: PaginationProps) {
@@ -81,9 +77,16 @@ export function Pagination({
   const endRecord =
     totalRecords === 0 ? 0 : Math.min(normalizedCurrentPage * pageSize, totalRecords);
 
+  // Keep pagination density consistent across the app:
+  // 2 fixed controls on the left + 5 center slots + 2 fixed controls on the right = 9 total items.
+  const enforcedCenterSlotCount = Math.max(
+    FIXED_CENTER_SLOT_COUNT,
+    Math.min(FIXED_CENTER_SLOT_COUNT, visiblePageCount)
+  );
+
   const items = React.useMemo(
-    () => getVisibleItems(normalizedCurrentPage, normalizedTotalPages, visiblePageCount),
-    [normalizedCurrentPage, normalizedTotalPages, visiblePageCount]
+    () => getVisibleItems(normalizedCurrentPage, normalizedTotalPages, enforcedCenterSlotCount),
+    [normalizedCurrentPage, normalizedTotalPages, enforcedCenterSlotCount]
   );
 
   const canGoBack = normalizedCurrentPage > 1;
