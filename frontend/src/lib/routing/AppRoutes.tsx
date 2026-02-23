@@ -7,7 +7,6 @@ import DashboardPage from '@/features/dashboard/pages/DashboardPage';
 import TablesPage from '@/features/database/pages/TablesPage';
 import UsersPage from '@/features/auth/pages/UsersPage';
 import AuthMethodsPage from '@/features/auth/pages/AuthMethodsPage';
-import ConfigurationPage from '@/features/auth/pages/ConfigurationPage';
 import LogsPage from '@/features/logs/pages/LogsPage';
 import FunctionLogsPage from '@/features/logs/pages/FunctionLogsPage';
 import MCPLogsPage from '@/features/logs/pages/MCPLogsPage';
@@ -63,7 +62,10 @@ export function AppRoutes() {
                   path="/dashboard/authentication/auth-methods"
                   element={<AuthMethodsPage />}
                 />
-                <Route path="/dashboard/authentication/config" element={<ConfigurationPage />} />
+                <Route
+                  path="/dashboard/authentication/config"
+                  element={<AuthMethodsPage openSettingsOnMount={true} />}
+                />
                 <Route
                   path="/dashboard/database"
                   element={<Navigate to="/dashboard/database/tables" replace />}
