@@ -54,7 +54,7 @@ When pg_cron fires:
 
 1. `execute_job()` fetches the job definition and decrypts headers
 2. An HTTP request is made to the function endpoint
-3. The result (status code, duration, success/failure) is logged to `job_logs`
+3. The result (status code, duration, success/failure) is logged to `schedules.job_logs`
 
 ### Execution Flow
 
