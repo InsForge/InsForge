@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Info,
   Plug,
@@ -21,6 +21,20 @@ import {
   DialogTitle,
   DialogBody,
   DialogCloseButton,
+  MenuDialog,
+  MenuDialogContent,
+  MenuDialogSideNav,
+  MenuDialogSideNavHeader,
+  MenuDialogSideNavTitle,
+  MenuDialogNav,
+  MenuDialogNavList,
+  MenuDialogNavItem,
+  MenuDialogMain,
+  MenuDialogHeader,
+  MenuDialogTitle,
+  MenuDialogBody,
+  MenuDialogFooter,
+  MenuDialogCloseButton,
 } from '@insforge/ui';
 import { CopyButton, ConfirmDialog } from '@/components';
 import { useApiKey } from '@/lib/hooks/useMetadata';
@@ -40,32 +54,7 @@ import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 
 type TabType = 'info' | 'usage' | 'compute' | 'connect';
 
-interface TabButtonProps {
-  id: TabType;
-  label: string;
-  icon: React.ElementType;
-  isActive: boolean;
-  onClick: () => void;
-}
-
-function TabButton({ label, icon: Icon, isActive, onClick }: TabButtonProps) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'h-11 flex items-center gap-2.5 p-3 rounded-xl transition-colors cursor-pointer',
-        isActive
-          ? 'bg-gray-200 dark:bg-neutral-700 text-gray-900 dark:text-white'
-          : 'text-gray-500 dark:text-neutral-400 hover:text-gray-900 dark:hover:text-white'
-      )}
-    >
-      <Icon className="w-5 h-5" />
-      <span className="text-sm font-medium">{label}</span>
-    </button>
-  );
-}
-
-export default function SettingsDialog() {
+export default function SettingsMenuDialog() {
   const { isSettingsDialogOpen, settingsDefaultTab, closeSettingsDialog } = useModal();
 
   const handleUsageClick = () => {
@@ -73,6 +62,12 @@ export default function SettingsDialog() {
   };
 
   const [activeTab, setActiveTab] = useState<TabType>('info');
+
+  const sectionTitle = useMemo(() => {
+    if (activeTab === 'compute') return 'Compute & Disk';
+    if (activeTab === 'connect') return 'Connect';
+    return 'Info';
+  }, [activeTab]);
 
   useEffect(() => {
     if (isSettingsDialogOpen) {
@@ -258,69 +253,60 @@ export default function SettingsDialog() {
   return (
     <>
       <ConfirmDialog {...confirmDialogProps} />
-      <Dialog open={isSettingsDialogOpen} onOpenChange={(open) => !open && closeSettingsDialog()}>
-        <DialogContent className="max-w-[900px]" showCloseButton={false}>
-          <DialogBody className="p-0">
-            <div className="flex max-h-[70vh]">
-              {/* Left Side Nav */}
-              <div className="flex flex-col w-[200px] shrink-0 border-r border-[var(--alpha-8)]">
-                <div className="px-4 py-3">
-                  <p className="text-base font-medium leading-7 text-gray-900 dark:text-white">
-                    Project Settings
-                  </p>
-                </div>
-                <div className="flex flex-col gap-2 flex-1 px-3 pb-2">
-                  <TabButton
-                    id="info"
-                    label="Info"
-                    icon={Info}
-                    isActive={activeTab === 'info'}
-                    onClick={() => setActiveTab('info')}
-                  />
+      <MenuDialog open={isSettingsDialogOpen} onOpenChange={(open) => !open && closeSettingsDialog()}>
+        <MenuDialogContent>
+          <MenuDialogSideNav>
+            <MenuDialogSideNavHeader>
+              <MenuDialogSideNavTitle>Project Settings</MenuDialogSideNavTitle>
+            </MenuDialogSideNavHeader>
+            <MenuDialogNav>
+              <MenuDialogNavList>
+                <MenuDialogNavItem
+                  icon={<Info className="w-5 h-5" />}
+                  active={activeTab === 'info'}
+                  onClick={() => setActiveTab('info')}
+                >
+                  Info
+                </MenuDialogNavItem>
 
-                  {/* Only show Usage tab in cloud environment & iframe */}
-                  {isCloud && isInIframe && (
-                    <TabButton
-                      id="usage"
-                      label="Usage"
-                      icon={ChartBarBig}
-                      isActive={false}
-                      onClick={handleUsageClick}
-                    />
-                  )}
+                {/* Only show Usage tab in cloud environment & iframe */}
+                {isCloud && isInIframe && (
+                  <MenuDialogNavItem
+                    icon={<ChartBarBig className="w-5 h-5" />}
+                    onClick={handleUsageClick}
+                  >
+                    Usage
+                  </MenuDialogNavItem>
+                )}
 
-                  <TabButton
-                    id="connect"
-                    label="Connect"
-                    icon={Plug}
-                    isActive={activeTab === 'connect'}
-                    onClick={() => setActiveTab('connect')}
-                  />
+                <MenuDialogNavItem
+                  icon={<Plug className="w-5 h-5" />}
+                  active={activeTab === 'connect'}
+                  onClick={() => setActiveTab('connect')}
+                >
+                  Connect
+                </MenuDialogNavItem>
 
-                  {isCloud && isInIframe && (
-                    <TabButton
-                      id="compute"
-                      label="Compute & Disk"
-                      icon={HardDrive}
-                      isActive={activeTab === 'compute'}
-                      onClick={() => setActiveTab('compute')}
-                    />
-                  )}
-                </div>
-              </div>
+                {isCloud && isInIframe && (
+                  <MenuDialogNavItem
+                    icon={<HardDrive className="w-5 h-5" />}
+                    active={activeTab === 'compute'}
+                    onClick={() => setActiveTab('compute')}
+                  >
+                    Compute & Disk
+                  </MenuDialogNavItem>
+                )}
+              </MenuDialogNavList>
+            </MenuDialogNav>
+          </MenuDialogSideNav>
 
-              {/* Right Content */}
-              <div className="flex-1 flex flex-col min-w-0">
-                {/* Right Header - active tab name + close */}
-                <DialogHeader className="flex-row items-center justify-between">
-                  <DialogTitle className="capitalize">
-                    {activeTab === 'compute' ? 'Compute & Disk' : activeTab}
-                  </DialogTitle>
-                  <DialogCloseButton />
-                </DialogHeader>
+          <MenuDialogMain>
+            <MenuDialogHeader>
+              <MenuDialogTitle>{sectionTitle}</MenuDialogTitle>
+              <MenuDialogCloseButton className="ml-auto" />
+            </MenuDialogHeader>
 
-                {/* Main Content Area */}
-                <div className="flex-1 flex flex-col gap-6 overflow-y-auto px-6 pt-6 pb-12">
+            <MenuDialogBody>
                   {activeTab === 'info' && (
                     <>
                       <div className="flex flex-col gap-6 bg-gray-200 dark:bg-[#333333] rounded-lg p-6">
@@ -607,65 +593,63 @@ export default function SettingsDialog() {
                       </div>
                     </TooltipProvider>
                   )}
-                </div>
+            </MenuDialogBody>
 
-                {/* Compute tab footer with additional cost and action buttons */}
-                {activeTab === 'compute' &&
-                  instanceInfo &&
-                  selectedInstanceType &&
-                  selectedInstanceType !== instanceInfo.currentInstanceType &&
-                  (() => {
-                    const currentInstance = instanceInfo.instanceTypes.find(
-                      (t) => t.id === instanceInfo.currentInstanceType
-                    );
-                    const selectedInstance = instanceInfo.instanceTypes.find(
-                      (t) => t.id === selectedInstanceType
-                    );
-                    const additionalCost =
-                      (selectedInstance?.pricePerMonth ?? 0) -
-                      (currentInstance?.pricePerMonth ?? 0);
-                    const credits =
-                      instanceInfo.computeCredits === -1 ? Infinity : instanceInfo.computeCredits;
-                    const newOrgCost =
-                      instanceInfo.currentOrgComputeCost -
-                      (currentInstance?.pricePerMonth ?? 0) +
-                      (selectedInstance?.pricePerMonth ?? 0);
-                    const newOrgCostAfterCredits = Math.max(
-                      0,
-                      newOrgCost - Math.min(credits, newOrgCost)
-                    );
-                    const showAdditionalCost = additionalCost > 0 && newOrgCostAfterCredits > 0;
+            {/* Compute tab footer with additional cost and action buttons */}
+            {activeTab === 'compute' &&
+              instanceInfo &&
+              selectedInstanceType &&
+              selectedInstanceType !== instanceInfo.currentInstanceType &&
+              (() => {
+                const currentInstance = instanceInfo.instanceTypes.find(
+                  (t) => t.id === instanceInfo.currentInstanceType
+                );
+                const selectedInstance = instanceInfo.instanceTypes.find(
+                  (t) => t.id === selectedInstanceType
+                );
+                const additionalCost =
+                  (selectedInstance?.pricePerMonth ?? 0) -
+                  (currentInstance?.pricePerMonth ?? 0);
+                const credits =
+                  instanceInfo.computeCredits === -1 ? Infinity : instanceInfo.computeCredits;
+                const newOrgCost =
+                  instanceInfo.currentOrgComputeCost -
+                  (currentInstance?.pricePerMonth ?? 0) +
+                  (selectedInstance?.pricePerMonth ?? 0);
+                const newOrgCostAfterCredits = Math.max(
+                  0,
+                  newOrgCost - Math.min(credits, newOrgCost)
+                );
+                const showAdditionalCost = additionalCost > 0 && newOrgCostAfterCredits > 0;
 
-                    return (
-                      <div className="flex items-center justify-between border-t border-[var(--alpha-8)] px-6 py-4">
-                        {showAdditionalCost ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-sm text-foreground">Additional Cost:</span>
-                            <span className="text-sm text-primary">${additionalCost}/Month</span>
-                            <Info className="w-4 h-4 text-muted-foreground" />
-                          </div>
-                        ) : (
-                          <div />
-                        )}
-                        <div className="flex items-center gap-3">
-                          <Button variant="secondary" onClick={() => setSelectedInstanceType(null)}>
-                            Cancel
-                          </Button>
-                          <Button
-                            onClick={() => setIsReviewDialogOpen(true)}
-                            disabled={isChangingInstance}
-                          >
-                            {isChangingInstance ? 'Changing...' : 'Review Changes'}
-                          </Button>
-                        </div>
+                return (
+                  <MenuDialogFooter className="justify-between">
+                    {showAdditionalCost ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm text-foreground">Additional Cost:</span>
+                        <span className="text-sm text-primary">${additionalCost}/Month</span>
+                        <Info className="w-4 h-4 text-muted-foreground" />
                       </div>
-                    );
-                  })()}
-              </div>
-            </div>
-          </DialogBody>
-        </DialogContent>
-      </Dialog>
+                    ) : (
+                      <div />
+                    )}
+                    <div className="flex items-center gap-3">
+                      <Button variant="secondary" onClick={() => setSelectedInstanceType(null)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={() => setIsReviewDialogOpen(true)}
+                        disabled={isChangingInstance}
+                      >
+                        {isChangingInstance ? 'Changing...' : 'Review Changes'}
+                      </Button>
+                    </div>
+                  </MenuDialogFooter>
+                );
+              })()}
+          </MenuDialogMain>
+        </MenuDialogContent>
+      </MenuDialog>
 
       {/* Review Changes Dialog */}
       <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
