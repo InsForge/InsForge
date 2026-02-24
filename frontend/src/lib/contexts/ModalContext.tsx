@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 
-type SettingsTab = 'info' | 'connect';
+type SettingsTab = 'info' | 'compute' | 'connect';
 
 interface ModalContextType {
   isOnboardingModalOpen: boolean;
