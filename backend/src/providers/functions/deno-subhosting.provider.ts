@@ -267,7 +267,11 @@ export class DenoSubhostingProvider {
     const tempDir = await mkdtemp(join(tmpdir(), 'insforge-deno-check-'));
 
     try {
-      await writeFile(join(tempDir, 'deno.json'), '{"nodeModulesDir":"auto"}', 'utf-8');
+      await writeFile(
+        join(tempDir, 'deno.json'),
+        '{"nodeModulesDir":"auto","compilerOptions":{"noImplicitAny":false}}',
+        'utf-8'
+      );
       await writeFile(join(tempDir, 'func.ts'), transformed, 'utf-8');
 
       await execFileAsync('deno', ['check', '--no-lock', 'func.ts'], {

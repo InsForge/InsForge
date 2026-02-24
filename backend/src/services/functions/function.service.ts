@@ -349,6 +349,14 @@ export class FunctionService {
    * Validate function code for dangerous patterns
    */
   private validateCode(code: string): void {
+    if (/Deno\.serve\s*\(/.test(code)) {
+      throw new AppError(
+        'Functions should use "export default async function(req: Request)" instead of "Deno.serve()". The router handles serving automatically.',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
     const dangerousPatterns = [
       /Deno\.run/i,
       /Deno\.spawn/i,
