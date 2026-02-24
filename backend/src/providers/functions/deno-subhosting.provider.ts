@@ -280,9 +280,10 @@ export class DenoSubhostingProvider {
         env: { ...process.env, NO_COLOR: '1' },
       });
     } catch (error: unknown) {
-      const execError = error as { stderr?: string; stdout?: string };
-      const output = (execError.stderr || execError.stdout || '').trim();
+      const execError = error as { stderr?: string; stdout?: string; code?: string };
 
+      // Type-check failure — deno ran but found errors
+      const output = (execError.stderr || execError.stdout || '').trim();
       if (output) {
         throw new AppError(
           `Function code failed type check:\n${output}`,
@@ -291,10 +292,18 @@ export class DenoSubhostingProvider {
         );
       }
 
-      // No output — deno binary likely missing; skip gracefully
-      logger.warn('Deno check unavailable, skipping', {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      // Deno binary not installed — skip gracefully
+      if (execError.code === 'ENOENT') {
+        logger.warn('Deno binary not found, skipping type check');
+        return;
+      }
+
+      // Any other error (ENOSPC, EACCES, timeout) — don't swallow
+      throw new AppError(
+        `Deno type check failed unexpectedly: ${error instanceof Error ? error.message : String(error)}`,
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
     } finally {
       await rm(tempDir, { recursive: true, force: true }).catch(() => {});
     }
