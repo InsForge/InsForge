@@ -166,7 +166,7 @@ export default function SettingsMenuDialog() {
     postMessageToParent({ type: 'REQUEST_INSTANCE_INFO' }, '*');
 
     return () => window.removeEventListener('message', handleMessage);
-  }, [isCloud, isInIframe]);
+  }, [isCloud, isInIframe, showToast]);
 
   // Compare versions when both values are available
   useEffect(() => {
