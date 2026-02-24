@@ -1,4 +1,10 @@
-FROM node:20-alpine
+FROM node:20-alpine AS base
+
+# Install Deno for pre-deployment type checking (deno check)
+RUN apk add --no-cache \
+    --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \
+    --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community \
+    deno
 
 WORKDIR /app
 
