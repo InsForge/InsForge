@@ -261,7 +261,7 @@ export default function SettingsMenuDialog() {
         open={isSettingsDialogOpen}
         onOpenChange={(open) => !open && closeSettingsDialog()}
       >
-        <MenuDialogContent>
+        <MenuDialogContent className="max-w-[900px]">
           <MenuDialogSideNav>
             <MenuDialogSideNavHeader>
               <MenuDialogSideNavTitle>Project Settings</MenuDialogSideNavTitle>
@@ -490,7 +490,7 @@ export default function SettingsMenuDialog() {
                                     !isCurrent && !isFree && setSelectedInstanceType(instance.id)
                                   }
                                   className={cn(
-                                    'flex flex-col gap-2.5 p-4 rounded-lg border text-left transition-colors',
+                                    'flex flex-col gap-2.5 p-4 rounded-lg border bg-[var(--alpha-8)] text-left transition-colors',
                                     isCurrent
                                       ? 'border-foreground cursor-default'
                                       : isSelected
@@ -663,7 +663,7 @@ export default function SettingsMenuDialog() {
                 return (
                   <>
                     <div className="flex items-center gap-4">
-                      <div className="flex-1 flex items-center justify-between border border-[var(--alpha-16)] rounded-lg p-4">
+                      <div className="flex-1 flex items-center justify-between border border-[var(--alpha-16)] bg-[var(--alpha-8)] rounded-lg p-4">
                         <span className="text-xs font-medium uppercase px-2 py-0.5 rounded bg-[var(--alpha-16)] text-foreground">
                           {currentInstance?.id}
                         </span>
@@ -672,7 +672,7 @@ export default function SettingsMenuDialog() {
                         </span>
                       </div>
                       <ArrowRight className="w-5 h-5 text-muted-foreground shrink-0" />
-                      <div className="flex-1 flex items-center justify-between border border-primary rounded-lg p-4">
+                      <div className="flex-1 flex items-center justify-between border border-primary bg-[var(--alpha-8)] rounded-lg p-4">
                         <span className="text-xs font-medium uppercase px-2 py-0.5 rounded bg-primary text-[rgb(var(--inverse))]">
                           {selectedInstance?.id}
                         </span>
