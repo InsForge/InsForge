@@ -15,6 +15,16 @@ export default {
       },
     },
     extend: {
+      colors: {
+        border: 'var(--border)',
+        foreground: 'rgb(var(--foreground))',
+        'muted-foreground': 'rgb(var(--muted-foreground))',
+        primary: 'rgb(var(--primary))',
+        destructive: 'rgb(var(--destructive))',
+        warning: 'rgb(var(--warning))',
+        card: 'rgb(var(--card))',
+        toast: 'rgb(var(--toast))',
+      },
       keyframes: {
         'accordion-down': {
           from: { height: '0' },

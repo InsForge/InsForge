@@ -55,6 +55,40 @@ export const routeChangeEventSchema = z.object({
   path: z.string(),
 });
 
+export const requestInstanceInfoEventSchema = z.object({
+  type: z.literal('REQUEST_INSTANCE_INFO'),
+});
+
+export const instanceInfoEventSchema = z.object({
+  type: z.literal('INSTANCE_INFO'),
+  currentInstanceType: z.string(),
+  planName: z.string(),
+  computeCredits: z.number(),
+  currentOrgComputeCost: z.number(),
+  instanceTypes: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      cpu: z.string(),
+      ram: z.string(),
+      pricePerHour: z.number(),
+      pricePerMonth: z.number(),
+    })
+  ),
+});
+
+export const requestInstanceTypeChangeEventSchema = z.object({
+  type: z.literal('REQUEST_INSTANCE_TYPE_CHANGE'),
+  instanceType: z.string(),
+});
+
+export const instanceTypeChangeResultEventSchema = z.object({
+  type: z.literal('INSTANCE_TYPE_CHANGE_RESULT'),
+  success: z.boolean(),
+  instanceType: z.string().optional(),
+  error: z.string().optional(),
+});
+
 export const cloudEventSchema = z.discriminatedUnion('type', [
   appRouteChangeEventSchema,
   authSuccessEventSchema,
@@ -68,6 +102,10 @@ export const cloudEventSchema = z.discriminatedUnion('type', [
   showConnectOverlayEventSchema,
   authorizationCodeEventSchema,
   routeChangeEventSchema,
+  requestInstanceInfoEventSchema,
+  instanceInfoEventSchema,
+  requestInstanceTypeChangeEventSchema,
+  instanceTypeChangeResultEventSchema,
 ]);
 
 export type AppRouteChangeEvent = z.infer<typeof appRouteChangeEventSchema>;
@@ -81,3 +119,7 @@ export type ShowContactModalEvent = z.infer<typeof showContactModalEventSchema>;
 export type ShowConnectOverlayEvent = z.infer<typeof showConnectOverlayEventSchema>;
 export type AuthorizationCodeEvent = z.infer<typeof authorizationCodeEventSchema>;
 export type RouteChangeEvent = z.infer<typeof routeChangeEventSchema>;
+export type RequestInstanceInfoEvent = z.infer<typeof requestInstanceInfoEventSchema>;
+export type InstanceInfoEvent = z.infer<typeof instanceInfoEventSchema>;
+export type RequestInstanceTypeChangeEvent = z.infer<typeof requestInstanceTypeChangeEventSchema>;
+export type InstanceTypeChangeResultEvent = z.infer<typeof instanceTypeChangeResultEventSchema>;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Info, Plug, ChartBarBig, RefreshCw } from 'lucide-react';
+import { Info, Plug, ChartBarBig, RefreshCw, HardDrive, Cpu, ArrowRight, CircleAlert, Loader2, CircleCheck } from 'lucide-react';
 import {
   Button,
   Input,
@@ -18,6 +18,7 @@ import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
 import { useModal } from '@/lib/contexts/ModalContext';
 import { metadataService } from '@/lib/services/metadata.service';
+import type { InstanceInfoEvent } from '@insforge/shared-schemas';
 import { cn, isInsForgeCloudProject, isIframe, compareVersions } from '@/lib/utils/utils';
 import {
   McpConnectionSection,
@@ -26,7 +27,7 @@ import {
 } from '@/features/onboard';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 
-type TabType = 'info' | 'usage' | 'connect';
+type TabType = 'info' | 'usage' | 'compute' | 'connect';
 
 interface TabButtonProps {
   id: TabType;
@@ -65,6 +66,8 @@ export default function SettingsDialog() {
   useEffect(() => {
     if (isSettingsDialogOpen) {
       setActiveTab(settingsDefaultTab);
+    } else {
+      setSelectedInstanceType(null);
     }
   }, [isSettingsDialogOpen, settingsDefaultTab]);
 
@@ -80,6 +83,12 @@ export default function SettingsDialog() {
   const { confirm, confirmDialogProps } = useConfirm();
   const { showToast } = useToast();
   const [isRotatingApiKey, setIsRotatingApiKey] = useState(false);
+  const [instanceInfo, setInstanceInfo] = useState<Omit<InstanceInfoEvent, 'type'> | null>(null);
+  const [selectedInstanceType, setSelectedInstanceType] = useState<string | null>(null);
+  const [isChangingInstance, setIsChangingInstance] = useState(false);
+  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [isResizeComplete, setIsResizeComplete] = useState(false);
   const isCloud = isInsForgeCloudProject();
   const isInIframe = isIframe();
   const projectUrl = window.location.origin;
@@ -109,12 +118,42 @@ export default function SettingsDialog() {
       if (event.data?.type === 'VERSION_UPDATE_STARTED') {
         setIsUpdatingVersion(true);
       }
+
+      // Handle instance info response
+      if (event.data?.type === 'INSTANCE_INFO') {
+        setInstanceInfo({
+          currentInstanceType: event.data.currentInstanceType,
+          planName: event.data.planName,
+          computeCredits: event.data.computeCredits,
+          currentOrgComputeCost: event.data.currentOrgComputeCost,
+          instanceTypes: event.data.instanceTypes,
+        });
+        setSelectedInstanceType(null);
+      }
+
+      // Handle instance type change result
+      if (event.data?.type === 'INSTANCE_TYPE_CHANGE_RESULT') {
+        setIsChangingInstance(false);
+        setIsResizing(false);
+        if (event.data.success) {
+          setIsResizeComplete(true);
+          if (event.data.instanceType) {
+            setInstanceInfo((prev) =>
+              prev ? { ...prev, currentInstanceType: event.data.instanceType } : prev
+            );
+            setSelectedInstanceType(null);
+          }
+        } else {
+          showToast(event.data.error || 'Failed to change instance type', 'error');
+        }
+      }
     };
 
     window.addEventListener('message', handleMessage);
 
     // Request project info when Settings page mounts
     postMessageToParent({ type: 'REQUEST_PROJECT_INFO' }, '*');
+    postMessageToParent({ type: 'REQUEST_INSTANCE_INFO' }, '*');
 
     return () => window.removeEventListener('message', handleMessage);
   }, [isCloud, isInIframe]);
@@ -160,6 +199,16 @@ export default function SettingsDialog() {
 
   const handleUpdateVersion = () => {
     postMessageToParent({ type: 'UPDATE_PROJECT_VERSION' }, '*');
+  };
+
+  const handleInstanceTypeChange = () => {
+    if (!selectedInstanceType || selectedInstanceType === instanceInfo?.currentInstanceType) return;
+
+    setIsChangingInstance(true);
+    setIsReviewDialogOpen(false);
+    closeSettingsDialog();
+    setIsResizing(true);
+    postMessageToParent({ type: 'REQUEST_INSTANCE_TYPE_CHANGE', instanceType: selectedInstanceType }, '*');
   };
 
   const handleRotateApiKey = async () => {
@@ -231,6 +280,16 @@ export default function SettingsDialog() {
                     isActive={activeTab === 'connect'}
                     onClick={() => setActiveTab('connect')}
                   />
+
+                  {isCloud && isInIframe && (
+                    <TabButton
+                      id="compute"
+                      label="Compute & Disk"
+                      icon={HardDrive}
+                      isActive={activeTab === 'compute'}
+                      onClick={() => setActiveTab('compute')}
+                    />
+                  )}
                 </div>
               </div>
 
@@ -238,7 +297,9 @@ export default function SettingsDialog() {
               <div className="flex-1 flex flex-col min-w-0">
                 {/* Right Header - active tab name + close */}
                 <DialogHeader className="flex-row items-center justify-between">
-                  <DialogTitle className="capitalize">{activeTab}</DialogTitle>
+                  <DialogTitle className="capitalize">
+                    {activeTab === 'compute' ? 'Compute & Disk' : activeTab}
+                  </DialogTitle>
                   <DialogCloseButton />
                 </DialogHeader>
 
@@ -378,6 +439,82 @@ export default function SettingsDialog() {
                   </>
                 )}
 
+                {activeTab === 'compute' && (
+                  <>
+                    {!instanceInfo ? (
+                      <div className="text-sm text-muted-foreground">
+                        Loading instance types...
+                      </div>
+                    ) : (() => {
+                      const isFree = instanceInfo.planName === 'free';
+                      return (
+                        <>
+                          {isFree && (
+                            <div className="flex items-center justify-between rounded border border-[var(--border)] bg-toast px-4 py-3">
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <Info className="w-4 h-4 shrink-0" />
+                                <span className="text-sm">Only Available on Start Plan and above</span>
+                              </div>
+                              <Button
+                                onClick={() => postMessageToParent({ type: 'NAVIGATE_TO_SUBSCRIPTION' }, '*')}
+                              >
+                                Upgrade Plan
+                              </Button>
+                            </div>
+                          )}
+                          <div className={cn('grid grid-cols-2 gap-3', isFree && 'opacity-60 pointer-events-none')}>
+                            {instanceInfo.instanceTypes.map((instance) => {
+                              const isCurrent = instance.id === instanceInfo.currentInstanceType;
+                              const isSelected = !isFree && instance.id === selectedInstanceType;
+                              return (
+                                <button
+                                  key={instance.id}
+                                  onClick={() => !isCurrent && !isFree && setSelectedInstanceType(instance.id)}
+                                  className={cn(
+                                    'flex flex-col gap-2.5 p-4 rounded-lg border text-left transition-colors',
+                                    isCurrent
+                                      ? 'border-foreground cursor-default'
+                                      : isSelected
+                                        ? 'border-primary cursor-pointer'
+                                        : 'border-[var(--alpha-16)] hover:border-[var(--alpha-12)] cursor-pointer'
+                                  )}
+                                >
+                                  <div className="flex items-center justify-between w-full">
+                                    <span className={cn(
+                                      'text-xs font-medium uppercase px-2 py-0.5 rounded',
+                                      isCurrent
+                                        ? 'bg-foreground text-[rgb(var(--inverse))]'
+                                        : isSelected
+                                          ? 'bg-primary text-[rgb(var(--inverse))]'
+                                          : 'bg-[var(--alpha-16)] text-foreground'
+                                    )}>
+                                      {instance.id}
+                                    </span>
+                                    <span className="text-sm text-muted-foreground">
+                                      <span className="text-foreground">${instance.pricePerHour.toFixed(4)}</span>
+                                      {' '}/ hour
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-col gap-2">
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                      <HardDrive className="w-4 h-4 shrink-0" />
+                                      <span>{instance.ram}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                      <Cpu className="w-4 h-4 shrink-0" />
+                                      <span>{instance.cpu}</span>
+                                    </div>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </>
+                )}
+
                 {activeTab === 'connect' && (
                   <TooltipProvider>
                     <div className="flex flex-col gap-12 mr-4">
@@ -420,9 +557,167 @@ export default function SettingsDialog() {
                   </TooltipProvider>
                 )}
               </div>
+
+              {/* Compute tab footer with additional cost and action buttons */}
+              {activeTab === 'compute' &&
+                instanceInfo &&
+                selectedInstanceType &&
+                selectedInstanceType !== instanceInfo.currentInstanceType && (() => {
+                  const currentInstance = instanceInfo.instanceTypes.find(
+                    (t) => t.id === instanceInfo.currentInstanceType
+                  );
+                  const selectedInstance = instanceInfo.instanceTypes.find(
+                    (t) => t.id === selectedInstanceType
+                  );
+                  const additionalCost = (selectedInstance?.pricePerMonth ?? 0) - (currentInstance?.pricePerMonth ?? 0);
+                  const credits = instanceInfo.computeCredits === -1 ? Infinity : instanceInfo.computeCredits;
+                  const newOrgCost = instanceInfo.currentOrgComputeCost
+                    - (currentInstance?.pricePerMonth ?? 0)
+                    + (selectedInstance?.pricePerMonth ?? 0);
+                  const newOrgCostAfterCredits = Math.max(0, newOrgCost - Math.min(credits, newOrgCost));
+                  const showAdditionalCost = additionalCost > 0 && newOrgCostAfterCredits > 0;
+
+                  return (
+                    <div className="flex items-center justify-between border-t border-[var(--alpha-8)] px-6 py-4">
+                      {showAdditionalCost ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm text-foreground">Additional Cost:</span>
+                          <span className="text-sm text-primary">
+                            ${additionalCost}/Month
+                          </span>
+                          <Info className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                      ) : (
+                        <div />
+                      )}
+                      <div className="flex items-center gap-3">
+                        <Button
+                          variant="secondary"
+                          onClick={() => setSelectedInstanceType(null)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={() => setIsReviewDialogOpen(true)}
+                          disabled={isChangingInstance}
+                        >
+                          {isChangingInstance ? 'Changing...' : 'Review Changes'}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })()}
+
               </div>
             </div>
           </DialogBody>
+        </DialogContent>
+      </Dialog>
+
+      {/* Review Changes Dialog */}
+      <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
+        <DialogContent className="max-w-[780px]" showCloseButton={false}>
+          <DialogHeader className="flex-row items-center justify-between">
+            <div className="flex flex-col gap-1">
+              <DialogTitle>Review Changes</DialogTitle>
+              <p className="text-sm text-muted-foreground">
+                Changes will be applied shortly once confirmed
+              </p>
+            </div>
+            <DialogCloseButton />
+          </DialogHeader>
+          <DialogBody className="flex flex-col gap-4 p-6">
+            {instanceInfo && selectedInstanceType && (() => {
+              const currentInstance = instanceInfo.instanceTypes.find(
+                (t) => t.id === instanceInfo.currentInstanceType
+              );
+              const selectedInstance = instanceInfo.instanceTypes.find(
+                (t) => t.id === selectedInstanceType
+              );
+
+              return (
+                <>
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 flex items-center justify-between border border-[var(--alpha-16)] rounded-lg p-4">
+                      <span className="text-xs font-medium uppercase px-2 py-0.5 rounded bg-[var(--alpha-16)] text-foreground">
+                        {currentInstance?.id}
+                      </span>
+                      <span className="text-sm text-foreground">
+                        ${currentInstance?.pricePerMonth ?? 0} / Month
+                      </span>
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-muted-foreground shrink-0" />
+                    <div className="flex-1 flex items-center justify-between border border-primary rounded-lg p-4">
+                      <span className="text-xs font-medium uppercase px-2 py-0.5 rounded bg-primary text-[rgb(var(--inverse))]">
+                        {selectedInstance?.id}
+                      </span>
+                      <span className="text-sm text-foreground">
+                        ${selectedInstance?.pricePerMonth ?? 0} / Month
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-warning">
+                      <CircleAlert className="w-4 h-4 shrink-0" />
+                      <span className="text-sm">
+                        Resizing your Compute will automatically restart your project
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <Button
+                        variant="secondary"
+                        onClick={() => setIsReviewDialogOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button onClick={handleInstanceTypeChange}>
+                        Confirm Changes
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resizing dialog */}
+      <Dialog open={isResizing}>
+        <DialogContent showCloseButton={false}>
+          <DialogBody className="p-6 flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-5 h-5 animate-spin text-foreground" />
+              <span className="text-base font-medium text-foreground">Resizing Project Compute Size</span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Your project is being restarted to apply compute size changes.
+              This can take a few minutes. Project will be offline while it is being restarted
+            </p>
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resize complete dialog */}
+      <Dialog open={isResizeComplete} onOpenChange={setIsResizeComplete}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader className="flex-row items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CircleCheck className="w-5 h-5 text-primary" />
+              <DialogTitle>Compute Size Updated</DialogTitle>
+            </div>
+            <DialogCloseButton />
+          </DialogHeader>
+          <DialogBody className="p-6">
+            <p className="text-sm text-muted-foreground">
+              Compute resizing completed. Your project is now back online.
+            </p>
+          </DialogBody>
+          <div className="flex justify-end px-6 pb-6">
+            <Button variant="secondary" onClick={() => setIsResizeComplete(false)}>
+              Close
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </>
