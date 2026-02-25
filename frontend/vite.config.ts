@@ -13,6 +13,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
       '@insforge/shared-schemas': path.resolve(__dirname, '../shared-schemas/src'),
       '@insforge/ui': path.resolve(__dirname, '../ui/src'),
+      'posthog-js/react': path.resolve(__dirname, '../node_modules/posthog-js/react'),
     },
   },
   server: {
