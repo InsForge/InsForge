@@ -51,6 +51,7 @@ import {
   ApiCredentialsSection,
 } from '@/features/onboard';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
+import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 
 type TabType = 'info' | 'usage' | 'compute' | 'connect';
 
@@ -137,6 +138,7 @@ export default function SettingsMenuDialog() {
           computeCredits: event.data.computeCredits,
           currentOrgComputeCost: event.data.currentOrgComputeCost,
           instanceTypes: event.data.instanceTypes,
+          projects: event.data.projects,
         });
         setSelectedInstanceType(null);
       }
@@ -466,9 +468,10 @@ export default function SettingsMenuDialog() {
                                 </span>
                               </div>
                               <Button
-                                onClick={() =>
-                                  postMessageToParent({ type: 'NAVIGATE_TO_SUBSCRIPTION' }, '*')
-                                }
+                                onClick={() => {
+                                  closeSettingsDialog();
+                                  postMessageToParent({ type: 'SHOW_PLAN_MODAL' }, '*');
+                                }}
                               >
                                 Upgrade Plan
                               </Button>
@@ -594,27 +597,107 @@ export default function SettingsMenuDialog() {
                 const selectedInstance = instanceInfo.instanceTypes.find(
                   (t) => t.id === selectedInstanceType
                 );
-                const additionalCost =
-                  (selectedInstance?.pricePerMonth ?? 0) - (currentInstance?.pricePerMonth ?? 0);
                 const credits =
                   instanceInfo.computeCredits === -1 ? Infinity : instanceInfo.computeCredits;
                 const newOrgCost =
                   instanceInfo.currentOrgComputeCost -
                   (currentInstance?.pricePerMonth ?? 0) +
                   (selectedInstance?.pricePerMonth ?? 0);
-                const newOrgCostAfterCredits = Math.max(
-                  0,
-                  newOrgCost - Math.min(credits, newOrgCost)
-                );
-                const showAdditionalCost = additionalCost > 0 && newOrgCostAfterCredits > 0;
+                const creditDeduction =
+                  credits === Infinity ? newOrgCost : Math.min(credits, newOrgCost);
+                const totalAfterCredits = Math.max(0, newOrgCost - creditDeduction);
 
                 return (
                   <MenuDialogFooter className="justify-between">
-                    {showAdditionalCost ? (
+                    {totalAfterCredits > 0 ? (
                       <div className="flex items-center gap-1.5">
                         <span className="text-sm text-foreground">Additional Cost:</span>
-                        <span className="text-sm text-primary">${additionalCost}/Month</span>
-                        <Info className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm text-primary">${totalAfterCredits}/Month</span>
+                        <TooltipPrimitive.Provider delayDuration={200}>
+                          <TooltipPrimitive.Root>
+                            <TooltipPrimitive.Trigger asChild>
+                              <span className="p-0.5 text-muted-foreground hover:text-foreground transition-colors cursor-default">
+                                <Info className="w-4 h-4" />
+                              </span>
+                            </TooltipPrimitive.Trigger>
+                            <TooltipPrimitive.Portal>
+                              <TooltipPrimitive.Content
+                                side="top"
+                                align="start"
+                                sideOffset={8}
+                                className="z-50 w-[420px] rounded-lg border border-[var(--alpha-8)] bg-[rgb(var(--semantic-1))] shadow-lg animate-in fade-in-0 zoom-in-95"
+                              >
+                                <div className="p-3 text-sm text-foreground leading-relaxed">
+                                  Each project includes a dedicated Postgres instance running on its
+                                  own server. You are charged for the Compute resource of that
+                                  server, independent of your database usage.
+                                  <br />
+                                  <br />
+                                  Compute costs are applied on top of your subscription plan cost.
+                                </div>
+                                <div className="flex flex-col">
+                                  {/* Header */}
+                                  <div className="flex items-center px-1.5 border-b border-[var(--alpha-8)] bg-[var(--alpha-4)]">
+                                    <div className="flex-1 px-2.5 py-1.5 text-xs text-muted-foreground">
+                                      Project
+                                    </div>
+                                    <div className="w-[120px] px-2.5 py-1.5 text-xs text-muted-foreground">
+                                      Compute Size
+                                    </div>
+                                    <div className="w-[120px] px-2.5 py-1.5 text-xs text-muted-foreground text-right">
+                                      Monthly Cost
+                                    </div>
+                                  </div>
+                                  {/* Projects */}
+                                  {instanceInfo.projects.map((p, i) => (
+                                    <div
+                                      key={i}
+                                      className="flex items-center px-1.5 border-b border-[var(--alpha-8)]"
+                                    >
+                                      <div className="flex-1 px-2.5 py-1.5 text-xs text-foreground flex items-center gap-1 truncate">
+                                        <span className="truncate">{p.name}</span>
+                                        {p.status === 'paused' && (
+                                          <span className="shrink-0 px-1.5 py-px text-[10px] font-medium text-destructive bg-[var(--alpha-8)] rounded">
+                                            PAUSED
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="w-[120px] px-2.5 py-1.5 text-xs text-foreground">
+                                        {p.isCurrent
+                                          ? selectedInstanceType.toUpperCase()
+                                          : p.instanceType}
+                                      </div>
+                                      <div className="w-[120px] px-2.5 py-1.5 text-xs text-foreground text-right">
+                                        $
+                                        {p.isCurrent
+                                          ? (selectedInstance?.pricePerMonth ?? 0)
+                                          : p.monthlyCost}
+                                      </div>
+                                    </div>
+                                  ))}
+                                  {/* Compute Credits */}
+                                  <div className="flex items-center px-1.5 border-b border-[var(--alpha-8)] bg-[var(--alpha-4)]">
+                                    <div className="flex-1 px-2.5 py-1.5 text-xs text-muted-foreground">
+                                      Compute Credits
+                                    </div>
+                                    <div className="w-[120px] px-2.5 py-1.5 text-xs text-muted-foreground text-right">
+                                      -${creditDeduction}
+                                    </div>
+                                  </div>
+                                  {/* Total */}
+                                  <div className="flex items-center px-1.5">
+                                    <div className="flex-1 px-2.5 py-2 text-xs text-foreground">
+                                      Total Monthly Compute Costs
+                                    </div>
+                                    <div className="w-[120px] px-2.5 py-2 text-xs text-foreground text-right">
+                                      ${totalAfterCredits}
+                                    </div>
+                                  </div>
+                                </div>
+                              </TooltipPrimitive.Content>
+                            </TooltipPrimitive.Portal>
+                          </TooltipPrimitive.Root>
+                        </TooltipPrimitive.Provider>
                       </div>
                     ) : (
                       <div />
