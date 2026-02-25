@@ -28,6 +28,14 @@ Create AI chat completions with streaming support, web search, file parsing, and
   - `enabled` (boolean) - Enable file parsing
   - `pdf` (object, optional) - PDF processing options
     - `engine` ('pdf-text' | 'mistral-ocr' | 'native', optional) - Processing engine. Defaults to native if supported, otherwise mistral-ocr
+- `tools` (array, optional) - Array of tool definitions for function calling
+  - `type` ('function') - Tool type
+  - `function` (object) - Function definition
+    - `name` (string) - Function name
+    - `description` (string, optional) - Description of what the function does
+    - `parameters` (object, optional) - JSON Schema of the function parameters
+- `tool_choice` (string | object, optional) - Controls tool usage: `'auto'`, `'none'`, `'required'`, or `{ type: 'function', function: { name: string } }`
+- `parallel_tool_calls` (boolean, optional) - Allow the model to call multiple tools in parallel
 
 <Note>
 File URLs must be publicly accessible. Storage buckets must be public, or use base64 for private files.
@@ -46,11 +54,31 @@ File URLs must be publicly accessible. Storage buckets must be public, or use ba
     message: {
       role: "assistant",
       content: string,
-      annotations?: UrlCitationAnnotation[]  // Present when web search is used
+      tool_calls?: ToolCall[],                // Present when the model invokes tools
+      annotations?: UrlCitationAnnotation[]   // Present when web search is used
     },
     finish_reason: string
   }],
   usage: { prompt_tokens: number, completion_tokens: number, total_tokens: number }
+}
+
+// ToolCall type
+interface ToolCall {
+  id: string;
+  type: 'function';
+  function: { name: string; arguments: string };
+}
+
+// UrlCitationAnnotation type
+interface UrlCitationAnnotation {
+  type: 'url_citation';
+  urlCitation: {
+    url: string;
+    title?: string;
+    content?: string;
+    startIndex?: number;
+    endIndex?: number;
+  };
 }
 ```
 
@@ -62,7 +90,10 @@ AsyncIterableIterator<{
   object: 'chat.completion.chunk';
   choices: [
     {
-      delta: { content: string };
+      delta: {
+        content: string;
+        tool_calls?: ToolCall[];   // Present in the final chunk when tools are used
+      };
       finish_reason: string | null;
     },
   ];
@@ -153,6 +184,30 @@ for await (const chunk of stream) {
     process.stdout.write(chunk.choices[0].delta.content);
   }
 }
+```
+
+### Example (Tool Calling)
+
+```typescript
+const completion = await insforge.ai.chat.completions.create({
+  model: 'openai/gpt-4o-mini',
+  messages: [{ role: 'user', content: 'Your prompt here' }],
+  tools: [{
+    type: 'function',
+    function: {
+      name: 'your_function_name',
+      description: 'Describe what your function does',
+      parameters: {
+        type: 'object',
+        properties: {
+          param1: { type: 'string', description: 'First parameter' }
+        },
+        required: ['param1']
+      }
+    }
+  }],
+});
+
 ```
 
 ---

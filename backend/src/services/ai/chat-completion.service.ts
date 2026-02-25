@@ -6,6 +6,7 @@ import type {
   AIConfigurationSchema,
   ChatCompletionResponse,
   ChatMessageSchema,
+  ToolCall,
   UrlCitationAnnotation,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
@@ -90,6 +91,29 @@ export class ChatCompletionService {
 
     // Format conversation messages
     for (const msg of messages) {
+      // Handle tool response messages
+      if (msg.role === 'tool') {
+        if (!msg.tool_call_id) {
+          throw new Error('Tool message is missing required tool_call_id');
+        }
+        formattedMessages.push({
+          role: 'tool',
+          content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
+          tool_call_id: msg.tool_call_id,
+        } as OpenAI.Chat.ChatCompletionToolMessageParam);
+        continue;
+      }
+
+      // Handle assistant messages with tool_calls
+      if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
+        formattedMessages.push({
+          role: 'assistant',
+          content: typeof msg.content === 'string' ? msg.content : (msg.content ?? null),
+          tool_calls: msg.tool_calls,
+        } as OpenAI.Chat.ChatCompletionAssistantMessageParam);
+        continue;
+      }
+
       // Check if message has images (legacy format), new format image is within the content array
       if (msg.images && msg.images.length && typeof msg.content === 'string') {
         // Build multimodal content array
@@ -267,6 +291,9 @@ export class ChatCompletionService {
         top_p: options.topP,
         stream: false,
         plugins: this.buildPlugins(options),
+        tools: options.tools,
+        tool_choice: options.tool_choice,
+        parallel_tool_calls: options.parallel_tool_calls,
       };
 
       // Send request with automatic renewal and retry logic
@@ -300,8 +327,28 @@ export class ChatCompletionService {
         response.choices[0]?.message as MessageWithAnnotations | undefined
       );
 
+      // Extract tool_calls from response
+      const rawToolCalls = response.choices[0]?.message?.tool_calls;
+      const toolCalls: ToolCall[] | undefined =
+        rawToolCalls && rawToolCalls.length > 0
+          ? rawToolCalls
+              .filter(
+                (tc): tc is OpenAI.Chat.ChatCompletionMessageToolCall & { type: 'function' } =>
+                  tc.type === 'function'
+              )
+              .map((tc) => ({
+                id: tc.id,
+                type: 'function' as const,
+                function: {
+                  name: tc.function.name,
+                  arguments: tc.function.arguments,
+                },
+              }))
+          : undefined;
+
       return {
         text: response.choices[0]?.message?.content || '',
+        tool_calls: toolCalls,
         annotations,
         metadata: {
           model: modelId,
@@ -328,6 +375,7 @@ export class ChatCompletionService {
     chunk?: string;
     tokenUsage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
     annotations?: UrlCitationAnnotation[];
+    tool_calls?: ToolCall[];
   }> {
     try {
       // Validate model and get config (pass thinking option for variant checking)
@@ -348,6 +396,9 @@ export class ChatCompletionService {
         top_p: options.topP,
         stream: true,
         plugins: this.buildPlugins(options),
+        tools: options.tools,
+        tool_choice: options.tool_choice,
+        parallel_tool_calls: options.parallel_tool_calls,
       };
 
       // Send request with automatic renewal and retry logic
@@ -364,10 +415,34 @@ export class ChatCompletionService {
       // Collect annotations from streaming response
       let collectedAnnotations: UrlCitationAnnotation[] | undefined;
 
+      // Collect tool call deltas across chunks
+      const toolCallMap = new Map<number, { id: string; name: string; arguments: string }>();
+
       for await (const chunk of stream) {
         const content = chunk.choices[0]?.delta?.content;
         if (content) {
           yield { chunk: content };
+        }
+
+        // Accumulate tool_call deltas from streaming chunks
+        const deltaToolCalls = chunk.choices[0]?.delta?.tool_calls;
+        if (deltaToolCalls) {
+          for (const delta of deltaToolCalls) {
+            const existing = toolCallMap.get(delta.index);
+            if (existing) {
+              // Append to existing tool call
+              if (delta.function?.arguments) {
+                existing.arguments += delta.function.arguments;
+              }
+            } else {
+              // Start a new tool call entry
+              toolCallMap.set(delta.index, {
+                id: delta.id || '',
+                name: delta.function?.name || '',
+                arguments: delta.function?.arguments || '',
+              });
+            }
+          }
         }
 
         // Check for annotations in the chunk (web search results)
@@ -389,6 +464,21 @@ export class ChatCompletionService {
           // Yield the accumulated usage
           yield { tokenUsage: { ...tokenUsage } };
         }
+      }
+
+      // Yield collected tool calls at the end if present
+      if (toolCallMap.size > 0) {
+        const toolCalls: ToolCall[] = Array.from(toolCallMap.entries())
+          .sort(([a], [b]) => a - b)
+          .map(([, tc]) => ({
+            id: tc.id,
+            type: 'function' as const,
+            function: {
+              name: tc.name,
+              arguments: tc.arguments,
+            },
+          }));
+        yield { tool_calls: toolCalls };
       }
 
       // Yield annotations at the end if present

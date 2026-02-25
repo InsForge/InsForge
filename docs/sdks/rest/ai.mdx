@@ -110,13 +110,18 @@ POST /api/ai/chat/completion
 | `maxTokens` | integer | No | Maximum tokens to generate |
 | `topP` | number | No | Nucleus sampling parameter (0-1) |
 | `systemPrompt` | string | No | System prompt to guide behavior |
+| `tools` | array | No | Tool definitions for function calling |
+| `tool_choice` | string/object | No | Tool usage control: `auto`, `none`, `required`, or specific function |
+| `parallel_tool_calls` | boolean | No | Allow parallel tool invocations |
 
 ### Message Format
 
 ```json
 {
-  "role": "user|assistant|system",
-  "content": "message text"
+  "role": "user|assistant|system|tool",
+  "content": "message text",
+  "tool_calls": [],       // assistant messages: tool calls from the model
+  "tool_call_id": ""      // tool messages: ID of the tool call being responded to
 }
 ```
 
@@ -139,7 +144,7 @@ curl -X POST "https://your-app.insforge.app/api/ai/chat/completion" \
 ```json
 {
   "success": true,
-  "content": "The capital of France is Paris.",
+  "text": "The capital of France is Paris.",
   "metadata": {
     "model": "anthropic/claude-3.5-haiku",
     "usage": {
@@ -182,6 +187,65 @@ curl -X POST "https://your-app.insforge.app/api/ai/chat/completion" \
       {"role": "user", "content": "What are its main features?"}
     ]
   }'
+```
+
+### Example (Tool Calling)
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/ai/chat/completion" \
+  -H "Authorization: Bearer your-jwt-token-or-anon-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/gpt-4o-mini",
+    "messages": [
+      {"role": "user", "content": "Your prompt here"}
+    ],
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "your_function_name",
+          "description": "Describe what your function does",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "param1": {"type": "string", "description": "First parameter"}
+            },
+            "required": ["param1"]
+          }
+        }
+      }
+    ]
+  }'
+```
+
+### Response (Tool Call)
+
+When the model decides to call a tool, the response includes `tool_calls`:
+
+```json
+{
+  "success": true,
+  "text": "",
+  "tool_calls": [
+    {
+      "id": "call_abc123",
+      "type": "function",
+      "function": {
+        "name": "your_function_name",
+        "arguments": "{\"param1\": \"value1\"}"
+      }
+    }
+  ],
+  "metadata": {
+    "model": "openai/gpt-4o-mini",
+    "usage": {
+      "promptTokens": 85,
+      "completionTokens": 24,
+      "totalTokens": 109
+    }
+  }
+}
 ```
 
 ---

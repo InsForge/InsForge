@@ -53,13 +53,51 @@ export const contentSchema = z.union([
   fileContentSchema,
 ]);
 
+// Tool function definition (OpenAI-compatible)
+export const toolFunctionSchema = z.object({
+  name: z.string(),
+  description: z.string().optional(),
+  parameters: z.record(z.unknown()).optional(),
+});
+
+// Tool definition
+export const toolSchema = z.object({
+  type: z.literal('function'),
+  function: toolFunctionSchema,
+});
+
+// Tool choice - controls whether/which tool is called
+export const toolChoiceSchema = z.union([
+  z.enum(['auto', 'none', 'required']),
+  z.object({
+    type: z.literal('function'),
+    function: z.object({ name: z.string() }),
+  }),
+]);
+
+// Tool call from assistant response
+export const toolCallSchema = z.object({
+  id: z.string(),
+  type: z.literal('function'),
+  function: z.object({
+    name: z.string(),
+    arguments: z.string(),
+  }),
+});
+
 // Chat message supports both OpenAI format and legacy format for backward compatibility
 export const chatMessageSchema = z.object({
-  role: z.enum(['user', 'assistant', 'system']),
+  role: z.enum(['user', 'assistant', 'system', 'tool']),
   // New format: content can be string or array of content parts (OpenAI-compatible)
-  content: z.union([z.string(), z.array(contentSchema)]),
+  content: z.union([z.string(), z.array(contentSchema)]).nullable(),
   // Legacy format: separate images field (deprecated but supported for backward compatibility)
   images: z.array(z.object({ url: z.string() })).optional(),
+  // Tool calls made by the assistant
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  tool_calls: z.array(toolCallSchema).optional(),
+  // Tool call ID for tool response messages
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  tool_call_id: z.string().optional(),
 });
 
 // Web Search Plugin configuration for OpenRouter
@@ -107,6 +145,14 @@ export const chatCompletionRequestSchema = z.object({
   // Thinking/Reasoning mode: Enable extended reasoning capabilities
   // Appends ":thinking" to the model ID for chain-of-thought reasoning
   thinking: z.boolean().optional(),
+  // Tool calling: Define functions the AI can call
+  tools: z.array(toolSchema).optional(),
+  // Tool choice: Control whether/which tool is called ('auto', 'none', 'required', or specific function)
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  tool_choice: toolChoiceSchema.optional(),
+  // Parallel tool calls: Allow the model to call multiple tools in parallel
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  parallel_tool_calls: z.boolean().optional(),
 });
 
 // URL citation annotation from web search results
@@ -140,6 +186,9 @@ export const annotationSchema = z.union([urlCitationAnnotationSchema, fileAnnota
 
 export const chatCompletionResponseSchema = z.object({
   text: z.string(),
+  // Tool calls from the assistant (present when the model invokes tools)
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  tool_calls: z.array(toolCallSchema).optional(),
   // Annotations from web search or file parsing (can be URL citations or file annotations)
   annotations: z.array(annotationSchema).optional(),
   metadata: z
@@ -262,6 +311,10 @@ export const getAIUsageSummaryRequestSchema = z.object({
 });
 
 // Export types
+export type ToolFunction = z.infer<typeof toolFunctionSchema>;
+export type Tool = z.infer<typeof toolSchema>;
+export type ToolChoice = z.infer<typeof toolChoiceSchema>;
+export type ToolCall = z.infer<typeof toolCallSchema>;
 export type TextContentSchema = z.infer<typeof textContentSchema>;
 export type ImageContentSchema = z.infer<typeof imageContentSchema>;
 export type AudioContentSchema = z.infer<typeof audioContentSchema>;

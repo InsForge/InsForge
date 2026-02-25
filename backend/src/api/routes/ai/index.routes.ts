@@ -79,6 +79,9 @@ router.post(
             if (data.tokenUsage) {
               res.write(`data: ${JSON.stringify({ tokenUsage: data.tokenUsage })}\n\n`);
             }
+            if (data.tool_calls) {
+              res.write(`data: ${JSON.stringify({ tool_calls: data.tool_calls })}\n\n`);
+            }
             if (data.annotations) {
               res.write(`data: ${JSON.stringify({ annotations: data.annotations })}\n\n`);
             }
@@ -93,7 +96,7 @@ router.post(
             stack: streamError instanceof Error ? streamError.stack : undefined,
           });
           res.write(
-            `data: ${JSON.stringify({ error: true, meesage: streamError instanceof Error ? streamError.message : String(streamError) })}\n\n`
+            `data: ${JSON.stringify({ error: true, message: streamError instanceof Error ? streamError.message : String(streamError) })}\n\n`
           );
         }
 

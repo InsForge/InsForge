@@ -76,6 +76,7 @@ Model availability may vary. Use the `GET /api/ai/models` endpoint or `get-backe
 | Capability | Description |
 |------------|-------------|
 | **Chat Completions** | Multi-turn conversations with streaming support |
+| **Tool Calling** | Let the AI invoke custom functions (e.g., database lookups, API calls) |
 | **Web Search** | Augment responses with real-time web results and citations |
 | **PDF/File Parsing** | Process PDFs and documents directly in chat (pdf-text, mistral-ocr, native engines) |
 | **Image Vision** | Analyze and describe images in conversations |
@@ -145,6 +146,28 @@ async function* streamChat(messages, options) {
   
   yield { done: true, tokenUsage: {...} };
 }
+```
+
+### Tool Calling
+
+Tool calling (function calling) lets the AI model invoke custom functions you define. The client sends tool definitions, the model decides when to call them, and the client executes the function and sends the result back.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant InsForge
+    participant OpenRouter
+
+    Client->>InsForge: Chat request with tools[]
+    InsForge->>OpenRouter: Forward with tool definitions
+    OpenRouter-->>InsForge: Response with tool_calls
+    InsForge-->>Client: Return tool_calls
+
+    Client->>Client: Execute tool function
+    Client->>InsForge: Send tool result (role: "tool")
+    InsForge->>OpenRouter: Forward conversation
+    OpenRouter-->>InsForge: Final text response
+    InsForge-->>Client: Return response
 ```
 
 ### Response Formats
