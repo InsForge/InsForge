@@ -19,7 +19,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@insforge/shared-schemas": ["../shared-schemas/src/index.ts"],
-      "@insforge/ui": ["../ui/src/index.ts"]
+      "@insforge/ui": ["../ui/src/index.ts"],
+      "posthog-js/react": ["../node_modules/posthog-js/react/dist/types/index.d.ts"]
     }
   },
   "include": ["src", "src/vite-env.d.ts", "../shared-schemas", "../ui"],
