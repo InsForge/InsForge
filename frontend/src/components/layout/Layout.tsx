@@ -3,6 +3,7 @@ import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
 import { ThemeProvider } from '@/lib/contexts/ThemeContext';
 import { OnboardingModal, OnboardingOverlay } from '@/features/onboard';
+import { SettingsMenuDialog } from '@/features/settings/components';
 import { isIframe } from '@/lib/utils/utils';
 
 interface LayoutProps {
@@ -32,6 +33,7 @@ export default function Layout({ children }: LayoutProps) {
         </div>
       </div>
       <OnboardingModal />
+      <SettingsMenuDialog />
     </ThemeProvider>
   );
 }
