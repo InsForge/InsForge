@@ -45,6 +45,10 @@ export const showConnectOverlayEventSchema = z.object({
   type: z.literal('SHOW_CONNECT_OVERLAY'),
 });
 
+export const showPlanModalEventSchema = z.object({
+  type: z.literal('SHOW_PLAN_MODAL'),
+});
+
 export const authorizationCodeEventSchema = z.object({
   type: z.literal('AUTHORIZATION_CODE'),
   code: z.string(),
@@ -75,6 +79,15 @@ export const instanceInfoEventSchema = z.object({
       pricePerMonth: z.number(),
     })
   ),
+  projects: z.array(
+    z.object({
+      name: z.string(),
+      instanceType: z.string(),
+      monthlyCost: z.number(),
+      isCurrent: z.boolean(),
+      status: z.string(),
+    })
+  ),
 });
 
 export const requestInstanceTypeChangeEventSchema = z.object({
@@ -100,6 +113,7 @@ export const cloudEventSchema = z.discriminatedUnion('type', [
   navigateToUsageSchema,
   showContactModalEventSchema,
   showConnectOverlayEventSchema,
+  showPlanModalEventSchema,
   authorizationCodeEventSchema,
   routeChangeEventSchema,
   requestInstanceInfoEventSchema,
@@ -117,6 +131,7 @@ export type ShowOnboardingOverlayEvent = z.infer<typeof showOnboardingOverlayEve
 export type ShowSettingsOverlayEvent = z.infer<typeof showSettingsOverlayEventSchema>;
 export type ShowContactModalEvent = z.infer<typeof showContactModalEventSchema>;
 export type ShowConnectOverlayEvent = z.infer<typeof showConnectOverlayEventSchema>;
+export type ShowPlanModalEvent = z.infer<typeof showPlanModalEventSchema>;
 export type AuthorizationCodeEvent = z.infer<typeof authorizationCodeEventSchema>;
 export type RouteChangeEvent = z.infer<typeof routeChangeEventSchema>;
 export type RequestInstanceInfoEvent = z.infer<typeof requestInstanceInfoEventSchema>;
