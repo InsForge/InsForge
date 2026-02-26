@@ -432,7 +432,6 @@ components:
       type: object
       required:
         - role
-        - content
       properties:
         role:
           type: string
@@ -440,7 +439,8 @@ components:
           description: Role of the message sender
         content:
           type: string
-          description: Message content
+          nullable: true
+          description: Message content (nullable for assistant messages with tool_calls)
         tool_calls:
           type: array
           description: Tool calls made by the assistant (assistant messages only)
@@ -502,6 +502,9 @@ components:
             - type: string
               enum: [auto, none, required]
             - type: object
+              required:
+                - type
+                - function
               properties:
                 type:
                   type: string

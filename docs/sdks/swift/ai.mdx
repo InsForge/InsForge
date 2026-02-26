@@ -350,7 +350,7 @@ public struct Tool: Codable, Sendable {
 public struct FunctionDefinition: Codable, Sendable {
     let name: String
     let description: String?
-    let parameters: [String: Any]?      // JSON Schema
+    let parameters: AnyCodable?         // JSON Schema (use AnyCodable from open-source package)
 }
 
 // Tool choice control
