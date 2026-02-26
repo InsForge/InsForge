@@ -78,8 +78,8 @@ async function seedSystemUsers(adminEmail: string, adminPassword: string): Promi
 async function seedDefaultAIConfigs(): Promise<void> {
   const aiConfigService = AIConfigService.getInstance();
 
-  const existingConfigs = await aiConfigService.findAll();
-  if (existingConfigs.length) {
+  const hasAnyConfig = await aiConfigService.hasAnyConfig();
+  if (hasAnyConfig) {
     return;
   }
 

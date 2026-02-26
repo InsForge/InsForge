@@ -312,23 +312,23 @@ router.patch(
 
 /**
  * DELETE /api/ai/configurations/:id
- * Delete an AI configuration
+ * Disable an AI configuration
  */
 router.delete(
   '/configurations/:id',
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const deleted = await aiConfigService.delete(req.params.id);
+      const disabled = await aiConfigService.disable(req.params.id);
 
-      if (!deleted) {
+      if (!disabled) {
         throw new AppError('AI configuration not found', 404, ERROR_CODES.NOT_FOUND);
       }
 
-      // Log audit for AI configuration deletion
+      // Log audit for AI configuration disable
       await auditService.log({
         actor: req.user?.email || 'api-key',
-        action: 'DELETE_CONFIGURATION',
+        action: 'DISABLE_CONFIGURATION',
         module: 'AI',
         details: {
           configId: req.params.id,
@@ -337,7 +337,7 @@ router.delete(
       });
 
       successResponse(res, {
-        message: 'AI configuration deleted successfully',
+        message: 'AI configuration disabled successfully',
       });
     } catch (error) {
       if (error instanceof AppError) {
@@ -345,7 +345,7 @@ router.delete(
       } else {
         next(
           new AppError(
-            error instanceof Error ? error.message : 'Failed to delete AI configuration',
+            error instanceof Error ? error.message : 'Failed to disable AI configuration',
             500,
             ERROR_CODES.INTERNAL_ERROR
           )

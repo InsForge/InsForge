@@ -114,7 +114,7 @@ export default function AIPage() {
         if (config) {
           const shouldDelete = await confirm({
             title: 'Disable AI Model',
-            description: `Are you sure you want to disable ${model.modelId.split('/')[1]}? This will remove the model.`,
+            description: `Are you sure you want to disable ${model.modelId.split('/')[1]}? Usage history will be preserved.`,
             confirmText: 'Disable',
             destructive: true,
           });

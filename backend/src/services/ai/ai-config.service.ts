@@ -32,17 +32,38 @@ export class AIConfigService {
   ): Promise<{ id: string }> {
     try {
       const result = await this.getPool().query(
-        `INSERT INTO ai.configs (input_modality, output_modality, provider, model_id, system_prompt)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO ai.configs (input_modality, output_modality, provider, model_id, system_prompt, is_active)
+         VALUES ($1, $2, $3, $4, $5, TRUE)
+         ON CONFLICT (model_id) DO UPDATE
+         SET input_modality = EXCLUDED.input_modality,
+             output_modality = EXCLUDED.output_modality,
+             provider = EXCLUDED.provider,
+             system_prompt = COALESCE(EXCLUDED.system_prompt, ai.configs.system_prompt),
+             is_active = TRUE,
+             updated_at = NOW()
          RETURNING id`,
         [inputModality, outputModality, provider, modelId, systemPrompt || null]
       );
 
-      logger.info('AI configuration created', { id: result.rows[0].id });
+      logger.info('AI configuration enabled', { id: result.rows[0].id, modelId });
       return { id: result.rows[0].id };
     } catch (error) {
       logger.error('Failed to create AI configuration', { error });
       throw new Error('Failed to create AI configuration');
+    }
+  }
+
+  /**
+   * Check whether ai.configs has any rows, including inactive ones.
+   * Used by bootstrap seed logic to avoid re-enabling intentionally disabled models.
+   */
+  async hasAnyConfig(): Promise<boolean> {
+    try {
+      const result = await this.getPool().query('SELECT 1 FROM ai.configs LIMIT 1');
+      return result.rows.length > 0;
+    } catch (error) {
+      logger.error('Failed to check AI configuration existence', { error });
+      throw new Error('Failed to check AI configuration existence');
     }
   }
 
@@ -64,6 +85,7 @@ export class AIConfigService {
           COALESCE(COUNT(u.id), 0)::INTEGER as "totalRequests"
          FROM ai.configs c
          LEFT JOIN ai.usage u ON c.id = u.config_id
+         WHERE c.is_active = TRUE
          GROUP BY c.id, c.input_modality, c.output_modality, c.provider, c.model_id, c.system_prompt, c.created_at
          ORDER BY c.created_at DESC`
       );
@@ -109,18 +131,23 @@ export class AIConfigService {
     }
   }
 
-  async delete(id: string): Promise<boolean> {
+  async disable(id: string): Promise<boolean> {
     try {
-      const result = await this.getPool().query('DELETE FROM ai.configs WHERE id = $1', [id]);
+      const result = await this.getPool().query(
+        `UPDATE ai.configs
+         SET is_active = FALSE, updated_at = NOW()
+         WHERE id = $1`,
+        [id]
+      );
 
       const success = (result.rowCount ?? 0) > 0;
       if (success) {
-        logger.info('AI configuration deleted', { id });
+        logger.info('AI configuration disabled', { id });
       }
       return success;
     } catch (error) {
-      logger.error('Failed to delete AI configuration', { error, id });
-      throw new Error('Failed to delete AI configuration');
+      logger.error('Failed to disable AI configuration', { error, id });
+      throw new Error('Failed to disable AI configuration');
     }
   }
 
@@ -129,7 +156,8 @@ export class AIConfigService {
       const result = await this.getPool().query(
         `SELECT id, input_modality as "inputModality", output_modality as "outputModality", provider, model_id as "modelId", system_prompt as "systemPrompt", created_at, updated_at
          FROM ai.configs
-         WHERE model_id = $1`,
+         WHERE model_id = $1
+           AND is_active = TRUE`,
         [modelId]
       );
 
