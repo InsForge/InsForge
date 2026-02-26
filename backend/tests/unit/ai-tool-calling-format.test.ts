@@ -130,6 +130,8 @@ describe('ChatCompletionService - formatMessages', () => {
       },
     ];
 
-    expect(() => service.formatMessages(messages)).toThrow('Tool message is missing required tool_call_id');
+    expect(() => service.formatMessages(messages)).toThrow(
+      'Tool message is missing required tool_call_id'
+    );
   });
 });
