@@ -148,11 +148,9 @@ export const chatCompletionRequestSchema = z.object({
   // Tool calling: Define functions the AI can call
   tools: z.array(toolSchema).optional(),
   // Tool choice: Control whether/which tool is called ('auto', 'none', 'required', or specific function)
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  tool_choice: toolChoiceSchema.optional(),
+  toolChoice: toolChoiceSchema.optional(),
   // Parallel tool calls: Allow the model to call multiple tools in parallel
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  parallel_tool_calls: z.boolean().optional(),
+  parallelToolCalls: z.boolean().optional(),
 });
 
 // URL citation annotation from web search results

@@ -159,18 +159,18 @@ describe('Tool Calling Schemas', () => {
       expect(result.success).toBe(true);
     });
 
-    it('accepts request with tool_choice', () => {
+    it('accepts request with toolChoice', () => {
       const result = chatCompletionRequestSchema.safeParse({
         ...baseRequest,
-        tool_choice: 'auto',
+        toolChoice: 'auto',
       });
       expect(result.success).toBe(true);
     });
 
-    it('accepts request with parallel_tool_calls', () => {
+    it('accepts request with parallelToolCalls', () => {
       const result = chatCompletionRequestSchema.safeParse({
         ...baseRequest,
-        parallel_tool_calls: true,
+        parallelToolCalls: true,
       });
       expect(result.success).toBe(true);
     });

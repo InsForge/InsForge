@@ -292,8 +292,8 @@ export class ChatCompletionService {
         stream: false,
         plugins: this.buildPlugins(options),
         tools: options.tools,
-        tool_choice: options.tool_choice,
-        parallel_tool_calls: options.parallel_tool_calls,
+        tool_choice: options.toolChoice,
+        parallel_tool_calls: options.parallelToolCalls,
       };
 
       // Send request with automatic renewal and retry logic
@@ -397,8 +397,8 @@ export class ChatCompletionService {
         stream: true,
         plugins: this.buildPlugins(options),
         tools: options.tools,
-        tool_choice: options.tool_choice,
-        parallel_tool_calls: options.parallel_tool_calls,
+        tool_choice: options.toolChoice,
+        parallel_tool_calls: options.parallelToolCalls,
       };
 
       // Send request with automatic renewal and retry logic

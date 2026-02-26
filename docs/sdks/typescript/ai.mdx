@@ -34,8 +34,8 @@ Create AI chat completions with streaming support, web search, file parsing, and
     - `name` (string) - Function name
     - `description` (string, optional) - Description of what the function does
     - `parameters` (object, optional) - JSON Schema of the function parameters
-- `tool_choice` (string | object, optional) - Controls tool usage: `'auto'`, `'none'`, `'required'`, or `{ type: 'function', function: { name: string } }`
-- `parallel_tool_calls` (boolean, optional) - Allow the model to call multiple tools in parallel
+- `toolChoice` (string | object, optional) - Controls tool usage: `'auto'`, `'none'`, `'required'`, or `{ type: 'function', function: { name: string } }`
+- `parallelToolCalls` (boolean, optional) - Allow the model to call multiple tools in parallel
 
 <Note>
 File URLs must be publicly accessible. Storage buckets must be public, or use base64 for private files.
