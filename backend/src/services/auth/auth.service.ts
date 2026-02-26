@@ -1109,7 +1109,27 @@ export class AuthService {
       [userId]
     );
 
-    return result.rows[0] || null;
+    if (result.rows[0]) {
+      return result.rows[0];
+    }
+
+    // Fallback: if admin record is missing from DB, construct it from env vars
+    if (userId === ADMIN_ID) {
+      const now = new Date().toISOString();
+      return {
+        id: ADMIN_ID,
+        email: this.adminEmail,
+        profile: { name: 'Administrator' },
+        metadata: {},
+        email_verified: true,
+        is_project_admin: true,
+        is_anonymous: false,
+        created_at: now,
+        updated_at: now,
+      };
+    }
+
+    return null;
   }
 
   /**
