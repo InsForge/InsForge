@@ -24,9 +24,6 @@ Generate AI chat completions.
 - `systemPrompt` (String, optional) - System prompt for the conversation
 - `webSearch` (WebSearchPlugin?, optional) - Enable web search capabilities
 - `fileParser` (FileParserPlugin?, optional) - Enable file/PDF parsing
-- `tools` ([Tool]?, optional) - Tool definitions for function calling
-- `toolChoice` (ToolChoice?, optional) - Controls tool usage: `.auto`, `.none`, `.required`, or `.function("name")`
-- `parallelToolCalls` (Bool?, optional) - Allow the model to call multiple tools in parallel
 
 ### Returns
 
@@ -137,36 +134,6 @@ let response = try await insforge.ai.chatCompletion(
 )
 
 print(response.text)
-```
-
-### Example (Tool Calling)
-
-```swift
-let response = try await insforge.ai.chatCompletion(
-    model: "openai/gpt-4o-mini",
-    messages: [
-        ChatMessage(role: .user, content: "Your prompt here")
-    ],
-    tools: [
-        Tool(
-            type: "function",
-            function: FunctionDefinition(
-                name: "your_function_name",
-                description: "Describe what your function does",
-                parameters: [
-                    "type": "object",
-                    "properties": [
-                        "param1": [
-                            "type": "string",
-                            "description": "First parameter"
-                        ]
-                    ],
-                    "required": ["param1"]
-                ]
-            )
-        )
-    ]
-)
 ```
 
 ---
@@ -335,42 +302,6 @@ public struct FileParserPlugin: Codable, Sendable {
     let pdf: PdfParserConfig?
 
     init(enabled: Bool = true, pdf: PdfParserConfig? = nil)
-}
-```
-
-### Tool Calling Types
-
-```swift
-// Tool definition
-public struct Tool: Codable, Sendable {
-    let type: String                    // "function"
-    let function: FunctionDefinition
-}
-
-public struct FunctionDefinition: Codable, Sendable {
-    let name: String
-    let description: String?
-    let parameters: AnyCodable?         // JSON Schema (use AnyCodable from open-source package)
-}
-
-// Tool choice control
-public enum ToolChoice: Codable, Sendable {
-    case auto
-    case none
-    case required
-    case function(String)               // Specific function name
-}
-
-// Tool call in response
-public struct ToolCall: Codable, Sendable {
-    let id: String
-    let type: String                    // "function"
-    let function: FunctionCall
-}
-
-public struct FunctionCall: Codable, Sendable {
-    let name: String
-    let arguments: String               // JSON string
 }
 ```
 

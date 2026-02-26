@@ -42,9 +42,6 @@ Create an AI chat completion.
 - `systemPrompt` (String?, optional) - System prompt
 - `webSearch` (WebSearchPlugin?, optional) - Enable web search capabilities
 - `fileParser` (FileParserPlugin?, optional) - Enable file/PDF parsing
-- `tools` (`List<Tool>`?, optional) - Tool definitions for function calling
-- `toolChoice` (ToolChoice?, optional) - Controls tool usage: `ToolChoice.auto()`, `ToolChoice.none()`, `ToolChoice.required()`, or `ToolChoice.function("name")`
-- `parallelToolCalls` (Boolean?, optional) - Allow the model to call multiple tools in parallel
 
 ### Returns
 
@@ -250,36 +247,6 @@ response.annotations?.forEach { annotation ->
 }
 ```
 
-### Example (Tool Calling)
-
-```kotlin
-val response = client.ai.chatCompletion(
-    model = "openai/gpt-4o-mini",
-    messages = listOf(
-        ChatMessage.user("Your prompt here")
-    ),
-    tools = listOf(
-        Tool(
-            type = "function",
-            function = FunctionDefinition(
-                name = "your_function_name",
-                description = "Describe what your function does",
-                parameters = mapOf(
-                    "type" to "object",
-                    "properties" to mapOf(
-                        "param1" to mapOf(
-                            "type" to "string",
-                            "description" to "First parameter"
-                        )
-                    ),
-                    "required" to listOf("param1")
-                )
-            )
-        )
-    )
-)
-```
-
 ---
 
 ## chatCompletionStream()
@@ -295,9 +262,6 @@ Create a streaming chat completion. Returns `Flow<String>` that emits content ch
 - `webSearch` (WebSearchPlugin?, optional) - Enable web search capabilities
 - `fileParser` (FileParserPlugin?, optional) - Enable file/PDF parsing
 - `thinking` (Boolean?, optional) - Enable extended reasoning mode
-- `tools` (`List<Tool>`?, optional) - Tool definitions for function calling
-- `toolChoice` (ToolChoice?, optional) - Controls tool usage
-- `parallelToolCalls` (Boolean?, optional) - Allow the model to call multiple tools in parallel
 
 ### Example
 
