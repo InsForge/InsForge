@@ -1281,11 +1281,16 @@ export class AuthService {
    * Delete multiple users by IDs
    */
   async deleteUsers(userIds: string[]): Promise<number> {
+    const filtered = userIds.filter((id) => id !== ADMIN_ID);
+    if (filtered.length === 0) {
+      return 0;
+    }
+
     const pool = this.getPool();
-    const placeholders = userIds.map((_, i) => `$${i + 1}`).join(',');
+    const placeholders = filtered.map((_, i) => `$${i + 1}`).join(',');
     const result = await pool.query(
       `DELETE FROM auth.users WHERE id IN (${placeholders})`,
-      userIds
+      filtered
     );
 
     return result.rowCount || 0;
