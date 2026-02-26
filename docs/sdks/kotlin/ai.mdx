@@ -42,6 +42,9 @@ Create an AI chat completion.
 - `systemPrompt` (String?, optional) - System prompt
 - `webSearch` (WebSearchPlugin?, optional) - Enable web search capabilities
 - `fileParser` (FileParserPlugin?, optional) - Enable file/PDF parsing
+- `tools` (`List<Tool>?`, optional) - List of tools (functions) the model may call
+- `toolChoice` (ToolChoice?, optional) - Controls tool selection: `ToolChoice.Auto`, `ToolChoice.None`, `ToolChoice.Required`, or `ToolChoice.Function("name")`
+- `parallelToolCalls` (Boolean?, optional) - Allow the model to call multiple tools in parallel
 
 ### Returns
 
@@ -154,6 +157,48 @@ val response2 = client.ai.chatCompletion(
 println(response2.text)
 ```
 
+### Example (Tool Calling)
+
+```kotlin
+val response = client.ai.chatCompletion(
+    model = "openai/gpt-4o-mini",
+    messages = listOf(ChatMessage.user("Your prompt here")),
+    tools = listOf(
+        Tool(function = ToolFunction(
+            name = "your_function_name",
+            description = "Describe what your function does",
+            parameters = buildJsonObject {
+                put("type", JsonPrimitive("object"))
+                putJsonObject("properties") {
+                    putJsonObject("param1") {
+                        put("type", JsonPrimitive("string"))
+                        put("description", JsonPrimitive("First parameter"))
+                    }
+                }
+                put("required", JsonArray(listOf(JsonPrimitive("param1"))))
+            }
+        ))
+    )
+)
+```
+
+When the model decides to call a tool, the response includes `toolCalls`:
+
+```kotlin
+// response.toolCalls = listOf(
+//     ToolCall(
+//         id = "call_abc123",
+//         type = "function",
+//         function = ToolCallFunction(
+//             name = "your_function_name",
+//             arguments = "{\"param1\": \"value1\"}"
+//         )
+//     )
+// )
+```
+
+For multi-turn tool calling, use `ChatMessage.tool(toolCallId, content)` to send tool results back.
+
 ---
 
 ## chatCompletionWithImages()
@@ -262,6 +307,9 @@ Create a streaming chat completion. Returns `Flow<String>` that emits content ch
 - `webSearch` (WebSearchPlugin?, optional) - Enable web search capabilities
 - `fileParser` (FileParserPlugin?, optional) - Enable file/PDF parsing
 - `thinking` (Boolean?, optional) - Enable extended reasoning mode
+- `tools` (`List<Tool>?`, optional) - List of tools the model may call
+- `toolChoice` (ToolChoice?, optional) - Controls tool selection
+- `parallelToolCalls` (Boolean?, optional) - Allow parallel tool calls
 
 ### Example
 
