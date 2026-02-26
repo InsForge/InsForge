@@ -438,7 +438,7 @@ public struct ChatCompletionResponse: Codable, Sendable {
 
 ```swift
 // Function definition for tool calling
-public struct ToolFunction: Sendable {
+public struct ToolFunction: @unchecked Sendable {
     let name: String
     let description: String?
     let parameters: [String: Any]?
