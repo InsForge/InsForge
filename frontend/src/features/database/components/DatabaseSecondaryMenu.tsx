@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Database, MoreVertical, Pencil, Plus, Trash2 } from 'lucide-react';
-import { Link, useMatch } from 'react-router-dom';
+import { Link, useMatch, useNavigate } from 'react-router-dom';
 import {
   SecondaryMenu,
   type SecondaryMenuActionButton,
@@ -20,9 +20,11 @@ export interface DatabaseSecondaryMenuProps {
   onNewTable?: () => void;
   onEditTable?: (table: string) => void;
   onDeleteTable?: (table: string) => void;
+  initialMode?: 'tables' | 'studio';
+  animateToMode?: 'tables' | 'studio';
 }
 
-interface DatabaseStudioMenuPanelProps {
+export interface DatabaseStudioMenuPanelProps {
   onBack: () => void;
 }
 
@@ -57,7 +59,9 @@ function DatabaseStudioMenuItem({ label, href, sectionEnd }: DatabaseStudioMenuI
   );
 }
 
-function DatabaseStudioMenuPanel({ onBack }: DatabaseStudioMenuPanelProps) {
+const STUDIO_MENU_TRANSITION_MS = 260;
+
+export function DatabaseStudioMenuPanel({ onBack }: DatabaseStudioMenuPanelProps) {
   return (
     <aside className="h-full w-60 flex flex-col border-r border-border bg-semantic-1 flex-shrink-0">
       <div className="p-3">
@@ -95,8 +99,34 @@ export function DatabaseSecondaryMenu({
   onNewTable,
   onEditTable,
   onDeleteTable,
+  initialMode = 'tables',
+  animateToMode,
 }: DatabaseSecondaryMenuProps) {
-  const [mode, setMode] = useState<'tables' | 'studio'>('tables');
+  const navigate = useNavigate();
+  const [mode, setMode] = useState<'tables' | 'studio'>(initialMode);
+  const navigateTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (navigateTimerRef.current) {
+        window.clearTimeout(navigateTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!animateToMode || animateToMode === initialMode) {
+      return;
+    }
+
+    const rafId = window.requestAnimationFrame(() => {
+      setMode(animateToMode);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+    };
+  }, [animateToMode, initialMode]);
 
   const tableMenuItems: SecondaryMenuListItem[] = tables.map((table) => ({
     id: table,
@@ -119,7 +149,15 @@ export function DatabaseSecondaryMenu({
       id: 'database-studio',
       label: 'Database Studio',
       icon: Database,
-      onClick: () => setMode('studio'),
+      onClick: () => {
+        setMode('studio');
+        if (navigateTimerRef.current) {
+          window.clearTimeout(navigateTimerRef.current);
+        }
+        navigateTimerRef.current = window.setTimeout(() => {
+          void navigate('/dashboard/database/indexes');
+        }, STUDIO_MENU_TRANSITION_MS);
+      },
     },
   ];
 
