@@ -24,6 +24,9 @@ Generate AI chat completions.
 - `systemPrompt` (String, optional) - System prompt for the conversation
 - `webSearch` (WebSearchPlugin?, optional) - Enable web search capabilities
 - `fileParser` (FileParserPlugin?, optional) - Enable file/PDF parsing
+- `tools` ([Tool]?, optional) - Array of tool definitions for function calling
+- `toolChoice` (ToolChoice?, optional) - Controls which tool the model should call
+- `parallelToolCalls` (Bool?, optional) - Allow model to call multiple tools in parallel
 
 ### Returns
 
@@ -135,6 +138,50 @@ let response = try await insforge.ai.chatCompletion(
 
 print(response.text)
 ```
+
+### Example (Tool Calling)
+
+```swift
+let response = try await insforge.ai.chatCompletion(
+    model: "openai/gpt-4o-mini",
+    messages: [
+        ChatMessage(role: .user, content: "Your prompt here")
+    ],
+    tools: [
+        Tool(function: ToolFunction(
+            name: "your_function_name",
+            description: "Describe what your function does",
+            parameters: [
+                "type": "object",
+                "properties": [
+                    "param1": [
+                        "type": "string",
+                        "description": "First parameter"
+                    ] as [String: Any]
+                ] as [String: Any],
+                "required": ["param1"]
+            ] as [String: Any]
+        ))
+    ]
+)
+```
+
+When the model decides to call a tool, the response includes `toolCalls`:
+
+```swift
+// response.toolCalls = [
+//     ToolCall(
+//         id: "call_abc123",
+//         type: "function",
+//         function: ToolCallFunction(
+//             name: "your_function_name",
+//             arguments: "{\"param1\": \"value1\"}"
+//         )
+//     )
+// ]
+```
+
+For multi-turn tool calling, use `ChatMessage(toolCallId:content:)` to send tool results back.
 
 ---
 
@@ -311,11 +358,14 @@ public struct FileParserPlugin: Codable, Sendable {
 public struct ChatMessage: Codable, Sendable {
     let role: Role
     let content: MessageContent
+    let toolCalls: [ToolCall]?
+    let toolCallId: String?
 
     enum Role: String, Codable {
         case user
         case assistant
         case system
+        case tool
     }
 
     // Initialize with simple text (backward compatible)
@@ -323,6 +373,12 @@ public struct ChatMessage: Codable, Sendable {
 
     // Initialize with multimodal content
     init(role: Role, content: [ContentPart])
+
+    // Initialize a tool response message
+    init(role: Role = .tool, toolCallId: String, content: String)
+
+    // Initialize an assistant message with tool calls
+    init(role: Role = .assistant, content: String, toolCalls: [ToolCall])
 }
 
 // Content can be simple text or multimodal parts
@@ -364,6 +420,7 @@ public enum AudioFormat: String, Codable, Sendable {
 public struct ChatCompletionResponse: Codable, Sendable {
     let text: String                              // The generated response text
     let annotations: [UrlCitationAnnotation]?     // URL citations from web search
+    let toolCalls: [ToolCall]?                    // Tool calls requested by the model
     let metadata: Metadata?
 
     // Computed properties
@@ -374,6 +431,48 @@ public struct ChatCompletionResponse: Codable, Sendable {
         let model: String
         let usage: TokenUsage?
     }
+}
+```
+
+### Tool Calling Types
+
+```swift
+// Function definition for tool calling
+public struct ToolFunction: @unchecked Sendable {
+    let name: String
+    let description: String?
+    let parameters: [String: Any]?
+
+    init(name: String, description: String? = nil, parameters: [String: Any]? = nil)
+}
+
+// Tool definition wrapping a function
+public struct Tool: Sendable {
+    let type: String              // "function"
+    let function: ToolFunction
+
+    init(type: String = "function", function: ToolFunction)
+}
+
+// Function details within a tool call response
+public struct ToolCallFunction: Codable, Sendable {
+    let name: String
+    let arguments: String         // JSON string of arguments
+}
+
+// Tool call made by the model
+public struct ToolCall: Codable, Sendable {
+    let id: String
+    let type: String              // "function"
+    let function: ToolCallFunction
+}
+
+// Controls which tool the model should call
+public enum ToolChoice: Sendable {
+    case auto                     // Model decides (default)
+    case none                     // No tool calls
+    case required                 // Must call at least one tool
+    case function(name: String)   // Must call the specified function
 }
 ```
 

@@ -122,7 +122,7 @@ describe('ChatCompletionService - formatMessages', () => {
     expect(result[2].tool_call_id).toBe('call_1');
   });
 
-  it('handles tool message with empty tool_call_id', () => {
+  it('throws on tool message with empty tool_call_id', () => {
     const messages: ChatMessageSchema[] = [
       {
         role: 'tool',
@@ -130,9 +130,8 @@ describe('ChatCompletionService - formatMessages', () => {
       },
     ];
 
-    const result = service.formatMessages(messages);
-
-    expect(result[0].role).toBe('tool');
-    expect(result[0].tool_call_id).toBe('');
+    expect(() => service.formatMessages(messages)).toThrow(
+      'Tool message is missing required tool_call_id'
+    );
   });
 });

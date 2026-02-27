@@ -432,15 +432,23 @@ components:
       type: object
       required:
         - role
-        - content
       properties:
         role:
           type: string
-          enum: [user, assistant, system]
+          enum: [user, assistant, system, tool]
           description: Role of the message sender
         content:
           type: string
-          description: Message content
+          nullable: true
+          description: Message content (nullable for assistant messages with tool_calls)
+        tool_calls:
+          type: array
+          description: Tool calls made by the assistant (assistant messages only)
+          items:
+            $ref: '#/components/schemas/ToolCall'
+        tool_call_id:
+          type: string
+          description: ID of the tool call being responded to (tool messages only)
 
     ChatRequest:
       type: object
@@ -483,6 +491,34 @@ components:
         thinking:
           type: boolean
           description: Enable extended reasoning capabilities (appends :thinking to model ID if not already present). Not every model supports this, only works with Anthropic models with the :thinking suffix.
+        tools:
+          type: array
+          description: Tool definitions for function calling
+          items:
+            $ref: '#/components/schemas/Tool'
+        toolChoice:
+          description: 'Controls tool usage: auto, none, required, or a specific function'
+          oneOf:
+            - type: string
+              enum: [auto, none, required]
+            - type: object
+              required:
+                - type
+                - function
+              properties:
+                type:
+                  type: string
+                  enum: [function]
+                function:
+                  type: object
+                  required:
+                    - name
+                  properties:
+                    name:
+                      type: string
+        parallelToolCalls:
+          type: boolean
+          description: Allow the model to call multiple tools in parallel
 
     ChatCompletionResponse:
       type: object
@@ -490,6 +526,11 @@ components:
         text:
           type: string
           description: AI model response content
+        tool_calls:
+          type: array
+          description: Tool calls requested by the model (present when the model invokes tools)
+          items:
+            $ref: '#/components/schemas/ToolCall'
         annotations:
           type: array
           description: URL citations from web search results (present when webSearch is enabled)
@@ -559,6 +600,59 @@ components:
                 - mistral-ocr: Best for scanned documents or PDFs with images ($2 per 1,000 pages)
                 - native: Only for models with native file support (charged as input tokens)
                 If not specified, defaults to native if available, otherwise mistral-ocr
+
+    Tool:
+      type: object
+      required:
+        - type
+        - function
+      properties:
+        type:
+          type: string
+          enum: [function]
+        function:
+          $ref: '#/components/schemas/FunctionDefinition'
+
+    FunctionDefinition:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The name of the function to call
+        description:
+          type: string
+          description: A description of what the function does
+        parameters:
+          type: object
+          description: JSON Schema describing the function parameters
+
+    ToolCall:
+      type: object
+      required:
+        - id
+        - type
+        - function
+      properties:
+        id:
+          type: string
+          description: Unique identifier for this tool call
+        type:
+          type: string
+          enum: [function]
+        function:
+          type: object
+          required:
+            - name
+            - arguments
+          properties:
+            name:
+              type: string
+              description: The name of the function called
+            arguments:
+              type: string
+              description: JSON string of the function arguments
 
     FileContent:
       type: object
