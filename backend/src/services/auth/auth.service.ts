@@ -1109,7 +1109,27 @@ export class AuthService {
       [userId]
     );
 
-    return result.rows[0] || null;
+    if (result.rows[0]) {
+      return result.rows[0];
+    }
+
+    // Fallback: if admin record is missing from DB, construct it from env vars
+    if (userId === ADMIN_ID) {
+      const now = new Date().toISOString();
+      return {
+        id: ADMIN_ID,
+        email: this.adminEmail,
+        profile: { name: 'Administrator' },
+        metadata: {},
+        email_verified: true,
+        is_project_admin: true,
+        is_anonymous: false,
+        created_at: now,
+        updated_at: now,
+      };
+    }
+
+    return null;
   }
 
   /**
@@ -1261,11 +1281,16 @@ export class AuthService {
    * Delete multiple users by IDs
    */
   async deleteUsers(userIds: string[]): Promise<number> {
+    const filtered = userIds.filter((id) => id !== ADMIN_ID);
+    if (filtered.length === 0) {
+      return 0;
+    }
+
     const pool = this.getPool();
-    const placeholders = userIds.map((_, i) => `$${i + 1}`).join(',');
+    const placeholders = filtered.map((_, i) => `$${i + 1}`).join(',');
     const result = await pool.query(
       `DELETE FROM auth.users WHERE id IN (${placeholders})`,
-      userIds
+      filtered
     );
 
     return result.rowCount || 0;
