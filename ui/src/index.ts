@@ -70,6 +70,7 @@ export {
   MenuDialogFooter,
   MenuDialogCloseButton,
 } from './components';
+export { Toast, toastVariants, type ToastProps } from './components';
 
 export { CopyButton } from './components';
 export { CodeBlock } from './components';
