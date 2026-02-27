@@ -33,10 +33,15 @@ import { DatabaseDataGrid } from '@/features/database/components/DatabaseDataGri
 import { SortColumn } from 'react-data-grid';
 import { convertValueForColumn } from '@/lib/utils/utils';
 import { useCSVImport } from '@/features/database/hooks/useCSVImport';
+import { useLocation } from 'react-router-dom';
 
 const PAGE_SIZE = 50;
 
 export default function TablesPage() {
+  const location = useLocation();
+  const shouldSlideBackToTables =
+    (location.state as { slideFromStudio?: boolean } | null)?.slideFromStudio === true;
+
   // Load selected table from localStorage on mount
   const [selectedTable, setSelectedTable] = useState<string | null>(() => {
     return localStorage.getItem('selectedTable');
@@ -386,6 +391,8 @@ export default function TablesPage() {
         onNewTable={handleCreateTable}
         onEditTable={handleEditTable}
         onDeleteTable={(tableName) => void handleDeleteTable(tableName)}
+        initialMode={shouldSlideBackToTables ? 'studio' : 'tables'}
+        animateToMode={shouldSlideBackToTables ? 'tables' : undefined}
       />
 
       {/* Main Content Area */}

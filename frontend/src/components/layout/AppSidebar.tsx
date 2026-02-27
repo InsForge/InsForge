@@ -76,7 +76,7 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   const isLoading = activeMenu?.id === 'logs' ? logsLoading : false;
   const hideSecondaryMenu =
     activeMenu?.id === 'database' &&
-    !!matchPath({ path: '/dashboard/database/tables', end: false }, pathname);
+    !!matchPath({ path: '/dashboard/database', end: false }, pathname);
 
   return (
     <div className="flex h-full">
