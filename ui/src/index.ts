@@ -69,6 +69,7 @@ export {
   MenuDialogFooter,
   MenuDialogCloseButton,
 } from './components';
+export { Toast, toastVariants, type ToastProps } from './components';
 
 // Utilities
 export { cn } from './lib';

@@ -4,7 +4,6 @@ import {
   Plug,
   ChartBarBig,
   RefreshCw,
-  HardDrive,
   Cpu,
   ArrowRight,
   CircleAlert,
@@ -35,6 +34,7 @@ import {
   MenuDialogBody,
   MenuDialogFooter,
   MenuDialogCloseButton,
+  Toast,
 } from '@insforge/ui';
 import { CopyButton, ConfirmDialog } from '@/components';
 import { useApiKey } from '@/lib/hooks/useMetadata';
@@ -52,6 +52,7 @@ import {
 } from '@/features/onboard';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
+import HardDriveIcon from '@/assets/icons/hard_drive.svg?react';
 
 type TabType = 'info' | 'usage' | 'compute' | 'connect';
 
@@ -66,7 +67,7 @@ export default function SettingsMenuDialog() {
 
   const sectionTitle = useMemo(() => {
     if (activeTab === 'compute') {
-      return 'Compute & Disk';
+      return 'Compute and Disk';
     }
     if (activeTab === 'connect') {
       return 'Connect';
@@ -105,7 +106,7 @@ export default function SettingsMenuDialog() {
   const projectUrl = window.location.origin;
 
   // Masked API key display
-  const maskedApiKey = apiKey ? `ik_${'•'.repeat(32)}` : '';
+  const maskedApiKey = apiKey ? `ik_${'•'.repeat(20)}` : '';
 
   // Listen for messages from cloud parent
   useEffect(() => {
@@ -263,10 +264,10 @@ export default function SettingsMenuDialog() {
         open={isSettingsDialogOpen}
         onOpenChange={(open) => !open && closeSettingsDialog()}
       >
-        <MenuDialogContent className="max-w-[900px]">
+        <MenuDialogContent>
           <MenuDialogSideNav>
             <MenuDialogSideNavHeader>
-              <MenuDialogSideNavTitle>Project Settings</MenuDialogSideNavTitle>
+              <MenuDialogSideNavTitle>Project Setting</MenuDialogSideNavTitle>
             </MenuDialogSideNavHeader>
             <MenuDialogNav>
               <MenuDialogNavList>
@@ -298,7 +299,7 @@ export default function SettingsMenuDialog() {
 
                 {isCloud && isInIframe && (
                   <MenuDialogNavItem
-                    icon={<HardDrive className="w-5 h-5" />}
+                    icon={<HardDriveIcon className="w-5 h-5" />}
                     active={activeTab === 'compute'}
                     onClick={() => setActiveTab('compute')}
                   >
@@ -311,8 +312,15 @@ export default function SettingsMenuDialog() {
 
           <MenuDialogMain>
             <MenuDialogHeader>
-              <MenuDialogTitle>{sectionTitle}</MenuDialogTitle>
-              <MenuDialogCloseButton className="ml-auto" />
+              <div className="flex flex-col">
+                <MenuDialogTitle>{sectionTitle}</MenuDialogTitle>
+                {activeTab === 'compute' && (
+                  <p className="text-sm text-muted-foreground">
+                    Configure compute and disk resources for your project.
+                  </p>
+                )}
+              </div>
+              <MenuDialogCloseButton className="ml-auto self-start" />
             </MenuDialogHeader>
 
             <MenuDialogBody>
@@ -367,14 +375,14 @@ export default function SettingsMenuDialog() {
                         API Key
                       </label>
                       <div className="flex-1 flex flex-col gap-1">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
                           <div
                             className={cn(
-                              'flex-1 h-9 flex items-center justify-between gap-2 text-sm bg-gray-100 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 pl-3 pr-2 rounded-lg',
+                              'flex-1 min-w-0 h-9 flex items-center justify-between gap-2 text-sm bg-gray-100 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 pl-3 pr-2 rounded-lg',
                               isApiKeyLoading && 'animate-pulse'
                             )}
                           >
-                            <span className="font-mono text-gray-900 dark:text-white">
+                            <span className="font-mono text-gray-900 dark:text-white truncate">
                               {isApiKeyLoading ? '•'.repeat(35) : maskedApiKey || 'Not available'}
                             </span>
                             {!isApiKeyLoading && apiKey && (
@@ -460,32 +468,29 @@ export default function SettingsMenuDialog() {
                       return (
                         <>
                           {isFree && (
-                            <div className="flex items-center justify-between rounded border border-[var(--border)] bg-toast px-4 py-3">
-                              <div className="flex items-center gap-2 text-muted-foreground">
-                                <Info className="w-4 h-4 shrink-0" />
-                                <span className="text-sm">
-                                  Only Available on Start Plan and above
-                                </span>
-                              </div>
-                              <Button
-                                onClick={() => {
-                                  closeSettingsDialog();
-                                  postMessageToParent({ type: 'SHOW_PLAN_MODAL' }, '*');
-                                }}
-                              >
-                                Upgrade Plan
-                              </Button>
-                            </div>
+                            <Toast
+                              className="mb-2"
+                              icon={<Info className="w-5 h-5 text-muted-foreground" />}
+                              action={
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    closeSettingsDialog();
+                                    postMessageToParent({ type: 'SHOW_PLAN_MODAL' }, '*');
+                                  }}
+                                >
+                                  Upgrade Plan
+                                </Button>
+                              }
+                            >
+                              Only Available on Start Plan and above
+                            </Toast>
                           )}
-                          <div
-                            className={cn(
-                              'grid grid-cols-2 gap-3',
-                              isFree && 'opacity-60 pointer-events-none'
-                            )}
-                          >
+                          <div className="grid grid-cols-2 gap-3">
                             {instanceInfo.instanceTypes.map((instance) => {
                               const isCurrent = instance.id === instanceInfo.currentInstanceType;
                               const isSelected = !isFree && instance.id === selectedInstanceType;
+                              const instanceId = instance.id.toLowerCase();
                               return (
                                 <button
                                   key={instance.id}
@@ -493,41 +498,44 @@ export default function SettingsMenuDialog() {
                                     !isCurrent && !isFree && setSelectedInstanceType(instance.id)
                                   }
                                   className={cn(
-                                    'flex flex-col gap-2.5 p-4 rounded-lg border bg-[var(--alpha-8)] text-left transition-colors',
+                                    'flex flex-col gap-3 p-4 rounded border bg-[rgb(var(--card))] text-left transition-colors',
+                                    isFree && !isCurrent && 'opacity-40 pointer-events-none',
                                     isCurrent
                                       ? 'border-foreground cursor-default'
                                       : isSelected
                                         ? 'border-primary cursor-pointer'
-                                        : 'border-[var(--alpha-16)] hover:border-[var(--alpha-12)] cursor-pointer'
+                                        : 'border-[var(--alpha-8)] hover:border-[var(--alpha-16)] cursor-pointer'
                                   )}
                                 >
                                   <div className="flex items-center justify-between w-full">
                                     <span
                                       className={cn(
                                         'text-xs font-medium uppercase px-2 py-0.5 rounded',
-                                        isCurrent
-                                          ? 'bg-foreground text-[rgb(var(--inverse))]'
-                                          : isSelected
-                                            ? 'bg-primary text-[rgb(var(--inverse))]'
-                                            : 'bg-[var(--alpha-16)] text-foreground'
+                                        instanceId === 'nano'
+                                          ? 'bg-[var(--alpha-8)] text-muted-foreground'
+                                          : 'border border-primary text-primary'
                                       )}
                                     >
                                       {instance.id}
                                     </span>
-                                    <span className="text-sm text-muted-foreground">
-                                      <span className="text-foreground">
-                                        ${instance.pricePerHour.toFixed(4)}
-                                      </span>{' '}
-                                      / hour
-                                    </span>
+                                    {isCurrent && isFree ? (
+                                      <span className="text-sm text-foreground">Current</span>
+                                    ) : (
+                                      <span className="text-sm text-muted-foreground">
+                                        <span className="text-foreground">
+                                          ${instance.pricePerHour.toFixed(4)}
+                                        </span>{' '}
+                                        / hour
+                                      </span>
+                                    )}
                                   </div>
                                   <div className="flex flex-col gap-2">
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                      <HardDrive className="w-4 h-4 shrink-0" />
+                                      <HardDriveIcon className="w-5 h-5 shrink-0" />
                                       <span>{instance.ram}</span>
                                     </div>
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                      <Cpu className="w-4 h-4 shrink-0" />
+                                      <Cpu className="w-5 h-5 shrink-0" />
                                       <span>{instance.cpu}</span>
                                     </div>
                                   </div>
@@ -610,95 +618,99 @@ export default function SettingsMenuDialog() {
                 return (
                   <MenuDialogFooter className="justify-between">
                     {totalAfterCredits > 0 ? (
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm text-foreground">Additional Cost:</span>
-                        <span className="text-sm text-primary">${totalAfterCredits}/Month</span>
-                        <TooltipPrimitive.Provider delayDuration={200}>
-                          <TooltipPrimitive.Root>
-                            <TooltipPrimitive.Trigger asChild>
-                              <span className="p-0.5 text-muted-foreground hover:text-foreground transition-colors cursor-default">
+                      <TooltipPrimitive.Provider delayDuration={200}>
+                        <TooltipPrimitive.Root>
+                          <TooltipPrimitive.Trigger asChild>
+                            <div className="flex items-center gap-1.5 cursor-default">
+                              <span className="text-sm text-foreground">Additional Cost:</span>
+                              <span className="text-sm">
+                                <span className="text-primary">${totalAfterCredits}</span>
+                                <span className="text-muted-foreground">/Month</span>
+                              </span>
+                              <span className="p-0.5 text-muted-foreground">
                                 <Info className="w-4 h-4" />
                               </span>
-                            </TooltipPrimitive.Trigger>
-                            <TooltipPrimitive.Portal>
-                              <TooltipPrimitive.Content
-                                side="top"
-                                align="start"
-                                sideOffset={8}
-                                className="z-50 w-[420px] rounded-lg border border-[var(--alpha-8)] bg-[rgb(var(--semantic-1))] shadow-lg animate-in fade-in-0 zoom-in-95"
-                              >
-                                <div className="p-3 text-sm text-foreground leading-relaxed">
-                                  Each project includes a dedicated Postgres instance running on its
-                                  own server. You are charged for the Compute resource of that
-                                  server, independent of your database usage.
-                                  <br />
-                                  <br />
-                                  Compute costs are applied on top of your subscription plan cost.
-                                </div>
-                                <div className="flex flex-col">
-                                  {/* Header */}
-                                  <div className="flex items-center px-1.5 border-b border-[var(--alpha-8)] bg-[var(--alpha-4)]">
-                                    <div className="flex-1 px-2.5 py-1.5 text-xs text-muted-foreground">
-                                      Project
-                                    </div>
-                                    <div className="w-[120px] px-2.5 py-1.5 text-xs text-muted-foreground">
-                                      Compute Size
-                                    </div>
-                                    <div className="w-[120px] px-2.5 py-1.5 text-xs text-muted-foreground text-right">
-                                      Monthly Cost
-                                    </div>
+                            </div>
+                          </TooltipPrimitive.Trigger>
+                          <TooltipPrimitive.Portal>
+                            <TooltipPrimitive.Content
+                              side="top"
+                              align="start"
+                              alignOffset={-16}
+                              sideOffset={8}
+                              className="z-50 w-[480px] rounded-lg border border-[var(--alpha-8)] bg-[rgb(var(--semantic-1))] shadow-lg animate-in fade-in-0 zoom-in-95"
+                            >
+                              <div className="p-3 text-sm text-foreground leading-relaxed">
+                                Each project includes a dedicated Postgres instance running on its
+                                own server. You are charged for the Compute resource of that server,
+                                independent of your database usage.
+                                <br />
+                                <br />
+                                Compute costs are applied on top of your subscription plan cost.
+                              </div>
+                              <div className="flex flex-col">
+                                {/* Header */}
+                                <div className="flex items-center px-1.5 border-b border-[var(--alpha-8)] bg-[var(--alpha-4)]">
+                                  <div className="flex-1 px-2.5 py-1.5 text-xs text-muted-foreground">
+                                    Project
                                   </div>
-                                  {/* Projects */}
-                                  {instanceInfo.projects.map((p, i) => (
-                                    <div
-                                      key={i}
-                                      className="flex items-center px-1.5 border-b border-[var(--alpha-8)]"
-                                    >
-                                      <div className="flex-1 px-2.5 py-1.5 text-xs text-foreground flex items-center gap-1 truncate">
-                                        <span className="truncate">{p.name}</span>
-                                        {p.status === 'paused' && (
-                                          <span className="shrink-0 px-1.5 py-px text-[10px] font-medium text-destructive bg-[var(--alpha-8)] rounded">
-                                            PAUSED
-                                          </span>
-                                        )}
-                                      </div>
-                                      <div className="w-[120px] px-2.5 py-1.5 text-xs text-foreground">
-                                        {p.isCurrent
-                                          ? selectedInstanceType.toUpperCase()
-                                          : p.instanceType}
-                                      </div>
-                                      <div className="w-[120px] px-2.5 py-1.5 text-xs text-foreground text-right">
-                                        $
-                                        {p.isCurrent
-                                          ? (selectedInstance?.pricePerMonth ?? 0)
-                                          : p.monthlyCost}
-                                      </div>
-                                    </div>
-                                  ))}
-                                  {/* Compute Credits */}
-                                  <div className="flex items-center px-1.5 border-b border-[var(--alpha-8)] bg-[var(--alpha-4)]">
-                                    <div className="flex-1 px-2.5 py-1.5 text-xs text-muted-foreground">
-                                      Compute Credits
-                                    </div>
-                                    <div className="w-[120px] px-2.5 py-1.5 text-xs text-muted-foreground text-right">
-                                      -${creditDeduction}
-                                    </div>
+                                  <div className="w-[120px] px-2.5 py-1.5 text-xs text-muted-foreground">
+                                    Compute Size
                                   </div>
-                                  {/* Total */}
-                                  <div className="flex items-center px-1.5">
-                                    <div className="flex-1 px-2.5 py-2 text-xs text-foreground">
-                                      Total Monthly Compute Costs
-                                    </div>
-                                    <div className="w-[120px] px-2.5 py-2 text-xs text-foreground text-right">
-                                      ${totalAfterCredits}
-                                    </div>
+                                  <div className="w-[120px] px-2.5 py-1.5 text-xs text-muted-foreground text-right">
+                                    Monthly Cost
                                   </div>
                                 </div>
-                              </TooltipPrimitive.Content>
-                            </TooltipPrimitive.Portal>
-                          </TooltipPrimitive.Root>
-                        </TooltipPrimitive.Provider>
-                      </div>
+                                {/* Projects */}
+                                {instanceInfo.projects.map((p, i) => (
+                                  <div
+                                    key={i}
+                                    className="flex items-center px-1.5 border-b border-[var(--alpha-8)]"
+                                  >
+                                    <div className="flex-1 px-2.5 py-1.5 text-xs text-foreground flex items-center gap-1 truncate">
+                                      <span className="truncate">{p.name}</span>
+                                      {p.status === 'paused' && (
+                                        <span className="shrink-0 px-1.5 py-px text-[10px] font-medium text-destructive bg-[var(--alpha-8)] rounded">
+                                          PAUSED
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="w-[120px] px-2.5 py-1.5 text-xs text-foreground">
+                                      {p.isCurrent
+                                        ? selectedInstanceType.toUpperCase()
+                                        : p.instanceType}
+                                    </div>
+                                    <div className="w-[120px] px-2.5 py-1.5 text-xs text-foreground text-right">
+                                      $
+                                      {p.isCurrent
+                                        ? (selectedInstance?.pricePerMonth ?? 0)
+                                        : p.monthlyCost}
+                                    </div>
+                                  </div>
+                                ))}
+                                {/* Compute Credits */}
+                                <div className="flex items-center px-1.5 border-b border-[var(--alpha-8)] bg-[var(--alpha-4)]">
+                                  <div className="flex-1 px-2.5 py-1.5 text-xs text-muted-foreground">
+                                    Compute Credits
+                                  </div>
+                                  <div className="w-[120px] px-2.5 py-1.5 text-xs text-muted-foreground text-right">
+                                    -${creditDeduction}
+                                  </div>
+                                </div>
+                                {/* Total */}
+                                <div className="flex items-center px-1.5">
+                                  <div className="flex-1 px-2.5 py-2 text-xs text-foreground">
+                                    Total Monthly Compute Costs
+                                  </div>
+                                  <div className="w-[120px] px-2.5 py-2 text-xs text-foreground text-right">
+                                    ${totalAfterCredits}
+                                  </div>
+                                </div>
+                              </div>
+                            </TooltipPrimitive.Content>
+                          </TooltipPrimitive.Portal>
+                        </TooltipPrimitive.Root>
+                      </TooltipPrimitive.Provider>
                     ) : (
                       <div />
                     )}
@@ -722,8 +734,8 @@ export default function SettingsMenuDialog() {
 
       {/* Review Changes Dialog */}
       <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
-        <DialogContent className="max-w-[780px]" showCloseButton={false}>
-          <DialogHeader className="flex-row items-center justify-between">
+        <DialogContent className="max-w-[840px]" showCloseButton={false}>
+          <DialogHeader className="flex-row items-start justify-between">
             <div className="flex flex-col gap-1">
               <DialogTitle>Review Changes</DialogTitle>
               <p className="text-sm text-muted-foreground">
@@ -732,7 +744,7 @@ export default function SettingsMenuDialog() {
             </div>
             <DialogCloseButton />
           </DialogHeader>
-          <DialogBody className="flex flex-col gap-4 p-6">
+          <DialogBody className="flex flex-col p-4">
             {instanceInfo &&
               selectedInstanceType &&
               (() => {
@@ -744,44 +756,60 @@ export default function SettingsMenuDialog() {
                 );
 
                 return (
-                  <>
-                    <div className="flex items-center gap-4">
-                      <div className="flex-1 flex items-center justify-between border border-[var(--alpha-16)] bg-[var(--alpha-8)] rounded-lg p-4">
-                        <span className="text-xs font-medium uppercase px-2 py-0.5 rounded bg-[var(--alpha-16)] text-foreground">
-                          {currentInstance?.id}
-                        </span>
-                        <span className="text-sm text-foreground">
-                          ${currentInstance?.pricePerMonth ?? 0} / Month
-                        </span>
-                      </div>
-                      <ArrowRight className="w-5 h-5 text-muted-foreground shrink-0" />
-                      <div className="flex-1 flex items-center justify-between border border-primary bg-[var(--alpha-8)] rounded-lg p-4">
-                        <span className="text-xs font-medium uppercase px-2 py-0.5 rounded bg-primary text-[rgb(var(--inverse))]">
-                          {selectedInstance?.id}
-                        </span>
-                        <span className="text-sm text-foreground">
-                          ${selectedInstance?.pricePerMonth ?? 0} / Month
-                        </span>
-                      </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 flex items-center justify-between border border-[var(--alpha-8)] bg-[rgb(var(--semantic-2))] rounded p-6">
+                      <span
+                        className={cn(
+                          'text-xs font-medium uppercase px-2 py-0.5 rounded',
+                          instanceInfo.currentInstanceType.toLowerCase() === 'nano'
+                            ? 'bg-[var(--alpha-8)] text-muted-foreground'
+                            : 'border border-primary text-primary'
+                        )}
+                      >
+                        {currentInstance?.id}
+                      </span>
+                      <span className="text-xl font-medium text-muted-foreground">
+                        ${currentInstance?.pricePerMonth ?? 0}
+                        <span> / Month</span>
+                      </span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-warning">
-                        <CircleAlert className="w-4 h-4 shrink-0" />
-                        <span className="text-sm">
-                          Resizing your Compute will automatically restart your project
+                    <ArrowRight className="w-6 h-6 text-muted-foreground shrink-0" />
+                    <div className="flex-1 flex items-center justify-between border border-[var(--alpha-8)] bg-[rgb(var(--semantic-2))] rounded p-6">
+                      <span
+                        className={cn(
+                          'text-xs font-medium uppercase px-2 py-0.5 rounded',
+                          selectedInstanceType.toLowerCase() === 'nano'
+                            ? 'bg-[var(--alpha-8)] text-muted-foreground'
+                            : 'border border-primary text-primary'
+                        )}
+                      >
+                        {selectedInstance?.id}
+                      </span>
+                      <span className="text-xl font-medium text-muted-foreground">
+                        <span className="text-foreground">
+                          ${selectedInstance?.pricePerMonth ?? 0}
                         </span>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <Button variant="secondary" onClick={() => setIsReviewDialogOpen(false)}>
-                          Cancel
-                        </Button>
-                        <Button onClick={handleInstanceTypeChange}>Confirm Changes</Button>
-                      </div>
+                        <span> / Month</span>
+                      </span>
                     </div>
-                  </>
+                  </div>
                 );
               })()}
           </DialogBody>
+          <div className="flex items-center gap-3 border-t border-[var(--alpha-8)] p-4">
+            <div className="flex flex-1 items-center gap-1.5 text-warning min-w-0">
+              <CircleAlert className="w-5 h-5 shrink-0" />
+              <span className="text-sm leading-6">
+                Resizing your Compute will automatically restart your project
+              </span>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <Button variant="secondary" onClick={() => setIsReviewDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleInstanceTypeChange}>Confirm Changes</Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
