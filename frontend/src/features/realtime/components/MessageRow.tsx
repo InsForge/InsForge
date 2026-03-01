@@ -13,12 +13,7 @@ export function MessageRow({ message, className }: MessageRowProps) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div
-      className={cn(
-        'rounded border border-[var(--alpha-8)] bg-card',
-        className
-      )}
-    >
+    <div className={cn('rounded border border-[var(--alpha-8)] bg-card', className)}>
       {/* Row */}
       <div
         className="flex items-center rounded cursor-pointer hover:bg-[var(--alpha-8)] transition-colors"
@@ -65,9 +60,7 @@ export function MessageRow({ message, className }: MessageRowProps) {
 
         {/* WebSockets */}
         <div className="w-[100px] shrink-0 h-12 flex items-center px-2.5">
-          <span className="text-sm text-foreground leading-[18px]">
-            {message.wsAudienceCount}
-          </span>
+          <span className="text-sm text-foreground leading-[18px]">{message.wsAudienceCount}</span>
         </div>
 
         {/* Webhooks */}

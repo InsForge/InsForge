@@ -63,7 +63,10 @@ export function ChannelRow({
 
         {/* Created Column */}
         <div className="flex-1 min-w-0 h-12 flex items-center px-2.5">
-          <span className="text-sm text-foreground leading-[18px] truncate" title={channel.createdAt}>
+          <span
+            className="text-sm text-foreground leading-[18px] truncate"
+            title={channel.createdAt}
+          >
             {formatDate(channel.createdAt)}
           </span>
         </div>

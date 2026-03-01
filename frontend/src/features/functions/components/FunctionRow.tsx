@@ -39,10 +39,7 @@ export function FunctionRow({
         {/* URL Column */}
         <div className="flex-[3] min-w-0 h-12 flex items-center px-2.5">
           <div className="flex items-center gap-2 min-w-0">
-            <span
-              className="text-sm leading-[18px] text-foreground truncate"
-              title={functionUrl}
-            >
+            <span className="text-sm leading-[18px] text-foreground truncate" title={functionUrl}>
               {functionUrl}
             </span>
             <CopyButton
@@ -56,10 +53,7 @@ export function FunctionRow({
 
         {/* Created Column */}
         <div className="flex-[1.5] min-w-0 h-12 flex items-center px-2.5">
-          <span
-            className="text-sm leading-[18px] text-foreground truncate"
-            title={func.createdAt}
-          >
+          <span className="text-sm leading-[18px] text-foreground truncate" title={func.createdAt}>
             {format(new Date(func.createdAt), 'MMM dd, yyyy, hh:mm a')}
           </span>
         </div>

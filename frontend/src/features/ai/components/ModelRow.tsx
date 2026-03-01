@@ -14,10 +14,7 @@ export function ModelRow({ model, isEnabled, requests, onToggle }: ModelRowProps
       {/* Model with Toggle */}
       <div className="flex items-center gap-3">
         <Switch checked={isEnabled} onCheckedChange={() => onToggle(model.modelId, isEnabled)} />
-        <span
-          className="text-sm text-foreground truncate"
-          title={model.modelName}
-        >
+        <span className="text-sm text-foreground truncate" title={model.modelName}>
           {model.modelName}
         </span>
       </div>

@@ -155,9 +155,7 @@ export default function AIPage() {
         <div className="max-w-[1024px] w-full flex flex-col gap-6 pt-10 pb-3">
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-medium text-foreground leading-8">
-                Model Gateway
-              </h1>
+              <h1 className="text-2xl font-medium text-foreground leading-8">Model Gateway</h1>
               {credits?.remaining && (
                 <span className="text-sm font-normal text-primary mt-[2.5px]">
                   {formatCredits(credits.remaining)} credit{credits.remaining !== 1 ? 's' : ''} left
@@ -189,9 +187,7 @@ export default function AIPage() {
         <div className="max-w-[1024px] w-full flex-1 min-h-0 flex flex-col pt-2 pb-6">
           {getAICreditsError ? (
             <div className="flex items-center justify-center h-64 text-muted-foreground">
-              <p className="text-sm font-normal">
-                {getAICreditsError.message}
-              </p>
+              <p className="text-sm font-normal">{getAICreditsError.message}</p>
             </div>
           ) : isLoading ? (
             <div className="flex items-center justify-center h-64">

@@ -65,7 +65,9 @@ export default function RealtimeMessagesPage() {
             Messages
           </button>
           <ChevronRight className="w-5 h-5 text-muted-foreground" />
-          <p className="text-base font-medium leading-7 text-foreground">{selectedMessage.eventName}</p>
+          <p className="text-base font-medium leading-7 text-foreground">
+            {selectedMessage.eventName}
+          </p>
         </div>
 
         <div className="flex-1 min-h-0 p-4 overflow-auto">
@@ -119,9 +121,7 @@ export default function RealtimeMessagesPage() {
       <div className="flex items-center justify-between min-w-[800px] shrink-0 border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
         {/* Left: Title + Divider + Refresh */}
         <div className="flex flex-1 items-center overflow-clip pl-4 pr-3 py-3">
-          <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">
-            Messages
-          </h1>
+          <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">Messages</h1>
           <div className="flex h-5 w-5 shrink-0 items-center justify-center">
             <div className="h-5 w-px bg-[var(--alpha-8)]" />
           </div>
@@ -156,12 +156,18 @@ export default function RealtimeMessagesPage() {
       </div>
 
       {/* Scrollable Content */}
-      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 min-h-0 overflow-y-auto relative">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 min-h-0 overflow-y-auto relative"
+      >
         {/* Top spacing */}
         <div className="h-10" />
 
         {/* Sticky Table Header */}
-        <div className={`sticky top-0 z-10 bg-[rgb(var(--semantic-1))] px-3 ${isScrolled ? 'border-b border-[var(--alpha-8)]' : ''}`}>
+        <div
+          className={`sticky top-0 z-10 bg-[rgb(var(--semantic-1))] px-3 ${isScrolled ? 'border-b border-[var(--alpha-8)]' : ''}`}
+        >
           <div className="mx-auto max-w-[1024px] w-4/5">
             <div className="flex items-center h-8 text-sm text-muted-foreground">
               <div className="w-[30px] shrink-0" />
@@ -187,10 +193,7 @@ export default function RealtimeMessagesPage() {
             ) : filteredMessages.length >= 1 ? (
               <>
                 {filteredMessages.map((message) => (
-                  <MessageRow
-                    key={message.id}
-                    message={message}
-                  />
+                  <MessageRow key={message.id} message={message} />
                 ))}
               </>
             ) : (

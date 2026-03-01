@@ -164,9 +164,7 @@ export default function RealtimePermissionsPage() {
       <div className="flex items-center justify-between min-w-[800px] shrink-0 border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
         {/* Left: Title + Divider + Toggle Nav */}
         <div className="flex flex-1 items-center overflow-clip pl-4 pr-3 py-3">
-          <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">
-            Permissions
-          </h1>
+          <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">Permissions</h1>
           <div className="flex h-5 w-5 shrink-0 items-center justify-center">
             <div className="h-5 w-px bg-[var(--alpha-8)]" />
           </div>
@@ -201,9 +199,7 @@ export default function RealtimePermissionsPage() {
             showPagination={false}
             noPadding={true}
             className="h-full"
-            emptyState={
-              <div className="text-sm text-muted-foreground">No policies defined</div>
-            }
+            emptyState={<div className="text-sm text-muted-foreground">No policies defined</div>}
           />
         )}
       </div>

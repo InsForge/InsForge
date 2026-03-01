@@ -72,7 +72,9 @@ export default function FunctionsPage() {
             >
               <ArrowLeft className="size-5 text-foreground" />
             </button>
-            <h1 className="text-base font-medium leading-7 text-foreground">{selectedFunction.name}</h1>
+            <h1 className="text-base font-medium leading-7 text-foreground">
+              {selectedFunction.name}
+            </h1>
           </div>
         </div>
         <div className="flex-1 min-h-0">
@@ -126,12 +128,18 @@ export default function FunctionsPage() {
       </div>
 
       {/* Scrollable Content */}
-      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 min-h-0 overflow-y-auto relative">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 min-h-0 overflow-y-auto relative"
+      >
         {/* Top spacing */}
         <div className="h-3" />
 
         {/* Sticky Table Header */}
-        <div className={`sticky top-0 z-10 bg-[rgb(var(--semantic-1))] px-3 ${isScrolled ? 'border-b border-[var(--alpha-8)]' : ''}`}>
+        <div
+          className={`sticky top-0 z-10 bg-[rgb(var(--semantic-1))] px-3 ${isScrolled ? 'border-b border-[var(--alpha-8)]' : ''}`}
+        >
           <div className="flex items-center h-8 pl-2 text-sm text-muted-foreground">
             <div className="flex-[1.5] py-1.5 px-2.5">Name</div>
             <div className="flex-[3] py-1.5 px-2.5">URL</div>
