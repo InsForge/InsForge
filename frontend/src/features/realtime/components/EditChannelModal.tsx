@@ -128,7 +128,9 @@ export function EditChannelModal({
           {/* Pattern */}
           <div className="flex gap-6 items-start">
             <div className="flex w-[200px] shrink-0 flex-col gap-2">
-              <Label htmlFor="pattern" className="leading-5 text-foreground">Pattern</Label>
+              <Label htmlFor="pattern" className="leading-5 text-foreground">
+                Pattern
+              </Label>
               <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
                 Use alphanumeric characters, colons, hyphens, and % as wildcard
               </p>
@@ -149,7 +151,9 @@ export function EditChannelModal({
           {/* Description */}
           <div className="flex gap-6 items-start">
             <div className="w-[200px] shrink-0">
-              <Label htmlFor="description" className="leading-5 text-foreground">Description</Label>
+              <Label htmlFor="description" className="leading-5 text-foreground">
+                Description
+              </Label>
             </div>
             <div className="min-w-0 flex-1">
               <Textarea
@@ -168,7 +172,9 @@ export function EditChannelModal({
           {/* Enabled */}
           <div className="flex gap-6 items-center">
             <div className="w-[200px] shrink-0">
-              <Label htmlFor="enabled" className="leading-5 text-foreground">Enabled</Label>
+              <Label htmlFor="enabled" className="leading-5 text-foreground">
+                Enabled
+              </Label>
             </div>
             <div className="min-w-0 flex-1 flex justify-end">
               <Switch id="enabled" checked={enabled} onCheckedChange={setEnabled} />
