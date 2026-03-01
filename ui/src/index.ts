@@ -70,5 +70,9 @@ export {
   MenuDialogCloseButton,
 } from './components';
 
+export { CopyButton } from './components';
+export { CodeBlock } from './components';
+export { ToggleNav, ToggleNavItem } from './components';
+
 // Utilities
 export { cn } from './lib';

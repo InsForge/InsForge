@@ -26,6 +26,9 @@ export {
   SelectScrollDownButton,
 } from './Select';
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './Tooltip';
+export { CopyButton } from './CopyButton';
+export { CodeBlock } from './CodeBlock';
+export { ToggleNav, ToggleNavItem } from './ToggleNav';
 export { Switch, switchVariants, type SwitchProps } from './Switch';
 export { Checkbox } from './Checkbox';
 export { Badge, badgeVariants, type BadgeProps } from './Badge';

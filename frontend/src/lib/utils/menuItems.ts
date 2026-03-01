@@ -162,7 +162,7 @@ export const staticMenuItems: PrimaryMenuItem[] = [
     secondaryMenu: [
       {
         id: 'functions-list',
-        label: 'Functions',
+        label: 'Edge Functions',
         href: '/dashboard/functions/list',
       },
       {

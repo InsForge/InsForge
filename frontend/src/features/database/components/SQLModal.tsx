@@ -55,20 +55,20 @@ interface SQLCellButtonProps {
 
 export function SQLCellButton({ value, onClick }: SQLCellButtonProps) {
   if (!value) {
-    return <span className="text-sm">-</span>;
+    return <span className="text-sm text-muted-foreground">-</span>;
   }
 
   return (
     <div className="flex items-center justify-between gap-1 min-w-0">
-      <span className="text-sm truncate">{value}</span>
+      <span className="text-sm text-foreground truncate">{value}</span>
       <button
         onClick={(e) => {
           e.stopPropagation();
           onClick();
         }}
-        className="shrink-0 p-1 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded transition-colors"
+        className="shrink-0 p-1 hover:bg-[var(--alpha-8)] rounded transition-colors"
       >
-        <ExternalLink className="size-4 text-zinc-400 dark:text-neutral-400" />
+        <ExternalLink className="size-4 text-muted-foreground" />
       </button>
     </div>
   );
