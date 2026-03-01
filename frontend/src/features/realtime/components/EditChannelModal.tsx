@@ -3,7 +3,9 @@ import { Plus, X } from 'lucide-react';
 import {
   Button,
   Dialog,
+  DialogBody,
   DialogContent,
+  DialogDivider,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -122,101 +124,98 @@ export function EditChannelModal({
           <DialogTitle>Edit Channel</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6 p-6">
+        <DialogBody>
           {/* Pattern */}
-          <div className="flex flex-row justify-between gap-6">
-            <Label
-              htmlFor="pattern"
-              className="w-28 shrink-0 text-sm font-medium text-zinc-950 dark:text-white pt-2"
-            >
-              Pattern
-            </Label>
-            <div className="flex-1 flex flex-col gap-1">
+          <div className="flex gap-6 items-start">
+            <div className="flex w-[200px] shrink-0 flex-col gap-2">
+              <Label htmlFor="pattern" className="leading-5 text-foreground">Pattern</Label>
+              <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
+                Use alphanumeric characters, colons, hyphens, and % as wildcard
+              </p>
+            </div>
+            <div className="min-w-0 flex-1">
               <Input
                 id="pattern"
                 value={pattern}
                 onChange={(e) => setPattern(e.target.value)}
                 placeholder="e.g., room:%, chat:lobby"
-                className="dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:border-neutral-700 dark:text-white"
+                className="h-8 rounded bg-[var(--alpha-4)] px-1.5 py-1.5 text-[13px] leading-[18px]"
               />
-              <p className="text-xs text-zinc-500 dark:text-neutral-400">
-                Use alphanumeric characters, colons, hyphens, and % as wildcard
-              </p>
             </div>
           </div>
 
+          <DialogDivider />
+
           {/* Description */}
-          <div className="flex flex-row justify-between gap-6">
-            <Label
-              htmlFor="description"
-              className="w-28 shrink-0 text-sm font-medium text-zinc-950 dark:text-white pt-2"
-            >
-              Description
-            </Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Optional description for this channel"
-              rows={2}
-              className="flex-1 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:border-neutral-700 dark:text-white resize-none"
-            />
+          <div className="flex gap-6 items-start">
+            <div className="w-[200px] shrink-0">
+              <Label htmlFor="description" className="leading-5 text-foreground">Description</Label>
+            </div>
+            <div className="min-w-0 flex-1">
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Enter your message here"
+                rows={3}
+                className="min-h-[80px] rounded bg-[var(--alpha-4)] border-[var(--alpha-12)] text-foreground px-2.5 py-1.5 text-[13px] leading-[18px] resize-none"
+              />
+            </div>
           </div>
 
-          {/* Enabled Toggle */}
-          <div className="flex flex-row justify-between gap-6">
-            <Label
-              htmlFor="enabled"
-              className="w-28 shrink-0 text-sm font-medium text-zinc-950 dark:text-white"
-            >
-              Enabled
-            </Label>
-            <div className="flex-1">
+          <DialogDivider />
+
+          {/* Enabled */}
+          <div className="flex gap-6 items-center">
+            <div className="w-[200px] shrink-0">
+              <Label htmlFor="enabled" className="leading-5 text-foreground">Enabled</Label>
+            </div>
+            <div className="min-w-0 flex-1 flex justify-end">
               <Switch id="enabled" checked={enabled} onCheckedChange={setEnabled} />
             </div>
           </div>
 
+          <DialogDivider />
+
           {/* Webhook URLs */}
-          <div className="flex flex-row justify-between gap-6">
-            <Label className="w-28 shrink-0 text-sm font-medium text-zinc-950 dark:text-white pt-2">
-              Webhook URLs
-            </Label>
-            <div className="flex-1 flex flex-col gap-2">
+          <div className="flex gap-6 items-start">
+            <div className="flex w-[200px] shrink-0 flex-col gap-2">
+              <Label className="leading-5 text-foreground">Webhook URLs</Label>
+              <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
+                Messages published to this channel will be forwarded to these URLs
+              </p>
+            </div>
+            <div className="min-w-0 flex-1 flex flex-col gap-2 items-end">
               {webhookUrls.map((url, index) => (
-                <div key={index} className="flex items-center gap-2">
+                <div key={index} className="flex w-full items-center gap-1.5">
                   <Input
                     value={url}
                     onChange={(e) => handleWebhookChange(index, e.target.value)}
                     placeholder="https://example.com/webhook"
-                    className="flex-1 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:border-neutral-700 dark:text-white"
+                    className="h-8 flex-1 rounded bg-[var(--alpha-4)] px-1.5 py-1.5 text-[13px] leading-[18px]"
                   />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleRemoveWebhook(index)}
-                    className="shrink-0"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                  {index > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveWebhook(index)}
+                      className="flex size-8 shrink-0 items-center justify-center rounded border border-[var(--alpha-8)] bg-card text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  )}
                 </div>
               ))}
-              <Button
+              <button
                 type="button"
-                variant="ghost"
-                size="sm"
                 onClick={handleAddWebhook}
-                className="w-fit"
+                className="flex h-8 items-center gap-0.5 rounded border border-[var(--alpha-8)] bg-card px-1.5 text-sm font-medium text-foreground"
               >
-                <Plus className="h-4 w-4 mr-1" />
-                Add URL
-              </Button>
-              <p className="text-xs text-zinc-500 dark:text-neutral-400">
-                Messages published to this channel will be forwarded to these URLs
-              </p>
+                <Plus className="size-5" />
+                <span className="px-1">Add URL</span>
+              </button>
             </div>
           </div>
-        </div>
+        </DialogBody>
 
         <DialogFooter>
           <Button
@@ -224,7 +223,7 @@ export function EditChannelModal({
             variant="secondary"
             onClick={() => onOpenChange(false)}
             disabled={isUpdating}
-            className="px-4"
+            className="h-8 rounded px-2"
           >
             Cancel
           </Button>
@@ -232,7 +231,7 @@ export function EditChannelModal({
             type="button"
             onClick={handleSave}
             disabled={!hasChanges() || isUpdating}
-            className="px-4"
+            className="h-8 rounded px-2"
           >
             {isUpdating ? 'Saving...' : 'Save Changes'}
           </Button>
