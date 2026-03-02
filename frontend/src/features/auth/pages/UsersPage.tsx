@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CirclePlus, RefreshCw, Search } from 'lucide-react';
+import { CirclePlus, RefreshCw } from 'lucide-react';
+import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import {
-  Button,
-  Input,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@insforge/ui';
-import { ConnectCTA, SelectionClearButton, DeleteActionButton, ConfirmDialog } from '@/components';
+  ConnectCTA,
+  SelectionClearButton,
+  DeleteActionButton,
+  ConfirmDialog,
+  TableHeader,
+} from '@/components';
 import { UsersDataGrid, UserFormDialog } from '@/features/auth/components';
 import { SortColumn } from 'react-data-grid';
 import { UserSchema } from '@insforge/shared-schemas';
@@ -152,9 +151,9 @@ export default function UsersPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <div className="flex shrink-0 items-center justify-between border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
-        <div className="flex min-w-0 flex-1 items-center overflow-hidden pl-4 pr-3 py-3">
-          {selectedRows.size > 0 ? (
+      <TableHeader
+        leftContent={
+          selectedRows.size > 0 ? (
             <div className="flex items-center gap-2">
               <SelectionClearButton
                 selectedCount={selectedRows.size}
@@ -168,7 +167,7 @@ export default function UsersPage() {
               />
             </div>
           ) : (
-            <>
+            <div className="flex min-w-0 items-center gap-3">
               <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">Users</h1>
               <div className="flex h-5 w-5 shrink-0 items-center justify-center">
                 <div className="h-5 w-px bg-[var(--alpha-8)]" />
@@ -203,27 +202,19 @@ export default function UsersPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-9 rounded px-1.5 text-primary hover:bg-[var(--alpha-4)] hover:text-primary active:bg-[var(--alpha-8)]"
+                className="h-8 rounded px-1.5 text-primary hover:bg-[var(--alpha-4)] hover:text-primary active:bg-[var(--alpha-8)]"
                 onClick={() => setAddDialogOpen(true)}
               >
                 <CirclePlus className="h-6 w-6 stroke-[1.5] text-primary" />
                 <span className="px-1 text-sm font-medium leading-5">Add User</span>
               </Button>
-            </>
-          )}
-        </div>
-        <div className="w-[280px] shrink-0 p-3">
-          <div className="relative w-full">
-            <Search className="pointer-events-none absolute left-1.5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={searchValue}
-              onChange={(event) => setSearchValue(event.target.value)}
-              placeholder="Search users"
-              className="h-9 border-[var(--alpha-12)] bg-[var(--alpha-4)] pl-8 pr-2 text-sm leading-5 placeholder:text-muted-foreground"
-            />
-          </div>
-        </div>
-      </div>
+            </div>
+          )
+        }
+        searchValue={searchValue}
+        onSearchChange={setSearchValue}
+        searchPlaceholder="Search users"
+      />
 
       <div className="relative min-h-0 flex-1">
         <UsersDataGrid

@@ -8,8 +8,7 @@ import {
   type DataGridColumn,
   type DataGridRowType,
   EmptyState,
-  SearchInput,
-  SortableHeaderRenderer,
+  TableHeader,
 } from '@/components';
 import { usePolicies } from '../hooks/useDatabase';
 import { SQLModal, SQLCellButton } from '../components/SQLModal';
@@ -89,21 +88,6 @@ export default function PoliciesPage() {
         width: 'minmax(180px, 1.5fr)',
         resizable: true,
         sortable: true,
-        renderHeaderCell: (props) => (
-          <div className="flex h-full w-full items-center pl-2">
-            <SortableHeaderRenderer
-              column={props.column as DataGridColumn<PolicyRow>}
-              sortDirection={props.sortDirection}
-            />
-          </div>
-        ),
-        renderCell: ({ row }) => (
-          <div className="flex h-full w-full items-center pl-2">
-            <span className="truncate text-foreground" title={row.tableName}>
-              {row.tableName}
-            </span>
-          </div>
-        ),
       },
       {
         key: 'policyName',
@@ -191,14 +175,10 @@ export default function PoliciesPage() {
         }
       />
       <div className="min-w-0 flex-1 flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-        <div className="flex shrink-0 items-center justify-between border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
-          <div className="flex min-w-0 flex-1 items-center overflow-hidden pl-4 pr-3 py-3">
-            <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">
-              RLS Policies
-            </h1>
-            <div className="flex h-5 w-5 shrink-0 items-center justify-center">
-              <div className="h-5 w-px bg-[var(--alpha-8)]" />
-            </div>
+        <TableHeader
+          title="RLS Policies"
+          showDividerAfterTitle
+          titleButtons={
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -217,16 +197,11 @@ export default function PoliciesPage() {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-          </div>
-          <div className="w-[280px] p-3">
-            <SearchInput
-              value={searchQuery}
-              onChange={setSearchQuery}
-              placeholder="Search policy"
-              className="w-full"
-            />
-          </div>
-        </div>
+          }
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchPlaceholder="Search policy"
+        />
         {isLoading ? (
           <div className="min-h-0 flex-1 flex items-center justify-center">
             <EmptyState title="Loading policies..." description="Please wait" />

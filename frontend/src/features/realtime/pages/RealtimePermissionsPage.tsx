@@ -11,7 +11,7 @@ import {
 import { SQLModal, SQLCellButton } from '@/features/database';
 import { useRealtimePermissions } from '../hooks/useRealtimePermissions';
 import type { RlsPolicy } from '../services/realtime.service';
-import { ToggleNav, ToggleNavItem } from '@insforge/ui';
+import { Tabs, Tab } from '@insforge/ui';
 
 type TabType = 'subscribe' | 'publish';
 
@@ -168,11 +168,11 @@ export default function RealtimePermissionsPage() {
           <div className="flex h-5 w-5 shrink-0 items-center justify-center">
             <div className="h-5 w-px bg-[var(--alpha-8)]" />
           </div>
-          {/* Toggle Nav */}
-          <ToggleNav value={activeTab} onValueChange={setActiveTab}>
-            <ToggleNavItem value="subscribe">Subscribe Policies</ToggleNavItem>
-            <ToggleNavItem value="publish">Publish Policies</ToggleNavItem>
-          </ToggleNav>
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <Tab value="subscribe">Subscribe Policies</Tab>
+            <Tab value="publish">Publish Policies</Tab>
+          </Tabs>
         </div>
         {/* Right: Search */}
         <div className="shrink-0 w-[280px] p-3">

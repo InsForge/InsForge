@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { CirclePlus, LogIn, Search } from 'lucide-react';
+import { CirclePlus, LogIn } from 'lucide-react';
 import PencilIcon from '@/assets/icons/pencil.svg?react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import { useTables } from '@/features/database/hooks/useTables';
@@ -10,14 +10,7 @@ import { TableForm } from '@/features/database/components/TableForm';
 import { TablesEmptyState } from '@/features/database/components/TablesEmptyState';
 import { TemplatePreview } from '@/features/database/components/TemplatePreview';
 import { DATABASE_TEMPLATES, DatabaseTemplate } from '@/features/database/templates';
-import {
-  Button,
-  Input,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@insforge/ui';
+import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import {
   Alert,
   AlertDescription,
@@ -26,6 +19,7 @@ import {
   EmptyState,
   SelectionClearButton,
   DeleteActionButton,
+  TableHeader,
 } from '@/components';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
@@ -420,9 +414,9 @@ export default function TablesPage() {
           // Show normal content with header
           <>
             {selectedTable && (
-              <div className="flex shrink-0 items-center justify-between border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
-                <div className="flex min-w-0 flex-1 items-center overflow-hidden pl-4 pr-3 py-3">
-                  {selectedRows.size > 0 ? (
+              <TableHeader
+                leftContent={
+                  selectedRows.size > 0 ? (
                     <div className="flex items-center gap-2">
                       <SelectionClearButton
                         selectedCount={selectedRows.size}
@@ -436,7 +430,7 @@ export default function TablesPage() {
                       />
                     </div>
                   ) : (
-                    <>
+                    <div className="flex min-w-0 items-center gap-3">
                       <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">
                         {selectedTable}
                       </h1>
@@ -484,7 +478,7 @@ export default function TablesPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-9 rounded px-1.5 text-primary hover:bg-[var(--alpha-4)] hover:text-primary active:bg-[var(--alpha-8)]"
+                        className="h-8 rounded px-1.5 text-primary hover:bg-[var(--alpha-4)] hover:text-primary active:bg-[var(--alpha-8)]"
                         onClick={() => setShowRecordForm(true)}
                       >
                         <CirclePlus className="h-6 w-6 stroke-[1.5] text-primary" />
@@ -493,7 +487,7 @@ export default function TablesPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-9 rounded px-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground active:bg-[var(--alpha-8)]"
+                        className="h-8 rounded px-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground active:bg-[var(--alpha-8)]"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isImporting}
                       >
@@ -502,21 +496,13 @@ export default function TablesPage() {
                           {isImporting ? 'Importing...' : 'Import CSV'}
                         </span>
                       </Button>
-                    </>
-                  )}
-                </div>
-                <div className="w-[280px] shrink-0 p-3">
-                  <div className="relative w-full">
-                    <Search className="pointer-events-none absolute left-1.5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      value={searchValue}
-                      onChange={(event) => setSearchValue(event.target.value)}
-                      placeholder="Search records"
-                      className="h-9 border-[var(--alpha-12)] bg-[var(--alpha-4)] pl-8 pr-2 text-sm leading-5 placeholder:text-muted-foreground"
-                    />
-                  </div>
-                </div>
-              </div>
+                    </div>
+                  )
+                }
+                searchValue={searchValue}
+                onSearchChange={setSearchValue}
+                searchPlaceholder="Search records"
+              />
             )}
 
             {/* Content - Full height without padding for table to fill */}

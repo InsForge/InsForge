@@ -72,7 +72,7 @@ export {
 
 export { CopyButton } from './components';
 export { CodeBlock } from './components';
-export { ToggleNav, ToggleNavItem } from './components';
+export { Tabs, Tab } from './components';
 
 // Utilities
 export { cn } from './lib';

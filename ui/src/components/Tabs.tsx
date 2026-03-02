@@ -1,28 +1,28 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import { cn } from '../lib';
 
-interface ToggleNavContextValue {
+interface TabsContextValue {
   value: string;
   onValueChange: (value: string) => void;
 }
 
-const ToggleNavContext = createContext<ToggleNavContextValue | null>(null);
+const TabsContext = createContext<TabsContextValue | null>(null);
 
-interface ToggleNavProps<T extends string = string> {
+interface TabsProps<T extends string = string> {
   value: T;
   onValueChange: (value: T) => void;
   className?: string;
   children: ReactNode;
 }
 
-function ToggleNav<T extends string = string>({
+function Tabs<T extends string = string>({
   value,
   onValueChange,
   className,
   children,
-}: ToggleNavProps<T>) {
+}: TabsProps<T>) {
   return (
-    <ToggleNavContext.Provider
+    <TabsContext.Provider
       value={{
         value,
         onValueChange: onValueChange as (value: string) => void,
@@ -36,19 +36,19 @@ function ToggleNav<T extends string = string>({
       >
         {children}
       </div>
-    </ToggleNavContext.Provider>
+    </TabsContext.Provider>
   );
 }
 
-interface ToggleNavItemProps {
+interface TabProps {
   value: string;
   className?: string;
   children: ReactNode;
 }
 
-function ToggleNavItem({ value, className, children }: ToggleNavItemProps) {
-  const context = useContext(ToggleNavContext);
-  if (!context) throw new Error('ToggleNavItem must be used within ToggleNav');
+function Tab({ value, className, children }: TabProps) {
+  const context = useContext(TabsContext);
+  if (!context) throw new Error('Tab must be used within Tabs');
 
   const isActive = context.value === value;
 
@@ -66,4 +66,4 @@ function ToggleNavItem({ value, className, children }: ToggleNavItemProps) {
   );
 }
 
-export { ToggleNav, ToggleNavItem };
+export { Tabs, Tab };

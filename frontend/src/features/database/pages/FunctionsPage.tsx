@@ -4,12 +4,11 @@ import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from
 import { useNavigate } from 'react-router-dom';
 import {
   EmptyState,
-  SearchInput,
   DataGrid,
   type DataGridColumn,
   type DataGridRowType,
   type ConvertedValue,
-  SortableHeaderRenderer,
+  TableHeader,
 } from '@/components';
 import { useFunctions } from '../hooks/useDatabase';
 import { SQLModal, SQLCellButton } from '../components/SQLModal';
@@ -81,21 +80,6 @@ export default function FunctionsPage() {
         width: 'minmax(200px, 2fr)',
         resizable: true,
         sortable: true,
-        renderHeaderCell: (props) => (
-          <div className="flex h-full w-full items-center pl-2">
-            <SortableHeaderRenderer
-              column={props.column as DataGridColumn<FunctionRow>}
-              sortDirection={props.sortDirection}
-            />
-          </div>
-        ),
-        renderCell: ({ row }) => (
-          <div className="flex h-full w-full items-center pl-2">
-            <span className="truncate text-foreground" title={row.functionName}>
-              {row.functionName}
-            </span>
-          </div>
-        ),
       },
       {
         key: 'kind',
@@ -157,14 +141,10 @@ export default function FunctionsPage() {
         }
       />
       <div className="min-w-0 flex-1 flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-        <div className="flex shrink-0 items-center justify-between border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
-          <div className="flex min-w-0 flex-1 items-center overflow-hidden pl-4 pr-3 py-3">
-            <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">
-              Database Functions
-            </h1>
-            <div className="flex h-5 w-5 shrink-0 items-center justify-center">
-              <div className="h-5 w-px bg-[var(--alpha-8)]" />
-            </div>
+        <TableHeader
+          title="Database Functions"
+          showDividerAfterTitle
+          titleButtons={
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -183,16 +163,11 @@ export default function FunctionsPage() {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-          </div>
-          <div className="w-[280px] p-3">
-            <SearchInput
-              value={searchQuery}
-              onChange={setSearchQuery}
-              placeholder="Search function"
-              className="w-full"
-            />
-          </div>
-        </div>
+          }
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchPlaceholder="Search function"
+        />
         {isLoading ? (
           <div className="min-h-0 flex-1 flex items-center justify-center">
             <EmptyState title="Loading functions..." description="Please wait" />

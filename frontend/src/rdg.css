@@ -29,7 +29,7 @@
   min-width: 0;
   border-right: 1px solid var(--rdg-border-color);
   border-bottom: 1px solid var(--rdg-border-color);
-  padding: 0 6px;
+  padding-inline: 6px;
 }
 
 .rdg-header-row .rdg-cell {
@@ -37,6 +37,11 @@
   background-color: var(--rdg-header-row-background-color) !important;
   font-weight: 400;
   color: rgb(var(--muted-foreground));
+}
+
+.rdg-row .rdg-cell:first-child,
+.rdg-header-row .rdg-cell:first-child {
+  padding-left: 12px;
 }
 
 .rdg-row {

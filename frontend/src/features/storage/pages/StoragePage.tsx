@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, type DragEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Search, Upload } from 'lucide-react';
+import { Upload } from 'lucide-react';
 import PencilIcon from '@/assets/icons/pencil.svg?react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import { useStorage } from '@/features/storage/hooks/useStorage';
@@ -11,14 +11,7 @@ import { BucketFormDialog } from '@/features/storage/components/BucketFormDialog
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
 import { useUploadToast } from '@/features/storage/components/UploadToast';
-import {
-  Button,
-  Input,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@insforge/ui';
+import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import {
   SelectionClearButton,
   DeleteActionButton,
@@ -26,6 +19,7 @@ import {
   AlertDescription,
   ConfirmDialog,
   EmptyState,
+  TableHeader,
 } from '@/components';
 
 interface BucketFormState {
@@ -309,9 +303,9 @@ export default function StoragePage() {
 
         {selectedBucket && (
           <>
-            <div className="flex shrink-0 items-center justify-between border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
-              <div className="flex min-w-0 flex-1 items-center overflow-hidden pl-4 pr-3 py-3">
-                {selectedFiles.size > 0 ? (
+            <TableHeader
+              leftContent={
+                selectedFiles.size > 0 ? (
                   <div className="flex items-center gap-2">
                     <SelectionClearButton
                       selectedCount={selectedFiles.size}
@@ -325,7 +319,7 @@ export default function StoragePage() {
                     />
                   </div>
                 ) : (
-                  <>
+                  <div className="flex min-w-0 items-center gap-3">
                     <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">
                       {selectedBucket}
                     </h1>
@@ -373,7 +367,7 @@ export default function StoragePage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-9 rounded px-1.5 text-primary hover:bg-[var(--alpha-4)] hover:text-primary active:bg-[var(--alpha-8)]"
+                      className="h-8 rounded px-1.5 text-primary hover:bg-[var(--alpha-4)] hover:text-primary active:bg-[var(--alpha-8)]"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isUploading}
                     >
@@ -382,21 +376,13 @@ export default function StoragePage() {
                         {isUploading ? 'Uploading...' : 'Upload File'}
                       </span>
                     </Button>
-                  </>
-                )}
-              </div>
-              <div className="w-[280px] shrink-0 p-3">
-                <div className="relative w-full">
-                  <Search className="pointer-events-none absolute left-1.5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    value={searchValue}
-                    onChange={(event) => setSearchValue(event.target.value)}
-                    placeholder="Search files"
-                    className="h-9 border-[var(--alpha-12)] bg-[var(--alpha-4)] pl-8 pr-2 text-sm leading-5 placeholder:text-muted-foreground"
-                  />
-                </div>
-              </div>
-            </div>
+                  </div>
+                )
+              }
+              searchValue={searchValue}
+              onSearchChange={setSearchValue}
+              searchPlaceholder="Search files"
+            />
 
             {/* Content (supports drag-and-drop file upload) */}
             <div

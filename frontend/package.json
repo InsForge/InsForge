@@ -24,7 +24,6 @@
     "@radix-ui/react-scroll-area": "^1.2.9",
     "@radix-ui/react-separator": "^1.1.7",
     "@radix-ui/react-slot": "^1.2.3",
-    "@radix-ui/react-tabs": "^1.1.12",
     "@tanstack/react-query": "^5.83.0",
     "@types/uuid": "^10.0.0",
     "@uiw/codemirror-theme-vscode": "^4.25.2",

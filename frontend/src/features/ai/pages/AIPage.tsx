@@ -5,7 +5,7 @@ import { useAIConfigs } from '../hooks/useAIConfigs';
 import { useAIRemainingCredits } from '../hooks/useAIUsage';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
-import { ToggleNav, ToggleNavItem } from '@insforge/ui';
+import { Tabs, Tab } from '@insforge/ui';
 import {
   generateProviderTabs,
   filterModelsByProvider,
@@ -167,18 +167,18 @@ export default function AIPage() {
             </p>
           </div>
 
-          {/* Provider Toggle Nav - Full Width */}
-          <ToggleNav value={activeTab} onValueChange={setActiveTab} className="w-full">
+          {/* Provider Tabs - Full Width */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             {providers.map((provider) => {
               const Logo = provider.logo;
               return (
-                <ToggleNavItem key={provider.id} value={provider.id} className="flex-1">
+                <Tab key={provider.id} value={provider.id} className="flex-1">
                   {Logo && <Logo className="w-5 h-5" />}
                   {provider.displayName}
-                </ToggleNavItem>
+                </Tab>
               );
             })}
-          </ToggleNav>
+          </Tabs>
         </div>
       </div>
 

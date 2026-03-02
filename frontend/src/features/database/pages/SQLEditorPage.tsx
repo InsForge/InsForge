@@ -1,7 +1,7 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useRawSQL } from '@/features/database/hooks/useRawSQL';
 import { useSQLEditorContext } from '@/features/database/contexts/SQLEditorContext';
-import { Button, ToggleNav, ToggleNavItem } from '@insforge/ui';
+import { Button, Tabs, Tab } from '@insforge/ui';
 import { CodeEditor, DataGrid, type DataGridColumn, type DataGridRow } from '@/components';
 import { X, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils/utils';
@@ -304,20 +304,20 @@ export default function SQLEditorPage() {
 
         {/* Bottom Half: Toggle Nav + Results */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Toggle Nav + Run Button */}
+          {/* Tabs + Run Button */}
           <div className="flex px-4 py-3 justify-between items-start shrink-0 border-t border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
-            {/* Toggle Nav */}
-            <ToggleNav value={resultView} onValueChange={setResultView}>
-              <ToggleNavItem value="result">
+            {/* Tabs */}
+            <Tabs value={resultView} onValueChange={setResultView}>
+              <Tab value="result">
                 Result
                 {isSuccess && data && isRowData(Array.isArray(data) ? data : data.rows) && (
                   <span className="flex items-center justify-center px-2 py-0.5 rounded bg-[var(--alpha-8)] text-xs font-medium text-muted-foreground">
                     {(Array.isArray(data) ? data : data.rows).length}
                   </span>
                 )}
-              </ToggleNavItem>
-              <ToggleNavItem value="chart">Chart</ToggleNavItem>
-            </ToggleNav>
+              </Tab>
+              <Tab value="chart">Chart</Tab>
+            </Tabs>
             {/* Run Button */}
             <Button onClick={handleExecuteQuery} disabled={isPending || !activeTab?.query.trim()}>
               Run

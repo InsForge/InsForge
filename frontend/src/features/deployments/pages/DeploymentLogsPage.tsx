@@ -145,7 +145,7 @@ export default function DeploymentLogsPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="h-9 pl-3 pr-9"
             />
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-neutral-400" />
+            <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
           </div>
 
           {/* Status Filter */}

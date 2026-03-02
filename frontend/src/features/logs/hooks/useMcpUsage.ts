@@ -10,6 +10,11 @@ import { LOGS_PAGE_SIZE } from '../helpers';
 // Main Hook
 // ============================================================================
 
+interface UseMcpUsageOptions {
+  successFilter?: boolean | null;
+  limit?: number;
+}
+
 /**
  * Hook to manage MCP usage data
  *
@@ -20,7 +25,9 @@ import { LOGS_PAGE_SIZE } from '../helpers';
  * - Supports search and pagination
  *
  */
-export function useMcpUsage() {
+export function useMcpUsage(options: UseMcpUsageOptions = {}) {
+  const { successFilter = true, limit = 200 } = options;
+
   // Hooks
   const { isAuthenticated } = useAuth();
 
@@ -38,8 +45,8 @@ export function useMcpUsage() {
     error,
     refetch,
   } = useQuery<McpUsageRecord[]>({
-    queryKey: ['mcp-usage'],
-    queryFn: () => usageService.getMcpUsage(),
+    queryKey: ['mcp-usage', successFilter, limit],
+    queryFn: () => usageService.getMcpUsage(successFilter, limit),
     enabled: isAuthenticated,
     staleTime: 30 * 1000, // Cache for 30 seconds
     refetchInterval: false,
