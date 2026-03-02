@@ -1,5 +1,4 @@
-import { Search } from 'lucide-react';
-import { Input } from '@insforge/ui';
+import { SearchInput } from '@insforge/ui';
 import { cn } from '@/lib/utils/utils';
 
 interface TableHeaderProps {
@@ -18,6 +17,7 @@ interface TableHeaderProps {
   onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
   searchInputClassName?: string;
+  searchDebounceTime?: number;
 }
 
 export function TableHeader({
@@ -36,6 +36,7 @@ export function TableHeader({
   onSearchChange,
   searchPlaceholder = 'Search',
   searchInputClassName,
+  searchDebounceTime = 0,
 }: TableHeaderProps) {
   const showTitleDivider = !leftContent && showDividerAfterTitle && (titleButtons || leftSlot);
   const shouldShowSearch = showSearch && !!onSearchChange;
@@ -83,18 +84,13 @@ export function TableHeader({
         {rightActions}
 
         {shouldShowSearch && (
-          <div className="relative w-64">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={searchValue}
-              onChange={(event) => onSearchChange(event.target.value)}
-              placeholder={searchPlaceholder}
-              className={cn(
-                'h-8 border-[var(--alpha-12)] bg-[var(--alpha-4)] pl-8 pr-2 text-[13px]',
-                searchInputClassName
-              )}
-            />
-          </div>
+          <SearchInput
+            value={searchValue}
+            onChange={onSearchChange}
+            placeholder={searchPlaceholder}
+            debounceTime={searchDebounceTime}
+            className={cn('w-64', searchInputClassName)}
+          />
         )}
       </div>
     </div>

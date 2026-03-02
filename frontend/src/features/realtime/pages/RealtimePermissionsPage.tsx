@@ -5,7 +5,7 @@ import {
   type DataGridColumn,
   type DataGridRowType,
   EmptyState,
-  SearchInput,
+  TableHeader,
   SortableHeaderRenderer,
 } from '@/components';
 import { SQLModal, SQLCellButton } from '@/features/database';
@@ -160,30 +160,27 @@ export default function RealtimePermissionsPage() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-      {/* Header Bar */}
-      <div className="flex items-center justify-between min-w-[800px] shrink-0 border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
-        {/* Left: Title + Divider + Toggle Nav */}
-        <div className="flex flex-1 items-center overflow-clip pl-4 pr-3 py-3">
-          <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">Permissions</h1>
-          <div className="flex h-5 w-5 shrink-0 items-center justify-center">
-            <div className="h-5 w-px bg-[var(--alpha-8)]" />
+      <TableHeader
+        className="min-w-[800px]"
+        leftContent={
+          <div className="flex flex-1 items-center overflow-clip">
+            <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">
+              Permissions
+            </h1>
+            <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+              <div className="h-5 w-px bg-[var(--alpha-8)]" />
+            </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <Tab value="subscribe">Subscribe Policies</Tab>
+              <Tab value="publish">Publish Policies</Tab>
+            </Tabs>
           </div>
-          {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <Tab value="subscribe">Subscribe Policies</Tab>
-            <Tab value="publish">Publish Policies</Tab>
-          </Tabs>
-        </div>
-        {/* Right: Search */}
-        <div className="shrink-0 w-[280px] p-3">
-          <SearchInput
-            value={searchQuery}
-            onChange={handleSearchChange}
-            placeholder="Search policies"
-            debounceTime={300}
-          />
-        </div>
-      </div>
+        }
+        searchValue={searchQuery}
+        onSearchChange={handleSearchChange}
+        searchDebounceTime={300}
+        searchPlaceholder="Search policies"
+      />
 
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-hidden">

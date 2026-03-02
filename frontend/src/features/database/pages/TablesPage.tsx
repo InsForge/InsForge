@@ -41,8 +41,8 @@ export default function TablesPage() {
   const [isTableFormDirty, setIsTableFormDirty] = useState(false);
   const [showTableForm, setShowTableForm] = useState(false);
   const [editingTable, setEditingTable] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [searchValue, setSearchValue] = useState('');
+  const searchQuery = searchValue.trim();
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -109,18 +109,6 @@ export default function TablesPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, selectedTable]);
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      const nextQuery = searchValue.trim();
-      if (nextQuery !== searchQuery) {
-        setCurrentPage(1);
-        setSearchQuery(nextQuery);
-      }
-    }, 300);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [searchValue, searchQuery]);
 
   // Clear selected rows when table changes
   useEffect(() => {
@@ -226,7 +214,6 @@ export default function TablesPage() {
       setSelectedRows(new Set());
       setSortColumns([]);
       setSearchValue('');
-      setSearchQuery('');
       setIsSorting(false);
 
       // Refresh current table data (if table is selected)
@@ -506,6 +493,7 @@ export default function TablesPage() {
                 }
                 searchValue={searchValue}
                 onSearchChange={setSearchValue}
+                searchDebounceTime={300}
                 searchPlaceholder="Search records"
               />
             )}

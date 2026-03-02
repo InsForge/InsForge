@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useMatch } from 'react-router-dom';
-import { LucideIcon, MoreVertical, Search } from 'lucide-react';
+import { LucideIcon, MoreVertical } from 'lucide-react';
 import { cn } from '@/lib/utils/utils';
 import { ScrollArea } from '@/components/radix/ScrollArea';
 import { SecondaryMenuItem as SecondaryMenuItemType } from '@/lib/utils/menuItems';
@@ -10,7 +10,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  Input,
+  SearchInput,
 } from '@insforge/ui';
 
 interface SecondaryMenuProps {
@@ -258,16 +258,12 @@ export function SecondaryMenu({
       {/* Search */}
       {showSearch && (
         <div className={cn('px-3 pb-3', !actionButtons?.length && 'pt-0')}>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="text"
-              value={searchValue}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder={searchPlaceholder}
-              className="h-8 pl-9 pr-3 text-sm leading-5"
-            />
-          </div>
+          <SearchInput
+            value={searchValue}
+            onChange={handleSearchChange}
+            placeholder={searchPlaceholder}
+            debounceTime={0}
+          />
         </div>
       )}
 

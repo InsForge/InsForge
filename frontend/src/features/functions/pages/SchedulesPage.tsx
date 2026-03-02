@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useRef } from 'react';
 import { ArrowLeft, CirclePlus } from 'lucide-react';
 import { useSchedules } from '@/features/functions/hooks/useSchedules';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
-import { SearchInput, Skeleton } from '@/components';
+import { Skeleton, TableHeader } from '@/components';
 import { ScheduleFormDialog } from '../components/ScheduleFormDialog';
 import type { ScheduleFormSchema } from '../types';
 import { normalizeHeaders } from '../helpers';
@@ -193,54 +193,50 @@ export default function SchedulesPage() {
   // Default list view
   return (
     <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-      {/* Header Bar */}
-      <div className="flex items-center justify-between min-w-[800px] shrink-0 border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
-        {/* Left: Title + Divider + Refresh + Divider + Add */}
-        <div className="flex flex-1 items-center overflow-clip pl-4 pr-3 py-3">
-          <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">Schedules</h1>
-          <div className="flex h-5 w-5 shrink-0 items-center justify-center">
-            <div className="h-5 w-px bg-[var(--alpha-8)]" />
+      <TableHeader
+        className="min-w-[800px]"
+        leftContent={
+          <div className="flex flex-1 items-center overflow-clip">
+            <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">Schedules</h1>
+            <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+              <div className="h-5 w-px bg-[var(--alpha-8)]" />
+            </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => void handleRefresh()}
+                    disabled={isRefreshing}
+                    className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
+                  >
+                    <RefreshIcon className={isRefreshing ? 'h-5 w-5 animate-spin' : 'h-5 w-5'} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="center">
+                  <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+              <div className="h-5 w-px bg-[var(--alpha-8)]" />
+            </div>
+            <Button
+              variant="ghost"
+              onClick={() => setCreateOpen(true)}
+              className="h-8 rounded px-1.5 text-primary hover:bg-[var(--alpha-4)] hover:text-primary active:bg-[var(--alpha-8)]"
+            >
+              <CirclePlus className="h-6 w-6 stroke-[1.5] text-primary" />
+              <span className="px-1 text-sm font-medium leading-5">Add Schedule</span>
+            </Button>
           </div>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => void handleRefresh()}
-                  disabled={isRefreshing}
-                  className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
-                >
-                  <RefreshIcon className={isRefreshing ? 'h-5 w-5 animate-spin' : 'h-5 w-5'} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" align="center">
-                <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <div className="flex h-5 w-5 shrink-0 items-center justify-center">
-            <div className="h-5 w-px bg-[var(--alpha-8)]" />
-          </div>
-          <Button
-            variant="ghost"
-            onClick={() => setCreateOpen(true)}
-            className="h-8 rounded px-1.5 text-primary hover:bg-[var(--alpha-4)] hover:text-primary active:bg-[var(--alpha-8)]"
-          >
-            <CirclePlus className="h-6 w-6 stroke-[1.5] text-primary" />
-            <span className="px-1 text-sm font-medium leading-5">Add Schedule</span>
-          </Button>
-        </div>
-        {/* Right: Search */}
-        <div className="shrink-0 w-[280px] p-3">
-          <SearchInput
-            value={searchQuery}
-            onChange={handleSearchChange}
-            placeholder="Search schedules"
-            debounceTime={300}
-          />
-        </div>
-      </div>
+        }
+        searchValue={searchQuery}
+        onSearchChange={handleSearchChange}
+        searchDebounceTime={300}
+        searchPlaceholder="Search schedules"
+      />
 
       {/* Error Alert */}
       {schedulesError && (

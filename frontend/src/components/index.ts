@@ -21,7 +21,6 @@ export { JsonHighlight } from './JsonHighlight';
 export { LoadingState } from './LoadingState';
 export { PaginationControls, type PaginationControlsProps } from './PaginationControls';
 export { PromptDialog } from './PromptDialog';
-export { SearchInput } from './SearchInput';
 export { SelectionClearButton } from './SelectionClearButton';
 export { CircularStepper, LinearStepper, VerticalStepper } from './Stepper';
 export { TableHeader } from './TableHeader';

@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { ChevronRight } from 'lucide-react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
-import { SearchInput, Skeleton, PaginationControls } from '@/components';
+import { Skeleton, PaginationControls, TableHeader } from '@/components';
 import { useRealtimeMessages } from '../hooks/useRealtimeMessages';
 import { MessageRow } from '../components/MessageRow';
 import RealtimeEmptyState from '../components/RealtimeEmptyState';
@@ -117,43 +117,39 @@ export default function RealtimeMessagesPage() {
   // Default list view
   return (
     <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-      {/* Header Bar */}
-      <div className="flex items-center justify-between min-w-[800px] shrink-0 border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
-        {/* Left: Title + Divider + Refresh */}
-        <div className="flex flex-1 items-center overflow-clip pl-4 pr-3 py-3">
-          <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">Messages</h1>
-          <div className="flex h-5 w-5 shrink-0 items-center justify-center">
-            <div className="h-5 w-px bg-[var(--alpha-8)]" />
+      <TableHeader
+        className="min-w-[800px]"
+        leftContent={
+          <div className="flex flex-1 items-center overflow-clip">
+            <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">Messages</h1>
+            <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+              <div className="h-5 w-px bg-[var(--alpha-8)]" />
+            </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => void handleRefresh()}
+                    disabled={isRefreshing}
+                    className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
+                  >
+                    <RefreshIcon className={isRefreshing ? 'h-5 w-5 animate-spin' : 'h-5 w-5'} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="center">
+                  <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => void handleRefresh()}
-                  disabled={isRefreshing}
-                  className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
-                >
-                  <RefreshIcon className={isRefreshing ? 'h-5 w-5 animate-spin' : 'h-5 w-5'} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" align="center">
-                <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-        {/* Right: Search */}
-        <div className="shrink-0 w-[280px] p-3">
-          <SearchInput
-            value={searchQuery}
-            onChange={handleSearchChange}
-            placeholder="Search message"
-            debounceTime={300}
-          />
-        </div>
-      </div>
+        }
+        searchValue={searchQuery}
+        onSearchChange={handleSearchChange}
+        searchDebounceTime={300}
+        searchPlaceholder="Search message"
+      />
 
       {/* Scrollable Content */}
       <div

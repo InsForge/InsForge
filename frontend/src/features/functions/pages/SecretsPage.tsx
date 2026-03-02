@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button, Input } from '@insforge/ui';
-import { Skeleton, SearchInput, ConfirmDialog } from '@/components';
+import { Skeleton, ConfirmDialog, TableHeader } from '@/components';
 import { SecretRow } from '../components/SecretRow';
 import SecretEmptyState from '../components/SecretEmptyState';
 import { useSecrets } from '@/features/functions/hooks/useSecrets';
@@ -29,20 +29,18 @@ export default function SecretsPage() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
+      <TableHeader
+        title="Secrets"
+        className="min-w-[800px]"
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchDebounceTime={300}
+        searchPlaceholder="Search secrets"
+      />
+
       {/* Scrollable Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="max-w-[1024px] w-4/5 mx-auto pt-10 pb-10">
-          {/* Header: Title + Search */}
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-medium leading-8 text-foreground">Secrets</h1>
-            <SearchInput
-              placeholder="Search secrets"
-              value={searchQuery}
-              onChange={setSearchQuery}
-              debounceTime={300}
-            />
-          </div>
-
           {/* Add New Secret Card */}
           <div className="bg-card rounded-lg mb-6">
             <div className="p-3 border-b border-[var(--alpha-8)]">

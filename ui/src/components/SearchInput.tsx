@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
-import { Button, Input } from '@insforge/ui';
+import { Button } from './Button';
+import { Input } from './Input';
+import { cn } from '../lib';
 
-interface SearchInputProps {
+export interface SearchInputProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -22,64 +24,65 @@ export function SearchInput({
   onImmediateChange,
 }: SearchInputProps) {
   const [internalValue, setInternalValue] = useState(value);
+  const onChangeRef = useRef(onChange);
 
-  // Sync internal value with external value prop
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  // Sync internal value with external value prop.
   useEffect(() => {
     setInternalValue(value);
   }, [value]);
 
-  // Handle debounced onChange
+  // Handle debounced onChange.
   useEffect(() => {
     if (debounceTime === 0) {
-      // No debouncing, call onChange immediately
-      onChange(internalValue);
       return;
     }
 
-    // Set up debounce timer
-    const handler = setTimeout(() => {
-      onChange(internalValue);
+    const timeoutId = window.setTimeout(() => {
+      onChangeRef.current(internalValue);
     }, debounceTime);
 
-    // Cleanup timer on value change
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [internalValue, debounceTime, onChange]);
+    return () => window.clearTimeout(timeoutId);
+  }, [internalValue, debounceTime]);
 
-  const handleInputChange = (newValue: string) => {
-    setInternalValue(newValue);
-    // Call immediate change callback if provided
-    onImmediateChange?.(newValue);
+  const handleInputChange = (nextValue: string) => {
+    setInternalValue(nextValue);
+    onImmediateChange?.(nextValue);
+    if (debounceTime === 0) {
+      onChangeRef.current(nextValue);
+    }
   };
 
   const handleClear = () => {
     setInternalValue('');
     onImmediateChange?.('');
-    // If no debouncing, clear immediately
     if (debounceTime === 0) {
-      onChange('');
+      onChangeRef.current('');
     }
   };
 
   return (
-    <div className={`relative overflow-hidden rounded ${className || ''}`}>
-      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+    <div className={cn('relative', className)}>
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         type="text"
         placeholder={placeholder}
         value={internalValue}
-        onChange={(e) => handleInputChange(e.target.value)}
-        className="pl-9 pr-9 h-10"
+        onChange={(event) => handleInputChange(event.target.value)}
+        className="h-8 pl-9 pr-9 text-[13px]"
       />
       {internalValue && (
         <Button
+          type="button"
           variant="ghost"
           size="icon"
           onClick={handleClear}
-          className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2"
+          className="absolute right-1 top-1/2 h-6 w-6 -translate-y-1/2"
         >
-          <X className="h-3 w-3" />
+          <X />
         </Button>
       )}
     </div>

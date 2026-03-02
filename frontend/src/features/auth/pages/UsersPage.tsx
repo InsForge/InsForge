@@ -15,8 +15,8 @@ import { useToast } from '@/lib/hooks/useToast';
 import { useUsers } from '@/features/auth/hooks/useUsers';
 
 export default function UsersPage() {
-  const [searchQuery, setSearchQuery] = useState('');
   const [searchValue, setSearchValue] = useState('');
+  const searchQuery = searchValue.trim();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -39,16 +39,8 @@ export default function UsersPage() {
   } = useUsers({ searchQuery, pageSize });
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      const nextQuery = searchValue.trim();
-      if (nextQuery !== searchQuery) {
-        setCurrentPage(1);
-        setSearchQuery(nextQuery);
-      }
-    }, 300);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [searchValue, searchQuery, setCurrentPage]);
+    setCurrentPage(1);
+  }, [searchQuery, setCurrentPage]);
 
   // Listen for refresh events
   useEffect(() => {
@@ -135,7 +127,6 @@ export default function UsersPage() {
     try {
       setSelectedRows(new Set());
       setSearchValue('');
-      setSearchQuery('');
       setCurrentPage(1);
       await refetch();
     } finally {
@@ -213,6 +204,7 @@ export default function UsersPage() {
         }
         searchValue={searchValue}
         onSearchChange={setSearchValue}
+        searchDebounceTime={300}
         searchPlaceholder="Search users"
       />
 

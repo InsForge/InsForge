@@ -32,8 +32,8 @@ interface BucketFormState {
 export default function StoragePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedBucketFromQuery = searchParams.get('bucket')?.trim();
-  const [searchQuery, setSearchQuery] = useState('');
   const [searchValue, setSearchValue] = useState('');
+  const searchQuery = searchValue.trim();
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
@@ -115,23 +115,11 @@ export default function StoragePage() {
     setSelectedFiles(new Set());
   }, [selectedBucket]);
 
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      const nextQuery = searchValue.trim();
-      if (nextQuery !== searchQuery) {
-        setSearchQuery(nextQuery);
-      }
-    }, 300);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [searchQuery, searchValue]);
-
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
       setSelectedFiles(new Set());
       setSearchValue('');
-      setSearchQuery('');
       await Promise.all([
         refetchBuckets(),
         queryClient.invalidateQueries({ queryKey: ['storage'] }),
@@ -415,6 +403,7 @@ export default function StoragePage() {
               }
               searchValue={searchValue}
               onSearchChange={setSearchValue}
+              searchDebounceTime={300}
               searchPlaceholder="Search files"
             />
 
