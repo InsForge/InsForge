@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, type DragEvent } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, type DragEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Upload } from 'lucide-react';
 import PencilIcon from '@/assets/icons/pencil.svg?react';
@@ -12,6 +12,7 @@ import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
 import { useUploadToast } from '@/features/storage/components/UploadToast';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
+import { useSearchParams } from 'react-router-dom';
 import {
   SelectionClearButton,
   DeleteActionButton,
@@ -29,7 +30,8 @@ interface BucketFormState {
 }
 
 export default function StoragePage() {
-  const [selectedBucket, setSelectedBucket] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedBucketFromQuery = searchParams.get('bucket')?.trim();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchValue, setSearchValue] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -60,6 +62,33 @@ export default function StoragePage() {
     deleteObjects,
     deleteBucket,
   } = useStorage();
+  const selectedBucket = useMemo(() => {
+    if (isLoading || !buckets.length) {
+      return null;
+    }
+
+    if (
+      selectedBucketFromQuery &&
+      buckets.some((bucket) => bucket.name === selectedBucketFromQuery)
+    ) {
+      return selectedBucketFromQuery;
+    }
+
+    return buckets[0].name;
+  }, [isLoading, buckets, selectedBucketFromQuery]);
+
+  const selectBucket = useCallback(
+    (bucketName: string | null, replace: boolean = false) => {
+      const nextSearchParams = new URLSearchParams(searchParams);
+      if (bucketName) {
+        nextSearchParams.set('bucket', bucketName);
+      } else {
+        nextSearchParams.delete('bucket');
+      }
+      setSearchParams(nextSearchParams, { replace });
+    },
+    [searchParams, setSearchParams]
+  );
 
   const { data: bucketStats } = useBucketStats();
 
@@ -68,12 +97,18 @@ export default function StoragePage() {
     return bucketStats || {};
   }, [bucketStats]);
 
-  // Auto-select first bucket
+  // Keep URL query param in sync with active bucket selection with fallback-to-first behavior.
   useEffect(() => {
-    if (buckets.length && !selectedBucket) {
-      setSelectedBucket(buckets[0].name);
+    if (isLoading) {
+      return;
     }
-  }, [buckets, selectedBucket]);
+
+    if ((selectedBucketFromQuery ?? null) === selectedBucket) {
+      return;
+    }
+
+    selectBucket(selectedBucket, true);
+  }, [selectedBucketFromQuery, isLoading, selectedBucket, selectBucket]);
 
   // Clear selected files when switching buckets
   useEffect(() => {
@@ -216,11 +251,10 @@ export default function StoragePage() {
       try {
         await deleteBucket(bucketName);
         await refetchBuckets();
-        // If the deleted bucket was selected, select the first available bucket
+        // Update selected bucket in URL BEFORE delete flow settles.
         if (selectedBucket === bucketName) {
-          const updatedBuckets =
-            queryClient.getQueryData<typeof buckets>(['storage', 'buckets']) || [];
-          setSelectedBucket(updatedBuckets[0]?.name || null);
+          const nextBucket = buckets.find((bucket) => bucket.name !== bucketName)?.name ?? null;
+          selectBucket(nextBucket, true);
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to delete bucket';
@@ -275,7 +309,7 @@ export default function StoragePage() {
       <StorageSidebar
         buckets={Object.keys(bucketInfo)}
         selectedBucket={selectedBucket || undefined}
-        onBucketSelect={setSelectedBucket}
+        onBucketSelect={(bucketName) => selectBucket(bucketName)}
         loading={isLoading}
         onNewBucket={() => {
           setBucketFormState({
@@ -431,7 +465,7 @@ export default function StoragePage() {
         onSuccess={(bucketName) => {
           void refetchBuckets();
           if (bucketFormState.mode === 'create' && bucketName) {
-            setSelectedBucket(bucketName);
+            selectBucket(bucketName);
           }
         }}
       />

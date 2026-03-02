@@ -1,5 +1,7 @@
-import { Database, Circle, Key } from 'lucide-react';
+import type { MouseEvent } from 'react';
+import { Database, Circle, Key, ExternalLink } from 'lucide-react';
 import { Handle, Position } from '@xyflow/react';
+import { useNavigate } from 'react-router-dom';
 import { TableSchema } from '@insforge/shared-schemas';
 
 interface TableNodeProps {
@@ -11,6 +13,7 @@ interface TableNodeProps {
 }
 
 export function TableNode({ data }: TableNodeProps) {
+  const navigate = useNavigate();
   const { table, referencedColumns = [], showRecordCount = true } = data;
 
   const getColumnIcon = (isReferenced: boolean = false) => {
@@ -34,10 +37,16 @@ export function TableNode({ data }: TableNodeProps) {
     );
   };
 
+  const handleOpenTable = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    const search = new URLSearchParams({ table: table.tableName }).toString();
+    void navigate(`/dashboard/database/tables?${search}`);
+  };
+
   return (
-    <div className="bg-white dark:bg-neutral-900 rounded-lg border border-gray-300 dark:border-[#363636] min-w-[320px] shadow-sm">
+    <div className="bg-card rounded-lg border border-[var(--alpha-8)] min-w-[320px] shadow-sm">
       {/* Table Header */}
-      <div className="flex items-center justify-between p-2 border-b border-gray-200 dark:border-neutral-800">
+      <div className="flex items-center justify-between p-2 border-b border-[var(--alpha-8)]">
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center w-11 h-11 bg-teal-300 rounded p-1.5">
             <Database className="w-5 h-5 text-neutral-900" />
@@ -53,9 +62,15 @@ export function TableNode({ data }: TableNodeProps) {
             )}
           </div>
         </div>
-        {/* <div className="p-1.5">
-          <ExternalLink className="w-4 h-4 text-neutral-400" />
-        </div> */}
+        <button
+          type="button"
+          onClick={handleOpenTable}
+          onMouseDown={(event) => event.stopPropagation()}
+          className="flex h-7 w-7 items-center justify-center rounded text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-zinc-200"
+          aria-label={`Open ${table.tableName} table`}
+        >
+          <ExternalLink className="h-4 w-4" />
+        </button>
       </div>
 
       {/* Columns */}
@@ -63,7 +78,7 @@ export function TableNode({ data }: TableNodeProps) {
         {table.columns.map((column) => (
           <div
             key={column.columnName}
-            className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-neutral-800 relative"
+            className="flex items-center justify-between p-3 border-b border-[var(--alpha-8)] last:border-b-0 relative"
           >
             {/* Source handle for foreign key columns - invisible and non-interactive */}
             {column.foreignKey && (

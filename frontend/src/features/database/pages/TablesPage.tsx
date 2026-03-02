@@ -27,20 +27,16 @@ import { DatabaseDataGrid } from '@/features/database/components/DatabaseDataGri
 import { SortColumn } from 'react-data-grid';
 import { convertValueForColumn } from '@/lib/utils/utils';
 import { useCSVImport } from '@/features/database/hooks/useCSVImport';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 
 const PAGE_SIZE = 50;
 
 export default function TablesPage() {
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const shouldSlideBackToTables =
     (location.state as { slideFromStudio?: boolean } | null)?.slideFromStudio === true;
-
-  // Load selected table from localStorage on mount
-  const [selectedTable, setSelectedTable] = useState<string | null>(() => {
-    return localStorage.getItem('selectedTable');
-  });
-  const [pendingTableSelection, setPendingTableSelection] = useState<string>();
+  const selectedTableFromQuery = searchParams.get('table')?.trim();
   const [showRecordForm, setShowRecordForm] = useState(false);
   const [isTableFormDirty, setIsTableFormDirty] = useState(false);
   const [showTableForm, setShowTableForm] = useState(false);
@@ -59,6 +55,29 @@ export default function TablesPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { tables, isLoadingTables, tablesError, deleteTable, useTableSchema, refetchTables } =
     useTables();
+  const selectedTable = useMemo(() => {
+    if (isLoadingTables || !tables.length) {
+      return null;
+    }
+
+    if (selectedTableFromQuery && tables.includes(selectedTableFromQuery)) {
+      return selectedTableFromQuery;
+    }
+
+    return tables[0];
+  }, [isLoadingTables, tables, selectedTableFromQuery]);
+  const selectTable = useCallback(
+    (tableName: string | null, replace: boolean = false) => {
+      const nextSearchParams = new URLSearchParams(searchParams);
+      if (tableName) {
+        nextSearchParams.set('table', tableName);
+      } else {
+        nextSearchParams.delete('table');
+      }
+      setSearchParams(nextSearchParams, { replace });
+    },
+    [searchParams, setSearchParams]
+  );
 
   const recordsHook = useRecords(selectedTable || '');
 
@@ -73,14 +92,18 @@ export default function TablesPage() {
     }
   };
 
-  // Persist selected table to localStorage when it changes
+  // Keep URL query param in sync with active table selection with fallback-to-first behavior.
   useEffect(() => {
-    if (selectedTable) {
-      localStorage.setItem('selectedTable', selectedTable);
-    } else {
-      localStorage.removeItem('selectedTable');
+    if (isLoadingTables) {
+      return;
     }
-  }, [selectedTable]);
+
+    if ((selectedTableFromQuery ?? null) === selectedTable) {
+      return;
+    }
+
+    selectTable(selectedTable, true);
+  }, [selectedTable, selectedTableFromQuery, isLoadingTables, selectTable]);
 
   // Reset page when search query or selected table changes
   useEffect(() => {
@@ -196,26 +219,6 @@ export default function TablesPage() {
     }
   }, [isLoadingTable, isSorting]);
 
-  // Auto-select first table (excluding system tables)
-  useEffect(() => {
-    if (!isLoadingTables && tables) {
-      if (pendingTableSelection && tables.includes(pendingTableSelection)) {
-        setSelectedTable(pendingTableSelection);
-        setPendingTableSelection(undefined);
-        return;
-      }
-
-      if (selectedTable && !tables.includes(selectedTable)) {
-        setSelectedTable(null);
-        return;
-      }
-
-      if (!selectedTable && tables.length && !showTableForm && !pendingTableSelection) {
-        setSelectedTable(tables[0]);
-      }
-    }
-  }, [tables, pendingTableSelection, selectedTable, showTableForm, isLoadingTables]);
-
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
@@ -263,22 +266,21 @@ export default function TablesPage() {
     if (showTableForm) {
       void handleTableFormClose().then((discarded) => {
         if (discarded) {
-          setSelectedTable(tableName);
+          selectTable(tableName);
         }
       });
     } else {
-      setSelectedTable(tableName);
+      selectTable(tableName);
     }
   };
 
   const handleCreateTable = () => {
-    setSelectedTable(null);
     setEditingTable(null);
     setShowTableForm(true);
   };
 
   const handleEditTable = (tableName: string) => {
-    setSelectedTable(tableName);
+    selectTable(tableName);
     setEditingTable(tableName);
     setShowTableForm(true);
   };
@@ -294,9 +296,10 @@ export default function TablesPage() {
     const shouldDelete = await confirm(confirmOptions);
 
     if (shouldDelete) {
-      // Update selectedTable BEFORE deleting to prevent queries on deleted table
+      // Update selected table in URL BEFORE deleting to prevent queries on deleted table.
       if (selectedTable === tableName) {
-        setSelectedTable(null);
+        const nextTable = tables.find((table) => table !== tableName) ?? null;
+        selectTable(nextTable, true);
       }
 
       deleteTable(tableName);
@@ -407,7 +410,9 @@ export default function TablesPage() {
               void refetchTables();
               void refetchTableData();
               setShowTableForm(false);
-              setPendingTableSelection(newTableName);
+              if (newTableName) {
+                selectTable(newTableName);
+              }
             }}
           />
         ) : (
@@ -539,7 +544,7 @@ export default function TablesPage() {
                   sortColumns={sortColumns}
                   onSortColumnsChange={handleSortColumnsChange}
                   onCellEdit={handleRecordUpdate}
-                  onJumpToTable={setSelectedTable}
+                  onJumpToTable={(tableName) => selectTable(tableName)}
                   currentPage={currentPage}
                   totalPages={totalPages}
                   pageSize={PAGE_SIZE}

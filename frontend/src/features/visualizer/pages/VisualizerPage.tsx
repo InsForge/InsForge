@@ -34,7 +34,7 @@ const VisualizerPage = () => {
 
   if (!metadata || error) {
     return (
-      <div className="relative h-full bg-gray-50 dark:bg-neutral-800 overflow-hidden">
+      <div className="relative h-full bg-semantic-1 overflow-hidden">
         {/* Dot Matrix Background - Light Mode */}
         <div
           className="absolute inset-0 opacity-50 dark:hidden"
@@ -47,7 +47,7 @@ const VisualizerPage = () => {
         <div
           className="absolute inset-0 opacity-50 hidden dark:block"
           style={{
-            backgroundImage: `radial-gradient(circle, #3B3B3B 1px, transparent 1px)`,
+            backgroundImage: `radial-gradient(circle, #282828 1px, transparent 1px)`,
             backgroundSize: '12px 12px',
           }}
         />
@@ -69,7 +69,7 @@ const VisualizerPage = () => {
   }
 
   return (
-    <div className="relative h-full bg-gray-50 dark:bg-neutral-800 overflow-hidden">
+    <div className="relative h-full bg-semantic-1 overflow-hidden">
       {/* Dot Matrix Background - Light Mode */}
       <div
         className="absolute inset-0 opacity-50 dark:hidden"
@@ -82,7 +82,7 @@ const VisualizerPage = () => {
       <div
         className="absolute inset-0 opacity-50 hidden dark:block"
         style={{
-          backgroundImage: `radial-gradient(circle, #3B3B3B 1px, transparent 1px)`,
+          backgroundImage: `radial-gradient(circle, #282828 1px, transparent 1px)`,
           backgroundSize: '12px 12px',
         }}
       />
