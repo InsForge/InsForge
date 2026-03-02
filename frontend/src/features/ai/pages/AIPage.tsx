@@ -183,8 +183,8 @@ export default function AIPage() {
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 min-h-0 flex flex-col items-center px-10">
-        <div className="max-w-[1024px] w-full flex-1 min-h-0 flex flex-col pt-2 pb-6">
+      <div className="flex-1 min-h-0 overflow-y-auto px-10">
+        <div className="max-w-[1024px] w-full mx-auto pt-2 pb-6">
           {getAICreditsError ? (
             <div className="flex items-center justify-center h-64 text-muted-foreground">
               <p className="text-sm font-normal">{getAICreditsError.message}</p>
@@ -199,7 +199,7 @@ export default function AIPage() {
               {providers.find((p) => p.id === activeTab)?.displayName || activeTab}
             </div>
           ) : (
-            <div className="bg-card border border-[var(--alpha-8)] rounded py-2 flex flex-col flex-1 min-h-0">
+            <div className="bg-card border border-[var(--alpha-8)] rounded py-2 flex flex-col">
               {/* Table Header - Fixed */}
               <div className="grid grid-cols-6 gap-x-2.5 h-8 items-center text-sm leading-5 text-muted-foreground px-4 border-b border-[var(--alpha-8)] shrink-0">
                 <div>Model</div>
@@ -250,7 +250,7 @@ export default function AIPage() {
               </div>
 
               {/* Table Body - Scrollable */}
-              <div className="flex-1 min-h-0 overflow-y-auto">
+              <div>
                 {modelsForActiveProvider.map((model) => (
                   <ModelRow
                     key={model.modelId}
