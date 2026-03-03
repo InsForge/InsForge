@@ -96,7 +96,7 @@ function SecondaryMenuItem({
           <Link
             to={item.href}
             onClick={handleItemClick}
-            className="flex min-w-0 flex-1 items-center px-2"
+            className="flex min-w-0 flex-1 items-center px-2 py-1.5"
           >
             <p className={cn('truncate text-sm leading-5', isSelected && 'text-inherit')}>
               {item.label}
