@@ -6,7 +6,7 @@ export {
 } from './DatabaseDataGrid';
 export { ForeignKeyCell } from './ForeignKeyCell';
 export { ForeignKeyPopover } from './ForeignKeyPopover';
-export { LinkRecordModal } from './LinkRecordModal';
+export { LinkRecordDialog } from './LinkRecordDialog';
 export { RecordFormDialog } from './RecordFormDialog';
 export { RecordFormField } from './RecordFormField';
 export { TableEmptyState } from './TableEmptyState';

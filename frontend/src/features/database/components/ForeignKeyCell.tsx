@@ -96,7 +96,7 @@ export function ForeignKeyCell({ value, foreignKey, onJumpToTable }: ForeignKeyC
 
   return (
     <div className="w-full flex items-center justify-between gap-1">
-      <span className="text-sm truncate" title={displayValue}>
+      <span className="text-sm truncate min-w-0" title={displayValue}>
         {displayValue}
       </span>
 
@@ -108,7 +108,7 @@ export function ForeignKeyCell({ value, foreignKey, onJumpToTable }: ForeignKeyC
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 w-7 p-1 bg-white dark:bg-neutral-700"
+                  className="h-7 w-7 shrink-0 p-1 bg-white dark:bg-neutral-700"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <Link2 className="h-5 w-5 text-black dark:text-white" />

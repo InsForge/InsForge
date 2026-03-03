@@ -55,13 +55,15 @@
 }
 
 .rdg-cell[aria-selected='true'] {
-  outline: none;
+  outline: 1px solid rgb(var(--foreground));
+  outline-offset: -1px;
   box-shadow: none;
 }
 
-/* Disable selection styling for disabled cells in link modal */
-.rdg-cell.link-modal-disabled-cell[aria-selected='true'] {
+/* Disable selection styling for disabled cells in link record dialog */
+.rdg-cell.link-record-dialog-disabled-cell[aria-selected='true'] {
   outline: none !important;
+  box-shadow: none !important;
 }
 
 .rdg-cell.rdg-cell-editing {

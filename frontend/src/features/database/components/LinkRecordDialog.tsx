@@ -30,19 +30,19 @@ import { AUTH_USERS_TABLE, authUsersSchema } from '../constants';
 
 const PAGE_SIZE = 50;
 
-interface LinkRecordModalProps {
+interface LinkRecordDialogProps {
   referenceTable: string;
   referenceColumn: string;
   onSelectRecord: (record: DatabaseRecord) => void;
-  children: (openModal: () => void) => ReactNode;
+  children: (openDialog: () => void) => ReactNode;
 }
 
-export function LinkRecordModal({
+export function LinkRecordDialog({
   referenceTable,
   referenceColumn,
   onSelectRecord,
   children,
-}: LinkRecordModalProps) {
+}: LinkRecordDialogProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRecord, setSelectedRecord] = useState<DatabaseRecord | null>(null);
@@ -203,7 +203,7 @@ export function LinkRecordModal({
 
       return {
         ...baseCol,
-        cellClass: 'link-modal-disabled-cell',
+        cellClass: 'link-record-dialog-disabled-cell',
         renderCell: (props: RenderCellProps<DataGridRowType>) => {
           const displayValue = renderCellValue(props.row[col.key], col.type);
           return (
@@ -243,8 +243,8 @@ export function LinkRecordModal({
     <>
       {children(() => setOpen(true))}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="flex h-[min(90dvh,760px)] flex-col overflow-hidden">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Link Record</DialogTitle>
             <div className="flex items-center gap-1.5">
               <span className="text-sm text-zinc-500 dark:text-neutral-400">
@@ -258,7 +258,7 @@ export function LinkRecordModal({
           </DialogHeader>
 
           {/* Search Bar */}
-          <div className="p-3">
+          <div className="flex-shrink-0 p-3">
             <SearchInput
               value={searchQuery}
               onChange={setSearchQuery}
@@ -269,7 +269,7 @@ export function LinkRecordModal({
           </div>
 
           {/* Records DataGrid */}
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-hidden max-h-[calc(100dvh-260px)]">
             <DataGrid
               data={records}
               columns={columns}
