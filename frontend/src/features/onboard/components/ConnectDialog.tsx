@@ -12,8 +12,8 @@ import {
   DialogTitle,
   TooltipProvider,
 } from '@insforge/ui';
-import { McpConnectionSection } from './McpConnectionSection';
-import { ApiCredentialsSection } from './ApiCredentialsSection';
+import { MCPSection } from './MCPSection';
+import { APIKeysSection } from './APIKeysSection';
 import { ConnectionStringSection } from './ConnectionStringSection';
 import { useApiKey } from '@/lib/hooks/useMetadata';
 import { useAnonToken } from '@/features/auth/hooks/useAnonToken';
@@ -166,7 +166,7 @@ export function ConnectDialog() {
               </div>
             )}
             {activeTab === 'mcp' && (
-              <McpConnectionSection
+              <MCPSection
                 apiKey={displayApiKey}
                 appUrl={appUrl}
                 isLoading={isApiKeyLoading}
@@ -175,7 +175,7 @@ export function ConnectDialog() {
             )}
             {activeTab === 'connection-string' && <ConnectionStringSection className="gap-4" />}
             {activeTab === 'api-keys' && (
-              <ApiCredentialsSection
+              <APIKeysSection
                 apiKey={displayApiKey}
                 anonKey={displayAnonKey}
                 appUrl={appUrl}

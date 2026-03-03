@@ -26,7 +26,7 @@ function CredentialRow({ label, value, isLoading = false }: CredentialRowProps) 
   );
 }
 
-interface ApiCredentialsSectionProps {
+interface APIKeysSectionProps {
   apiKey: string;
   anonKey: string;
   appUrl: string;
@@ -34,13 +34,13 @@ interface ApiCredentialsSectionProps {
   className?: string;
 }
 
-export function ApiCredentialsSection({
+export function APIKeysSection({
   apiKey,
   anonKey,
   appUrl,
   isLoading = false,
   className,
-}: ApiCredentialsSectionProps) {
+}: APIKeysSectionProps) {
   return (
     <div className={cn('flex flex-col gap-6', className)}>
       <p className="text-gray-500 dark:text-neutral-400 text-base leading-7">

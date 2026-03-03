@@ -7,8 +7,8 @@ export {
 } from './components/ConnectDialog';
 export { OnboardingOverlay } from './components/OnboardingOverlay';
 export { VideoDemoModal } from './components/VideoDemoModal';
-export { McpConnectionSection } from './components/McpConnectionSection';
-export { ApiCredentialsSection } from './components/ApiCredentialsSection';
+export { MCPSection } from './components/MCPSection';
+export { APIKeysSection } from './components/APIKeysSection';
 export { ConnectionStringSection } from './components/ConnectionStringSection';
 export { ShowPasswordButton } from './components/ShowPasswordButton';
 export { OnboardingController } from './components/OnboardingController';

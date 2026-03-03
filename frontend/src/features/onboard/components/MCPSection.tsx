@@ -13,7 +13,7 @@ import { QoderDeeplinkGenerator } from './mcp/QoderDeeplinkGenerator';
 import { MCP_AGENTS, GenerateInstallCommand, createMCPConfig, type MCPAgent } from './mcp/helpers';
 import { cn } from '@/lib/utils/utils';
 
-interface McpConnectionSectionProps {
+interface MCPSectionProps {
   apiKey: string;
   appUrl: string;
   isLoading?: boolean;
@@ -21,13 +21,13 @@ interface McpConnectionSectionProps {
   onAgentChange?: (agent: MCPAgent) => void;
 }
 
-export function McpConnectionSection({
+export function MCPSection({
   apiKey,
   appUrl,
   isLoading = false,
   className,
   onAgentChange,
-}: McpConnectionSectionProps) {
+}: MCPSectionProps) {
   const [selectedAgent, setSelectedAgent] = useState<MCPAgent>(MCP_AGENTS[0]);
 
   const handleAgentChange = (agent: MCPAgent) => {

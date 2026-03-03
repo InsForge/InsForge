@@ -46,11 +46,7 @@ import { useModal } from '@/lib/contexts/ModalContext';
 import { metadataService } from '@/lib/services/metadata.service';
 import type { InstanceInfoEvent } from '@insforge/shared-schemas';
 import { cn, isInsForgeCloudProject, isIframe, compareVersions } from '@/lib/utils/utils';
-import {
-  McpConnectionSection,
-  ConnectionStringSection,
-  ApiCredentialsSection,
-} from '@/features/onboard';
+import { MCPSection, ConnectionStringSection, APIKeysSection } from '@/features/onboard';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import { useAnonToken } from '@/features/auth/hooks/useAnonToken';
@@ -545,7 +541,7 @@ export default function SettingsMenuDialog() {
                       {/* MCP Section */}
                       <div className="bg-gray-200 dark:bg-[#333333] rounded-lg p-6 flex flex-col gap-6">
                         <p className="text-base text-gray-900 dark:text-white">MCP</p>
-                        <McpConnectionSection
+                        <MCPSection
                           apiKey={apiKey || ''}
                           appUrl={projectUrl}
                           isLoading={isApiKeyLoading}
@@ -568,7 +564,7 @@ export default function SettingsMenuDialog() {
                       {/* API Credentials Section */}
                       <div className="bg-gray-200 dark:bg-[#333333] rounded-lg p-6 flex flex-col gap-6">
                         <p className="text-base text-gray-900 dark:text-white">API Credentials</p>
-                        <ApiCredentialsSection
+                        <APIKeysSection
                           apiKey={apiKey || ''}
                           anonKey={anonKey || ''}
                           appUrl={projectUrl}
