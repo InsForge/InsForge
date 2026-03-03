@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Link, useMatch } from 'react-router-dom';
 import { LucideIcon, MoreVertical } from 'lucide-react';
 import { cn } from '@/lib/utils/utils';
@@ -19,6 +19,7 @@ interface SecondaryMenuProps {
   loading?: boolean;
   headerButtons?: SecondaryMenuHeaderButton[];
   actionButtons?: SecondaryMenuActionButton[];
+  emptyState?: ReactNode;
   activeItemId?: string | null;
   showSearch?: boolean;
   searchPlaceholder?: string;
@@ -177,6 +178,7 @@ export function SecondaryMenu({
   loading,
   headerButtons,
   actionButtons,
+  emptyState,
   activeItemId,
   showSearch = false,
   searchPlaceholder = 'Search...',
@@ -186,6 +188,7 @@ export function SecondaryMenu({
   itemActions,
 }: SecondaryMenuProps) {
   const [searchValue, setSearchValue] = useState('');
+  const hasSearchQuery = showSearch && searchValue.trim().length > 0;
 
   const filteredItems = useMemo(() => {
     if (!showSearch || !searchValue.trim()) {
@@ -275,7 +278,11 @@ export function SecondaryMenu({
             ))}
           </div>
         ) : filteredItems.length === 0 ? (
-          <div className="px-2 py-1 text-sm text-muted-foreground">No results found</div>
+          hasSearchQuery || !emptyState ? (
+            <div className="px-2 py-1 text-sm text-muted-foreground">No results found</div>
+          ) : (
+            emptyState
+          )
         ) : (
           <div className="flex flex-col gap-1.5">
             {filteredItems.map((item) => (

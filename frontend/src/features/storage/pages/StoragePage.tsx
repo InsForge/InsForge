@@ -7,6 +7,7 @@ import { useStorage } from '@/features/storage/hooks/useStorage';
 import { StorageSidebar } from '@/features/storage/components/StorageSidebar';
 import { StorageManager } from '@/features/storage/components/StorageManager';
 import { BucketFormDialog } from '@/features/storage/components/BucketFormDialog';
+import { StoragePageEmptyState } from '@/features/storage/components/StoragePageEmptyState';
 
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
@@ -19,7 +20,6 @@ import {
   Alert,
   AlertDescription,
   ConfirmDialog,
-  EmptyState,
   TableHeader,
 } from '@/components';
 
@@ -435,11 +435,8 @@ export default function StoragePage() {
           </>
         )}
         {!selectedBucket && (
-          <div className="flex-1 flex items-center justify-center">
-            <EmptyState
-              title="No Bucket Selected"
-              description="Select a bucket from the sidebar to view its files"
-            />
+          <div className="flex-1">
+            <StoragePageEmptyState />
           </div>
         )}
       </div>

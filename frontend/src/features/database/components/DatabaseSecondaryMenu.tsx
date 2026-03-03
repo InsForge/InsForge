@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { ArrowLeft, Database, MoreVertical, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Link, useMatch, useNavigate } from 'react-router-dom';
+import EmptyBoxSvg from '@/assets/images/empty_box.svg?react';
 import {
   SecondaryMenu,
   type SecondaryMenuActionButton,
@@ -104,6 +105,7 @@ export function DatabaseSecondaryMenu({
 }: DatabaseSecondaryMenuProps) {
   const navigate = useNavigate();
   const [mode, setMode] = useState<'tables' | 'studio'>(initialMode);
+  const showEmptyState = tables.length === 0;
   const navigateTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -201,8 +203,38 @@ export function DatabaseSecondaryMenu({
             activeItemId={selectedTable}
             loading={loading}
             actionButtons={actionButtons}
+            emptyState={
+              showEmptyState ? (
+                <div className="flex flex-col items-center gap-2 pt-2 text-center">
+                  <EmptyBoxSvg
+                    className="h-[95px] w-[160px]"
+                    style={
+                      {
+                        '--empty-box-fill-primary': 'rgb(var(--semantic-2))',
+                        '--empty-box-fill-secondary': 'rgb(var(--semantic-6))',
+                      } as CSSProperties
+                    }
+                    aria-hidden="true"
+                  />
+                  <p className="text-sm font-medium leading-6 text-muted-foreground">
+                    No Table Yet
+                  </p>
+                  <div className="text-xs leading-4">
+                    <button
+                      type="button"
+                      className="font-medium text-primary disabled:cursor-not-allowed disabled:opacity-60"
+                      onClick={onNewTable}
+                      disabled={!onNewTable}
+                    >
+                      Create your first table
+                    </button>
+                    <p className="text-muted-foreground">to get started</p>
+                  </div>
+                </div>
+              ) : undefined
+            }
             itemActions={getItemActions}
-            showSearch
+            showSearch={!showEmptyState}
             searchPlaceholder="Search tables..."
           />
         </div>
