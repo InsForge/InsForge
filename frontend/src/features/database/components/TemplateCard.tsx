@@ -1,4 +1,4 @@
-import { Table } from 'lucide-react';
+import { Table2 } from 'lucide-react';
 import { DatabaseTemplate } from '@/features/database/templates';
 
 interface TemplateCardProps {
@@ -10,28 +10,26 @@ interface TemplateCardProps {
 export function TemplateCard({ template, onClick, showTableCount = false }: TemplateCardProps) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className="bg-white dark:bg-[#363636] border border-gray-200 dark:border-[#414141] rounded-[4px] pl-6 pr-4 pt-4 pb-6 text-left transition-colors hover:bg-gray-50 hover:border-gray-300 dark:hover:bg-neutral-700 dark:hover:border-[#525252] hover:shadow-sm flex flex-col gap-3"
+      className="group w-full overflow-hidden rounded border border-[var(--alpha-8)] bg-card text-left transition-colors"
     >
-      <div className="flex flex-col gap-2">
-        <h3 className="text-base font-normal text-zinc-950 dark:text-white leading-6">
-          {template.title}
-        </h3>
-        {/* Fixed height container for description with line clamp */}
-        <div className="h-[72px]">
-          <p className="text-sm font-normal text-zinc-500 dark:text-neutral-400 leading-6 line-clamp-3">
+      <div className="flex w-full flex-col gap-3 rounded px-4 pb-6 pt-4 transition-colors group-hover:bg-[var(--alpha-4)] group-active:bg-[var(--alpha-8)]">
+        <div className="flex flex-col gap-2">
+          <h3 className="text-base font-medium leading-7 text-foreground">{template.title}</h3>
+          <p className="min-h-[72px] line-clamp-3 text-sm leading-6 text-muted-foreground">
             {template.description}
           </p>
         </div>
+        {showTableCount && (
+          <div className="inline-flex w-fit items-center rounded bg-[var(--alpha-8)] px-1 py-0.5">
+            <Table2 className="h-4 w-4 text-muted-foreground" />
+            <p className="px-1 text-xs font-medium leading-4 text-muted-foreground">
+              {template.tableCount} {template.tableCount === 1 ? 'Table' : 'Tables'}
+            </p>
+          </div>
+        )}
       </div>
-      {showTableCount && (
-        <div className="flex items-center gap-2">
-          <Table className="w-5 h-5 text-zinc-500 dark:text-neutral-400" />
-          <p className="text-sm font-normal text-zinc-500 dark:text-neutral-400 leading-6">
-            {template.tableCount} {template.tableCount === 1 ? 'Table' : 'Tables'}
-          </p>
-        </div>
-      )}
     </button>
   );
 }

@@ -22,25 +22,18 @@ export default function TemplatesPage() {
           void navigate('/dashboard/database/tables', { state: { slideFromStudio: true } })
         }
       />
-      <div className="min-w-0 flex-1 flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-        <div className="flex shrink-0 items-center justify-between border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
-          <div className="flex min-w-0 flex-1 items-center overflow-hidden pl-4 pr-3 py-3">
-            <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">
-              Database Templates
-            </h1>
-          </div>
-        </div>
-        <div className="min-h-0 flex-1 overflow-auto">
-          <div className="mx-auto w-full max-w-[1024px] px-6 py-6">
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-              {DATABASE_TEMPLATES.map((template) => (
-                <TemplateCard
-                  key={template.id}
-                  template={template}
-                  onClick={() => handleTemplateClick(template)}
-                />
-              ))}
-            </div>
+      <div className="min-w-0 flex-1 overflow-auto bg-[rgb(var(--semantic-1))]">
+        <div className="mx-auto flex w-full max-w-[1024px] flex-col gap-6 px-4 pb-10 pt-8 sm:px-6 sm:pt-10 lg:px-10">
+          <h1 className="text-2xl font-medium leading-8 text-foreground">Database Templates</h1>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {DATABASE_TEMPLATES.map((template) => (
+              <TemplateCard
+                key={template.id}
+                template={template}
+                onClick={() => handleTemplateClick(template)}
+                showTableCount
+              />
+            ))}
           </div>
         </div>
       </div>
