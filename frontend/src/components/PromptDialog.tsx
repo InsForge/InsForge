@@ -1,5 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@insforge/ui';
-import { CopyButton } from '@/components';
+import { CopyButton, Dialog, DialogContent, DialogHeader, DialogTitle } from '@insforge/ui';
 import { cn } from '@/lib/utils/utils';
 
 interface PromptDialogProps {
@@ -48,13 +47,7 @@ export function PromptDialog({
             {/* Action buttons */}
             <div className="flex items-center justify-end gap-2.5">
               {additionalAction}
-              <CopyButton
-                text={prompt}
-                showText={true}
-                className="h-9 pl-2 pr-3 py-2 text-sm font-medium"
-                copyText="Copy Prompt"
-                copiedText="Copied!"
-              />
+              <CopyButton text={prompt} copyText="Copy Prompt" copiedText="Copied!" />
             </div>
           </div>
         </div>

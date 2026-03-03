@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
 import { ThemeProvider } from '@/lib/contexts/ThemeContext';
-import { OnboardingModal, OnboardingOverlay } from '@/features/onboard';
+import { ConnectDialog, OnboardingOverlay } from '@/features/onboard';
 import { SettingsMenuDialog } from '@/features/settings/components';
 import { isIframe } from '@/lib/utils/utils';
 
@@ -32,7 +32,7 @@ export default function Layout({ children }: LayoutProps) {
           </main>
         </div>
       </div>
-      <OnboardingModal />
+      <ConnectDialog />
       <SettingsMenuDialog />
     </ThemeProvider>
   );

@@ -1,4 +1,4 @@
-import { CodeBlock } from '@/components';
+import { CodeBlock } from '@insforge/ui';
 
 const TEST_PROMPT =
   "I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to learn about InsForge instructions.";

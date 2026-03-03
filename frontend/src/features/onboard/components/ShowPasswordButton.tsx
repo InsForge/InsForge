@@ -1,20 +1,25 @@
 import { Eye, EyeOff } from 'lucide-react';
+import { cn } from '@/lib/utils/utils';
 
 interface ShowPasswordButtonProps {
   show: boolean;
   onToggle: () => void;
+  className?: string;
 }
 
-export function ShowPasswordButton({ show, onToggle }: ShowPasswordButtonProps) {
+export function ShowPasswordButton({ show, onToggle, className }: ShowPasswordButtonProps) {
   return (
     <button
       type="button"
       onClick={onToggle}
-      className="flex items-center gap-1 pl-1 pr-1.5 py-0.5 bg-gray-200 dark:bg-neutral-800 text-gray-500 dark:text-neutral-400 hover:bg-gray-300 dark:hover:bg-neutral-700 hover:text-gray-700 dark:hover:text-neutral-200 transition-colors text-xs font-medium rounded-md cursor-pointer"
+      className={cn(
+        'inline-flex h-5 items-center gap-1 rounded bg-transparent px-0 text-xs font-normal leading-4 text-[#a3a3a3] transition-colors hover:text-white',
+        className
+      )}
       aria-pressed={show}
       aria-label={`${show ? 'Hide' : 'Show'} password`}
     >
-      {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+      {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
       <span>{show ? 'Hide' : 'Show'} Password</span>
     </button>
   );

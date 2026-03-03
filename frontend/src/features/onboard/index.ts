@@ -1,10 +1,10 @@
 // Onboard components
 export { McpConnectionStatus } from './components/McpConnectionStatus';
 export {
-  OnboardingModal,
+  ConnectDialog,
   getOnboardingSkipped,
   setOnboardingSkipped,
-} from './components/OnboardingModal';
+} from './components/ConnectDialog';
 export { OnboardingOverlay } from './components/OnboardingOverlay';
 export { VideoDemoModal } from './components/VideoDemoModal';
 export { McpConnectionSection } from './components/McpConnectionSection';

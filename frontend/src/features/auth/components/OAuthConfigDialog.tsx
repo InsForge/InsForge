@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { ExternalLink } from 'lucide-react';
 import {
   Button,
+  CopyButton,
   Dialog,
   DialogContent,
   DialogFooter,
@@ -13,7 +14,6 @@ import {
   Input,
   Switch,
 } from '@insforge/ui';
-import { CopyButton } from '@/components';
 import WarningIcon from '@/assets/icons/warning.svg';
 import {
   oAuthConfigSchema,
@@ -263,7 +263,7 @@ export function OAuthConfigDialog({
                         <code className="flex items-center py-1 px-3 bg-blue-100 dark:bg-neutral-700 text-blue-800 dark:text-blue-300 font-mono break-all rounded-md text-sm">
                           {getCallbackUrl(provider?.id)}
                         </code>
-                        <CopyButton className="h-9" text={getCallbackUrl(provider?.id)} />
+                        <CopyButton text={getCallbackUrl(provider?.id)} />
                       </div>
                     </div>
                   </div>

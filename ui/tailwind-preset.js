@@ -12,6 +12,7 @@ const tailwindPreset = {
         'muted-foreground': 'rgb(var(--muted-foreground))',
         primary: 'rgb(var(--primary))',
         destructive: 'rgb(var(--destructive))',
+        'semantic-0': 'rgb(var(--semantic-0))',
         'semantic-1': 'rgb(var(--semantic-1))',
         'semantic-2': 'rgb(var(--semantic-2))',
         card: 'rgb(var(--card))',

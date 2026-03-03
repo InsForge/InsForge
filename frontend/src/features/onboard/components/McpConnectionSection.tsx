@@ -1,12 +1,13 @@
 import { useState, useMemo } from 'react';
 import { ChevronDown } from 'lucide-react';
 import {
+  CodeBlock,
+  CopyButton,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@insforge/ui';
-import { CodeBlock, CopyButton } from '@/components';
 import { CursorDeeplinkGenerator } from './mcp/CursorDeeplinkGenerator';
 import { QoderDeeplinkGenerator } from './mcp/QoderDeeplinkGenerator';
 import { MCP_AGENTS, GenerateInstallCommand, createMCPConfig, type MCPAgent } from './mcp/helpers';
@@ -55,9 +56,8 @@ export function McpConnectionSection({
       {/* Step 1 */}
       <div className="flex flex-col items-start gap-6">
         <div className="flex flex-col gap-2">
-          <p className="text-gray-900 dark:text-white text-base leading-6 font-medium">
-            <span className="text-emerald-500 dark:text-emerald-300">Step1</span>
-            <span> Install InsForge</span>
+          <p className="text-gray-900 dark:text-white text-base leading-6">
+            <span>Step 1 - Install InsForge</span>
           </p>
           {(selectedAgent.id === 'cursor' || selectedAgent.id === 'qoder') && (
             <p className="text-gray-500 dark:text-neutral-400 text-sm leading-6">
@@ -129,11 +129,7 @@ export function McpConnectionSection({
                     MCP Configuration
                   </span>
                 </div>
-                <CopyButton
-                  text={mcpJsonConfig}
-                  showText={false}
-                  className="h-6 w-6 p-1 bg-white dark:bg-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-600 border-none rounded-md shadow-sm min-w-0 text-black dark:text-white"
-                />
+                <CopyButton text={mcpJsonConfig} showText={false} className="shrink-0" />
               </div>
               {/* Scrollable content */}
               <div className="flex-1 overflow-auto p-3">
@@ -146,7 +142,7 @@ export function McpConnectionSection({
             <CodeBlock
               code={installCommand}
               label="Terminal Command"
-              className={cn(isLoading && 'animate-pulse')}
+              className={cn('bg-semantic-0', isLoading && 'animate-pulse')}
             />
           )}
         </div>
@@ -155,19 +151,14 @@ export function McpConnectionSection({
       {/* Step 2 */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-2">
-          <p className="text-gray-900 dark:text-white text-base leading-6 font-medium">
-            <span className="text-emerald-500 dark:text-emerald-300">Step2</span>
-            <span> Verify Connection</span>
+          <p className="text-gray-900 dark:text-white text-base leading-6">
+            <span>Step 2 - Verify Connection</span>
           </p>
           <p className="text-gray-500 dark:text-neutral-400 text-sm leading-6">
             Send the prompt below to your AI coding agent to verify the connection.
           </p>
         </div>
-        <CodeBlock
-          code={testPrompt}
-          label="prompt"
-          className="bg-gray-100 dark:bg-neutral-900 break-normal"
-        />
+        <CodeBlock code={testPrompt} label="prompt" className="bg-semantic-0" />
       </div>
     </div>
   );

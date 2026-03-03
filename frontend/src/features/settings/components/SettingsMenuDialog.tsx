@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import {
   Button,
+  CopyButton,
   Input,
   TooltipProvider,
   Dialog,
@@ -36,7 +37,7 @@ import {
   MenuDialogFooter,
   MenuDialogCloseButton,
 } from '@insforge/ui';
-import { CopyButton, ConfirmDialog } from '@/components';
+import { ConfirmDialog } from '@/components';
 import { useApiKey } from '@/lib/hooks/useMetadata';
 import { useHealth } from '@/lib/hooks/useHealth';
 import { useConfirm } from '@/lib/hooks/useConfirm';
@@ -52,6 +53,7 @@ import {
 } from '@/features/onboard';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
+import { useAnonToken } from '@/features/auth/hooks/useAnonToken';
 
 type TabType = 'info' | 'usage' | 'compute' | 'connect';
 
@@ -90,6 +92,7 @@ export default function SettingsMenuDialog() {
   const [isUpdatingVersion, setIsUpdatingVersion] = useState(false);
 
   const { apiKey, isLoading: isApiKeyLoading, refetch: refetchApiKey } = useApiKey();
+  const { accessToken: anonKey, isLoading: isAnonKeyLoading } = useAnonToken();
   const { version, isLoading: isVersionLoading } = useHealth();
   const { confirm, confirmDialogProps } = useConfirm();
   const { showToast } = useToast();
@@ -353,11 +356,7 @@ export default function SettingsMenuDialog() {
                       </label>
                       <div className="flex-1 h-9 flex items-center justify-between gap-2 text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 pl-3 pr-2 rounded-lg">
                         <span className="font-mono truncate">{projectUrl}</span>
-                        <CopyButton
-                          text={projectUrl}
-                          showText={false}
-                          className="h-6 w-6 p-1 min-w-0 shrink-0 text-black dark:text-white bg-white dark:bg-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-600 border-none"
-                        />
+                        <CopyButton text={projectUrl} showText={false} className="shrink-0" />
                       </div>
                     </div>
 
@@ -378,11 +377,7 @@ export default function SettingsMenuDialog() {
                               {isApiKeyLoading ? '•'.repeat(35) : maskedApiKey || 'Not available'}
                             </span>
                             {!isApiKeyLoading && apiKey && (
-                              <CopyButton
-                                text={apiKey}
-                                showText={false}
-                                className="h-6 w-6 p-1 min-w-0 shrink-0 text-black dark:text-white bg-white dark:bg-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-600 border-none"
-                              />
+                              <CopyButton text={apiKey} showText={false} className="shrink-0" />
                             )}
                           </div>
                           <Button
@@ -575,8 +570,9 @@ export default function SettingsMenuDialog() {
                         <p className="text-base text-gray-900 dark:text-white">API Credentials</p>
                         <ApiCredentialsSection
                           apiKey={apiKey || ''}
+                          anonKey={anonKey || ''}
                           appUrl={projectUrl}
-                          isLoading={isApiKeyLoading}
+                          isLoading={isApiKeyLoading || isAnonKeyLoading}
                         />
                       </div>
                     </div>

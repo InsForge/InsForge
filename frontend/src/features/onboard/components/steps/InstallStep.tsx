@@ -1,12 +1,13 @@
 import { useState, useMemo, useCallback } from 'react';
 import { ChevronDown } from 'lucide-react';
 import {
+  CodeBlock,
+  CopyButton,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@insforge/ui';
-import { CodeBlock, CopyButton } from '@/components';
 import { CursorDeeplinkGenerator } from '../mcp/CursorDeeplinkGenerator';
 import { QoderDeeplinkGenerator } from '../mcp/QoderDeeplinkGenerator';
 import { MCP_AGENTS, GenerateInstallCommand, createMCPConfig, type MCPAgent } from '../mcp/helpers';
@@ -120,7 +121,7 @@ export function InstallStep({
             <CopyButton
               text={mcpJsonConfig}
               showText={false}
-              className="h-6 w-6 p-1 bg-white dark:bg-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-600 border-none rounded-md shadow-sm min-w-0 text-black dark:text-white"
+              className="shrink-0"
               onCopy={onCommandCopied}
             />
           </div>

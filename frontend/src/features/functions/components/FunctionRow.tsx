@@ -1,4 +1,4 @@
-import { CopyButton } from '@/components/CopyButton';
+import { CopyButton } from '@insforge/ui';
 import { FunctionSchema } from '@insforge/shared-schemas';
 import { cn, getBackendUrl } from '@/lib/utils/utils';
 import { format, formatDistance } from 'date-fns';
@@ -43,10 +43,9 @@ export function FunctionRow({
               {functionUrl}
             </span>
             <CopyButton
-              variant="secondary"
               showText={false}
               text={functionUrl}
-              className="size-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity bg-transparent hover:bg-[var(--alpha-8)] dark:bg-transparent dark:hover:bg-[var(--alpha-8)]"
+              className="size-6 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
             />
           </div>
         </div>

@@ -153,6 +153,16 @@ export function OnboardingOverlay() {
   const shouldShow = isCloudEnvironment && (isLoading || !hasCompletedOnboarding);
   const isOnDashboardPage = location.pathname === '/dashboard';
 
+  // Reset step state when navigating back to the dashboard page
+  useEffect(() => {
+    if (isOnDashboardPage) {
+      setCurrentStepByMethod({
+        terminal: 1,
+        extension: 1,
+      });
+    }
+  }, [isOnDashboardPage]);
+
   // Track onboarding overlay viewed (once when shown)
   useEffect(() => {
     if (shouldShow && isOnDashboardPage && !isLoading && !hasTrackedOverlayView.current) {
@@ -168,7 +178,7 @@ export function OnboardingOverlay() {
 
   // Listen for MCP connection events to auto-advance steps
   useEffect(() => {
-    if (!socket) {
+    if (!socket || !isOnDashboardPage) {
       return;
     }
 
@@ -184,7 +194,7 @@ export function OnboardingOverlay() {
     return () => {
       socket.off(ServerEvents.MCP_CONNECTED, handleMcpConnected);
     };
-  }, [socket, installMethod]);
+  }, [socket, installMethod, isOnDashboardPage]);
 
   // If not on dashboard page or not in cloud environment, don't show the onboarding overlay
   if (!shouldShow || !isOnDashboardPage) {
@@ -205,7 +215,7 @@ export function OnboardingOverlay() {
 
   // Main onboarding overlay for /dashboard page
   return (
-    <div className="absolute inset-0 z-50 dark:bg-[#1E1E1E] bg-white flex flex-col">
+    <div className="absolute inset-0 z-50 bg-semantic-1 flex flex-col">
       {/* Scrollable content area */}
       <div className="flex-1 overflow-y-auto scrollbar-gutter-stable">
         <div className="w-full max-w-[612px] mx-auto px-4 pb-8">
@@ -326,7 +336,7 @@ export function OnboardingOverlay() {
       </div>
 
       {/* Help Section - fixed at bottom, does not scroll */}
-      <div className="shrink-0 flex flex-col items-center w-full px-4 pt-6 pb-10 dark:bg-[#1B1B1B] bg-neutral-100 border-t dark:border-white/8 border-gray-50">
+      <div className="shrink-0 flex flex-col items-center w-full px-4 pt-6 pb-10 bg-semantic-1">
         <HelpSection agentSlug={selectedAgentSlug} installMethod={installMethod} />
       </div>
     </div>

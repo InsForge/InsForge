@@ -4,13 +4,13 @@ import { format } from 'date-fns';
 import { MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import {
   Button,
+  CopyButton,
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
   Switch,
 } from '@insforge/ui';
-import { CopyButton } from '@/components/CopyButton';
 
 interface ScheduleRowProps {
   schedule: ScheduleSchema;
@@ -54,10 +54,9 @@ export function ScheduleRow({
               {schedule.functionUrl}
             </span>
             <CopyButton
-              variant="secondary"
               showText={false}
               text={schedule.functionUrl}
-              className="size-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity bg-transparent hover:bg-[var(--alpha-8)] dark:bg-transparent dark:hover:bg-[var(--alpha-8)]"
+              className="size-6 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
             />
           </div>
         </div>

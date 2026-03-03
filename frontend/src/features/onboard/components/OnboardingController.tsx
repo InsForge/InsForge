@@ -4,7 +4,7 @@ import { parseCloudEvent } from '@/lib/utils/cloudMessaging';
 import { isIframe } from '@/lib/utils/utils';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { useSocket, ServerEvents } from '@/lib/contexts/SocketContext';
-import { getOnboardingSkipped, setOnboardingSkipped } from './OnboardingModal';
+import { getOnboardingSkipped, setOnboardingSkipped } from './ConnectDialog';
 
 /**
  * OnboardingController manages onboarding modal state:

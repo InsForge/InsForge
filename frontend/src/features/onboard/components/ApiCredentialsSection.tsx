@@ -1,4 +1,4 @@
-import { CopyButton } from '@/components';
+import { CopyButton } from '@insforge/ui';
 import { cn } from '@/lib/utils/utils';
 
 interface CredentialRowProps {
@@ -20,12 +20,7 @@ function CredentialRow({ label, value, isLoading = false }: CredentialRowProps) 
         <span className="text-gray-900 dark:text-white text-sm truncate min-w-0 flex-1">
           {value}
         </span>
-        <CopyButton
-          text={value}
-          disabled={isLoading}
-          showText={false}
-          className="h-6 w-6 p-1 min-w-0 shrink-0 text-black dark:text-white bg-white dark:bg-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-600 border-none"
-        />
+        <CopyButton text={value} disabled={isLoading} showText={false} className="shrink-0" />
       </div>
     </div>
   );
@@ -33,6 +28,7 @@ function CredentialRow({ label, value, isLoading = false }: CredentialRowProps) 
 
 interface ApiCredentialsSectionProps {
   apiKey: string;
+  anonKey: string;
   appUrl: string;
   isLoading?: boolean;
   className?: string;
@@ -40,6 +36,7 @@ interface ApiCredentialsSectionProps {
 
 export function ApiCredentialsSection({
   apiKey,
+  anonKey,
   appUrl,
   isLoading = false,
   className,
@@ -53,6 +50,7 @@ export function ApiCredentialsSection({
       <div className="flex flex-col gap-4">
         <CredentialRow label="Project URL" value={appUrl} isLoading={isLoading} />
         <CredentialRow label="API Key" value={apiKey} isLoading={isLoading} />
+        <CredentialRow label="Anon Key" value={anonKey} isLoading={isLoading} />
       </div>
     </div>
   );

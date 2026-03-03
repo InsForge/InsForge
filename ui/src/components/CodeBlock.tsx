@@ -45,11 +45,7 @@ export function CodeBlock({
               text={code}
               onCopy={onCopy}
               showText={false}
-              className={cn(
-                'h-6 w-6 p-0 bg-transparent hover:bg-alpha-8 border-none rounded min-w-0 shrink-0 text-muted-foreground hover:text-foreground',
-                !label && 'ml-auto',
-                buttonClassName
-              )}
+              className={cn(!label && 'ml-auto', buttonClassName)}
             />
           )}
         </div>
@@ -72,10 +68,9 @@ export function CodeBlock({
       </div>
       {showCopy && (
         <CopyButton
-          variant="primary"
           text={code}
           onCopy={onCopy}
-          className={cn('absolute right-3.5 top-3.5 h-9 pl-2', buttonClassName)}
+          className={cn('absolute right-3.5 top-3.5', buttonClassName)}
         />
       )}
     </div>
