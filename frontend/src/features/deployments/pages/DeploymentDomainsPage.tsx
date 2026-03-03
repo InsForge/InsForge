@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ExternalLink, Copy, Check, Plus, Pencil, Globe } from 'lucide-react';
-import { Button, Dialog, DialogContent, Input } from '@insforge/ui';
+import { Button, Dialog, DialogContent, DialogTitle, Input } from '@insforge/ui';
 import { Skeleton } from '@/components';
 import DiscordIcon from '@/assets/logos/discord.svg?react';
 import { useDeployments } from '../hooks/useDeployments';
@@ -312,9 +312,9 @@ export default function DeploymentDomainsPage() {
             <DialogContent>
               {/* Header */}
               <div className="flex items-center justify-between px-6 py-3 border-b border-neutral-200 dark:border-neutral-700">
-                <h2 className="text-lg font-semibold text-zinc-950 dark:text-white leading-7">
+                <DialogTitle className="text-lg font-semibold text-zinc-950 dark:text-white leading-7">
                   Add your own domain
-                </h2>
+                </DialogTitle>
               </div>
 
               {/* Body */}

@@ -107,7 +107,7 @@ export default function LogsPage() {
       <div className="flex-1 overflow-hidden">
         {logsError ? (
           <div className="flex h-full items-center justify-center">
-            <EmptyState title="Error loading logs" description={String(logsError)} />
+            <EmptyState title="Error loading logs" description={logsError instanceof Error ? logsError.message : 'Failed to load logs. Please refresh or contact support.'} />
           </div>
         ) : (
           <LogsDataGrid

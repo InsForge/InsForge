@@ -88,7 +88,7 @@ const MimeTypeRenderer = ({ row, column }: RenderCellProps<StorageDataGridRow>) 
 const UploadedAtRenderer = ({ row, column }: RenderCellProps<StorageDataGridRow>) => {
   const rawValue = row[column.key];
   const value = typeof rawValue === 'string' ? rawValue : '';
-  const displayValue = value ? formatTime(value) : 'null';
+  const displayValue = value ? formatTime(value) : '—';
 
   return (
     <span

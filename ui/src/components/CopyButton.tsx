@@ -23,7 +23,7 @@ export function CopyButton({
   disabled = false,
 }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -69,6 +69,7 @@ export function CopyButton({
     <Button
       onClick={(e) => void handleCopy(e)}
       disabled={disabled}
+      aria-label={!showText ? (copied ? copiedText : copyText) : undefined}
       className={cn(
         'h-8 px-3 gap-2 text-sm font-medium rounded',
         // Icon-only mode follows small icon action style from design

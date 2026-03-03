@@ -154,7 +154,7 @@ export default function AuditsPage() {
           emptyState={
             <div className="text-[13px] text-muted-foreground">
               {error
-                ? `Error loading audit logs: ${String(error)}`
+                ? `Error loading audit logs: ${error instanceof Error ? error.message : 'An unexpected error occurred'}`
                 : searchQuery
                   ? 'No audit logs match your search criteria'
                   : 'No audit logs found'}

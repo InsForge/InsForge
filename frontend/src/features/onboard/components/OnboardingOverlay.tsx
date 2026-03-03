@@ -255,7 +255,7 @@ export function OnboardingOverlay() {
                     appUrl={appUrl}
                     isLoading={isApiKeyLoading}
                     onAgentChange={handleAgentChange}
-                    onTrigerClick={handleAgentTriggerClick}
+                    onTriggerClick={handleAgentTriggerClick}
                     onCommandCopied={handleInstallationCommandCopied}
                   />
                 </OnboardingStep>

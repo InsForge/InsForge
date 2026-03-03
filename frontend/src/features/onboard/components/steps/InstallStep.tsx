@@ -18,7 +18,7 @@ interface InstallStepProps {
   appUrl: string;
   isLoading?: boolean;
   onAgentChange?: (agent: MCPAgent) => void;
-  onTrigerClick?: () => void;
+  onTriggerClick?: () => void;
   onCommandCopied?: () => void;
 }
 
@@ -27,7 +27,7 @@ export function InstallStep({
   appUrl,
   isLoading = false,
   onAgentChange,
-  onTrigerClick,
+  onTriggerClick,
   onCommandCopied,
 }: InstallStepProps) {
   const [selectedAgent, setSelectedAgent] = useState<MCPAgent>(MCP_AGENTS[0]);
@@ -70,7 +70,7 @@ export function InstallStep({
           <DropdownMenuTrigger asChild>
             <button
               className="w-40 bg-gray-100 dark:bg-[rgba(0,0,0,0.12)] border border-gray-300 dark:border-[rgba(255,255,255,0.24)] rounded flex items-center justify-between px-2 py-1 cursor-pointer"
-              onClick={onTrigerClick}
+              onClick={onTriggerClick}
             >
               <div className="flex items-center gap-2">
                 {selectedAgent.logo && (

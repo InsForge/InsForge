@@ -54,6 +54,7 @@ function Tab({ value, className, children }: TabProps) {
 
   return (
     <button
+      type="button"
       onClick={() => context.onValueChange(value)}
       className={cn(
         'flex items-center justify-center gap-1 px-3 py-1.5 text-sm transition-colors',
