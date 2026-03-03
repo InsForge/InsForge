@@ -86,7 +86,7 @@ function SecondaryMenuItem({
     <>
       <div
         className={cn(
-          'flex w-full items-center gap-1 rounded px-1.5 py-1.5 transition-colors',
+          'flex w-full items-center gap-1 rounded px-1.5 transition-colors',
           isSelected
             ? 'bg-alpha-8 text-foreground'
             : 'text-muted-foreground hover:bg-alpha-4 hover:text-foreground'
@@ -103,13 +103,12 @@ function SecondaryMenuItem({
             </p>
           </Link>
         ) : (
-          <Button
-            variant="ghost"
-            className="h-auto min-w-0 flex-1 justify-start rounded px-2 py-0 text-left text-sm leading-5 text-inherit hover:bg-transparent"
+          <div
+            className="h-auto min-w-0 flex-1 justify-start pl-2 pr-1 py-1.5 text-left text-sm leading-5 text-inherit cursor-pointer"
             onClick={handleItemClick}
           >
             <p className="truncate">{item.label}</p>
-          </Button>
+          </div>
         )}
 
         {menuActions.length > 0 ? (
