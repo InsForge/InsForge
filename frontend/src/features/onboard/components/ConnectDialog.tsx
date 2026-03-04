@@ -95,10 +95,7 @@ export function ConnectDialog() {
   return (
     <Dialog open={isOnboardingModalOpen} onOpenChange={handleModalClose}>
       <TooltipProvider>
-        <DialogContent
-          showCloseButton={false}
-          className="w-[640px] max-w-[640px] gap-0 p-0"
-        >
+        <DialogContent showCloseButton={false} className="w-[640px] max-w-[640px] gap-0 p-0">
           <div className="border-b border-[var(--alpha-8)] px-4 pt-3">
             <div className="flex items-start gap-3">
               <div className="flex-1">
@@ -114,7 +111,9 @@ export function ConnectDialog() {
                         onClick={() => setActiveTab(tab.id)}
                         className={cn(
                           'relative h-auto shrink-0 rounded-none px-0 pb-3 pt-0 text-[13px] leading-[18px] transition-colors before:hidden hover:bg-transparent',
-                          isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+                          isActive
+                            ? 'text-foreground'
+                            : 'text-muted-foreground hover:text-foreground'
                         )}
                       >
                         <span>{tab.label}</span>

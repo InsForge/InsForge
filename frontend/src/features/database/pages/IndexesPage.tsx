@@ -4,6 +4,7 @@ import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from
 import { useNavigate } from 'react-router-dom';
 import {
   ConvertedValue,
+  DataGridEmptyState,
   DataGrid,
   type DataGridColumn,
   type DataGridRowType,
@@ -208,9 +209,11 @@ export default function IndexesPage() {
               className="h-full"
               isRefreshing={isRefreshing}
               emptyState={
-                <div className="text-sm text-zinc-500 dark:text-zinc-400">
-                  {searchQuery ? 'No indexes match your search criteria' : 'No indexes found'}
-                </div>
+                <DataGridEmptyState
+                  message={
+                    searchQuery ? 'No indexes match your search criteria' : 'No indexes found'
+                  }
+                />
               }
             />
           </div>

@@ -126,7 +126,7 @@ export default function DeploymentLogsPage() {
   };
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       {/* Header */}
       <div className="flex flex-col gap-6 p-4">
         {/* Title */}
@@ -276,7 +276,7 @@ export default function DeploymentLogsPage() {
 
         {/* Loading overlay */}
         {isRefreshing && (
-          <div className="absolute inset-0 bg-white dark:bg-neutral-800 flex items-center justify-center z-50">
+          <div className="absolute inset-0 bg-[rgb(var(--semantic-1))] flex items-center justify-center z-50">
             <div className="flex items-center gap-1">
               <div className="w-5 h-5 border-2 border-zinc-500 dark:border-neutral-700 border-t-transparent rounded-full animate-spin" />
               <span className="text-sm text-zinc-500 dark:text-zinc-400">Loading</span>

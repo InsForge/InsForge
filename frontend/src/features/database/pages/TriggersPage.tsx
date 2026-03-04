@@ -4,6 +4,7 @@ import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from
 import { useNavigate } from 'react-router-dom';
 import {
   ConvertedValue,
+  DataGridEmptyState,
   DataGrid,
   type DataGridColumn,
   type DataGridRowType,
@@ -210,9 +211,11 @@ export default function TriggersPage() {
               className="h-full"
               isRefreshing={isRefreshing}
               emptyState={
-                <div className="text-sm text-zinc-500 dark:text-zinc-400">
-                  {searchQuery ? 'No triggers match your search criteria' : 'No triggers found'}
-                </div>
+                <DataGridEmptyState
+                  message={
+                    searchQuery ? 'No triggers match your search criteria' : 'No triggers found'
+                  }
+                />
               }
             />
           </div>

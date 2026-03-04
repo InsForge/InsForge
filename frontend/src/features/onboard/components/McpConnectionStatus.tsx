@@ -1,7 +1,6 @@
 import { format } from 'date-fns';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
-import { cn } from '@/lib/utils/utils';
 
 const formatConnectionTime = (timestamp: string) => {
   return format(new Date(timestamp), 'MMM dd, yyyy, h:mm a');
@@ -49,10 +48,14 @@ export function McpConnectionStatus({ onConnectClick }: McpConnectionStatusProps
             <span className="text-sm">Connected</span>
           </Button>
         </TooltipTrigger>
-        <TooltipContent side="bottom" sideOffset={8} className={cn('', 'p-3 max-w-[280px]')}>
-          <p className="text-sm">
+        <TooltipContent
+          side="bottom"
+          sideOffset={8}
+          className="max-w-[280px] border border-[var(--border)] bg-[rgb(var(--inverse))] p-3 text-[rgb(var(--foreground))]"
+        >
+          <p className="text-sm text-muted-foreground">
             Last MCP call was at{' '}
-            <span className="text-gray-900 dark:text-white font-medium">
+            <span className="font-medium text-foreground">
               {latestRecord ? formatConnectionTime(latestRecord.created_at) : 'Unknown'}
             </span>
           </p>

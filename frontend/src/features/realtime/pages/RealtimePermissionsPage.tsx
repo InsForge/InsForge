@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
+  DataGridEmptyState,
   DataGrid,
   type ConvertedValue,
   type DataGridColumn,
@@ -196,7 +197,13 @@ export default function RealtimePermissionsPage() {
             showPagination={false}
             noPadding={true}
             className="h-full"
-            emptyState={<div className="text-sm text-muted-foreground">No policies defined</div>}
+            emptyState={
+              <DataGridEmptyState
+                message={
+                  searchQuery ? 'No policies match your search criteria' : 'No policies found'
+                }
+              />
+            }
           />
         )}
       </div>

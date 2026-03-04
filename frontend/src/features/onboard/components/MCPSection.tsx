@@ -60,9 +60,7 @@ export function MCPSection({
             <span>Step 1 - Install InsForge</span>
           </p>
           {(selectedAgent.id === 'cursor' || selectedAgent.id === 'qoder') && (
-            <p className="text-sm leading-6 text-muted-foreground">
-              Install in one click
-            </p>
+            <p className="text-sm leading-6 text-muted-foreground">Install in one click</p>
           )}
           {selectedAgent.id === 'mcp' && (
             <p className="text-sm leading-6 text-muted-foreground">

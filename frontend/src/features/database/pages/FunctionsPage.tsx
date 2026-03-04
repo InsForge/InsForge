@@ -3,6 +3,7 @@ import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import { useNavigate } from 'react-router-dom';
 import {
+  DataGridEmptyState,
   EmptyState,
   DataGrid,
   type DataGridColumn,
@@ -183,9 +184,11 @@ export default function FunctionsPage() {
               className="h-full"
               isRefreshing={isRefreshing}
               emptyState={
-                <div className="text-sm text-zinc-500 dark:text-zinc-400">
-                  {searchQuery ? 'No functions match your search criteria' : 'No functions found'}
-                </div>
+                <DataGridEmptyState
+                  message={
+                    searchQuery ? 'No functions match your search criteria' : 'No functions found'
+                  }
+                />
               }
             />
           </div>

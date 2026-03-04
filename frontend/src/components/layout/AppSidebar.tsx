@@ -22,7 +22,7 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   const { menuItems: logsMenuItems, isLoading: logsLoading } = useLogSources();
   const { openSettingsDialog } = useModal();
 
-  const isCloud = isInsForgeCloudProject();
+  const isCloud = isInsForgeCloudProject() || true;
 
   // Build main menu items - insert deployments at the end of section 2 for cloud projects
   const mainMenuItems = useMemo(() => {

@@ -8,9 +8,9 @@ export * from './layout';
 export * from './radix';
 
 // Custom UI components
-export { ButtonWithLoading } from './ButtonWithLoading';
 export { CodeEditor } from './CodeEditor';
 export { ConnectCTA } from './ConnectCTA';
+export { DataGridEmptyState } from './DataGridEmptyState';
 export { DeleteActionButton } from './DeleteActionButton';
 export { EmptyState } from './EmptyState';
 export { ErrorState } from './ErrorState';

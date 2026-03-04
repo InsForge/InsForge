@@ -17,9 +17,7 @@ function CredentialRow({ label, value, isLoading = false }: CredentialRowProps) 
           isLoading && 'animate-pulse'
         )}
       >
-        <span className="min-w-0 flex-1 truncate text-sm text-foreground">
-          {value}
-        </span>
+        <span className="min-w-0 flex-1 truncate text-sm text-foreground">{value}</span>
         <CopyButton text={value} disabled={isLoading} showText={false} className="shrink-0" />
       </div>
     </div>
