@@ -3,7 +3,7 @@ import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
 import { ThemeProvider } from '@/lib/contexts/ThemeContext';
 import { ConnectDialog, OnboardingOverlay } from '@/features/onboard';
-import { SettingsMenuDialog } from '@/features/settings/components';
+import { SettingsMenuDialog } from '@/features/dashboard/components';
 import { isIframe } from '@/lib/utils/utils';
 
 interface LayoutProps {

@@ -3,7 +3,6 @@ import { X } from 'lucide-react';
 import {
   Badge,
   Button,
-  CopyButton,
   Dialog,
   DialogBody,
   DialogCloseButton,
@@ -15,6 +14,7 @@ import {
 import { MCPSection } from './MCPSection';
 import { APIKeysSection } from './APIKeysSection';
 import { ConnectionStringSection } from './ConnectionStringSection';
+import { CLISection } from './CLISection';
 import { useApiKey } from '@/lib/hooks/useMetadata';
 import { useAnonToken } from '@/features/auth/hooks/useAnonToken';
 import { cn, getBackendUrl, isInsForgeCloudProject } from '@/lib/utils/utils';
@@ -22,8 +22,6 @@ import { useModal } from '@/lib/hooks/useModal';
 import DiscordIcon from '@/assets/logos/discord.svg?react';
 
 const ONBOARDING_SKIPPED_KEY = 'insforge_onboarding_skipped';
-const CLI_INSTALL_COMMAND = 'npx insforge cli';
-
 type ConnectTabId = 'cli' | 'mcp' | 'connection-string' | 'api-keys';
 
 interface ConnectTab {
@@ -143,25 +141,7 @@ export function ConnectDialog() {
           </div>
 
           <DialogBody className="max-h-[60dvh] overflow-y-auto p-4">
-            {activeTab === 'cli' && (
-              <div className="flex flex-col gap-2">
-                <p className="text-sm leading-6 text-muted-foreground">
-                  Run the following command in your terminal
-                </p>
-                <div className="flex items-center gap-2 rounded border border-[var(--alpha-8)] bg-semantic-0 py-3 pl-6 pr-3">
-                  <div className="flex min-w-0 flex-1 items-center gap-4 font-mono text-sm text-foreground">
-                    <span>$</span>
-                    <span className="truncate">{CLI_INSTALL_COMMAND}</span>
-                  </div>
-                  <CopyButton
-                    text={CLI_INSTALL_COMMAND}
-                    copyText="Copy"
-                    copiedText="Copied"
-                    className="shrink-0"
-                  />
-                </div>
-              </div>
-            )}
+            {activeTab === 'cli' && <CLISection />}
             {activeTab === 'mcp' && (
               <MCPSection
                 apiKey={displayApiKey}

@@ -8,6 +8,7 @@ export {
 export { OnboardingOverlay } from './components/OnboardingOverlay';
 export { VideoDemoModal } from './components/VideoDemoModal';
 export { MCPSection } from './components/MCPSection';
+export { CLISection } from './components/CLISection';
 export { APIKeysSection } from './components/APIKeysSection';
 export { ConnectionStringSection } from './components/ConnectionStringSection';
 export { ShowPasswordButton } from './components/ShowPasswordButton';

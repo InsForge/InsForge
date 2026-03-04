@@ -11,6 +11,7 @@ import {
 import { CursorDeeplinkGenerator } from './mcp/CursorDeeplinkGenerator';
 import { QoderDeeplinkGenerator } from './mcp/QoderDeeplinkGenerator';
 import { MCP_AGENTS, GenerateInstallCommand, createMCPConfig, type MCPAgent } from './mcp/helpers';
+import { VERIFY_CONNECTION_PROMPT } from '../constants';
 import { cn } from '@/lib/utils/utils';
 
 interface MCPSectionProps {
@@ -44,19 +45,11 @@ export function MCPSection({
     return JSON.stringify(config, null, 2);
   }, [apiKey, appUrl]);
 
-  const testPrompt =
-    "I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool to learn about InsForge instructions.";
-
   return (
-    <div className={cn('flex flex-col gap-10', className)}>
-      {/* <p className="text-gray-500 dark:text-neutral-400 text-base leading-7">
-        Install the MCP server so your coding agent can access and build the backend.
-      </p> */}
-
-      {/* Step 1 */}
-      <div className="flex flex-col items-start gap-6">
-        <div className="flex flex-col gap-2">
-          <p className="text-base leading-6 text-foreground">
+    <div className={cn('flex flex-col gap-6', className)}>
+      <div className="flex w-full flex-col gap-3">
+        <div className="flex flex-col">
+          <p className="text-sm font-medium leading-6 text-foreground">
             <span>Step 1 - Install InsForge</span>
           </p>
           {(selectedAgent.id === 'cursor' || selectedAgent.id === 'qoder') && (
@@ -76,7 +69,12 @@ export function MCPSection({
             )}
         </div>
         <div
-          className={`flex-1 flex ${selectedAgent.id === 'cursor' || selectedAgent.id === 'qoder' ? 'flex-row gap-3' : 'flex-col gap-3'}`}
+          className={cn(
+            'flex w-full',
+            selectedAgent.id === 'cursor' || selectedAgent.id === 'qoder'
+              ? 'items-start gap-3'
+              : 'flex-col gap-3'
+          )}
         >
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -144,17 +142,16 @@ export function MCPSection({
         </div>
       </div>
 
-      {/* Step 2 */}
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-2">
-          <p className="text-base leading-6 text-foreground">
+        <div className="flex flex-col">
+          <p className="text-sm font-medium leading-6 text-foreground">
             <span>Step 2 - Verify Connection</span>
           </p>
           <p className="text-sm leading-6 text-muted-foreground">
             Send the prompt below to your AI coding agent to verify the connection.
           </p>
         </div>
-        <CodeBlock code={testPrompt} label="prompt" className="bg-semantic-0" />
+        <CodeBlock code={VERIFY_CONNECTION_PROMPT} label="prompt" className="bg-semantic-0" />
       </div>
     </div>
   );
