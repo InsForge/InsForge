@@ -288,11 +288,17 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
             enableVirtualization={true}
             renderers={{
               noRowsFallback: emptyState ? (
-                <div className="absolute inset-x-0 top-0 mt-8 flex items-center justify-center bg-[rgb(var(--semantic-1))] py-8">
+                <div
+                  className="absolute inset-x-0 bottom-0 flex items-start justify-center bg-semantic-1"
+                  style={{ top: headerRowHeight }}
+                >
                   {emptyState}
                 </div>
               ) : (
-                <div className="absolute inset-x-0 top-0 mt-8 flex items-center justify-center bg-[rgb(var(--semantic-1))] py-8">
+                <div
+                  className="absolute inset-x-0 bottom-0 flex items-center justify-center bg-semantic-1"
+                  style={{ top: headerRowHeight }}
+                >
                   <div className="text-sm text-muted-foreground">No data to display</div>
                 </div>
               ),
@@ -301,7 +307,10 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
 
           {/* Loading mask overlay */}
           {isRefreshing && (
-            <div className="absolute inset-0 z-50 mt-8 flex items-center justify-center bg-[rgb(var(--semantic-1))]">
+            <div
+              className="absolute inset-x-0 bottom-0 z-50 flex items-center justify-center bg-semantic-1"
+              style={{ top: headerRowHeight }}
+            >
               <div className="flex items-center gap-1">
                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--alpha-12)] border-t-transparent" />
                 <span className="text-sm text-muted-foreground">Loading</span>
