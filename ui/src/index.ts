@@ -50,6 +50,7 @@ export {
   DialogMessage,
   DialogCloseButton,
 } from './components';
+export { ConfirmDialog, type ConfirmDialogProps } from './components';
 export {
   MenuDialog,
   MenuDialogTrigger,

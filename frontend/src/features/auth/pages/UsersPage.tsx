@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CirclePlus, RefreshCw } from 'lucide-react';
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import {
-  ConnectCTA,
-  SelectionClearButton,
-  DeleteActionButton,
+  Button,
   ConfirmDialog,
-  TableHeader,
-} from '@/components';
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@insforge/ui';
+import { ConnectCTA, SelectionClearButton, DeleteActionButton, TableHeader } from '@/components';
 import { UsersDataGrid, UserFormDialog } from '@/features/auth/components';
 import { SortColumn } from 'react-data-grid';
 import { UserSchema } from '@insforge/shared-schemas';

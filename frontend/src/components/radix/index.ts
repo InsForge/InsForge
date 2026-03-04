@@ -1,5 +1,4 @@
 export * from './Alert';
-export * from './AlertDialog';
 export * from './Avatar';
 export * from './Card';
 export * from './Form';

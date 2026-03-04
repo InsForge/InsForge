@@ -36,8 +36,8 @@ import {
   MenuDialogFooter,
   MenuDialogCloseButton,
   Toast,
+  ConfirmDialog,
 } from '@insforge/ui';
-import { ConfirmDialog } from '@/components';
 import { useApiKey } from '@/lib/hooks/useMetadata';
 import { useHealth } from '@/lib/hooks/useHealth';
 import { useConfirm } from '@/lib/hooks/useConfirm';

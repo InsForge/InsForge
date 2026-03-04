@@ -52,6 +52,7 @@ export {
   DialogMessage,
   DialogCloseButton,
 } from './Dialog';
+export { ConfirmDialog, type ConfirmDialogProps } from './ConfirmDialog';
 export {
   MenuDialog,
   MenuDialogTrigger,

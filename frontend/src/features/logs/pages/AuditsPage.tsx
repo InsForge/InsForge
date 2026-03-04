@@ -4,8 +4,8 @@ import { LogsDataGrid, type LogsColumnDef } from '@/features/logs/components';
 import { formatTime, cn } from '@/lib/utils/utils';
 import { LOGS_PAGE_SIZE } from '@/features/logs/helpers';
 import { useConfirm } from '@/lib/hooks/useConfirm';
-import { Button } from '@insforge/ui';
-import { ConfirmDialog, TableHeader } from '@/components';
+import { Button, ConfirmDialog } from '@insforge/ui';
+import { TableHeader } from '@/components';
 import { useAuditLogs, useClearAuditLogs } from '@/features/logs/hooks/useAuditLogs';
 import type { GetAuditLogsRequest } from '@insforge/shared-schemas';
 

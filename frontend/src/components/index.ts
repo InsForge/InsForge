@@ -10,7 +10,6 @@ export * from './radix';
 // Custom UI components
 export { ButtonWithLoading } from './ButtonWithLoading';
 export { CodeEditor } from './CodeEditor';
-export { ConfirmDialog } from './ConfirmDialog';
 export { ConnectCTA } from './ConnectCTA';
 export { DeleteActionButton } from './DeleteActionButton';
 export { EmptyState } from './EmptyState';

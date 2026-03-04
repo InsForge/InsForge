@@ -12,14 +12,20 @@ import { StoragePageEmptyState } from '@/features/storage/components/StoragePage
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
 import { useUploadToast } from '@/features/storage/components/UploadToast';
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
+import {
+  Button,
+  ConfirmDialog,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@insforge/ui';
 import { useSearchParams } from 'react-router-dom';
 import {
   SelectionClearButton,
   DeleteActionButton,
   Alert,
   AlertDescription,
-  ConfirmDialog,
   TableHeader,
 } from '@/components';
 

@@ -11,11 +11,17 @@ import { TableForm } from '@/features/database/components/TableForm';
 import { TablesEmptyState } from '@/features/database/components/TablesEmptyState';
 import { TemplatePreview } from '@/features/database/components/TemplatePreview';
 import { DATABASE_TEMPLATES, DatabaseTemplate } from '@/features/database/templates';
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
+import {
+  Button,
+  ConfirmDialog,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@insforge/ui';
 import {
   Alert,
   AlertDescription,
-  ConfirmDialog,
   EmptyState,
   SelectionClearButton,
   DeleteActionButton,

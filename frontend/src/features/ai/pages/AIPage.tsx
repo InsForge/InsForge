@@ -1,11 +1,10 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Loader2, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
-import { ConfirmDialog } from '@/components';
 import { useAIConfigs } from '../hooks/useAIConfigs';
 import { useAIRemainingCredits } from '../hooks/useAIUsage';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
-import { Tabs, Tab } from '@insforge/ui';
+import { Tabs, Tab, ConfirmDialog } from '@insforge/ui';
 import {
   generateProviderTabs,
   filterModelsByProvider,

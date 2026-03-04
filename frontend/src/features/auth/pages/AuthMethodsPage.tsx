@@ -11,8 +11,8 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  ConfirmDialog,
 } from '@insforge/ui';
-import { ConfirmDialog } from '@/components';
 import type { OAuthProvidersSchema } from '@insforge/shared-schemas';
 import { oauthProviders, type OAuthProviderInfo } from '@/features/auth/helpers';
 

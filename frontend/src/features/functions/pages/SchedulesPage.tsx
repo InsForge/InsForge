@@ -1,7 +1,14 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { ArrowLeft, CirclePlus } from 'lucide-react';
 import { useSchedules } from '@/features/functions/hooks/useSchedules';
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
+import {
+  Button,
+  ConfirmDialog,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@insforge/ui';
 import { Skeleton, TableHeader } from '@/components';
 import { ScheduleFormDialog } from '../components/ScheduleFormDialog';
 import type { ScheduleFormSchema } from '../types';
@@ -10,7 +17,6 @@ import ScheduleRow from '../components/ScheduleRow';
 import ScheduleLogs from '../components/ScheduleLogs';
 import { Alert, AlertDescription } from '@/components/radix/Alert';
 import ScheduleEmptyState from '../components/ScheduleEmptyState';
-import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 

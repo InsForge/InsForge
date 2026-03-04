@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Button, Input } from '@insforge/ui';
-import { Skeleton, ConfirmDialog, TableHeader } from '@/components';
+import { Button, ConfirmDialog, Input } from '@insforge/ui';
+import { Skeleton, TableHeader } from '@/components';
 import { SecretRow } from '../components/SecretRow';
 import SecretEmptyState from '../components/SecretEmptyState';
 import { useSecrets } from '@/features/functions/hooks/useSecrets';
