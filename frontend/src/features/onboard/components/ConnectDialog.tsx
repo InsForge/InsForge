@@ -97,14 +97,12 @@ export function ConnectDialog() {
       <TooltipProvider>
         <DialogContent
           showCloseButton={false}
-          className="w-[640px] max-w-[640px] gap-0 overflow-hidden rounded-lg border border-white/8 bg-[#1b1b1b] p-0 text-white shadow-[0px_8px_12px_0px_rgba(0,0,0,0.24)]"
+          className="w-[640px] max-w-[640px] gap-0 p-0"
         >
-          <div className="border-b border-white/8 px-4 pt-3">
+          <div className="border-b border-[var(--alpha-8)] px-4 pt-3">
             <div className="flex items-start gap-3">
               <div className="flex-1">
-                <DialogTitle className="text-base font-medium leading-7 text-white">
-                  Connect Project
-                </DialogTitle>
+                <DialogTitle>Connect Project</DialogTitle>
                 <div className="mt-3 flex items-start gap-6 overflow-x-auto">
                   {visibleTabs.map((tab) => {
                     const isActive = activeTab === tab.id;
@@ -116,19 +114,19 @@ export function ConnectDialog() {
                         onClick={() => setActiveTab(tab.id)}
                         className={cn(
                           'relative h-auto shrink-0 rounded-none px-0 pb-3 pt-0 text-[13px] leading-[18px] transition-colors before:hidden hover:bg-transparent',
-                          isActive ? 'text-white' : 'text-[#a3a3a3] hover:text-white'
+                          isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
                         )}
                       >
                         <span>{tab.label}</span>
                         {tab.showRecommended && (
-                          <Badge className="rounded bg-white/8 px-2 py-[2px] text-xs font-medium leading-4 text-[#6ee7b7]">
+                          <Badge className="rounded bg-[var(--alpha-8)] px-2 py-[2px] text-primary">
                             Recommended
                           </Badge>
                         )}
                         <span
                           className={cn(
                             'absolute bottom-0 left-0 h-0.5 w-full',
-                            isActive ? 'bg-white' : 'bg-transparent'
+                            isActive ? 'bg-foreground' : 'bg-transparent'
                           )}
                         />
                       </Button>
@@ -137,7 +135,7 @@ export function ConnectDialog() {
                 </div>
               </div>
               <DialogCloseButton
-                className="relative right-auto top-auto h-7 w-7 rounded p-1 text-white/80 hover:bg-white/8 hover:text-white"
+                className="relative right-auto top-auto h-7 w-7 p-1"
                 aria-label="Close"
               >
                 <X className="size-5" />
@@ -148,11 +146,11 @@ export function ConnectDialog() {
           <DialogBody className="max-h-[60dvh] overflow-y-auto p-4">
             {activeTab === 'cli' && (
               <div className="flex flex-col gap-2">
-                <p className="text-sm leading-6 text-[#a3a3a3]">
+                <p className="text-sm leading-6 text-muted-foreground">
                   Run the following command in your terminal
                 </p>
-                <div className="flex items-center gap-2 rounded border border-white/8 bg-[#161616] py-3 pl-6 pr-3">
-                  <div className="flex min-w-0 flex-1 items-center gap-4 font-mono text-sm text-white">
+                <div className="flex items-center gap-2 rounded border border-[var(--alpha-8)] bg-semantic-0 py-3 pl-6 pr-3">
+                  <div className="flex min-w-0 flex-1 items-center gap-4 font-mono text-sm text-foreground">
                     <span>$</span>
                     <span className="truncate">{CLI_INSTALL_COMMAND}</span>
                   </div>
@@ -160,7 +158,7 @@ export function ConnectDialog() {
                     text={CLI_INSTALL_COMMAND}
                     copyText="Copy"
                     copiedText="Copied"
-                    className="shrink-0 bg-[#6ee7b7] text-black hover:bg-[#60d7aa]"
+                    className="shrink-0"
                   />
                 </div>
               </div>
@@ -185,8 +183,8 @@ export function ConnectDialog() {
             )}
           </DialogBody>
 
-          <DialogFooter className="justify-between border-white/8 p-4">
-            <p className="flex min-w-0 items-center gap-1 text-sm leading-6 text-[#a3a3a3]">
+          <DialogFooter className="justify-between">
+            <p className="flex min-w-0 items-center gap-1 text-sm leading-6 text-muted-foreground">
               <span>Need help? Join our</span>
               <a
                 href="https://discord.gg/DvBtaEc9Jz"
@@ -203,7 +201,7 @@ export function ConnectDialog() {
               variant="secondary"
               size="default"
               onClick={handleSkipOnboarding}
-              className="h-8 shrink-0 rounded border-white/8 bg-[#242424] px-3 text-sm font-medium text-white hover:bg-[#2f2f2f]"
+              className="shrink-0"
             >
               I&apos;ll connect later
             </Button>

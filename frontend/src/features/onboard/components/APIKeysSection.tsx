@@ -10,14 +10,14 @@ interface CredentialRowProps {
 function CredentialRow({ label, value, isLoading = false }: CredentialRowProps) {
   return (
     <div className="flex items-center gap-4 min-w-0">
-      <span className="text-gray-900 dark:text-white text-sm leading-6 w-25 shrink-0">{label}</span>
+      <span className="w-25 shrink-0 text-sm leading-6 text-foreground">{label}</span>
       <div
         className={cn(
-          'flex-1 h-9 min-w-0 flex items-center justify-between gap-2 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg px-3 py-2',
+          'flex h-9 min-w-0 flex-1 items-center justify-between gap-2 rounded-lg border border-[var(--alpha-8)] bg-semantic-0 px-3 py-2',
           isLoading && 'animate-pulse'
         )}
       >
-        <span className="text-gray-900 dark:text-white text-sm truncate min-w-0 flex-1">
+        <span className="min-w-0 flex-1 truncate text-sm text-foreground">
           {value}
         </span>
         <CopyButton text={value} disabled={isLoading} showText={false} className="shrink-0" />
@@ -43,7 +43,7 @@ export function APIKeysSection({
 }: APIKeysSectionProps) {
   return (
     <div className={cn('flex flex-col gap-6', className)}>
-      <p className="text-gray-500 dark:text-neutral-400 text-base leading-7">
+      <p className="text-base leading-7 text-muted-foreground">
         Use the project URL and API key to connect directly via REST API or any HTTP client.
       </p>
 

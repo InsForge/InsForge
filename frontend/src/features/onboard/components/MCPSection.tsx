@@ -56,23 +56,23 @@ export function MCPSection({
       {/* Step 1 */}
       <div className="flex flex-col items-start gap-6">
         <div className="flex flex-col gap-2">
-          <p className="text-gray-900 dark:text-white text-base leading-6">
+          <p className="text-base leading-6 text-foreground">
             <span>Step 1 - Install InsForge</span>
           </p>
           {(selectedAgent.id === 'cursor' || selectedAgent.id === 'qoder') && (
-            <p className="text-gray-500 dark:text-neutral-400 text-sm leading-6">
+            <p className="text-sm leading-6 text-muted-foreground">
               Install in one click
             </p>
           )}
           {selectedAgent.id === 'mcp' && (
-            <p className="text-gray-500 dark:text-neutral-400 text-sm leading-6">
+            <p className="text-sm leading-6 text-muted-foreground">
               Add this configuration to your MCP settings
             </p>
           )}
           {selectedAgent.id !== 'cursor' &&
             selectedAgent.id !== 'qoder' &&
             selectedAgent.id !== 'mcp' && (
-              <p className="text-gray-500 dark:text-neutral-400 text-sm leading-6">
+              <p className="text-sm leading-6 text-muted-foreground">
                 Run the following command in terminal to install InsForge MCP Server
               </p>
             )}
@@ -82,18 +82,18 @@ export function MCPSection({
         >
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="w-40 bg-gray-100 dark:bg-[rgba(0,0,0,0.12)] border border-gray-300 dark:border-[rgba(255,255,255,0.24)] rounded flex items-center justify-between px-2 py-1 cursor-pointer">
+              <button className="flex w-40 cursor-pointer items-center justify-between rounded border border-[var(--alpha-8)] bg-semantic-0 px-2 py-1 transition-colors hover:bg-[var(--alpha-4)]">
                 <div className="flex items-center gap-2">
                   {selectedAgent.logo && (
                     <div className="w-6 h-6 flex items-center justify-center">
                       {selectedAgent.logo}
                     </div>
                   )}
-                  <span className="text-gray-900 dark:text-white text-sm font-medium">
+                  <span className="text-sm font-medium text-foreground">
                     {selectedAgent.displayName}
                   </span>
                 </div>
-                <ChevronDown className="w-5 h-5 text-gray-500 dark:text-neutral-400" />
+                <ChevronDown className="h-5 w-5 text-muted-foreground" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-40 p-0">
@@ -121,19 +121,17 @@ export function MCPSection({
               <QoderDeeplinkGenerator apiKey={apiKey} os="macos-linux" />
             </div>
           ) : selectedAgent.id === 'mcp' ? (
-            <div className="bg-gray-100 dark:bg-neutral-900 rounded overflow-hidden flex flex-col h-[320px] w-full">
+            <div className="flex h-[320px] w-full flex-col overflow-hidden rounded border border-[var(--alpha-8)] bg-semantic-0">
               {/* Header - fixed at top */}
-              <div className="bg-gray-100 dark:bg-neutral-900 flex items-center justify-between p-3">
+              <div className="flex items-center justify-between border-b border-[var(--alpha-8)] bg-semantic-0 p-3">
                 <div className="px-2">
-                  <span className="text-gray-700 dark:text-neutral-50 text-xs">
-                    MCP Configuration
-                  </span>
+                  <span className="text-xs text-muted-foreground">MCP Configuration</span>
                 </div>
                 <CopyButton text={mcpJsonConfig} showText={false} className="shrink-0" />
               </div>
               {/* Scrollable content */}
               <div className="flex-1 overflow-auto p-3">
-                <pre className="text-gray-700 dark:text-neutral-300 text-sm leading-6 m-0 whitespace-pre-wrap break-all">
+                <pre className="m-0 whitespace-pre-wrap break-all text-sm leading-6 text-foreground">
                   <code>{mcpJsonConfig}</code>
                 </pre>
               </div>
@@ -151,10 +149,10 @@ export function MCPSection({
       {/* Step 2 */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-2">
-          <p className="text-gray-900 dark:text-white text-base leading-6">
+          <p className="text-base leading-6 text-foreground">
             <span>Step 2 - Verify Connection</span>
           </p>
-          <p className="text-gray-500 dark:text-neutral-400 text-sm leading-6">
+          <p className="text-sm leading-6 text-muted-foreground">
             Send the prompt below to your AI coding agent to verify the connection.
           </p>
         </div>

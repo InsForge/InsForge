@@ -13,7 +13,7 @@ export function ShowPasswordButton({ show, onToggle, className }: ShowPasswordBu
       type="button"
       onClick={onToggle}
       className={cn(
-        'inline-flex h-5 items-center gap-1 rounded bg-transparent px-0 text-xs font-normal leading-4 text-[#a3a3a3] transition-colors hover:text-white',
+        'inline-flex h-5 items-center gap-1 rounded bg-transparent px-0 text-xs font-normal leading-4 text-muted-foreground transition-colors hover:text-foreground',
         className
       )}
       aria-pressed={show}

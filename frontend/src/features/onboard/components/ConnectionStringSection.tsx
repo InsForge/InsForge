@@ -73,10 +73,12 @@ export function ConnectionStringSection({ className }: ConnectionStringSectionPr
 
   return (
     <div className={cn('flex flex-col gap-3', isConnectionLoading && 'animate-pulse', className)}>
-      <div className="flex flex-col gap-2 rounded border border-white/8 bg-[#161616] p-3">
+      <div className="flex flex-col gap-2 rounded border border-[var(--alpha-8)] bg-semantic-0 p-3">
         <div className="flex items-center justify-between">
-          <div className="flex h-5 items-center justify-center rounded bg-white/8 px-2">
-            <span className="text-xs font-medium leading-4 text-[#a3a3a3]">connection string</span>
+          <div className="flex h-5 items-center justify-center rounded bg-[var(--alpha-8)] px-2">
+            <span className="text-xs font-medium leading-4 text-muted-foreground">
+              connection string
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <ShowPasswordButton
@@ -86,15 +88,15 @@ export function ConnectionStringSection({ className }: ConnectionStringSectionPr
             <CopyButton text={connectionStringClipboard} showText={false} />
           </div>
         </div>
-        <p className="break-all font-mono text-sm leading-6 text-white">
+        <p className="break-all font-mono text-sm leading-6 text-foreground">
           {connectionStringDisplay || 'Loading...'}
         </p>
       </div>
 
-      <div className="flex flex-col gap-2 rounded border border-white/8 bg-[#161616] p-3">
+      <div className="flex flex-col gap-2 rounded border border-[var(--alpha-8)] bg-semantic-0 p-3">
         <div className="flex items-center justify-between">
-          <div className="flex h-5 items-center justify-center rounded bg-white/8 px-2">
-            <span className="text-xs font-medium leading-4 text-[#a3a3a3]">parameters</span>
+          <div className="flex h-5 items-center justify-center rounded bg-[var(--alpha-8)] px-2">
+            <span className="text-xs font-medium leading-4 text-muted-foreground">parameters</span>
           </div>
           <div className="flex items-center gap-2">
             <ShowPasswordButton
@@ -105,8 +107,8 @@ export function ConnectionStringSection({ className }: ConnectionStringSectionPr
         </div>
         <div className="flex flex-col gap-1 font-mono text-sm leading-5">
           {parameters.map(({ label, value }) => (
-            <p key={label} className="break-all text-white">
-              <span className="text-[#a3a3a3]">{label}: </span>
+            <p key={label} className="break-all text-foreground">
+              <span className="text-muted-foreground">{label}: </span>
               <span>{formatParameterValue(value)}</span>
             </p>
           ))}

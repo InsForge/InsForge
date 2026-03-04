@@ -35,7 +35,7 @@ export function CursorDeeplinkGenerator({
   return (
     <button
       onClick={handleOpenInCursor}
-      className="h-8 bg-black hover:bg-neutral-800 dark:bg-neutral-600 dark:hover:bg-neutral-500 px-4 flex items-center justify-center gap-2.5 rounded text-white text-sm font-medium"
+      className="flex h-8 items-center justify-center gap-2.5 rounded border border-[var(--alpha-8)] bg-semantic-0 px-4 text-sm font-medium text-foreground transition-colors hover:bg-[var(--alpha-4)]"
     >
       <CursorLogo className="h-6 w-6" />
       <span>Add to Cursor</span>
