@@ -72,3 +72,4 @@ export {
   MenuDialogFooter,
   MenuDialogCloseButton,
 } from './MenuDialog';
+export { Toast, toastVariants, type ToastProps } from './Toast';
