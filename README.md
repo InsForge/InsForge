@@ -137,7 +137,7 @@ I'm using InsForge as my backend platform, call InsForge MCP's fetch-docs tool t
 
 In addition to running InsForge locally, you can also launch InsForge using a pre-configured setup. This allows you to get up and running quickly with InsForge without installing Docker on your local machine.
 
-| Railway | Zeabur | Sealos (coming soon) |
+| Railway | Zeabur | Sealos |
 | --- | --- | --- |
 | [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/insforge) | [![Deploy on Zeabur](https://zeabur.com/button.svg)](https://zeabur.com/templates/Q82M3Y) | [![Deploy on Sealos](https://raw.githubusercontent.com/labring-actions/templates/main/Deploy-on-Sealos.svg)](https://template.hzh.sealos.run/deploy?templateName=insforge) |
 
