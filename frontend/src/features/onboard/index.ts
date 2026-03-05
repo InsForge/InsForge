@@ -1,5 +1,4 @@
 // Onboard components
-export { McpConnectionStatus } from './components/McpConnectionStatus';
 export {
   ConnectDialog,
   getOnboardingSkipped,

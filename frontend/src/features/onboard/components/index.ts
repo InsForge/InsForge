@@ -1,5 +1,4 @@
 export * from './mcp';
-export { McpConnectionStatus } from './McpConnectionStatus';
 export { ConnectDialog, getOnboardingSkipped, setOnboardingSkipped } from './ConnectDialog';
 export { OnboardingOverlay } from './OnboardingOverlay';
 export { VideoDemoModal } from './VideoDemoModal';

@@ -1,209 +1,556 @@
-import { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Badge, Button } from '@insforge/ui';
+import {
+  Braces,
+  CheckCircle,
+  Database,
+  ExternalLink,
+  HardDrive,
+  Minus,
+  Paperclip,
+  Plus,
+  Scan,
+  User,
+  Plug,
+} from 'lucide-react';
+import {
+  Edge,
+  Handle,
+  Node,
+  NodeProps,
+  NodeTypes,
+  Panel,
+  Position,
+  ReactFlow,
+  useEdgesState,
+  useNodesState,
+  useReactFlow,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import { useMetadata } from '@/lib/hooks/useMetadata';
-import { useUsers } from '@/features/auth';
-import { Users, Database, HardDrive, Lock, ChevronRight } from 'lucide-react';
-import { ConnectionSuccessBanner, StatsCard, PromptCard, PromptDialog } from '../components';
+import { useCloudProjectInfo } from '@/lib/hooks/useCloudProjectInfo';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
-import { LogsDataGrid, type LogsColumnDef } from '@/features/logs/components/LogsDataGrid';
-import { cn, formatTime } from '@/lib/utils/utils';
-import { Button } from '@insforge/ui';
-import { quickStartPrompts, type PromptTemplate } from '../prompts';
+import { useModal } from '@/lib/contexts/ModalContext';
+import { isInsForgeCloudProject } from '@/lib/utils/utils';
+import { useUsers } from '@/features/auth';
 
-export default function DashboardPage() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [selectedPrompt, setSelectedPrompt] = useState<PromptTemplate | null>(null);
-  const [promptDialogOpen, setPromptDialogOpen] = useState(false);
-  const { metadata, auth, tables, storage, isLoading } = useMetadata();
-  const { totalUsers } = useUsers();
-  const { records } = useMcpUsage();
+const CLI_COMMAND = 'npx insforge cli';
 
-  const authCount = auth?.oAuthProviders.length ?? 0;
-  const tableCount = tables?.length ?? 0;
-  const showBanner = location.state?.showSuccessBanner === true;
+type DatabasePreviewData = {
+  tableCount: number;
+  region?: string;
+  showRegion: boolean;
+  onOpenDatabase: () => void;
+};
 
-  const mcpColumns: LogsColumnDef[] = [
-    {
-      key: 'tool_name',
-      name: 'MCP Call',
-      width: '12fr',
-      renderCell: ({ row }) => (
-        <p className="text-sm text-gray-900 dark:text-white font-normal leading-6">
-          {String(row.tool_name ?? '')}
-        </p>
-      ),
-    },
-    {
-      key: 'created_at',
-      name: 'Time',
-      width: 'minmax(200px, 1fr)',
-      renderCell: ({ row }) => (
-        <p className="text-sm text-gray-900 dark:text-white font-normal leading-6">
-          {formatTime(String(row.created_at ?? ''))}
-        </p>
-      ),
-    },
-  ];
+type AgentConnectorData = {
+  onOpenConnect: () => void;
+};
 
-  const handleViewMoreClick = () => {
-    void navigate('/dashboard/logs/MCP');
-  };
+type AgentCardData = {
+  requestCount: number;
+};
+
+type AgentConnectorNodeType = Node<AgentConnectorData, 'agentConnector'>;
+type AgentCardNodeType = Node<AgentCardData, 'agentCard'>;
+type DatabasePreviewNodeType = Node<DatabasePreviewData, 'databasePreview'>;
+type PreviewNodeData = AgentConnectorNodeType | AgentCardNodeType | DatabasePreviewNodeType;
+
+function UsFlagIcon() {
+  return (
+    <div
+      className="relative h-3 w-[18px] overflow-hidden rounded-[1px] border border-[var(--alpha-8)]"
+      style={{
+        backgroundImage:
+          'repeating-linear-gradient(to bottom, #D5385A 0px, #D5385A 1px, #FFFFFF 1px, #FFFFFF 2px)',
+      }}
+    >
+      <div className="absolute left-0 top-0 h-[7px] w-[7px] bg-[#2A4A9B]" />
+    </div>
+  );
+}
+
+function AgentConnectorNode({ data }: NodeProps<AgentConnectorNodeType>) {
+  return (
+    <button
+      type="button"
+      onClick={data.onOpenConnect}
+      className="flex h-12 w-12 items-center justify-center rounded-full border border-[var(--alpha-8)] bg-card transition-colors hover:bg-[var(--alpha-4)]"
+      aria-label="Connect agent"
+    >
+      <Plug className="h-5 w-5 text-muted-foreground" />
+    </button>
+  );
+}
+
+function AgentCardNode({ data }: NodeProps<AgentCardNodeType>) {
+  const requestLabel = `${data.requestCount} MCP Call${data.requestCount === 1 ? '' : 's'}`;
 
   return (
-    <main className="h-full bg-semantic-1 overflow-y-auto px-6">
-      <div className="flex flex-col gap-16 w-full max-w-[1080px] mx-auto pt-6 pb-8">
-        <div className="flex flex-col gap-6">
-          {/* Connection Success Banner - Only shows once on first connection */}
-          {showBanner && <ConnectionSuccessBanner />}
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white tracking-[-0.1px]">
-            Dashboard
-          </h1>
-
-          {/* Stats Section */}
-          <section className="flex flex-col gap-6 w-full">
-            <div className="flex gap-6 w-full h-[176px]">
-              <StatsCard
-                icon={Users}
-                title="AUTH"
-                value={(totalUsers || 0).toLocaleString()}
-                unit={totalUsers === 1 ? 'user' : 'users'}
-                description={`${authCount} OAuth ${authCount === 1 ? 'provider' : 'providers'} enabled`}
-                isLoading={isLoading}
-              />
-
-              <StatsCard
-                icon={Database}
-                title="Database"
-                value={(metadata?.database?.totalSizeInGB || 0).toFixed(2)}
-                unit="GB"
-                description={`${tableCount} ${tableCount === 1 ? 'Table' : 'Tables'}`}
-                isLoading={isLoading}
-              />
-
-              <StatsCard
-                icon={HardDrive}
-                title="Storage"
-                value={(storage?.totalSizeInGB || 0).toFixed(2)}
-                unit="GB"
-                description={`${storage?.buckets?.length || 0} ${storage?.buckets?.length === 1 ? 'Bucket' : 'Buckets'}`}
-                isLoading={isLoading}
-              />
-            </div>
-          </section>
+    <div className="w-[240px] overflow-hidden rounded-lg border border-[var(--alpha-8)] bg-card shadow-[0px_4px_4px_rgba(0,0,0,0.08)]">
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="edge-right"
+        className="!h-0 !w-0 !border-0 !bg-transparent !opacity-0 !pointer-events-none"
+        style={{ right: 0, top: '50%' }}
+        isConnectable={false}
+      />
+      <div className="flex items-center gap-2 border-b border-[var(--alpha-8)] px-2 py-2">
+        <div className="flex h-10 w-10 items-center justify-center rounded border border-[var(--alpha-8)] bg-semantic-1">
+          <Paperclip className="h-5 w-5 text-foreground" />
         </div>
 
-        {/* Quick Start Prompt Section */}
-        <section className="flex flex-col gap-6 w-full">
-          <div className="flex flex-col gap-1 w-full">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white tracking-[-0.1px]">
-              Quick Start Prompt
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
-              Paste the prompts below into your agent to quickly start building real apps.
-            </p>
-          </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium leading-5 text-foreground">Agent</p>
+          <p className="truncate text-[13px] leading-[18px] text-muted-foreground">
+            {requestLabel}
+          </p>
+        </div>
+      </div>
 
-          <div className="grid grid-cols-3 gap-6 w-full">
-            {quickStartPrompts.map((prompt, index) => (
-              <PromptCard
-                key={index}
-                title={prompt.title}
-                onClick={() => {
-                  setSelectedPrompt(prompt);
-                  setPromptDialogOpen(true);
-                }}
-              />
-            ))}
-          </div>
+      <div className="flex items-center gap-1.5 px-3 py-3">
+        <div className="h-2 w-2 rounded-full bg-primary" />
+        <p className="text-sm leading-5 text-primary">Connected</p>
+      </div>
+    </div>
+  );
+}
 
-          <PromptDialog
-            open={promptDialogOpen}
-            onOpenChange={setPromptDialogOpen}
-            promptTemplate={selectedPrompt}
+function DatabasePreviewNode({ data }: NodeProps<DatabasePreviewNodeType>) {
+  const tableLabel = `${data.tableCount} ${data.tableCount === 1 ? 'table' : 'tables'} created`;
+  const hasRegionRow = data.showRegion && !!data.region;
+
+  return (
+    <div className="w-[240px] overflow-hidden rounded-lg border border-[var(--alpha-8)] bg-card shadow-[0px_4px_4px_rgba(0,0,0,0.08)]">
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="edge-left"
+        className="!h-0 !w-0 !border-0 !bg-transparent !opacity-0 !pointer-events-none"
+        style={{ left: 0, top: '50%' }}
+        isConnectable={false}
+      />
+      <div
+        className={`flex items-center gap-2 px-2 py-2 ${hasRegionRow ? 'border-b border-[var(--alpha-8)]' : ''}`}
+      >
+        <div className="flex h-10 w-10 items-center justify-center rounded border border-[var(--alpha-8)] bg-semantic-1">
+          <Database className="h-5 w-5 text-foreground" />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium leading-5 text-foreground">Database</p>
+          <p className="truncate text-[13px] leading-[18px] text-muted-foreground">{tableLabel}</p>
+        </div>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          onClick={data.onOpenDatabase}
+          className="size-5 rounded text-muted-foreground hover:text-foreground"
+          aria-label="Open database tables"
+        >
+          <ExternalLink className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {hasRegionRow && (
+        <div className="flex items-center gap-2 px-3 py-3">
+          <UsFlagIcon />
+          <p className="truncate text-[13px] leading-[18px] text-muted-foreground">{data.region}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const previewNodeTypes = {
+  agentConnector: AgentConnectorNode,
+  agentCard: AgentCardNode,
+  databasePreview: DatabasePreviewNode,
+} satisfies NodeTypes;
+
+function VisualizerControls() {
+  const { zoomIn, zoomOut, fitView } = useReactFlow();
+
+  return (
+    <Panel position="bottom-right" className="m-3">
+      <div className="flex flex-col overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => void zoomIn()}
+          className="h-7 w-7 rounded-none border-b border-[var(--alpha-8)] text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground"
+          aria-label="Zoom in"
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => void zoomOut()}
+          className="h-7 w-7 rounded-none border-b border-[var(--alpha-8)] text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground"
+          aria-label="Zoom out"
+        >
+          <Minus className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => void fitView({ duration: 250, padding: 0.45 })}
+          className="h-7 w-7 rounded-none text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground"
+          aria-label="Fit view"
+        >
+          <Scan className="h-4 w-4" />
+        </Button>
+      </div>
+    </Panel>
+  );
+}
+
+interface StatusTileProps {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+}
+
+function StatusTile({ label, value, icon }: StatusTileProps) {
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div className="flex h-12 w-12 items-center justify-center rounded border border-[var(--alpha-8)] bg-card">
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs leading-4 text-muted-foreground">{label}</p>
+        <p className="truncate text-base leading-7 text-foreground">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+interface MetricCardProps {
+  label: string;
+  value: string;
+  unit?: string;
+  icon: React.ReactNode;
+}
+
+function MetricCard({ label, value, unit, icon }: MetricCardProps) {
+  return (
+    <div className="flex h-[120px] min-h-[120px] flex-col justify-between rounded border border-[var(--alpha-8)] bg-card p-4">
+      <div className="flex h-[22px] items-center gap-1.5">
+        <div className="flex h-5 w-5 items-center justify-center text-muted-foreground">{icon}</div>
+        <p className="truncate text-[13px] leading-[22px] text-muted-foreground">{label}</p>
+      </div>
+
+      <p className="text-[20px] font-medium leading-7 text-foreground">
+        {value}
+        {unit && (
+          <span className="ml-1 text-xs font-normal leading-4 text-muted-foreground">{unit}</span>
+        )}
+      </p>
+    </div>
+  );
+}
+
+export default function DashboardPage() {
+  const navigate = useNavigate();
+  const { setOnboardingModalOpen } = useModal();
+  const {
+    metadata,
+    tables,
+    storage,
+    isLoading: isMetadataLoading,
+    error: metadataError,
+  } = useMetadata();
+  const { projectInfo } = useCloudProjectInfo();
+  const { totalUsers } = useUsers();
+  const { hasCompletedOnboarding, recordsCount } = useMcpUsage();
+  const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+      }
+    };
+  }, []);
+
+  const tableCount = tables?.length ?? 0;
+  const agentConnected = hasCompletedOnboarding;
+  const isCloudProject = isInsForgeCloudProject();
+  const projectName = isCloudProject ? projectInfo.name : 'My InsForge Project';
+  const instanceType = projectInfo.instanceType?.toUpperCase();
+  const showInstanceTypeBadge = isCloudProject && !!instanceType;
+  const showRegionInfo = isCloudProject && !!projectInfo.region;
+  const projectRegion = projectInfo.region;
+
+  const projectHealth = useMemo(() => {
+    if (metadataError) {
+      return 'Issue';
+    }
+    if (isMetadataLoading) {
+      return 'Loading...';
+    }
+    return 'Healthy';
+  }, [isMetadataLoading, metadataError]);
+
+  const openConnectFlow = useCallback(() => {
+    setOnboardingModalOpen(true);
+  }, [setOnboardingModalOpen]);
+
+  const handleCopyCommand = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(CLI_COMMAND);
+      setCopied(true);
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+      }
+      copyTimerRef.current = setTimeout(() => {
+        setCopied(false);
+        copyTimerRef.current = null;
+      }, 2000);
+    } catch (error) {
+      console.error(error);
+    }
+  }, []);
+
+  const initialPreviewNodes = useMemo<PreviewNodeData[]>(() => {
+    const unconnectedPlugY = showRegionInfo ? 390 : 368;
+
+    if (agentConnected) {
+      return [
+        {
+          id: 'agent',
+          type: 'agentCard',
+          position: { x: 220, y: 360 },
+          sourcePosition: Position.Right,
+          data: {
+            requestCount: recordsCount,
+          },
+        },
+        {
+          id: 'database',
+          type: 'databasePreview',
+          position: { x: 640, y: 360 },
+          targetPosition: Position.Left,
+          data: {
+            tableCount,
+            showRegion: showRegionInfo,
+            region: projectRegion,
+            onOpenDatabase: () => void navigate('/dashboard/database/tables'),
+          },
+        },
+      ];
+    }
+
+    return [
+      {
+        id: 'agent',
+        type: 'agentConnector',
+        position: { x: 552, y: unconnectedPlugY },
+        data: {
+          onOpenConnect: openConnectFlow,
+        },
+      },
+      {
+        id: 'database',
+        type: 'databasePreview',
+        position: { x: 640, y: 364 },
+        data: {
+          tableCount,
+          showRegion: showRegionInfo,
+          region: projectRegion,
+          onOpenDatabase: () => void navigate('/dashboard/database/tables'),
+        },
+      },
+    ];
+  }, [
+    agentConnected,
+    openConnectFlow,
+    recordsCount,
+    tableCount,
+    showRegionInfo,
+    projectRegion,
+    navigate,
+  ]);
+
+  const initialPreviewEdges = useMemo<Edge[]>(() => {
+    if (!agentConnected) {
+      return [];
+    }
+
+    return [
+      {
+        id: 'agent-to-database',
+        source: 'agent',
+        target: 'database',
+        type: 'smoothstep',
+        animated: true,
+        sourceHandle: 'edge-right',
+        targetHandle: 'edge-left',
+        style: {
+          stroke: 'white',
+          strokeWidth: 2,
+          zIndex: 1000,
+        },
+        zIndex: 1000,
+      },
+    ];
+  }, [agentConnected]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialPreviewNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialPreviewEdges);
+
+  useEffect(() => {
+    setNodes(initialPreviewNodes);
+    setEdges(initialPreviewEdges);
+  }, [initialPreviewNodes, initialPreviewEdges, setNodes, setEdges]);
+
+  return (
+    <main className="h-full overflow-hidden bg-semantic-0">
+      <div className="flex h-full flex-col xl:flex-row">
+        <section className="w-full border-b border-[var(--alpha-8)] px-10 py-10 xl:w-[480px] xl:border-b-0 xl:border-r">
+          <div className="mx-auto flex w-full max-w-[400px] flex-col gap-12">
+            <div className="flex flex-col gap-12">
+              <div className="flex items-center gap-2">
+                <h1 className="text-[32px] font-medium leading-8 text-foreground">{projectName}</h1>
+                {showInstanceTypeBadge && (
+                  <Badge
+                    variant="default"
+                    className="h-5 rounded px-2 py-0 text-xs font-medium uppercase text-muted-foreground"
+                  >
+                    {instanceType}
+                  </Badge>
+                )}
+              </div>
+
+              <div className="flex gap-6">
+                <StatusTile
+                  label="Status"
+                  value={projectHealth}
+                  icon={<div className="h-2 w-2 rounded-full bg-emerald-400" />}
+                />
+                <StatusTile
+                  label="Agent"
+                  value={agentConnected ? 'Connected' : 'Not Connected'}
+                  icon={
+                    agentConnected ? (
+                      <CheckCircle className="h-5 w-5 text-primary" />
+                    ) : (
+                      <Plug className="h-5 w-5 text-muted-foreground" />
+                    )
+                  }
+                />
+              </div>
+            </div>
+
+            {agentConnected ? (
+              <div className="grid grid-cols-2 gap-3">
+                <MetricCard
+                  label="User"
+                  value={String(totalUsers ?? 0)}
+                  icon={<User className="h-4 w-4" />}
+                />
+                <MetricCard
+                  label="Database"
+                  value={(metadata?.database.totalSizeInGB ?? 0).toFixed(2)}
+                  unit="GB"
+                  icon={<Database className="h-4 w-4" />}
+                />
+                <MetricCard
+                  label="Storage"
+                  value={(storage?.totalSizeInGB ?? 0).toFixed(2)}
+                  unit="GB"
+                  icon={<HardDrive className="h-4 w-4" />}
+                />
+                <MetricCard
+                  label="Edge Functions"
+                  value={String(metadata?.functions.length ?? 0)}
+                  unit={(metadata?.functions.length ?? 0) === 1 ? 'Function' : 'Functions'}
+                  icon={<Braces className="h-4 w-4" />}
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-3">
+                  <h2 className="text-base font-normal leading-7 text-foreground">
+                    Getting Started
+                  </h2>
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    Run this command to link your agent to this project
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3 rounded border border-[var(--alpha-8)] bg-semantic-0 py-3 pl-6 pr-3">
+                  <div className="flex min-w-0 flex-1 items-center gap-4 font-mono text-sm text-foreground">
+                    <p className="shrink-0">$</p>
+                    <p className="truncate">{CLI_COMMAND}</p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void handleCopyCommand()}
+                    className="h-7 rounded px-3 text-sm font-medium text-[rgb(var(--inverse))]"
+                  >
+                    {copied ? 'Copied' : 'Copy'}
+                  </Button>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="default"
+                  onClick={openConnectFlow}
+                  className="h-9 w-full justify-center gap-2 rounded border-[var(--alpha-8)] bg-card text-sm font-medium"
+                >
+                  <Plug className="h-4 w-4" />
+                  More Options
+                </Button>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="relative min-h-[420px] flex-1 overflow-hidden bg-semantic-0">
+          <div
+            className="absolute inset-0 dark:hidden"
+            style={{
+              backgroundImage: `radial-gradient(circle, rgba(0, 0, 0, 0.12) 1px, transparent 1px)`,
+              backgroundSize: '34px 34px',
+            }}
           />
-        </section>
+          <div
+            className="absolute inset-0 hidden dark:block"
+            style={{
+              backgroundImage: `radial-gradient(circle, rgba(255, 255, 255, 0.10) 1px, transparent 1px)`,
+              backgroundSize: '34px 34px',
+            }}
+          />
 
-        {/* Templates & Components Section */}
-        <section className="flex flex-col gap-6 w-full">
-          <div className="flex flex-col gap-1 w-full">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white tracking-[-0.1px]">
-              Explore Our Platform
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
-              InsForge gives you every backend feature you need. Use the whole platform or just the
-              features you want.
-            </p>
-          </div>
-
-          <div className="flex gap-6 w-full">
-            {/* Sign-in Component Card */}
-            <button
-              onClick={() => void navigate('/dashboard/authentication/auth-methods')}
-              className="flex-1 bg-white dark:bg-[#363636] border border-gray-200 dark:border-[#414141] rounded-lg p-4 flex items-center gap-3 hover:bg-gray-50 hover:border-gray-300 dark:hover:bg-neutral-700 dark:hover:border-[#525252] hover:shadow-sm transition-all group"
+          <div className="relative z-10 h-full w-full">
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              nodeTypes={previewNodeTypes}
+              fitView
+              fitViewOptions={{ padding: 0.6, maxZoom: 1.4, minZoom: 0.6 }}
+              minZoom={0.6}
+              maxZoom={2}
+              nodesConnectable={false}
+              proOptions={{ hideAttribution: true }}
+              className="!bg-transparent"
             >
-              <div className="flex-1 flex items-center gap-4">
-                <div className="bg-gray-100 dark:bg-neutral-800 rounded p-3.5 flex items-center justify-center shrink-0">
-                  <Lock className="w-6 h-6 text-gray-600 dark:text-neutral-400" />
-                </div>
-                <div className="flex flex-col gap-1 items-start text-left">
-                  <p className="text-base text-gray-900 dark:text-white font-normal leading-6">
-                    Authentication
-                  </p>
-                  <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
-                    User Authentication and management
-                  </p>
-                </div>
-              </div>
-              <ChevronRight className="w-5 h-5 text-gray-400 dark:text-neutral-400 shrink-0 group-hover:translate-x-0.5 transition-transform" />
-            </button>
-
-            {/* Database Templates Card */}
-            <button
-              onClick={() => void navigate('/dashboard/database/tables')}
-              className="flex-1 bg-white dark:bg-[#363636] border border-gray-200 dark:border-[#414141] rounded-lg p-4 flex items-center gap-3 hover:bg-gray-50 hover:border-gray-300 dark:hover:bg-neutral-700 dark:hover:border-[#525252] hover:shadow-sm transition-all group"
-            >
-              <div className="flex-1 flex items-center gap-4">
-                <div className="bg-gray-100 dark:bg-neutral-800 rounded p-3.5 flex items-center justify-center shrink-0">
-                  <Database className="w-6 h-6 text-gray-600 dark:text-neutral-400" />
-                </div>
-                <div className="flex flex-col gap-1 items-start text-left">
-                  <p className="text-base text-gray-900 dark:text-white font-normal leading-6">
-                    Database
-                  </p>
-                  <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
-                    Manage your tables and data
-                  </p>
-                </div>
-              </div>
-              <ChevronRight className="w-5 h-5 text-gray-400 dark:text-neutral-400 shrink-0 group-hover:translate-x-0.5 transition-transform" />
-            </button>
-          </div>
-        </section>
-
-        {/* MCP Call Records Section */}
-        <section className="flex flex-col gap-6 w-full">
-          <div className="flex items-center justify-between w-full">
-            <p className="text-xl font-semibold text-gray-900 dark:text-white">MCP Call Records</p>
-            <Button
-              onClick={handleViewMoreClick}
-              className="h-8 px-4 font-medium dark:bg-emerald-300 dark:text-black"
-            >
-              View More
-            </Button>
-          </div>
-
-          <div className={cn('w-full overflow-hidden', !records.length && 'h-60')}>
-            <LogsDataGrid
-              columnDefs={mcpColumns}
-              data={records.slice(0, 5)}
-              emptyState={
-                <div className="h-20 text-sm text-zinc-500 dark:text-zinc-400">
-                  No MCP call records found
-                </div>
-              }
-              noPadding
-            />
+              <VisualizerControls />
+            </ReactFlow>
           </div>
         </section>
       </div>

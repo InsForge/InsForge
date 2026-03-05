@@ -20,6 +20,7 @@ import {
 } from '@insforge/ui';
 import { useApiKey } from '@/lib/hooks/useMetadata';
 import { useHealth } from '@/lib/hooks/useHealth';
+import { useCloudProjectInfo } from '@/lib/hooks/useCloudProjectInfo';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useModal } from '@/lib/contexts/ModalContext';
 import { cn, compareVersions, isIframe, isInsForgeCloudProject } from '@/lib/utils/utils';
@@ -34,13 +35,12 @@ const INFO_FIELD_CLASS =
 export default function SettingsMenuDialog() {
   const { isSettingsDialogOpen, settingsDefaultTab, closeSettingsDialog } = useModal();
   const [activeTab, setActiveTab] = useState<TabType>('info');
-  const [projectName, setProjectName] = useState('');
-  const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [isVersionOutdated, setIsVersionOutdated] = useState(false);
   const [isUpdatingVersion, setIsUpdatingVersion] = useState(false);
 
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
   const { version, isLoading: isVersionLoading } = useHealth();
+  const { projectInfo, isLoading: isProjectInfoLoading } = useCloudProjectInfo();
   const { confirm, confirmDialogProps } = useConfirm();
 
   const isCloud = isInsForgeCloudProject();
@@ -48,6 +48,7 @@ export default function SettingsMenuDialog() {
   const projectUrl = useMemo(() => `${window.location.origin.replace(/\/$/, '')}/`, []);
 
   const maskedApiKey = apiKey ? `ik_${'*'.repeat(22)}` : 'ik_**********************';
+  const latestVersion = projectInfo.latestVersion ?? null;
 
   const sectionTitle = activeTab === 'connect' ? 'Connect Project' : 'Project Information';
 
@@ -66,23 +67,12 @@ export default function SettingsMenuDialog() {
     }
 
     const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'PROJECT_INFO') {
-        if (event.data.name) {
-          setProjectName(event.data.name);
-        }
-
-        if (event.data.latestVersion) {
-          setLatestVersion(event.data.latestVersion);
-        }
-      }
-
       if (event.data?.type === 'VERSION_UPDATE_STARTED') {
         setIsUpdatingVersion(true);
       }
     };
 
     window.addEventListener('message', handleMessage);
-    postMessageToParent({ type: 'REQUEST_PROJECT_INFO' }, '*');
 
     return () => window.removeEventListener('message', handleMessage);
   }, [isCloud, isInIframe]);
@@ -114,7 +104,7 @@ export default function SettingsMenuDialog() {
     postMessageToParent({ type: 'UPDATE_PROJECT_VERSION' }, '*');
   };
 
-  const projectNameDisplay = projectName || 'Project';
+  const projectNameDisplay = projectInfo.name;
 
   return (
     <>
@@ -173,11 +163,13 @@ export default function SettingsMenuDialog() {
                           <div
                             className={cn(
                               INFO_FIELD_CLASS,
-                              isInIframe && !projectName && 'animate-pulse'
+                              isInIframe && isProjectInfoLoading && 'animate-pulse'
                             )}
                           >
                             <span className="truncate">
-                              {isInIframe && !projectName ? 'Loading...' : projectNameDisplay}
+                              {isInIframe && isProjectInfoLoading
+                                ? 'Loading...'
+                                : projectNameDisplay}
                             </span>
                           </div>
                         </div>

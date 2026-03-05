@@ -59,6 +59,19 @@ export const routeChangeEventSchema = z.object({
   path: z.string(),
 });
 
+// Standard cloud project metadata request/response contract.
+export const requestProjectInfoEventSchema = z.object({
+  type: z.literal('REQUEST_PROJECT_INFO'),
+});
+
+export const projectInfoEventSchema = z.object({
+  type: z.literal('PROJECT_INFO'),
+  name: z.string(),
+  instanceType: z.string(),
+  region: z.string(),
+  latestVersion: z.string().optional(),
+});
+
 export const requestInstanceInfoEventSchema = z.object({
   type: z.literal('REQUEST_INSTANCE_INFO'),
 });
@@ -116,6 +129,8 @@ export const cloudEventSchema = z.discriminatedUnion('type', [
   showPlanModalEventSchema,
   authorizationCodeEventSchema,
   routeChangeEventSchema,
+  requestProjectInfoEventSchema,
+  projectInfoEventSchema,
   requestInstanceInfoEventSchema,
   instanceInfoEventSchema,
   requestInstanceTypeChangeEventSchema,
@@ -134,6 +149,8 @@ export type ShowConnectOverlayEvent = z.infer<typeof showConnectOverlayEventSche
 export type ShowPlanModalEvent = z.infer<typeof showPlanModalEventSchema>;
 export type AuthorizationCodeEvent = z.infer<typeof authorizationCodeEventSchema>;
 export type RouteChangeEvent = z.infer<typeof routeChangeEventSchema>;
+export type RequestProjectInfoEvent = z.infer<typeof requestProjectInfoEventSchema>;
+export type ProjectInfoEvent = z.infer<typeof projectInfoEventSchema>;
 export type RequestInstanceInfoEvent = z.infer<typeof requestInstanceInfoEventSchema>;
 export type InstanceInfoEvent = z.infer<typeof instanceInfoEventSchema>;
 export type RequestInstanceTypeChangeEvent = z.infer<typeof requestInstanceTypeChangeEventSchema>;

@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
-import { LogOut, ChevronDown } from 'lucide-react';
+import { LogOut, ChevronDown, Plug } from 'lucide-react';
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@insforge/ui';
 import { Avatar, AvatarFallback, Separator, ThemeSelect } from '@/components';
-import { McpConnectionStatus } from '@/features/onboard';
 import { cn } from '@/lib/utils/utils';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
@@ -114,7 +114,16 @@ export default function AppHeader() {
           <ThemeSelect />
           <Separator className="h-5 mx-2" orientation="vertical" />
           {/* MCP Connection Status */}
-          <McpConnectionStatus onConnectClick={() => setOnboardingModalOpen(true)} />
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => setOnboardingModalOpen(true)}
+            className="gap-1 rounded-[14px] border-[var(--alpha-8)] px-2 [&_svg]:size-4"
+          >
+            <Plug aria-hidden="true" />
+            <span>Connect</span>
+          </Button>
 
           {/* User Profile*/}
           <Separator className="h-5 mx-2" orientation="vertical" />
