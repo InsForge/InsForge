@@ -22,7 +22,7 @@ import InsForgeLogoDark from '@/assets/logos/insforge_dark.svg';
 export default function AppHeader() {
   const { resolvedTheme } = useTheme();
   const { user, logout } = useAuth();
-  const { setOnboardingModalOpen } = useModal();
+  const { setConnectDialogOpen } = useModal();
   const [githubStars, setGithubStars] = useState<number | null>(null);
 
   // Fetch GitHub stars
@@ -118,7 +118,7 @@ export default function AppHeader() {
             type="button"
             variant="secondary"
             size="sm"
-            onClick={() => setOnboardingModalOpen(true)}
+            onClick={() => setConnectDialogOpen(true)}
             className="gap-1 rounded-[14px] border-[var(--alpha-8)] px-2 [&_svg]:size-4"
           >
             <Plug aria-hidden="true" />

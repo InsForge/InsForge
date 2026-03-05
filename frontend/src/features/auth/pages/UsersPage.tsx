@@ -8,7 +8,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@insforge/ui';
-import { ConnectCTA, SelectionClearButton, DeleteActionButton, TableHeader } from '@/components';
+import {
+  DataGridEmptyState,
+  SelectionClearButton,
+  DeleteActionButton,
+  TableHeader,
+} from '@/components';
 import { UsersDataGrid, UserFormDialog } from '@/features/auth/components';
 import { SortColumn } from 'react-data-grid';
 import { UserSchema } from '@insforge/shared-schemas';
@@ -136,9 +141,10 @@ export default function UsersPage() {
   };
 
   const emptyState = (
-    <div className="text-sm text-foreground">
-      {searchQuery ? 'No users match your search criteria' : 'No users found'}. <ConnectCTA />
-    </div>
+    <DataGridEmptyState
+      message="No Users Found"
+      action={{ label: 'Add User', onClick: () => setAddDialogOpen(true) }}
+    />
   );
 
   return (

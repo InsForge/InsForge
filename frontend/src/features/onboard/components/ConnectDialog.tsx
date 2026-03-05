@@ -18,6 +18,7 @@ import { CLISection } from './CLISection';
 import { useApiKey } from '@/lib/hooks/useMetadata';
 import { useAnonToken } from '@/features/auth/hooks/useAnonToken';
 import { cn, getBackendUrl, isInsForgeCloudProject } from '@/lib/utils/utils';
+import { parseCloudEvent } from '@/lib/utils/cloudMessaging';
 import { useModal } from '@/lib/hooks/useModal';
 import DiscordIcon from '@/assets/logos/discord.svg?react';
 
@@ -38,7 +39,7 @@ const CONNECT_TABS: ConnectTab[] = [
 ];
 
 export function ConnectDialog() {
-  const { isOnboardingModalOpen, setOnboardingModalOpen } = useModal();
+  const { isConnectDialogOpen, setConnectDialogOpen } = useModal();
   const [activeTab, setActiveTab] = useState<ConnectTabId>('cli');
   const isCloudProject = isInsForgeCloudProject();
 
@@ -61,17 +62,33 @@ export function ConnectDialog() {
   }, [activeTab, visibleTabs]);
 
   useEffect(() => {
-    if (isOnboardingModalOpen) {
+    if (isConnectDialogOpen) {
       setActiveTab('cli');
     }
-  }, [isOnboardingModalOpen]);
+  }, [isConnectDialogOpen]);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const parsed = parseCloudEvent(event.data);
+      // Cloud host still sends the legacy event name to trigger opening the connect dialog.
+      if (!parsed.ok || parsed.data.type !== 'SHOW_ONBOARDING_OVERLAY') {
+        return;
+      }
+      setConnectDialogOpen(true);
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [setConnectDialogOpen]);
 
   const handleModalClose = (nextOpen: boolean) => {
-    setOnboardingModalOpen(nextOpen);
+    setConnectDialogOpen(nextOpen);
   };
 
   return (
-    <Dialog open={isOnboardingModalOpen} onOpenChange={handleModalClose}>
+    <Dialog open={isConnectDialogOpen} onOpenChange={handleModalClose}>
       <TooltipProvider>
         <DialogContent showCloseButton={false} className="w-[640px] max-w-[640px] gap-0 p-0">
           <div className="border-b border-[var(--alpha-8)] px-4 pt-3">
@@ -159,7 +176,7 @@ export function ConnectDialog() {
               type="button"
               variant="secondary"
               size="default"
-              onClick={() => setOnboardingModalOpen(false)}
+              onClick={() => setConnectDialogOpen(false)}
               className="shrink-0"
             >
               I&apos;ll connect later

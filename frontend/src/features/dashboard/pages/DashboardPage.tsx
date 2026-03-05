@@ -36,8 +36,9 @@ import { useModal } from '@/lib/contexts/ModalContext';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
 import { useUsers } from '@/features/auth';
 
-const CLI_COMMAND = 'npx insforge cli';
+const CLI_COMMAND = 'npx @insforge/cli create';
 const REGION_COUNTRY_CODE_MAP: Record<string, 'us' | 'de' | 'sg'> = {
+  'us-test': 'us',
   'us-east': 'us',
   'us-west': 'us',
   'eu-central': 'de',
@@ -362,7 +363,7 @@ function DashboardLoadingState() {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { setOnboardingModalOpen } = useModal();
+  const { setConnectDialogOpen } = useModal();
   const {
     metadata,
     tables,
@@ -415,8 +416,8 @@ export default function DashboardPage() {
   }, [isMetadataLoading, metadataError]);
 
   const openConnectFlow = useCallback(() => {
-    setOnboardingModalOpen(true);
-  }, [setOnboardingModalOpen]);
+    setConnectDialogOpen(true);
+  }, [setConnectDialogOpen]);
 
   const handleCopyCommand = useCallback(async () => {
     try {

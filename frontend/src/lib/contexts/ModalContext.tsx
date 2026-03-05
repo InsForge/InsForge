@@ -3,8 +3,8 @@ import React, { createContext, useContext, useState, useCallback, ReactNode } fr
 type SettingsTab = 'info' | 'compute' | 'connect';
 
 interface ModalContextType {
-  isOnboardingModalOpen: boolean;
-  setOnboardingModalOpen: (open: boolean) => void;
+  isConnectDialogOpen: boolean;
+  setConnectDialogOpen: (open: boolean) => void;
   isSettingsDialogOpen: boolean;
   settingsDefaultTab: SettingsTab;
   openSettingsDialog: (tab?: SettingsTab) => void;
@@ -26,12 +26,12 @@ interface ModalProviderProps {
 }
 
 export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
-  const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
+  const [isConnectDialogOpen, setIsConnectDialogOpen] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [settingsDefaultTab, setSettingsDefaultTab] = useState<SettingsTab>('info');
 
-  const setOnboardingModalOpen = useCallback((open: boolean) => {
-    setIsOnboardingModalOpen(open);
+  const setConnectDialogOpen = useCallback((open: boolean) => {
+    setIsConnectDialogOpen(open);
   }, []);
 
   const openSettingsDialog = useCallback((tab: SettingsTab = 'info') => {
@@ -44,8 +44,8 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
   }, []);
 
   const value: ModalContextType = {
-    isOnboardingModalOpen,
-    setOnboardingModalOpen,
+    isConnectDialogOpen,
+    setConnectDialogOpen,
     isSettingsDialogOpen,
     settingsDefaultTab,
     openSettingsDialog,
