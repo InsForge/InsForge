@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
 import { ThemeProvider } from '@/lib/contexts/ThemeContext';
-import { ConnectDialog } from '@/features/onboard';
+import { ConnectDialog } from '@/features/connect';
 import { SettingsMenuDialog } from '@/features/dashboard/components';
 import { isIframe } from '@/lib/utils/utils';
 

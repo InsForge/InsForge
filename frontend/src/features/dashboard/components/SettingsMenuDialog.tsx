@@ -4,6 +4,7 @@ import {
   Button,
   CopyButton,
   ConfirmDialog,
+  Input,
   MenuDialog,
   MenuDialogContent,
   MenuDialogSideNav,
@@ -16,6 +17,7 @@ import {
   MenuDialogHeader,
   MenuDialogTitle,
   MenuDialogBody,
+  MenuDialogFooter,
   MenuDialogCloseButton,
 } from '@insforge/ui';
 import { useApiKey } from '@/lib/hooks/useMetadata';
@@ -24,7 +26,7 @@ import { useCloudProjectInfo } from '@/lib/hooks/useCloudProjectInfo';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useModal } from '@/lib/contexts/ModalContext';
 import { cn, compareVersions, isIframe, isInsForgeCloudProject } from '@/lib/utils/utils';
-import { MCPSection, ConnectionStringSection } from '@/features/onboard';
+import { MCPSection, CLISection, ConnectionStringSection } from '@/features/connect';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 
 type TabType = 'info' | 'connect';
@@ -37,6 +39,9 @@ export default function SettingsMenuDialog() {
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [isVersionOutdated, setIsVersionOutdated] = useState(false);
   const [isUpdatingVersion, setIsUpdatingVersion] = useState(false);
+  const [projectName, setProjectName] = useState('');
+  const [projectNameInitialValue, setProjectNameInitialValue] = useState('');
+  const [isProjectNameFocused, setIsProjectNameFocused] = useState(false);
 
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
   const { version, isLoading: isVersionLoading } = useHealth();
@@ -51,15 +56,23 @@ export default function SettingsMenuDialog() {
   const latestVersion = projectInfo.latestVersion ?? null;
 
   const sectionTitle = activeTab === 'connect' ? 'Connect Project' : 'Project Information';
+  const isProjectNameDirty = projectName !== projectNameInitialValue;
+  const showProjectNameActions =
+    isCloud && activeTab === 'info' && (isProjectNameFocused || isProjectNameDirty);
 
   useEffect(() => {
     if (isSettingsDialogOpen) {
+      const cloudProjectName = projectInfo.name ?? '';
       setActiveTab(settingsDefaultTab === 'connect' ? 'connect' : 'info');
+      setProjectName(cloudProjectName);
+      setProjectNameInitialValue(cloudProjectName);
+      setIsProjectNameFocused(false);
       return;
     }
 
     setIsUpdatingVersion(false);
-  }, [isSettingsDialogOpen, settingsDefaultTab]);
+    setIsProjectNameFocused(false);
+  }, [isSettingsDialogOpen, settingsDefaultTab, projectInfo.name]);
 
   useEffect(() => {
     if (!isCloud || !isInIframe) {
@@ -84,6 +97,28 @@ export default function SettingsMenuDialog() {
     }
   }, [version, latestVersion]);
 
+  useEffect(() => {
+    if (!isSettingsDialogOpen || !isCloud || !isInIframe || isProjectInfoLoading) {
+      return;
+    }
+
+    if (isProjectNameDirty || isProjectNameFocused) {
+      return;
+    }
+
+    const cloudProjectName = projectInfo.name ?? '';
+    setProjectName(cloudProjectName);
+    setProjectNameInitialValue(cloudProjectName);
+  }, [
+    isSettingsDialogOpen,
+    isCloud,
+    isInIframe,
+    isProjectInfoLoading,
+    isProjectNameDirty,
+    isProjectNameFocused,
+    projectInfo.name,
+  ]);
+
   const handleDeleteProject = async () => {
     const confirmed = await confirm({
       title: 'Delete Project',
@@ -104,7 +139,19 @@ export default function SettingsMenuDialog() {
     postMessageToParent({ type: 'UPDATE_PROJECT_VERSION' }, '*');
   };
 
-  const projectNameDisplay = projectInfo.name;
+  const handleCancelProjectNameEdit = () => {
+    setProjectName(projectNameInitialValue);
+    setIsProjectNameFocused(false);
+  };
+
+  const handleSaveProjectName = () => {
+    if (!isProjectNameDirty) {
+      return;
+    }
+
+    setProjectNameInitialValue(projectName);
+    setIsProjectNameFocused(false);
+  };
 
   return (
     <>
@@ -160,18 +207,17 @@ export default function SettingsMenuDialog() {
                           <p className="py-1.5 text-sm leading-5 text-foreground">Project Name</p>
                         </div>
                         <div className="flex min-w-0 flex-1 items-start gap-1.5">
-                          <div
+                          <Input
+                            value={isInIframe && isProjectInfoLoading ? 'Loading...' : projectName}
+                            onChange={(event) => setProjectName(event.target.value)}
+                            onFocus={() => setIsProjectNameFocused(true)}
+                            onBlur={() => setIsProjectNameFocused(false)}
+                            disabled={isInIframe && isProjectInfoLoading}
                             className={cn(
-                              INFO_FIELD_CLASS,
-                              isInIframe && isProjectInfoLoading && 'animate-pulse'
+                              'h-8',
+                              isInIframe && isProjectInfoLoading && 'animate-pulse cursor-wait'
                             )}
-                          >
-                            <span className="truncate">
-                              {isInIframe && isProjectInfoLoading
-                                ? 'Loading...'
-                                : projectNameDisplay}
-                            </span>
-                          </div>
+                          />
                         </div>
                       </div>
 
@@ -283,6 +329,26 @@ export default function SettingsMenuDialog() {
 
               {activeTab === 'connect' && (
                 <div className="flex w-full flex-col">
+                  {isCloud && isInIframe && (
+                    <>
+                      <div className="flex items-start gap-6">
+                        <div className="w-[200px] shrink-0">
+                          <p className="py-1.5 text-sm leading-5 text-foreground">CLI</p>
+                          <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
+                            Link this cloud project with InsForge CLI and verify the connection.
+                          </p>
+                        </div>
+                        <div className="flex min-w-0 flex-1 items-start gap-1.5">
+                          <CLISection className="w-full gap-4" />
+                        </div>
+                      </div>
+
+                      <div className="flex h-5 items-center">
+                        <div className="h-px w-full bg-[var(--alpha-8)]" />
+                      </div>
+                    </>
+                  )}
+
                   <div className="flex items-start gap-6">
                     <div className="w-[200px] shrink-0">
                       <p className="py-1.5 text-sm leading-5 text-foreground">MCP</p>
@@ -326,6 +392,26 @@ export default function SettingsMenuDialog() {
                 </div>
               )}
             </MenuDialogBody>
+            {showProjectNameActions && (
+              <MenuDialogFooter className="border-t border-[var(--alpha-8)]">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleCancelProjectNameEdit}
+                  className="h-8 rounded border-[var(--alpha-8)] bg-card px-3 text-sm font-medium"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleSaveProjectName}
+                  disabled={!isProjectNameDirty}
+                  className="h-8 rounded px-3 text-sm font-medium"
+                >
+                  Save
+                </Button>
+              </MenuDialogFooter>
+            )}
           </MenuDialogMain>
         </MenuDialogContent>
       </MenuDialog>

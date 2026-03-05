@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Button } from '@insforge/ui';
 import { Skeleton } from '@/components';
@@ -29,14 +29,13 @@ import {
   useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useMetadata } from '@/lib/hooks/useMetadata';
+import { useApiKey, useMetadata } from '@/lib/hooks/useMetadata';
 import { useCloudProjectInfo } from '@/lib/hooks/useCloudProjectInfo';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { useModal } from '@/lib/contexts/ModalContext';
-import { isInsForgeCloudProject } from '@/lib/utils/utils';
+import { getBackendUrl, isIframe, isInsForgeCloudProject } from '@/lib/utils/utils';
 import { useUsers } from '@/features/auth';
-
-const CLI_COMMAND = 'npx @insforge/cli create';
+import { CLISection, MCPSection } from '@/features/connect';
 const REGION_COUNTRY_CODE_MAP: Record<string, 'us' | 'de' | 'sg'> = {
   'us-test': 'us',
   'us-east': 'us',
@@ -364,6 +363,9 @@ function DashboardLoadingState() {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { setConnectDialogOpen } = useModal();
+  const isCloudProject = isInsForgeCloudProject();
+  const isInIframe = isIframe();
+  const canShowCliGettingStarted = isCloudProject && isInIframe;
   const {
     metadata,
     tables,
@@ -371,6 +373,7 @@ export default function DashboardPage() {
     isLoading: isMetadataLoading,
     error: metadataError,
   } = useMetadata();
+  const { apiKey, isLoading: isApiKeyLoading } = useApiKey({ enabled: !canShowCliGettingStarted });
   const { projectInfo, isLoading: isProjectInfoLoading } = useCloudProjectInfo();
   const { totalUsers } = useUsers();
   const {
@@ -379,21 +382,11 @@ export default function DashboardPage() {
     isLoading: isMcpUsageLoading,
     isFetching: isMcpUsageFetching,
   } = useMcpUsage();
-  const [copied, setCopied] = useState(false);
-  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [previewFitVersion, setPreviewFitVersion] = useState(0);
-
-  useEffect(() => {
-    return () => {
-      if (copyTimerRef.current) {
-        clearTimeout(copyTimerRef.current);
-      }
-    };
-  }, []);
+  const appUrl = getBackendUrl();
 
   const tableCount = tables?.length ?? 0;
   const agentConnected = hasCompletedOnboarding;
-  const isCloudProject = isInsForgeCloudProject();
   const shouldShowLoadingState =
     isMetadataLoading ||
     isMcpUsageLoading ||
@@ -404,6 +397,7 @@ export default function DashboardPage() {
   const showInstanceTypeBadge = isCloudProject && !!instanceType;
   const showRegionInfo = isCloudProject && !!projectInfo.region;
   const projectRegion = projectInfo.region;
+  const displayApiKey = isApiKeyLoading ? 'ik_' + '*'.repeat(32) : apiKey || '';
 
   const projectHealth = useMemo(() => {
     if (metadataError) {
@@ -418,22 +412,6 @@ export default function DashboardPage() {
   const openConnectFlow = useCallback(() => {
     setConnectDialogOpen(true);
   }, [setConnectDialogOpen]);
-
-  const handleCopyCommand = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(CLI_COMMAND);
-      setCopied(true);
-      if (copyTimerRef.current) {
-        clearTimeout(copyTimerRef.current);
-      }
-      copyTimerRef.current = setTimeout(() => {
-        setCopied(false);
-        copyTimerRef.current = null;
-      }, 2000);
-    } catch (error) {
-      console.error(error);
-    }
-  }, []);
 
   const initialPreviewNodes = useMemo<PreviewNodeData[]>(() => {
     const unconnectedPlugY = showRegionInfo ? 390 : 368;
@@ -603,35 +581,17 @@ export default function DashboardPage() {
                     Getting Started
                   </h2>
                   <p className="text-sm leading-6 text-muted-foreground">
-                    Run this command to link your agent to this project
+                    {canShowCliGettingStarted
+                      ? 'Run this command to link your agent to this project'
+                      : 'Use MCP to link your agent to this project'}
                   </p>
                 </div>
 
-                <div className="flex items-center gap-3 rounded border border-[var(--alpha-8)] bg-semantic-0 py-3 pl-6 pr-3">
-                  <div className="flex min-w-0 flex-1 items-center gap-4 font-mono text-sm text-foreground">
-                    <p className="shrink-0">$</p>
-                    <p className="truncate">{CLI_COMMAND}</p>
-                  </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => void handleCopyCommand()}
-                    className="h-7 rounded px-3 text-sm font-medium text-[rgb(var(--inverse))]"
-                  >
-                    {copied ? 'Copied' : 'Copy'}
-                  </Button>
-                </div>
-
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="default"
-                  onClick={openConnectFlow}
-                  className="h-9 w-full justify-center gap-2 rounded border-[var(--alpha-8)] bg-card text-sm font-medium"
-                >
-                  <Plug className="h-4 w-4" />
-                  More Options
-                </Button>
+                {canShowCliGettingStarted ? (
+                  <CLISection />
+                ) : (
+                  <MCPSection apiKey={displayApiKey} appUrl={appUrl} isLoading={isApiKeyLoading} />
+                )}
               </div>
             )}
           </div>

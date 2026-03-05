@@ -43,6 +43,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Ref for pending refresh request (resolves when AUTHORIZATION_CODE is received)
   const pendingRefreshRef = useRef<{
+    requestId: symbol;
+    promise: Promise<boolean>;
     resolve: (success: boolean) => void;
     timeoutId: ReturnType<typeof setTimeout>;
   } | null>(null);
@@ -89,6 +91,47 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     [invalidateAuthQueries]
   );
 
+  const requestAuthorizationCodeFromParent = useCallback((): Promise<boolean> => {
+    if (!isIframe()) {
+      return Promise.resolve(false);
+    }
+
+    if (pendingRefreshRef.current) {
+      return pendingRefreshRef.current.promise;
+    }
+
+    let resolvePromise!: (success: boolean) => void;
+    const promise = new Promise<boolean>((resolve) => {
+      resolvePromise = resolve;
+    });
+
+    const requestId = Symbol('cloud-auth-request');
+    const timeoutId = setTimeout(() => {
+      if (pendingRefreshRef.current?.requestId !== requestId) {
+        return;
+      }
+      pendingRefreshRef.current = null;
+      resolvePromise(false);
+    }, CLOUD_AUTH_TIMEOUT);
+
+    pendingRefreshRef.current = {
+      requestId,
+      promise,
+      timeoutId,
+      resolve: (success: boolean) => {
+        if (pendingRefreshRef.current?.requestId !== requestId) {
+          return;
+        }
+        clearTimeout(timeoutId);
+        pendingRefreshRef.current = null;
+        resolvePromise(success);
+      },
+    };
+
+    postMessageToParent({ type: 'REQUEST_AUTHORIZATION_CODE' });
+    return promise;
+  }, []);
+
   // Handle AUTHORIZATION_CODE from parent window
   const handleAuthorizationCode = useCallback(
     async (code: string, origin: string) => {
@@ -104,9 +147,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // Resolve pending refresh if any
         if (pendingRefreshRef.current) {
-          clearTimeout(pendingRefreshRef.current.timeoutId);
           pendingRefreshRef.current.resolve(success);
-          pendingRefreshRef.current = null;
         }
 
         // Notify parent
@@ -163,19 +204,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const handleRefreshAccessToken = (): Promise<boolean> => {
       if (isIframe()) {
         // In iframe: request new auth code from parent, persistent listener will handle it
-        return new Promise<boolean>((resolve) => {
-          pendingRefreshRef.current = {
-            resolve: (success: boolean) => {
-              pendingRefreshRef.current = null;
-              resolve(success);
-            },
-            timeoutId: setTimeout(() => {
-              pendingRefreshRef.current = null;
-              resolve(false);
-            }, CLOUD_AUTH_TIMEOUT),
-          };
-          postMessageToParent({ type: 'REQUEST_AUTHORIZATION_CODE' });
-        });
+        return requestAuthorizationCodeFromParent();
       } else {
         // Not in iframe: use cookie-based refresh
         return loginService.refreshAccessToken();
@@ -191,7 +220,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         pendingRefreshRef.current = null;
       }
     };
-  }, []);
+  }, [requestAuthorizationCodeFromParent]);
 
   const checkAuthStatus = useCallback(async () => {
     try {

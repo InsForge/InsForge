@@ -17,7 +17,7 @@ import { ConnectionStringSection } from './ConnectionStringSection';
 import { CLISection } from './CLISection';
 import { useApiKey } from '@/lib/hooks/useMetadata';
 import { useAnonToken } from '@/features/auth/hooks/useAnonToken';
-import { cn, getBackendUrl, isInsForgeCloudProject } from '@/lib/utils/utils';
+import { cn, getBackendUrl, isIframe, isInsForgeCloudProject } from '@/lib/utils/utils';
 import { parseCloudEvent } from '@/lib/utils/cloudMessaging';
 import { useModal } from '@/lib/hooks/useModal';
 import DiscordIcon from '@/assets/logos/discord.svg?react';
@@ -32,7 +32,7 @@ interface ConnectTab {
 }
 
 const CONNECT_TABS: ConnectTab[] = [
-  { id: 'cli', label: 'CLI', showRecommended: true },
+  { id: 'cli', label: 'CLI', showRecommended: true, cloudOnly: true },
   { id: 'mcp', label: 'MCP' },
   { id: 'connection-string', label: 'Connection String', cloudOnly: true },
   { id: 'api-keys', label: 'API Keys' },
@@ -40,16 +40,23 @@ const CONNECT_TABS: ConnectTab[] = [
 
 export function ConnectDialog() {
   const { isConnectDialogOpen, setConnectDialogOpen } = useModal();
-  const [activeTab, setActiveTab] = useState<ConnectTabId>('cli');
   const isCloudProject = isInsForgeCloudProject();
+  const canShowCli = isCloudProject && isIframe();
+  const [activeTab, setActiveTab] = useState<ConnectTabId>(canShowCli ? 'cli' : 'mcp');
 
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
   const { accessToken: anonKey, isLoading: isAnonKeyLoading } = useAnonToken();
   const isApiCredentialsLoading = isApiKeyLoading || isAnonKeyLoading;
   const appUrl = getBackendUrl();
   const visibleTabs = useMemo(
-    () => CONNECT_TABS.filter((tab) => isCloudProject || !tab.cloudOnly),
-    [isCloudProject]
+    () =>
+      CONNECT_TABS.filter((tab) => {
+        if (tab.id === 'cli') {
+          return canShowCli;
+        }
+        return isCloudProject || !tab.cloudOnly;
+      }),
+    [canShowCli, isCloudProject]
   );
 
   const displayApiKey = isApiKeyLoading ? 'ik_' + '*'.repeat(32) : apiKey || '';
@@ -63,9 +70,9 @@ export function ConnectDialog() {
 
   useEffect(() => {
     if (isConnectDialogOpen) {
-      setActiveTab('cli');
+      setActiveTab(canShowCli ? 'cli' : 'mcp');
     }
-  }, [isConnectDialogOpen]);
+  }, [canShowCli, isConnectDialogOpen]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -105,7 +112,7 @@ export function ConnectDialog() {
                         variant="ghost"
                         onClick={() => setActiveTab(tab.id)}
                         className={cn(
-                          'relative h-auto shrink-0 rounded-none px-0 pb-3 pt-0 text-[13px] leading-[18px] transition-colors before:hidden hover:bg-transparent',
+                          'relative h-auto shrink-0 rounded-none px-0 pb-3 pt-0 text-[13px] leading-[18px] transition-colors before:hidden hover:bg-transparent focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0',
                           isActive
                             ? 'text-foreground'
                             : 'text-muted-foreground hover:text-foreground'
@@ -138,7 +145,7 @@ export function ConnectDialog() {
           </div>
 
           <DialogBody className="max-h-[60dvh] overflow-y-auto p-4">
-            {activeTab === 'cli' && <CLISection />}
+            {canShowCli && activeTab === 'cli' && <CLISection />}
             {activeTab === 'mcp' && (
               <MCPSection
                 apiKey={displayApiKey}

@@ -11,7 +11,7 @@ import {
 import { CursorDeeplinkGenerator } from './mcp/CursorDeeplinkGenerator';
 import { QoderDeeplinkGenerator } from './mcp/QoderDeeplinkGenerator';
 import { MCP_AGENTS, GenerateInstallCommand, createMCPConfig, type MCPAgent } from './mcp/helpers';
-import { VERIFY_CONNECTION_PROMPT } from '../constants';
+import { MCP_VERIFY_CONNECTION_PROMPT } from '../constants';
 import { cn } from '@/lib/utils/utils';
 
 interface MCPSectionProps {
@@ -151,7 +151,17 @@ export function MCPSection({
             Send the prompt below to your AI coding agent to verify the connection.
           </p>
         </div>
-        <CodeBlock code={VERIFY_CONNECTION_PROMPT} label="prompt" className="bg-semantic-0" />
+        <div className="flex flex-col gap-2 rounded border border-[var(--alpha-8)] bg-semantic-0 p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex h-5 items-center rounded bg-[var(--alpha-8)] px-2">
+              <span className="text-xs font-medium leading-4 text-muted-foreground">prompt</span>
+            </div>
+            <CopyButton text={MCP_VERIFY_CONNECTION_PROMPT} showText={false} className="shrink-0" />
+          </div>
+          <p className="font-mono text-sm leading-6 text-foreground">
+            {MCP_VERIFY_CONNECTION_PROMPT}
+          </p>
+        </div>
       </div>
     </div>
   );
