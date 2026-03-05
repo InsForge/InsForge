@@ -130,7 +130,7 @@ router.get('/api-key', async (req: AuthRequest, res: Response, next: NextFunctio
 });
 
 // Get backend project id from environment (admin only)
-router.get('/project-id', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/project-id', (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const projectIdResponse: ProjectIdResponse = {
       projectId: process.env.PROJECT_ID || null,
