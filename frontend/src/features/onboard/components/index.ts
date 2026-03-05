@@ -1,12 +1,8 @@
 export * from './mcp';
-export { ConnectDialog, getOnboardingSkipped, setOnboardingSkipped } from './ConnectDialog';
-export { OnboardingOverlay } from './OnboardingOverlay';
+export { ConnectDialog } from './ConnectDialog';
 export { VideoDemoModal } from './VideoDemoModal';
 export { MCPSection } from './MCPSection';
 export { CLISection } from './CLISection';
 export { APIKeysSection } from './APIKeysSection';
 export { ConnectionStringSection } from './ConnectionStringSection';
 export { ShowPasswordButton } from './ShowPasswordButton';
-export { OnboardingController } from './OnboardingController';
-export { HelpSection } from './HelpSection';
-export { OnboardingStep } from './OnboardingStep';

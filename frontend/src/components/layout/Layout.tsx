@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
 import { ThemeProvider } from '@/lib/contexts/ThemeContext';
-import { ConnectDialog, OnboardingOverlay } from '@/features/onboard';
+import { ConnectDialog } from '@/features/onboard';
 import { SettingsMenuDialog } from '@/features/dashboard/components';
 import { isIframe } from '@/lib/utils/utils';
 
@@ -26,10 +26,7 @@ export default function Layout({ children }: LayoutProps) {
         {/* Main layout - sidebars + content in flexbox */}
         <div className="flex-1 flex overflow-hidden">
           <AppSidebar isCollapsed={sidebarCollapsed} onToggleCollapse={handleToggleCollapse} />
-          <main className="flex-1 overflow-y-auto relative">
-            {children}
-            <OnboardingOverlay />
-          </main>
+          <main className="flex-1 overflow-y-auto relative">{children}</main>
         </div>
       </div>
       <ConnectDialog />

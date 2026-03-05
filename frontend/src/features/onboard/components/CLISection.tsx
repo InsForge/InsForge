@@ -2,7 +2,7 @@ import { CopyButton } from '@insforge/ui';
 import { VERIFY_CONNECTION_PROMPT } from '../constants';
 import { cn } from '@/lib/utils/utils';
 
-const CLI_INSTALL_COMMAND = 'npx insforge cli';
+const CLI_INSTALL_COMMAND = 'npx @insforge/cli create';
 
 interface CLISectionProps {
   className?: string;

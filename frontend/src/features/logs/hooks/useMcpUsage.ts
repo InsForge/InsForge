@@ -42,6 +42,7 @@ export function useMcpUsage(options: UseMcpUsageOptions = {}) {
   const {
     data: records = [],
     isLoading,
+    isFetching,
     error,
     refetch,
   } = useQuery<McpUsageRecord[]>({
@@ -127,6 +128,7 @@ export function useMcpUsage(options: UseMcpUsageOptions = {}) {
 
     // Loading states
     isLoading,
+    isFetching,
     error,
 
     // Actions

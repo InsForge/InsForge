@@ -21,7 +21,6 @@ import { cn, getBackendUrl, isInsForgeCloudProject } from '@/lib/utils/utils';
 import { useModal } from '@/lib/hooks/useModal';
 import DiscordIcon from '@/assets/logos/discord.svg?react';
 
-const ONBOARDING_SKIPPED_KEY = 'insforge_onboarding_skipped';
 type ConnectTabId = 'cli' | 'mcp' | 'connection-string' | 'api-keys';
 
 interface ConnectTab {
@@ -37,18 +36,6 @@ const CONNECT_TABS: ConnectTab[] = [
   { id: 'connection-string', label: 'Connection String', cloudOnly: true },
   { id: 'api-keys', label: 'API Keys' },
 ];
-
-export function getOnboardingSkipped(): boolean {
-  return localStorage.getItem(ONBOARDING_SKIPPED_KEY) === 'true';
-}
-
-export function setOnboardingSkipped(skipped: boolean): void {
-  if (skipped) {
-    localStorage.setItem(ONBOARDING_SKIPPED_KEY, 'true');
-  } else {
-    localStorage.removeItem(ONBOARDING_SKIPPED_KEY);
-  }
-}
 
 export function ConnectDialog() {
   const { isOnboardingModalOpen, setOnboardingModalOpen } = useModal();
@@ -79,15 +66,8 @@ export function ConnectDialog() {
     }
   }, [isOnboardingModalOpen]);
 
-  const handleSkipOnboarding = () => {
-    setOnboardingSkipped(true);
-    setOnboardingModalOpen(false);
-  };
-
   const handleModalClose = (nextOpen: boolean) => {
-    if (!nextOpen) {
-      handleSkipOnboarding();
-    }
+    setOnboardingModalOpen(nextOpen);
   };
 
   return (
@@ -179,7 +159,7 @@ export function ConnectDialog() {
               type="button"
               variant="secondary"
               size="default"
-              onClick={handleSkipOnboarding}
+              onClick={() => setOnboardingModalOpen(false)}
               className="shrink-0"
             >
               I&apos;ll connect later

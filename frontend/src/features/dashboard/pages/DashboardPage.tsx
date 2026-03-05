@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Button } from '@insforge/ui';
+import { Skeleton } from '@/components';
 import {
   Braces,
   CheckCircle,
@@ -36,6 +37,13 @@ import { isInsForgeCloudProject } from '@/lib/utils/utils';
 import { useUsers } from '@/features/auth';
 
 const CLI_COMMAND = 'npx insforge cli';
+const REGION_COUNTRY_CODE_MAP: Record<string, 'us' | 'de' | 'sg'> = {
+  'us-east': 'us',
+  'us-west': 'us',
+  'eu-central': 'de',
+  'ap-southeast': 'sg',
+};
+const PREVIEW_FIT_VIEW_OPTIONS = { padding: 0.6, maxZoom: 1.4, minZoom: 0.6 } as const;
 
 type DatabasePreviewData = {
   tableCount: number;
@@ -57,18 +65,15 @@ type AgentCardNodeType = Node<AgentCardData, 'agentCard'>;
 type DatabasePreviewNodeType = Node<DatabasePreviewData, 'databasePreview'>;
 type PreviewNodeData = AgentConnectorNodeType | AgentCardNodeType | DatabasePreviewNodeType;
 
-function UsFlagIcon() {
-  return (
-    <div
-      className="relative h-3 w-[18px] overflow-hidden rounded-[1px] border border-[var(--alpha-8)]"
-      style={{
-        backgroundImage:
-          'repeating-linear-gradient(to bottom, #D5385A 0px, #D5385A 1px, #FFFFFF 1px, #FFFFFF 2px)',
-      }}
-    >
-      <div className="absolute left-0 top-0 h-[7px] w-[7px] bg-[#2A4A9B]" />
-    </div>
-  );
+function getFlagUrlByRegion(region?: string): string | undefined {
+  if (!region) {
+    return undefined;
+  }
+  const countryCode = REGION_COUNTRY_CODE_MAP[region.toLowerCase()];
+  if (!countryCode) {
+    return undefined;
+  }
+  return `https://flagcdn.com/h20/${countryCode}.webp`;
 }
 
 function AgentConnectorNode({ data }: NodeProps<AgentConnectorNodeType>) {
@@ -120,6 +125,7 @@ function AgentCardNode({ data }: NodeProps<AgentCardNodeType>) {
 
 function DatabasePreviewNode({ data }: NodeProps<DatabasePreviewNodeType>) {
   const tableLabel = `${data.tableCount} ${data.tableCount === 1 ? 'table' : 'tables'} created`;
+  const flagUrl = getFlagUrlByRegion(data.region);
   const hasRegionRow = data.showRegion && !!data.region;
 
   return (
@@ -158,7 +164,13 @@ function DatabasePreviewNode({ data }: NodeProps<DatabasePreviewNodeType>) {
 
       {hasRegionRow && (
         <div className="flex items-center gap-2 px-3 py-3">
-          <UsFlagIcon />
+          {flagUrl && (
+            <img
+              src={flagUrl}
+              alt=""
+              className="h-3 w-[18px] rounded-[1px] border border-[var(--alpha-8)] object-cover"
+            />
+          )}
           <p className="truncate text-[13px] leading-[18px] text-muted-foreground">{data.region}</p>
         </div>
       )}
@@ -202,7 +214,7 @@ function VisualizerControls() {
           type="button"
           variant="ghost"
           size="icon-sm"
-          onClick={() => void fitView({ duration: 250, padding: 0.45 })}
+          onClick={() => void fitView({ ...PREVIEW_FIT_VIEW_OPTIONS, duration: 250 })}
           className="h-7 w-7 rounded-none text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground"
           aria-label="Fit view"
         >
@@ -211,6 +223,30 @@ function VisualizerControls() {
       </div>
     </Panel>
   );
+}
+
+interface VisualizerAutoFitProps {
+  fitVersion: number;
+}
+
+function VisualizerAutoFit({ fitVersion }: VisualizerAutoFitProps) {
+  const { fitView } = useReactFlow();
+
+  useEffect(() => {
+    if (fitVersion === 0) {
+      return;
+    }
+
+    const rafId = window.requestAnimationFrame(() => {
+      void fitView({ ...PREVIEW_FIT_VIEW_OPTIONS, duration: 250 });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+    };
+  }, [fitVersion, fitView]);
+
+  return null;
 }
 
 interface StatusTileProps {
@@ -258,6 +294,72 @@ function MetricCard({ label, value, unit, icon }: MetricCardProps) {
   );
 }
 
+function DashboardLoadingState() {
+  return (
+    <main className="h-full overflow-hidden bg-semantic-0">
+      <div className="flex h-full flex-col xl:flex-row">
+        <section className="w-full border-b border-[var(--alpha-8)] px-10 py-10 xl:w-[480px] xl:border-b-0 xl:border-r">
+          <div className="mx-auto flex w-full max-w-[400px] flex-col gap-12">
+            <div className="flex flex-col gap-12">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-8 w-56" />
+                <Skeleton className="h-5 w-16 rounded" />
+              </div>
+              <div className="flex gap-6">
+                <div className="flex flex-1 items-center gap-3">
+                  <Skeleton className="h-12 w-12 rounded" />
+                  <div className="flex flex-1 flex-col gap-2">
+                    <Skeleton className="h-3 w-14" />
+                    <Skeleton className="h-5 w-24" />
+                  </div>
+                </div>
+                <div className="flex flex-1 items-center gap-3">
+                  <Skeleton className="h-12 w-12 rounded" />
+                  <div className="flex flex-1 flex-col gap-2">
+                    <Skeleton className="h-3 w-14" />
+                    <Skeleton className="h-5 w-24" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Skeleton className="h-[120px]" />
+              <Skeleton className="h-[120px]" />
+              <Skeleton className="h-[120px]" />
+              <Skeleton className="h-[120px]" />
+            </div>
+          </div>
+        </section>
+
+        <section className="relative min-h-[420px] flex-1 overflow-hidden bg-semantic-0">
+          <div
+            className="absolute inset-0 dark:hidden"
+            style={{
+              backgroundImage: `radial-gradient(circle, rgba(0, 0, 0, 0.12) 1px, transparent 1px)`,
+              backgroundSize: '34px 34px',
+            }}
+          />
+          <div
+            className="absolute inset-0 hidden dark:block"
+            style={{
+              backgroundImage: `radial-gradient(circle, rgba(255, 255, 255, 0.10) 1px, transparent 1px)`,
+              backgroundSize: '34px 34px',
+            }}
+          />
+          <div className="relative z-10 flex h-full items-center justify-center">
+            <div className="flex items-center gap-12">
+              <Skeleton className="h-[92px] w-[240px] rounded-lg border border-[var(--alpha-8)]" />
+              <Skeleton className="h-[2px] w-[120px]" />
+              <Skeleton className="h-[92px] w-[240px] rounded-lg border border-[var(--alpha-8)]" />
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
+
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { setOnboardingModalOpen } = useModal();
@@ -268,11 +370,17 @@ export default function DashboardPage() {
     isLoading: isMetadataLoading,
     error: metadataError,
   } = useMetadata();
-  const { projectInfo } = useCloudProjectInfo();
+  const { projectInfo, isLoading: isProjectInfoLoading } = useCloudProjectInfo();
   const { totalUsers } = useUsers();
-  const { hasCompletedOnboarding, recordsCount } = useMcpUsage();
+  const {
+    hasCompletedOnboarding,
+    recordsCount,
+    isLoading: isMcpUsageLoading,
+    isFetching: isMcpUsageFetching,
+  } = useMcpUsage();
   const [copied, setCopied] = useState(false);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [previewFitVersion, setPreviewFitVersion] = useState(0);
 
   useEffect(() => {
     return () => {
@@ -285,6 +393,11 @@ export default function DashboardPage() {
   const tableCount = tables?.length ?? 0;
   const agentConnected = hasCompletedOnboarding;
   const isCloudProject = isInsForgeCloudProject();
+  const shouldShowLoadingState =
+    isMetadataLoading ||
+    isMcpUsageLoading ||
+    isMcpUsageFetching ||
+    (isCloudProject && isProjectInfoLoading);
   const projectName = isCloudProject ? projectInfo.name : 'My InsForge Project';
   const instanceType = projectInfo.instanceType?.toUpperCase();
   const showInstanceTypeBadge = isCloudProject && !!instanceType;
@@ -327,7 +440,7 @@ export default function DashboardPage() {
     if (agentConnected) {
       return [
         {
-          id: 'agent',
+          id: 'agent-card',
           type: 'agentCard',
           position: { x: 220, y: 360 },
           sourcePosition: Position.Right,
@@ -352,7 +465,7 @@ export default function DashboardPage() {
 
     return [
       {
-        id: 'agent',
+        id: 'agent-connector',
         type: 'agentConnector',
         position: { x: 552, y: unconnectedPlugY },
         data: {
@@ -389,7 +502,7 @@ export default function DashboardPage() {
     return [
       {
         id: 'agent-to-database',
-        source: 'agent',
+        source: 'agent-card',
         target: 'database',
         type: 'smoothstep',
         animated: true,
@@ -411,7 +524,12 @@ export default function DashboardPage() {
   useEffect(() => {
     setNodes(initialPreviewNodes);
     setEdges(initialPreviewEdges);
+    setPreviewFitVersion((current) => current + 1);
   }, [initialPreviewNodes, initialPreviewEdges, setNodes, setEdges]);
+
+  if (shouldShowLoadingState) {
+    return <DashboardLoadingState />;
+  }
 
   return (
     <main className="h-full overflow-hidden bg-semantic-0">
@@ -542,13 +660,14 @@ export default function DashboardPage() {
               onEdgesChange={onEdgesChange}
               nodeTypes={previewNodeTypes}
               fitView
-              fitViewOptions={{ padding: 0.6, maxZoom: 1.4, minZoom: 0.6 }}
+              fitViewOptions={PREVIEW_FIT_VIEW_OPTIONS}
               minZoom={0.6}
               maxZoom={2}
               nodesConnectable={false}
               proOptions={{ hideAttribution: true }}
               className="!bg-transparent"
             >
+              <VisualizerAutoFit fitVersion={previewFitVersion} />
               <VisualizerControls />
             </ReactFlow>
           </div>
