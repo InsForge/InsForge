@@ -75,12 +75,13 @@ function TableItem({ table, isSelected, onSelect, onEdit, onDelete }: TableItemP
             <Button
               variant="ghost"
               size="icon-sm"
+              aria-label="Row actions"
               className={cn(
                 'h-6 w-6 rounded p-0',
                 'hover:before:bg-transparent active:before:bg-transparent',
                 isSelected
                   ? 'text-muted-foreground/50 opacity-100'
-                  : 'text-muted-foreground/40 opacity-0 group-hover:opacity-100'
+                  : 'text-muted-foreground/40 opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
               )}
             >
               <MoreVertical className="h-4 w-4" />

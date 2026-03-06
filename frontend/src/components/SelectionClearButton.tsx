@@ -22,6 +22,7 @@ export function SelectionClearButton({
       className="h-8 w-8 border border-[var(--alpha-8)] text-muted-foreground hover:text-foreground"
       onClick={() => onClear()}
       title={`Clear selection (${displayText})`}
+      aria-label={`Clear selection (${displayText})`}
     >
       <X strokeWidth={1.5} className="h-4 w-4" />
     </Button>

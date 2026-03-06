@@ -49,6 +49,11 @@
   box-shadow: none;
 }
 
+.rdg-cell[aria-selected='true']:focus {
+  outline: 2px solid rgb(var(--primary));
+  outline-offset: -2px;
+}
+
 /* Disable selection styling for disabled cells in link record dialog */
 .rdg-cell.link-record-dialog-disabled-cell[aria-selected='true'] {
   outline: none !important;

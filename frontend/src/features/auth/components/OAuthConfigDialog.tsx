@@ -209,12 +209,13 @@ export function OAuthConfigDialog({
                       control={form.control}
                       render={({ field }) => (
                         <Switch
+                          id="shared-keys-toggle"
                           checked={field.value}
                           onCheckedChange={(value) => field.onChange(value)}
                         />
                       )}
                     />
-                    <span className="text-sm font-medium text-foreground">Shared Keys</span>
+                    <label htmlFor="shared-keys-toggle" className="text-sm font-medium text-foreground cursor-pointer">Shared Keys</label>
                   </div>
                 )}
 
@@ -258,16 +259,18 @@ export function OAuthConfigDialog({
               {!useSharedKey && (
                 <div className="space-y-4 border-t border-border p-6">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-foreground">Client ID</label>
+                    <label htmlFor="oauth-client-id" className="text-sm font-medium text-foreground">Client ID</label>
                     <Input
+                      id="oauth-client-id"
                       type="text"
                       {...form.register('clientId')}
                       placeholder={`Enter ${provider?.name} Client ID`}
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-foreground">Client Secret</label>
+                    <label htmlFor="oauth-client-secret" className="text-sm font-medium text-foreground">Client Secret</label>
                     <Input
+                      id="oauth-client-secret"
                       type="password"
                       {...form.register('clientSecret')}
                       placeholder={`Enter ${provider?.name} Client Secret`}

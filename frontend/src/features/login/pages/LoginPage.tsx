@@ -133,7 +133,7 @@ export default function LoginPage() {
 
               {/* Error */}
               {submitError && (
-                <div className="flex items-start gap-2.5 rounded-lg bg-alpha-4 border border-destructive/30 px-3 py-2.5">
+                <div role="alert" className="flex items-start gap-2.5 rounded-lg bg-alpha-4 border border-destructive/30 px-3 py-2.5">
                   <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />
                   <p className="text-sm text-destructive">{submitError}</p>
                 </div>

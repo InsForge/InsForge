@@ -22,8 +22,10 @@ export function MessageRow({ message, isLast, className }: MessageRowProps) {
       )}
     >
       {/* Row */}
-      <div
-        className="flex items-center cursor-pointer hover:bg-[var(--alpha-4)] transition-colors"
+      <button
+        type="button"
+        aria-expanded={expanded}
+        className="flex w-full items-center cursor-pointer hover:bg-[var(--alpha-4)] transition-colors text-left"
         onClick={() => setExpanded((prev) => !prev)}
       >
         {/* Chevron */}
@@ -86,7 +88,7 @@ export function MessageRow({ message, isLast, className }: MessageRowProps) {
             {formatTime(message.createdAt)}
           </span>
         </div>
-      </div>
+      </button>
 
       {/* Expanded payload */}
       {expanded && (

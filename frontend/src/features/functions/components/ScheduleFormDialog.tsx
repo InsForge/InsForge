@@ -434,8 +434,10 @@ export function ScheduleFormDialog({
                           value={inputValue}
                           nullable
                           onChange={(v) => {
-                            if (v === 'null') { field.onChange(null); }
-                            else { field.onChange(JSON.parse(v)); }
+                            try {
+                              if (v === 'null') { field.onChange(null); }
+                              else { field.onChange(JSON.parse(v)); }
+                            } catch { /* InlineJsonEditor validates before calling onChange */ }
                           }}
                           onCancel={() => setEditingField(null)}
                         />
@@ -478,8 +480,10 @@ export function ScheduleFormDialog({
                           value={inputValue}
                           nullable
                           onChange={(v) => {
-                            if (v === 'null') { field.onChange(null); }
-                            else { field.onChange(JSON.parse(v)); }
+                            try {
+                              if (v === 'null') { field.onChange(null); }
+                              else { field.onChange(JSON.parse(v)); }
+                            } catch { /* InlineJsonEditor validates before calling onChange */ }
                           }}
                           onCancel={() => setEditingField(null)}
                         />

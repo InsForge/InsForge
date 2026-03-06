@@ -15,18 +15,20 @@ export default function RedirectUrlPage() {
   }, [config]);
 
   const handleSave = () => {
-    updateConfig({
-      requireEmailVerification: config?.requireEmailVerification ?? false,
-      passwordMinLength: config?.passwordMinLength ?? 6,
-      requireNumber: config?.requireNumber ?? false,
-      requireLowercase: config?.requireLowercase ?? false,
-      requireUppercase: config?.requireUppercase ?? false,
-      requireSpecialChar: config?.requireSpecialChar ?? false,
-      verifyEmailMethod: config?.verifyEmailMethod ?? 'code',
-      resetPasswordMethod: config?.resetPasswordMethod ?? 'code',
-      signInRedirectTo: redirectUrl.trim() || null,
-    });
-    setIsDirty(false);
+    updateConfig(
+      {
+        requireEmailVerification: config?.requireEmailVerification ?? false,
+        passwordMinLength: config?.passwordMinLength ?? 6,
+        requireNumber: config?.requireNumber ?? false,
+        requireLowercase: config?.requireLowercase ?? false,
+        requireUppercase: config?.requireUppercase ?? false,
+        requireSpecialChar: config?.requireSpecialChar ?? false,
+        verifyEmailMethod: config?.verifyEmailMethod ?? 'code',
+        resetPasswordMethod: config?.resetPasswordMethod ?? 'code',
+        signInRedirectTo: redirectUrl.trim() || null,
+      },
+      { onSuccess: () => setIsDirty(false) }
+    );
   };
 
   if (isLoading) {

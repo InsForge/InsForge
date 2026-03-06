@@ -89,7 +89,9 @@ export default function AppHeader() {
           )}
         </a>
 
-        <Separator className="h-4 mx-2" orientation="vertical" />
+        {!isMcpLoading && (
+          <Separator className="h-4 mx-2" orientation="vertical" />
+        )}
 
         {/* MCP connection status */}
         {!isMcpLoading && (

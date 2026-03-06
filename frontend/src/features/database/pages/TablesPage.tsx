@@ -434,7 +434,7 @@ export default function TablesPage() {
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button className="h-8 px-2.5" disabled={isImporting}>
+                          <Button className="h-8 px-2.5">
                             Add record
                             <ChevronDown strokeWidth={1.5} className="h-3.5 w-3.5 opacity-60" />
                           </Button>
@@ -442,14 +442,14 @@ export default function TablesPage() {
                         <DropdownMenuContent align="start" className="w-48" sideOffset={6}>
                           <DropdownMenuItem
                             className="cursor-pointer [&_svg]:size-3.5"
-                            onClick={() => setShowRecordForm(true)}
+                            onSelect={() => setShowRecordForm(true)}
                           >
                             <Plus strokeWidth={1.5} />
                             Add record
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="cursor-pointer [&_svg]:size-3.5"
-                            onClick={() => fileInputRef.current?.click()}
+                            onSelect={() => fileInputRef.current?.click()}
                             disabled={isImporting}
                           >
                             <FileUp strokeWidth={1.5} />

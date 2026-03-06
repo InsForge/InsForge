@@ -184,6 +184,7 @@ export default function UsersPage() {
                     size="icon"
                     onClick={() => void handleRefresh()}
                     disabled={isRefreshing}
+                    aria-label={isRefreshing ? 'Refreshing users' : 'Refresh users'}
                   >
                     <RefreshCw
                       strokeWidth={1.5}

@@ -17,6 +17,7 @@ export interface PaginationProps extends React.HTMLAttributes<HTMLDivElement> {
   totalRecords?: number;
   pageSize?: number;
   recordLabel?: string;
+  recordLabelSingular?: string;
   visiblePageCount?: number;
   onPageChange?: (page: number) => void;
 }
@@ -64,6 +65,7 @@ export function Pagination({
   totalRecords = 0,
   pageSize = 100,
   recordLabel = 'users',
+  recordLabelSingular,
   visiblePageCount = FIXED_CENTER_SLOT_COUNT,
   onPageChange,
   ...props
@@ -105,7 +107,7 @@ export function Pagination({
       {...props}
     >
       <p className="min-w-0 flex-1 truncate text-xs font-medium leading-[18px] text-muted-foreground">
-        {endRecord} of {totalRecords} {totalRecords === 1 ? recordLabel.replace(/s$/, '') : recordLabel}
+        {endRecord} of {totalRecords} {totalRecords === 1 ? (recordLabelSingular ?? recordLabel.replace(/s$/, '')) : recordLabel}
       </p>
       <nav className="flex items-center gap-1" aria-label="Pagination">
         <button
