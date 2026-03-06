@@ -1,5 +1,12 @@
 # Changelog
 
+# [2.0.0](https://github.com/InsForge/insforge/compare/v1.5.9-ui-6...v2.0.0) (2026-03-06)
+
+
+### Bug Fixes
+
+* fix linking unnecessary contents in docs ([0edcb03](https://github.com/InsForge/insforge/commit/0edcb03a0aa3d05bd41160b193a358a1dfd0e58e))
+
 ## [1.5.8](https://github.com/InsForge/insforge/compare/v1.5.8-admin...v1.5.8) (2026-02-27)
 
 
