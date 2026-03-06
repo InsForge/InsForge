@@ -48,7 +48,7 @@ export function SecretRow({ secret, onDelete, className, isLast }: SecretRowProp
             variant="ghost"
             size="icon"
             onClick={handleDeleteClick}
-            className="size-8 p-1.5 text-muted-foreground hover:text-foreground hover:bg-[var(--alpha-8)] opacity-0 group-hover:opacity-100 transition-opacity"
+            className="size-8 p-1.5 text-muted-foreground hover:text-foreground hover:bg-[var(--alpha-8)] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
             title="Delete secret"
           >
             <Trash2 className="w-5 h-5" />

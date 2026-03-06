@@ -166,11 +166,7 @@ export default function PoliciesPage() {
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <DatabaseStudioSidebar
-        onBack={() =>
-          void navigate('/dashboard/database/tables', { state: { slideFromStudio: true } })
-        }
-      />
+      <DatabaseStudioSidebar />
       <div className="min-w-0 flex-1 flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
         <TableHeader
           title="RLS Policies"
@@ -185,7 +181,7 @@ export default function PoliciesPage() {
                     onClick={() => void handleRefresh()}
                     disabled={isRefreshing}
                   >
-                    <RefreshIcon className={isRefreshing ? '!size-3.5 animate-spin' : '!size-3.5'} />
+                    <RefreshIcon className={isRefreshing ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" align="center">

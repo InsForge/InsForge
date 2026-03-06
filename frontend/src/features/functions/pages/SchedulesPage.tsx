@@ -60,29 +60,22 @@ export default function SchedulesPage() {
     setSearchQuery(value);
   }, []);
 
+  const matchesSearch = useCallback(
+    (s: (typeof schedules)[0]) =>
+      s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.functionUrl.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.cronSchedule.toLowerCase().includes(searchQuery.toLowerCase()),
+    [searchQuery]
+  );
+
   const filteredSchedules = useMemo(() => {
-    const filtered = searchQuery
-      ? schedules.filter(
-          (s) =>
-            s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            s.functionUrl.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            s.functionUrl.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-      : schedules;
+    const filtered = searchQuery ? schedules.filter(matchesSearch) : schedules;
     const offset = (currentPage - 1) * PAGE_SIZE;
     return filtered.slice(offset, offset + PAGE_SIZE);
-  }, [schedules, searchQuery, currentPage]);
+  }, [schedules, searchQuery, currentPage, matchesSearch]);
 
   const totalPages = Math.ceil(
-    (searchQuery
-      ? schedules.filter(
-          (s) =>
-            s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            s.functionUrl.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            s.functionUrl.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-      : schedules
-    ).length / PAGE_SIZE
+    (searchQuery ? schedules.filter(matchesSearch) : schedules).length / PAGE_SIZE
   );
 
   const handleRefresh = async () => {
@@ -224,7 +217,7 @@ export default function SchedulesPage() {
                     disabled={isRefreshing}
                     className="h-8 w-8"
                   >
-                    <RefreshIcon className={isRefreshing ? '!size-3.5 animate-spin' : '!size-3.5'} />
+                    <RefreshIcon className={isRefreshing ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" align="center">

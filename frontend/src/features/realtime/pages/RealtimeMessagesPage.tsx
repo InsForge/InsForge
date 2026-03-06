@@ -1,16 +1,14 @@
 import { useState, useCallback, useRef } from 'react';
-import { ChevronRight } from 'lucide-react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import { Skeleton, PaginationControls, TableHeader } from '@/components';
 import { useRealtimeMessages } from '../hooks/useRealtimeMessages';
 import { MessageRow } from '../components/MessageRow';
 import RealtimeEmptyState from '../components/RealtimeEmptyState';
-import type { RealtimeMessage } from '../services/realtime.service';
+
 
 export default function RealtimeMessagesPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedMessage, setSelectedMessage] = useState<RealtimeMessage | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isScrolled, setIsScrolled] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -53,68 +51,7 @@ export default function RealtimeMessagesPage() {
     }
   };
 
-  // Message detail view
-  if (selectedMessage) {
-    return (
-      <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
-        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
-          <button
-            onClick={() => setSelectedMessage(null)}
-            className="text-base font-medium leading-7 text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Messages
-          </button>
-          <ChevronRight className="w-5 h-5 text-muted-foreground" />
-          <p className="text-base font-medium leading-7 text-foreground">
-            {selectedMessage.eventName}
-          </p>
-        </div>
-
-        <div className="flex-1 min-h-0 p-4 overflow-auto">
-          <div className="mx-auto max-w-[1024px] w-4/5 space-y-4">
-            <div className="grid grid-cols-3 gap-4">
-              <div className="p-4 rounded border border-[var(--alpha-8)] bg-card">
-                <p className="text-sm text-muted-foreground mb-1">Channel</p>
-                <p className="text-sm text-foreground">{selectedMessage.channelName}</p>
-              </div>
-              <div className="p-4 rounded border border-[var(--alpha-8)] bg-card">
-                <p className="text-sm text-muted-foreground mb-1">Sender Type</p>
-                <p className="text-sm text-foreground">{selectedMessage.senderType}</p>
-              </div>
-              <div className="p-4 rounded border border-[var(--alpha-8)] bg-card">
-                <p className="text-sm text-muted-foreground mb-1">Created</p>
-                <p className="text-sm text-foreground">{selectedMessage.createdAt}</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div className="p-4 rounded border border-[var(--alpha-8)] bg-card">
-                <p className="text-sm text-muted-foreground mb-1">WebSockets Audience</p>
-                <p className="text-sm text-foreground">{selectedMessage.wsAudienceCount}</p>
-              </div>
-              <div className="p-4 rounded border border-[var(--alpha-8)] bg-card">
-                <p className="text-sm text-muted-foreground mb-1">Webhooks Audience</p>
-                <p className="text-sm text-foreground">{selectedMessage.whAudienceCount}</p>
-              </div>
-              <div className="p-4 rounded border border-[var(--alpha-8)] bg-card">
-                <p className="text-sm text-muted-foreground mb-1">Webhooks Delivered</p>
-                <p className="text-sm text-foreground">{selectedMessage.whDeliveredCount}</p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded border border-[var(--alpha-8)] bg-card">
-              <p className="text-sm text-muted-foreground mb-2">Payload</p>
-              <pre className="text-sm text-foreground font-mono whitespace-pre-wrap overflow-auto">
-                {JSON.stringify(selectedMessage.payload, null, 2)}
-              </pre>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Default list view
+  // List view
   return (
     <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       <TableHeader
@@ -135,7 +72,7 @@ export default function RealtimeMessagesPage() {
                     disabled={isRefreshing}
                     className="h-8 w-8"
                   >
-                    <RefreshIcon className={isRefreshing ? '!size-3.5 animate-spin' : '!size-3.5'} />
+                    <RefreshIcon className={isRefreshing ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" align="center">

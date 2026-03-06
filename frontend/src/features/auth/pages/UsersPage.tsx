@@ -187,7 +187,7 @@ export default function UsersPage() {
                   >
                     <RefreshCw
                       strokeWidth={1.5}
-                      className={cn('!size-3.5', isRefreshing && 'animate-spin')}
+                      className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')}
                     />
                   </Button>
                 </TooltipTrigger>

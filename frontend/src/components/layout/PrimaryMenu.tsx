@@ -117,6 +117,8 @@ export function PrimaryMenu({
         <button
           type="button"
           onClick={handleToggleClick}
+          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-expanded={!isCollapsed}
           className="h-8 w-8 flex items-center justify-center rounded-lg text-muted-foreground transition-all duration-150 hover:bg-alpha-4 hover:text-foreground active:scale-[0.98]"
         >
           {isCollapsed ? (

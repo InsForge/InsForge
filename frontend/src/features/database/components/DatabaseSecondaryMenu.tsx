@@ -186,7 +186,7 @@ export function DatabaseSecondaryMenu({
                   className="h-8 w-full px-2.5 text-xs"
                   onClick={onNewTable}
                 >
-                  <Plus strokeWidth={1.5} className="!size-3.5" />
+                  <Plus strokeWidth={1.5} className="h-3.5 w-3.5" />
                   Create New Table
                 </Button>
               )}

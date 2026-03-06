@@ -83,7 +83,7 @@ export default function LoginPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem className="space-y-1.5">
-                    <label className="block text-sm font-medium text-muted-foreground">
+                    <label htmlFor="login-email" className="block text-sm font-medium text-muted-foreground">
                       Email
                     </label>
                     <FormControl>
@@ -91,6 +91,7 @@ export default function LoginPage() {
                         <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                         <Input
                           {...field}
+                          id="login-email"
                           type="email"
                           placeholder="admin@example.com"
                           className="pl-9"
@@ -109,7 +110,7 @@ export default function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem className="space-y-1.5">
-                    <label className="block text-sm font-medium text-muted-foreground">
+                    <label htmlFor="login-password" className="block text-sm font-medium text-muted-foreground">
                       Password
                     </label>
                     <FormControl>
@@ -117,6 +118,7 @@ export default function LoginPage() {
                         <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                         <Input
                           {...field}
+                          id="login-password"
                           type="password"
                           placeholder="Enter your password"
                           className="pl-9"

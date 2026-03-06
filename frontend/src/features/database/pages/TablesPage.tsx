@@ -464,8 +464,9 @@ export default function TablesPage() {
                               variant="outline-muted"
                               size="icon"
                               onClick={() => handleEditTable(selectedTable)}
+                              aria-label="Edit table"
                             >
-                              <Pencil strokeWidth={1.5} className="!size-3.5" />
+                              <Pencil strokeWidth={1.5} className="h-3.5 w-3.5" />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent side="bottom" align="center">
@@ -479,10 +480,11 @@ export default function TablesPage() {
                               size="icon"
                               onClick={() => void handleRefresh()}
                               disabled={isRefreshing}
+                              aria-label="Refresh"
                             >
                               <RefreshCw
                                 strokeWidth={1.5}
-                                className={isRefreshing ? '!size-3.5 animate-spin' : '!size-3.5'}
+                                className={isRefreshing ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'}
                               />
                             </Button>
                           </TooltipTrigger>

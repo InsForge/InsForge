@@ -112,7 +112,8 @@
   }
 
   input:focus {
-    outline: none !important;
+    outline: 2px solid rgb(var(--primary));
+    outline-offset: -1px;
     box-shadow: none !important;
   }
 

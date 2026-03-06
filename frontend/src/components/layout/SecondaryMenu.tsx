@@ -86,7 +86,7 @@ function SecondaryMenuItem({
     <>
       <div
         className={cn(
-          'flex w-full items-center gap-1 rounded-lg px-1.5 transition-colors',
+          'group flex w-full items-center gap-1 rounded-lg px-1.5 transition-colors',
           isSelected
             ? 'bg-alpha-8 text-foreground'
             : 'text-muted-foreground hover:bg-alpha-4 hover:text-foreground'
@@ -250,7 +250,7 @@ export function SecondaryMenu({
                 onClick={button.onClick}
                 disabled={button.disabled}
               >
-                {button.icon && <button.icon strokeWidth={1.5} className="!size-3.5" />}
+                {button.icon && <button.icon strokeWidth={1.5} className="h-3.5 w-3.5" />}
                 {button.label}
               </Button>
             ))}

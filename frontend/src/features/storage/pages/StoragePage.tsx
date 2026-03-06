@@ -369,8 +369,9 @@ export default function StoragePage() {
                             size="icon"
                             onClick={() => handleEditBucket(selectedBucket)}
                             className="h-8 w-8"
+                            aria-label="Edit bucket"
                           >
-                            <PencilIcon className="!size-3.5" />
+                            <PencilIcon className="h-3.5 w-3.5" />
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent side="bottom" align="center">
@@ -385,9 +386,10 @@ export default function StoragePage() {
                             onClick={() => void handleRefresh()}
                             disabled={isRefreshing}
                             className="h-8 w-8"
+                            aria-label="Refresh"
                           >
                             <RefreshIcon
-                              className={isRefreshing ? '!size-3.5 animate-spin' : '!size-3.5'}
+                              className={isRefreshing ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'}
                             />
                           </Button>
                         </TooltipTrigger>
