@@ -376,22 +376,14 @@ export default function DashboardPage() {
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey({ enabled: !canShowCliGettingStarted });
   const { projectInfo, isLoading: isProjectInfoLoading } = useCloudProjectInfo();
   const { totalUsers } = useUsers();
-  const {
-    hasCompletedOnboarding,
-    recordsCount,
-    isLoading: isMcpUsageLoading,
-    isFetching: isMcpUsageFetching,
-  } = useMcpUsage();
+  const { hasCompletedOnboarding, recordsCount, isLoading: isMcpUsageLoading } = useMcpUsage();
   const [previewFitVersion, setPreviewFitVersion] = useState(0);
   const appUrl = getBackendUrl();
 
   const tableCount = tables?.length ?? 0;
   const agentConnected = hasCompletedOnboarding;
   const shouldShowLoadingState =
-    isMetadataLoading ||
-    isMcpUsageLoading ||
-    isMcpUsageFetching ||
-    (isCloudProject && isProjectInfoLoading);
+    isMetadataLoading || isMcpUsageLoading || (isCloudProject && isProjectInfoLoading);
   const projectName = isCloudProject ? projectInfo.name : 'My InsForge Project';
   const instanceType = projectInfo.instanceType?.toUpperCase();
   const showInstanceTypeBadge = isCloudProject && !!instanceType;
