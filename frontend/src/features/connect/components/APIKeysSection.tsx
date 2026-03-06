@@ -13,7 +13,7 @@ function CredentialRow({ label, value, isLoading = false }: CredentialRowProps) 
       <span className="w-25 shrink-0 text-sm leading-6 text-foreground">{label}</span>
       <div
         className={cn(
-          'flex h-9 min-w-0 flex-1 items-center justify-between gap-2 rounded-lg border border-[var(--alpha-8)] bg-semantic-0 px-3 py-2',
+          'flex h-9 min-w-0 flex-1 items-center justify-between gap-2 rounded-lg border border-border bg-semantic-0 px-3 py-2',
           isLoading && 'animate-pulse'
         )}
       >
@@ -41,7 +41,7 @@ export function APIKeysSection({
 }: APIKeysSectionProps) {
   return (
     <div className={cn('flex flex-col gap-6', className)}>
-      <p className="text-base leading-7 text-muted-foreground">
+      <p className="font-content text-base leading-7 text-muted-foreground">
         Use the project URL and API key to connect directly via REST API or any HTTP client.
       </p>
 

@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { DATABASE_TEMPLATES, type DatabaseTemplate } from '@/features/database/templates';
 import { useSQLEditorContext } from '@/features/database/contexts/SQLEditorContext';
 import { TemplateCard } from '@/features/database/components/TemplateCard';
-import { DatabaseStudioMenuPanel } from '@/features/database/components/DatabaseSecondaryMenu';
+import { DatabaseStudioSidebar } from '@/features/database/components/DatabaseSecondaryMenu';
 
 export default function TemplatesPage() {
   const navigate = useNavigate();
@@ -17,11 +17,7 @@ export default function TemplatesPage() {
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <DatabaseStudioMenuPanel
-        onBack={() =>
-          void navigate('/dashboard/database/tables', { state: { slideFromStudio: true } })
-        }
-      />
+      <DatabaseStudioSidebar />
       <div className="min-w-0 flex-1 overflow-auto bg-[rgb(var(--semantic-1))]">
         <div className="mx-auto flex w-full max-w-[1024px] flex-col gap-6 px-4 pb-10 pt-8 sm:px-6 sm:pt-10 lg:px-10">
           <h1 className="text-2xl font-medium leading-8 text-foreground">Database Templates</h1>

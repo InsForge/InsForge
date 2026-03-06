@@ -98,10 +98,10 @@ export function ConnectDialog() {
     <Dialog open={isConnectDialogOpen} onOpenChange={handleModalClose}>
       <TooltipProvider>
         <DialogContent showCloseButton={false} className="w-[640px] max-w-[640px] gap-0 p-0">
-          <div className="border-b border-[var(--alpha-8)] px-4 pt-3">
+          <div className="border-b border-border px-4 pt-3">
             <div className="flex items-start gap-3">
               <div className="flex-1">
-                <DialogTitle>Connect Project</DialogTitle>
+                <DialogTitle className="font-medium">Connect Project</DialogTitle>
                 <div className="mt-3 flex items-start gap-6 overflow-x-auto">
                   {visibleTabs.map((tab) => {
                     const isActive = activeTab === tab.id;
@@ -167,13 +167,13 @@ export function ConnectDialog() {
           </DialogBody>
 
           <DialogFooter className="justify-between">
-            <p className="flex min-w-0 items-center gap-1 text-sm leading-6 text-muted-foreground">
+            <p className="font-content flex min-w-0 items-center gap-1 text-sm leading-6 text-muted-foreground">
               <span>Need help? Join our</span>
               <a
                 href="https://discord.gg/DvBtaEc9Jz"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-[#818cf8] hover:text-[#99a3ff]"
+                className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
               >
                 <DiscordIcon className="size-5" />
                 <span>Discord</span>
@@ -181,10 +181,10 @@ export function ConnectDialog() {
             </p>
             <Button
               type="button"
-              variant="secondary"
+              variant="ghost"
               size="default"
               onClick={() => setConnectDialogOpen(false)}
-              className="shrink-0"
+              className="shrink-0 text-muted-foreground hover:text-foreground"
             >
               I&apos;ll connect later
             </Button>

@@ -55,7 +55,7 @@ function FormBooleanEditor({ value, nullable, onChange }: FormBooleanEditorProps
       onCancel={() => {}}
       autoOpen={false}
       className={cn(
-        'h-8 w-full justify-start rounded border border-[var(--alpha-8)] bg-[var(--alpha-4)] px-2 py-1.5 text-[13px] font-normal leading-[18px] shadow-none',
+        'h-8 w-full justify-start border border-[var(--alpha-8)] bg-[var(--alpha-4)] px-2 py-1.5 text-[13px] font-normal leading-[18px] shadow-none',
         value === null && 'text-muted-foreground italic'
       )}
     />
@@ -125,7 +125,7 @@ function FormDateEditor({
       variant="secondary"
       onClick={() => setShowEditor(true)}
       className={cn(
-        'h-8 w-full justify-start rounded bg-[var(--alpha-4)] px-2 py-1.5 text-[13px] font-normal leading-[18px]',
+        'h-8 w-full justify-start bg-[var(--alpha-4)] px-2 py-1.5 text-[13px] font-normal leading-[18px]',
         (!value || value === 'null') && 'text-muted-foreground'
       )}
     >
@@ -164,7 +164,7 @@ function FormNumberEditor({ value, type, onChange, tableName, field }: FormNumbe
         }
       }}
       placeholder={getPlaceholderText(field)}
-      className="h-8 rounded px-2 py-1.5 text-[13px] leading-[18px]"
+      className="h-8 px-2 py-1.5 text-[13px] leading-[18px]"
     />
   );
 }
@@ -211,7 +211,7 @@ function FormJsonEditor({ value, nullable, onChange }: FormJsonEditorProps) {
       variant="secondary"
       onClick={() => setShowEditor(true)}
       className={cn(
-        'h-8 w-full justify-start rounded bg-[var(--alpha-4)] px-2 py-1.5 text-[13px] font-normal leading-[18px]',
+        'h-8 w-full justify-start bg-[var(--alpha-4)] px-2 py-1.5 text-[13px] font-normal leading-[18px]',
         (!value || value === 'null') && 'text-muted-foreground'
       )}
     >
@@ -273,7 +273,7 @@ function FieldWithLink({ field, control, children }: FieldWithLinkProps) {
                 variant="secondary"
                 size="icon"
                 onClick={() => formField.onChange('')}
-                className="h-8 w-8 shrink-0 rounded border border-[var(--alpha-8)] bg-card p-0"
+                className="h-8 w-8 shrink-0 border border-[var(--alpha-8)] bg-card p-0"
                 title="Clear linked record"
               >
                 <X className="h-4 w-4" />
@@ -298,7 +298,7 @@ function FieldWithLink({ field, control, children }: FieldWithLinkProps) {
                   variant="secondary"
                   size="icon"
                   onClick={openModal}
-                  className="h-8 w-8 shrink-0 rounded border border-[var(--alpha-8)] bg-card p-0"
+                  className="h-8 w-8 shrink-0 border border-[var(--alpha-8)] bg-card p-0"
                   title={
                     hasLinkedValue
                       ? `Change linked ${foreignKey.referenceTable} record`
@@ -417,7 +417,7 @@ export function RecordFormField({ field, form, tableName }: RecordFormFieldProps
                 name={formField.name}
                 ref={formField.ref}
                 placeholder={getPlaceholderText(field)}
-                className="h-8 rounded px-2 py-1.5 text-[13px] leading-[18px]"
+                className="h-8 px-2 py-1.5 text-[13px] leading-[18px]"
               />
             )}
           />
@@ -439,7 +439,7 @@ export function RecordFormField({ field, form, tableName }: RecordFormFieldProps
                 name={formField.name}
                 ref={formField.ref}
                 placeholder={getPlaceholderText(field)}
-                className="h-8 rounded px-2 py-1.5 text-[13px] leading-[18px]"
+                className="h-8 px-2 py-1.5 text-[13px] leading-[18px]"
               />
             )}
           />

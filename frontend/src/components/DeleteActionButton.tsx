@@ -29,8 +29,8 @@ export function DeleteActionButton({
 
   return (
     <Button
-      variant="destructive"
-      className={`h-8 rounded px-2 text-sm leading-5 whitespace-nowrap ${className}`}
+      variant="secondary"
+      className={`h-8 px-2.5 whitespace-nowrap text-muted-foreground ${className}`}
       onClick={onDelete}
     >
       Delete {selectedCount} {getItemLabel(selectedCount, itemType)}

@@ -15,6 +15,10 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        brand: 'var(--insforge-font)',
+        content: 'var(--insforge-content-font)',
+      },
       colors: {
         border: 'var(--border)',
         foreground: 'rgb(var(--foreground))',
@@ -24,6 +28,9 @@ export default {
         warning: 'rgb(var(--warning))',
         card: 'rgb(var(--card))',
         toast: 'rgb(var(--toast))',
+        canvas: 'rgb(var(--canvas))',
+        surface: 'rgb(var(--surface))',
+        page: 'rgb(var(--page))',
       },
       keyframes: {
         'accordion-down': {

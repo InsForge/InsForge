@@ -132,6 +132,11 @@ export const staticMenuItems: PrimaryMenuItem[] = [
         label: 'Auth Methods',
         href: '/dashboard/authentication/auth-methods',
       },
+      {
+        id: 'redirect-url',
+        label: 'Redirect URL',
+        href: '/dashboard/authentication/redirect-url',
+      },
     ],
   },
   {

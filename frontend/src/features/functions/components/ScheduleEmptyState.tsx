@@ -2,7 +2,7 @@ import { Clock } from 'lucide-react';
 
 export default function ScheduleEmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center py-8 text-center gap-3 rounded-lg bg-[var(--alpha-4)]">
+    <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
       <Clock size={40} className="text-muted-foreground" />
       <div className="flex flex-col items-center justify-center gap-1">
         <p className="text-sm font-medium text-foreground">No schedules configured</p>

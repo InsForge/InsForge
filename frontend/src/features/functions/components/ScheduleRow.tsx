@@ -19,6 +19,7 @@ interface ScheduleRowProps {
   onDelete: (id: string) => void;
   onToggle: (scheduleId: string, isActive: boolean) => void;
   isLoading?: boolean;
+  isLast?: boolean;
   className?: string;
 }
 
@@ -29,17 +30,18 @@ export function ScheduleRow({
   onDelete,
   onToggle,
   isLoading,
+  isLast,
   className,
 }: ScheduleRowProps) {
   return (
-    <div
-      className={cn(
-        'group rounded border border-[var(--alpha-8)] bg-card cursor-pointer',
-        className
-      )}
-      onClick={onClick}
-    >
-      <div className="flex items-center pl-2 rounded hover:bg-[var(--alpha-8)] transition-colors">
+      <div
+        className={cn(
+          'group flex items-center pl-2 cursor-pointer bg-[rgb(var(--card))] hover:bg-[var(--alpha-4)] transition-colors',
+          !isLast && 'border-b border-[var(--alpha-8)]',
+          className
+        )}
+        onClick={onClick}
+      >
         {/* Name Column */}
         <div className="flex-1 min-w-0 h-12 flex items-center px-2.5">
           <p className="text-sm text-foreground truncate" title={schedule.name}>
@@ -113,23 +115,29 @@ export function ScheduleRow({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
+              align="end"
               sideOffset={6}
               className="w-40"
               onCloseAutoFocus={(e) => e.preventDefault()}
             >
-              <DropdownMenuItem onSelect={() => onEdit(schedule.id)}>
-                <Pencil className="mr-2 h-4 w-4" />
-                <span>Edit</span>
+              <DropdownMenuItem
+                className="cursor-pointer [&_svg]:size-3.5"
+                onSelect={() => onEdit(schedule.id)}
+              >
+                <Pencil strokeWidth={1} />
+                Edit
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => onDelete(schedule.id)} className="text-destructive">
-                <Trash2 className="mr-2 h-4 w-4" />
-                <span>Delete</span>
+              <DropdownMenuItem
+                className="cursor-pointer [&_svg]:size-3.5"
+                onSelect={() => onDelete(schedule.id)}
+              >
+                <Trash2 strokeWidth={1} />
+                Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
-    </div>
   );
 }
 

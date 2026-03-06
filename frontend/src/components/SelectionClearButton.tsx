@@ -18,12 +18,12 @@ export function SelectionClearButton({
   return (
     <Button
       variant="ghost"
-      size="default"
-      className="h-8 rounded border border-[var(--alpha-8)] bg-[var(--alpha-4)] px-2 text-foreground whitespace-nowrap hover:bg-[var(--alpha-8)] active:bg-[var(--alpha-12)]"
+      size="icon"
+      className="h-8 w-8 border border-[var(--alpha-8)] text-muted-foreground hover:text-foreground"
       onClick={() => onClear()}
+      title={`Clear selection (${displayText})`}
     >
-      <span className="text-sm leading-5">{displayText}</span>
-      <X className="h-4 w-4 text-muted-foreground" />
+      <X strokeWidth={1.5} className="h-4 w-4" />
     </Button>
   );
 }

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, type DragEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Upload } from 'lucide-react';
 import PencilIcon from '@/assets/icons/pencil.svg?react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import { useStorage } from '@/features/storage/hooks/useStorage';
@@ -347,23 +346,31 @@ export default function StoragePage() {
                     />
                   </div>
                 ) : (
-                  <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex min-w-0 items-center gap-2">
                     <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">
                       {selectedBucket}
                     </h1>
                     <div className="flex h-5 w-5 shrink-0 items-center justify-center">
                       <div className="h-5 w-px bg-[var(--alpha-8)]" />
                     </div>
+                    <Button
+                      variant="primary"
+                      className="h-8 px-3 text-sm font-medium"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                    >
+                      {isUploading ? 'Uploading...' : 'Upload File'}
+                    </Button>
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
-                            variant="ghost"
+                            variant="outline-muted"
                             size="icon"
                             onClick={() => handleEditBucket(selectedBucket)}
-                            className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
+                            className="h-8 w-8"
                           >
-                            <PencilIcon className="h-5 w-5" />
+                            <PencilIcon className="!size-3.5" />
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent side="bottom" align="center">
@@ -373,14 +380,14 @@ export default function StoragePage() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
-                            variant="ghost"
+                            variant="outline-muted"
                             size="icon"
                             onClick={() => void handleRefresh()}
                             disabled={isRefreshing}
-                            className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
+                            className="h-8 w-8"
                           >
                             <RefreshIcon
-                              className={isRefreshing ? 'h-5 w-5 animate-spin' : 'h-5 w-5'}
+                              className={isRefreshing ? '!size-3.5 animate-spin' : '!size-3.5'}
                             />
                           </Button>
                         </TooltipTrigger>
@@ -389,21 +396,6 @@ export default function StoragePage() {
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
-                    <div className="flex h-5 w-5 shrink-0 items-center justify-center">
-                      <div className="h-5 w-px bg-[var(--alpha-8)]" />
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 rounded px-1.5 text-primary hover:bg-[var(--alpha-4)] hover:text-primary active:bg-[var(--alpha-8)]"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading}
-                    >
-                      <Upload className="h-5 w-5 stroke-[1.5]" />
-                      <span className="px-1 text-sm font-medium leading-5">
-                        {isUploading ? 'Uploading...' : 'Upload File'}
-                      </span>
-                    </Button>
                   </div>
                 )
               }

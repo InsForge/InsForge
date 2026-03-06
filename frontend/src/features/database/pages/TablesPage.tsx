@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef, type CSSProperties } from 'react';
-import { CirclePlus, LogIn } from 'lucide-react';
-import PencilIcon from '@/assets/icons/pencil.svg?react';
-import RefreshIcon from '@/assets/icons/refresh.svg?react';
+import { ChevronDown, FileUp, Pencil, Plus, RefreshCw } from 'lucide-react';
 import EmptyBoxSvg from '@/assets/images/empty_box.svg?react';
 import { useTables } from '@/features/database/hooks/useTables';
 import { useRecords } from '@/features/database/hooks/useRecords';
@@ -14,6 +12,10 @@ import { DATABASE_TEMPLATES, DatabaseTemplate } from '@/features/database/templa
 import {
   Button,
   ConfirmDialog,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -33,15 +35,12 @@ import { DatabaseDataGrid } from '@/features/database/components/DatabaseDataGri
 import { SortColumn } from 'react-data-grid';
 import { convertValueForColumn } from '@/lib/utils/utils';
 import { useCSVImport } from '@/features/database/hooks/useCSVImport';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 
 const PAGE_SIZE = 50;
 
 export default function TablesPage() {
-  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const shouldSlideBackToTables =
-    (location.state as { slideFromStudio?: boolean } | null)?.slideFromStudio === true;
   const selectedTableFromQuery = searchParams.get('table')?.trim();
   const [showRecordForm, setShowRecordForm] = useState(false);
   const [isTableFormDirty, setIsTableFormDirty] = useState(false);
@@ -381,8 +380,6 @@ export default function TablesPage() {
         onNewTable={handleCreateTable}
         onEditTable={handleEditTable}
         onDeleteTable={(tableName) => void handleDeleteTable(tableName)}
-        initialMode={shouldSlideBackToTables ? 'studio' : 'tables'}
-        animateToMode={shouldSlideBackToTables ? 'tables' : undefined}
       />
 
       {/* Main Content Area */}
@@ -428,23 +425,47 @@ export default function TablesPage() {
                       />
                     </div>
                   ) : (
-                    <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex min-w-0 items-center gap-2">
                       <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">
                         {selectedTable}
                       </h1>
                       <div className="flex h-5 w-5 shrink-0 items-center justify-center">
                         <div className="h-5 w-px bg-[var(--alpha-8)]" />
                       </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button className="h-8 px-2.5" disabled={isImporting}>
+                            Add record
+                            <ChevronDown strokeWidth={1.5} className="h-3.5 w-3.5 opacity-60" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-48" sideOffset={6}>
+                          <DropdownMenuItem
+                            className="cursor-pointer [&_svg]:size-3.5"
+                            onClick={() => setShowRecordForm(true)}
+                          >
+                            <Plus strokeWidth={1.5} />
+                            Add record
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="cursor-pointer [&_svg]:size-3.5"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isImporting}
+                          >
+                            <FileUp strokeWidth={1.5} />
+                            {isImporting ? 'Importing...' : 'Import data from CSV'}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
-                              variant="ghost"
+                              variant="outline-muted"
                               size="icon"
                               onClick={() => handleEditTable(selectedTable)}
-                              className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
                             >
-                              <PencilIcon className="h-5 w-5" />
+                              <Pencil strokeWidth={1.5} className="!size-3.5" />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent side="bottom" align="center">
@@ -454,14 +475,14 @@ export default function TablesPage() {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
-                              variant="ghost"
+                              variant="outline-muted"
                               size="icon"
                               onClick={() => void handleRefresh()}
                               disabled={isRefreshing}
-                              className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
                             >
-                              <RefreshIcon
-                                className={isRefreshing ? 'h-5 w-5 animate-spin' : 'h-5 w-5'}
+                              <RefreshCw
+                                strokeWidth={1.5}
+                                className={isRefreshing ? '!size-3.5 animate-spin' : '!size-3.5'}
                               />
                             </Button>
                           </TooltipTrigger>
@@ -470,30 +491,6 @@ export default function TablesPage() {
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-                      <div className="flex h-5 w-5 shrink-0 items-center justify-center">
-                        <div className="h-5 w-px bg-[var(--alpha-8)]" />
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 rounded px-1.5 text-primary hover:bg-[var(--alpha-4)] hover:text-primary active:bg-[var(--alpha-8)]"
-                        onClick={() => setShowRecordForm(true)}
-                      >
-                        <CirclePlus className="h-6 w-6 stroke-[1.5] text-primary" />
-                        <span className="px-1 text-sm font-medium leading-5">Add Record</span>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 rounded px-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground active:bg-[var(--alpha-8)]"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isImporting}
-                      >
-                        <LogIn className="h-6 w-6 stroke-[1.5]" />
-                        <span className="px-1 text-sm font-medium leading-5">
-                          {isImporting ? 'Importing...' : 'Import CSV'}
-                        </span>
-                      </Button>
                     </div>
                   )
                 }
@@ -560,15 +557,6 @@ export default function TablesPage() {
                       <p className="text-sm font-medium leading-6 text-muted-foreground">
                         No Records Found
                       </p>
-                      {!searchQuery && (
-                        <button
-                          type="button"
-                          className="text-xs leading-4 text-primary hover:underline"
-                          onClick={() => setShowRecordForm(true)}
-                        >
-                          Add Record
-                        </button>
-                      )}
                     </div>
                   }
                 />

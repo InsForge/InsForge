@@ -95,7 +95,7 @@ export function RecordFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton={false} className="w-[640px] max-w-[640px] p-0">
+      <DialogContent showCloseButton={false} className="max-w-[520px] p-0">
         <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col">
           <DialogHeader className="gap-0 px-4 py-3">
             <div className="flex w-full items-center gap-3">
@@ -141,14 +141,14 @@ export function RecordFormDialog({
               variant="secondary"
               onClick={() => onOpenChange(false)}
               disabled={isCreating}
-              className="h-8 rounded px-2"
+              className="w-30"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={isCreating}
-              className={cn('h-8 rounded px-2', isCreating && 'opacity-40')}
+              className="w-30"
             >
               {isCreating ? 'Saving...' : 'Add Record'}
             </Button>

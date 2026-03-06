@@ -55,7 +55,7 @@ export const TableFormColumn = memo(function TableFormColumn({
           control={control}
           name={`columns.${index}.type`}
           disabled={!isNewColumn}
-          className={`h-8 w-full rounded border-[var(--alpha-12)] bg-[var(--alpha-4)] text-sm font-normal ${
+          className={`h-8 w-full border-[var(--alpha-12)] bg-[var(--alpha-4)] text-sm font-normal ${
             isSystemColumn ? 'text-muted-foreground' : 'text-foreground'
           }`}
         />

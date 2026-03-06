@@ -7,6 +7,7 @@ import DashboardPage from '@/features/dashboard/pages/DashboardPage';
 import TablesPage from '@/features/database/pages/TablesPage';
 import UsersPage from '@/features/auth/pages/UsersPage';
 import AuthMethodsPage from '@/features/auth/pages/AuthMethodsPage';
+import RedirectUrlPage from '@/features/auth/pages/RedirectUrlPage';
 import LogsPage from '@/features/logs/pages/LogsPage';
 import FunctionLogsPage from '@/features/logs/pages/FunctionLogsPage';
 import MCPLogsPage from '@/features/logs/pages/MCPLogsPage';
@@ -64,6 +65,10 @@ export function AppRoutes() {
                 <Route
                   path="/dashboard/authentication/config"
                   element={<AuthMethodsPage openSettingsOnMount={true} />}
+                />
+                <Route
+                  path="/dashboard/authentication/redirect-url"
+                  element={<RedirectUrlPage />}
                 />
                 <Route
                   path="/dashboard/database"

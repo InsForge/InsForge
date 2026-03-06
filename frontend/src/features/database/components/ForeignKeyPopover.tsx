@@ -4,6 +4,8 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
+  DialogHeader,
   DialogTitle,
   Select,
   SelectContent,
@@ -16,6 +18,14 @@ import { UseFormReturn } from 'react-hook-form';
 import { TableFormSchema, TableFormForeignKeySchema } from '../schema';
 import { ColumnSchema, OnDeleteActionSchema, OnUpdateActionSchema } from '@insforge/shared-schemas';
 import { cn } from '@/lib/utils/utils';
+
+const ACTION_LABELS: Record<string, string> = {
+  'NO ACTION': 'No Action',
+  CASCADE: 'Cascade',
+  RESTRICT: 'Restrict',
+  'SET NULL': 'Set Null',
+  'SET DEFAULT': 'Set Default',
+};
 import { AUTH_USERS_TABLE } from '../constants';
 
 interface ForeignKeyPopoverProps {
@@ -131,238 +141,218 @@ export function ForeignKeyPopover({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <div className="flex flex-col">
-          {/* Header */}
-          <div className="flex flex-col gap-1 px-6 py-3 border-b border-zinc-200 dark:border-neutral-700">
-            <DialogTitle>{initialValue ? 'Edit Foreign Key' : 'Add Foreign Key'}</DialogTitle>
-            <DialogDescription>
-              {initialValue
-                ? 'Modify the relationship between tables'
-                : 'Create a relationship between this table and another table'}
-            </DialogDescription>
-          </div>
+      <DialogContent className="max-w-[520px]">
+        <DialogHeader>
+          <DialogTitle>{initialValue ? 'Edit Foreign Key' : 'Add Foreign Key'}</DialogTitle>
+          <DialogDescription>
+            {initialValue
+              ? 'Modify the relationship between tables'
+              : 'Create a relationship between this table and another table'}
+          </DialogDescription>
+        </DialogHeader>
 
-          {/* Form Content */}
-          <div className="flex flex-col gap-6 p-6">
-            {/* Column selector */}
-            <div className="flex flex-row gap-10 items-center">
-              <Label className="text-sm text-black dark:text-white flex-1">Column</Label>
-              <Select
-                value={newForeignKey.columnName}
-                onValueChange={(value) =>
-                  setNewForeignKey((prev) => ({ ...prev, columnName: value }))
-                }
-              >
-                <SelectTrigger className="w-70 h-10">
-                  <span
-                    className={cn(
-                      'text-sm text-muted-foreground dark:text-neutral-400',
-                      newForeignKey.columnName && 'text-black dark:text-white'
-                    )}
-                  >
-                    {newForeignKey.columnName || 'Select column'}
-                  </span>
-                </SelectTrigger>
-                <SelectContent>
-                  {columns
-                    .filter((col) => col.columnName)
-                    .map((col, index) => (
-                      <SelectItem
-                        key={col.columnName || index}
-                        value={col.columnName}
-                        disabled={col.isSystemColumn}
-                      >
-                        {col.columnName}
-                        <span className="text-xs text-muted-foreground">({col.type})</span>
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Reference Table selector */}
-            <div className="flex flex-row gap-10 items-center">
-              <Label className="text-sm text-black dark:text-white flex-1">Reference Table</Label>
-              <Select
-                value={newForeignKey.referenceTable}
-                onValueChange={(value) => {
-                  setNewForeignKey((prev) => ({
-                    ...prev,
-                    referenceTable: value,
-                    referenceColumn: '', // Reset column when table changes
-                  }));
-                }}
-              >
-                <SelectTrigger className="w-70 h-10">
-                  <span
-                    className={cn(
-                      'text-sm text-muted-foreground dark:text-neutral-400',
-                      newForeignKey.referenceTable && 'text-black dark:text-white'
-                    )}
-                  >
-                    {newForeignKey.referenceTable || 'Select table'}
-                  </span>
-                </SelectTrigger>
-                <SelectContent>
-                  {availableTables.map((tableName) => (
-                    <SelectItem key={tableName} value={tableName}>
-                      {tableName}
+        <div className="flex flex-col gap-4 p-6">
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-sm font-medium text-foreground">Column</Label>
+            <Select
+              value={newForeignKey.columnName}
+              onValueChange={(value) =>
+                setNewForeignKey((prev) => ({ ...prev, columnName: value }))
+              }
+            >
+              <SelectTrigger>
+                <span
+                  className={cn(
+                    'text-sm text-muted-foreground',
+                    newForeignKey.columnName && 'text-foreground'
+                  )}
+                >
+                  {newForeignKey.columnName || 'Select column'}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                {columns
+                  .filter((col) => col.columnName)
+                  .map((col, index) => (
+                    <SelectItem
+                      key={col.columnName || index}
+                      value={col.columnName}
+                      disabled={col.isSystemColumn}
+                    >
+                      {col.columnName}
+                      <span className="text-xs text-muted-foreground">({col.type})</span>
                     </SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Reference Column selector - only shown after table and source column are selected */}
-            {newForeignKey.referenceTable && newForeignKey.columnName && (
-              <div className="flex flex-row gap-10 items-center">
-                <Label className="text-sm text-black dark:text-white flex-1">
-                  Reference Column
-                </Label>
-                <Select
-                  key={`column-select-${newForeignKey.referenceTable}`}
-                  value={newForeignKey.referenceColumn}
-                  onValueChange={(value) =>
-                    setNewForeignKey((prev) => ({ ...prev, referenceColumn: value }))
-                  }
-                >
-                  <SelectTrigger className="w-70 h-10">
-                    <span
-                      className={cn(
-                        'text-sm text-muted-foreground dark:text-neutral-400',
-                        newForeignKey.referenceColumn && 'text-black dark:text-white'
-                      )}
-                    >
-                      {newForeignKey.referenceColumn || 'Select column'}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent className="max-w-[360px]">
-                    {(() => {
-                      const allColumns = referenceTableSchema?.columns || [];
-                      if (allColumns.length) {
-                        const sourceType = getSourceFieldType;
-
-                        return allColumns.map((col: ColumnSchema) => {
-                          // Check if types match exactly (sourceType should always exist at this point since we require columnName)
-                          const typesMatch =
-                            sourceType && col.type.toLowerCase() === sourceType.toLowerCase();
-
-                          // Disable if not a valid reference or types don't match
-                          const isDisabled = !col.isUnique || !typesMatch;
-
-                          // Determine what to show on the right side
-                          let rightText = '';
-                          if (!col.isUnique) {
-                            rightText = 'Not unique';
-                          } else if (!typesMatch) {
-                            rightText = 'Column types mismatch';
-                          }
-
-                          return (
-                            <SelectItem
-                              key={col.columnName}
-                              value={col.columnName}
-                              disabled={isDisabled}
-                            >
-                              {col.columnName}
-                              <span className="text-xs text-muted-foreground">({col.type})</span>
-                              {rightText && (
-                                <span className="text-xs text-muted-foreground">{rightText}</span>
-                              )}
-                            </SelectItem>
-                          );
-                        });
-                      }
-
-                      return (
-                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                          No columns available
-                        </div>
-                      );
-                    })()}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* On Update action */}
-            <div className="flex flex-row gap-10 items-center">
-              <Label className="text-sm text-black dark:text-white flex-1">On Update</Label>
-              <Select
-                value={newForeignKey.onUpdate}
-                onValueChange={(value) =>
-                  setNewForeignKey((prev) => ({
-                    ...prev,
-                    onUpdate: value as OnUpdateActionSchema,
-                  }))
-                }
-              >
-                <SelectTrigger className="w-70 h-10">
-                  <span className="text-sm text-black dark:text-white">
-                    {newForeignKey.onUpdate}
-                  </span>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="NO ACTION">No Action</SelectItem>
-                  <SelectItem value="CASCADE">Cascade</SelectItem>
-                  <SelectItem value="RESTRICT">Restrict</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* On Delete action */}
-            <div className="flex flex-row gap-10 items-center">
-              <Label className="text-sm text-black dark:text-white flex-1">On Delete</Label>
-              <Select
-                value={newForeignKey.onDelete}
-                onValueChange={(value) =>
-                  setNewForeignKey((prev) => ({
-                    ...prev,
-                    onDelete: value as OnDeleteActionSchema,
-                  }))
-                }
-              >
-                <SelectTrigger className="w-70 h-10">
-                  <span className="text-sm text-black dark:text-white">
-                    {newForeignKey.onDelete}
-                  </span>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="NO ACTION">No Action</SelectItem>
-                  <SelectItem value="CASCADE">Cascade</SelectItem>
-                  <SelectItem value="SET NULL">Set Null</SelectItem>
-                  <SelectItem value="SET DEFAULT">Set Default</SelectItem>
-                  <SelectItem value="RESTRICT">Restrict</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Footer */}
-          <div className="flex justify-end gap-3 p-6 border-t border-zinc-200 dark:border-neutral-700">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleCancelAddForeignKey}
-              className="h-10 px-4 dark:bg-neutral-600 dark:text-white dark:border-transparent dark:hover:bg-neutral-700"
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-sm font-medium text-foreground">Reference Table</Label>
+            <Select
+              value={newForeignKey.referenceTable}
+              onValueChange={(value) => {
+                setNewForeignKey((prev) => ({
+                  ...prev,
+                  referenceTable: value,
+                  referenceColumn: '',
+                }));
+              }}
             >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={handleAddForeignKey}
-              disabled={!isAddButtonEnabled}
-              className={`h-10 px-4 ${
-                !isAddButtonEnabled
-                  ? 'bg-zinc-950/40 dark:bg-emerald-300/40'
-                  : 'bg-zinc-950 dark:text-zinc-950 dark:bg-emerald-300 dark:hover:bg-emerald-400'
-              } text-white dark:text-zinc-950 shadow-sm`}
+              <SelectTrigger>
+                <span
+                  className={cn(
+                    'text-sm text-muted-foreground',
+                    newForeignKey.referenceTable && 'text-foreground'
+                  )}
+                >
+                  {newForeignKey.referenceTable || 'Select table'}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                {availableTables.map((tableName) => (
+                  <SelectItem key={tableName} value={tableName}>
+                    {tableName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {newForeignKey.referenceTable && newForeignKey.columnName && (
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-sm font-medium text-foreground">Reference Column</Label>
+              <Select
+                key={`column-select-${newForeignKey.referenceTable}`}
+                value={newForeignKey.referenceColumn}
+                onValueChange={(value) =>
+                  setNewForeignKey((prev) => ({ ...prev, referenceColumn: value }))
+                }
+              >
+                <SelectTrigger>
+                  <span
+                    className={cn(
+                      'text-sm text-muted-foreground',
+                      newForeignKey.referenceColumn && 'text-foreground'
+                    )}
+                  >
+                    {newForeignKey.referenceColumn || 'Select column'}
+                  </span>
+                </SelectTrigger>
+                <SelectContent className="max-w-[360px]">
+                  {(() => {
+                    const allColumns = referenceTableSchema?.columns || [];
+                    if (allColumns.length) {
+                      const sourceType = getSourceFieldType;
+
+                      return allColumns.map((col: ColumnSchema) => {
+                        const typesMatch =
+                          sourceType && col.type.toLowerCase() === sourceType.toLowerCase();
+                        const isDisabled = !col.isUnique || !typesMatch;
+
+                        let rightText = '';
+                        if (!col.isUnique) {
+                          rightText = 'Not unique';
+                        } else if (!typesMatch) {
+                          rightText = 'Column types mismatch';
+                        }
+
+                        return (
+                          <SelectItem
+                            key={col.columnName}
+                            value={col.columnName}
+                            disabled={isDisabled}
+                          >
+                            {col.columnName}
+                            <span className="text-xs text-muted-foreground">({col.type})</span>
+                            {rightText && (
+                              <span className="text-xs text-muted-foreground">{rightText}</span>
+                            )}
+                          </SelectItem>
+                        );
+                      });
+                    }
+
+                    return (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                        No columns available
+                      </div>
+                    );
+                  })()}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-sm font-medium text-foreground">On Update</Label>
+            <Select
+              value={newForeignKey.onUpdate}
+              onValueChange={(value) =>
+                setNewForeignKey((prev) => ({
+                  ...prev,
+                  onUpdate: value as OnUpdateActionSchema,
+                }))
+              }
             >
-              {initialValue ? 'Update Foreign Key' : 'Add Foreign Key'}
-            </Button>
+              <SelectTrigger>
+                <span className="text-sm text-foreground">
+                  {ACTION_LABELS[newForeignKey.onUpdate] ?? newForeignKey.onUpdate}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="NO ACTION">No Action</SelectItem>
+                <SelectItem value="CASCADE">Cascade</SelectItem>
+                <SelectItem value="RESTRICT">Restrict</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-sm font-medium text-foreground">On Delete</Label>
+            <Select
+              value={newForeignKey.onDelete}
+              onValueChange={(value) =>
+                setNewForeignKey((prev) => ({
+                  ...prev,
+                  onDelete: value as OnDeleteActionSchema,
+                }))
+              }
+            >
+              <SelectTrigger>
+                <span className="text-sm text-foreground">
+                  {ACTION_LABELS[newForeignKey.onDelete] ?? newForeignKey.onDelete}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="NO ACTION">No Action</SelectItem>
+                <SelectItem value="CASCADE">Cascade</SelectItem>
+                <SelectItem value="SET NULL">Set Null</SelectItem>
+                <SelectItem value="SET DEFAULT">Set Default</SelectItem>
+                <SelectItem value="RESTRICT">Restrict</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleCancelAddForeignKey}
+            className="w-30"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={handleAddForeignKey}
+            disabled={!isAddButtonEnabled}
+            className="w-30"
+          >
+            {initialValue ? 'Update Foreign Key' : 'Add Foreign Key'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

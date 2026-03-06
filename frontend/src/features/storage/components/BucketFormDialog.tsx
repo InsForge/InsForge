@@ -6,7 +6,6 @@ import {
   Button,
   Dialog,
   DialogBody,
-  DialogCloseButton,
   DialogContent,
   DialogDescription,
   DialogDivider,
@@ -28,18 +27,33 @@ interface BucketFormDialogProps {
 
 interface BucketFormRowProps {
   label: string;
-  description: string;
+  description?: string;
   children: React.ReactNode;
+  layout?: 'vertical' | 'horizontal';
 }
 
-function BucketFormRow({ label, description, children }: BucketFormRowProps) {
-  return (
-    <div className="flex w-full items-start gap-6">
-      <div className="flex w-80 shrink-0 flex-col gap-2">
-        <p className="flex h-8 items-center text-sm leading-5 text-foreground">{label}</p>
-        <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">{description}</p>
+function BucketFormRow({ label, description, children, layout = 'vertical' }: BucketFormRowProps) {
+  if (layout === 'horizontal') {
+    return (
+      <div className="flex w-full items-center justify-between gap-6">
+        <div className="flex flex-col gap-1">
+          <p className="text-sm font-medium leading-5 text-foreground">{label}</p>
+          {description && (
+            <p className="text-[13px] leading-[18px] text-muted-foreground">{description}</p>
+          )}
+        </div>
+        <div className="shrink-0">{children}</div>
       </div>
-      <div className="min-w-0 flex-1">{children}</div>
+    );
+  }
+
+  return (
+    <div className="flex w-full flex-col gap-1.5">
+      <p className="text-sm font-medium leading-5 text-foreground">{label}</p>
+      {description && (
+        <p className="text-[13px] leading-[18px] text-muted-foreground">{description}</p>
+      )}
+      <div className="min-w-0 w-full">{children}</div>
     </div>
   );
 }
@@ -122,16 +136,11 @@ export function BucketFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent showCloseButton={false}>
+      <DialogContent className="max-w-[520px]">
         <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col">
-          <DialogHeader className="gap-0">
-            <div className="flex w-full items-start gap-3">
-              <div className="min-w-0 flex-1 space-y-1">
-                <DialogTitle>{title}</DialogTitle>
-                <DialogDescription>{description}</DialogDescription>
-              </div>
-              <DialogCloseButton className="relative right-auto top-auto h-7 w-7 rounded p-1" />
-            </div>
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+            <DialogDescription>{description}</DialogDescription>
           </DialogHeader>
           <DialogBody className="gap-2 p-4">
             <BucketFormRow label="Bucket Name" description={bucketNameHelpText}>
@@ -147,7 +156,7 @@ export function BucketFormDialog({
                   }}
                   placeholder={mode === 'create' ? 'Enter a name' : ''}
                   disabled={mode === 'edit'}
-                  className={`h-8 rounded px-1.5 py-1.5 text-sm leading-5 ${mode === 'edit' ? 'cursor-not-allowed' : ''}`}
+                  className={`h-8 px-1.5 py-1.5 text-sm leading-5 ${mode === 'edit' ? 'cursor-not-allowed' : ''}`}
                   autoFocus={mode === 'create'}
                 />
                 {error && <p className="text-[13px] leading-[18px] text-destructive">{error}</p>}
@@ -158,7 +167,8 @@ export function BucketFormDialog({
 
             <BucketFormRow
               label="Public Bucket"
-              description="If enabled, files in this bucket can be accessed without authentication."
+              description="Allow public read access to files without authentication."
+              layout="horizontal"
             >
               <div className="flex h-8 w-full items-center justify-end">
                 <Switch id="bucket-public" checked={isPublic} onCheckedChange={setIsPublic} />
@@ -172,6 +182,7 @@ export function BucketFormDialog({
                 <BucketFormRow
                   label="File Size Limit"
                   description="Default limit for cloud projects."
+                  layout="horizontal"
                 >
                   <div className="flex w-full flex-col gap-1">
                     <p className="text-sm leading-5 text-foreground">50MB per file</p>
@@ -192,14 +203,14 @@ export function BucketFormDialog({
               </>
             )}
           </DialogBody>
-          <DialogFooter className="gap-3 p-4">
-            <Button type="button" variant="secondary" onClick={handleClose} className="h-8 px-2">
+          <DialogFooter>
+            <Button type="button" variant="secondary" onClick={handleClose} className="w-30">
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={isLoading || (mode === 'create' && !bucketName.trim())}
-              className="h-8 px-2"
+              className="w-30"
             >
               {submitButtonText}
             </Button>

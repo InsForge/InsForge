@@ -1,26 +1,16 @@
 /* React Data Grid styles */
 @import 'react-data-grid/lib/styles.css';
 
-@layer base {
-  :root {
-    --rdg-border-color: var(--alpha-8);
-    --rdg-background-color: rgb(var(--semantic-1));
-    --rdg-row-hover-color: var(--alpha-4);
-    --rdg-background-color-edit: rgb(var(--semantic-1));
-    --rdg-header-row-background-color: rgb(var(--semantic-1));
-    --rdg-outline-color: rgb(var(--foreground));
-    --rdg-cell-frozen-box-shadow: none;
-  }
-
-  .rdg-dark {
-    --rdg-border-color: var(--alpha-8);
-    --rdg-background-color: rgb(var(--semantic-1));
-    --rdg-row-hover-color: var(--alpha-4);
-    --rdg-background-color-edit: rgb(var(--semantic-1));
-    --rdg-header-row-background-color: rgb(var(--semantic-1));
-    --rdg-outline-color: rgb(var(--foreground));
-    --rdg-cell-frozen-box-shadow: none;
-  }
+/* Override react-data-grid CSS variables directly on the grid element.
+   Must use .insforge-rdg (not :root) to beat RDG's own class-level definitions. */
+.insforge-rdg {
+  --rdg-border-color: var(--alpha-8);
+  --rdg-background-color: rgb(var(--semantic-1));
+  --rdg-row-hover-color: var(--alpha-4);
+  --rdg-background-color-edit: rgb(var(--semantic-1));
+  --rdg-header-row-background-color: rgb(var(--semantic-1));
+  --rdg-outline-color: rgb(var(--foreground));
+  --rdg-cell-frozen-box-shadow: none;
 }
 
 .rdg-cell {
@@ -45,7 +35,7 @@
 }
 
 .rdg-row {
-  background-color: rgb(var(--semantic-0));
+  background-color: rgb(var(--card));
 }
 
 .rdg-row:hover,
@@ -55,8 +45,7 @@
 }
 
 .rdg-cell[aria-selected='true'] {
-  outline: 1px solid rgb(var(--foreground));
-  outline-offset: -1px;
+  outline: none;
   box-shadow: none;
 }
 

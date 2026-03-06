@@ -104,8 +104,8 @@ export function Pagination({
       )}
       {...props}
     >
-      <p className="min-w-0 flex-1 truncate text-[13px] leading-[18px] text-muted-foreground">
-        Showing {startRecord} to {endRecord} of {totalRecords} {recordLabel}
+      <p className="min-w-0 flex-1 truncate text-xs font-medium leading-[18px] text-muted-foreground">
+        {endRecord} of {totalRecords} {totalRecords === 1 ? recordLabel.replace(/s$/, '') : recordLabel}
       </p>
       <nav className="flex items-center gap-1" aria-label="Pagination">
         <button

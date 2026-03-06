@@ -27,17 +27,17 @@ export function PrimaryMenu({
 
   const menuItemBaseClasses = (isActive: boolean) =>
     cn(
-      'group flex items-center rounded transition-colors',
-      isCollapsed ? 'h-8 w-9 justify-center p-1.5' : 'h-8 w-full gap-1 p-1.5',
+      'group flex items-center rounded-lg transition-all duration-150 active:scale-[0.98]',
+      isCollapsed ? 'h-8 w-8 justify-center' : 'h-8 w-full gap-1 p-1.5',
       isActive
-        ? 'bg-toast text-foreground'
+        ? 'bg-alpha-8 text-foreground'
         : 'text-muted-foreground hover:bg-alpha-4 hover:text-foreground'
     );
 
   const MenuItemLabel = ({ label, isActive }: { label: string; isActive: boolean }) => (
     <span
       className={cn(
-        'min-w-0 truncate px-2 text-sm font-normal leading-5',
+        'min-w-0 truncate px-2 text-sm font-medium leading-5',
         isActive ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'
       )}
     >
@@ -47,9 +47,10 @@ export function PrimaryMenu({
 
   const MenuItemIcon = ({ item, isActive }: { item: PrimaryMenuItem; isActive: boolean }) => (
     <item.icon
+      strokeWidth={1.5}
       className={cn(
         'h-5 w-5 shrink-0',
-        isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
+        isActive ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'
       )}
     />
   );
@@ -110,21 +111,18 @@ export function PrimaryMenu({
     );
   };
 
-  const ToggleButton = ({ compact = false }: { compact?: boolean }) => (
+  const ToggleButton = () => (
     <Tooltip>
       <TooltipTrigger asChild>
         <button
           type="button"
           onClick={handleToggleClick}
-          className={cn(
-            'flex items-center justify-center rounded text-muted-foreground transition-colors hover:bg-alpha-8 hover:text-foreground',
-            compact ? 'h-6 w-6' : 'h-9 w-9 p-1.5'
-          )}
+          className="h-8 w-8 flex items-center justify-center rounded-lg text-muted-foreground transition-all duration-150 hover:bg-alpha-4 hover:text-foreground active:scale-[0.98]"
         >
           {isCollapsed ? (
-            <PanelLeftOpen className="h-5 w-5" />
+            <PanelLeftOpen strokeWidth={1.5} className="h-5 w-5" />
           ) : (
-            <PanelRightOpen className="h-5 w-5" />
+            <PanelRightOpen strokeWidth={1.5} className="h-5 w-5" />
           )}
         </button>
       </TooltipTrigger>
@@ -135,13 +133,12 @@ export function PrimaryMenu({
   );
 
   const bottomItemsList = bottomItems ?? [];
-  const useInlineToggle = !isCollapsed && bottomItemsList.length === 1;
 
   return (
     <TooltipProvider disableHoverableContent delayDuration={300}>
       <aside
         className={cn(
-          'bg-semantic-2 border-r border-border h-full flex flex-col flex-shrink-0 px-2 pt-3 pb-2',
+          'bg-card border-r border-border h-full flex flex-col flex-shrink-0 px-2 pt-3 pb-2',
           'transition-[width] duration-300 ease-in-out overflow-hidden',
           isCollapsed ? 'w-[52px]' : 'w-[200px]'
         )}
@@ -159,25 +156,12 @@ export function PrimaryMenu({
         {/* Spacer to push bottom items down */}
         <div className="flex-1" />
 
-        {/* Bottom items */}
-        <div className={cn('w-full', isCollapsed ? 'space-y-2' : 'space-y-1.5')}>
-          {useInlineToggle ? (
-            <div className="flex items-center gap-2">
-              <div className="min-w-0 flex-1">
-                <MenuItem item={bottomItemsList[0]} isBottom />
-              </div>
-              <ToggleButton compact />
-            </div>
-          ) : (
-            <>
-              {bottomItemsList.map((item) => (
-                <MenuItem key={item.id} item={item} isBottom />
-              ))}
-              <div className={cn('flex', isCollapsed ? 'justify-center' : 'justify-start')}>
-                <ToggleButton compact={!isCollapsed} />
-              </div>
-            </>
-          )}
+        {/* Bottom items + toggle */}
+        <div className="w-full space-y-1.5">
+          {bottomItemsList.map((item) => (
+            <MenuItem key={item.id} item={item} isBottom />
+          ))}
+          <ToggleButton />
         </div>
       </aside>
     </TooltipProvider>

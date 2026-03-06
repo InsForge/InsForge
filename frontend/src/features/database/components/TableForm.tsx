@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, Plus, X, Link, MoveRight } from 'lucide-react';
+import { AlertCircle, X, Link, MoveRight } from 'lucide-react';
 import { Button, Input } from '@insforge/ui';
 import { Alert, AlertDescription } from '@/components';
 import { tableService } from '@/features/database/services/table.service';
@@ -458,7 +458,7 @@ export function TableForm({
             )}
           </div>
 
-          <div className="overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
+          <div className="overflow-hidden rounded-lg border border-[var(--alpha-8)] bg-card">
             <div className="px-4 py-3">
               <h2 className="text-base leading-7 font-medium">Columns</h2>
             </div>
@@ -496,16 +496,15 @@ export function TableForm({
               <Button
                 type="button"
                 onClick={addField}
-                variant="secondary"
-                className="h-8 rounded border-[var(--alpha-8)] bg-card px-2.5 text-sm font-medium hover:before:bg-[var(--alpha-4)]"
+                variant="outline-muted"
+                className="h-8 px-2.5"
               >
-                <Plus className="size-5" />
                 Add Column
               </Button>
             </div>
           </div>
 
-          <div className="overflow-hidden rounded border border-[var(--alpha-8)] bg-card">
+          <div className="overflow-hidden rounded-lg border border-[var(--alpha-8)] bg-card">
             <div className="flex flex-col gap-1 px-4 py-3">
               <h2 className="text-base leading-7 font-medium">Foreign Keys</h2>
               <p className="text-sm leading-6 text-muted-foreground">
@@ -563,12 +562,11 @@ export function TableForm({
             <div className="flex justify-center border-t border-[var(--alpha-8)] px-4 py-3">
               <Button
                 type="button"
-                variant="secondary"
-                className="h-8 rounded border-[var(--alpha-8)] bg-card px-2.5 text-sm font-medium hover:before:bg-[var(--alpha-4)]"
+                variant="outline-muted"
+                className="h-8 px-2.5"
                 onClick={() => setShowForeignKeyDialog(true)}
               >
-                <Link className="size-5" />
-                Add Foreign Keys
+                Add Foreign Key
               </Button>
             </div>
 
@@ -605,9 +603,9 @@ export function TableForm({
         <div className="mx-auto flex w-full max-w-[1024px] justify-end gap-2.5">
           <Button
             type="button"
-            variant="secondary"
+            variant="outline-muted"
             onClick={() => onOpenChange(false)}
-            className="h-9 rounded border-[var(--alpha-8)] bg-card px-3 text-sm font-medium hover:before:bg-[var(--alpha-4)]"
+            className="h-9 px-3"
           >
             Cancel
           </Button>
@@ -619,7 +617,7 @@ export function TableForm({
               updateTableMutation.isPending ||
               (!form.formState.isDirty && !foreignKeysDirty)
             }
-            className="h-9 rounded bg-primary px-3 text-sm font-medium text-[rgb(var(--inverse))] hover:before:bg-[var(--alpha-inverse-8)] disabled:opacity-40"
+            className="h-9 px-3"
           >
             {mode === 'edit' ? 'Update Table' : 'Create Table'}
           </Button>

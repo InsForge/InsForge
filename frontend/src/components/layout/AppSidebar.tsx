@@ -35,21 +35,24 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
       if (aiItemIndex >= 0) {
         items[aiItemIndex] = { ...items[aiItemIndex], sectionEnd: false };
         items.splice(aiItemIndex + 1, 0, deploymentsItem);
-        return items;
+      } else {
+        items.push(deploymentsItem);
       }
-
-      return [...items, deploymentsItem];
     }
 
-    return items;
-  }, [isCloud]);
+    // Add a section separator on the last item before settings
+    if (items.length > 0) {
+      items[items.length - 1] = { ...items[items.length - 1], sectionEnd: true };
+    }
 
-  // Build bottom menu items based on deployment environment
-  const bottomMenuItems = useMemo(() => {
-    const items: PrimaryMenuItem[] = [];
+    // Settings lives at the bottom of the main nav
     items.push({ ...settingsMenuItem, onClick: () => openSettingsDialog() });
+
     return items;
-  }, [openSettingsDialog]);
+  }, [isCloud, openSettingsDialog]);
+
+  // Toggle button is the only bottom element; settings moved to main nav
+  const bottomMenuItems = useMemo<PrimaryMenuItem[]>(() => [], []);
 
   // Find which primary menu item matches the current route
   // Items with secondary menus use prefix matching (end: false)

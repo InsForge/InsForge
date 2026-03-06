@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Lock, Mail, Settings } from 'lucide-react';
+import { Lock, Mail } from 'lucide-react';
 import {
   Button,
   Checkbox,
@@ -37,9 +37,10 @@ import { isInsForgeCloudProject } from '@/lib/utils/utils';
 interface AuthSettingsMenuDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  defaultSection?: AuthSettingsSection;
 }
 
-type AuthSettingsSection = 'general' | 'email-verification' | 'password';
+type AuthSettingsSection = 'email-verification' | 'password';
 
 const defaultValues: UpdateAuthConfigRequest = {
   requireEmailVerification: false,
@@ -95,9 +96,9 @@ function SettingRow({ label, description, children }: SettingRowProps) {
   );
 }
 
-export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuDialogProps) {
+export function AuthSettingsMenuDialog({ open, onOpenChange, defaultSection = 'password' }: AuthSettingsMenuDialogProps) {
   const isCloudProject = isInsForgeCloudProject();
-  const [activeSection, setActiveSection] = useState<AuthSettingsSection>('general');
+  const [activeSection, setActiveSection] = useState<AuthSettingsSection>(defaultSection);
   const { config, isLoading, isUpdating, updateConfig } = useAuthConfig();
 
   const form = useForm<UpdateAuthConfigRequest>({
@@ -114,14 +115,14 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
   useEffect(() => {
     if (open) {
       resetForm();
-      setActiveSection('general');
+      setActiveSection(defaultSection);
     }
-  }, [open, resetForm]);
+  }, [open, resetForm, defaultSection]);
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       resetForm();
-      setActiveSection('general');
+      setActiveSection(defaultSection);
     }
     onOpenChange(nextOpen);
   };
@@ -136,10 +137,7 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
     if (activeSection === 'email-verification') {
       return 'Email Verification';
     }
-    if (activeSection === 'password') {
-      return 'Password';
-    }
-    return 'General';
+    return 'Password';
   }, [activeSection]);
 
   const saveDisabled = !form.formState.isDirty || isUpdating;
@@ -153,13 +151,6 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
           </MenuDialogSideNavHeader>
           <MenuDialogNav>
             <MenuDialogNavList>
-              <MenuDialogNavItem
-                icon={<Settings className="h-5 w-5" />}
-                active={activeSection === 'general'}
-                onClick={() => setActiveSection('general')}
-              >
-                General
-              </MenuDialogNavItem>
               {isCloudProject && (
                 <MenuDialogNavItem
                   icon={<Mail className="h-5 w-5" />}
@@ -198,26 +189,6 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
               className="flex min-h-0 flex-1 flex-col"
             >
               <MenuDialogBody>
-                {activeSection === 'general' && (
-                  <SettingRow
-                    label="Redirect URL After Sign In"
-                    description="Your app url after successful authentication"
-                  >
-                    <Input
-                      type="url"
-                      placeholder="https://yourapp.com/dashboard"
-                      {...form.register('signInRedirectTo')}
-                      className={form.formState.errors.signInRedirectTo ? 'border-destructive' : ''}
-                    />
-                    {form.formState.errors.signInRedirectTo && (
-                      <p className="pt-1 text-xs text-destructive">
-                        {form.formState.errors.signInRedirectTo.message ||
-                          'Please enter a valid URL'}
-                      </p>
-                    )}
-                  </SettingRow>
-                )}
-
                 {activeSection === 'email-verification' && (
                   <>
                     {!isCloudProject ? (

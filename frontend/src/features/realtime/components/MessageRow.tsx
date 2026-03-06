@@ -6,17 +6,24 @@ import type { RealtimeMessage } from '../services/realtime.service';
 
 interface MessageRowProps {
   message: RealtimeMessage;
+  isLast?: boolean;
   className?: string;
 }
 
-export function MessageRow({ message, className }: MessageRowProps) {
+export function MessageRow({ message, isLast, className }: MessageRowProps) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className={cn('rounded border border-[var(--alpha-8)] bg-card', className)}>
+    <div
+      className={cn(
+        'bg-[rgb(var(--card))]',
+        !isLast && !expanded && 'border-b border-[var(--alpha-8)]',
+        className
+      )}
+    >
       {/* Row */}
       <div
-        className="flex items-center rounded cursor-pointer hover:bg-[var(--alpha-8)] transition-colors"
+        className="flex items-center cursor-pointer hover:bg-[var(--alpha-4)] transition-colors"
         onClick={() => setExpanded((prev) => !prev)}
       >
         {/* Chevron */}
@@ -83,7 +90,7 @@ export function MessageRow({ message, className }: MessageRowProps) {
 
       {/* Expanded payload */}
       {expanded && (
-        <div className="px-3 pb-3">
+        <div className={cn('px-3 pb-3', !isLast && 'border-b border-[var(--alpha-8)]')}>
           <CodeBlock
             code={JSON.stringify(message.payload, null, 2)}
             label="Payload"

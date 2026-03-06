@@ -3,7 +3,7 @@ import { Folder } from 'lucide-react';
 import { useStorage } from '@/features/storage/hooks/useStorage';
 import { StorageFileSchema } from '@insforge/shared-schemas';
 import { ConfirmDialog } from '@insforge/ui';
-import { LoadingState, ErrorState, EmptyState, ConnectCTA } from '@/components';
+import { LoadingState, ErrorState, EmptyState, DataGridEmptyState } from '@/components';
 import { StorageDataGrid } from './StorageDataGrid';
 import { FilePreviewDialog } from './FilePreviewDialog';
 import { useConfirm } from '@/lib/hooks/useConfirm';
@@ -203,10 +203,9 @@ export function StorageManager({
           onDelete={(file) => void handleDelete(file)}
           isDownloading={isDownloading}
           emptyState={
-            <div className="text-sm text-foreground">
-              {searchQuery ? 'No files match your search criteria' : 'No files found'}.{' '}
-              <ConnectCTA />
-            </div>
+            <DataGridEmptyState
+              message={searchQuery ? 'No files match your search criteria' : 'No files found'}
+            />
           }
         />
       </div>

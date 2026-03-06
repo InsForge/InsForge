@@ -294,6 +294,12 @@ function MetricCard({ label, value, unit, icon }: MetricCardProps) {
   );
 }
 
+// Shared radial dot grid style — uses token, works in both light and dark mode
+const radialGridStyle = {
+  backgroundImage: 'radial-gradient(circle, var(--alpha-12) 1px, transparent 1px)',
+  backgroundSize: '34px 34px',
+} as const;
+
 function DashboardLoadingState() {
   return (
     <main className="h-full overflow-hidden bg-semantic-0">
@@ -333,20 +339,8 @@ function DashboardLoadingState() {
         </section>
 
         <section className="relative min-h-[420px] flex-1 overflow-hidden bg-semantic-0">
-          <div
-            className="absolute inset-0 dark:hidden"
-            style={{
-              backgroundImage: `radial-gradient(circle, rgba(0, 0, 0, 0.12) 1px, transparent 1px)`,
-              backgroundSize: '34px 34px',
-            }}
-          />
-          <div
-            className="absolute inset-0 hidden dark:block"
-            style={{
-              backgroundImage: `radial-gradient(circle, rgba(255, 255, 255, 0.10) 1px, transparent 1px)`,
-              backgroundSize: '34px 34px',
-            }}
-          />
+          {/* P0: unified radial grid using token — no dark:hidden/hidden dark:block */}
+          <div className="absolute inset-0" style={radialGridStyle} />
           <div className="relative z-10 flex h-full items-center justify-center">
             <div className="flex items-center gap-12">
               <Skeleton className="h-[92px] w-[240px] rounded-lg border border-[var(--alpha-8)]" />
@@ -480,7 +474,8 @@ export default function DashboardPage() {
         sourceHandle: 'edge-right',
         targetHandle: 'edge-left',
         style: {
-          stroke: 'white',
+          // P0: use foreground token so edge is visible in both light and dark
+          stroke: 'rgb(var(--foreground))',
           strokeWidth: 2,
           zIndex: 1000,
         },
@@ -524,7 +519,8 @@ export default function DashboardPage() {
                 <StatusTile
                   label="Status"
                   value={projectHealth}
-                  icon={<div className="h-2 w-2 rounded-full bg-emerald-400" />}
+                  // P0: use token instead of hardcoded bg-emerald-400
+                  icon={<div className="h-2 w-2 rounded-full bg-primary" />}
                 />
                 <StatusTile
                   label="Agent"
@@ -590,20 +586,8 @@ export default function DashboardPage() {
         </section>
 
         <section className="relative min-h-[420px] flex-1 overflow-hidden bg-semantic-0">
-          <div
-            className="absolute inset-0 dark:hidden"
-            style={{
-              backgroundImage: `radial-gradient(circle, rgba(0, 0, 0, 0.12) 1px, transparent 1px)`,
-              backgroundSize: '34px 34px',
-            }}
-          />
-          <div
-            className="absolute inset-0 hidden dark:block"
-            style={{
-              backgroundImage: `radial-gradient(circle, rgba(255, 255, 255, 0.10) 1px, transparent 1px)`,
-              backgroundSize: '34px 34px',
-            }}
-          />
+          {/* P0: unified radial grid using token — no dark:hidden/hidden dark:block */}
+          <div className="absolute inset-0" style={radialGridStyle} />
 
           <div className="relative z-10 h-full w-full">
             <ReactFlow

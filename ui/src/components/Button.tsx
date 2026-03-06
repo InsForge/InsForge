@@ -6,7 +6,7 @@ import { cn } from '../lib/utils';
 
 const buttonVariants = cva(
   [
-    'relative isolate inline-flex items-center justify-center gap-1 whitespace-nowrap rounded text-sm font-medium leading-5',
+    'relative isolate inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-lg text-sm font-medium leading-5',
     'cursor-pointer overflow-hidden',
     'before:pointer-events-none before:absolute before:inset-0 before:transition-colors',
     'hover:before:bg-[var(--alpha-inverse-8)]',
@@ -24,6 +24,7 @@ const buttonVariants = cva(
         primary: 'bg-primary text-[rgb(var(--inverse))]',
         secondary: 'bg-card text-foreground border border-[var(--border)]',
         outline: 'bg-transparent text-foreground border border-foreground',
+        'outline-muted': 'bg-transparent text-muted-foreground border border-[var(--alpha-8)]',
         ghost: 'bg-transparent text-muted-foreground',
         destructive: 'bg-destructive text-white',
       },

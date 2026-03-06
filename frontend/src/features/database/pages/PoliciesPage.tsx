@@ -13,7 +13,7 @@ import {
 } from '@/components';
 import { usePolicies } from '../hooks/useDatabase';
 import { SQLModal, SQLCellButton } from '../components/SQLModal';
-import { DatabaseStudioMenuPanel } from '../components/DatabaseSecondaryMenu';
+import { DatabaseStudioSidebar } from '../components/DatabaseSecondaryMenu';
 import type { DatabasePoliciesResponse } from '@insforge/shared-schemas';
 
 interface PolicyRow extends DataGridRowType {
@@ -153,11 +153,7 @@ export default function PoliciesPage() {
   if (error) {
     return (
       <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
-        <DatabaseStudioMenuPanel
-          onBack={() =>
-            void navigate('/dashboard/database/tables', { state: { slideFromStudio: true } })
-          }
-        />
+        <DatabaseStudioSidebar />
         <div className="min-w-0 flex-1 flex items-center justify-center bg-[rgb(var(--semantic-1))]">
           <EmptyState
             title="Failed to load policies"
@@ -170,7 +166,7 @@ export default function PoliciesPage() {
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <DatabaseStudioMenuPanel
+      <DatabaseStudioSidebar
         onBack={() =>
           void navigate('/dashboard/database/tables', { state: { slideFromStudio: true } })
         }
@@ -184,13 +180,12 @@ export default function PoliciesPage() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-                    variant="ghost"
+                    variant="outline-muted"
                     size="icon"
-                    className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
                     onClick={() => void handleRefresh()}
                     disabled={isRefreshing}
                   >
-                    <RefreshIcon className={isRefreshing ? 'h-5 w-5 animate-spin' : 'h-5 w-5'} />
+                    <RefreshIcon className={isRefreshing ? '!size-3.5 animate-spin' : '!size-3.5'} />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" align="center">

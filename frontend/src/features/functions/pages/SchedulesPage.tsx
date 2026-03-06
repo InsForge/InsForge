@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
-import { ArrowLeft, CirclePlus } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useSchedules } from '@/features/functions/hooks/useSchedules';
 import {
   Button,
@@ -202,22 +202,29 @@ export default function SchedulesPage() {
       <TableHeader
         className="min-w-[800px]"
         leftContent={
-          <div className="flex flex-1 items-center overflow-clip">
+          <div className="flex flex-1 items-center gap-2 overflow-clip">
             <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">Schedules</h1>
             <div className="flex h-5 w-5 shrink-0 items-center justify-center">
               <div className="h-5 w-px bg-[var(--alpha-8)]" />
             </div>
+            <Button
+              variant="primary"
+              className="h-8 px-3 text-sm font-medium"
+              onClick={() => setCreateOpen(true)}
+            >
+              Add Schedule
+            </Button>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-                    variant="ghost"
+                    variant="outline-muted"
                     size="icon"
                     onClick={() => void handleRefresh()}
                     disabled={isRefreshing}
-                    className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
+                    className="h-8 w-8"
                   >
-                    <RefreshIcon className={isRefreshing ? 'h-5 w-5 animate-spin' : 'h-5 w-5'} />
+                    <RefreshIcon className={isRefreshing ? '!size-3.5 animate-spin' : '!size-3.5'} />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" align="center">
@@ -225,17 +232,6 @@ export default function SchedulesPage() {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            <div className="flex h-5 w-5 shrink-0 items-center justify-center">
-              <div className="h-5 w-px bg-[var(--alpha-8)]" />
-            </div>
-            <Button
-              variant="ghost"
-              onClick={() => setCreateOpen(true)}
-              className="h-8 rounded px-1.5 text-primary hover:bg-[var(--alpha-4)] hover:text-primary active:bg-[var(--alpha-8)]"
-            >
-              <CirclePlus className="h-6 w-6 stroke-[1.5] text-primary" />
-              <span className="px-1 text-sm font-medium leading-5">Add Schedule</span>
-            </Button>
           </div>
         }
         searchValue={searchQuery}
@@ -259,77 +255,69 @@ export default function SchedulesPage() {
         onScroll={handleScroll}
         className="flex-1 min-h-0 overflow-y-auto relative"
       >
-        {/* Top spacing */}
-        <div className="h-3" />
-
         {/* Sticky Table Header */}
-        <div
-          className={`sticky top-0 z-10 bg-[rgb(var(--semantic-1))] px-3 ${isScrolled ? 'border-b border-[var(--alpha-8)]' : ''}`}
-        >
-          <div className="flex items-center h-8 pl-2 text-sm text-muted-foreground">
-            <div className="flex-1 py-1.5 px-2.5">Name</div>
-            <div className="flex-[2] py-1.5 px-2.5">Function URL</div>
-            <div className="flex-1 py-1.5 px-2.5">Next Run</div>
-            <div className="flex-1 py-1.5 px-2.5">Last Run</div>
-            <div className="flex-1 py-1.5 px-2.5">Created</div>
-            <div className="w-[60px] py-1.5 px-2.5">Active</div>
-            <div className="w-12" />
-          </div>
+        <div className="sticky top-0 z-10 flex h-10 items-center border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-1))] pl-2">
+          <div className="flex-1 px-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Name</div>
+          <div className="flex-[2] px-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Function URL</div>
+          <div className="flex-1 px-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Next Run</div>
+          <div className="flex-1 px-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Last Run</div>
+          <div className="flex-1 px-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Created</div>
+          <div className="w-[60px] px-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Active</div>
+          <div className="w-12" />
         </div>
 
         {/* Table Body */}
-        <div className="flex flex-col px-3 pb-4">
-          <div className="flex flex-col gap-1 pt-1">
-            {isLoading ? (
-              <>
-                {[...Array(4)].map((_, i) => (
-                  <Skeleton key={i} className="h-12 rounded" />
-                ))}
-              </>
-            ) : filteredSchedules.length >= 1 ? (
-              <>
-                {filteredSchedules.map((s) => (
-                  <ScheduleRow
-                    key={s.id}
-                    schedule={s}
-                    onClick={() => void handleViewLogs(s.id, s.name)}
-                    onEdit={(id) => handleEditSchedule(id)}
-                    onDelete={(id) => void handleDeleteSchedule(id)}
-                    onToggle={(id, isActive) => void toggleScheduleFn(id, isActive)}
-                    isLoading={Boolean(isUpdating || isDeletingSchedule)}
-                  />
-                ))}
-              </>
-            ) : (
-              <ScheduleEmptyState />
-            )}
-          </div>
-
-          {/* Pagination controls */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-end gap-2 py-2">
-              <Button
-                variant="ghost"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                Prev
-              </Button>
-              <div className="text-sm text-muted-foreground">
-                Page {currentPage} of {totalPages}
-              </div>
-              <Button
-                variant="ghost"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                Next
-              </Button>
-            </div>
+        <div className="flex flex-col pb-4">
+          {isLoading ? (
+            <>
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-12 rounded-none border-b border-[var(--alpha-8)] bg-[rgb(var(--card))]" />
+              ))}
+            </>
+          ) : filteredSchedules.length >= 1 ? (
+            <>
+              {filteredSchedules.map((s, index) => (
+                <ScheduleRow
+                  key={s.id}
+                  schedule={s}
+                  onClick={() => void handleViewLogs(s.id, s.name)}
+                  onEdit={(id) => handleEditSchedule(id)}
+                  onDelete={(id) => void handleDeleteSchedule(id)}
+                  onToggle={(id, isActive) => void toggleScheduleFn(id, isActive)}
+                  isLoading={Boolean(isUpdating || isDeletingSchedule)}
+                  isLast={index === filteredSchedules.length - 1}
+                />
+              ))}
+            </>
+          ) : (
+            <ScheduleEmptyState />
           )}
         </div>
+
+        {/* Pagination controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-end gap-2 px-3 py-2">
+            <Button
+              variant="ghost"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              Prev
+            </Button>
+            <div className="text-sm text-muted-foreground">
+              Page {currentPage} of {totalPages}
+            </div>
+            <Button
+              variant="ghost"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              Next
+            </Button>
+          </div>
+        )}
 
         {/* Loading mask overlay */}
         {isRefreshing && (

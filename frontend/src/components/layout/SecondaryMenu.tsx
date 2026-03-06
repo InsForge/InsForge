@@ -73,7 +73,6 @@ function SecondaryMenuItem({
   onItemMenuClick,
   itemActions,
 }: SecondaryMenuItemProps) {
-  // Each item determines its own active state using React Router's useMatch
   const match = useMatch({ path: item.href ?? '/__secondary_menu_no_match__', end: false });
   const hasExternalActiveItem = activeItemId !== null && activeItemId !== undefined;
   const isSelected = hasExternalActiveItem ? item.id === activeItemId : !!match;
@@ -87,7 +86,7 @@ function SecondaryMenuItem({
     <>
       <div
         className={cn(
-          'flex w-full items-center gap-1 rounded px-1.5 transition-colors',
+          'flex w-full items-center gap-1 rounded-lg px-1.5 transition-colors',
           isSelected
             ? 'bg-alpha-8 text-foreground'
             : 'text-muted-foreground hover:bg-alpha-4 hover:text-foreground'
@@ -99,7 +98,7 @@ function SecondaryMenuItem({
             onClick={handleItemClick}
             className="flex min-w-0 flex-1 items-center px-2 py-1.5"
           >
-            <p className={cn('truncate text-sm leading-5', isSelected && 'text-inherit')}>
+            <p className={cn('truncate text-sm font-medium leading-5', isSelected && 'text-inherit')}>
               {item.label}
             </p>
           </Link>
@@ -108,7 +107,7 @@ function SecondaryMenuItem({
             className="h-auto min-w-0 flex-1 justify-start pl-2 pr-1 py-1.5 text-left text-sm leading-5 text-inherit cursor-pointer"
             onClick={handleItemClick}
           >
-            <p className="truncate">{item.label}</p>
+            <p className="truncate font-medium">{item.label}</p>
           </div>
         )}
 
@@ -119,26 +118,27 @@ function SecondaryMenuItem({
                 variant="ghost"
                 size="icon-sm"
                 className={cn(
-                  'h-6 w-6 rounded p-0',
+                  'h-6 w-6 rounded-lg p-0',
+                  'hover:before:bg-transparent active:before:bg-transparent',
                   isSelected
-                    ? 'text-foreground hover:bg-alpha-8'
-                    : 'text-muted-foreground hover:bg-alpha-8'
+                    ? 'text-muted-foreground/50 opacity-100'
+                    : 'text-muted-foreground/40 opacity-0 group-hover:opacity-100'
                 )}
               >
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuContent align="start" className="w-40" sideOffset={6}>
               {menuActions.map((action) => (
                 <DropdownMenuItem
                   key={action.id}
-                  className={cn('cursor-pointer', action.destructive && 'text-destructive')}
+                  className={cn('cursor-pointer [&_svg]:size-3.5', action.destructive && 'text-destructive')}
                   onClick={(e) => {
                     e.stopPropagation();
                     action.onClick(item);
                   }}
                 >
-                  {action.icon && <action.icon className="mr-2 h-4 w-4" />}
+                  {action.icon && <action.icon strokeWidth={1} />}
                   {action.label}
                 </DropdownMenuItem>
               ))}
@@ -150,10 +150,11 @@ function SecondaryMenuItem({
               variant="ghost"
               size="icon-sm"
               className={cn(
-                'h-6 w-6 rounded p-0',
+                'h-6 w-6 rounded-lg p-0',
+                'hover:before:bg-transparent active:before:bg-transparent',
                 isSelected
-                  ? 'text-foreground hover:bg-alpha-8'
-                  : 'text-muted-foreground hover:bg-alpha-8'
+                  ? 'text-muted-foreground/50 opacity-100'
+                  : 'text-muted-foreground/40 opacity-0 group-hover:opacity-100'
               )}
               onClick={(e) => {
                 e.preventDefault();
@@ -209,12 +210,12 @@ export function SecondaryMenu({
   return (
     <aside
       className={cn(
-        'w-60 h-full min-h-0 flex flex-col border-r border-border bg-semantic-1 flex-shrink-0',
-        'transition-all duration-300 ease-in-out'
+        'w-60 h-full min-h-0 flex flex-col border-r border-border bg-card flex-shrink-0',
+        'transition-[width] duration-300 ease-in-out'
       )}
     >
       {/* Header */}
-      <div className="flex h-14 items-center justify-between pl-4 pr-3 py-3">
+      <div className="flex h-[57px] shrink-0 items-center justify-between border-b border-[var(--alpha-8)] pl-4 pr-3 py-3">
         <p className="truncate text-base font-medium leading-7 text-foreground">{title}</p>
         {!!headerButtons?.length && (
           <div className="flex items-center">
@@ -223,7 +224,7 @@ export function SecondaryMenu({
                 key={button.id}
                 variant="ghost"
                 size="icon-lg"
-                className="h-9 w-9 rounded text-muted-foreground hover:bg-alpha-8 hover:text-foreground"
+                className="h-9 w-9 rounded-lg text-muted-foreground hover:bg-alpha-8 hover:text-foreground"
                 aria-label={button.label}
                 title={button.label}
                 onClick={button.onClick}
@@ -236,56 +237,47 @@ export function SecondaryMenu({
         )}
       </div>
 
-      {/* Action Buttons */}
-      {!!actionButtons?.length && (
-        <div className="px-3 pb-3">
-          <div className="flex flex-col gap-2">
-            {actionButtons.map((button) => (
+      {/* Scrollable content */}
+      <ScrollArea className="flex-1 px-3 py-3">
+        <div className="flex flex-col gap-1.5">
+          {/* Action Buttons */}
+          {!!actionButtons?.length &&
+            actionButtons.map((button) => (
               <Button
                 key={button.id}
-                variant="secondary"
-                className="h-8 w-full justify-start gap-1.5 rounded border-alpha-8 px-2 text-sm leading-5 font-medium"
+                variant="outline-muted"
+                className="h-8 w-full px-2.5 text-xs"
                 onClick={button.onClick}
                 disabled={button.disabled}
               >
-                {button.icon && <button.icon className="h-5 w-5" />}
-                <span className="truncate">{button.label}</span>
+                {button.icon && <button.icon strokeWidth={1.5} className="!size-3.5" />}
+                {button.label}
               </Button>
             ))}
-          </div>
-          <div className="mt-3 h-px w-full bg-alpha-8" />
-        </div>
-      )}
 
-      {/* Search */}
-      {showSearch && (
-        <div className={cn('px-3 pb-3', !actionButtons?.length && 'pt-0')}>
-          <SearchInput
-            value={searchValue}
-            onChange={handleSearchChange}
-            placeholder={searchPlaceholder}
-            debounceTime={0}
-          />
-        </div>
-      )}
+          {/* Search */}
+          {showSearch && (
+            <SearchInput
+              value={searchValue}
+              onChange={handleSearchChange}
+              placeholder={searchPlaceholder}
+              debounceTime={0}
+            />
+          )}
 
-      {/* Item List */}
-      <ScrollArea className="flex-1 px-3 pb-2">
-        {loading ? (
-          <div className="flex flex-col gap-1.5">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-9 w-full rounded bg-alpha-8 animate-pulse" />
-            ))}
-          </div>
-        ) : filteredItems.length === 0 ? (
-          hasSearchQuery || !emptyState ? (
-            <div className="px-2 py-1 text-sm text-muted-foreground">No results found</div>
+          {/* Item List */}
+          {loading ? (
+            [...Array(5)].map((_, i) => (
+              <div key={i} className="h-9 w-full rounded-lg bg-alpha-8 animate-pulse" />
+            ))
+          ) : filteredItems.length === 0 ? (
+            hasSearchQuery || !emptyState ? (
+              <div className="px-2 py-1 text-sm text-muted-foreground">No results found</div>
+            ) : (
+              emptyState
+            )
           ) : (
-            emptyState
-          )
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            {filteredItems.map((item) => (
+            filteredItems.map((item) => (
               <SecondaryMenuItem
                 key={item.id}
                 item={item}
@@ -294,9 +286,9 @@ export function SecondaryMenu({
                 onItemMenuClick={onItemMenuClick}
                 itemActions={itemActions}
               />
-            ))}
-          </div>
-        )}
+            ))
+          )}
+        </div>
       </ScrollArea>
     </aside>
   );

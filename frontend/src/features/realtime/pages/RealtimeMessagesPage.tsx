@@ -129,13 +129,13 @@ export default function RealtimeMessagesPage() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-                    variant="ghost"
+                    variant="outline-muted"
                     size="icon"
                     onClick={() => void handleRefresh()}
                     disabled={isRefreshing}
-                    className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
+                    className="h-8 w-8"
                   >
-                    <RefreshIcon className={isRefreshing ? 'h-5 w-5 animate-spin' : 'h-5 w-5'} />
+                    <RefreshIcon className={isRefreshing ? '!size-3.5 animate-spin' : '!size-3.5'} />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" align="center">
@@ -157,45 +157,38 @@ export default function RealtimeMessagesPage() {
         onScroll={handleScroll}
         className="flex-1 min-h-0 overflow-y-auto relative"
       >
-        {/* Top spacing */}
-        <div className="h-10" />
-
         {/* Sticky Table Header */}
-        <div
-          className={`sticky top-0 z-10 bg-[rgb(var(--semantic-1))] px-3 ${isScrolled ? 'border-b border-[var(--alpha-8)]' : ''}`}
-        >
-          <div className="mx-auto max-w-[1024px] w-4/5">
-            <div className="flex items-center h-8 text-sm text-muted-foreground">
-              <div className="w-[30px] shrink-0" />
-              <div className="flex-1 py-1.5 px-2.5">Event</div>
-              <div className="flex-1 py-1.5 px-2.5">Channel</div>
-              <div className="w-[80px] shrink-0 py-1.5 px-2.5">Sender</div>
-              <div className="w-[100px] shrink-0 py-1.5 px-2.5">WebSockets</div>
-              <div className="w-[100px] shrink-0 py-1.5 px-2.5">Webhooks</div>
-              <div className="flex-1 py-1.5 px-2.5">Sent At</div>
-            </div>
-          </div>
+        <div className="sticky top-0 z-10 flex h-10 items-center border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-1))]">
+          <div className="w-[30px] shrink-0" />
+          <div className="flex-1 px-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Event</div>
+          <div className="flex-1 px-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Channel</div>
+          <div className="w-[80px] shrink-0 px-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Sender</div>
+          <div className="w-[100px] shrink-0 px-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">WebSockets</div>
+          <div className="w-[100px] shrink-0 px-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Webhooks</div>
+          <div className="flex-1 px-2.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Sent At</div>
         </div>
 
         {/* Table Body */}
-        <div className="flex flex-col items-center px-3 pb-4">
-          <div className="max-w-[1024px] w-4/5 flex flex-col gap-1 pt-1">
-            {isLoadingMessages ? (
-              <>
-                {[...Array(4)].map((_, i) => (
-                  <Skeleton key={i} className="h-12 rounded" />
-                ))}
-              </>
-            ) : filteredMessages.length >= 1 ? (
-              <>
-                {filteredMessages.map((message) => (
-                  <MessageRow key={message.id} message={message} />
-                ))}
-              </>
-            ) : (
-              <RealtimeEmptyState type="messages" />
-            )}
-          </div>
+        <div className="flex flex-col pb-4">
+          {isLoadingMessages ? (
+            <>
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-12 rounded-none border-b border-[var(--alpha-8)] bg-[rgb(var(--card))]" />
+              ))}
+            </>
+          ) : filteredMessages.length >= 1 ? (
+            <>
+              {filteredMessages.map((message, index) => (
+                <MessageRow
+                  key={message.id}
+                  message={message}
+                  isLast={index === filteredMessages.length - 1}
+                />
+              ))}
+            </>
+          ) : (
+            <RealtimeEmptyState type="messages" />
+          )}
         </div>
 
         {/* Loading mask overlay */}

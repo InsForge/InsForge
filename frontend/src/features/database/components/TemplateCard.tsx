@@ -12,9 +12,9 @@ export function TemplateCard({ template, onClick, showTableCount = false }: Temp
     <button
       type="button"
       onClick={onClick}
-      className="group w-full overflow-hidden rounded border border-[var(--alpha-8)] bg-card text-left transition-colors"
+      className="group w-full overflow-hidden rounded-lg border border-[var(--alpha-8)] bg-card text-left transition-colors hover:border-[var(--alpha-16)]"
     >
-      <div className="flex w-full flex-col gap-3 rounded px-4 pb-6 pt-4 transition-colors group-hover:bg-[var(--alpha-4)] group-active:bg-[var(--alpha-8)]">
+      <div className="flex w-full flex-col gap-3 p-5 transition-colors group-hover:bg-[var(--alpha-4)] group-active:bg-[var(--alpha-8)]">
         <div className="flex flex-col gap-2">
           <h3 className="text-base font-medium leading-7 text-foreground">{template.title}</h3>
           <p className="min-h-[72px] line-clamp-3 text-sm leading-6 text-muted-foreground">
@@ -22,9 +22,9 @@ export function TemplateCard({ template, onClick, showTableCount = false }: Temp
           </p>
         </div>
         {showTableCount && (
-          <div className="inline-flex w-fit items-center rounded bg-[var(--alpha-8)] px-1 py-0.5">
-            <Table2 className="h-4 w-4 text-muted-foreground" />
-            <p className="px-1 text-xs font-medium leading-4 text-muted-foreground">
+          <div className="inline-flex w-fit items-center gap-1 rounded-md border border-[var(--alpha-8)] px-2 py-1">
+            <Table2 className="h-3.5 w-3.5 text-muted-foreground" />
+            <p className="text-xs font-medium leading-4 text-muted-foreground">
               {template.tableCount} {template.tableCount === 1 ? 'Table' : 'Tables'}
             </p>
           </div>

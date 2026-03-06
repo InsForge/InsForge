@@ -73,7 +73,7 @@ export function ConnectionStringSection({ className }: ConnectionStringSectionPr
 
   return (
     <div className={cn('flex flex-col gap-3', isConnectionLoading && 'animate-pulse', className)}>
-      <div className="flex flex-col gap-2 rounded border border-[var(--alpha-8)] bg-semantic-0 p-3">
+      <div className="flex flex-col gap-2 rounded border border-border bg-semantic-0 p-3">
         <div className="flex items-center justify-between">
           <div className="flex h-5 items-center justify-center rounded bg-[var(--alpha-8)] px-2">
             <span className="text-xs font-medium leading-4 text-muted-foreground">
@@ -93,7 +93,7 @@ export function ConnectionStringSection({ className }: ConnectionStringSectionPr
         </p>
       </div>
 
-      <div className="flex flex-col gap-2 rounded border border-[var(--alpha-8)] bg-semantic-0 p-3">
+      <div className="flex flex-col gap-2 rounded border border-border bg-semantic-0 p-3">
         <div className="flex items-center justify-between">
           <div className="flex h-5 items-center justify-center rounded bg-[var(--alpha-8)] px-2">
             <span className="text-xs font-medium leading-4 text-muted-foreground">parameters</span>

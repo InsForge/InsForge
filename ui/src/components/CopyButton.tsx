@@ -87,12 +87,12 @@ export function CopyButton({
     >
       {copied ? (
         <>
-          <CheckCircle className="w-4 h-4" />
+          <CheckCircle strokeWidth={1.5} className="w-4 h-4" />
           {showText && <span>{copiedText}</span>}
         </>
       ) : (
         <>
-          <Copy className="w-4 h-4" />
+          <Copy strokeWidth={1.5} className="w-4 h-4" />
           {showText && <span>{copyText}</span>}
         </>
       )}

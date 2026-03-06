@@ -1,17 +1,33 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { ArrowLeft, Database, MoreVertical, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { MoreVertical, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Link, useMatch, useNavigate } from 'react-router-dom';
-import EmptyBoxSvg from '@/assets/images/empty_box.svg?react';
-import {
-  SecondaryMenu,
-  type SecondaryMenuActionButton,
-  type SecondaryMenuItemAction,
-  type SecondaryMenuListItem,
-} from '@/components/layout/SecondaryMenu';
+import { useTables } from '@/features/database/hooks/useTables';
 import { ScrollArea } from '@/components/radix/ScrollArea';
 import { databaseStudioMenuItems } from '@/lib/utils/menuItems';
 import { cn } from '@/lib/utils/utils';
-import { Button } from '@insforge/ui';
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  SearchInput,
+} from '@insforge/ui';
+
+// Sidebar used by studio pages (Indexes, Triggers, Functions, etc.)
+// Fetches tables internally and navigates to TablesPage on table select.
+export function DatabaseStudioSidebar() {
+  const navigate = useNavigate();
+  const { tables, isLoadingTables } = useTables();
+
+  return (
+    <DatabaseSecondaryMenu
+      tables={tables}
+      loading={isLoadingTables}
+      onTableSelect={(table) => void navigate(`/dashboard/database/tables?table=${table}`)}
+    />
+  );
+}
 
 export interface DatabaseSecondaryMenuProps {
   tables: string[];
@@ -21,21 +37,82 @@ export interface DatabaseSecondaryMenuProps {
   onNewTable?: () => void;
   onEditTable?: (table: string) => void;
   onDeleteTable?: (table: string) => void;
-  initialMode?: 'tables' | 'studio';
-  animateToMode?: 'tables' | 'studio';
 }
 
-export interface DatabaseStudioMenuPanelProps {
-  onBack: () => void;
+interface TableItemProps {
+  table: string;
+  isSelected: boolean;
+  onSelect: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }
 
-interface DatabaseStudioMenuItemProps {
-  label: string;
-  href: string;
-  sectionEnd?: boolean;
+function TableItem({ table, isSelected, onSelect, onEdit, onDelete }: TableItemProps) {
+  const hasActions = !!(onEdit || onDelete);
+
+  return (
+    <div
+      className={cn(
+        'group flex w-full items-center gap-1 rounded-lg px-1.5 transition-colors',
+        isSelected
+          ? 'bg-alpha-8 text-foreground'
+          : 'text-muted-foreground hover:bg-alpha-4 hover:text-foreground'
+      )}
+    >
+      <button
+        type="button"
+        className="min-w-0 flex-1 px-2 py-1.5 text-left"
+        onClick={onSelect}
+      >
+        <p className={cn('truncate text-sm font-medium leading-5', isSelected && 'text-inherit')}>
+          {table}
+        </p>
+      </button>
+
+      {hasActions && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className={cn(
+                'h-6 w-6 rounded p-0',
+                'hover:before:bg-transparent active:before:bg-transparent',
+                isSelected
+                  ? 'text-muted-foreground/50 opacity-100'
+                  : 'text-muted-foreground/40 opacity-0 group-hover:opacity-100'
+              )}
+            >
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-40" sideOffset={6}>
+            {onEdit && (
+              <DropdownMenuItem
+                className="cursor-pointer [&_svg]:size-3.5"
+                onClick={(e) => { e.stopPropagation(); onEdit(); }}
+              >
+                <Pencil strokeWidth={1} />
+                Edit Table
+              </DropdownMenuItem>
+            )}
+            {onDelete && (
+              <DropdownMenuItem
+                className="cursor-pointer [&_svg]:size-3.5"
+                onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              >
+                <Trash2 strokeWidth={1} />
+                Delete Table
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </div>
+  );
 }
 
-function DatabaseStudioMenuItem({ label, href, sectionEnd }: DatabaseStudioMenuItemProps) {
+function StudioItem({ label, href, sectionEnd }: { label: string; href: string; sectionEnd?: boolean }) {
   const match = useMatch({ path: href, end: false });
   const isSelected = !!match;
 
@@ -43,52 +120,20 @@ function DatabaseStudioMenuItem({ label, href, sectionEnd }: DatabaseStudioMenuI
     <>
       <div
         className={cn(
-          'flex w-full items-center gap-1 rounded px-1.5 py-1.5 transition-colors',
+          'flex w-full items-center gap-1 rounded-lg px-1.5 transition-colors',
           isSelected
             ? 'bg-alpha-8 text-foreground'
             : 'text-muted-foreground hover:bg-alpha-4 hover:text-foreground'
         )}
       >
-        <Link to={href} className="flex min-w-0 flex-1 items-center px-2">
-          <p className={cn('truncate text-sm leading-5', isSelected && 'text-inherit')}>{label}</p>
+        <Link to={href} className="flex min-w-0 flex-1 items-center px-2 py-1.5">
+          <p className={cn('truncate text-sm font-medium leading-5', isSelected && 'text-inherit')}>
+            {label}
+          </p>
         </Link>
-        {isSelected && <MoreVertical className="h-4 w-4 shrink-0 text-muted-foreground" />}
       </div>
-
       {sectionEnd && <div className="my-1.5 h-px w-full bg-alpha-8" />}
     </>
-  );
-}
-
-const STUDIO_MENU_TRANSITION_MS = 260;
-
-export function DatabaseStudioMenuPanel({ onBack }: DatabaseStudioMenuPanelProps) {
-  return (
-    <aside className="h-full w-60 flex flex-col border-r border-border bg-semantic-1 flex-shrink-0">
-      <div className="p-3">
-        <Button
-          variant="ghost"
-          className="h-8 w-full justify-start gap-1 rounded px-1.5 text-sm leading-5 font-medium text-muted-foreground hover:bg-transparent hover:text-foreground"
-          onClick={onBack}
-        >
-          <ArrowLeft className="h-5 w-5" />
-          Back
-        </Button>
-      </div>
-
-      <ScrollArea className="flex-1 px-3 pb-2">
-        <div className="flex flex-col gap-1.5">
-          {databaseStudioMenuItems.map((item) => (
-            <DatabaseStudioMenuItem
-              key={item.id}
-              label={item.label}
-              href={item.href}
-              sectionEnd={item.sectionEnd}
-            />
-          ))}
-        </div>
-      </ScrollArea>
-    </aside>
   );
 }
 
@@ -100,149 +145,87 @@ export function DatabaseSecondaryMenu({
   onNewTable,
   onEditTable,
   onDeleteTable,
-  initialMode = 'tables',
-  animateToMode,
 }: DatabaseSecondaryMenuProps) {
-  const navigate = useNavigate();
-  const [mode, setMode] = useState<'tables' | 'studio'>(initialMode);
-  const showEmptyState = tables.length === 0;
-  const navigateTimerRef = useRef<number | null>(null);
+  const [searchValue, setSearchValue] = useState('');
+  const showEmptyState = !loading && tables.length === 0;
 
-  useEffect(() => {
-    return () => {
-      if (navigateTimerRef.current) {
-        window.clearTimeout(navigateTimerRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!animateToMode || animateToMode === initialMode) {
-      return;
-    }
-
-    const rafId = window.requestAnimationFrame(() => {
-      setMode(animateToMode);
-    });
-
-    return () => {
-      window.cancelAnimationFrame(rafId);
-    };
-  }, [animateToMode, initialMode]);
-
-  const tableMenuItems: SecondaryMenuListItem[] = tables.map((table) => ({
-    id: table,
-    label: table,
-    onClick: () => onTableSelect(table),
-  }));
-
-  const actionButtons: SecondaryMenuActionButton[] = [
-    ...(onNewTable
-      ? [
-          {
-            id: 'create-table',
-            label: 'Create Table',
-            icon: Plus,
-            onClick: onNewTable,
-          },
-        ]
-      : []),
-    {
-      id: 'database-studio',
-      label: 'Database Studio',
-      icon: Database,
-      onClick: () => {
-        setMode('studio');
-        if (navigateTimerRef.current) {
-          window.clearTimeout(navigateTimerRef.current);
-        }
-        navigateTimerRef.current = window.setTimeout(() => {
-          void navigate('/dashboard/database/indexes');
-        }, STUDIO_MENU_TRANSITION_MS);
-      },
-    },
-  ];
-
-  const getItemActions = (item: SecondaryMenuListItem): SecondaryMenuItemAction[] => {
-    const actions: SecondaryMenuItemAction[] = [];
-
-    if (onEditTable) {
-      actions.push({
-        id: `edit-${item.id}`,
-        label: 'Edit Table',
-        icon: Pencil,
-        onClick: () => onEditTable(item.id),
-      });
-    }
-
-    if (onDeleteTable) {
-      actions.push({
-        id: `delete-${item.id}`,
-        label: 'Delete Table',
-        icon: Trash2,
-        destructive: true,
-        onClick: () => onDeleteTable(item.id),
-      });
-    }
-
-    return actions;
-  };
+  const filteredTables = searchValue.trim()
+    ? tables.filter((t) => t.toLowerCase().includes(searchValue.toLowerCase()))
+    : tables;
 
   return (
-    <div className="h-full w-60 flex-shrink-0 overflow-hidden">
-      <div
-        className={cn(
-          'flex h-full w-[200%] transition-transform duration-300 ease-in-out',
-          mode === 'tables' ? 'translate-x-0' : '-translate-x-1/2'
-        )}
-      >
-        <div className="h-full w-1/2">
-          <SecondaryMenu
-            title="Database"
-            items={tableMenuItems}
-            activeItemId={selectedTable}
-            loading={loading}
-            actionButtons={actionButtons}
-            emptyState={
-              showEmptyState ? (
-                <div className="flex flex-col items-center gap-2 pt-2 text-center">
-                  <EmptyBoxSvg
-                    className="h-[95px] w-[160px]"
-                    style={
-                      {
-                        '--empty-box-fill-primary': 'rgb(var(--semantic-2))',
-                        '--empty-box-fill-secondary': 'rgb(var(--semantic-6))',
-                      } as CSSProperties
-                    }
-                    aria-hidden="true"
+    <aside className="h-full w-60 flex-shrink-0 flex flex-col border-r border-border bg-card">
+      {/* Header */}
+      <div className="flex h-[57px] shrink-0 items-center border-b border-[var(--alpha-8)] pl-4 pr-3 py-3">
+        <p className="truncate text-base font-medium leading-7 text-foreground">Database</p>
+      </div>
+
+      <ScrollArea className="flex-1 px-3 py-3">
+        {/* Tables section */}
+        <div className="flex flex-col gap-1.5">
+          <p className="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">
+            Tables
+          </p>
+          {loading ? (
+            [...Array(5)].map((_, i) => (
+              <div key={i} className="h-9 w-full animate-pulse rounded bg-alpha-8" />
+            ))
+          ) : (
+            <>
+              {tables.length > 3 && (
+                <SearchInput
+                  value={searchValue}
+                  onChange={setSearchValue}
+                  placeholder="Search tables..."
+                  debounceTime={0}
+                />
+              )}
+              {onNewTable && (
+                <Button
+                  variant="outline-muted"
+                  className="h-8 w-full px-2.5 text-xs"
+                  onClick={onNewTable}
+                >
+                  <Plus strokeWidth={1.5} className="!size-3.5" />
+                  Create New Table
+                </Button>
+              )}
+              {!showEmptyState && filteredTables.length === 0 ? (
+                <p className="px-2 py-1 text-sm text-muted-foreground">No results found</p>
+              ) : (
+                filteredTables.map((table) => (
+                  <TableItem
+                    key={table}
+                    table={table}
+                    isSelected={table === selectedTable}
+                    onSelect={() => onTableSelect(table)}
+                    onEdit={onEditTable ? () => onEditTable(table) : undefined}
+                    onDelete={onDeleteTable ? () => onDeleteTable(table) : undefined}
                   />
-                  <p className="text-sm font-medium leading-6 text-muted-foreground">
-                    No Table Yet
-                  </p>
-                  <div className="text-xs leading-4">
-                    <button
-                      type="button"
-                      className="font-medium text-primary disabled:cursor-not-allowed disabled:opacity-60"
-                      onClick={onNewTable}
-                      disabled={!onNewTable}
-                    >
-                      Create your first table
-                    </button>
-                    <p className="text-muted-foreground">to get started</p>
-                  </div>
-                </div>
-              ) : undefined
-            }
-            itemActions={getItemActions}
-            showSearch={!showEmptyState}
-            searchPlaceholder="Search tables..."
-          />
+                ))
+              )}
+            </>
+          )}
         </div>
 
-        <div className="h-full w-1/2">
-          <DatabaseStudioMenuPanel onBack={() => setMode('tables')} />
+        {/* Divider */}
+        <div className="my-3 h-px w-full bg-alpha-8" />
+
+        {/* Studio items */}
+        <p className="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">
+          Database Management
+        </p>
+        <div className="flex flex-col gap-1.5">
+          {databaseStudioMenuItems.map((item) => (
+            <StudioItem
+              key={item.id}
+              label={item.label}
+              href={item.href}
+              sectionEnd={item.sectionEnd}
+            />
+          ))}
         </div>
-      </div>
-    </div>
+      </ScrollArea>
+    </aside>
   );
 }

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Mail, User } from 'lucide-react';
+import { User } from 'lucide-react';
 import {
   Avatar,
   AvatarFallback,
@@ -10,18 +10,7 @@ import {
   type RenderCellProps,
   type SelectionCellProps,
 } from '@/components';
-import AppleLogo from '@/assets/logos/apple.svg?react';
-import DiscordLogo from '@/assets/logos/discord.svg?react';
-import FacebookLogo from '@/assets/logos/facebook.svg?react';
-import GithubLogo from '@/assets/logos/github.svg?react';
-import GoogleLogo from '@/assets/logos/google.svg?react';
-import InstagramLogo from '@/assets/logos/instagram.svg?react';
-import LinkedinLogo from '@/assets/logos/linkedin.svg?react';
-import MicrosoftLogo from '@/assets/logos/microsoft.svg?react';
-import SpotifyLogo from '@/assets/logos/spotify.svg?react';
-import TiktokLogo from '@/assets/logos/tiktok.svg?react';
-import XLogo from '@/assets/logos/x.svg?react';
-import { Badge, Checkbox } from '@insforge/ui';
+import { Checkbox } from '@insforge/ui';
 import { cn, formatTime } from '@/lib/utils/utils';
 import type { UserSchema } from '@insforge/shared-schemas';
 
@@ -44,38 +33,6 @@ const providerLabelMap: Record<string, string> = {
   email: 'Email',
 };
 
-const providerLogoMap = {
-  google: GoogleLogo,
-  github: GithubLogo,
-  discord: DiscordLogo,
-  linkedin: LinkedinLogo,
-  facebook: FacebookLogo,
-  instagram: InstagramLogo,
-  apple: AppleLogo,
-  x: XLogo,
-  spotify: SpotifyLogo,
-  tiktok: TiktokLogo,
-  microsoft: MicrosoftLogo,
-} as const;
-
-const ProviderBadge = ({ provider }: { provider: string }) => {
-  const normalized = provider.toLowerCase();
-  const label =
-    providerLabelMap[normalized] ?? normalized.charAt(0).toUpperCase() + normalized.slice(1);
-  const ProviderLogo = providerLogoMap[normalized as keyof typeof providerLogoMap];
-
-  return (
-    <Badge className="h-5 rounded border border-[var(--alpha-inverse-8)] bg-white px-1.5 py-0 text-xs font-medium leading-4 text-black">
-      {ProviderLogo ? (
-        <ProviderLogo className="h-4 w-4 shrink-0" />
-      ) : normalized === 'email' ? (
-        <Mail className="h-4 w-4 shrink-0 text-black" />
-      ) : null}
-      {label}
-    </Badge>
-  );
-};
-
 const ProvidersCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
   const providers = row.providers;
 
@@ -84,18 +41,15 @@ const ProvidersCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
   }
 
   const uniqueProviders = [...new Set(providers)];
+  const labels = uniqueProviders.map(
+    (p) => providerLabelMap[p.toLowerCase()] ?? p.charAt(0).toUpperCase() + p.slice(1)
+  );
+  const displayText = labels.join(', ');
 
   return (
-    <div className="flex items-center gap-1" title={providers.join(', ')}>
-      {uniqueProviders.slice(0, 1).map((provider) => (
-        <ProviderBadge key={provider} provider={provider} />
-      ))}
-      {uniqueProviders.length > 1 && (
-        <Badge className="h-5 rounded bg-[var(--alpha-8)] px-1.5 py-0 text-xs font-medium leading-4 text-muted-foreground">
-          +{uniqueProviders.length - 1}
-        </Badge>
-      )}
-    </div>
+    <span className="truncate text-[13px] leading-[18px] text-foreground" title={displayText}>
+      {displayText}
+    </span>
   );
 };
 
@@ -105,14 +59,9 @@ const EmailVerifiedCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) =>
   }
 
   return (
-    <Badge
-      className={cn(
-        'h-5 rounded px-1.5 py-0 text-xs font-medium leading-4 text-white',
-        row.emailVerified ? 'bg-[rgb(var(--success))]' : 'bg-[rgb(var(--destructive))]'
-      )}
-    >
+    <span className="truncate text-[13px] leading-[18px] text-foreground">
       {row.emailVerified ? 'True' : 'False'}
-    </Badge>
+    </span>
   );
 };
 
@@ -250,6 +199,8 @@ export function UsersDataGrid(props: UsersDataGridProps) {
       selectionColumnWidth={180}
       selectionHeaderLabel="User"
       renderSelectionCell={UserSelectionCell}
+      headerRowHeight={40}
+      rowHeight={40}
     />
   );
 }

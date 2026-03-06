@@ -20,7 +20,7 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <ThemeProvider forcedTheme={isIframe() ? 'dark' : undefined}>
-      <div className="h-screen bg-gray-50 dark:bg-neutral-800 flex flex-col">
+      <div className="h-screen bg-page flex flex-col">
         {!isIframe() && <AppHeader />}
 
         {/* Main layout - sidebars + content in flexbox */}

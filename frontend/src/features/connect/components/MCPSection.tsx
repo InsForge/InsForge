@@ -53,17 +53,17 @@ export function MCPSection({
             <span>Step 1 - Install InsForge</span>
           </p>
           {(selectedAgent.id === 'cursor' || selectedAgent.id === 'qoder') && (
-            <p className="text-sm leading-6 text-muted-foreground">Install in one click</p>
+            <p className="font-content text-sm leading-6 text-muted-foreground">Install in one click</p>
           )}
           {selectedAgent.id === 'mcp' && (
-            <p className="text-sm leading-6 text-muted-foreground">
+            <p className="font-content text-sm leading-6 text-muted-foreground">
               Add this configuration to your MCP settings
             </p>
           )}
           {selectedAgent.id !== 'cursor' &&
             selectedAgent.id !== 'qoder' &&
             selectedAgent.id !== 'mcp' && (
-              <p className="text-sm leading-6 text-muted-foreground">
+              <p className="font-content text-sm leading-6 text-muted-foreground">
                 Run the following command in terminal to install InsForge MCP Server
               </p>
             )}
@@ -78,7 +78,7 @@ export function MCPSection({
         >
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex w-40 cursor-pointer items-center justify-between rounded border border-[var(--alpha-8)] bg-semantic-0 px-2 py-1 transition-colors hover:bg-[var(--alpha-4)]">
+              <button className="flex w-40 cursor-pointer items-center justify-between rounded border border-border bg-semantic-0 px-2 py-1 transition-colors hover:bg-alpha-4">
                 <div className="flex items-center gap-2">
                   {selectedAgent.logo && (
                     <div className="w-6 h-6 flex items-center justify-center">
@@ -89,7 +89,7 @@ export function MCPSection({
                     {selectedAgent.displayName}
                   </span>
                 </div>
-                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-40 p-0">
@@ -117,9 +117,9 @@ export function MCPSection({
               <QoderDeeplinkGenerator apiKey={apiKey} os="macos-linux" />
             </div>
           ) : selectedAgent.id === 'mcp' ? (
-            <div className="flex h-[320px] w-full flex-col overflow-hidden rounded border border-[var(--alpha-8)] bg-semantic-0">
+            <div className="flex h-[320px] w-full flex-col overflow-hidden rounded border border-border bg-semantic-0">
               {/* Header - fixed at top */}
-              <div className="flex items-center justify-between border-b border-[var(--alpha-8)] bg-semantic-0 p-3">
+              <div className="flex items-center justify-between border-b border-border bg-semantic-0 p-3">
                 <div className="px-2">
                   <span className="text-xs text-muted-foreground">MCP Configuration</span>
                 </div>
@@ -147,18 +147,18 @@ export function MCPSection({
           <p className="text-sm font-medium leading-6 text-foreground">
             <span>Step 2 - Verify Connection</span>
           </p>
-          <p className="text-sm leading-6 text-muted-foreground">
+          <p className="font-content text-sm leading-6 text-muted-foreground">
             Send the prompt below to your AI coding agent to verify the connection.
           </p>
         </div>
-        <div className="flex flex-col gap-2 rounded border border-[var(--alpha-8)] bg-semantic-0 p-3">
+        <div className="flex flex-col gap-2 rounded border border-border bg-semantic-0 p-3">
           <div className="flex items-center justify-between">
             <div className="flex h-5 items-center rounded bg-[var(--alpha-8)] px-2">
               <span className="text-xs font-medium leading-4 text-muted-foreground">prompt</span>
             </div>
             <CopyButton text={MCP_VERIFY_CONNECTION_PROMPT} showText={false} className="shrink-0" />
           </div>
-          <p className="font-mono text-sm leading-6 text-foreground">
+          <p className="font-content text-sm leading-6 text-foreground">
             {MCP_VERIFY_CONNECTION_PROMPT}
           </p>
         </div>

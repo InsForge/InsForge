@@ -185,7 +185,7 @@ export function OAuthConfigDialog({
 
   return (
     <Dialog open={isOpen && !!provider} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
+      <DialogContent className="max-w-[520px]">
         <DialogHeader>
           <DialogTitle>{provider?.name}</DialogTitle>
         </DialogHeader>
@@ -203,91 +203,74 @@ export function OAuthConfigDialog({
               <div className="space-y-6 p-6">
                 {/* Shared Keys Toggle */}
                 {isSharedKeysAvailable && (
-                  <div className="flex items-center justify-start gap-2">
+                  <div className="flex items-center gap-2">
                     <Controller
                       name="useSharedKey"
                       control={form.control}
-                      render={({ field }) => {
-                        return (
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={(value) => {
-                              field.onChange(value);
-                            }}
-                          />
-                        );
-                      }}
+                      render={({ field }) => (
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={(value) => field.onChange(value)}
+                        />
+                      )}
                     />
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      Shared Keys
-                    </span>
+                    <span className="text-sm font-medium text-foreground">Shared Keys</span>
                   </div>
                 )}
 
                 {useSharedKey ? (
                   /* Shared Keys Enabled */
-                  <div className="space-y-6">
-                    <p className="text-sm text-zinc-500 dark:text-neutral-400">
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
                       Shared keys are created by the InsForge team for development. It helps you get
                       started, but will show a InsForge logo and name on the OAuth screen.
                     </p>
-
-                    <div className="flex items-center gap-3">
-                      <img src={WarningIcon} alt="Warning" className="h-6 w-6" />
-                      <span className="text-sm font-medium text-zinc-950 dark:text-white">
+                    <div className="flex items-center gap-2.5">
+                      <img src={WarningIcon} alt="Warning" className="h-5 w-5" />
+                      <span className="text-sm font-medium text-foreground">
                         Shared keys should never be used in production
                       </span>
                     </div>
                   </div>
                 ) : (
                   /* Shared Keys Disabled */
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <ExternalLink className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5">
                       <a
                         href={provider?.setupUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 font-medium underline"
+                        className="text-sm font-medium text-foreground underline underline-offset-4 hover:text-muted-foreground"
                       >
-                        Create a {provider?.name.split(' ')[0]} OAuth App
+                        Create a {provider?.name} OAuth App
                       </a>
-                      <span className="text-sm font-normal text-zinc-950 dark:text-white">
-                        {' '}
-                        and set the callback url to:
-                      </span>
+                      <span className="text-sm text-muted-foreground">and set the callback URL to:</span>
                     </div>
-
-                    <div className="space-x-3">
-                      <div className="flex items-center gap-2">
-                        <code className="flex items-center py-1 px-3 bg-blue-100 dark:bg-neutral-700 text-blue-800 dark:text-blue-300 font-mono break-all rounded-md text-sm">
-                          {getCallbackUrl(provider?.id)}
-                        </code>
-                        <CopyButton text={getCallbackUrl(provider?.id)} />
-                      </div>
+                    <div className="flex items-center gap-2 rounded-lg border border-border bg-alpha-4 px-3 py-2">
+                      <code className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
+                        {getCallbackUrl(provider?.id)}
+                      </code>
+                      <CopyButton text={getCallbackUrl(provider?.id)} showText={false} />
                     </div>
                   </div>
                 )}
               </div>
               {!useSharedKey && (
-                <div className="space-y-6 p-6 border-t border-zinc-200 dark:border-neutral-700">
-                  <div className="flex flex-row items-center justify-between gap-10">
-                    <label className="text-sm text-zinc-950 dark:text-white">Client ID</label>
+                <div className="space-y-4 border-t border-border p-6">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-foreground">Client ID</label>
                     <Input
                       type="text"
                       {...form.register('clientId')}
-                      placeholder={`Enter ${provider?.name.split(' ')[0]} OAuth App ID`}
-                      className="w-[340px]"
+                      placeholder={`Enter ${provider?.name} Client ID`}
                     />
                   </div>
-
-                  <div className="flex flex-row items-center justify-between gap-10">
-                    <label className="text-sm text-zinc-950 dark:text-white">Client Secret</label>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-foreground">Client Secret</label>
                     <Input
                       type="password"
                       {...form.register('clientSecret')}
-                      placeholder={`Enter ${provider?.name.split(' ')[0]} OAuth App Secret`}
-                      className="w-[340px]"
+                      placeholder={`Enter ${provider?.name} Client Secret`}
                     />
                   </div>
                 </div>

@@ -7,20 +7,118 @@ import { createScheduleRequestSchema, type ScheduleSchema } from '@insforge/shar
 import {
   Button,
   Dialog,
+  DialogBody,
   DialogContent,
+  DialogDescription,
+  DialogDivider,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Input,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@insforge/ui';
-import { JsonCellEditor } from '@/components/datagrid/cell-editors/JsonCellEditor';
 import { Alert, AlertDescription } from '@/components/radix/Alert';
 import { ScrollArea } from '@/components/radix/ScrollArea';
-import { Pencil } from 'lucide-react';
+import { cn } from '@/lib/utils/utils';
+
+interface InlineJsonEditorProps {
+  value: string;
+  nullable?: boolean;
+  onChange: (v: string) => void;
+  onCancel: () => void;
+}
+
+function InlineJsonEditor({ value, nullable, onChange, onCancel }: InlineJsonEditorProps) {
+  const [text, setText] = useState(() => {
+    if (!value || value === 'null') return '';
+    try { return JSON.stringify(JSON.parse(value), null, 2); } catch { return value; }
+  });
+  const [isValid, setIsValid] = useState(true);
+
+  const validate = (t: string) => {
+    if (!t.trim()) { setIsValid(true); return true; }
+    try { JSON.parse(t); setIsValid(true); return true; }
+    catch { setIsValid(false); return false; }
+  };
+
+  const handleFormat = () => {
+    try { setText(JSON.stringify(JSON.parse(text), null, 2)); setIsValid(true); } catch {}
+  };
+
+  const handleMinify = () => {
+    try { setText(JSON.stringify(JSON.parse(text))); setIsValid(true); } catch {}
+  };
+
+  const handleSave = () => {
+    if (!isValid) return;
+    const t = text.trim();
+    onChange(t ? JSON.stringify(JSON.parse(t)) : (nullable ? 'null' : '{}'));
+    onCancel();
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <textarea
+        value={text}
+        onChange={(e) => { setText(e.target.value); validate(e.target.value); }}
+        onKeyDown={(e) => {
+          if (e.key === 'Tab') {
+            e.preventDefault();
+            const el = e.target as HTMLTextAreaElement;
+            const s = el.selectionStart;
+            const newVal = text.substring(0, s) + '  ' + text.substring(el.selectionEnd);
+            setText(newVal);
+            validate(newVal);
+            setTimeout(() => { el.selectionStart = el.selectionEnd = s + 2; }, 0);
+          } else if (e.key === 'Escape') { onCancel(); }
+        }}
+        placeholder="Enter JSON..."
+        className={cn(
+          'h-32 w-full resize-none rounded-lg border bg-[var(--alpha-4)] px-3 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground',
+          'focus:outline-none focus:border-foreground/30',
+          isValid ? 'border-[var(--alpha-12)]' : 'border-destructive'
+        )}
+        spellCheck={false}
+        autoFocus
+      />
+      {!isValid && (
+        <p className="text-[13px] leading-[18px] text-destructive">Invalid JSON</p>
+      )}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-1">
+          <Button
+            type="button" variant="ghost" size="sm"
+            onClick={handleFormat}
+            disabled={!isValid || !text.trim()}
+            className="h-7 px-2 text-xs text-muted-foreground"
+          >
+            Format
+          </Button>
+          <Button
+            type="button" variant="ghost" size="sm"
+            onClick={handleMinify}
+            disabled={!isValid || !text.trim()}
+            className="h-7 px-2 text-xs text-muted-foreground"
+          >
+            Minify
+          </Button>
+        </div>
+        <div className="flex gap-2">
+          <Button type="button" variant="secondary" onClick={onCancel} className="h-7 px-3 text-xs">
+            Cancel
+          </Button>
+          <Button type="button" onClick={handleSave} disabled={!isValid} className="h-7 px-3 text-xs">
+            Save
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface ScheduleFormDialogProps {
   open: boolean;
@@ -182,131 +280,106 @@ export function ScheduleFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-[520px]">
         <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col">
           <DialogHeader>
-            <DialogTitle>{mode === 'create' ? 'Create Schedule' : 'Edit Schedule'}</DialogTitle>
+            <DialogTitle>{mode === 'create' ? 'Add Schedule' : 'Edit Schedule'}</DialogTitle>
+            <DialogDescription>
+              {mode === 'create'
+                ? 'Configure a scheduled task to run your edge functions automatically.'
+                : 'Update the schedule configuration.'}
+            </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="h-full overflow-auto max-h-[680px]">
-            <div className="px-6 py-6 space-y-8 bg-white dark:bg-neutral-900">
-              <div className="grid gap-y-5 gap-x-6 md:grid-cols-[160px_minmax(0,1fr)] items-center">
-                {/* Schedule Name */}
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Schedule Name
-                </label>
+          <ScrollArea className="h-full overflow-auto max-h-[600px]">
+            <DialogBody className="gap-2 p-4">
+              {/* Schedule Name */}
+              <div className="flex w-full flex-col gap-1.5">
+                <p className="text-sm font-medium leading-5 text-foreground">Schedule Name</p>
+                <Input
+                  {...form.register('name')}
+                  placeholder="Enter schedule name"
+                  className="h-8 px-1.5 py-1.5 text-sm leading-5"
+                />
+                {form.formState.errors.name && (
+                  <p className="text-[13px] leading-[18px] text-destructive">
+                    {form.formState.errors.name.message}
+                  </p>
+                )}
+              </div>
+
+              <DialogDivider />
+
+              {/* Cron Schedule */}
+              <div className="flex w-full flex-col gap-1.5">
                 <div>
-                  <input
-                    {...form.register('name')}
-                    className="w-full px-3 py-2 rounded border bg-white dark:bg-neutral-800 border-zinc-200 dark:border-neutral-700 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500"
-                    placeholder="Enter schedule name"
-                  />
-                  {form.formState.errors.name && (
-                    <p className="text-xs text-rose-500 mt-1">
-                      {form.formState.errors.name.message}
-                    </p>
-                  )}
+                  <p className="text-sm font-medium leading-5 text-foreground">Cron Schedule</p>
+                  <p className="text-[13px] leading-[18px] text-muted-foreground">
+                    Enter a cron expression or pick from examples
+                  </p>
                 </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {[
+                    { label: 'Every 5 minutes', value: '*/5 * * * *' },
+                    { label: 'Every hour', value: '0 * * * *' },
+                    { label: 'Every 1st of month', value: '0 0 1 * *' },
+                    { label: 'Every Monday at 2 AM', value: '0 2 * * 1' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      className="rounded-lg border border-[var(--alpha-8)] bg-[var(--alpha-4)] px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-[var(--alpha-8)]"
+                      onClick={() =>
+                        form.setValue('cronSchedule', preset.value, {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        })
+                      }
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+                <Input
+                  {...form.register('cronSchedule')}
+                  placeholder="e.g. */5 * * * *"
+                  className="h-8 px-1.5 py-1.5 text-sm leading-5"
+                />
+                {form.formState.errors.cronSchedule && (
+                  <p className="text-[13px] leading-[18px] text-destructive">
+                    {form.formState.errors.cronSchedule.message}
+                  </p>
+                )}
+              </div>
 
-                {/* Cron Schedule */}
-                <div className="flex flex-col self-start">
-                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                    Cron Schedule
-                  </label>
-                  <span className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                    Pick from examples
-                  </span>
-                </div>
-                <div className="self-start">
-                  <input
-                    {...form.register('cronSchedule')}
-                    className="w-full px-3 py-2 rounded border bg-white dark:bg-neutral-800 border-zinc-200 dark:border-neutral-700 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500"
-                    placeholder="E.g., */5 * * * *"
-                  />
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      className="px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 hover:bg-zinc-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 dark:bg-neutral-800 dark:text-zinc-100 dark:hover:bg-neutral-700 text-sm transition-colors text-left"
-                      onClick={() => {
-                        form.setValue('cronSchedule', '*/5 * * * *', {
-                          shouldDirty: true,
-                          shouldValidate: true,
-                        });
-                      }}
-                    >
-                      Every 5 minutes
-                    </button>
-                    <button
-                      type="button"
-                      className="px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 hover:bg-zinc-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 dark:bg-neutral-800 dark:text-zinc-100 dark:hover:bg-neutral-700 text-sm transition-colors text-left"
-                      onClick={() => {
-                        form.setValue('cronSchedule', '0 * * * *', {
-                          shouldDirty: true,
-                          shouldValidate: true,
-                        });
-                      }}
-                    >
-                      Every hour
-                    </button>
-                    <button
-                      type="button"
-                      className="px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 hover:bg-zinc-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 dark:bg-neutral-800 dark:text-zinc-100 dark:hover:bg-neutral-700 text-sm transition-colors text-left"
-                      onClick={() => {
-                        form.setValue('cronSchedule', '0 0 1 * *', {
-                          shouldDirty: true,
-                          shouldValidate: true,
-                        });
-                      }}
-                    >
-                      Every first of the month, at 00:00
-                    </button>
-                    <button
-                      type="button"
-                      className="px-3 py-2 rounded-lg bg-zinc-100 text-zinc-900 hover:bg-zinc-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 dark:bg-neutral-800 dark:text-zinc-100 dark:hover:bg-neutral-700 text-sm transition-colors text-left"
-                      onClick={() => {
-                        form.setValue('cronSchedule', '0 2 * * 1', {
-                          shouldDirty: true,
-                          shouldValidate: true,
-                        });
-                      }}
-                    >
-                      Every Monday at 2 AM
-                    </button>
-                  </div>
-                  {form.formState.errors.cronSchedule && (
-                    <p className="text-xs text-rose-500 mt-2">
-                      {form.formState.errors.cronSchedule.message}
-                    </p>
-                  )}
-                </div>
+              <DialogDivider />
 
-                {/* Function URL */}
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Function URL
-                </label>
-                <div>
-                  <input
-                    {...form.register('functionUrl')}
-                    className="w-full px-3 py-2 rounded border bg-white dark:bg-neutral-800 border-zinc-200 dark:border-neutral-700 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500"
-                    placeholder="Enter Function URL"
-                  />
-                  {form.formState.errors.functionUrl && (
-                    <p className="text-xs text-rose-500 mt-1">
-                      {form.formState.errors.functionUrl.message}
-                    </p>
-                  )}
-                </div>
+              {/* Function URL */}
+              <div className="flex w-full flex-col gap-1.5">
+                <p className="text-sm font-medium leading-5 text-foreground">Function URL</p>
+                <Input
+                  {...form.register('functionUrl')}
+                  placeholder="https://..."
+                  className="h-8 px-1.5 py-1.5 text-sm leading-5"
+                />
+                {form.formState.errors.functionUrl && (
+                  <p className="text-[13px] leading-[18px] text-destructive">
+                    {form.formState.errors.functionUrl.message}
+                  </p>
+                )}
+              </div>
 
-                {/* HTTP Method */}
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  HTTP Method
-                </label>
+              <DialogDivider />
+
+              {/* HTTP Method */}
+              <div className="flex w-full items-center justify-between gap-6">
+                <p className="text-sm font-medium leading-5 text-foreground">HTTP Method</p>
                 <Controller
                   control={form.control}
                   name="httpMethod"
                   render={({ field }) => (
                     <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger className="w-[160px]">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -319,13 +392,15 @@ export function ScheduleFormDialog({
                     </Select>
                   )}
                 />
+              </div>
 
-                {/* Content Type */}
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Content Type
-                </label>
+              <DialogDivider />
+
+              {/* Content Type */}
+              <div className="flex w-full items-center justify-between gap-6">
+                <p className="text-sm font-medium leading-5 text-foreground">Content Type</p>
                 <Select value={contentType} onValueChange={handleContentTypeChange}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-[160px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -338,118 +413,98 @@ export function ScheduleFormDialog({
                 </Select>
               </div>
 
-              <div className="grid gap-y-5 gap-x-6 md:grid-cols-[160px_minmax(0,1fr)] items-center">
-                {/* Headers (JSON) */}
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 self-start mt-2">
-                  Headers (JSON)
-                </label>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 px-3 py-2 rounded-lg border bg-zinc-50 dark:bg-neutral-800/50 border-zinc-200 dark:border-neutral-700 text-sm text-zinc-600 dark:text-zinc-400 font-mono truncate">
-                      {getJsonDisplay(form.watch('headers')).slice(0, 50)}
-                      {getJsonDisplay(form.watch('headers')).length > 50 && '...'}
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setEditingField(editingField === 'headers' ? null : 'headers')}
-                      className="shrink-0 dark:text-zinc-100"
-                    >
-                      <Pencil className="h-3.5 w-3.5" /> Edit
-                    </Button>
-                  </div>
-                  {editingField === 'headers' && (
-                    <Controller
-                      control={form.control}
-                      name="headers"
-                      render={({ field }) => {
-                        const inputValue =
-                          field.value === null || field.value === undefined
-                            ? 'null'
-                            : typeof field.value === 'string'
-                              ? field.value
-                              : JSON.stringify(field.value, null, 2);
+              <DialogDivider />
 
-                        return (
-                          <JsonCellEditor
-                            value={inputValue}
-                            nullable
-                            onValueChange={(v) => {
-                              if (v === 'null') {
-                                field.onChange(null);
-                                return;
-                              }
-                              const parsed = JSON.parse(v);
-                              field.onChange(parsed);
-                            }}
-                            onCancel={() => setEditingField(null)}
-                            className="w-full"
-                          />
-                        );
-                      }}
-                    />
-                  )}
-                </div>
-
-                {/* Body (JSON) */}
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 self-start mt-2">
-                  Body (JSON)
-                </label>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 px-3 py-2 rounded-lg border bg-zinc-50 dark:bg-neutral-800/50 border-zinc-200 dark:border-neutral-700 text-sm text-zinc-600 dark:text-zinc-400 font-mono truncate">
-                      {getJsonDisplay(form.watch('body')).slice(0, 50)}
-                      {getJsonDisplay(form.watch('body')).length > 50 && '...'}
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setEditingField(editingField === 'body' ? null : 'body')}
-                      className="shrink-0 dark:text-zinc-100"
-                    >
-                      <Pencil className="h-3.5 w-3.5 dark:text-zinc-100" /> Edit
-                    </Button>
-                  </div>
-                  {editingField === 'body' && (
-                    <Controller
-                      control={form.control}
-                      name="body"
-                      render={({ field }) => {
-                        const inputValue =
-                          field.value === null || field.value === undefined
-                            ? 'null'
-                            : typeof field.value === 'string'
-                              ? field.value
-                              : JSON.stringify(field.value, null, 2);
-
-                        return (
-                          <JsonCellEditor
-                            value={inputValue}
-                            nullable
-                            onValueChange={(v) => {
-                              if (v === 'null') {
-                                field.onChange(null);
-                                return;
-                              }
-                              const parsed = JSON.parse(v);
-                              field.onChange(parsed);
-                            }}
-                            onCancel={() => setEditingField(null)}
-                            className="w-full"
-                          />
-                        );
-                      }}
-                    />
-                  )}
-                </div>
+              {/* Headers (JSON) */}
+              <div className="flex w-full flex-col gap-1.5">
+                <p className="text-sm font-medium leading-5 text-foreground">Headers (JSON)</p>
+                <Controller
+                  control={form.control}
+                  name="headers"
+                  render={({ field }) => {
+                    const inputValue =
+                      field.value === null || field.value === undefined
+                        ? 'null'
+                        : typeof field.value === 'string'
+                          ? field.value
+                          : JSON.stringify(field.value, null, 2);
+                    if (editingField === 'headers') {
+                      return (
+                        <InlineJsonEditor
+                          value={inputValue}
+                          nullable
+                          onChange={(v) => {
+                            if (v === 'null') { field.onChange(null); }
+                            else { field.onChange(JSON.parse(v)); }
+                          }}
+                          onCancel={() => setEditingField(null)}
+                        />
+                      );
+                    }
+                    return (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => setEditingField('headers')}
+                        className="h-8 w-full justify-start bg-[var(--alpha-4)] px-2 py-1.5 text-[13px] font-normal leading-[18px] text-muted-foreground"
+                      >
+                        <span className="truncate font-mono">
+                          {inputValue.slice(0, 60)}{inputValue.length > 60 && '...'}
+                        </span>
+                      </Button>
+                    );
+                  }}
+                />
               </div>
-            </div>
+
+              <DialogDivider />
+
+              {/* Body (JSON) */}
+              <div className="flex w-full flex-col gap-1.5">
+                <p className="text-sm font-medium leading-5 text-foreground">Body (JSON)</p>
+                <Controller
+                  control={form.control}
+                  name="body"
+                  render={({ field }) => {
+                    const inputValue =
+                      field.value === null || field.value === undefined
+                        ? 'null'
+                        : typeof field.value === 'string'
+                          ? field.value
+                          : JSON.stringify(field.value, null, 2);
+                    if (editingField === 'body') {
+                      return (
+                        <InlineJsonEditor
+                          value={inputValue}
+                          nullable
+                          onChange={(v) => {
+                            if (v === 'null') { field.onChange(null); }
+                            else { field.onChange(JSON.parse(v)); }
+                          }}
+                          onCancel={() => setEditingField(null)}
+                        />
+                      );
+                    }
+                    return (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => setEditingField('body')}
+                        className="h-8 w-full justify-start bg-[var(--alpha-4)] px-2 py-1.5 text-[13px] font-normal leading-[18px] text-muted-foreground"
+                      >
+                        <span className="truncate font-mono">
+                          {inputValue.slice(0, 60)}{inputValue.length > 60 && '...'}
+                        </span>
+                      </Button>
+                    );
+                  }}
+                />
+              </div>
+            </DialogBody>
           </ScrollArea>
 
           {error && (
-            <div className="px-6 py-3 shrink-0">
+            <div className="shrink-0 px-4 py-3">
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
@@ -459,20 +514,20 @@ export function ScheduleFormDialog({
           <DialogFooter>
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               onClick={() => onOpenChange(false)}
-              className="h-10 px-5 dark:bg-neutral-600 dark:text-zinc-300 dark:border-neutral-600 dark:hover:bg-neutral-700"
+              className="w-30"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              className="h-10 px-5 font-medium bg-zinc-950 text-white hover:bg-zinc-800 dark:bg-emerald-300 dark:text-zinc-950 dark:hover:bg-emerald-400 disabled:opacity-40"
               disabled={
                 !form.formState.isValid ||
                 form.formState.isSubmitting ||
                 (mode === 'edit' && !form.formState.isDirty)
               }
+              className="w-30"
             >
               {mode === 'create' ? 'Create' : 'Save'}
             </Button>

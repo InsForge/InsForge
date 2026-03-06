@@ -2,6 +2,10 @@
 const tailwindPreset = {
   theme: {
     extend: {
+      fontFamily: {
+        brand: 'var(--insforge-font)',
+        content: 'var(--insforge-content-font)',
+      },
       colors: {
         border: 'var(--border)',
         'alpha-4': 'var(--alpha-4)',
@@ -17,6 +21,8 @@ const tailwindPreset = {
         'semantic-2': 'rgb(var(--semantic-2))',
         card: 'rgb(var(--card))',
         toast: 'rgb(var(--toast))',
+        canvas: 'rgb(var(--canvas))',
+        surface: 'rgb(var(--surface))',
       },
     },
   },

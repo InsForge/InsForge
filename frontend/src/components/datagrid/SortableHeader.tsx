@@ -21,8 +21,8 @@ function SortableHeaderRenderer<TRow extends DataGridRowType>({
         <span
           className={
             mutedHeader
-              ? 'truncate text-[13px] leading-[18px] text-muted-foreground opacity-80'
-              : 'truncate text-[13px] leading-[18px] text-muted-foreground'
+              ? 'truncate text-sm font-medium leading-5 text-muted-foreground opacity-80'
+              : 'truncate text-sm font-medium leading-5 text-muted-foreground'
           }
           title={typeof column.name === 'string' ? column.name : ''}
         >

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CirclePlus, RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
 import {
   Button,
   ConfirmDialog,
+  SearchInput,
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -19,6 +20,7 @@ import { SortColumn } from 'react-data-grid';
 import { UserSchema } from '@insforge/shared-schemas';
 import { useToast } from '@/lib/hooks/useToast';
 import { useUsers } from '@/features/auth/hooks/useUsers';
+import { cn } from '@/lib/utils/utils';
 
 export default function UsersPage() {
   const [searchValue, setSearchValue] = useState('');
@@ -141,14 +143,11 @@ export default function UsersPage() {
   };
 
   const emptyState = (
-    <DataGridEmptyState
-      message="No Users Found"
-      action={{ label: 'Add User', onClick: () => setAddDialogOpen(true) }}
-    />
+    <DataGridEmptyState message="No users found" />
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-surface">
       <TableHeader
         leftContent={
           selectedRows.size > 0 ? (
@@ -165,54 +164,47 @@ export default function UsersPage() {
               />
             </div>
           ) : (
-            <div className="flex min-w-0 items-center gap-3">
-              <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">Users</h1>
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center">
-                <div className="h-5 w-px bg-[var(--alpha-8)]" />
-              </div>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => void handleRefresh()}
-                      disabled={isRefreshing}
-                      className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
-                    >
-                      <RefreshCw
-                        className={
-                          isRefreshing
-                            ? 'h-5 w-5 animate-spin stroke-[1.5]'
-                            : 'h-5 w-5 stroke-[1.5]'
-                        }
-                      />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" align="center">
-                    <p>{isRefreshing ? 'Refreshing...' : 'Refresh users'}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center">
-                <div className="h-5 w-px bg-[var(--alpha-8)]" />
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 rounded px-1.5 text-primary hover:bg-[var(--alpha-4)] hover:text-primary active:bg-[var(--alpha-8)]"
-                onClick={() => setAddDialogOpen(true)}
-              >
-                <CirclePlus className="h-6 w-6 stroke-[1.5] text-primary" />
-                <span className="px-1 text-sm font-medium leading-5">Add User</span>
-              </Button>
-            </div>
+            <SearchInput
+              value={searchValue}
+              onChange={setSearchValue}
+              placeholder="Search users"
+              debounceTime={300}
+              className="w-64"
+            />
           )
         }
-        searchValue={searchValue}
-        onSearchChange={setSearchValue}
-        searchDebounceTime={300}
-        searchPlaceholder="Search users"
+        showSearch={false}
+        rightActions={
+          <div className="flex items-center gap-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline-muted"
+                    size="icon"
+                    onClick={() => void handleRefresh()}
+                    disabled={isRefreshing}
+                  >
+                    <RefreshCw
+                      strokeWidth={1.5}
+                      className={cn('!size-3.5', isRefreshing && 'animate-spin')}
+                    />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="center">
+                  <p>{isRefreshing ? 'Refreshing...' : 'Refresh users'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <Button
+              onClick={() => setAddDialogOpen(true)}
+              className="h-8 px-2.5"
+            >
+              <Plus strokeWidth={1.5} className="h-4 w-4" />
+              Create user
+            </Button>
+          </div>
+        }
       />
 
       <div className="relative min-h-0 flex-1">
