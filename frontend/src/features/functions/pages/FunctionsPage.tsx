@@ -107,7 +107,7 @@ export default function FunctionsPage() {
                     disabled={isRefreshing}
                     className="h-8 w-8"
                   >
-                    <RefreshIcon className={isRefreshing ? '!size-3.5 animate-spin' : '!size-3.5'} />
+                    <RefreshIcon className={isRefreshing ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" align="center">

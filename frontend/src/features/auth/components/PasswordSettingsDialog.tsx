@@ -77,11 +77,10 @@ export function PasswordSettingsDialog({ open, onOpenChange }: PasswordSettingsD
     onOpenChange(nextOpen);
   };
 
-  const handleSubmit = () => {
-    void form.handleSubmit((data) => {
-      updateConfig(data);
-      onOpenChange(false);
-    })();
+  const onSubmit = (data: UpdateAuthConfigRequest) => {
+    updateConfig(data, {
+      onSuccess: () => onOpenChange(false),
+    });
   };
 
   const saveDisabled = !form.formState.isDirty || isUpdating;
@@ -90,7 +89,7 @@ export function PasswordSettingsDialog({ open, onOpenChange }: PasswordSettingsD
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-[520px]">
         <DialogHeader>
-          <DialogTitle className="font-medium">Email</DialogTitle>
+          <DialogTitle className="font-medium">Password Settings</DialogTitle>
         </DialogHeader>
 
         {isLoading ? (
@@ -98,7 +97,7 @@ export function PasswordSettingsDialog({ open, onOpenChange }: PasswordSettingsD
             Loading configuration...
           </div>
         ) : (
-          <form onSubmit={(e) => e.preventDefault()} className="flex flex-col">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col">
             <div className="space-y-6 p-6">
               {/* Minimum length */}
               <div className="flex items-center justify-between gap-10">
@@ -207,12 +206,12 @@ export function PasswordSettingsDialog({ open, onOpenChange }: PasswordSettingsD
                 type="button"
                 variant="secondary"
                 className="w-30"
-                onClick={resetForm}
+                onClick={() => onOpenChange(false)}
                 disabled={isUpdating}
               >
                 Cancel
               </Button>
-              <Button type="button" className="w-30" onClick={handleSubmit} disabled={saveDisabled}>
+              <Button type="submit" className="w-30" disabled={saveDisabled}>
                 {isUpdating ? 'Saving...' : 'Save changes'}
               </Button>
             </DialogFooter>
