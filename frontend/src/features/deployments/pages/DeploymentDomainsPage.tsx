@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ExternalLink, Copy, Check, Plus, Pencil, Globe } from 'lucide-react';
-import { Button, Skeleton, Input, Dialog, DialogContent } from '@/components';
+import { Button, Dialog, DialogContent, DialogTitle, Input } from '@insforge/ui';
+import { Skeleton } from '@/components';
 import DiscordIcon from '@/assets/logos/discord.svg?react';
 import { useDeployments } from '../hooks/useDeployments';
 import { useDeploymentSlug } from '../hooks/useDeploymentSlug';
@@ -123,7 +124,7 @@ export default function DeploymentDomainsPage() {
 
   if (isLoadingDeployments || isLoadingMetadata) {
     return (
-      <div className="h-full flex flex-col overflow-hidden">
+      <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
         <div className="flex-1 min-h-0 overflow-auto p-6">
           <div className="w-full max-w-[1080px] mx-auto flex flex-col gap-6">
             <h1 className="text-xl font-semibold text-zinc-950 dark:text-white tracking-[-0.1px]">
@@ -139,7 +140,7 @@ export default function DeploymentDomainsPage() {
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       <div className="flex-1 min-h-0 overflow-auto p-6">
         <div className="w-full max-w-[1080px] mx-auto flex flex-col gap-6">
           {/* Title */}
@@ -213,7 +214,7 @@ export default function DeploymentDomainsPage() {
                       value={customSlug}
                       onChange={(e) => setCustomSlug(e.target.value)}
                       placeholder=""
-                      className="h-8 w-[200px] dark:bg-neutral-900 dark:text-white dark:border-neutral-700"
+                      className="h-8 w-[200px]"
                     />
                     <span className="text-[13px] text-zinc-950 dark:text-white">
                       .insforge.site
@@ -308,12 +309,12 @@ export default function DeploymentDomainsPage() {
 
           {/* Own Domain Dialog */}
           <Dialog open={isOwnDomainDialogOpen} onOpenChange={setIsOwnDomainDialogOpen}>
-            <DialogContent className="max-w-md p-0 gap-0 bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 overflow-hidden">
+            <DialogContent>
               {/* Header */}
               <div className="flex items-center justify-between px-6 py-3 border-b border-neutral-200 dark:border-neutral-700">
-                <h2 className="text-lg font-semibold text-zinc-950 dark:text-white leading-7">
+                <DialogTitle className="text-lg font-semibold text-zinc-950 dark:text-white leading-7">
                   Add your own domain
-                </h2>
+                </DialogTitle>
               </div>
 
               {/* Body */}

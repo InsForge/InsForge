@@ -1,29 +1,39 @@
 import { useMemo } from 'react';
+import { Button } from '@insforge/ui';
 import {
   DataGrid,
-  createDefaultCellRenderer,
   type DataGridProps,
   type RenderCellProps,
   type DataGridColumn,
   type DataGridRowType,
-  Button,
 } from '@/components';
 import { Download, Eye, Trash2, Image, FileText, Music, Video, Archive, File } from 'lucide-react';
 import { StorageFileSchema } from '@insforge/shared-schemas';
+import { cn, formatTime } from '@/lib/utils/utils';
 
 // Create a type that makes StorageFileSchema compatible with DataGridRowType
 // This allows StorageFileSchema to be used with the generic DataGrid while maintaining type safety
 type StorageDataGridRow = StorageFileSchema & DataGridRowType;
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(2)} KB`;
+  }
+  if (bytes < 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  }
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
 
 // Custom cell renderers for storage files
 const FileNameRenderer = ({ row, column }: RenderCellProps<StorageDataGridRow>) => {
   const fullPath = String(row[column.key] || '');
   const fileName = fullPath.split('/').pop() || fullPath;
   return (
-    <span
-      className="text-sm font-medium text-zinc-900 dark:text-zinc-300 truncate"
-      title={fullPath}
-    >
+    <span className="truncate text-[13px] leading-[18px] text-foreground" title={fullPath}>
       {fileName}
     </span>
   );
@@ -31,21 +41,11 @@ const FileNameRenderer = ({ row, column }: RenderCellProps<StorageDataGridRow>) 
 
 const FileSizeRenderer = ({ row, column }: RenderCellProps<StorageDataGridRow>) => {
   const bytes = Number(row[column.key] || 0);
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) {
-      return `${bytes} B`;
-    }
-    if (bytes < 1024 * 1024) {
-      return `${(bytes / 1024).toFixed(2)} KB`;
-    }
-    if (bytes < 1024 * 1024 * 1024) {
-      return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-    }
-    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-  };
-
-  return <span className="text-sm text-zinc-600 dark:text-zinc-300">{formatFileSize(bytes)}</span>;
+  return (
+    <span className="truncate text-[13px] leading-[18px] text-foreground">
+      {formatFileSize(bytes)}
+    </span>
+  );
 };
 
 const MimeTypeRenderer = ({ row, column }: RenderCellProps<StorageDataGridRow>) => {
@@ -56,32 +56,50 @@ const MimeTypeRenderer = ({ row, column }: RenderCellProps<StorageDataGridRow>) 
   const getFileIcon = () => {
     switch (category) {
       case 'image':
-        return <Image className="h-4 w-4 text-zinc-950 dark:text-zinc-300" />;
+        return <Image className="h-4 w-4 text-muted-foreground" />;
       case 'video':
-        return <Video className="h-4 w-4 text-zinc-950 dark:text-zinc-300" />;
+        return <Video className="h-4 w-4 text-muted-foreground" />;
       case 'audio':
-        return <Music className="h-4 w-4 text-zinc-950 dark:text-zinc-300" />;
+        return <Music className="h-4 w-4 text-muted-foreground" />;
       case 'text':
-        return <FileText className="h-4 w-4 text-zinc-950 dark:text-zinc-300" />;
+        return <FileText className="h-4 w-4 text-muted-foreground" />;
       case 'application':
         // Check for specific application types
         if (mimeType.includes('zip') || mimeType.includes('tar') || mimeType.includes('rar')) {
-          return <Archive className="h-4 w-4 text-zinc-950 dark:text-zinc-300" />;
+          return <Archive className="h-4 w-4 text-muted-foreground" />;
         }
         if (mimeType.includes('pdf')) {
-          return <FileText className="h-4 w-4 text-zinc-950 dark:text-zinc-300" />;
+          return <FileText className="h-4 w-4 text-muted-foreground" />;
         }
-        return <File className="h-4 w-4 text-zinc-950 dark:text-zinc-300" />;
+        return <File className="h-4 w-4 text-muted-foreground" />;
       default:
-        return <File className="h-4 w-4 text-zinc-950 dark:text-zinc-300" />;
+        return <File className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
   return (
-    <div className="flex items-center gap-2.5">
+    <div className="flex items-center gap-2.5 min-w-0">
       {getFileIcon()}
-      <span className="text-sm text-zinc-500 dark:text-zinc-300">{mimeType}</span>
+      <span className="truncate text-[13px] leading-[18px] text-foreground">{mimeType}</span>
     </div>
+  );
+};
+
+const UploadedAtRenderer = ({ row, column }: RenderCellProps<StorageDataGridRow>) => {
+  const rawValue = row[column.key];
+  const value = typeof rawValue === 'string' ? rawValue : '';
+  const displayValue = value ? formatTime(value) : '—';
+
+  return (
+    <span
+      className={cn(
+        'truncate text-[13px] leading-[18px]',
+        value ? 'text-foreground' : 'text-muted-foreground'
+      )}
+      title={displayValue}
+    >
+      {displayValue}
+    </span>
   );
 };
 
@@ -92,14 +110,12 @@ export function createStorageColumns(
   onDelete?: (file: StorageFileSchema) => void,
   isDownloading?: (key: string) => boolean
 ): DataGridColumn<StorageDataGridRow>[] {
-  // Create typed cell renderers
-  const cellRenderers = createDefaultCellRenderer<StorageDataGridRow>();
-
   const columns: DataGridColumn<StorageDataGridRow>[] = [
     {
       key: 'key',
       name: 'Name',
-      width: '1fr',
+      width: '1.35fr',
+      minWidth: 220,
       resizable: true,
       sortable: true,
       renderCell: FileNameRenderer,
@@ -107,7 +123,8 @@ export function createStorageColumns(
     {
       key: 'size',
       name: 'Size',
-      width: '1fr',
+      width: '0.8fr',
+      minWidth: 120,
       resizable: true,
       sortable: true,
       renderCell: FileSizeRenderer,
@@ -115,7 +132,8 @@ export function createStorageColumns(
     {
       key: 'mimeType',
       name: 'Type',
-      width: '1fr',
+      width: '1.2fr',
+      minWidth: 200,
       resizable: true,
       sortable: true,
       renderCell: MimeTypeRenderer,
@@ -123,10 +141,11 @@ export function createStorageColumns(
     {
       key: 'uploadedAt',
       name: 'Uploaded At',
-      width: '1fr',
+      width: '1.1fr',
+      minWidth: 180,
       resizable: true,
       sortable: true,
-      renderCell: cellRenderers.datetime,
+      renderCell: UploadedAtRenderer,
     },
   ];
 
@@ -135,8 +154,8 @@ export function createStorageColumns(
     columns.push({
       key: 'actions',
       name: '',
-      minWidth: 120,
-      maxWidth: 120,
+      minWidth: 108,
+      maxWidth: 108,
       resizable: false,
       sortable: false,
       renderCell: ({ row }: RenderCellProps<StorageDataGridRow>) => {
@@ -145,26 +164,26 @@ export function createStorageColumns(
         const isFileDownloading = isDownloading?.(fileKey) || false;
 
         return (
-          <div className="flex justify-center">
+          <div className="flex w-full items-center justify-center gap-2">
             {onPreview && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
+                className="h-6 w-6 rounded p-0 text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground active:bg-[var(--alpha-8)]"
                 onClick={(e) => {
                   e.stopPropagation();
                   onPreview(row as StorageFileSchema);
                 }}
                 title="Preview file"
               >
-                <Eye className="h-4 w-4 text-zinc-500 dark:text-zinc-300" />
+                <Eye className="h-5 w-5 stroke-[1.5]" />
               </Button>
             )}
             {onDownload && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
+                className="h-6 w-6 rounded p-0 text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground active:bg-[var(--alpha-8)]"
                 onClick={(e) => {
                   e.stopPropagation();
                   onDownload(row as StorageFileSchema);
@@ -172,21 +191,21 @@ export function createStorageColumns(
                 disabled={isFileDownloading}
                 title="Download file"
               >
-                <Download className="h-4 w-4 text-zinc-500 dark:text-zinc-300" />
+                <Download className="h-5 w-5 stroke-[1.5]" />
               </Button>
             )}
             {onDelete && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
+                className="h-6 w-6 rounded p-0 text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground active:bg-[var(--alpha-8)]"
                 onClick={(e) => {
                   e.stopPropagation();
                   onDelete(row as StorageFileSchema);
                 }}
                 title="Delete file"
               >
-                <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+                <Trash2 className="h-5 w-5 stroke-[1.5]" />
               </Button>
             )}
           </div>
@@ -234,6 +253,8 @@ export function StorageDataGrid({
       columns={columns}
       showSelection={true}
       showPagination={true}
+      showTypeBadge={false}
+      paginationRecordLabel="files"
       rowKeyGetter={(row) => row.key}
     />
   );

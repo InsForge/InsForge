@@ -1,10 +1,10 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { Loader2, ArrowUp, ArrowDown } from 'lucide-react';
-import { ConfirmDialog, Tabs, TabsList, TabsTrigger, TabsContent } from '@/components';
+import { Loader2, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { useAIConfigs } from '../hooks/useAIConfigs';
 import { useAIRemainingCredits } from '../hooks/useAIUsage';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
+import { Tabs, Tab, ConfirmDialog } from '@insforge/ui';
 import {
   generateProviderTabs,
   filterModelsByProvider,
@@ -85,10 +85,8 @@ export default function AIPage() {
   // Handle sort click
   const handleSort = (field: SortField) => {
     if (sortField === field) {
-      // Toggle direction if same field
       setSortDirection((prev) => (prev === 'desc' ? 'asc' : 'desc'));
     } else {
-      // New field, default to desc
       setSortField(field);
       setSortDirection('desc');
     }
@@ -96,13 +94,15 @@ export default function AIPage() {
 
   // Sort indicator component
   const SortIndicator = ({ field }: { field: SortField }) => {
-    if (sortField !== field) {
-      return null;
-    }
-    return sortDirection === 'desc' ? (
-      <ArrowDown className="w-4 h-4" />
-    ) : (
-      <ArrowUp className="w-4 h-4" />
+    const isActive = sortField === field;
+    return (
+      <div className="ml-0.5 inline-flex h-4 w-4 items-center justify-center text-muted-foreground">
+        {isActive && sortDirection === 'asc' && <ChevronUp className="h-3.5 w-3.5" />}
+        {isActive && sortDirection === 'desc' && <ChevronDown className="h-3.5 w-3.5" />}
+        {!isActive && (
+          <ChevronsUpDown className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+        )}
+      </div>
     );
   };
 
@@ -148,122 +148,108 @@ export default function AIPage() {
   const isLoading = isLoadingModels || isLoadingConfigurations;
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-neutral-800 pt-8">
+    <div className="h-full flex flex-col bg-[rgb(var(--semantic-0))]">
       {/* Header Section - Fixed */}
-      <div className="max-w-[1080px] mx-auto w-full flex flex-col gap-2 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold text-black dark:text-white leading-7">
-            Model Gateway
-          </h1>
-          {credits?.remaining && (
-            <span className="text-sm font-normal text-neutral-700 dark:text-emerald-300 mt-[2.5px]">
-              {formatCredits(credits.remaining)} credit{credits.remaining !== 1 ? 's' : ''} left
-            </span>
-          )}
-        </div>
-        <p className="text-sm leading-6 text-neutral-500 dark:text-neutral-400">
-          Your backend has connected to the following models, start building LLM-powered features.
-        </p>
-      </div>
+      <div className="flex flex-col items-center px-10 flex-shrink-0">
+        <div className="max-w-[1024px] w-full flex flex-col gap-6 pt-10 pb-3">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-medium text-foreground leading-8">Model Gateway</h1>
+              {credits?.remaining && (
+                <span className="text-sm font-normal text-primary mt-[2.5px]">
+                  {formatCredits(credits.remaining)} credit{credits.remaining !== 1 ? 's' : ''} left
+                </span>
+              )}
+            </div>
+            <p className="text-sm leading-5 text-muted-foreground">
+              Your models are ready — build LLM-powered features or add more integrations.
+            </p>
+          </div>
 
-      {/* Provider Tabs */}
-      <Tabs
-        value={activeTab}
-        onValueChange={setActiveTab}
-        className="flex-1 flex flex-col min-h-0 mt-6"
-      >
-        {/* Tabs List */}
-        <TabsList className="bg-transparent border-b border-neutral-200 dark:border-neutral-700 rounded-none h-auto p-0 justify-start gap-0 flex-shrink-0">
-          <div className="max-w-[1080px] mx-auto w-full space-x-6 h-8.5 flex items-start">
+          {/* Provider Tabs - Full Width */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             {providers.map((provider) => {
               const Logo = provider.logo;
               return (
-                <TabsTrigger
-                  key={provider.id}
-                  value={provider.id}
-                  className="h-full relative rounded-none border-b-2 border-transparent gap-1 pb-3 px-0 pt-0 text-sm font-normal text-neutral-500 dark:text-neutral-400 hover:text-black dark:hover:text-white data-[state=active]:border-black dark:data-[state=active]:border-white data-[state=active]:text-black dark:data-[state=active]:text-white data-[state=active]:shadow-none bg-transparent data-[state=active]:bg-transparent"
-                >
+                <Tab key={provider.id} value={provider.id} className="flex-1">
                   {Logo && <Logo className="w-5 h-5" />}
                   {provider.displayName}
-                </TabsTrigger>
+                </Tab>
               );
             })}
-          </div>
-        </TabsList>
+          </Tabs>
+        </div>
+      </div>
 
-        {/* Tab Content - Scrollbar on page edge */}
-        <TabsContent
-          value={activeTab}
-          className="flex-1 min-h-0 overflow-y-auto scrollbar-gutter-stable mt-0"
-        >
-          <div className="max-w-[1080px] mx-auto w-full pt-6 pb-6">
-            {getAICreditsError ? (
-              <div className="flex items-center justify-center h-64 text-neutral-500 dark:text-neutral-400">
-                <p className="text-sm font-normal text-neutral-500 dark:text-neutral-400">
-                  {getAICreditsError.message}
-                </p>
+      {/* Tab Content */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-10">
+        <div className="max-w-[1024px] w-full mx-auto pt-2 pb-6">
+          {getAICreditsError ? (
+            <div className="flex items-center justify-center h-64 text-muted-foreground">
+              <p className="text-sm font-normal">{getAICreditsError.message}</p>
+            </div>
+          ) : isLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : modelsForActiveProvider.length === 0 ? (
+            <div className="flex items-center justify-center h-64 text-muted-foreground">
+              No models available for{' '}
+              {providers.find((p) => p.id === activeTab)?.displayName || activeTab}
+            </div>
+          ) : (
+            <div className="bg-card border border-[var(--alpha-8)] rounded py-2 flex flex-col">
+              {/* Table Header - Fixed */}
+              <div className="grid grid-cols-6 gap-x-2.5 h-8 items-center text-sm leading-5 text-muted-foreground px-4 border-b border-[var(--alpha-8)] shrink-0">
+                <div>Model</div>
+                <div>Input</div>
+                <button
+                  onClick={() => handleSort('inputPrice')}
+                  className="group flex items-center gap-1 hover:text-foreground transition-colors"
+                  aria-sort={
+                    sortField === 'inputPrice'
+                      ? sortDirection === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
+                >
+                  Input Price
+                  <SortIndicator field="inputPrice" />
+                </button>
+                <div>Output</div>
+                <button
+                  onClick={() => handleSort('outputPrice')}
+                  className="group flex items-center gap-1 hover:text-foreground transition-colors"
+                  aria-sort={
+                    sortField === 'outputPrice'
+                      ? sortDirection === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
+                >
+                  Output Price
+                  <SortIndicator field="outputPrice" />
+                </button>
+                <button
+                  onClick={() => handleSort('requests')}
+                  className="group flex items-center gap-1 justify-end hover:text-foreground transition-colors"
+                  aria-sort={
+                    sortField === 'requests'
+                      ? sortDirection === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
+                >
+                  Requests
+                  <SortIndicator field="requests" />
+                </button>
               </div>
-            ) : isLoading ? (
-              <div className="flex items-center justify-center h-64">
-                <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
-              </div>
-            ) : modelsForActiveProvider.length === 0 ? (
-              <div className="flex items-center justify-center h-64 text-neutral-500 dark:text-neutral-400">
-                No models available for{' '}
-                {providers.find((p) => p.id === activeTab)?.displayName || activeTab}
-              </div>
-            ) : (
-              <>
-                {/* Table Header */}
-                <div className="grid grid-cols-[200px_173px_173px_173px_173px_80px] gap-3 px-6 text-sm leading-6 text-neutral-500 dark:text-neutral-400 mb-2">
-                  <div>Model</div>
-                  <div>Input</div>
-                  <button
-                    onClick={() => handleSort('inputPrice')}
-                    className="flex items-center gap-1 hover:text-black dark:hover:text-white transition-colors"
-                    aria-sort={
-                      sortField === 'inputPrice'
-                        ? sortDirection === 'asc'
-                          ? 'ascending'
-                          : 'descending'
-                        : 'none'
-                    }
-                  >
-                    Input Price
-                    <SortIndicator field="inputPrice" />
-                  </button>
-                  <div>Output</div>
-                  <button
-                    onClick={() => handleSort('outputPrice')}
-                    className="flex items-center gap-1 hover:text-black dark:hover:text-white transition-colors"
-                    aria-sort={
-                      sortField === 'outputPrice'
-                        ? sortDirection === 'asc'
-                          ? 'ascending'
-                          : 'descending'
-                        : 'none'
-                    }
-                  >
-                    Output Price
-                    <SortIndicator field="outputPrice" />
-                  </button>
-                  <button
-                    onClick={() => handleSort('requests')}
-                    className="flex items-center gap-1 justify-end hover:text-black dark:hover:text-white transition-colors"
-                    aria-sort={
-                      sortField === 'requests'
-                        ? sortDirection === 'asc'
-                          ? 'ascending'
-                          : 'descending'
-                        : 'none'
-                    }
-                  >
-                    Requests
-                    <SortIndicator field="requests" />
-                  </button>
-                </div>
 
-                {/* Table Body */}
+              {/* Table Body - Scrollable */}
+              <div>
                 {modelsForActiveProvider.map((model) => (
                   <ModelRow
                     key={model.modelId}
@@ -273,11 +259,11 @@ export default function AIPage() {
                     onToggle={handleSwitchChange}
                   />
                 ))}
-              </>
-            )}
-          </div>
-        </TabsContent>
-      </Tabs>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Confirm Dialog */}
       <ConfirmDialog {...confirmDialogProps} />

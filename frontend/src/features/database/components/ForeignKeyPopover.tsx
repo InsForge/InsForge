@@ -1,16 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   Button,
-  Label,
   Dialog,
   DialogContent,
-  DialogTitle,
   DialogDescription,
+  DialogTitle,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-} from '@/components';
+} from '@insforge/ui';
+import { Label } from '@/components';
 import { useTables } from '@/features/database/hooks/useTables';
 import { UseFormReturn } from 'react-hook-form';
 import { TableFormSchema, TableFormForeignKeySchema } from '../schema';
@@ -131,14 +131,12 @@ export function ForeignKeyPopover({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[520px] p-0 gap-0">
+      <DialogContent>
         <div className="flex flex-col">
           {/* Header */}
           <div className="flex flex-col gap-1 px-6 py-3 border-b border-zinc-200 dark:border-neutral-700">
-            <DialogTitle className="text-lg font-semibold dark:text-white">
-              {initialValue ? 'Edit Foreign Key' : 'Add Foreign Key'}
-            </DialogTitle>
-            <DialogDescription className="text-sm text-zinc-500 dark:text-neutral-400">
+            <DialogTitle>{initialValue ? 'Edit Foreign Key' : 'Add Foreign Key'}</DialogTitle>
+            <DialogDescription>
               {initialValue
                 ? 'Modify the relationship between tables'
                 : 'Create a relationship between this table and another table'}
@@ -156,7 +154,7 @@ export function ForeignKeyPopover({
                   setNewForeignKey((prev) => ({ ...prev, columnName: value }))
                 }
               >
-                <SelectTrigger className="w-70 h-10 border-zinc-200 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+                <SelectTrigger className="w-70 h-10">
                   <span
                     className={cn(
                       'text-sm text-muted-foreground dark:text-neutral-400',
@@ -175,12 +173,8 @@ export function ForeignKeyPopover({
                         value={col.columnName}
                         disabled={col.isSystemColumn}
                       >
-                        <div className="flex flex-row items-center justify-between gap-2">
-                          <span className="truncate max-w-[160px] block">{col.columnName}</span>
-                          <span className="text-xs text-muted-foreground dark:text-neutral-400 flex-shrink-0">
-                            ({col.type})
-                          </span>
-                        </div>
+                        {col.columnName}
+                        <span className="text-xs text-muted-foreground">({col.type})</span>
                       </SelectItem>
                     ))}
                 </SelectContent>
@@ -200,7 +194,7 @@ export function ForeignKeyPopover({
                   }));
                 }}
               >
-                <SelectTrigger className="w-70 h-10 border-zinc-200 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+                <SelectTrigger className="w-70 h-10">
                   <span
                     className={cn(
                       'text-sm text-muted-foreground dark:text-neutral-400',
@@ -233,7 +227,7 @@ export function ForeignKeyPopover({
                     setNewForeignKey((prev) => ({ ...prev, referenceColumn: value }))
                   }
                 >
-                  <SelectTrigger className="w-70 h-10 border-zinc-200 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+                  <SelectTrigger className="w-70 h-10">
                     <span
                       className={cn(
                         'text-sm text-muted-foreground dark:text-neutral-400',
@@ -270,24 +264,12 @@ export function ForeignKeyPopover({
                               key={col.columnName}
                               value={col.columnName}
                               disabled={isDisabled}
-                              className="relative flex items-center justify-between pr-16"
                             >
-                              <div className="flex flex-row items-center justify-between gap-2">
-                                <span
-                                  className="flex-1 truncate max-w-[180px] block"
-                                  title={col.columnName}
-                                >
-                                  {col.columnName}
-                                </span>
-                                <span className="text-xs text-muted-foreground dark:text-neutral-400">
-                                  ({col.type})
-                                </span>
-                                {rightText && (
-                                  <span className="text-right text-xs text-muted-foreground dark:text-neutral-400">
-                                    {rightText}
-                                  </span>
-                                )}
-                              </div>
+                              {col.columnName}
+                              <span className="text-xs text-muted-foreground">({col.type})</span>
+                              {rightText && (
+                                <span className="text-xs text-muted-foreground">{rightText}</span>
+                              )}
                             </SelectItem>
                           );
                         });
@@ -316,7 +298,7 @@ export function ForeignKeyPopover({
                   }))
                 }
               >
-                <SelectTrigger className="w-70 h-10 border-zinc-200 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+                <SelectTrigger className="w-70 h-10">
                   <span className="text-sm text-black dark:text-white">
                     {newForeignKey.onUpdate}
                   </span>
@@ -341,7 +323,7 @@ export function ForeignKeyPopover({
                   }))
                 }
               >
-                <SelectTrigger className="w-70 h-10 border-zinc-200 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+                <SelectTrigger className="w-70 h-10">
                   <span className="text-sm text-black dark:text-white">
                     {newForeignKey.onDelete}
                   </span>

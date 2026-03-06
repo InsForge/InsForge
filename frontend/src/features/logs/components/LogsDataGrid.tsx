@@ -3,6 +3,7 @@ import {
   DataGrid,
   type DataGridProps,
   type RenderCellProps,
+  type RenderHeaderCellProps,
   type DataGridColumn,
   type DataGridRowType,
 } from '@/components/datagrid';
@@ -17,11 +18,35 @@ export interface LogsColumnDef {
   maxWidth?: number;
   sortable?: boolean;
   renderCell?: (props: RenderCellProps<DataGridRowType>) => React.ReactNode;
+  renderHeaderCell?: (props: RenderHeaderCellProps<DataGridRowType>) => React.ReactNode;
 }
 
 // Convert logs data to DataGrid columns with custom renderers
 export function createLogsColumns(columnDefs: LogsColumnDef[]): DataGridColumn<DataGridRowType>[] {
   return columnDefs.map((def) => {
+    const baseCellRenderer =
+      def.renderCell ||
+      (({ row, column }: RenderCellProps<DataGridRowType>) => {
+        const value = row[column.key];
+        const displayValue = String(value ?? '');
+        return (
+          <span className="truncate text-[13px] font-normal leading-[18px] text-[rgb(var(--foreground))]">
+            {displayValue}
+          </span>
+        );
+      });
+
+    const baseHeaderRenderer =
+      def.renderHeaderCell ||
+      (({ column }: RenderHeaderCellProps<DataGridRowType>) => (
+        <span
+          className="truncate text-[13px] leading-[18px] text-muted-foreground"
+          title={typeof column.name === 'string' ? column.name : ''}
+        >
+          {column.name}
+        </span>
+      ));
+
     const column: DataGridColumn<DataGridRowType> = {
       key: def.key,
       name: def.name,
@@ -30,17 +55,9 @@ export function createLogsColumns(columnDefs: LogsColumnDef[]): DataGridColumn<D
       maxWidth: def.maxWidth,
       resizable: true,
       sortable: false,
-      renderCell:
-        def.renderCell ||
-        (({ row, column }: RenderCellProps<DataGridRowType>) => {
-          const value = row[column.key];
-          const displayValue = String(value ?? '');
-          return (
-            <span className="text-sm text-gray-900 dark:text-white font-normal leading-6 truncate">
-              {displayValue}
-            </span>
-          );
-        }),
+      renderCell: (props: RenderCellProps<DataGridRowType>) => baseCellRenderer(props),
+      renderHeaderCell: (props: RenderHeaderCellProps<DataGridRowType>) =>
+        baseHeaderRenderer(props),
     };
 
     return column;
@@ -97,7 +114,7 @@ export function LogsDataGrid<T = Record<string, unknown>>({
   const rowClass = useCallback(
     (row: DataGridRowType) => {
       if (selectedRowId && row.id === selectedRowId) {
-        return 'bg-gray-200 dark:bg-neutral-700';
+        return 'bg-[var(--alpha-4)]';
       }
       return '';
     },

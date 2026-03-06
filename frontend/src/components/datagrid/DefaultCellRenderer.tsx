@@ -2,7 +2,7 @@ import { ColumnType } from '@insforge/shared-schemas';
 import type { ConvertedValue, DataGridRowType } from './datagridTypes';
 import { RenderCellProps } from 'react-data-grid';
 import { cn, formatValueForDisplay, isEmptyValue } from '@/lib/utils/utils';
-import { Badge } from '@/components/radix/Badge';
+import { Badge } from '@insforge/ui';
 import IdCell from './IdCell';
 
 // Generic cell renderer factory
@@ -34,9 +34,8 @@ function createDefaultCellRenderer<TRow extends DataGridRowType>() {
       return (
         <div className="w-full h-full flex items-center justify-start">
           <Badge
-            variant={isNull ? 'secondary' : value ? 'default' : 'secondary'}
             className={cn(
-              'py-0.5 px-1.5 border border-transparent',
+              'py-0.5 px-1.5 border border-transparent text-white',
               isNull && 'text-muted-foreground italic'
             )}
           >

@@ -1,4 +1,4 @@
-import { CopyButton } from '@/components/CopyButton';
+import { CopyButton } from '@insforge/ui';
 import { FunctionSchema } from '@insforge/shared-schemas';
 import { cn, getBackendUrl } from '@/lib/utils/utils';
 import { format, formatDistance } from 'date-fns';
@@ -23,51 +23,44 @@ export function FunctionRow({
   return (
     <div
       className={cn(
-        'group h-14 px-3 bg-white hover:bg-neutral-100 dark:bg-[#333333] dark:hover:bg-neutral-700 rounded-[8px] transition-all cursor-pointer',
+        'group rounded border border-[var(--alpha-8)] bg-card cursor-pointer',
         className
       )}
       onClick={onClick}
     >
-      <div className="grid grid-cols-12 h-full items-center">
+      <div className="flex items-center pl-2 rounded hover:bg-[var(--alpha-8)] transition-colors">
         {/* Name Column */}
-        <div className="col-span-2 min-w-0 px-3 py-1.5">
-          <p className="text-sm text-zinc-950 dark:text-white truncate" title={func.name}>
+        <div className="flex-[1.5] min-w-0 h-12 flex items-center px-2.5">
+          <p className="text-sm leading-[18px] text-foreground truncate" title={func.name}>
             {func.name}
           </p>
         </div>
 
         {/* URL Column */}
-        <div className="col-span-6 min-w-0 px-3 py-1.5">
-          <div className="flex items-center gap-3">
-            <span
-              className="text-sm text-muted-foreground dark:text-white truncate"
-              title={functionUrl}
-            >
+        <div className="flex-[3] min-w-0 h-12 flex items-center px-2.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm leading-[18px] text-foreground truncate" title={functionUrl}>
               {functionUrl}
             </span>
             <CopyButton
-              variant="secondary"
               showText={false}
               text={functionUrl}
-              className="h-7 w-7"
+              className="size-6 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
             />
           </div>
         </div>
 
         {/* Created Column */}
-        <div className="col-span-2 px-3 py-1.5">
-          <span
-            className="text-sm text-muted-foreground dark:text-white truncate"
-            title={func.createdAt}
-          >
-            {format(new Date(func.createdAt), 'MMM dd, yyyy HH:mm')}
+        <div className="flex-[1.5] min-w-0 h-12 flex items-center px-2.5">
+          <span className="text-sm leading-[18px] text-foreground truncate" title={func.createdAt}>
+            {format(new Date(func.createdAt), 'MMM dd, yyyy, hh:mm a')}
           </span>
         </div>
 
         {/* Last Update Column */}
-        <div className="col-span-2 px-3 py-1.5">
+        <div className="flex-1 min-w-0 h-12 flex items-center px-2.5">
           <span
-            className="text-sm text-muted-foreground dark:text-white truncate"
+            className="text-sm leading-[18px] text-foreground truncate"
             title={func.deployedAt ?? ''}
           >
             {func.deployedAt

@@ -1,5 +1,5 @@
 import { LucideIcon } from 'lucide-react';
-import { Button } from '@/components/radix/Button';
+import { Button } from '@insforge/ui';
 import { cn } from '@/lib/utils/utils';
 
 interface EmptyStateProps {

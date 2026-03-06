@@ -72,8 +72,10 @@ const getLayoutedElements = (nodes: Node<CustomNodeData>[], edges: BuiltInEdge[]
   // Calculate actual node heights based on content
   const calculateNodeHeight = (node: Node<CustomNodeData>) => {
     if (node.type === 'authNode') {
-      // Auth node has fixed content
-      return 150;
+      // Auth node includes email/password + configured OAuth methods
+      const authData = node.data as AuthNodeData;
+      const methodCount = (authData.providers?.length ?? 0) + 1;
+      return 116 + methodCount * 40;
     } else if (node.type === 'tableNode') {
       // Table node height depends on columns
       const tableData = node.data as TableNodeData;

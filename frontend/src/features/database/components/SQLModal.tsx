@@ -3,7 +3,7 @@ import CodeMirror from '@uiw/react-codemirror';
 import { sql } from '@codemirror/lang-sql';
 import { EditorView } from '@codemirror/view';
 import { vscodeDark, vscodeLight } from '@uiw/codemirror-theme-vscode';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@insforge/ui';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 
 const customTheme = EditorView.theme({
@@ -30,9 +30,9 @@ export function SQLModal({ open, onOpenChange, title, value }: SQLModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle className="text-zinc-950 dark:text-white">{title}</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <div className="mt-2 rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-900">
           <CodeMirror
@@ -55,20 +55,20 @@ interface SQLCellButtonProps {
 
 export function SQLCellButton({ value, onClick }: SQLCellButtonProps) {
   if (!value) {
-    return <span className="text-sm">-</span>;
+    return <span className="text-sm text-muted-foreground">-</span>;
   }
 
   return (
     <div className="flex items-center justify-between gap-1 min-w-0">
-      <span className="text-sm truncate">{value}</span>
+      <span className="text-sm text-foreground truncate">{value}</span>
       <button
         onClick={(e) => {
           e.stopPropagation();
           onClick();
         }}
-        className="shrink-0 p-1 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded transition-colors"
+        className="shrink-0 p-1 hover:bg-[var(--alpha-8)] rounded transition-colors"
       >
-        <ExternalLink className="size-4 text-zinc-400 dark:text-neutral-400" />
+        <ExternalLink className="size-4 text-muted-foreground" />
       </button>
     </div>
   );

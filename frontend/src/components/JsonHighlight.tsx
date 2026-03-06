@@ -1,4 +1,4 @@
-import { CopyButton } from './CopyButton';
+import { CopyButton } from '@insforge/ui';
 import { cn } from '@/lib/utils/utils';
 
 interface JsonHighlightProps {
@@ -67,7 +67,7 @@ export function JsonHighlight({ json, textColor, className }: JsonHighlightProps
       >
         {highlightJson(json, textColor)}
       </pre>
-      <CopyButton variant="primary" text={json} className="absolute top-3.5 right-3.5 pl-2" />
+      <CopyButton text={json} className="absolute top-3.5 right-3.5" />
     </div>
   );
 }

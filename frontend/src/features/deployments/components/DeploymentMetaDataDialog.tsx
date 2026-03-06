@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Copy, Check } from 'lucide-react';
-import { Button, Dialog, DialogContent, ScrollArea } from '@/components';
+import { Button, Dialog, DialogContent } from '@insforge/ui';
+import { ScrollArea } from '@/components';
 import type { DeploymentSchema } from '../services/deployments.service';
 
 interface DeploymentMetaDataDialogProps {
@@ -33,7 +34,7 @@ export function DeploymentMetaDataDialog({
 
   return (
     <Dialog open={!!deployment} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl p-0 gap-0 bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700">
+      <DialogContent>
         {/* Header */}
         <div className="flex flex-col gap-6 p-6 border-b border-neutral-200 dark:border-neutral-700">
           <div className="flex flex-col gap-1">

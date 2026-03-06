@@ -2,7 +2,8 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Folder } from 'lucide-react';
 import { useStorage } from '@/features/storage/hooks/useStorage';
 import { StorageFileSchema } from '@insforge/shared-schemas';
-import { LoadingState, ErrorState, EmptyState, ConfirmDialog, ConnectCTA } from '@/components';
+import { ConfirmDialog } from '@insforge/ui';
+import { LoadingState, ErrorState, EmptyState, ConnectCTA } from '@/components';
 import { StorageDataGrid } from './StorageDataGrid';
 import { FilePreviewDialog } from './FilePreviewDialog';
 import { useConfirm } from '@/lib/hooks/useConfirm';
@@ -202,7 +203,7 @@ export function StorageManager({
           onDelete={(file) => void handleDelete(file)}
           isDownloading={isDownloading}
           emptyState={
-            <div className="text-sm text-zinc-500 dark:text-zinc-400">
+            <div className="text-sm text-foreground">
               {searchQuery ? 'No files match your search criteria' : 'No files found'}.{' '}
               <ConnectCTA />
             </div>

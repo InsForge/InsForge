@@ -1,5 +1,5 @@
 import { Trash2 } from 'lucide-react';
-import { Button } from '@/components/radix/Button';
+import { Button } from '@insforge/ui';
 import { SecretSchema } from '@insforge/shared-schemas';
 import { cn } from '@/lib/utils/utils';
 import { formatDistance } from 'date-fns';
@@ -17,32 +17,18 @@ export function SecretRow({ secret, onDelete, className }: SecretRowProps) {
   };
 
   return (
-    <div
-      className={cn(
-        'group h-14 px-3 bg-white hover:bg-neutral-100 dark:bg-[#333333] dark:hover:bg-neutral-700 rounded-[8px] transition-all',
-        className
-      )}
-    >
-      <div className="grid grid-cols-12 h-full items-center">
+    <div className={cn('group rounded border border-[var(--alpha-8)] bg-card', className)}>
+      <div className="flex items-center pl-1.5 rounded hover:bg-[var(--alpha-8)] transition-colors">
         {/* Name Column */}
-        <div className="col-span-8 min-w-0 px-3 py-1.5">
-          <p
-            className="text-sm text-zinc-950 dark:text-white truncate font-medium"
-            title={secret.key}
-          >
+        <div className="flex-1 min-w-0 h-12 flex items-center px-2.5">
+          <p className="text-sm text-foreground truncate" title={secret.key}>
             {secret.key}
           </p>
         </div>
 
-        {/* Digest Column */}
-        {/* <div className="col-span-5 min-w-0 px-3 py-1.5">
-          <span className="text-sm text-zinc-950 dark:text-white font-mono truncate">
-          </span>
-        </div> */}
-
         {/* Updated at Column */}
-        <div className="col-span-3 px-3 py-1.5">
-          <span className="text-sm text-zinc-950 dark:text-white truncate">
+        <div className="flex-1 min-w-0 h-12 flex items-center px-2.5">
+          <span className="text-sm text-foreground truncate">
             {secret.updatedAt
               ? formatDistance(new Date(secret.updatedAt), new Date(), { addSuffix: true })
               : 'Never'}
@@ -50,17 +36,18 @@ export function SecretRow({ secret, onDelete, className }: SecretRowProps) {
         </div>
 
         {/* Delete Button Column */}
-        <div className="col-span-1 flex justify-end px-3 py-1.5">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleDeleteClick}
-            disabled={secret.isReserved}
-            className="h-7 w-7 p-1 text-neutral-500 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-600"
-            title={secret.isReserved ? 'Cannot delete reserved secrets' : 'Delete secret'}
-          >
-            <Trash2 className="w-5 h-5" />
-          </Button>
+        <div className="w-12 h-12 flex items-center justify-end px-2.5">
+          {!secret.isReserved && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleDeleteClick}
+              className="size-8 p-1.5 text-muted-foreground hover:text-foreground hover:bg-[var(--alpha-8)] opacity-0 group-hover:opacity-100 transition-opacity"
+              title="Delete secret"
+            >
+              <Trash2 className="w-5 h-5" />
+            </Button>
+          )}
         </div>
       </div>
     </div>

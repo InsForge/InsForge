@@ -2,18 +2,17 @@ import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, X } from 'lucide-react';
 import {
-  Alert,
-  AlertDescription,
   Button,
   Dialog,
+  DialogCloseButton,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
-  ScrollArea,
-} from '@/components';
+} from '@insforge/ui';
+import { ScrollArea } from '@/components';
 import { useRecords } from '@/features/database/hooks/useRecords';
 import { buildDynamicSchema, getInitialValues } from '@/features/database';
 import { RecordFormField } from '@/features/database/components/RecordFormField';
@@ -96,52 +95,60 @@ export function RecordFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-160 p-0 gap-0 overflow-hidden flex flex-col">
+      <DialogContent showCloseButton={false} className="w-[640px] max-w-[640px] p-0">
         <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col">
-          <DialogHeader className="px-6 py-3 border-b border-zinc-200 dark:border-neutral-700">
-            <DialogTitle className="text-lg font-semibold text-zinc-950 dark:text-white">
-              Add Record
-            </DialogTitle>
+          <DialogHeader className="gap-0 px-4 py-3">
+            <div className="flex w-full items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <DialogTitle className="text-base font-medium leading-7 text-foreground">
+                  Add Record
+                </DialogTitle>
+              </div>
+              <DialogCloseButton
+                className="relative right-auto top-auto h-8 w-8 rounded p-1 text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground"
+                disabled={isCreating}
+              >
+                <X className="size-4" />
+                <span className="sr-only">Close</span>
+              </DialogCloseButton>
+            </div>
           </DialogHeader>
 
-          <ScrollArea className="h-full max-h-[540px] overflow-auto">
-            <div className="p-6 space-y-6">
-              {displayFields.map((field) => (
-                <RecordFormField
-                  key={field.columnName}
-                  field={field}
-                  form={form}
-                  tableName={tableName}
-                />
+          <ScrollArea className="max-h-[500px]">
+            <div className="p-4">
+              {displayFields.map((field, index) => (
+                <div key={field.columnName}>
+                  {index > 0 && (
+                    <div className="flex h-5 items-center">
+                      <div className="h-px w-full bg-[var(--alpha-8)]" />
+                    </div>
+                  )}
+                  <RecordFormField field={field} form={form} tableName={tableName} />
+                </div>
               ))}
             </div>
           </ScrollArea>
 
-          {error && (
-            <div className="mx-6 mb-6 shrink-0">
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            </div>
-          )}
-
-          <DialogFooter className="p-6 gap-3 sm:justify-end border-t border-zinc-200 dark:border-neutral-700 shrink-0">
+          <DialogFooter className="gap-3 px-4 py-4">
+            {error && (
+              <div className="mr-auto flex min-w-0 flex-1 items-center gap-1 text-sm leading-6 text-muted-foreground">
+                <AlertCircle className="size-4 shrink-0 text-destructive" />
+                <span className="truncate">{error}</span>
+              </div>
+            )}
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               onClick={() => onOpenChange(false)}
-              className="h-10 px-4 dark:bg-neutral-600 dark:text-zinc-300 dark:border-neutral-600 dark:hover:bg-neutral-700"
+              disabled={isCreating}
+              className="h-8 rounded px-2"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={isCreating}
-              className={cn(
-                'h-10 px-4 bg-zinc-950 text-white hover:bg-zinc-800 dark:bg-emerald-300 dark:text-zinc-950 dark:hover:bg-emerald-400',
-                isCreating && 'opacity-40'
-              )}
+              className={cn('h-8 rounded px-2', isCreating && 'opacity-40')}
             >
               {isCreating ? 'Saving...' : 'Add Record'}
             </Button>

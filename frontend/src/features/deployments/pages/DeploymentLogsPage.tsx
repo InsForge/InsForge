@@ -2,20 +2,19 @@ import { useState, useMemo } from 'react';
 import { RefreshCw, Search, MoreVertical, RefreshCcw, XCircle } from 'lucide-react';
 import {
   Button,
-  Input,
-  PaginationControls,
-  Skeleton,
-  Badge,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components';
+  Badge,
+  Input,
+} from '@insforge/ui';
+import { PaginationControls, Skeleton } from '@/components';
 import { useDeployments } from '../hooks/useDeployments';
 import type { DeploymentSchema } from '../services/deployments.service';
 import DeploymentsEmptyState from '../components/DeploymentsEmptyState';
@@ -127,7 +126,7 @@ export default function DeploymentLogsPage() {
   };
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       {/* Header */}
       <div className="flex flex-col gap-6 p-4">
         {/* Title */}
@@ -144,9 +143,9 @@ export default function DeploymentLogsPage() {
               placeholder="Search logs"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 pl-3 pr-9 bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 text-sm text-zinc-950 dark:text-white placeholder:text-neutral-400"
+              className="h-9 pl-3 pr-9"
             />
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-neutral-400" />
+            <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
           </div>
 
           {/* Status Filter */}
@@ -154,7 +153,7 @@ export default function DeploymentLogsPage() {
             value={statusFilter}
             onValueChange={(value) => setStatusFilter(value as DeploymentStatus)}
           >
-            <SelectTrigger className="w-[180px] h-9 bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700">
+            <SelectTrigger className="w-[180px] h-9">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -218,14 +217,7 @@ export default function DeploymentLogsPage() {
                       >
                         {deployment.id}
                       </span>
-                      {isCurrent && (
-                        <Badge
-                          variant="outline"
-                          className="h-[22px] px-2.5 bg-white dark:bg-black border-neutral-200 dark:border-neutral-700 text-xs font-medium text-zinc-950 dark:text-white shrink-0"
-                        >
-                          Current
-                        </Badge>
-                      )}
+                      {isCurrent && <Badge className="shrink-0">Current</Badge>}
                     </div>
 
                     {/* Status */}
@@ -284,7 +276,7 @@ export default function DeploymentLogsPage() {
 
         {/* Loading overlay */}
         {isRefreshing && (
-          <div className="absolute inset-0 bg-white dark:bg-neutral-800 flex items-center justify-center z-50">
+          <div className="absolute inset-0 bg-[rgb(var(--semantic-1))] flex items-center justify-center z-50">
             <div className="flex items-center gap-1">
               <div className="w-5 h-5 border-2 border-zinc-500 dark:border-neutral-700 border-t-transparent rounded-full animate-spin" />
               <span className="text-sm text-zinc-500 dark:text-zinc-400">Loading</span>

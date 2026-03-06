@@ -1,4 +1,4 @@
-import { Button } from '@/components/radix/Button';
+import { Button } from '@insforge/ui';
 import { DatabaseTemplate } from '@/features/database/templates';
 import { SchemaVisualizer } from '@/features/visualizer/components/SchemaVisualizer';
 import { useRawSQL } from '@/features/database/hooks/useRawSQL';
@@ -29,18 +29,10 @@ export function TemplatePreview({ template, onCancel }: TemplatePreviewProps) {
         <p className="text-sm font-normal text-zinc-600 dark:text-neutral-400">
           You are previewing a template
         </p>
-        <Button
-          variant="outline"
-          onClick={onCancel}
-          className="h-8 px-4 dark:bg-neutral-600 dark:text-zinc-300 dark:border-neutral-600 dark:hover:bg-neutral-700"
-        >
+        <Button variant="secondary" onClick={onCancel} className="px-4">
           Cancel
         </Button>
-        <Button
-          className="h-8 px-4 font-medium bg-emerald-300 hover:bg-emerald-400 text-black dark:bg-emerald-300 dark:hover:bg-emerald-400"
-          onClick={handleImplementTemplate}
-          disabled={isPending}
-        >
+        <Button className="px-4 font-medium" onClick={handleImplementTemplate} disabled={isPending}>
           {isPending ? 'Implementing...' : 'Implement Template'}
         </Button>
       </div>

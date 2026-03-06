@@ -1,29 +1,31 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Plus, Upload } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo, useRef, type CSSProperties } from 'react';
+import { CirclePlus, LogIn } from 'lucide-react';
 import PencilIcon from '@/assets/icons/pencil.svg?react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
+import EmptyBoxSvg from '@/assets/images/empty_box.svg?react';
 import { useTables } from '@/features/database/hooks/useTables';
 import { useRecords } from '@/features/database/hooks/useRecords';
-import { TableSidebar } from '@/features/database/components/TableSidebar';
+import { DatabaseSecondaryMenu } from '@/features/database/components/DatabaseSecondaryMenu';
 import { RecordFormDialog } from '@/features/database/components/RecordFormDialog';
 import { TableForm } from '@/features/database/components/TableForm';
 import { TablesEmptyState } from '@/features/database/components/TablesEmptyState';
 import { TemplatePreview } from '@/features/database/components/TemplatePreview';
 import { DATABASE_TEMPLATES, DatabaseTemplate } from '@/features/database/templates';
 import {
-  Alert,
-  AlertDescription,
   Button,
   ConfirmDialog,
-  ConnectCTA,
-  EmptyState,
-  SearchInput,
-  SelectionClearButton,
-  DeleteActionButton,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+} from '@insforge/ui';
+import {
+  Alert,
+  AlertDescription,
+  EmptyState,
+  SelectionClearButton,
+  DeleteActionButton,
+  TableHeader,
 } from '@/components';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
@@ -31,20 +33,22 @@ import { DatabaseDataGrid } from '@/features/database/components/DatabaseDataGri
 import { SortColumn } from 'react-data-grid';
 import { convertValueForColumn } from '@/lib/utils/utils';
 import { useCSVImport } from '@/features/database/hooks/useCSVImport';
+import { useLocation, useSearchParams } from 'react-router-dom';
 
 const PAGE_SIZE = 50;
 
 export default function TablesPage() {
-  // Load selected table from localStorage on mount
-  const [selectedTable, setSelectedTable] = useState<string | null>(() => {
-    return localStorage.getItem('selectedTable');
-  });
-  const [pendingTableSelection, setPendingTableSelection] = useState<string>();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const shouldSlideBackToTables =
+    (location.state as { slideFromStudio?: boolean } | null)?.slideFromStudio === true;
+  const selectedTableFromQuery = searchParams.get('table')?.trim();
   const [showRecordForm, setShowRecordForm] = useState(false);
   const [isTableFormDirty, setIsTableFormDirty] = useState(false);
   const [showTableForm, setShowTableForm] = useState(false);
   const [editingTable, setEditingTable] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchValue, setSearchValue] = useState('');
+  const searchQuery = searchValue.trim();
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -57,6 +61,29 @@ export default function TablesPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { tables, isLoadingTables, tablesError, deleteTable, useTableSchema, refetchTables } =
     useTables();
+  const selectedTable = useMemo(() => {
+    if (isLoadingTables || !tables.length) {
+      return null;
+    }
+
+    if (selectedTableFromQuery && tables.includes(selectedTableFromQuery)) {
+      return selectedTableFromQuery;
+    }
+
+    return tables[0];
+  }, [isLoadingTables, tables, selectedTableFromQuery]);
+  const selectTable = useCallback(
+    (tableName: string | null, replace: boolean = false) => {
+      const nextSearchParams = new URLSearchParams(searchParams);
+      if (tableName) {
+        nextSearchParams.set('table', tableName);
+      } else {
+        nextSearchParams.delete('table');
+      }
+      setSearchParams(nextSearchParams, { replace });
+    },
+    [searchParams, setSearchParams]
+  );
 
   const recordsHook = useRecords(selectedTable || '');
 
@@ -71,14 +98,18 @@ export default function TablesPage() {
     }
   };
 
-  // Persist selected table to localStorage when it changes
+  // Keep URL query param in sync with active table selection with fallback-to-first behavior.
   useEffect(() => {
-    if (selectedTable) {
-      localStorage.setItem('selectedTable', selectedTable);
-    } else {
-      localStorage.removeItem('selectedTable');
+    if (isLoadingTables) {
+      return;
     }
-  }, [selectedTable]);
+
+    if ((selectedTableFromQuery ?? null) === selectedTable) {
+      return;
+    }
+
+    selectTable(selectedTable, true);
+  }, [selectedTable, selectedTableFromQuery, isLoadingTables, selectTable]);
 
   // Reset page when search query or selected table changes
   useEffect(() => {
@@ -165,7 +196,9 @@ export default function TablesPage() {
           name: selectedTable,
           schema: schemaData,
           records: recordsData.records,
-          totalRecords: recordsData.pagination.total ?? schemaData.recordCount,
+          totalRecords: searchQuery.trim()
+            ? (recordsData.pagination?.total ?? recordsData.records.length)
+            : Math.max(schemaData.recordCount ?? 0, recordsData.pagination?.total ?? 0),
         }
       : null;
 
@@ -180,33 +213,13 @@ export default function TablesPage() {
     }
   }, [isLoadingTable, isSorting]);
 
-  // Auto-select first table (excluding system tables)
-  useEffect(() => {
-    if (!isLoadingTables && tables) {
-      if (pendingTableSelection && tables.includes(pendingTableSelection)) {
-        setSelectedTable(pendingTableSelection);
-        setPendingTableSelection(undefined);
-        return;
-      }
-
-      if (selectedTable && !tables.includes(selectedTable)) {
-        setSelectedTable(null);
-        return;
-      }
-
-      if (!selectedTable && tables.length && !showTableForm && !pendingTableSelection) {
-        setSelectedTable(tables[0]);
-      }
-    }
-  }, [tables, pendingTableSelection, selectedTable, showTableForm, isLoadingTables]);
-
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
       // Reset all state
       setSelectedRows(new Set());
       setSortColumns([]);
-      setSearchQuery('');
+      setSearchValue('');
       setIsSorting(false);
 
       // Refresh current table data (if table is selected)
@@ -246,22 +259,21 @@ export default function TablesPage() {
     if (showTableForm) {
       void handleTableFormClose().then((discarded) => {
         if (discarded) {
-          setSelectedTable(tableName);
+          selectTable(tableName);
         }
       });
     } else {
-      setSelectedTable(tableName);
+      selectTable(tableName);
     }
   };
 
   const handleCreateTable = () => {
-    setSelectedTable(null);
     setEditingTable(null);
     setShowTableForm(true);
   };
 
   const handleEditTable = (tableName: string) => {
-    setSelectedTable(tableName);
+    selectTable(tableName);
     setEditingTable(tableName);
     setShowTableForm(true);
   };
@@ -277,9 +289,10 @@ export default function TablesPage() {
     const shouldDelete = await confirm(confirmOptions);
 
     if (shouldDelete) {
-      // Update selectedTable BEFORE deleting to prevent queries on deleted table
+      // Update selected table in URL BEFORE deleting to prevent queries on deleted table.
       if (selectedTable === tableName) {
-        setSelectedTable(null);
+        const nextTable = tables.find((table) => table !== tableName) ?? null;
+        selectTable(nextTable, true);
       }
 
       deleteTable(tableName);
@@ -358,9 +371,9 @@ export default function TablesPage() {
   }
 
   return (
-    <div className="flex h-full bg-bg-gray dark:bg-neutral-800">
+    <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
       {/* Secondary Sidebar - Table List */}
-      <TableSidebar
+      <DatabaseSecondaryMenu
         tables={tables}
         selectedTable={selectedTable || undefined}
         onTableSelect={handleSelectTable}
@@ -368,10 +381,12 @@ export default function TablesPage() {
         onNewTable={handleCreateTable}
         onEditTable={handleEditTable}
         onDeleteTable={(tableName) => void handleDeleteTable(tableName)}
+        initialMode={shouldSlideBackToTables ? 'studio' : 'tables'}
+        animateToMode={shouldSlideBackToTables ? 'tables' : undefined}
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+      <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
         {showTableForm ? (
           // Show TableForm replacing entire main content area
           <TableForm
@@ -388,128 +403,111 @@ export default function TablesPage() {
               void refetchTables();
               void refetchTableData();
               setShowTableForm(false);
-              setPendingTableSelection(newTableName);
+              if (newTableName) {
+                selectTable(newTableName);
+              }
             }}
           />
         ) : (
           // Show normal content with header
           <>
-            {/* Sticky Header Section */}
             {selectedTable && (
-              <div className="sticky top-0 z-30 bg-bg-gray dark:bg-neutral-800">
-                <div className="pl-4 pr-1.5 py-1.5 h-12">
-                  {/* Page Header with Breadcrumb */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <nav className="flex items-center text-base font-semibold">
-                        <span className="text-black dark:text-white">{selectedTable}</span>
-                      </nav>
-
-                      {/* Separator */}
-                      <div className="h-6 w-px bg-gray-200 dark:bg-neutral-700" />
-
-                      {/* Action buttons group */}
-                      <div className="flex items-center gap-1">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="p-1 h-9 w-9"
-                                onClick={() => handleEditTable(selectedTable)}
-                              >
-                                <PencilIcon className="h-5 w-5 text-zinc-400 dark:text-neutral-400" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom" align="center">
-                              <p>Edit Table</p>
-                            </TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="p-1 h-9 w-9"
-                                onClick={() => void handleRefresh()}
-                                disabled={isRefreshing}
-                              >
-                                <RefreshIcon className="h-5 w-5 text-zinc-400 dark:text-neutral-400" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom" align="center">
-                              <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
+              <TableHeader
+                leftContent={
+                  selectedRows.size > 0 ? (
+                    <div className="flex items-center gap-2">
+                      <SelectionClearButton
+                        selectedCount={selectedRows.size}
+                        itemType="record"
+                        onClear={() => setSelectedRows(new Set())}
+                      />
+                      <DeleteActionButton
+                        selectedCount={selectedRows.size}
+                        itemType="record"
+                        onDelete={() => void handleBulkDelete(Array.from(selectedRows))}
+                      />
                     </div>
-                  </div>
-                </div>
-
-                <div className="pt-2 pb-4 px-3">
-                  {/* Search Bar and Actions - only show when table is selected */}
-                  {selectedTable && (
-                    <div className="flex items-center justify-between">
-                      {selectedRows.size > 0 ? (
-                        <div className="flex items-center gap-3">
-                          <SelectionClearButton
-                            selectedCount={selectedRows.size}
-                            itemType="record"
-                            onClear={() => setSelectedRows(new Set())}
-                          />
-                          {
-                            <DeleteActionButton
-                              selectedCount={selectedRows.size}
-                              itemType="record"
-                              onDelete={() => void handleBulkDelete(Array.from(selectedRows))}
-                            />
-                          }
-                        </div>
-                      ) : (
-                        <SearchInput
-                          value={searchQuery}
-                          onChange={setSearchQuery}
-                          placeholder="Search Records by any String Field"
-                          className="flex-1 max-w-80 dark:bg-neutral-800 dark:text-zinc-300 dark:border-neutral-700"
-                          debounceTime={300}
-                        />
-                      )}
-                      <div className="flex items-center gap-2 ml-4">
-                        {selectedRows.size === 0 && (
-                          <>
-                            {/* Import CSV Button */}
-                            <Button
-                              variant="secondary"
-                              className="h-10 px-4 font-medium gap-1.5 border border-zinc-200 dark:border-neutral-600"
-                              onClick={() => fileInputRef.current?.click()}
-                              disabled={isImporting}
-                            >
-                              <Upload className="w-5 h-5" />
-                              {isImporting ? 'Importing...' : 'Import CSV'}
-                            </Button>
-                            {/* Add Record Button */}
-                            <Button
-                              className="h-10 px-4 font-medium gap-1.5 dark:bg-emerald-300 dark:hover:bg-emerald-400"
-                              onClick={() => setShowRecordForm(true)}
-                            >
-                              <Plus className="w-5 h-5" />
-                              Add Record
-                            </Button>
-                          </>
-                        )}
+                  ) : (
+                    <div className="flex min-w-0 items-center gap-3">
+                      <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">
+                        {selectedTable}
+                      </h1>
+                      <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+                        <div className="h-5 w-px bg-[var(--alpha-8)]" />
                       </div>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEditTable(selectedTable)}
+                              className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
+                            >
+                              <PencilIcon className="h-5 w-5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" align="center">
+                            <p>Edit table</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => void handleRefresh()}
+                              disabled={isRefreshing}
+                              className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
+                            >
+                              <RefreshIcon
+                                className={isRefreshing ? 'h-5 w-5 animate-spin' : 'h-5 w-5'}
+                              />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" align="center">
+                            <p>{isRefreshing ? 'Refreshing...' : 'Refresh records'}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+                        <div className="h-5 w-px bg-[var(--alpha-8)]" />
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 rounded px-1.5 text-primary hover:bg-[var(--alpha-4)] hover:text-primary active:bg-[var(--alpha-8)]"
+                        onClick={() => setShowRecordForm(true)}
+                      >
+                        <CirclePlus className="h-6 w-6 stroke-[1.5] text-primary" />
+                        <span className="px-1 text-sm font-medium leading-5">Add Record</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 rounded px-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground active:bg-[var(--alpha-8)]"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isImporting}
+                      >
+                        <LogIn className="h-6 w-6 stroke-[1.5]" />
+                        <span className="px-1 text-sm font-medium leading-5">
+                          {isImporting ? 'Importing...' : 'Import CSV'}
+                        </span>
+                      </Button>
                     </div>
-                  )}
-                </div>
-              </div>
+                  )
+                }
+                searchValue={searchValue}
+                onSearchChange={setSearchValue}
+                searchDebounceTime={300}
+                searchPlaceholder="Search records"
+              />
             )}
 
             {/* Content - Full height without padding for table to fill */}
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
               {error && (
-                <Alert variant="destructive" className="mb-4 mx-8 mt-4">
+                <Alert variant="destructive" className="mx-4 mt-4">
                   <AlertDescription>{String(error)}</AlertDescription>
                 </Alert>
               )}
@@ -540,16 +538,37 @@ export default function TablesPage() {
                   sortColumns={sortColumns}
                   onSortColumnsChange={handleSortColumnsChange}
                   onCellEdit={handleRecordUpdate}
-                  onJumpToTable={setSelectedTable}
+                  onJumpToTable={(tableName) => selectTable(tableName)}
                   currentPage={currentPage}
                   totalPages={totalPages}
                   pageSize={PAGE_SIZE}
                   totalRecords={tableData?.totalRecords || 0}
+                  paginationRecordLabel="records"
                   onPageChange={setCurrentPage}
                   emptyState={
-                    <div className="text-sm text-black dark:text-white">
-                      {searchQuery ? 'No records match your search criteria' : 'No records found'}.{' '}
-                      <ConnectCTA />
+                    <div className="flex flex-col items-center gap-2 pb-12 pt-6 text-center">
+                      <EmptyBoxSvg
+                        className="h-[95px] w-[160px]"
+                        style={
+                          {
+                            '--empty-box-fill-primary': 'rgb(var(--semantic-2))',
+                            '--empty-box-fill-secondary': 'rgb(var(--semantic-6))',
+                          } as CSSProperties
+                        }
+                        aria-hidden="true"
+                      />
+                      <p className="text-sm font-medium leading-6 text-muted-foreground">
+                        No Records Found
+                      </p>
+                      {!searchQuery && (
+                        <button
+                          type="button"
+                          className="text-xs leading-4 text-primary hover:underline"
+                          onClick={() => setShowRecordForm(true)}
+                        >
+                          Add Record
+                        </button>
+                      )}
                     </div>
                   }
                 />

@@ -55,7 +55,7 @@ docker compose up
 
 ### 2. 接入 AI 编程助手
 
-访问 InsForge 控制面板 (默认: http://localhost:7131)，登录，并按照"Connect"指南设置您的 MCP。
+访问 InsForge 控制面板 (默认: [http://localhost:7131](http://localhost:7131))，登录，并按照"Connect"指南设置您的 MCP。
 
 <div align="center">
   <table>

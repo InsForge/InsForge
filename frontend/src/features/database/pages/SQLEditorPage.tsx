@@ -1,14 +1,8 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useRawSQL } from '@/features/database/hooks/useRawSQL';
 import { useSQLEditorContext } from '@/features/database/contexts/SQLEditorContext';
-import {
-  Badge,
-  Button,
-  CodeEditor,
-  DataGrid,
-  type DataGridColumn,
-  type DataGridRow,
-} from '@/components';
+import { Button, Tabs, Tab } from '@insforge/ui';
+import { CodeEditor, DataGrid, type DataGridColumn, type DataGridRow } from '@/components';
 import { X, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils/utils';
 
@@ -41,7 +35,7 @@ function convertRowsToDataGridFormat(rows: Record<string, unknown>[]) {
   // Create simple columns that render values as plain strings
   const columns: DataGridColumn<DataGridRow>[] = columnKeys.map((key) => ({
     key,
-    name: key,
+    name: key.charAt(0).toUpperCase() + key.slice(1),
     width: 'minmax(200px, 1fr)',
     resizable: true,
     sortable: true,
@@ -51,40 +45,13 @@ function convertRowsToDataGridFormat(rows: Record<string, unknown>[]) {
   return { columns, data: dataWithIds };
 }
 
-function ResultsViewer({ data }: ResultsViewerProps) {
-  // Check if data is row data (array of objects)
-  const isTable = isRowData(data);
-
-  const gridData = useMemo(() => {
-    if (isTable && data.length > 0) {
-      return convertRowsToDataGridFormat(data);
-    }
-    return null;
-  }, [isTable, data]);
-
-  if (isTable && gridData) {
-    // Render as table
-    return (
-      <div className="w-full">
-        <DataGrid
-          data={gridData.data}
-          columns={gridData.columns}
-          showSelection={false}
-          showPagination={false}
-          noPadding={true}
-          className="h-full"
-        />
-      </div>
-    );
-  }
-
-  // Render as JSON for non-table data
+function RawViewer({ data }: ResultsViewerProps) {
   const jsonString = JSON.stringify(data, null, 2);
   const lines = jsonString.split('\n');
 
   return (
-    <div className="bg-neutral-100 dark:bg-neutral-900/50 rounded-lg p-3 overflow-auto">
-      <pre className="font-mono text-sm text-black dark:text-white leading-5 m-0">
+    <div className="bg-[var(--alpha-4)] rounded-lg p-3 overflow-auto">
+      <pre className="font-mono text-sm text-foreground leading-5 m-0">
         {lines.map((line, index) => (
           <div key={index} className="min-h-[1.25rem]">
             {line || <span>&nbsp;</span>}
@@ -95,14 +62,41 @@ function ResultsViewer({ data }: ResultsViewerProps) {
   );
 }
 
+function ResultsViewer({ data }: ResultsViewerProps) {
+  const isTable = isRowData(data);
+
+  const gridData = useMemo(() => {
+    if (isTable && data.length > 0) {
+      return convertRowsToDataGridFormat(data);
+    }
+    return null;
+  }, [isTable, data]);
+
+  if (isTable && gridData) {
+    return (
+      <DataGrid
+        data={gridData.data}
+        columns={gridData.columns}
+        showSelection={false}
+        showPagination={false}
+        noPadding={true}
+        className="h-full"
+      />
+    );
+  }
+
+  // Fallback to raw JSON if data isn't table-shaped
+  return <RawViewer data={data} />;
+}
+
 interface ErrorViewerProps {
   error: Error;
 }
 
 function ErrorViewer({ error }: ErrorViewerProps) {
   return (
-    <div className="bg-neutral-100 dark:bg-neutral-800 rounded-lg p-3 overflow-auto">
-      <pre className="font-mono text-sm text-red-600 dark:text-red-400 leading-5 m-0 whitespace-pre-wrap">
+    <div className="bg-[var(--alpha-4)] rounded-lg p-3 overflow-auto">
+      <pre className="font-mono text-sm text-destructive leading-5 m-0 whitespace-pre-wrap">
         {error.message}
       </pre>
     </div>
@@ -123,6 +117,7 @@ export default function SQLEditorPage() {
 
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingTabName, setEditingTabName] = useState('');
+  const [resultView, setResultView] = useState<'result' | 'chart'>('result');
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { executeSQL, isPending, data, isSuccess, error, isError } = useRawSQL({
@@ -178,46 +173,44 @@ export default function SQLEditorPage() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-bg-gray dark:bg-neutral-800 overflow-auto">
-      {/* Header */}
-      <div className="flex items-center gap-3 h-[72px] px-4 bg-bg-gray dark:bg-neutral-800 flex-shrink-0">
-        <h1 className="text-xl font-semibold text-black dark:text-white">SQL Editor</h1>
-      </div>
+    <div className="flex flex-col h-full bg-[rgb(var(--semantic-1))] overflow-hidden">
+      {/* Tab Header: Figma h-56, items-center, bg #1b1b1b, border-b */}
+      <div className="flex items-center h-14 min-w-[800px] bg-[rgb(var(--semantic-1))] border-b border-[var(--alpha-8)] shrink-0">
+        {/* Title: h-full, px-16, py-12 */}
+        <div className="flex items-center h-full overflow-clip px-4 py-3 shrink-0">
+          <span className="text-base font-medium leading-7 text-black dark:text-white whitespace-nowrap">
+            SQL Editor
+          </span>
+        </div>
 
-      {/* Main Content */}
-      <div className="flex flex-1 flex-col px-4 gap-3 bg-bg-gray dark:bg-neutral-800 items-center pb-6">
-        {/* Tabs and Editor Combined Section */}
-        <div className="w-full flex flex-col">
-          {/* Tabs Section */}
-          <div className="w-full flex items-end overflow-hidden">
-            <div className="flex items-end overflow-x-auto overflow-y-hidden scrollbar-hide">
-              {tabs.map((tab) => {
-                const isActive = tab.id === activeTabId;
-                return (
-                  <div
-                    key={tab.id}
-                    className={cn(
-                      'h-8 group relative flex items-center gap-1 px-2 cursor-pointer',
-                      'min-w-[110px] max-w-[200px] rounded-t-lg',
-                      'border-t border-l border-r border-gray-300 dark:border-neutral-700',
-                      isActive
-                        ? 'bg-white dark:bg-[#1E1E1E] text-black dark:text-white z-10'
-                        : 'bg-gray-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-gray-300 dark:hover:bg-neutral-600'
-                    )}
-                    onClick={() => setActiveTab(tab.id)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      // Don't handle keyboard events if we're editing
-                      if (editingTabId === tab.id) {
-                        return;
-                      }
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        setActiveTab(tab.id);
-                      }
-                    }}
-                  >
+        {/* Tab Nav: h-full, items-center */}
+        <div className="flex items-center h-full shrink-0">
+          {/* Tab container: h-full, overflow-clip */}
+          <div className="flex items-center h-full overflow-clip">
+            {tabs.map((tab) => {
+              const isActive = tab.id === activeTabId;
+              return (
+                <div
+                  key={tab.id}
+                  className={cn(
+                    'flex flex-col h-full shrink-0 w-[106px] cursor-pointer',
+                    isActive ? 'bg-[rgb(var(--semantic-0))]' : ''
+                  )}
+                  onClick={() => setActiveTab(tab.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (editingTabId === tab.id) {
+                      return;
+                    }
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setActiveTab(tab.id);
+                    }
+                  }}
+                >
+                  {/* Inner status: border-l, flex-1, items-center, px-10, gap-6 */}
+                  <div className="flex flex-1 items-center w-full px-2.5 gap-1.5 border-l border-[var(--alpha-8)]">
                     {editingTabId === tab.id ? (
                       <input
                         ref={inputRef}
@@ -226,153 +219,137 @@ export default function SQLEditorPage() {
                         onChange={handleTabNameChange}
                         onBlur={handleTabNameBlur}
                         onKeyDown={(e) => {
-                          // Stop propagation to prevent parent handlers from interfering
                           e.stopPropagation();
                           handleTabNameKeyDown(e);
                         }}
-                        className={cn(
-                          'pl-2 pr-1 text-sm font-medium bg-transparent',
-                          'border-none outline-none focus:outline-none w-full min-w-0',
-                          'text-black dark:text-white'
-                        )}
+                        className="flex-1 min-w-0 px-1.5 text-[13px] font-medium leading-[18px] bg-transparent border-none outline-none text-black dark:text-white"
                         onClick={(e) => e.stopPropagation()}
                       />
                     ) : (
                       <>
-                        <span
-                          className={cn(
-                            'pl-2 text-sm font-medium whitespace-nowrap overflow-hidden text-ellipsis',
-                            'flex-1 min-w-0'
-                          )}
+                        {/* Context container: px-6, shrink-0 */}
+                        <div
+                          className="flex items-center justify-center px-1.5 shrink-0 min-w-0"
                           onDoubleClick={(e) => {
                             e.stopPropagation();
                             handleTabNameDoubleClick(tab.id, tab.name);
                           }}
                         >
-                          {tab.name}
-                        </span>
-                        {tabs.length > 1 && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeTab(tab.id);
-                            }}
+                          <span
                             className={cn(
-                              'flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity',
-                              'text-neutral-400 hover:text-black dark:hover:text-white',
-                              'rounded p-0.5 hover:bg-gray-200 dark:hover:bg-neutral-700',
-                              'focus:outline-none focus-visible:outline-none'
+                              'text-[13px] font-medium leading-[18px] whitespace-nowrap truncate',
+                              isActive
+                                ? 'text-black dark:text-white'
+                                : 'text-neutral-500 dark:text-neutral-400'
                             )}
-                            aria-label="Close tab"
                           >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                            {tab.name}
+                          </span>
+                        </div>
+                        {/* Close button: shrink-0 */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (tabs.length > 1) {
+                              removeTab(tab.id);
+                            }
+                          }}
+                          className={cn(
+                            'flex items-center justify-center shrink-0 rounded',
+                            tabs.length <= 1 && 'invisible'
+                          )}
+                          aria-label="Close tab"
+                        >
+                          <X className="w-5 h-5 text-neutral-400 hover:text-black dark:hover:text-white" />
+                        </button>
                       </>
                     )}
                   </div>
-                );
-              })}
-              <button
-                onClick={() => addTab()}
-                className={cn(
-                  'h-8 group relative flex items-center justify-center px-3 py-1.5',
-                  'cursor-pointer transition-colors min-w-[40px]',
-                  'focus:outline-none focus-visible:outline-none',
-                  'text-neutral-500 dark:text-neutral-400',
-                  'hover:bg-gray-200/70 dark:hover:bg-neutral-700',
-                  'hover:text-black dark:hover:text-white rounded-t-lg'
-                )}
-                aria-label="Add new tab"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
+                </div>
+              );
+            })}
+          </div>
+          {/* Add tab: w-40, h-full */}
+          <div
+            className="flex flex-col h-full shrink-0 w-10 cursor-pointer"
+            onClick={() => addTab()}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                addTab();
+              }
+            }}
+          >
+            <div className="flex flex-1 items-center justify-center w-full border-l border-[var(--alpha-8)]">
+              <Plus className="w-5 h-5 text-neutral-400 hover:text-black dark:hover:text-white transition-colors" />
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* Code Editor Section */}
-          <div
-            className={cn(
-              'h-[480px] w-full',
-              'bg-white dark:bg-neutral-900/50',
-              'border border-gray-200 dark:border-neutral-700',
-              'rounded-lg rounded-tl-none overflow-hidden -mt-px'
-            )}
-          >
-            <CodeEditor
-              editable
-              language="sql"
-              value={activeTab?.query || ''}
-              onChange={handleQueryChange}
-              placeholder="SELECT * from products LIMIT 10;"
-            />
-          </div>
+      {/* Main Content */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Code Editor Section */}
+        <div className="flex-1 w-full bg-[rgb(var(--semantic-0))] overflow-hidden">
+          <CodeEditor
+            editable
+            language="sql"
+            value={activeTab?.query || ''}
+            onChange={handleQueryChange}
+            placeholder="SELECT * from products LIMIT 10;"
+          />
         </div>
 
-        {/* Run Button */}
-        <div className="w-full flex justify-end">
-          <Button
-            onClick={handleExecuteQuery}
-            disabled={isPending || !activeTab?.query.trim()}
-            className={cn(
-              'h-8 px-6 gap-1 text-sm',
-              'bg-zinc-950 hover:bg-zinc-800 text-white',
-              'dark:bg-emerald-300 dark:hover:bg-emerald-400 dark:text-black',
-              'disabled:opacity-50'
-            )}
-          >
-            Run
-          </Button>
-        </div>
-
-        {/* Divider */}
-        <div className="w-full h-px bg-gray-200 dark:bg-neutral-700" />
-
-        {/* Results Section */}
-        <div className="flex-1 flex flex-col gap-4 w-full">
-          {/* Results Heading */}
-          <div className="flex items-center gap-2">
-            <h2 className="text-base font-semibold text-black dark:text-white">Results</h2>
-            {isSuccess && (
-              <Badge
-                className={cn(
-                  'px-2 py-0.5 border-transparent',
-                  'bg-emerald-500/10 text-emerald-600',
-                  'dark:bg-emerald-500/20 dark:text-emerald-400'
+        {/* Bottom Half: Toggle Nav + Results */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Tabs + Run Button */}
+          <div className="flex px-4 py-3 justify-between items-start shrink-0 border-t border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
+            {/* Tabs */}
+            <Tabs value={resultView} onValueChange={setResultView}>
+              <Tab value="result">
+                Result
+                {isSuccess && data && isRowData(Array.isArray(data) ? data : data.rows) && (
+                  <span className="flex items-center justify-center px-2 py-0.5 rounded bg-[var(--alpha-8)] text-xs font-medium text-muted-foreground">
+                    {(Array.isArray(data) ? data : data.rows).length}
+                  </span>
                 )}
-              >
-                Success
-              </Badge>
-            )}
-            {isError && (
-              <Badge
-                className={cn(
-                  'px-2 py-0.5 border-transparent',
-                  'bg-red-500/10 text-red-600',
-                  'dark:bg-red-500/20 dark:text-red-400'
-                )}
-              >
-                Error
-              </Badge>
-            )}
+              </Tab>
+              <Tab value="chart">Chart</Tab>
+            </Tabs>
+            {/* Run Button */}
+            <Button onClick={handleExecuteQuery} disabled={isPending || !activeTab?.query.trim()}>
+              Run
+            </Button>
           </div>
 
           {/* Results Content */}
-          <div className="flex-1">
+          <div
+            className={cn(
+              'flex-1 min-h-0 w-full overflow-auto bg-[rgb(var(--semantic-0))]',
+              resultView === 'result' && 'px-4 py-3'
+            )}
+          >
             {isError && error ? (
-              <ErrorViewer error={error} />
+              <div className={resultView !== 'result' ? 'px-4 py-3' : ''}>
+                <ErrorViewer error={error} />
+              </div>
             ) : isSuccess && data ? (
-              <ResultsViewer data={data.rows || data} />
+              resultView === 'result' ? (
+                <RawViewer data={data.rows || data} />
+              ) : (
+                <ResultsViewer data={data.rows || data} />
+              )
             ) : (
-              <div
+              <p
                 className={cn(
-                  'h-full rounded-lg flex items-center justify-center text-sm',
-                  'bg-neutral-100 dark:bg-neutral-900/50',
-                  'text-neutral-500 dark:text-neutral-400'
+                  'font-mono text-sm leading-5 text-foreground',
+                  resultView !== 'result' && 'px-4 py-3'
                 )}
               >
-                {isPending ? 'Executing query...' : 'Run a query to see results'}
-              </div>
+                {isPending ? 'Executing query...' : 'Click Run to execute your query'}
+              </p>
             )}
           </div>
         </div>

@@ -15,6 +15,7 @@ export interface BaseCellEditorProps {
 export interface BooleanCellEditorProps extends BaseCellEditorProps {
   value: boolean | null;
   onValueChange: (newValue: string) => void; // Returns 'true', 'false', or 'null'
+  autoOpen?: boolean;
 }
 
 /**

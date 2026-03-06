@@ -5,15 +5,15 @@ import { z } from 'zod';
 import { ExternalLink } from 'lucide-react';
 import {
   Button,
-  Input,
-  Switch,
   CopyButton,
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
-} from '@/components';
+  Input,
+  Switch,
+} from '@insforge/ui';
 import WarningIcon from '@/assets/icons/warning.svg';
 import {
   oAuthConfigSchema,
@@ -185,8 +185,8 @@ export function OAuthConfigDialog({
 
   return (
     <Dialog open={isOpen && !!provider} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-[700px] dark:bg-neutral-800 dark:text-white p-0 gap-0">
-        <DialogHeader className="px-6 py-3 border-b border-zinc-200 dark:border-neutral-700">
+      <DialogContent>
+        <DialogHeader>
           <DialogTitle>{provider?.name}</DialogTitle>
         </DialogHeader>
         {isLoadingProvider ? (
@@ -263,7 +263,7 @@ export function OAuthConfigDialog({
                         <code className="flex items-center py-1 px-3 bg-blue-100 dark:bg-neutral-700 text-blue-800 dark:text-blue-300 font-mono break-all rounded-md text-sm">
                           {getCallbackUrl(provider?.id)}
                         </code>
-                        <CopyButton className="h-9" text={getCallbackUrl(provider?.id)} />
+                        <CopyButton text={getCallbackUrl(provider?.id)} />
                       </div>
                     </div>
                   </div>
@@ -277,7 +277,7 @@ export function OAuthConfigDialog({
                       type="text"
                       {...form.register('clientId')}
                       placeholder={`Enter ${provider?.name.split(' ')[0]} OAuth App ID`}
-                      className="w-[340px] dark:bg-neutral-900 dark:placeholder:text-neutral-400 dark:border-neutral-700 dark:text-white"
+                      className="w-[340px]"
                     />
                   </div>
 
@@ -287,29 +287,24 @@ export function OAuthConfigDialog({
                       type="password"
                       {...form.register('clientSecret')}
                       placeholder={`Enter ${provider?.name.split(' ')[0]} OAuth App Secret`}
-                      className="w-[340px] dark:bg-neutral-900 dark:placeholder:text-neutral-400 dark:border-neutral-700 dark:text-white"
+                      className="w-[340px]"
                     />
                   </div>
                 </div>
               )}
             </form>
 
-            <DialogFooter className="p-6 border-t border-zinc-200 dark:border-neutral-700">
+            <DialogFooter>
               <Button
                 type="button"
-                className="h-9 w-30 px-3 py-2 dark:bg-neutral-600 dark:text-white dark:border-transparent dark:hover:bg-neutral-700"
-                variant="outline"
+                className="w-30"
+                variant="secondary"
                 onClick={onClose}
                 disabled={saving}
               >
                 Cancel
               </Button>
-              <Button
-                type="button"
-                onClick={handleSubmit}
-                disabled={isDisabled()}
-                className="h-9 w-30 px-3 py-2 dark:bg-emerald-300 dark:text-black dark:hover:bg-emerald-400"
-              >
+              <Button type="button" onClick={handleSubmit} disabled={isDisabled()} className="w-30">
                 {saving
                   ? providerConfig
                     ? 'Updating...'

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Eye, EyeOff, MoreVertical, Pencil, Trash2, Loader2 } from 'lucide-react';
-import { Button } from '@/components/radix/Button';
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -10,7 +10,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components';
+} from '@insforge/ui';
 import type { DeploymentEnvVar } from '@insforge/shared-schemas';
 import { cn, formatTime } from '@/lib/utils/utils';
 import { deploymentsService } from '../services/deployments.service';
@@ -177,10 +177,7 @@ export function EnvVarRow({ envVar, onEdit, onDelete, className }: EnvVarRowProp
                 <Pencil className="h-4 w-4 mr-2" />
                 Edit
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={handleDeleteClick}
-                className="text-red-600 dark:text-red-400"
-              >
+              <DropdownMenuItem onClick={handleDeleteClick} className="text-destructive">
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete
               </DropdownMenuItem>

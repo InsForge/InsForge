@@ -1,3 +1,4 @@
+import { Button } from '@insforge/ui';
 import { X } from 'lucide-react';
 
 interface SelectionClearButtonProps {
@@ -15,12 +16,14 @@ export function SelectionClearButton({
   const displayText = `${selectedCount} ${isPlural ? `${itemType}s` : itemType} selected`;
 
   return (
-    <button
-      className="flex items-center gap-1.5 h-10 px-3 rounded-[6px] bg-white border border-border-gray hover:bg-gray-50 dark:bg-neutral-600 dark:border-neutral-600 dark:hover:bg-neutral-700 transition-colors"
-      onClick={onClear}
+    <Button
+      variant="ghost"
+      size="default"
+      className="h-8 rounded border border-[var(--alpha-8)] bg-[var(--alpha-4)] px-2 text-foreground whitespace-nowrap hover:bg-[var(--alpha-8)] active:bg-[var(--alpha-12)]"
+      onClick={() => onClear()}
     >
-      <p className="text-zinc-950 dark:text-white text-sm">{displayText}</p>
-      <X className="h-4 w-4 text-gray-500 dark:text-neutral-400" />
-    </button>
+      <span className="text-sm leading-5">{displayText}</span>
+      <X className="h-4 w-4 text-muted-foreground" />
+    </Button>
   );
 }

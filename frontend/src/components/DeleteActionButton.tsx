@@ -1,5 +1,4 @@
-import { Button } from '@/components/radix/Button';
-import { useTheme } from '@/lib/contexts/ThemeContext';
+import { Button } from '@insforge/ui';
 
 interface DeleteActionButtonProps {
   selectedCount: number;
@@ -14,8 +13,6 @@ export function DeleteActionButton({
   onDelete,
   className = '',
 }: DeleteActionButtonProps) {
-  const { resolvedTheme } = useTheme();
-
   const getItemLabel = (count: number, type: string) => {
     const singular = type.charAt(0).toUpperCase() + type.slice(1);
     const plural =
@@ -32,8 +29,8 @@ export function DeleteActionButton({
 
   return (
     <Button
-      variant={resolvedTheme === 'light' ? 'outline' : 'default'}
-      className={`h-10 px-3 text-sm text-red-600 hover:text-red-400 hover:bg-zinc-50 border border-border-gray shadow-0 dark:bg-red-200 dark:text-red-600 dark:border-transparent dark:hover:bg-red-300 ${className}`}
+      variant="destructive"
+      className={`h-8 rounded px-2 text-sm leading-5 whitespace-nowrap ${className}`}
       onClick={onDelete}
     >
       Delete {selectedCount} {getItemLabel(selectedCount, itemType)}

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Dialog, DialogContent } from './radix/Dialog';
+import { Dialog, DialogContent } from '@insforge/ui';
 import { Expand } from 'lucide-react';
 import { cn } from '@/lib/utils/utils';
 
@@ -57,7 +57,7 @@ export function ZoomedVideo({ src, className, 'aria-label': ariaLabel }: ZoomedV
 
       {/* Zoomed dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-5xl w-[90vw] p-0 border-0 bg-transparent shadow-none">
+        <DialogContent>
           <video
             ref={dialogVideoRef}
             src={src}

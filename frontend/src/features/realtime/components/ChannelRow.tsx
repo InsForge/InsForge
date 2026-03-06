@@ -1,6 +1,6 @@
 import { cn, formatDate } from '@/lib/utils/utils';
 import { Trash2 } from 'lucide-react';
-import { Switch } from '@/components';
+import { Switch } from '@insforge/ui';
 import type { RealtimeChannel } from '../services/realtime.service';
 
 interface ChannelRowProps {
@@ -25,59 +25,67 @@ export function ChannelRow({
   return (
     <div
       className={cn(
-        'group flex items-center h-14 px-3 bg-white hover:bg-neutral-100 dark:bg-[#333333] dark:hover:bg-neutral-700 rounded-lg transition-all cursor-pointer',
+        'group rounded border border-[var(--alpha-8)] bg-card cursor-pointer',
         className
       )}
       onClick={onClick}
     >
-      {/* Toggle Switch - matches header w-[76px] */}
-      <div className="flex items-center w-[76px] shrink-0 px-3 py-1.5">
-        <Switch
-          checked={channel.enabled}
-          disabled={isUpdating}
-          onCheckedChange={(checked) => {
-            onToggleEnabled(checked);
-          }}
-          onClick={(e) => e.stopPropagation()}
-        />
-      </div>
+      {/* Inner state layer — hover overlays on top of bg-card */}
+      <div className="flex items-center pl-1.5 rounded hover:bg-[var(--alpha-8)] transition-colors">
+        {/* Toggle Switch */}
+        <div className="flex items-center w-[62px] shrink-0 h-12 px-2.5">
+          <Switch
+            checked={channel.enabled}
+            disabled={isUpdating}
+            onCheckedChange={(checked) => {
+              onToggleEnabled(checked);
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
 
-      {/* Pattern Column - flex-1 to match header */}
-      <div className="flex-1 min-w-0 px-3 py-1.5">
-        <p className="text-sm text-zinc-950 dark:text-white truncate" title={channel.pattern}>
-          {channel.pattern}
-        </p>
-      </div>
+        {/* Pattern Column */}
+        <div className="flex-1 min-w-0 h-12 flex items-center px-2.5">
+          <p className="text-sm leading-[18px] text-foreground truncate" title={channel.pattern}>
+            {channel.pattern}
+          </p>
+        </div>
 
-      {/* Description Column - fixed w-[640px] to match header */}
-      <div className="w-[640px] min-w-0 px-3 py-1.5">
-        <span
-          className="text-sm text-zinc-700 dark:text-white truncate block"
-          title={channel.description || ''}
-        >
-          {channel.description || '-'}
-        </span>
-      </div>
+        {/* Description Column */}
+        <div className="flex-[2.5] min-w-0 h-12 flex items-center px-2.5">
+          <span
+            className="text-sm text-foreground leading-[18px] truncate block"
+            title={channel.description || ''}
+          >
+            {channel.description || '-'}
+          </span>
+        </div>
 
-      {/* Created Column - flex-1 to match header */}
-      <div className="flex-1 min-w-0 px-3 py-1">
-        <span className="text-sm text-zinc-700 dark:text-white truncate" title={channel.createdAt}>
-          {formatDate(channel.createdAt)}
-        </span>
-      </div>
+        {/* Created Column */}
+        <div className="flex-1 min-w-0 h-12 flex items-center px-2.5">
+          <span
+            className="text-sm text-foreground leading-[18px] truncate"
+            title={channel.createdAt}
+          >
+            {formatDate(channel.createdAt)}
+          </span>
+        </div>
 
-      {/* Delete Button - hidden by default, visible on hover */}
-      <button
-        className="flex items-center justify-center size-8 rounded opacity-0 group-hover:opacity-100 hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-all disabled:opacity-50"
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete();
-        }}
-        disabled={isDeleting}
-        aria-label="Delete channel"
-      >
-        <Trash2 className="size-5 text-neutral-400 group-hover:text-zinc-600 dark:group-hover:text-white transition-colors" />
-      </button>
+        {/* Delete Button - hidden by default, visible on hover */}
+        <div className="w-[52px] shrink-0 flex items-center justify-center h-12">
+          <button
+            className="flex items-center justify-center size-8 rounded opacity-0 group-hover:opacity-100 hover:bg-[var(--alpha-8)] transition-all disabled:opacity-50"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            disabled={isDeleting}
+            aria-label="Delete channel"
+          >
+            <Trash2 className="size-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

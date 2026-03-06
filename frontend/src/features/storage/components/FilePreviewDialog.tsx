@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Download, ExternalLink } from 'lucide-react';
-import { Button, Dialog, DialogContent, LoadingState, TypeBadge } from '@/components';
+import { Button, Dialog, DialogContent } from '@insforge/ui';
+import { LoadingState, TypeBadge } from '@/components';
 import { useStorage } from '@/features/storage/hooks/useStorage';
 import { StorageFileSchema } from '@insforge/shared-schemas';
 
@@ -197,7 +198,7 @@ export function FilePreviewDialog({ open, onOpenChange, file, bucket }: FilePrev
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[800px] max-w-[800px] p-0 flex">
+      <DialogContent>
         <div className="w-[800px] min-h-[500px] max-h-[820px] bg-white dark:bg-neutral-800 border border-zinc-200 dark:border-neutral-700 flex flex-col">
           {/* Header */}
           <div className="px-6 py-3">

@@ -1,11 +1,15 @@
 ---
 title: Storage Architecture
-description: Enterprise-grade storage system powered by AWS S3
+description: Enterprise-grade storage system powered by S3-compatible storage
 ---
 
 ## Overview
 
-InsForge provides a high-performance, scalable storage system built on AWS S3, delivering enterprise-grade reliability with 99.999999999% (11 9's) durability.
+InsForge provides a high-performance, scalable storage system built on any S3-compatible endpoint, delivering enterprise-grade reliability. Actual durability depends on your storage provider (e.g., AWS S3 offers 99.999999999% durability).
+
+<Info>
+**Bring your own S3** — Enterprise customers can use their own S3-compatible storage endpoint. [Contact us](mailto:tony.chang@insforge.dev) to learn more.
+</Info>
 
 ## Technology Stack
 
@@ -38,7 +42,7 @@ graph TB
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
-| **Storage Backend** | AWS S3 | Enterprise-grade object storage |
+| **Storage Backend** | S3-compatible | Enterprise-grade object storage |
 | **Metadata Store** | PostgreSQL | File metadata, bucket configuration |
 | **Upload Handler** | Multer | Multipart form data parsing (both backends) |
 | **URL Strategy** | Presigned URLs | Secure direct uploads/downloads (S3 only) |

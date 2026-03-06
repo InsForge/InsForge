@@ -1,101 +1,76 @@
 import { useMemo } from 'react';
-import { User } from 'lucide-react';
+import { Mail, User } from 'lucide-react';
 import {
   Avatar,
-  AvatarImage,
   AvatarFallback,
-  Badge,
-  Checkbox,
+  AvatarImage,
   DataGrid,
-  createDefaultCellRenderer,
-  type DataGridProps,
   type DataGridColumn,
+  type DataGridProps,
   type RenderCellProps,
   type SelectionCellProps,
-  ConvertedValue,
 } from '@/components';
-import { cn } from '@/lib/utils/utils';
+import AppleLogo from '@/assets/logos/apple.svg?react';
+import DiscordLogo from '@/assets/logos/discord.svg?react';
+import FacebookLogo from '@/assets/logos/facebook.svg?react';
+import GithubLogo from '@/assets/logos/github.svg?react';
+import GoogleLogo from '@/assets/logos/google.svg?react';
+import InstagramLogo from '@/assets/logos/instagram.svg?react';
+import LinkedinLogo from '@/assets/logos/linkedin.svg?react';
+import MicrosoftLogo from '@/assets/logos/microsoft.svg?react';
+import SpotifyLogo from '@/assets/logos/spotify.svg?react';
+import TiktokLogo from '@/assets/logos/tiktok.svg?react';
+import XLogo from '@/assets/logos/x.svg?react';
+import { Badge, Checkbox } from '@insforge/ui';
+import { cn, formatTime } from '@/lib/utils/utils';
 import type { UserSchema } from '@insforge/shared-schemas';
 
-// Create a type that makes UserSchema compatible with DataGrid requirements
 type UserDataGridRow = UserSchema & {
-  [key: string]: ConvertedValue | { [key: string]: string }[];
+  [key: string]: string | number | boolean | null | string[] | Record<string, unknown>;
 };
 
-// Provider icon component
-const ProviderIcon = ({ provider }: { provider: string }) => {
-  const getProviderInfo = (provider: string) => {
-    switch (provider.toLowerCase()) {
-      case 'google':
-        return {
-          label: 'Google',
-          color:
-            'bg-red-100 text-red-700 dark:bg-neutral-800 dark:text-red-300 dark:border-red-500',
-        };
-      case 'github':
-        return {
-          label: 'GitHub',
-          color:
-            'bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-zinc-300 dark:border-gray-500',
-        };
-      case 'discord':
-        return {
-          label: 'Discord',
-          color:
-            'bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-zinc-300 dark:border-gray-500',
-        };
-      case 'linkedin':
-        return {
-          label: 'LinkedIn',
-          color:
-            'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-500',
-        };
-      case 'facebook':
-        return {
-          label: 'Facebook',
-          color:
-            'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-600',
-        };
-      case 'microsoft':
-        return {
-          label: 'Microsoft',
-          color:
-            'bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-zinc-300 dark:border-gray-500',
-        };
-      case 'email':
-        return {
-          label: 'Email',
-          color:
-            'bg-green-100 text-green-700 dark:bg-neutral-800 dark:text-green-300 dark:border-green-500',
-        };
-      case 'x':
-        return {
-          label: 'X',
-          color:
-            'bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-zinc-300 dark:border-gray-500',
-        };
-      case 'apple':
-        return {
-          label: 'Apple',
-          color:
-            'bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-zinc-300 dark:border-gray-500',
-        };
-      default:
-        return {
-          label: provider,
-          color:
-            'bg-gray-100 text-gray-700 dark:bg-neutral-800 dark:text-zinc-300 dark:border-gray-500',
-        };
-    }
-  };
+const providerLabelMap: Record<string, string> = {
+  google: 'Google',
+  github: 'GitHub',
+  discord: 'Discord',
+  linkedin: 'LinkedIn',
+  facebook: 'Facebook',
+  instagram: 'Instagram',
+  apple: 'Apple',
+  x: 'X',
+  spotify: 'Spotify',
+  tiktok: 'TikTok',
+  microsoft: 'Microsoft',
+  email: 'Email',
+};
 
-  const { label, color } = getProviderInfo(provider);
+const providerLogoMap = {
+  google: GoogleLogo,
+  github: GithubLogo,
+  discord: DiscordLogo,
+  linkedin: LinkedinLogo,
+  facebook: FacebookLogo,
+  instagram: InstagramLogo,
+  apple: AppleLogo,
+  x: XLogo,
+  spotify: SpotifyLogo,
+  tiktok: TiktokLogo,
+  microsoft: MicrosoftLogo,
+} as const;
+
+const ProviderBadge = ({ provider }: { provider: string }) => {
+  const normalized = provider.toLowerCase();
+  const label =
+    providerLabelMap[normalized] ?? normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  const ProviderLogo = providerLogoMap[normalized as keyof typeof providerLogoMap];
 
   return (
-    <Badge
-      variant="secondary"
-      className={cn('text-xs font-medium px-2 py-1 border border-transparent', color)}
-    >
+    <Badge className="h-5 rounded border border-[var(--alpha-inverse-8)] bg-white px-1.5 py-0 text-xs font-medium leading-4 text-black">
+      {ProviderLogo ? (
+        <ProviderLogo className="h-4 w-4 shrink-0" />
+      ) : normalized === 'email' ? (
+        <Mail className="h-4 w-4 shrink-0 text-black" />
+      ) : null}
       {label}
     </Badge>
   );
@@ -105,55 +80,93 @@ const ProvidersCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
   const providers = row.providers;
 
   if (!providers || !Array.isArray(providers) || !providers.length) {
-    return <span className="text-sm text-black dark:text-zinc-300">null</span>;
+    return <span className="truncate text-[13px] leading-[18px] text-muted-foreground">null</span>;
   }
 
-  // Get unique providers to avoid duplicates
   const uniqueProviders = [...new Set(providers)];
 
   return (
-    <div className="flex flex-wrap gap-1" title={providers.join(', ')}>
-      {uniqueProviders.slice(0, 2).map((provider: string, index: number) => (
-        <ProviderIcon key={index} provider={provider} />
+    <div className="flex items-center gap-1" title={providers.join(', ')}>
+      {uniqueProviders.slice(0, 1).map((provider) => (
+        <ProviderBadge key={provider} provider={provider} />
       ))}
-      {uniqueProviders.length > 2 && (
-        <Badge
-          variant="secondary"
-          className="text-xs px-2 py-1 bg-gray-100 text-gray-600 dark:bg-neutral-800 dark:text-zinc-300 dark:border-neutral-700 border border-transparent"
-        >
-          +{uniqueProviders.length - 2}
+      {uniqueProviders.length > 1 && (
+        <Badge className="h-5 rounded bg-[var(--alpha-8)] px-1.5 py-0 text-xs font-medium leading-4 text-muted-foreground">
+          +{uniqueProviders.length - 1}
         </Badge>
       )}
     </div>
   );
 };
 
-// Convert users data to DataGrid columns
-export function createUsersColumns(): DataGridColumn<UserDataGridRow>[] {
-  const cellRenderers = createDefaultCellRenderer<UserDataGridRow>();
+const EmailVerifiedCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
+  if (typeof row.emailVerified !== 'boolean') {
+    return <span className="truncate text-[13px] leading-[18px] text-muted-foreground">null</span>;
+  }
 
+  return (
+    <Badge
+      className={cn(
+        'h-5 rounded px-1.5 py-0 text-xs font-medium leading-4 text-white',
+        row.emailVerified ? 'bg-[rgb(var(--success))]' : 'bg-[rgb(var(--destructive))]'
+      )}
+    >
+      {row.emailVerified ? 'True' : 'False'}
+    </Badge>
+  );
+};
+
+const DateTimeCellRenderer = ({
+  row,
+  column,
+}: RenderCellProps<UserDataGridRow> & { column: { key: string } }) => {
+  const rawValue = row[column.key as keyof UserDataGridRow];
+  const value = typeof rawValue === 'string' ? rawValue : '';
+  const displayValue = value ? formatTime(value) : 'null';
+  return (
+    <span
+      className={cn(
+        'truncate text-[13px] leading-[18px]',
+        value ? 'text-foreground' : 'text-muted-foreground'
+      )}
+      title={displayValue}
+    >
+      {displayValue}
+    </span>
+  );
+};
+
+export function createUsersColumns(): DataGridColumn<UserDataGridRow>[] {
   return [
     {
       key: 'id',
       name: 'ID',
-      width: '1fr',
-      resizable: true,
+      width: '1.3fr',
+      minWidth: 120,
       sortable: true,
-      renderCell: cellRenderers.id,
+      renderCell: ({ row }) => (
+        <span className="truncate text-[13px] leading-[18px] text-foreground" title={row.id}>
+          {row.id}
+        </span>
+      ),
     },
     {
       key: 'email',
       name: 'Email',
-      width: '1fr',
-      resizable: true,
+      width: '1.2fr',
+      minWidth: 160,
       sortable: true,
-      renderCell: cellRenderers.email,
+      renderCell: ({ row }) => (
+        <span className="truncate text-[13px] leading-[18px] text-foreground" title={row.email}>
+          {row.email}
+        </span>
+      ),
     },
     {
       key: 'providers',
       name: 'Providers',
       width: '1fr',
-      resizable: true,
+      minWidth: 140,
       sortable: true,
       renderCell: ProvidersCellRenderer,
     },
@@ -161,36 +174,34 @@ export function createUsersColumns(): DataGridColumn<UserDataGridRow>[] {
       key: 'emailVerified',
       name: 'Email Verified',
       width: '1fr',
-      resizable: true,
+      minWidth: 130,
       sortable: true,
-      renderCell: cellRenderers.boolean,
+      renderCell: EmailVerifiedCellRenderer,
     },
     {
       key: 'createdAt',
       name: 'Created',
-      width: '1fr',
-      resizable: true,
+      width: '1.1fr',
+      minWidth: 160,
       sortable: true,
-      renderCell: cellRenderers.datetime,
+      renderCell: (props) => <DateTimeCellRenderer {...props} />,
     },
     {
       key: 'updatedAt',
       name: 'Updated',
-      width: '1fr',
-      resizable: true,
+      width: '1.1fr',
+      minWidth: 160,
       sortable: true,
-      renderCell: cellRenderers.datetime,
+      renderCell: (props) => <DateTimeCellRenderer {...props} />,
     },
   ];
 }
 
-// Users-specific DataGrid props
 export type UsersDataGridProps = Omit<
   DataGridProps<UserDataGridRow>,
-  'columns' | 'selectionColumnWidth' | 'renderSelectionCell'
+  'columns' | 'selectionColumnWidth' | 'renderSelectionCell' | 'selectionHeaderLabel'
 >;
 
-// Custom selection cell with avatar and name
 const UserSelectionCell = ({
   row,
   isSelected,
@@ -199,33 +210,32 @@ const UserSelectionCell = ({
 }: SelectionCellProps<UserDataGridRow>) => {
   const profile = row.profile as Record<string, unknown> | null;
   const avatarUrl = profile?.avatar_url as string | undefined;
-  const name = profile?.name as string | undefined;
+  const rawName = profile?.name;
+  const name =
+    (typeof rawName === 'string' && rawName.trim()) || row.email.split('@')[0] || 'Unknown';
 
   return (
-    <div className="flex items-center gap-2 w-full h-full">
-      <Checkbox checked={isSelected} onChange={onToggle} tabIndex={tabIndex} />
-      <div className="flex items-center gap-2 min-w-0 flex-1">
-        <Avatar className="w-6 h-6 rounded-full flex-shrink-0">
-          <AvatarImage src={avatarUrl} alt={name || 'User avatar'} className="object-cover" />
-          <AvatarFallback className="bg-gray-200 dark:bg-neutral-700 rounded-full">
-            <User className="w-4 h-4 text-gray-500 dark:text-neutral-400" />
+    <div className="flex h-full w-full items-center gap-2 pr-2">
+      <Checkbox
+        checked={isSelected}
+        onCheckedChange={(checked) => onToggle(checked === true)}
+        tabIndex={tabIndex}
+      />
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <Avatar className="h-6 w-6 shrink-0 rounded-full">
+          <AvatarImage src={avatarUrl} alt={name} className="rounded-full object-cover" />
+          <AvatarFallback className="rounded-full bg-[var(--alpha-8)]">
+            <User className="h-3.5 w-3.5 text-muted-foreground" />
           </AvatarFallback>
         </Avatar>
-        <span
-          className={cn(
-            'text-sm truncate',
-            name ? 'text-black dark:text-zinc-300' : 'text-gray-400 dark:text-neutral-500'
-          )}
-          title={name || 'null'}
-        >
-          {name || 'null'}
+        <span className="truncate text-[13px] leading-[18px] text-foreground" title={name}>
+          {name}
         </span>
       </div>
     </div>
   );
 };
 
-// Specialized DataGrid for users
 export function UsersDataGrid(props: UsersDataGridProps) {
   const columns = useMemo(() => createUsersColumns(), []);
 
@@ -235,8 +245,10 @@ export function UsersDataGrid(props: UsersDataGridProps) {
       columns={columns}
       showSelection={true}
       showPagination={true}
+      paginationRecordLabel="users"
       showTypeBadge={false}
       selectionColumnWidth={180}
+      selectionHeaderLabel="User"
       renderSelectionCell={UserSelectionCell}
     />
   );

@@ -1,13 +1,7 @@
 import { useState } from 'react';
 import { ExternalLink, Copy, Check, RefreshCw } from 'lucide-react';
-import {
-  Button,
-  Skeleton,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components';
+import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
+import { Skeleton } from '@/components';
 import { useDeployments } from '../hooks/useDeployments';
 import { useDeploymentMetadata } from '../hooks/useDeploymentMetadata';
 import { useToast } from '@/lib/hooks/useToast';
@@ -227,7 +221,7 @@ export default function DeploymentOverviewPage() {
   };
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       <div className="flex-1 min-h-0 overflow-auto p-6">
         <div className="w-full max-w-[1080px] mx-auto flex flex-col gap-6">
           <div className="flex items-center justify-between">

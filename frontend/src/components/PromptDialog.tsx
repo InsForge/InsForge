@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, CopyButton } from '@/components';
+import { CopyButton, Dialog, DialogContent, DialogHeader, DialogTitle } from '@insforge/ui';
 import { cn } from '@/lib/utils/utils';
 
 interface PromptDialogProps {
@@ -20,12 +20,10 @@ export function PromptDialog({
 }: PromptDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl p-0 bg-white border border-zinc-200 shadow-[0px_1px_3px_0px_rgba(0,0,0,0.1)] dark:bg-neutral-800 dark:border-neutral-700">
+      <DialogContent>
         <div className="flex flex-col">
-          <DialogHeader className="px-6 py-3 flex flex-col gap-1 justify-start border-b border-zinc-200 dark:border-neutral-700">
-            <DialogTitle className="text-lg font-semibold text-zinc-950 dark:text-white">
-              {title}
-            </DialogTitle>
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
           {/* Content */}
           <div className="p-6 flex flex-col gap-4">
@@ -49,13 +47,7 @@ export function PromptDialog({
             {/* Action buttons */}
             <div className="flex items-center justify-end gap-2.5">
               {additionalAction}
-              <CopyButton
-                text={prompt}
-                showText={true}
-                className="h-9 pl-2 pr-3 py-2 text-sm font-medium"
-                copyText="Copy Prompt"
-                copiedText="Copied!"
-              />
+              <CopyButton text={prompt} copyText="Copy Prompt" copiedText="Copied!" />
             </div>
           </div>
         </div>

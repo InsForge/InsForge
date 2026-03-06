@@ -1,194 +1,103 @@
-/* React Data Grid Styles */
+/* React Data Grid styles */
 @import 'react-data-grid/lib/styles.css';
 
 @layer base {
   :root {
-    --rdg-border-color: #f3f4f6;
-    --rdg-background-color: #f9fafb;
-    --rdg-row-hover-color: #f5f5f5;
-    --rdg-background-color-edit: #ffffff;
-    --rdg-header-row-background-color: #f9fafb;
-    --rdg-outline-color: #262626;
+    --rdg-border-color: var(--alpha-8);
+    --rdg-background-color: rgb(var(--semantic-1));
+    --rdg-row-hover-color: var(--alpha-4);
+    --rdg-background-color-edit: rgb(var(--semantic-1));
+    --rdg-header-row-background-color: rgb(var(--semantic-1));
+    --rdg-outline-color: rgb(var(--foreground));
+    --rdg-cell-frozen-box-shadow: none;
   }
 
   .rdg-dark {
-    --rdg-border-color: #404040;
-    --rdg-background-color: #262626;
-    --rdg-row-hover-color: #171717;
-    --rdg-background-color-edit: #262626;
-    --rdg-header-row-background-color: #171717;
-    --rdg-outline-color: #ffffff;
+    --rdg-border-color: var(--alpha-8);
+    --rdg-background-color: rgb(var(--semantic-1));
+    --rdg-row-hover-color: var(--alpha-4);
+    --rdg-background-color-edit: rgb(var(--semantic-1));
+    --rdg-header-row-background-color: rgb(var(--semantic-1));
+    --rdg-outline-color: rgb(var(--foreground));
+    --rdg-cell-frozen-box-shadow: none;
   }
 }
 
 .rdg-cell {
-  border-right: 1px solid var(--rdg-border-color);
-  padding: 0 14px;
   display: flex;
   align-items: center;
+  min-width: 0;
+  border-right: 1px solid var(--rdg-border-color);
   border-bottom: 1px solid var(--rdg-border-color);
+  padding-inline: 6px;
 }
 
-/* Special styling for select column */
-.rdg-cell[data-column-key='rdg-select-column'],
-.rdg-cell[data-colindex='0'] {
-  padding: 0;
-  width: 45px !important;
-  min-width: 45px !important;
-  max-width: 45px !important;
-  justify-content: center;
+.rdg-header-row .rdg-cell {
+  border-bottom: 1px solid var(--rdg-border-color);
+  background-color: var(--rdg-header-row-background-color) !important;
+  font-weight: 400;
+  color: rgb(var(--muted-foreground));
 }
 
-.rdg-header-row .rdg-cell[data-column-key='rdg-select-column'],
-.rdg-header-row .rdg-cell[data-colindex='0'] {
-  padding: 0;
-  width: 45px !important;
-  min-width: 45px !important;
-  max-width: 45px !important;
-  justify-content: center;
+.rdg-row .rdg-cell:first-child,
+.rdg-header-row .rdg-cell:first-child {
+  padding-left: 12px;
+}
+
+.rdg-row {
+  background-color: rgb(var(--semantic-0));
 }
 
 .rdg-row:hover,
 .rdg-row[aria-selected='true'],
-.rdg-row[aria-selected='true']:hover,
-.rdg-header-row .rdg-cell:hover {
+.rdg-row[aria-selected='true']:hover {
   background-color: var(--rdg-row-hover-color);
 }
 
-/* Remove cell focus outline and use custom styling */
 .rdg-cell[aria-selected='true'] {
-  outline: 2px solid var(--rdg-outline-color);
+  outline: 1px solid rgb(var(--foreground));
+  outline-offset: -1px;
+  box-shadow: none;
 }
 
-/* Disable selection styling for disabled cells in link modal */
-.rdg-cell.link-modal-disabled-cell[aria-selected='true'] {
+/* Disable selection styling for disabled cells in link record dialog */
+.rdg-cell.link-record-dialog-disabled-cell[aria-selected='true'] {
   outline: none !important;
+  box-shadow: none !important;
 }
 
-/* Editor cell styling */
 .rdg-cell.rdg-cell-editing {
   background-color: var(--rdg-background-color-edit);
 }
 
-/* Custom scrollbar for react-data-grid */
-.rdg-viewport::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.rdg-viewport::-webkit-scrollbar-track {
-  background: #f1f5f9;
-}
-
-.rdg-viewport::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
-}
-
-.rdg-viewport::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-/* Ensure proper column sizing */
-.rdg-header-row .rdg-cell,
-.rdg-row .rdg-cell {
-  min-width: 0;
-}
-
-/* Remove default sorting icon styling and use custom */
-.rdg-sort-arrow {
-  display: none;
-}
-
-/* Sortable header styling */
-.sortable-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  min-height: 50px;
-}
-
-.sort-indicators {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-left: 8px;
-  flex-shrink: 0;
-}
-
-/* Sortable column header styling */
-.rdg-header-row .rdg-cell[aria-sort] {
-  cursor: pointer;
-}
-
-/* Monospace font for IDs */
-.font-mono {
-  font-family: 'Ubuntu Mono', 'Consolas', 'Monaco', monospace;
-}
-
-/* Removed duplicate forced scrollbar */
-
-/* Ensure dropdown menu doesn't cause layout shift */
-[data-radix-popper-content-wrapper] {
-  position: fixed !important;
-}
-
-/* React Data Grid Header Styling */
-.rdg-header-row .rdg-cell {
-  border-bottom: 1px solid var(--rdg-border-color);
-  background-color: var(--rdg-header-row-background-color) !important;
-  font-weight: 500;
-  color: var(--rdg-text-color);
-}
-
-.rdg-header-row .rdg-cell:hover {
-  background-color: var(--rdg-row-hover-color);
-}
-
-/* Hide default react-data-grid sort arrows */
-.rdg-header-row .rdg-cell .rdg-sort-arrow {
-  display: none !important;
-}
-
+/* Hide default sorting indicators; we render our own */
+.rdg-sort-arrow,
+.rdg-header-row .rdg-cell .rdg-sort-arrow,
 .rdg-header-row .rdg-cell[aria-sort='ascending']::after,
-.rdg-header-row .rdg-cell[aria-sort='descending']::after {
-  display: none !important;
-}
-
-/* Hide any default sorting indicators */
+.rdg-header-row .rdg-cell[aria-sort='descending']::after,
 .rdg-header-row .rdg-cell::after {
   display: none !important;
 }
 
-/* Custom header renderer styling */
-.rdg-header-row .rdg-cell .sortable-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  height: 100%;
-  padding: 0 8px;
+/* Selection column */
+.rdg-cell[data-column-key='rdg-select-column'],
+.rdg-header-row .rdg-cell[data-column-key='rdg-select-column'],
+.rdg .rdg-cell[data-column-key='select-row'] {
+  justify-content: flex-start;
+  padding-left: 10px;
+  padding-right: 10px;
 }
 
-.rdg-header-row .rdg-cell .sort-indicators {
-  display: flex;
-  flex-direction: column;
-  margin-left: 4px;
+.rdg-header-row .rdg-cell[aria-sort] {
+  cursor: pointer;
 }
 
-.rdg-header-row .rdg-cell .sort-indicators svg {
-  transition: color 0.2s ease;
-}
-/* Custom scrollbar for data grid */
+/* Prevent accidental interactions while dragging columns */
 .rdg .rdg-viewport-dragging .rdg-row {
   pointer-events: none;
 }
 
-/* Selection column specific styling */
-.rdg .rdg-cell[data-column-key='select-row'] {
-  width: 45px !important;
-  min-width: 45px !important;
-  max-width: 45px !important;
-  justify-content: center;
+/* Ensure dropdown menu doesn't cause layout shift */
+[data-radix-popper-content-wrapper] {
+  position: fixed !important;
 }
