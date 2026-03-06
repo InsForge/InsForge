@@ -1,8 +1,8 @@
-import { Lock, FormInput, Users, Circle } from 'lucide-react';
+import type { MouseEvent, ReactNode } from 'react';
+import { LockKeyhole, Mail, Users, Circle, ExternalLink } from 'lucide-react';
 import { Handle, Position } from '@xyflow/react';
+import { useNavigate } from 'react-router-dom';
 import { OAuthProvidersSchema } from '@insforge/shared-schemas';
-import { cn } from '@/lib/utils/utils';
-import { useOAuthConfig } from '@/features/auth/hooks/useOAuthConfig';
 import { oauthProviders } from '@/features/auth/helpers';
 
 interface AuthNodeProps {
@@ -14,67 +14,64 @@ interface AuthNodeProps {
 }
 
 export function AuthNode({ data }: AuthNodeProps) {
-  const { providers, userCount, isReferenced = false } = data;
-  const { isProviderConfigured } = useOAuthConfig();
+  const navigate = useNavigate();
+  const { providers, isReferenced = false } = data;
+  const enabledProviders = oauthProviders.filter((provider) => providers.includes(provider.id));
+  const authMethods: Array<{ id: string; name: string; icon?: ReactNode }> = [
+    { id: 'email', name: 'Email / Password', icon: <Mail /> },
+    ...enabledProviders,
+  ];
+  const enabledCount = authMethods.length;
 
-  const enabledCount = providers.length + 1;
+  const handleOpenAuthUsers = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    void navigate('/dashboard/authentication/users');
+  };
 
   return (
-    <div className="bg-white dark:bg-neutral-900 rounded-lg border border-gray-300 dark:border-[#363636] min-w-[280px] shadow-sm">
+    <div className="min-w-[280px] rounded-lg border border-[var(--alpha-8)] bg-card shadow-[0px_4px_4px_rgba(0,0,0,0.08)]">
       {/* Auth Header */}
-      <div className="flex items-center justify-between p-2 border-b border-gray-200 dark:border-neutral-800">
+      <div className="flex items-center justify-between gap-2 border-b border-[var(--alpha-8)] p-2">
         <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center w-11 h-11 bg-lime-300 rounded p-1.5">
-            <Lock className="w-5 h-5 text-neutral-900" />
+          <div className="flex h-9 w-9 items-center justify-center rounded bg-sky-700">
+            <LockKeyhole className="h-5 w-5 text-white" />
           </div>
           <div className="flex-1">
-            <h3 className="text-sm font-medium text-zinc-950 dark:text-white">Authentication</h3>
-            <p className="text-xs text-zinc-600 dark:text-neutral-300">
-              {enabledCount} provider{enabledCount !== 1 ? 's' : ''} enabled
+            <h3 className="text-sm font-medium text-zinc-900 dark:text-white">Authentication</h3>
+            <p className="text-[13px] leading-[18px] text-zinc-600 dark:text-zinc-400">
+              {enabledCount} method{enabledCount !== 1 ? 's' : ''} enabled
             </p>
           </div>
         </div>
-        {/* <div className="p-1.5">
-          <ExternalLink className="w-4 h-4 text-neutral-400" />
-        </div> */}
+        <button
+          type="button"
+          onClick={handleOpenAuthUsers}
+          onMouseDown={(event) => event.stopPropagation()}
+          className="flex h-7 w-7 items-center justify-center rounded text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-zinc-200"
+          aria-label="Open authentication settings"
+        >
+          <ExternalLink className="h-4 w-4" />
+        </button>
       </div>
 
       {/* Auth Providers */}
-      <div className="p-2 space-y-2 border-b border-gray-200 dark:border-neutral-800">
-        {/* Email/Password */}
-        <div className="flex items-center justify-between p-2.5 bg-gray-100 dark:bg-neutral-800 rounded">
-          <div className="flex items-center gap-2.5">
-            <FormInput className="w-5 h-5 text-zinc-700 dark:text-neutral-300" />
-            <span className="text-sm text-zinc-700 dark:text-neutral-300">Email/Password</span>
-          </div>
-          <div className="px-1.5 py-0.5 bg-lime-200 rounded flex items-center">
-            <span className="text-xs font-medium text-lime-900">Enabled</span>
-          </div>
-        </div>
-
-        {/* OAuth Providers */}
-        {oauthProviders.map((provider) => {
-          const isEnabled = isProviderConfigured(provider.id);
+      <div className="space-y-2 border-b border-[var(--alpha-8)] px-2 py-3">
+        {authMethods.map((method) => {
           return (
             <div
-              key={provider.id}
-              className="flex items-center justify-between p-2.5 bg-gray-100 dark:bg-neutral-800 rounded"
+              key={method.id}
+              className="flex h-8 min-h-8 items-center justify-between rounded bg-zinc-100 px-1.5 dark:bg-white/[0.04]"
             >
-              <div className="flex items-center gap-2.5">
-                <div className="w-5 h-5 flex items-center justify-center [&>svg]:w-5 [&>svg]:h-5">
-                  {provider.icon}
+              <div className="flex items-center gap-2 px-1">
+                <div className="flex h-5 w-5 items-center justify-center text-zinc-700 dark:text-zinc-200 [&>svg]:h-4 [&>svg]:w-4">
+                  {method.icon}
                 </div>
-                <span className="text-sm text-zinc-700 dark:text-neutral-300">{provider.name}</span>
+                <span className="text-[13px] leading-[18px] text-zinc-800 dark:text-white">
+                  {method.name}
+                </span>
               </div>
-              <div
-                className={cn(
-                  'px-1.5 py-0.5 rounded flex items-center',
-                  isEnabled
-                    ? 'bg-lime-200 text-lime-900'
-                    : 'bg-gray-200 dark:bg-neutral-700 text-gray-600 dark:text-neutral-300'
-                )}
-              >
-                <span className="text-xs font-medium">{isEnabled ? 'Enabled' : 'Disabled'}</span>
+              <div className="rounded bg-green-700 px-2 py-0.5">
+                <span className="text-xs font-medium leading-4 text-white">Enabled</span>
               </div>
             </div>
           );
@@ -82,7 +79,7 @@ export function AuthNode({ data }: AuthNodeProps) {
       </div>
 
       {/* Users Section */}
-      <div className="flex items-center justify-between p-3 border-t border-gray-300 dark:border-neutral-700 relative">
+      <div className="relative flex items-center justify-between p-3">
         {/* Target handle for auth.id references - positioned at right bottom corner */}
         <Handle
           type="target"
@@ -100,21 +97,20 @@ export function AuthNode({ data }: AuthNodeProps) {
         />
 
         <div className="flex items-center gap-2.5">
-          <Users className="w-5 h-5 text-zinc-700 dark:text-neutral-300" />
-          <span className="text-sm text-zinc-700 dark:text-neutral-300">Users</span>
-          <span className="text-xs text-zinc-500 dark:text-neutral-400">{userCount ?? 0}</span>
+          <Users className="h-5 w-5 text-zinc-700 dark:text-zinc-400" />
+          <span className="text-sm text-zinc-700 dark:text-zinc-400">Users</span>
         </div>
         <div className="flex items-center">
           {isReferenced ? (
-            <div className="w-5 h-5 flex items-center justify-center relative">
+            <div className="relative flex h-5 w-5 items-center justify-center">
               <Circle
-                className="w-5 h-5 text-zinc-950 dark:text-white fill-none stroke-current"
+                className="h-5 w-5 fill-none stroke-current text-zinc-900 dark:text-white"
                 strokeWidth={1.5}
               />
-              <div className="w-2 h-2 bg-zinc-950 dark:bg-white rounded-full absolute" />
+              <div className="absolute h-2 w-2 rounded-full bg-zinc-900 dark:bg-white" />
             </div>
           ) : (
-            <Circle className="w-5 h-5 text-gray-400 dark:text-neutral-700 fill-gray-100 dark:fill-neutral-800 stroke-current" />
+            <Circle className="h-5 w-5 fill-zinc-100 stroke-current text-zinc-400 dark:fill-neutral-800 dark:text-neutral-700" />
           )}
         </div>
       </div>

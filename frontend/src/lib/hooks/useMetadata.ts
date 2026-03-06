@@ -52,6 +52,27 @@ export function useApiKey(options?: UseMetadataOptions) {
   };
 }
 
+export function useProjectId(options?: UseMetadataOptions) {
+  const {
+    data: projectId,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['metadata', 'projectId'],
+    queryFn: () => metadataService.fetchProjectId(),
+    staleTime: options?.staleTime ?? 10 * 60 * 1000,
+    enabled: options?.enabled ?? true,
+  });
+
+  return {
+    projectId,
+    isLoading,
+    error,
+    refetch,
+  };
+}
+
 export function useDatabaseConnectionString(options?: UseMetadataOptions) {
   const {
     data: connectionData,

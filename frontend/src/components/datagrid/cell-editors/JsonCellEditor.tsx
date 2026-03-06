@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FileJson, AlertCircle, CheckCircle } from 'lucide-react';
-import { ConfirmDialog, Button, Popover, PopoverContent, PopoverTrigger } from '@/components';
+import { Badge, Button, ConfirmDialog } from '@insforge/ui';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components';
 import { cn } from '@/lib/utils/utils';
 import type { JsonCellEditorProps } from './types';
 
@@ -43,6 +44,7 @@ export function JsonCellEditor({
   });
   const [isValid, setIsValid] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasJsonText = String(jsonText || '').trim() !== '';
 
   useEffect(() => {
     // Auto-open the popover when component mounts
@@ -199,7 +201,7 @@ export function JsonCellEditor({
           <Button
             variant="ghost"
             className={cn(
-              'w-full justify-start text-sm text-left font-normal h-full border-0 p-0 hover:bg-transparent dark:text-white',
+              'h-full w-full justify-start border-0 p-0 text-left text-sm font-normal text-foreground hover:bg-transparent',
               (!value || value === 'null') && 'text-muted-foreground',
               className
             )}
@@ -209,23 +211,22 @@ export function JsonCellEditor({
           </Button>
         </PopoverTrigger>
         <PopoverContent
-          className="overflow-hidden w-125 p-0 dark:bg-neutral-800 dark:border-neutral-700"
+          className="w-[32rem] overflow-hidden border-[var(--alpha-12)] bg-card p-0 shadow-xl"
           align="start"
           side="bottom"
         >
           <div className="p-4">
-            <div className="flex items-center justify-between mb-3">
+            <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FileJson className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">JSON Editor</span>
+                <span className="text-sm font-medium text-foreground">JSON Editor</span>
               </div>
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleFormat}
-                  disabled={!isValid || String(jsonText || '').trim() === ''}
-                  className="h-7 px-2"
+                  disabled={!isValid || !hasJsonText}
                 >
                   Format
                 </Button>
@@ -233,8 +234,7 @@ export function JsonCellEditor({
                   variant="ghost"
                   size="sm"
                   onClick={handleMinify}
-                  disabled={!isValid || String(jsonText || '').trim() === ''}
-                  className="h-7 px-2"
+                  disabled={!isValid || !hasJsonText}
                 >
                   Minify
                 </Button>
@@ -275,19 +275,21 @@ export function JsonCellEditor({
                 }}
                 placeholder="Enter JSON here..."
                 className={cn(
-                  'w-full h-75 px-3 py-2 text-sm border border-border-gray dark:border-neutral-600 rounded-md font-mono resize-none',
-                  'focus:outline-none focus:ring-2 focus:ring-offset-2',
-                  isValid ? 'focus:ring-primary' : 'focus:ring-red-500 border-red-500'
+                  'h-75 w-full resize-none rounded-md border bg-[var(--alpha-4)] px-3 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground transition-colors',
+                  'focus:outline-none focus:shadow-[0_0_0_1px_rgb(var(--foreground))]',
+                  isValid
+                    ? 'border-[var(--alpha-12)] focus:border-primary'
+                    : 'border-destructive focus:border-destructive focus:shadow-[0_0_0_1px_rgb(var(--destructive))]'
                 )}
                 spellCheck={false}
                 autoFocus
               />
 
               {/* Validation indicator */}
-              <div
+              <Badge
                 className={cn(
-                  'absolute bottom-2 right-2 flex items-center gap-1',
-                  isValid ? 'text-green-600' : 'text-red-600'
+                  'pointer-events-none absolute bottom-3 right-3 flex items-center gap-1',
+                  isValid ? 'bg-primary/15 text-primary' : 'bg-destructive/15 text-destructive'
                 )}
               >
                 {isValid ? (
@@ -301,29 +303,26 @@ export function JsonCellEditor({
                     <span className="text-xs">Invalid JSON</span>
                   </>
                 )}
-              </div>
+              </Badge>
             </div>
 
             {/* Error message */}
             {error && (
-              <div className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded">{error}</div>
+              <div className="mt-2 rounded border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
+                {error}
+              </div>
             )}
 
             {/* Tips */}
-            <div className="mt-2 text-xs text-muted-foreground">
+            <div className="mt-2 rounded border border-[var(--alpha-8)] bg-[var(--alpha-4)] px-2 py-1.5 text-xs text-muted-foreground">
               Tip: Use Tab for indentation, Ctrl+Enter to save, Escape to cancel
             </div>
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center gap-2 p-3 border-t border-border-gray dark:border-neutral-600 bg-muted/30 dark:bg-neutral-800">
+          <div className="flex items-center gap-2 border-t border-[var(--alpha-8)] bg-[var(--alpha-4)] p-3">
             {nullable && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSetNull}
-                className="flex-1 dark:bg-neutral-600 dark:text-white dark:hover:bg-neutral-700"
-              >
+              <Button variant="outline" size="sm" onClick={handleSetNull} className="flex-1">
                 Null
               </Button>
             )}
@@ -334,7 +333,7 @@ export function JsonCellEditor({
                 onCancel();
                 setOpen(false);
               }}
-              className="flex-1 dark:bg-neutral-600 dark:text-white dark:hover:bg-neutral-700"
+              className="flex-1"
             >
               Cancel
             </Button>

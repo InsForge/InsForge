@@ -125,11 +125,8 @@ export function BuildLogsView({ className }: BuildLogsViewProps) {
           columnDefs={columns}
           data={logsWithIds}
           loading={isLoading}
-          currentPage={1}
-          totalPages={1}
-          pageSize={logsWithIds.length || 50}
-          totalRecords={logsWithIds.length}
-          onPageChange={() => {}}
+          showPagination={false}
+          gridContainerClassName="border-t border-[var(--alpha-8)]"
           emptyState={
             <div className="text-sm text-zinc-500 dark:text-zinc-400">No build logs found</div>
           }

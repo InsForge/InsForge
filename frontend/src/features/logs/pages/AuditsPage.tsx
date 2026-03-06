@@ -1,22 +1,21 @@
 import { useState, useEffect, useMemo } from 'react';
-import { RefreshCw, Search, FileText, Trash2 } from 'lucide-react';
-import { LogsDataGrid, type LogsColumnDef } from '@/features/logs/components/LogsDataGrid';
-import { formatTime } from '@/lib/utils/utils';
+import { RefreshCw, Trash2, ExternalLink } from 'lucide-react';
+import { LogsDataGrid, type LogsColumnDef } from '@/features/logs/components';
+import { formatTime, cn } from '@/lib/utils/utils';
 import { LOGS_PAGE_SIZE } from '@/features/logs/helpers';
 import { useConfirm } from '@/lib/hooks/useConfirm';
-import {
-  Alert,
-  AlertDescription,
-  Button,
-  ConfirmDialog,
-  Input,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components';
+import { Button, ConfirmDialog } from '@insforge/ui';
+import { TableHeader } from '@/components';
 import { useAuditLogs, useClearAuditLogs } from '@/features/logs/hooks/useAuditLogs';
 import type { GetAuditLogsRequest } from '@insforge/shared-schemas';
+
+function ModuleBadge({ module }: { module?: string | null }) {
+  return (
+    <span className="inline-flex h-5 items-center rounded border border-[var(--alpha-8)] bg-[var(--alpha-8)] px-2 text-[12px] font-medium leading-4 text-[rgb(var(--muted-foreground))]">
+      {module || 'general'}
+    </span>
+  );
+}
 
 export default function AuditsPage() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,10 +23,8 @@ export default function AuditsPage() {
   const [filters, setFilters] = useState<Partial<GetAuditLogsRequest>>({});
   const { confirm, confirmDialogProps } = useConfirm();
 
-  // Calculate offset based on current page
   const offset = (currentPage - 1) * LOGS_PAGE_SIZE;
 
-  // Fetch logs with pagination and filters
   const {
     data: logsResponse,
     isLoading,
@@ -59,186 +56,113 @@ export default function AuditsPage() {
     });
   };
 
-  // Apply search filter
   useEffect(() => {
     setCurrentPage(1);
     if (searchQuery) {
-      // Search can filter by actor, action, or module
-      setFilters({
-        actor: searchQuery,
-      });
+      setFilters({ actor: searchQuery });
     } else {
       setFilters({});
     }
   }, [searchQuery]);
 
-  // Extract data from response
   const logsData = logsResponse?.data || [];
   const totalRecords = logsResponse?.pagination?.total || 0;
 
-  // Define columns for audit logs
   const columns: LogsColumnDef[] = useMemo(
     () => [
       {
         key: 'actor',
         name: 'Actor',
-        width: '200px',
+        width: '240px',
       },
       {
         key: 'action',
         name: 'Action',
-        width: '200px',
+        width: '240px',
       },
       {
         key: 'module',
-        name: 'Module',
-        width: '150px',
+        name: 'Type',
+        width: '160px',
+        renderCell: ({ row }) => <ModuleBadge module={String(row.module ?? '')} />,
       },
       {
         key: 'details',
-        name: 'Details',
-        renderCell: ({ row }) => (
-          <p className="text-sm text-gray-900 dark:text-white font-normal leading-6 break-all">
-            {row.details ? JSON.stringify(row.details) : '-'}
-          </p>
-        ),
-      },
-      {
-        key: 'createdAt',
-        name: 'Time',
-        width: '250px',
-        renderCell: ({ row }) => (
-          <p className="text-sm text-gray-900 dark:text-white font-normal leading-6">
-            {formatTime(String(row.createdAt ?? ''))}
-          </p>
-        ),
+        name: 'Definition',
+        width: '1fr',
+        minWidth: 360,
+        renderCell: ({ row }) => {
+          const details = row.details ? JSON.stringify(row.details) : '-';
+          const timestamp = formatTime(String(row.createdAt ?? ''));
+
+          return (
+            <div className="flex w-full items-center gap-2">
+              <p className="min-w-0 flex-1 truncate text-[13px] font-normal leading-[18px] text-[rgb(var(--foreground))]">
+                {`${timestamp} - ${details}`}
+              </p>
+              <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            </div>
+          );
+        },
       },
     ],
     []
   );
+
   return (
-    <div className="flex h-full bg-bg-gray dark:bg-neutral-800">
-      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-        {/* Sticky Header Section */}
-        <div className="sticky top-0 z-30 bg-bg-gray dark:bg-neutral-800">
-          <div className="px-8 pt-6 pb-4">
-            {/* Page Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <nav className="flex items-center text-[22px] font-semibold">
-                  <span className="text-gray-900 dark:text-white">Audit Logs</span>
-                </nav>
-
-                {/* Separator */}
-                <div className="mx-4 h-6 w-px bg-gray-200 dark:bg-neutral-700" />
-
-                {/* Action buttons group */}
-                <div className="flex items-center gap-1">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-9 w-9 hover:bg-gray-100 dark:hover:bg-neutral-700"
-                          onClick={handleRefresh}
-                          disabled={isLoading}
-                        >
-                          <RefreshCw
-                            className={`h-4 w-4 text-gray-600 dark:text-neutral-400 ${isLoading ? 'animate-spin' : ''}`}
-                          />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" align="center">
-                        <p>Refresh</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-9 w-9 hover:bg-gray-100 dark:hover:bg-neutral-700"
-                          onClick={handleClearLogs}
-                          disabled={clearMutation.isPending || !logsData.length}
-                        >
-                          <Trash2 className="h-4 w-4 text-gray-600 dark:text-neutral-400" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" align="center">
-                        <p>Clear old logs</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-              </div>
-            </div>
-
-            {/* Search Bar */}
-            <div className="relative mt-6">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-neutral-400" />
-              <Input
-                placeholder="Search logs..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-11 bg-white dark:bg-neutral-900 border-gray-200 dark:border-neutral-700 rounded-full text-sm dark:text-white"
-              />
-            </div>
+    <div className="flex h-full flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
+      <TableHeader
+        title="audits.logs"
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search audit logs"
+        rightActions={
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleRefresh}
+              disabled={isLoading}
+            >
+              <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleClearLogs}
+              disabled={clearMutation.isPending || !logsData.length}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
           </div>
-        </div>
+        }
+      />
 
-        {/* Content */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {error && (
-            <Alert variant="destructive" className="mb-4 mx-8 mt-4">
-              <AlertDescription>{String(error)}</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="flex-1 flex flex-col overflow-hidden px-8">
-            {!logsData.length && !isLoading ? (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center">
-                  <FileText className="mx-auto h-12 w-12 text-gray-400 dark:text-neutral-600 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                    No Audit Logs Available
-                  </h3>
-                  <p className="text-sm text-gray-500 dark:text-neutral-400">
-                    {searchQuery
-                      ? 'No logs found matching your search criteria'
-                      : 'Audit logs will appear here once operations are performed'}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="flex-1 overflow-hidden">
-                <LogsDataGrid
-                  columnDefs={columns}
-                  data={logsData}
-                  loading={isLoading}
-                  currentPage={currentPage}
-                  totalPages={Math.ceil(totalRecords / LOGS_PAGE_SIZE)}
-                  pageSize={LOGS_PAGE_SIZE}
-                  totalRecords={totalRecords}
-                  onPageChange={setCurrentPage}
-                  emptyState={
-                    <div className="text-sm text-zinc-500 dark:text-zinc-400">
-                      {searchQuery
-                        ? 'No audit logs match your search criteria'
-                        : 'No audit logs found'}
-                    </div>
-                  }
-                />
-              </div>
-            )}
-          </div>
-        </div>
+      <div className="flex-1 overflow-hidden">
+        <LogsDataGrid
+          columnDefs={columns}
+          data={logsData}
+          loading={isLoading}
+          currentPage={currentPage}
+          totalPages={Math.ceil(totalRecords / LOGS_PAGE_SIZE)}
+          pageSize={LOGS_PAGE_SIZE}
+          totalRecords={totalRecords}
+          onPageChange={setCurrentPage}
+          gridContainerClassName="border-t border-[var(--alpha-8)]"
+          emptyState={
+            <div className="text-[13px] text-muted-foreground">
+              {error
+                ? `Error loading audit logs: ${error instanceof Error ? error.message : 'An unexpected error occurred'}`
+                : searchQuery
+                  ? 'No audit logs match your search criteria'
+                  : 'No audit logs found'}
+            </div>
+          }
+        />
       </div>
 
-      {/* Confirm Dialog */}
       <ConfirmDialog {...confirmDialogProps} />
     </div>
   );

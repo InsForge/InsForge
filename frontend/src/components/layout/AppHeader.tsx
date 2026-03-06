@@ -1,16 +1,13 @@
 import { useState, useEffect } from 'react';
-import { LogOut, ChevronDown } from 'lucide-react';
+import { LogOut, ChevronDown, Plug } from 'lucide-react';
 import {
-  Avatar,
-  AvatarFallback,
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  Separator,
-  ThemeToggle,
-} from '@/components';
-import { McpConnectionStatus } from '@/features/onboard';
+} from '@insforge/ui';
+import { Avatar, AvatarFallback, Separator, ThemeSelect } from '@/components';
 import { cn } from '@/lib/utils/utils';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
@@ -25,7 +22,7 @@ import InsForgeLogoDark from '@/assets/logos/insforge_dark.svg';
 export default function AppHeader() {
   const { resolvedTheme } = useTheme();
   const { user, logout } = useAuth();
-  const { setOnboardingModalOpen } = useModal();
+  const { setConnectDialogOpen } = useModal();
   const [githubStars, setGithubStars] = useState<number | null>(null);
 
   // Fetch GitHub stars
@@ -78,7 +75,7 @@ export default function AppHeader() {
 
   return (
     <>
-      <div className="h-12 w-full bg-white dark:bg-neutral-800 border-b border-border-gray dark:border-neutral-700 z-50 flex items-center justify-between px-6">
+      <div className="h-12 w-full bg-semantic-2 border-b border-[var(--alpha-8)] z-50 flex items-center justify-between px-6">
         {/* Logo */}
 
         <a href="https://insforge.dev" target="_blank" rel="noopener noreferrer">
@@ -114,11 +111,19 @@ export default function AppHeader() {
             )}
           </a>
           <Separator className="h-5 mx-2" orientation="vertical" />
-          {/* Theme Toggle */}
-          <ThemeToggle />
+          <ThemeSelect />
           <Separator className="h-5 mx-2" orientation="vertical" />
           {/* MCP Connection Status */}
-          <McpConnectionStatus onConnectClick={() => setOnboardingModalOpen(true)} />
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => setConnectDialogOpen(true)}
+            className="gap-1 rounded-[14px] border-[var(--alpha-8)] px-2 [&_svg]:size-4"
+          >
+            <Plug aria-hidden="true" />
+            <span>Connect</span>
+          </Button>
 
           {/* User Profile*/}
           <Separator className="h-5 mx-2" orientation="vertical" />

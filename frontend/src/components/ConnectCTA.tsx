@@ -11,7 +11,7 @@ interface ConnectCTAProps {
 export function ConnectCTA({ className, fallback }: ConnectCTAProps) {
   const navigate = useNavigate();
   const { hasCompletedOnboarding } = useMcpUsage();
-  const { setOnboardingModalOpen } = useModal();
+  const { setConnectDialogOpen } = useModal();
 
   if (hasCompletedOnboarding) {
     return fallback;
@@ -19,7 +19,7 @@ export function ConnectCTA({ className, fallback }: ConnectCTAProps) {
 
   const handleConnect = () => {
     if (isInsForgeCloudProject()) {
-      setOnboardingModalOpen(true);
+      setConnectDialogOpen(true);
     } else {
       void navigate('/dashboard/onboard');
     }

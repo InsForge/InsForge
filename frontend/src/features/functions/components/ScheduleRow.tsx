@@ -1,16 +1,16 @@
 import { cn } from '@/lib/utils/utils';
 import type { ScheduleSchema } from '@insforge/shared-schemas';
 import { format } from 'date-fns';
-import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
-import { Switch } from '@/components/radix/Switch';
-import { Button } from '@/components/radix/Button';
+import { MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import {
+  Button,
+  CopyButton,
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-} from '@/components/radix/DropdownMenu';
-import { CopyButton } from '@/components/CopyButton';
+  Switch,
+} from '@insforge/ui';
 
 interface ScheduleRowProps {
   schedule: ScheduleSchema;
@@ -34,39 +34,36 @@ export function ScheduleRow({
   return (
     <div
       className={cn(
-        'group h-14 px-3 bg-white hover:bg-neutral-100 dark:bg-[#333333] dark:hover:bg-neutral-700 rounded-[8px] transition-all cursor-pointer',
+        'group rounded border border-[var(--alpha-8)] bg-card cursor-pointer',
         className
       )}
       onClick={onClick}
     >
-      <div className="grid grid-cols-14 gap-x-1 h-full items-center">
-        <div className="col-span-2 min-w-0 px-3 py-1.5">
-          <p className="text-sm text-zinc-950 dark:text-white truncate" title={schedule.name}>
+      <div className="flex items-center pl-2 rounded hover:bg-[var(--alpha-8)] transition-colors">
+        {/* Name Column */}
+        <div className="flex-1 min-w-0 h-12 flex items-center px-2.5">
+          <p className="text-sm text-foreground truncate" title={schedule.name}>
             {schedule.name}
           </p>
         </div>
 
-        <div className="col-span-4 min-w-0 px-3 py-1.5">
-          <div className="flex items-center gap-3 min-w-0">
-            <span
-              className="text-sm text-muted-foreground dark:text-white truncate min-w-0"
-              title={schedule.functionUrl}
-            >
+        {/* Function URL Column */}
+        <div className="flex-[2] min-w-0 h-12 flex items-center px-2.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm text-foreground truncate" title={schedule.functionUrl}>
               {schedule.functionUrl}
             </span>
             <CopyButton
-              variant="secondary"
               showText={false}
               text={schedule.functionUrl}
-              className="h-7 w-7"
+              className="size-6 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
             />
           </div>
         </div>
-        <div className="col-span-2 min-w-0 px-3 py-1.5">
-          <span
-            className="text-sm text-muted-foreground dark:text-white truncate"
-            title={schedule.nextRun ?? ''}
-          >
+
+        {/* Next Run Column */}
+        <div className="flex-1 min-w-0 h-12 flex items-center px-2.5">
+          <span className="text-sm text-foreground truncate" title={schedule.nextRun ?? ''}>
             {schedule.isActive
               ? schedule.nextRun
                 ? format(new Date(schedule.nextRun), 'MMM dd, yyyy HH:mm')
@@ -75,28 +72,25 @@ export function ScheduleRow({
           </span>
         </div>
 
-        <div className="col-span-2 min-w-0 px-3 py-1.5">
-          <span
-            className="text-sm text-muted-foreground dark:text-white truncate"
-            title={schedule.lastExecutedAt ?? ''}
-          >
+        {/* Last Run Column */}
+        <div className="flex-1 min-w-0 h-12 flex items-center px-2.5">
+          <span className="text-sm text-foreground truncate" title={schedule.lastExecutedAt ?? ''}>
             {schedule.lastExecutedAt
               ? format(new Date(schedule.lastExecutedAt), 'MMM dd, yyyy HH:mm')
               : 'Never'}
           </span>
         </div>
 
-        <div className="col-span-2 min-w-0 px-3 py-1.5">
-          <span
-            className="text-sm text-muted-foreground dark:text-white truncate"
-            title={schedule.createdAt}
-          >
+        {/* Created Column */}
+        <div className="flex-1 min-w-0 h-12 flex items-center px-2.5">
+          <span className="text-sm text-foreground truncate" title={schedule.createdAt}>
             {format(new Date(schedule.createdAt), 'MMM dd, yyyy HH:mm')}
           </span>
         </div>
 
+        {/* Active Toggle Column */}
         <div
-          className="col-span-1 min-w-0 px-3 py-1.5 flex items-center"
+          className="w-[60px] shrink-0 h-12 flex items-center px-2.5"
           onClick={(e) => e.stopPropagation()}
         >
           <Switch
@@ -107,19 +101,15 @@ export function ScheduleRow({
           />
         </div>
 
+        {/* Actions Column */}
         <div
-          className="col-span-1 min-w-0 px-3 py-1.5 flex items-center justify-end"
+          className="w-12 shrink-0 h-12 flex items-center justify-end px-2.5"
           onClick={(e) => e.stopPropagation()}
         >
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 hover:bg-zinc-200 dark:hover:bg-neutral-600"
-                title={`Actions for ${schedule.name}`}
-              >
-                <MoreHorizontal className="h-4 w-4 text-zinc-500 dark:text-zinc-300" />
+              <Button variant="ghost" size="icon-sm" title={`Actions for ${schedule.name}`}>
+                <MoreVertical className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -128,14 +118,11 @@ export function ScheduleRow({
               onCloseAutoFocus={(e) => e.preventDefault()}
             >
               <DropdownMenuItem onSelect={() => onEdit(schedule.id)}>
-                <Pencil className="mr-2 h-4 w-4 text-zinc-700 dark:text-zinc-300" />
+                <Pencil className="mr-2 h-4 w-4" />
                 <span>Edit</span>
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => onDelete(schedule.id)}
-                className="text-destructive dark:text-red-400"
-              >
-                <Trash2 className="mr-2 h-4 w-4 text-destructive dark:text-red-400" />
+              <DropdownMenuItem onSelect={() => onDelete(schedule.id)} className="text-destructive">
+                <Trash2 className="mr-2 h-4 w-4" />
                 <span>Delete</span>
               </DropdownMenuItem>
             </DropdownMenuContent>

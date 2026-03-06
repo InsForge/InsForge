@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Button, Input, Dialog, DialogContent } from '@/components';
+import { Button, Dialog, DialogContent, Input } from '@insforge/ui';
 import type { DeploymentEnvVar } from '@insforge/shared-schemas';
 
 interface EnvVarDialogProps {
@@ -50,7 +50,7 @@ export function EnvVarDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md p-0 gap-0 bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 overflow-hidden">
+      <DialogContent>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-3 border-b border-neutral-200 dark:border-neutral-700">
           <h2 className="text-lg font-semibold text-zinc-950 dark:text-white leading-7">{title}</h2>
@@ -67,7 +67,7 @@ export function EnvVarDialog({
               placeholder="e.g CLIENT KEY"
               value={key}
               onChange={(e) => setKey(e.target.value)}
-              className="flex-1 dark:bg-neutral-900 dark:text-white dark:placeholder:text-neutral-400 dark:border-neutral-700"
+              className="flex-1"
             />
           </div>
 
@@ -80,7 +80,7 @@ export function EnvVarDialog({
               placeholder="Enter Value"
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              className="flex-1 dark:bg-neutral-900 dark:text-white dark:placeholder:text-neutral-400 dark:border-neutral-700"
+              className="flex-1"
             />
           </div>
         </div>

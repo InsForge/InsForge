@@ -1,4 +1,4 @@
-import { Button, CopyButton, Dialog, DialogContent } from '@/components';
+import { Button, CopyButton, Dialog, DialogContent } from '@insforge/ui';
 import { CheckCircle, Lock, Database, HardDrive, Code2, Box } from 'lucide-react';
 import type { PromptTemplate } from '../prompts';
 
@@ -23,7 +23,7 @@ export function PromptDialog({ open, onOpenChange, promptTemplate }: PromptDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] p-0 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 overflow-y-auto">
+      <DialogContent>
         {/* Content area with border bottom */}
         <div className="flex flex-col gap-10 p-6 border-b border-gray-200 dark:border-neutral-700">
           {/* Header and Prompt Section */}
@@ -88,14 +88,7 @@ export function PromptDialog({ open, onOpenChange, promptTemplate }: PromptDialo
           >
             Cancel
           </Button>
-          <CopyButton
-            text={promptTemplate.prompt}
-            showText={true}
-            variant="primary"
-            className="h-8 px-3 text-sm font-medium"
-            copyText="Copy Prompt"
-            copiedText="Copied!"
-          />
+          <CopyButton text={promptTemplate.prompt} copyText="Copy Prompt" copiedText="Copied!" />
         </div>
       </DialogContent>
     </Dialog>

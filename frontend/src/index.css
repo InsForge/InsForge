@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import '@insforge/ui/styles.css';
 @import 'tailwindcss';
 @config "../tailwind.config.js";
 
@@ -56,9 +56,8 @@
     --fontWeightMedium: 500;
     --fontWeightSemibold: 600;
 
-    /* Font families */
-    --fontFamilyBase:
-      'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    /* Font families (--insforge-font provided by @insforge/ui) */
+    --fontFamilyBase: var(--insforge-font);
     --fontFamilyMono: 'Ubuntu Mono', ui-monospace, monospace;
     --fontFamilyManrope: 'Manrope', sans-serif;
   }
@@ -108,33 +107,6 @@
 }
 
 @layer components {
-  /* Checkbox styling */
-  input[type='checkbox'] {
-    @apply cursor-pointer;
-    accent-color: #000000;
-  }
-
-  input[type='checkbox']:checked {
-    background-color: #000000 !important;
-    border-color: #000000 !important;
-    accent-color: #000000;
-  }
-
-  input[type='checkbox']:checked:hover {
-    background-color: #1a1a1a !important;
-    border-color: #1a1a1a !important;
-  }
-
-  input[type='checkbox']:focus {
-    outline: none !important;
-    box-shadow: none !important;
-  }
-
-  input[type='checkbox']:focus-visible {
-    outline: none !important;
-    box-shadow: none !important;
-  }
-
   button {
     cursor: pointer;
   }
@@ -145,76 +117,6 @@
 
   button:focus {
     outline: none !important;
-  }
-}
-
-@layer base {
-  /* CSS Variables for Radix UI components - using RGB values for clarity */
-  :root {
-    /* Light mode colors */
-    --background: 255 255 255; /* white */
-    --foreground: 10 10 10; /* near-black */
-    --card: 255 255 255; /* white */
-    --card-foreground: 10 10 10; /* near-black */
-    --popover: 255 255 255; /* white */
-    --popover-foreground: 10 10 10; /* near-black */
-    --primary: 23 23 23; /* zinc-900 */
-    --primary-foreground: 250 250 250; /* zinc-50 */
-    --secondary: 245 245 245; /* neutral-100 */
-    --secondary-foreground: 23 23 23; /* zinc-900 */
-    --muted: 245 245 245; /* neutral-100 */
-    --muted-foreground: 115 115 115; /* neutral-500 */
-    --accent: 245 245 245; /* neutral-100 */
-    --accent-foreground: 23 23 23; /* zinc-900 */
-    --destructive: 239 68 68; /* red-500 */
-    --destructive-foreground: 250 250 250; /* zinc-50 */
-    --border: 228 228 231; /* zinc-200 */
-    --input: 228 228 231; /* zinc-200 */
-    --ring: 10 10 10; /* near-black */
-    --radius: 0.5rem;
-    --background-color: #ffffff;
-    --border-color: #737373;
-    --border-hover-color: #d4d4d4;
-  }
-
-  .dark {
-    /* Dark mode colors - matching your neutral theme */
-    --background: 38 38 38; /* neutral-800 */
-    --foreground: 250 250 250; /* zinc-50 */
-    --card: 64 64 64; /* neutral-700 */
-    --card-foreground: 250 250 250; /* zinc-50 */
-    --popover: 64 64 64; /* neutral-700 */
-    --popover-foreground: 250 250 250; /* zinc-50 */
-    --primary: 250 250 250; /* zinc-50 */
-    --primary-foreground: 23 23 23; /* zinc-900 */
-    --secondary: 82 82 82; /* neutral-600 */
-    --secondary-foreground: 250 250 250; /* zinc-50 */
-    --muted: 82 82 82; /* neutral-600 */
-    --muted-foreground: 163 163 163; /* neutral-400 */
-    --accent: 82 82 82; /* neutral-600 */
-    --accent-foreground: 250 250 250; /* zinc-50 */
-    --destructive: 127 29 29; /* red-900 */
-    --destructive-foreground: 250 250 250; /* zinc-50 */
-    --border: 64 64 64; /* neutral-700 */
-    --input: 64 64 64; /* neutral-700 */
-    --ring: 212 212 212; /* zinc-300 */
-    --background-color: #262626;
-    --border-color: #737373;
-    --border-hover-color: #d4d4d4;
-  }
-}
-
-@layer base {
-  body {
-    font-family:
-      'Inter',
-      -apple-system,
-      BlinkMacSystemFont,
-      'Segoe UI',
-      Roboto,
-      'Helvetica Neue',
-      Arial,
-      sans-serif;
   }
 }
 
@@ -230,24 +132,4 @@
 /* Fix for Radix UI dropdowns to prevent scroll lock */
 [data-radix-popper-content-wrapper] {
   position: fixed !important;
-}
-
-/* Custom scrollbar styles */
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--background-color);
-  border-radius: 5px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 5px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--border-hover-color);
 }

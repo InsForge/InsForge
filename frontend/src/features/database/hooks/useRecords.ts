@@ -50,7 +50,7 @@ export function useRecords(tableName: string) {
       recordService.createRecord(tableName, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['records', tableName] });
-      void queryClient.invalidateQueries({ queryKey: ['table', tableName] });
+      void queryClient.invalidateQueries({ queryKey: ['tables', tableName, 'schema'] });
       showToast('Record created successfully', 'success');
     },
     onError: (error: Error) => {
@@ -65,7 +65,7 @@ export function useRecords(tableName: string) {
       recordService.createRecords(tableName, records),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['records', tableName] });
-      void queryClient.invalidateQueries({ queryKey: ['table', tableName] });
+      void queryClient.invalidateQueries({ queryKey: ['tables', tableName, 'schema'] });
       showToast('Records created successfully', 'success');
     },
     onError: (error: Error) => {
@@ -87,7 +87,7 @@ export function useRecords(tableName: string) {
     }) => recordService.updateRecord(tableName, pkColumn, pkValue, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['records', tableName] });
-      void queryClient.invalidateQueries({ queryKey: ['table', tableName] });
+      void queryClient.invalidateQueries({ queryKey: ['tables', tableName, 'schema'] });
       showToast('Record updated successfully', 'success');
     },
     onError: (error: Error) => {
@@ -102,7 +102,7 @@ export function useRecords(tableName: string) {
       recordService.deleteRecords(tableName, variables.pkColumn, variables.pkValues),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['records', tableName] });
-      void queryClient.invalidateQueries({ queryKey: ['table', tableName] });
+      void queryClient.invalidateQueries({ queryKey: ['tables', tableName, 'schema'] });
       const count = variables.pkValues.length;
       if (count === 1) {
         showToast('Record deleted successfully', 'success');

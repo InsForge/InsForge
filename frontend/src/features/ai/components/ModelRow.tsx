@@ -1,4 +1,4 @@
-import { Switch } from '@/components';
+import { Switch } from '@insforge/ui';
 import { ModelOption, formatPrice, formatModality } from '../helpers';
 
 interface ModelRowProps {
@@ -10,53 +10,50 @@ interface ModelRowProps {
 
 export function ModelRow({ model, isEnabled, requests, onToggle }: ModelRowProps) {
   return (
-    <div className="grid grid-cols-[200px_173px_173px_173px_173px_80px] gap-3 px-6 py-4 items-center rounded-lg bg-neutral-100 dark:bg-[#323232] mb-3">
+    <div className="grid grid-cols-6 gap-x-2.5 h-12 items-center px-4 border-b border-[var(--alpha-8)] last:border-b-0">
       {/* Model with Toggle */}
       <div className="flex items-center gap-3">
         <Switch checked={isEnabled} onCheckedChange={() => onToggle(model.modelId, isEnabled)} />
-        <span
-          className="text-base font-medium text-black dark:text-white truncate"
-          title={model.modelName}
-        >
+        <span className="text-sm text-foreground truncate" title={model.modelName}>
           {model.modelName}
         </span>
       </div>
 
       {/* Input Modalities */}
       <div
-        className="text-sm leading-6 text-black dark:text-white"
+        className="text-sm leading-5 text-foreground truncate"
         title={model.inputModality.map(formatModality).join(' / ')}
       >
         {model.inputModality.map(formatModality).join(' / ')}
       </div>
 
       {/* Input Price */}
-      <div className="text-sm text-black dark:text-white" title={formatPrice(model.inputPrice)}>
+      <div className="text-sm leading-5 text-foreground" title={formatPrice(model.inputPrice)}>
         {formatPrice(model.inputPrice)}
         {model.inputPrice !== undefined && model.inputPrice > 0 && (
-          <span className="text-neutral-400 dark:text-neutral-500"> / M tokens</span>
+          <span className="text-muted-foreground"> / M tokens</span>
         )}
       </div>
 
       {/* Output Modalities */}
       <div
-        className="text-sm leading-6 text-black dark:text-white"
+        className="text-sm leading-5 text-foreground truncate"
         title={model.outputModality.map(formatModality).join(' / ')}
       >
         {model.outputModality.map(formatModality).join(' / ')}
       </div>
 
       {/* Output Price */}
-      <div className="text-sm text-black dark:text-white" title={formatPrice(model.outputPrice)}>
+      <div className="text-sm leading-5 text-foreground" title={formatPrice(model.outputPrice)}>
         {formatPrice(model.outputPrice)}
         {model.outputPrice !== undefined && model.outputPrice > 0 && (
-          <span className="text-neutral-400 dark:text-neutral-500"> / M tokens</span>
+          <span className="text-muted-foreground"> / M tokens</span>
         )}
       </div>
 
       {/* Requests Count */}
       <div
-        className="text-right text-sm leading-6 text-black dark:text-white"
+        className="text-right text-sm leading-5 text-foreground"
         title={requests > 0 ? requests.toLocaleString() : '-'}
       >
         {requests > 0 ? requests.toLocaleString() : '-'}

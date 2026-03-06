@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Button, Input, Skeleton, SearchInput, ConfirmDialog } from '@/components';
+import { Button, ConfirmDialog, Input } from '@insforge/ui';
+import { Skeleton, TableHeader } from '@/components';
 import { SecretRow } from '../components/SecretRow';
 import SecretEmptyState from '../components/SecretEmptyState';
 import { useSecrets } from '@/features/functions/hooks/useSecrets';
@@ -12,7 +13,7 @@ export default function SecretsPage() {
     filteredSecrets,
     searchQuery,
     setSearchQuery,
-    isLoading: loading,
+    isLoading,
     createSecret,
     deleteSecret,
     confirmDialogProps,
@@ -27,88 +28,86 @@ export default function SecretsPage() {
   };
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex flex-col gap-6 p-4">
-        {/* Header */}
-        <h1 className="text-xl font-normal text-zinc-950 dark:text-white">Secrets</h1>
+    <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
+      <TableHeader
+        title="Secrets"
+        className="min-w-[800px]"
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchDebounceTime={300}
+        searchPlaceholder="Search secrets"
+      />
 
-        {/* Add New Secret Portal */}
-        <div className="bg-white dark:bg-[#333333] rounded-[8px]">
-          <div className="p-6 border-b border-gray-200 dark:border-neutral-700">
-            <p className="text-base text-zinc-950 dark:text-white">Add New Secret</p>
-          </div>
-          <div className="p-6 flex gap-6 items-end">
-            <div className="flex-1">
-              <label className="block text-sm text-zinc-950 dark:text-neutral-50 mb-2">Key</label>
-              <Input
-                placeholder="e.g CLIENT_KEY"
-                value={newSecretKey}
-                onChange={(e) => setNewSecretKey(e.target.value)}
-                className="shadow-none w-full dark:bg-neutral-900 dark:text-white dark:placeholder:text-neutral-400 dark:border-neutral-700"
-              />
+      {/* Scrollable Content */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="max-w-[1024px] w-4/5 mx-auto pt-10 pb-10">
+          {/* Add New Secret Card */}
+          <div className="bg-card rounded-lg mb-6">
+            <div className="p-3 border-b border-[var(--alpha-8)]">
+              <p className="text-sm text-foreground">Add New Secret</p>
             </div>
-            <div className="flex-1">
-              <label className="block text-sm text-zinc-950 dark:text-neutral-50 mb-2">Value</label>
-              <Input
-                placeholder="e.g 1234567890"
-                type="text"
-                value={newSecretValue}
-                onChange={(e) => setNewSecretValue(e.target.value)}
-                className="shadow-none w-full dark:bg-neutral-900 dark:text-white dark:placeholder:text-neutral-400 dark:border-neutral-700"
-              />
-            </div>
-            <Button
-              onClick={() => void handleSaveNewSecret()}
-              className="bg-black hover:bg-zinc-800 dark:bg-emerald-300 dark:hover:bg-emerald-400 dark:text-black text-white px-3 py-2 w-20 h-9 rounded"
-              disabled={!newSecretKey.trim() || !newSecretValue.trim()}
-            >
-              Save
-            </Button>
-          </div>
-        </div>
-
-        {/* Search Bar */}
-        <SearchInput
-          placeholder="Search secret"
-          value={searchQuery}
-          onChange={setSearchQuery}
-          className="max-w-70 dark:bg-neutral-900 dark:border-neutral-700"
-        />
-
-        {/* Secrets Table Header */}
-        <div className="grid grid-cols-12 px-3 text-sm text-muted-foreground dark:text-neutral-400">
-          <div className="col-span-8 py-1 px-3">Name</div>
-          {/* <div className="col-span-5 py-1 px-3">Digest</div> */}
-          <div className="col-span-3 py-1 px-3">Updated at</div>
-          <div className="col-span-1 py-1 px-3" />
-        </div>
-      </div>
-
-      {/* Scrollable Table Body */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4">
-        <div className="flex flex-col gap-2">
-          {loading ? (
-            <>
-              {[...Array(4)].map((_, i) => (
-                <Skeleton key={i} className="h-14 rounded-[8px] cols-span-full" />
-              ))}
-            </>
-          ) : filteredSecrets.length >= 1 ? (
-            <>
-              {filteredSecrets.map((secret) => (
-                <SecretRow
-                  key={secret.id}
-                  secret={secret}
-                  onDelete={() => void deleteSecret(secret)}
-                  className="cols-span-full"
+            <div className="flex gap-6 items-end p-6">
+              <div className="flex-1">
+                <label className="block text-sm text-foreground mb-1.5">Key</label>
+                <Input
+                  placeholder="e.g CLIENT_KEY"
+                  value={newSecretKey}
+                  onChange={(e) => setNewSecretKey(e.target.value)}
                 />
-              ))}
-            </>
-          ) : (
-            <div className="cols-span-full">
-              <SecretEmptyState searchQuery={searchQuery} />
+              </div>
+              <div className="flex-1">
+                <label className="block text-sm text-foreground mb-1.5">Value</label>
+                <Input
+                  placeholder="Enter Value"
+                  type="text"
+                  value={newSecretValue}
+                  onChange={(e) => setNewSecretValue(e.target.value)}
+                />
+              </div>
+              <Button
+                onClick={() => void handleSaveNewSecret()}
+                className="bg-emerald-300 hover:bg-emerald-400 text-black px-3 py-1.5 rounded"
+                disabled={!newSecretKey.trim() || !newSecretValue.trim()}
+              >
+                Save
+              </Button>
             </div>
-          )}
+          </div>
+
+          {/* Table */}
+          <div className="flex flex-col gap-1">
+            {/* Table Header */}
+            <div className="flex items-center pl-1.5">
+              <div className="flex-1 h-8 flex items-center px-2.5">
+                <span className="text-sm text-muted-foreground">Name</span>
+              </div>
+              <div className="flex-1 h-8 flex items-center px-2.5">
+                <span className="text-sm text-muted-foreground">Updated at</span>
+              </div>
+              <div className="w-12" />
+            </div>
+
+            {/* Table Body */}
+            {isLoading ? (
+              <>
+                {[...Array(4)].map((_, i) => (
+                  <Skeleton key={i} className="h-12 rounded" />
+                ))}
+              </>
+            ) : filteredSecrets.length >= 1 ? (
+              <>
+                {filteredSecrets.map((secret) => (
+                  <SecretRow
+                    key={secret.id}
+                    secret={secret}
+                    onDelete={() => void deleteSecret(secret)}
+                  />
+                ))}
+              </>
+            ) : (
+              <SecretEmptyState searchQuery={searchQuery} />
+            )}
+          </div>
         </div>
       </div>
 

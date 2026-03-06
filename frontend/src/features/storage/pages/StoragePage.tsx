@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, type DragEvent } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, type DragEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Upload } from 'lucide-react';
 import PencilIcon from '@/assets/icons/pencil.svg?react';
@@ -7,23 +7,26 @@ import { useStorage } from '@/features/storage/hooks/useStorage';
 import { StorageSidebar } from '@/features/storage/components/StorageSidebar';
 import { StorageManager } from '@/features/storage/components/StorageManager';
 import { BucketFormDialog } from '@/features/storage/components/BucketFormDialog';
+import { StoragePageEmptyState } from '@/features/storage/components/StoragePageEmptyState';
 
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
 import { useUploadToast } from '@/features/storage/components/UploadToast';
 import {
-  SearchInput,
-  SelectionClearButton,
-  DeleteActionButton,
-  Alert,
-  AlertDescription,
   Button,
   ConfirmDialog,
-  EmptyState,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+} from '@insforge/ui';
+import { useSearchParams } from 'react-router-dom';
+import {
+  SelectionClearButton,
+  DeleteActionButton,
+  Alert,
+  AlertDescription,
+  TableHeader,
 } from '@/components';
 
 interface BucketFormState {
@@ -33,8 +36,10 @@ interface BucketFormState {
 }
 
 export default function StoragePage() {
-  const [selectedBucket, setSelectedBucket] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedBucketFromQuery = searchParams.get('bucket')?.trim();
+  const [searchValue, setSearchValue] = useState('');
+  const searchQuery = searchValue.trim();
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
@@ -63,6 +68,33 @@ export default function StoragePage() {
     deleteObjects,
     deleteBucket,
   } = useStorage();
+  const selectedBucket = useMemo(() => {
+    if (isLoading || !buckets.length) {
+      return null;
+    }
+
+    if (
+      selectedBucketFromQuery &&
+      buckets.some((bucket) => bucket.name === selectedBucketFromQuery)
+    ) {
+      return selectedBucketFromQuery;
+    }
+
+    return buckets[0].name;
+  }, [isLoading, buckets, selectedBucketFromQuery]);
+
+  const selectBucket = useCallback(
+    (bucketName: string | null, replace: boolean = false) => {
+      const nextSearchParams = new URLSearchParams(searchParams);
+      if (bucketName) {
+        nextSearchParams.set('bucket', bucketName);
+      } else {
+        nextSearchParams.delete('bucket');
+      }
+      setSearchParams(nextSearchParams, { replace });
+    },
+    [searchParams, setSearchParams]
+  );
 
   const { data: bucketStats } = useBucketStats();
 
@@ -71,12 +103,18 @@ export default function StoragePage() {
     return bucketStats || {};
   }, [bucketStats]);
 
-  // Auto-select first bucket
+  // Keep URL query param in sync with active bucket selection with fallback-to-first behavior.
   useEffect(() => {
-    if (buckets.length && !selectedBucket) {
-      setSelectedBucket(buckets[0].name);
+    if (isLoading) {
+      return;
     }
-  }, [buckets, selectedBucket]);
+
+    if ((selectedBucketFromQuery ?? null) === selectedBucket) {
+      return;
+    }
+
+    selectBucket(selectedBucket, true);
+  }, [selectedBucketFromQuery, isLoading, selectedBucket, selectBucket]);
 
   // Clear selected files when switching buckets
   useEffect(() => {
@@ -86,6 +124,8 @@ export default function StoragePage() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
+      setSelectedFiles(new Set());
+      setSearchValue('');
       await Promise.all([
         refetchBuckets(),
         queryClient.invalidateQueries({ queryKey: ['storage'] }),
@@ -205,11 +245,10 @@ export default function StoragePage() {
       try {
         await deleteBucket(bucketName);
         await refetchBuckets();
-        // If the deleted bucket was selected, select the first available bucket
+        // Update selected bucket in URL BEFORE delete flow settles.
         if (selectedBucket === bucketName) {
-          const updatedBuckets =
-            queryClient.getQueryData<typeof buckets>(['storage', 'buckets']) || [];
-          setSelectedBucket(updatedBuckets[0]?.name || null);
+          const nextBucket = buckets.find((bucket) => bucket.name !== bucketName)?.name ?? null;
+          selectBucket(nextBucket, true);
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to delete bucket';
@@ -259,12 +298,12 @@ export default function StoragePage() {
   const error = bucketsError;
 
   return (
-    <div className="flex h-full bg-bg-gray dark:bg-neutral-800">
+    <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
       {/* Secondary Sidebar - Bucket List */}
       <StorageSidebar
         buckets={Object.keys(bucketInfo)}
         selectedBucket={selectedBucket || undefined}
-        onBucketSelect={setSelectedBucket}
+        onBucketSelect={(bucketName) => selectBucket(bucketName)}
         loading={isLoading}
         onNewBucket={() => {
           setBucketFormState({
@@ -279,131 +318,113 @@ export default function StoragePage() {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+      <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          onChange={(e) => void handleFileSelect(e)}
+          className="hidden"
+          accept="*"
+          style={{ display: 'none' }}
+        />
+
         {selectedBucket && (
           <>
-            {/* Sticky Header Section */}
-            <div className="sticky top-0 z-30 bg-bg-gray dark:bg-neutral-800">
-              <div className="pl-4 pr-1.5 py-1.5 h-12">
-                {/* Page Header with Breadcrumb */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {selectedBucket && (
-                      <nav className="flex items-center text-base font-semibold">
-                        <span className="text-black dark:text-white">{selectedBucket}</span>
-                      </nav>
-                    )}
-
-                    {/* Separator */}
-                    <div className="h-6 w-px bg-gray-200 dark:bg-neutral-700" />
-
-                    {/* Action buttons group */}
-                    <div className="flex items-center gap-1">
-                      <TooltipProvider>
-                        {selectedBucket && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="p-1 h-9 w-9"
-                                onClick={() => handleEditBucket(selectedBucket)}
-                              >
-                                <PencilIcon className="h-5 w-5 text-zinc-400 dark:text-neutral-400" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom" align="center">
-                              <p>Edit Bucket</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="p-1 h-9 w-9"
-                              onClick={() => void handleRefresh()}
-                              disabled={isRefreshing}
-                            >
-                              <RefreshIcon className="h-5 w-5 text-zinc-400 dark:text-neutral-400" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom" align="center">
-                            <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
+            <TableHeader
+              leftContent={
+                selectedFiles.size > 0 ? (
+                  <div className="flex items-center gap-2">
+                    <SelectionClearButton
+                      selectedCount={selectedFiles.size}
+                      itemType="file"
+                      onClear={() => setSelectedFiles(new Set())}
+                    />
+                    <DeleteActionButton
+                      selectedCount={selectedFiles.size}
+                      itemType="file"
+                      onDelete={() => void handleBulkDeleteFiles(Array.from(selectedFiles))}
+                    />
                   </div>
-                </div>
-              </div>
-              <div className="pt-2 px-3 pb-4">
-                {/* Search Bar and Actions - only show when bucket is selected */}
-                {selectedBucket && (
-                  <div className="flex items-center justify-between">
-                    {selectedFiles.size > 0 ? (
-                      <div className="flex items-center gap-3">
-                        <SelectionClearButton
-                          selectedCount={selectedFiles.size}
-                          itemType="file"
-                          onClear={() => setSelectedFiles(new Set())}
-                        />
-                        <DeleteActionButton
-                          selectedCount={selectedFiles.size}
-                          itemType="file"
-                          onDelete={() => void handleBulkDeleteFiles(Array.from(selectedFiles))}
-                        />
-                      </div>
-                    ) : (
-                      <SearchInput
-                        value={searchQuery}
-                        onChange={setSearchQuery}
-                        placeholder="Search Files by Name"
-                        className="flex-1 max-w-80 dark:bg-neutral-800 dark:text-white dark:placeholder:text-neutral-400 dark:border-neutral-700"
-                        debounceTime={300}
-                      />
-                    )}
-                    <div className="flex items-center gap-2 ml-4">
-                      {selectedFiles.size === 0 && (
-                        <>
-                          {/* Upload File Button - moved here when no files selected */}
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            multiple
-                            onChange={(e) => void handleFileSelect(e)}
-                            className="hidden"
-                            accept="*"
-                            style={{ display: 'none' }}
-                          />
+                ) : (
+                  <div className="flex min-w-0 items-center gap-3">
+                    <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">
+                      {selectedBucket}
+                    </h1>
+                    <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+                      <div className="h-5 w-px bg-[var(--alpha-8)]" />
+                    </div>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
                           <Button
-                            className="h-10 px-4 font-medium gap-1.5 dark:bg-emerald-300 dark:text-zinc-950 dark:hover:bg-emerald-400"
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={isUploading}
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEditBucket(selectedBucket)}
+                            className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
                           >
-                            <Upload className="w-5 h-5" />
-                            {isUploading ? 'Uploading...' : 'Upload File'}
+                            <PencilIcon className="h-5 w-5" />
                           </Button>
-                        </>
-                      )}
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" align="center">
+                          <p>Edit bucket</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => void handleRefresh()}
+                            disabled={isRefreshing}
+                            className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
+                          >
+                            <RefreshIcon
+                              className={isRefreshing ? 'h-5 w-5 animate-spin' : 'h-5 w-5'}
+                            />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" align="center">
+                          <p>{isRefreshing ? 'Refreshing...' : 'Refresh files'}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+                      <div className="h-5 w-px bg-[var(--alpha-8)]" />
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 rounded px-1.5 text-primary hover:bg-[var(--alpha-4)] hover:text-primary active:bg-[var(--alpha-8)]"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                    >
+                      <Upload className="h-5 w-5 stroke-[1.5]" />
+                      <span className="px-1 text-sm font-medium leading-5">
+                        {isUploading ? 'Uploading...' : 'Upload File'}
+                      </span>
+                    </Button>
                   </div>
-                )}
-              </div>
-            </div>
+                )
+              }
+              searchValue={searchValue}
+              onSearchChange={setSearchValue}
+              searchDebounceTime={300}
+              searchPlaceholder="Search files"
+            />
 
             {/* Content (supports drag-and-drop file upload) */}
             <div
               className={
-                'relative flex-1 flex flex-col overflow-hidden' + (isDragging ? ' opacity-25' : '')
+                'relative min-h-0 flex-1 flex flex-col overflow-hidden' +
+                (isDragging ? ' opacity-25' : '')
               }
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
             >
               {error && (
-                <Alert variant="destructive" className="mb-4 mx-8 mt-4">
+                <Alert variant="destructive" className="mx-4 mt-4">
                   <AlertDescription>{String(error)}</AlertDescription>
                 </Alert>
               )}
@@ -420,11 +441,8 @@ export default function StoragePage() {
           </>
         )}
         {!selectedBucket && (
-          <div className="flex-1 flex items-center justify-center">
-            <EmptyState
-              title="No Bucket Selected"
-              description="Select a bucket from the sidebar to view its files"
-            />
+          <div className="flex-1">
+            <StoragePageEmptyState />
           </div>
         )}
       </div>
@@ -439,7 +457,7 @@ export default function StoragePage() {
         onSuccess={(bucketName) => {
           void refetchBuckets();
           if (bucketFormState.mode === 'create' && bucketName) {
-            setSelectedBucket(bucketName);
+            selectBucket(bucketName);
           }
         }}
       />

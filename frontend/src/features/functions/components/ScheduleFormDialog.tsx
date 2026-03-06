@@ -5,21 +5,19 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createScheduleRequestSchema, type ScheduleSchema } from '@insforge/shared-schemas';
 import {
+  Button,
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
-} from '@/components/radix/Dialog';
-import { Button } from '@/components/radix/Button';
-import { JsonCellEditor } from '@/components/datagrid/cell-editors/JsonCellEditor';
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/radix/Select';
+} from '@insforge/ui';
+import { JsonCellEditor } from '@/components/datagrid/cell-editors/JsonCellEditor';
 import { Alert, AlertDescription } from '@/components/radix/Alert';
 import { ScrollArea } from '@/components/radix/ScrollArea';
 import { Pencil } from 'lucide-react';
@@ -184,12 +182,10 @@ export function ScheduleFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-xl p-0 gap-0 overflow-hidden flex flex-col">
+      <DialogContent>
         <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col">
-          <DialogHeader className="px-6 py-4 border-b border-zinc-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
-            <DialogTitle className="text-xl font-semibold text-zinc-950 dark:text-white">
-              {mode === 'create' ? 'Create Schedule' : 'Edit Schedule'}
-            </DialogTitle>
+          <DialogHeader>
+            <DialogTitle>{mode === 'create' ? 'Create Schedule' : 'Edit Schedule'}</DialogTitle>
           </DialogHeader>
 
           <ScrollArea className="h-full overflow-auto max-h-[680px]">
@@ -460,7 +456,7 @@ export function ScheduleFormDialog({
             </div>
           )}
 
-          <DialogFooter className="px-6 py-4 gap-3 sm:justify-end border-t border-zinc-200 dark:border-neutral-700 shrink-0 bg-white dark:bg-neutral-900">
+          <DialogFooter>
             <Button
               type="button"
               variant="outline"

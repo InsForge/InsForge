@@ -1,19 +1,35 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LockIcon } from 'lucide-react';
 import { useAuth } from '@/lib/contexts/AuthContext';
-import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
+import { postMessageToParent } from '@/lib/utils/cloudMessaging';
+import { isInsForgeCloudProject, isIframe } from '@/lib/utils/utils';
 
 export default function CloudLoginPage() {
   const navigate = useNavigate();
   const { isAuthenticated, error } = useAuth();
-  const { isLoading: isMcpUsageLoading } = useMcpUsage();
+  const hasRequestedAuthRef = useRef(false);
 
   useEffect(() => {
-    if (isAuthenticated && !isMcpUsageLoading) {
+    if (
+      hasRequestedAuthRef.current ||
+      isAuthenticated ||
+      error ||
+      !isInsForgeCloudProject() ||
+      !isIframe()
+    ) {
+      return;
+    }
+
+    hasRequestedAuthRef.current = true;
+    postMessageToParent({ type: 'REQUEST_AUTHORIZATION_CODE' });
+  }, [isAuthenticated, error]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
       void navigate('/dashboard', { replace: true });
     }
-  }, [isAuthenticated, isMcpUsageLoading, navigate]);
+  }, [isAuthenticated, navigate]);
 
   // Show error state if authentication failed
   if (error) {

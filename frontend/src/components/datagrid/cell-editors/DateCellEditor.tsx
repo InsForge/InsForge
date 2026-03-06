@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils/utils';
 import { format, parse } from 'date-fns';
-import { Button, Popover, PopoverContent, PopoverTrigger } from '@/components';
+import { Button } from '@insforge/ui';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components';
 import type { DateCellEditorProps } from './types';
 import { ColumnType } from '@insforge/shared-schemas';
 
@@ -23,22 +24,26 @@ const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 function TimeColumn({ label, value, range, onChange, scrollRef }: TimeColumnProps) {
   return (
     <div className="flex-1">
-      <div className="text-xs text-muted-foreground mb-1 text-center">{label}</div>
+      <div className="mb-1 text-center text-xs text-muted-foreground">{label}</div>
       <div
         ref={scrollRef}
-        className="h-60 overflow-y-auto border border-border-gray dark:border-neutral-600 rounded p-1 scrollbar-thin"
+        className="h-60 overflow-y-auto rounded border border-[var(--alpha-8)] bg-semantic-0 p-1"
       >
         {Array.from({ length: range }, (_, i) => (
-          <button
+          <Button
             key={i}
+            type="button"
+            variant={value === i ? 'primary' : 'ghost'}
+            size="sm"
             onClick={() => onChange(i)}
             className={cn(
-              'w-full px-1 py-1 text-sm rounded hover:bg-gray-100 dark:hover:text-zinc-950 text-center',
-              value === i && 'bg-primary text-primary-foreground hover:bg-primary'
+              'h-7 w-full justify-center rounded',
+              value !== i &&
+                'text-foreground before:hidden hover:bg-[var(--alpha-8)] hover:text-foreground'
             )}
           >
             {i.toString().padStart(2, '0')}
-          </button>
+          </Button>
         ))}
       </div>
     </div>
@@ -259,8 +264,8 @@ export function DateCellEditor({
           key={day}
           onClick={() => handleDateClick(day)}
           className={cn(
-            'h-8 w-8 text-sm rounded hover:bg-gray-100 dark:hover:text-zinc-950',
-            isSelected && 'bg-primary text-primary-foreground hover:bg-primary',
+            'h-8 w-8 rounded text-sm text-foreground hover:bg-[var(--alpha-8)]',
+            isSelected && 'bg-primary text-[rgb(var(--inverse))] hover:bg-primary',
             isToday && !isSelected && 'font-bold'
           )}
         >
@@ -280,8 +285,8 @@ export function DateCellEditor({
           key={month}
           onClick={() => handleMonthClick(index)}
           className={cn(
-            'h-12 w-20 text-sm rounded hover:bg-gray-100 dark:hover:text-zinc-950',
-            isSelected && 'bg-primary text-primary-foreground hover:bg-primary'
+            'h-12 w-20 rounded text-sm text-foreground hover:bg-[var(--alpha-8)]',
+            isSelected && 'bg-primary text-[rgb(var(--inverse))] hover:bg-primary'
           )}
         >
           {month}
@@ -302,8 +307,8 @@ export function DateCellEditor({
           key={year}
           onClick={() => handleYearClick(year)}
           className={cn(
-            'h-12 w-20 text-sm rounded hover:bg-gray-100',
-            isSelected && 'bg-primary text-primary-foreground hover:bg-primary'
+            'h-12 w-20 rounded text-sm text-foreground hover:bg-[var(--alpha-8)]',
+            isSelected && 'bg-primary text-[rgb(var(--inverse))] hover:bg-primary'
           )}
         >
           {year}
@@ -320,7 +325,7 @@ export function DateCellEditor({
         <Button
           variant="ghost"
           className={cn(
-            'w-full justify-start text-left text-sm font-normal h-full border-0 p-0 hover:bg-transparent dark:text-white',
+            'h-full w-full justify-start border-0 p-0 text-left text-sm font-normal text-foreground hover:bg-transparent',
             (!value || value === 'null') && 'text-muted-foreground',
             className
           )}
@@ -334,18 +339,17 @@ export function DateCellEditor({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="overflow-hidden w-auto p-0 dark:bg-neutral-800 dark:border-neutral-700"
+        className="w-auto overflow-hidden border-[var(--alpha-12)] bg-card p-0 shadow-xl"
         align="start"
         side="bottom"
       >
-        <div className={cn('flex', type === ColumnType.DATETIME && '')}>
+        <div className="flex">
           <div className="p-3">
             {/* Header */}
-            <div className="flex items-center justify-between mb-3">
+            <div className="mb-3 flex items-center justify-between">
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-7 w-7"
+                size="icon-sm"
                 onClick={
                   pickerMode === 'day'
                     ? handlePrevMonth
@@ -358,7 +362,7 @@ export function DateCellEditor({
               </Button>
 
               <button
-                className="text-sm font-medium px-2 py-1 rounded hover:bg-gray-100 dark:hover:text-zinc-950"
+                className="rounded px-2 py-1 text-sm font-medium text-foreground hover:bg-[var(--alpha-8)]"
                 onClick={() => {
                   if (pickerMode === 'day') {
                     setPickerMode('month');
@@ -375,8 +379,7 @@ export function DateCellEditor({
 
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-7 w-7"
+                size="icon-sm"
                 onClick={
                   pickerMode === 'day'
                     ? handleNextMonth
@@ -390,15 +393,15 @@ export function DateCellEditor({
             </div>
 
             {/* Calendar Grid - Fixed dimensions */}
-            <div className="w-70 h-60">
+            <div className="h-60 w-70">
               {pickerMode === 'day' && (
                 <>
                   {/* Weekday headers */}
-                  <div className="grid grid-cols-7 gap-1 mb-1">
+                  <div className="mb-1 grid grid-cols-7 gap-1">
                     {WEEKDAYS.map((day) => (
                       <div
                         key={day}
-                        className="h-8 w-8 text-xs text-muted-foreground flex items-center justify-center"
+                        className="flex h-8 w-8 items-center justify-center text-xs text-muted-foreground"
                       >
                         {day}
                       </div>
@@ -421,11 +424,11 @@ export function DateCellEditor({
           </div>
 
           {type === ColumnType.DATETIME && (
-            <div className="border-l border-border-gray dark:border-neutral-600 bg-muted/30 dark:bg-neutral-800 w-35">
+            <div className="w-35 border-l border-[var(--alpha-8)] bg-[var(--alpha-4)]">
               <div className="p-3">
-                <div className="flex items-center justify-center gap-2 mb-3">
+                <div className="mb-3 flex items-center justify-center gap-2">
                   <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Time</span>
+                  <span className="text-sm font-medium text-foreground">Time</span>
                 </div>
 
                 <div className="flex gap-2">
@@ -450,14 +453,9 @@ export function DateCellEditor({
         </div>
 
         {/* Action buttons */}
-        <div className="flex items-center gap-2 p-3 border-t border-border-gray dark:border-neutral-600">
+        <div className="flex items-center gap-2 border-t border-[var(--alpha-8)] bg-[var(--alpha-4)] p-3">
           {nullable && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleClear}
-              className="flex-1 dark:bg-neutral-600 dark:text-white dark:hover:bg-neutral-700"
-            >
+            <Button variant="outline" size="sm" onClick={handleClear} className="flex-1">
               Null
             </Button>
           )}
@@ -468,7 +466,7 @@ export function DateCellEditor({
               onCancel();
               setOpen(false);
             }}
-            className="flex-1 dark:bg-neutral-600 dark:text-white dark:hover:bg-neutral-700"
+            className="flex-1"
           >
             Cancel
           </Button>

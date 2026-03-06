@@ -1,12 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ExternalLink, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
 import { cn } from '@/lib/utils/utils';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/radix/Tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import { PrimaryMenuItem } from '@/lib/utils/menuItems';
 
 interface PrimaryMenuProps {
@@ -30,74 +25,61 @@ export function PrimaryMenu({
     onToggleCollapse();
   };
 
-  const baseButtonClasses = cn(
-    'relative h-9 rounded duration-200 ease-in-out overflow-hidden flex items-center',
-    isCollapsed ? 'w-9' : 'w-full',
-    'hover:bg-zinc-100 dark:hover:bg-neutral-600 text-black dark:text-neutral-400'
+  const menuItemBaseClasses = (isActive: boolean) =>
+    cn(
+      'group flex items-center rounded transition-colors',
+      isCollapsed ? 'h-8 w-9 justify-center p-1.5' : 'h-8 w-full gap-1 p-1.5',
+      isActive
+        ? 'bg-toast text-foreground'
+        : 'text-muted-foreground hover:bg-alpha-4 hover:text-foreground'
+    );
+
+  const MenuItemLabel = ({ label, isActive }: { label: string; isActive: boolean }) => (
+    <span
+      className={cn(
+        'min-w-0 truncate px-2 text-sm font-normal leading-5',
+        isActive ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'
+      )}
+    >
+      {label}
+    </span>
   );
 
-  const MenuItem = ({ item }: { item: PrimaryMenuItem }) => {
-    const isActive = item.id === activeItemId;
+  const MenuItemIcon = ({ item, isActive }: { item: PrimaryMenuItem; isActive: boolean }) => (
+    <item.icon
+      className={cn(
+        'h-5 w-5 shrink-0',
+        isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
+      )}
+    />
+  );
 
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Link
-            to={item.href}
-            className={cn(
-              'flex items-center gap-3 h-9 rounded duration-200 ease-in-out',
-              isCollapsed ? 'w-9 justify-center px-0' : 'w-full px-2',
-              isActive
-                ? 'bg-zinc-950 dark:bg-emerald-300 text-white dark:text-black'
-                : 'hover:bg-zinc-100 dark:hover:bg-neutral-600 text-black dark:text-neutral-400'
-            )}
-          >
-            <item.icon className="w-5 h-5 flex-shrink-0" />
-            {!isCollapsed && <span className="font-medium text-sm truncate">{item.label}</span>}
-          </Link>
-        </TooltipTrigger>
-        {isCollapsed && (
-          <TooltipContent side="right">
-            <p>{item.label}</p>
-          </TooltipContent>
+  const MenuItem = ({ item, isBottom = false }: { item: PrimaryMenuItem; isBottom?: boolean }) => {
+    const isActive = item.id === activeItemId;
+    const itemClasses = menuItemBaseClasses(isActive);
+
+    const content = (
+      <>
+        <MenuItemIcon item={item} isActive={isActive} />
+        {!isCollapsed && <MenuItemLabel label={item.label} isActive={isActive} />}
+        {!isCollapsed && isBottom && item.external && (
+          <ExternalLink className="ml-auto h-4 w-4 text-muted-foreground" />
         )}
-      </Tooltip>
+      </>
     );
-  };
 
-  const BottomMenuItem = ({ item }: { item: PrimaryMenuItem }) => {
-    const isActive = item.id === activeItemId;
-
-    const itemClasses = cn(
-      baseButtonClasses,
-      isActive
-        ? 'bg-zinc-950 dark:bg-emerald-300 text-white dark:text-black hover:bg-zinc-950 dark:hover:bg-emerald-300 hover:text-white dark:hover:text-black'
-        : 'hover:bg-zinc-100 dark:hover:bg-neutral-600 text-black dark:text-neutral-400'
-    );
-    // For items with onClick handler or external links, use a button
     if (item.onClick || item.external) {
       return (
         <Tooltip>
           <TooltipTrigger asChild>
             <button
+              type="button"
               className={itemClasses}
               onClick={
                 item.onClick || (item.external ? () => window.open(item.href, '_blank') : undefined)
               }
             >
-              <div className="absolute left-2 h-5 w-5">
-                <item.icon className="w-5 h-5" />
-              </div>
-              {!isCollapsed && (
-                <>
-                  <span className="font-medium text-sm truncate ml-9 mr-2 block text-left">
-                    {item.label}
-                  </span>
-                  {item.external && (
-                    <ExternalLink className="absolute left-40 h-4 w-4 text-neutral-500" />
-                  )}
-                </>
-              )}
+              {content}
             </button>
           </TooltipTrigger>
           {isCollapsed && (
@@ -112,19 +94,11 @@ export function PrimaryMenu({
       );
     }
 
-    // For internal navigation, use a Link
     return (
       <Tooltip>
         <TooltipTrigger asChild>
           <Link to={item.href} className={itemClasses}>
-            <div className="absolute left-2 h-5 w-5">
-              <item.icon className="w-5 h-5" />
-            </div>
-            {!isCollapsed && (
-              <span className="font-medium text-sm truncate ml-9 mr-2 block text-left">
-                {item.label}
-              </span>
-            )}
+            {content}
           </Link>
         </TooltipTrigger>
         {isCollapsed && (
@@ -136,21 +110,48 @@ export function PrimaryMenu({
     );
   };
 
+  const ToggleButton = ({ compact = false }: { compact?: boolean }) => (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={handleToggleClick}
+          className={cn(
+            'flex items-center justify-center rounded text-muted-foreground transition-colors hover:bg-alpha-8 hover:text-foreground',
+            compact ? 'h-6 w-6' : 'h-9 w-9 p-1.5'
+          )}
+        >
+          {isCollapsed ? (
+            <PanelLeftOpen className="h-5 w-5" />
+          ) : (
+            <PanelRightOpen className="h-5 w-5" />
+          )}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="right">
+        <p>{isCollapsed ? 'Expand' : 'Collapse'}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+
+  const bottomItemsList = bottomItems ?? [];
+  const useInlineToggle = !isCollapsed && bottomItemsList.length === 1;
+
   return (
     <TooltipProvider disableHoverableContent delayDuration={300}>
       <aside
         className={cn(
-          'bg-white dark:bg-neutral-800 border-r border-gray-200 dark:border-neutral-700 flex flex-col flex-shrink-0 pt-2 pb-6 pl-2',
+          'bg-semantic-2 border-r border-border h-full flex flex-col flex-shrink-0 px-2 pt-3 pb-2',
           'transition-[width] duration-300 ease-in-out overflow-hidden',
           isCollapsed ? 'w-[52px]' : 'w-[200px]'
         )}
       >
         {/* Top navigation items with separators */}
-        <nav className="flex flex-col gap-2 overflow-y-auto overflow-x-hidden pr-2 w-full">
+        <nav className="flex min-h-0 flex-col gap-1.5 overflow-y-auto overflow-x-hidden w-full">
           {items.map((item) => (
             <div key={item.id}>
               <MenuItem item={item} />
-              {item.sectionEnd && <div className="h-px bg-neutral-700 my-2" />}
+              {item.sectionEnd && <div className="my-1.5 h-px w-full bg-alpha-8" />}
             </div>
           ))}
         </nav>
@@ -159,35 +160,24 @@ export function PrimaryMenu({
         <div className="flex-1" />
 
         {/* Bottom items */}
-        <div className="flex flex-col gap-2 pr-2">
-          {bottomItems?.map((item) => (
-            <BottomMenuItem key={item.id} item={item} />
-          ))}
-
-          {/* Collapse/Expand toggle button */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button className={baseButtonClasses} onClick={handleToggleClick}>
-                <div className="absolute left-2 h-5 w-5">
-                  {isCollapsed ? (
-                    <PanelLeftOpen className="w-5 h-5" />
-                  ) : (
-                    <PanelRightOpen className="w-5 h-5" />
-                  )}
-                </div>
-                {!isCollapsed && (
-                  <span className="font-medium text-sm truncate ml-9 mr-2 block text-left">
-                    Collapse
-                  </span>
-                )}
-              </button>
-            </TooltipTrigger>
-            {isCollapsed && (
-              <TooltipContent side="right">
-                <p>Expand</p>
-              </TooltipContent>
-            )}
-          </Tooltip>
+        <div className={cn('w-full', isCollapsed ? 'space-y-2' : 'space-y-1.5')}>
+          {useInlineToggle ? (
+            <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <MenuItem item={bottomItemsList[0]} isBottom />
+              </div>
+              <ToggleButton compact />
+            </div>
+          ) : (
+            <>
+              {bottomItemsList.map((item) => (
+                <MenuItem key={item.id} item={item} isBottom />
+              ))}
+              <div className={cn('flex', isCollapsed ? 'justify-center' : 'justify-start')}>
+                <ToggleButton compact={!isCollapsed} />
+              </div>
+            </>
+          )}
         </div>
       </aside>
     </TooltipProvider>

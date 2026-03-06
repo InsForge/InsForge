@@ -9,7 +9,7 @@ import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { successResponse } from '@/utils/response.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { AppError } from '@/api/middlewares/error.js';
-import type { AppMetadataSchema } from '@insforge/shared-schemas';
+import type { AppMetadataSchema, ProjectIdResponse } from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { CloudDatabaseProvider } from '@/providers/database/cloud.provider.js';
@@ -129,6 +129,18 @@ router.get('/api-key', async (req: AuthRequest, res: Response, next: NextFunctio
   }
 });
 
+// Get backend project id from environment (admin only)
+router.get('/project-id', (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const projectIdResponse: ProjectIdResponse = {
+      projectId: process.env.PROJECT_ID || null,
+    };
+    successResponse(res, projectIdResponse);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Get database connection string from cloud backend (admin only)
 router.get(
   '/database-connection-string',
@@ -155,7 +167,7 @@ router.get('/database-password', async (_req: AuthRequest, res: Response, next: 
 });
 
 // get metadata for a table.
-// Notice: must be after endpoint /api-key in case of conflict.
+// Notice: must be after fixed endpoints like /api-key and /project-id in case of conflict.
 router.get('/:tableName', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { tableName } = req.params;

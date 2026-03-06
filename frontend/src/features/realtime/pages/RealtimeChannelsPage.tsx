@@ -1,14 +1,14 @@
-import { useState } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import {
   Button,
   ConfirmDialog,
-  Skeleton,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components';
+} from '@insforge/ui';
+import { Skeleton, TableHeader } from '@/components';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useRealtimeChannels } from '../hooks/useRealtimeChannels';
 import { ChannelRow } from '../components/ChannelRow';
@@ -20,6 +20,15 @@ export default function RealtimeChannelsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState<RealtimeChannel | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isScrolled, setIsScrolled] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const handleScroll = useCallback(() => {
+    if (scrollRef.current) {
+      setIsScrolled(scrollRef.current.scrollTop > 0);
+    }
+  }, []);
 
   const {
     channels,
@@ -32,6 +41,18 @@ export default function RealtimeChannelsPage() {
   } = useRealtimeChannels();
 
   const { confirm, confirmDialogProps } = useConfirm();
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+  }, []);
+
+  const filteredChannels = searchQuery
+    ? channels.filter(
+        (ch) =>
+          ch.pattern.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          ch.description?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : channels;
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -76,78 +97,100 @@ export default function RealtimeChannelsPage() {
     );
   };
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex flex-col gap-6 p-4">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-normal text-zinc-950 dark:text-white">Channels</h1>
+    <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
+      <TableHeader
+        className="min-w-[800px]"
+        leftContent={
+          <div className="flex flex-1 items-center overflow-clip">
+            <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">Channels</h1>
+            <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+              <div className="h-5 w-px bg-[var(--alpha-8)]" />
+            </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => void handleRefresh()}
+                    disabled={isRefreshing}
+                    className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
+                  >
+                    <RefreshIcon className={isRefreshing ? 'h-5 w-5 animate-spin' : 'h-5 w-5'} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="center">
+                  <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        }
+        searchValue={searchQuery}
+        onSearchChange={handleSearchChange}
+        searchDebounceTime={300}
+        searchPlaceholder="Search channel"
+      />
 
-          {/* Separator */}
-          <div className="h-6 w-px bg-gray-200 dark:bg-neutral-700" />
+      {/* Scrollable Content */}
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 min-h-0 overflow-y-auto relative"
+      >
+        {/* Top spacing */}
+        <div className="h-10" />
 
-          {/* Refresh button */}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="p-1 h-9 w-9"
-                  onClick={() => void handleRefresh()}
-                  disabled={isRefreshing}
-                >
-                  <RefreshIcon className="h-5 w-5 text-zinc-400 dark:text-neutral-400" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" align="center">
-                <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+        {/* Sticky Table Header */}
+        <div
+          className={`sticky top-0 z-10 bg-[rgb(var(--semantic-1))] px-3 ${isScrolled ? 'border-b border-[var(--alpha-8)]' : ''}`}
+        >
+          <div className="mx-auto max-w-[1024px] w-4/5">
+            <div className="flex items-center pl-1.5 h-8 text-sm text-muted-foreground">
+              <div className="w-[62px] shrink-0 py-1.5 px-2.5" />
+              <div className="flex-1 py-1.5 px-2.5">Pattern</div>
+              <div className="flex-[2.5] py-1.5 px-2.5">Description</div>
+              <div className="flex-1 py-1.5 px-2.5">Created</div>
+              <div className="w-[52px] shrink-0" />
+            </div>
+          </div>
         </div>
 
-        {/* Table Header */}
-        <div className="flex items-center pl-3 pr-[44px] text-sm text-muted-foreground dark:text-neutral-400">
-          <div className="w-[76px] shrink-0 py-1 px-3">Enabled</div>
-          <div className="flex-1 py-1 px-3">Pattern</div>
-          <div className="w-[640px] py-1 px-3">Description</div>
-          <div className="flex-1 py-1 px-3">Created</div>
-        </div>
-      </div>
-
-      {/* Scrollable Table Body */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 relative">
-        <div className="flex flex-col gap-2">
-          {isLoadingChannels ? (
-            <>
-              {[...Array(4)].map((_, i) => (
-                <Skeleton key={i} className="h-14 rounded-[8px]" />
-              ))}
-            </>
-          ) : channels.length >= 1 ? (
-            <>
-              {channels.map((channel) => (
-                <ChannelRow
-                  key={channel.id}
-                  channel={channel}
-                  onClick={() => handleRowClick(channel)}
-                  onToggleEnabled={(enabled) => handleToggleEnabled(channel, enabled)}
-                  onDelete={() => void handleDelete(channel)}
-                  isUpdating={isUpdating}
-                  isDeleting={isDeleting}
-                />
-              ))}
-            </>
-          ) : (
-            <RealtimeEmptyState type="channels" />
-          )}
+        {/* Table Body */}
+        <div className="flex flex-col items-center px-3 pb-4">
+          <div className="max-w-[1024px] w-4/5 flex flex-col gap-1 pt-1">
+            {isLoadingChannels ? (
+              <>
+                {[...Array(4)].map((_, i) => (
+                  <Skeleton key={i} className="h-12 rounded" />
+                ))}
+              </>
+            ) : filteredChannels.length >= 1 ? (
+              <>
+                {filteredChannels.map((channel) => (
+                  <ChannelRow
+                    key={channel.id}
+                    channel={channel}
+                    onClick={() => handleRowClick(channel)}
+                    onToggleEnabled={(enabled) => handleToggleEnabled(channel, enabled)}
+                    onDelete={() => void handleDelete(channel)}
+                    isUpdating={isUpdating}
+                    isDeleting={isDeleting}
+                  />
+                ))}
+              </>
+            ) : (
+              <RealtimeEmptyState type="channels" />
+            )}
+          </div>
         </div>
 
         {/* Loading mask overlay */}
         {isRefreshing && (
-          <div className="absolute inset-0 bg-white dark:bg-neutral-800 flex items-center justify-center z-50">
+          <div className="absolute inset-0 bg-[rgb(var(--semantic-1))] flex items-center justify-center z-50">
             <div className="flex items-center gap-1">
-              <div className="w-5 h-5 border-2 border-zinc-500 dark:border-neutral-700 border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-zinc-500 dark:text-zinc-400">Loading</span>
+              <div className="w-5 h-5 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm text-muted-foreground">Loading</span>
             </div>
           </div>
         )}

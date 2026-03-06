@@ -5,15 +5,17 @@ import DiscordIcon from '@/assets/logos/discord.svg?react';
 import {
   Button,
   Dialog,
+  DialogBody,
+  DialogCloseButton,
   DialogContent,
   DialogDescription,
+  DialogDivider,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   Input,
-  Label,
   Switch,
-} from '@/components';
+} from '@insforge/ui';
 
 interface BucketFormDialogProps {
   open: boolean;
@@ -24,13 +26,31 @@ interface BucketFormDialogProps {
   initialIsPublic?: boolean;
 }
 
+interface BucketFormRowProps {
+  label: string;
+  description: string;
+  children: React.ReactNode;
+}
+
+function BucketFormRow({ label, description, children }: BucketFormRowProps) {
+  return (
+    <div className="flex w-full items-start gap-6">
+      <div className="flex w-80 shrink-0 flex-col gap-2">
+        <p className="flex h-8 items-center text-sm leading-5 text-foreground">{label}</p>
+        <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">{description}</p>
+      </div>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  );
+}
+
 export function BucketFormDialog({
   open,
   onOpenChange,
   onSuccess,
   mode,
   initialBucketName = '',
-  initialIsPublic = true,
+  initialIsPublic = false,
 }: BucketFormDialogProps) {
   const [bucketName, setBucketName] = useState(initialBucketName);
   const [isPublic, setIsPublic] = useState(initialIsPublic);
@@ -45,7 +65,7 @@ export function BucketFormDialog({
         setIsPublic(initialIsPublic);
       } else {
         setBucketName('');
-        setIsPublic(true);
+        setIsPublic(initialIsPublic);
       }
       setError('');
     }
@@ -61,7 +81,7 @@ export function BucketFormDialog({
       }
       try {
         await createBucket({ bucketName: bucketName.trim(), isPublic });
-        onSuccess(bucketName);
+        onSuccess(bucketName.trim());
         handleClose();
       } catch (error) {
         setError(error instanceof Error ? error.message : 'Failed to create bucket');
@@ -90,30 +110,32 @@ export function BucketFormDialog({
       : isLoading
         ? 'Saving...'
         : 'Save Changes';
+  const title = mode === 'create' ? 'Create New Bucket' : 'Edit Bucket';
+  const description =
+    mode === 'create'
+      ? 'Create a new storage bucket to organize your files.'
+      : "Update this storage bucket's settings.";
+  const bucketNameHelpText =
+    mode === 'create'
+      ? 'Use lowercase letters, numbers, hyphens, and underscores only.'
+      : 'Bucket name cannot be changed.';
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="w-[480px] p-0 border-zinc-200 shadow-[0px_1px_3px_0px_rgba(0,0,0,0.1)]">
+      <DialogContent showCloseButton={false}>
         <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col">
-          <DialogHeader className="px-6 py-3 flex flex-col gap-1 justify-start border-b border-zinc-200 dark:border-neutral-700">
-            <DialogTitle className="text-lg font-semibold text-zinc-950 dark:text-white">
-              {mode === 'create' ? 'Create New Bucket' : 'Edit Bucket'}
-            </DialogTitle>
-            {mode === 'create' && (
-              <DialogDescription className="text-sm text-zinc-500">
-                Create a new storage bucket to organize your files.
-              </DialogDescription>
-            )}
+          <DialogHeader className="gap-0">
+            <div className="flex w-full items-start gap-3">
+              <div className="min-w-0 flex-1 space-y-1">
+                <DialogTitle>{title}</DialogTitle>
+                <DialogDescription>{description}</DialogDescription>
+              </div>
+              <DialogCloseButton className="relative right-auto top-auto h-7 w-7 rounded p-1" />
+            </div>
           </DialogHeader>
-          <div className="flex flex-col gap-6 p-6">
-            <div className="flex flex-row justify-between gap-10">
-              <Label
-                htmlFor="bucket-name"
-                className="text-sm font-medium text-zinc-950 dark:text-zinc-300"
-              >
-                Bucket Name
-              </Label>
-              <div className="w-70 flex flex-col gap-1">
+          <DialogBody className="gap-2 p-4">
+            <BucketFormRow label="Bucket Name" description={bucketNameHelpText}>
+              <div className="flex w-full flex-col gap-1">
                 <Input
                   id="bucket-name"
                   value={bucketName}
@@ -125,76 +147,59 @@ export function BucketFormDialog({
                   }}
                   placeholder={mode === 'create' ? 'Enter a name' : ''}
                   disabled={mode === 'edit'}
-                  className={`w-full h-9 px-3 py-2 bg-transparent dark:bg-neutral-900 ${mode === 'edit' ? 'cursor-not-allowed' : ''} dark:text-white dark:placeholder:text-neutral-400 dark:border-neutral-700`}
+                  className={`h-8 rounded px-1.5 py-1.5 text-sm leading-5 ${mode === 'edit' ? 'cursor-not-allowed' : ''}`}
                   autoFocus={mode === 'create'}
                 />
-                {error && <p className="text-sm text-red-600 dark:text-red-500">{error}</p>}
-                <p className="text-xs font-medium text-zinc-500 dark:text-neutral-400">
-                  {mode === 'create'
-                    ? 'Use lowercase letters, numbers, hyphens, and underscores only.'
-                    : 'Bucket name cannot be changed.'}
-                </p>
+                {error && <p className="text-[13px] leading-[18px] text-destructive">{error}</p>}
               </div>
-            </div>
-            <div className="flex flex-row justify-between gap-10">
-              <div className="flex items-center gap-2">
-                <Label
-                  htmlFor="bucket-public"
-                  className="text-sm font-medium text-zinc-950 dark:text-white"
-                >
-                  Public
-                </Label>
-                <Switch
-                  id="bucket-public"
-                  checked={isPublic}
-                  onCheckedChange={setIsPublic}
-                  className="h-6"
-                />
+            </BucketFormRow>
+
+            <DialogDivider />
+
+            <BucketFormRow
+              label="Public Bucket"
+              description="If enabled, files in this bucket can be accessed without authentication."
+            >
+              <div className="flex h-8 w-full items-center justify-end">
+                <Switch id="bucket-public" checked={isPublic} onCheckedChange={setIsPublic} />
               </div>
-              <p className="w-70 text-xs font-medium text-zinc-500 dark:text-neutral-400">
-                If enabled, files in this bucket can be accessed without authentication.
-              </p>
-            </div>
+            </BucketFormRow>
 
             {/* File Size Limit - Cloud only, edit mode only */}
             {mode === 'edit' && isInsForgeCloudProject() && (
-              <div className="flex flex-row justify-between gap-10">
-                <Label className="text-sm font-medium text-zinc-950 dark:text-zinc-300">
-                  File Size Limit
-                </Label>
-                <div className="w-70 flex flex-col gap-1">
-                  <p className="text-sm text-zinc-950 dark:text-white">50MB per file</p>
-                  <p className="text-xs font-medium text-zinc-500 dark:text-neutral-400">
-                    Need a higher limit? Reach out to us on{' '}
-                    <a
-                      href="https://discord.gg/DvBtaEc9Jz"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 align-middle"
-                    >
-                      <DiscordIcon className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
-                      <span className="text-indigo-500 dark:text-indigo-400 font-medium">
-                        Discord
-                      </span>
-                    </a>
-                  </p>
-                </div>
-              </div>
+              <>
+                <DialogDivider />
+                <BucketFormRow
+                  label="File Size Limit"
+                  description="Default limit for cloud projects."
+                >
+                  <div className="flex w-full flex-col gap-1">
+                    <p className="text-sm leading-5 text-foreground">50MB per file</p>
+                    <p className="text-[13px] leading-[18px] text-muted-foreground">
+                      Need a higher limit? Reach out to us on{' '}
+                      <a
+                        href="https://discord.gg/DvBtaEc9Jz"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 align-middle text-primary"
+                      >
+                        <DiscordIcon className="h-3.5 w-3.5 text-primary" />
+                        <span className="text-xs font-medium leading-4 text-primary">Discord</span>
+                      </a>
+                    </p>
+                  </div>
+                </BucketFormRow>
+              </>
             )}
-          </div>
-          <DialogFooter className="p-6 gap-3 border-t border-zinc-200 dark:border-neutral-700">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleClose}
-              className="w-30 h-9 px-3 py-2 text-sm font-medium dark:bg-neutral-600 dark:text-zinc-300 dark:border-neutral-600 dark:hover:bg-neutral-700"
-            >
+          </DialogBody>
+          <DialogFooter className="gap-3 p-4">
+            <Button type="button" variant="secondary" onClick={handleClose} className="h-8 px-2">
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={isLoading || (mode === 'create' && !bucketName.trim())}
-              className="w-30 h-9 px-3 py-2 text-sm font-medium bg-zinc-950 text-white hover:bg-zinc-800 disabled:opacity-40 dark:bg-emerald-300 dark:text-zinc-950 dark:hover:bg-emerald-400"
+              className="h-8 px-2"
             >
               {submitButtonText}
             </Button>

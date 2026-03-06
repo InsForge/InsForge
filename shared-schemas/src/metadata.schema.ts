@@ -90,7 +90,12 @@ export const apiKeyResponseSchema = z.object({
   apiKey: z.string(),
 });
 
+export const projectIdResponseSchema = z.object({
+  projectId: z.string().nullable(),
+});
+
 export type DatabaseConnectionParameters = z.infer<typeof databaseConnectionParametersSchema>;
 export type DatabaseConnectionInfo = z.infer<typeof databaseConnectionInfoSchema>;
 export type DatabasePasswordInfo = z.infer<typeof databasePasswordInfoSchema>;
 export type ApiKeyResponse = z.infer<typeof apiKeyResponseSchema>;
+export type ProjectIdResponse = z.infer<typeof projectIdResponseSchema>;

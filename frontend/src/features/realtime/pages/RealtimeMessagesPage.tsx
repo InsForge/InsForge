@@ -1,15 +1,8 @@
-import { useState } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { ChevronRight } from 'lucide-react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
-import {
-  Button,
-  PaginationControls,
-  Skeleton,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components';
+import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
+import { Skeleton, PaginationControls, TableHeader } from '@/components';
 import { useRealtimeMessages } from '../hooks/useRealtimeMessages';
 import { MessageRow } from '../components/MessageRow';
 import RealtimeEmptyState from '../components/RealtimeEmptyState';
@@ -18,17 +11,38 @@ import type { RealtimeMessage } from '../services/realtime.service';
 export default function RealtimeMessagesPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<RealtimeMessage | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isScrolled, setIsScrolled] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const handleScroll = useCallback(() => {
+    if (scrollRef.current) {
+      setIsScrolled(scrollRef.current.scrollTop > 0);
+    }
+  }, []);
 
   const {
     messages,
     isLoadingMessages,
     refetchMessages,
-    messagesPageSize,
     messagesCurrentPage,
-    messagesTotalCount,
     messagesTotalPages,
+    messagesTotalCount,
+    messagesPageSize,
     setMessagesPage,
   } = useRealtimeMessages();
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+  }, []);
+
+  const filteredMessages = searchQuery
+    ? messages.filter(
+        (msg) =>
+          msg.eventName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          msg.channelName.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : messages;
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -42,71 +56,55 @@ export default function RealtimeMessagesPage() {
   // Message detail view
   if (selectedMessage) {
     return (
-      <div className="h-full flex flex-col overflow-hidden">
-        <div className="flex items-center gap-2.5 p-4 border-b border-border-gray dark:border-neutral-600">
+      <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
+        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
           <button
             onClick={() => setSelectedMessage(null)}
-            className="text-xl text-zinc-500 dark:text-neutral-400 hover:text-zinc-950 dark:hover:text-white transition-colors"
+            className="text-base font-medium leading-7 text-muted-foreground hover:text-foreground transition-colors"
           >
             Messages
           </button>
-          <ChevronRight className="w-5 h-5 text-muted-foreground dark:text-neutral-400" />
-          <p className="text-xl text-zinc-950 dark:text-white">{selectedMessage.eventName}</p>
+          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          <p className="text-base font-medium leading-7 text-foreground">
+            {selectedMessage.eventName}
+          </p>
         </div>
 
         <div className="flex-1 min-h-0 p-4 overflow-auto">
-          <div className="space-y-4">
+          <div className="mx-auto max-w-[1024px] w-4/5 space-y-4">
             <div className="grid grid-cols-3 gap-4">
-              <div className="p-4 rounded-lg bg-neutral-100 dark:bg-[#333333]">
-                <p className="text-sm text-muted-foreground dark:text-neutral-400 mb-1">Channel</p>
-                <p className="text-sm text-zinc-950 dark:text-white">
-                  {selectedMessage.channelName}
-                </p>
+              <div className="p-4 rounded border border-[var(--alpha-8)] bg-card">
+                <p className="text-sm text-muted-foreground mb-1">Channel</p>
+                <p className="text-sm text-foreground">{selectedMessage.channelName}</p>
               </div>
-              <div className="p-4 rounded-lg bg-neutral-100 dark:bg-[#333333]">
-                <p className="text-sm text-muted-foreground dark:text-neutral-400 mb-1">
-                  Sender Type
-                </p>
-                <p className="text-sm text-zinc-950 dark:text-white">
-                  {selectedMessage.senderType}
-                </p>
+              <div className="p-4 rounded border border-[var(--alpha-8)] bg-card">
+                <p className="text-sm text-muted-foreground mb-1">Sender Type</p>
+                <p className="text-sm text-foreground">{selectedMessage.senderType}</p>
               </div>
-              <div className="p-4 rounded-lg bg-neutral-100 dark:bg-[#333333]">
-                <p className="text-sm text-muted-foreground dark:text-neutral-400 mb-1">Created</p>
-                <p className="text-sm text-zinc-950 dark:text-white">{selectedMessage.createdAt}</p>
+              <div className="p-4 rounded border border-[var(--alpha-8)] bg-card">
+                <p className="text-sm text-muted-foreground mb-1">Created</p>
+                <p className="text-sm text-foreground">{selectedMessage.createdAt}</p>
               </div>
             </div>
 
             <div className="grid grid-cols-3 gap-4">
-              <div className="p-4 rounded-lg bg-neutral-100 dark:bg-[#333333]">
-                <p className="text-sm text-muted-foreground dark:text-neutral-400 mb-1">
-                  WS Audience
-                </p>
-                <p className="text-sm text-zinc-950 dark:text-white">
-                  {selectedMessage.wsAudienceCount}
-                </p>
+              <div className="p-4 rounded border border-[var(--alpha-8)] bg-card">
+                <p className="text-sm text-muted-foreground mb-1">WebSockets Audience</p>
+                <p className="text-sm text-foreground">{selectedMessage.wsAudienceCount}</p>
               </div>
-              <div className="p-4 rounded-lg bg-neutral-100 dark:bg-[#333333]">
-                <p className="text-sm text-muted-foreground dark:text-neutral-400 mb-1">
-                  WH Audience
-                </p>
-                <p className="text-sm text-zinc-950 dark:text-white">
-                  {selectedMessage.whAudienceCount}
-                </p>
+              <div className="p-4 rounded border border-[var(--alpha-8)] bg-card">
+                <p className="text-sm text-muted-foreground mb-1">Webhooks Audience</p>
+                <p className="text-sm text-foreground">{selectedMessage.whAudienceCount}</p>
               </div>
-              <div className="p-4 rounded-lg bg-neutral-100 dark:bg-[#333333]">
-                <p className="text-sm text-muted-foreground dark:text-neutral-400 mb-1">
-                  WH Delivered
-                </p>
-                <p className="text-sm text-zinc-950 dark:text-white">
-                  {selectedMessage.whDeliveredCount}
-                </p>
+              <div className="p-4 rounded border border-[var(--alpha-8)] bg-card">
+                <p className="text-sm text-muted-foreground mb-1">Webhooks Delivered</p>
+                <p className="text-sm text-foreground">{selectedMessage.whDeliveredCount}</p>
               </div>
             </div>
 
-            <div className="p-4 rounded-lg bg-neutral-100 dark:bg-[#333333]">
-              <p className="text-sm text-muted-foreground dark:text-neutral-400 mb-2">Payload</p>
-              <pre className="text-sm text-zinc-950 dark:text-white font-mono whitespace-pre-wrap overflow-auto">
+            <div className="p-4 rounded border border-[var(--alpha-8)] bg-card">
+              <p className="text-sm text-muted-foreground mb-2">Payload</p>
+              <pre className="text-sm text-foreground font-mono whitespace-pre-wrap overflow-auto">
                 {JSON.stringify(selectedMessage.payload, null, 2)}
               </pre>
             </div>
@@ -118,83 +116,101 @@ export default function RealtimeMessagesPage() {
 
   // Default list view
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      {/* Fixed Page Header */}
-      <div className="shrink-0 flex items-center gap-3 p-4 pb-0">
-        <h1 className="text-xl font-normal text-zinc-950 dark:text-white">Messages</h1>
+    <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
+      <TableHeader
+        className="min-w-[800px]"
+        leftContent={
+          <div className="flex flex-1 items-center overflow-clip">
+            <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">Messages</h1>
+            <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+              <div className="h-5 w-px bg-[var(--alpha-8)]" />
+            </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => void handleRefresh()}
+                    disabled={isRefreshing}
+                    className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
+                  >
+                    <RefreshIcon className={isRefreshing ? 'h-5 w-5 animate-spin' : 'h-5 w-5'} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="center">
+                  <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        }
+        searchValue={searchQuery}
+        onSearchChange={handleSearchChange}
+        searchDebounceTime={300}
+        searchPlaceholder="Search message"
+      />
 
-        {/* Separator */}
-        <div className="h-6 w-px bg-gray-200 dark:bg-neutral-700" />
+      {/* Scrollable Content */}
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 min-h-0 overflow-y-auto relative"
+      >
+        {/* Top spacing */}
+        <div className="h-10" />
 
-        {/* Refresh button */}
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="p-1 h-9 w-9"
-                onClick={() => void handleRefresh()}
-                disabled={isRefreshing}
-              >
-                <RefreshIcon className="h-5 w-5 text-zinc-400 dark:text-neutral-400" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" align="center">
-              <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
+        {/* Sticky Table Header */}
+        <div
+          className={`sticky top-0 z-10 bg-[rgb(var(--semantic-1))] px-3 ${isScrolled ? 'border-b border-[var(--alpha-8)]' : ''}`}
+        >
+          <div className="mx-auto max-w-[1024px] w-4/5">
+            <div className="flex items-center h-8 text-sm text-muted-foreground">
+              <div className="w-[30px] shrink-0" />
+              <div className="flex-1 py-1.5 px-2.5">Event</div>
+              <div className="flex-1 py-1.5 px-2.5">Channel</div>
+              <div className="w-[80px] shrink-0 py-1.5 px-2.5">Sender</div>
+              <div className="w-[100px] shrink-0 py-1.5 px-2.5">WebSockets</div>
+              <div className="w-[100px] shrink-0 py-1.5 px-2.5">Webhooks</div>
+              <div className="flex-1 py-1.5 px-2.5">Sent At</div>
+            </div>
+          </div>
+        </div>
 
-      {/* Fixed Table Header */}
-      <div className="shrink-0 grid grid-cols-12 px-7 pt-6 pb-2 text-sm text-muted-foreground dark:text-neutral-400">
-        <div className="col-span-2 py-1 px-3">Event</div>
-        <div className="col-span-2 py-1 px-3">Channel</div>
-        <div className="col-span-1 py-1 px-3">Sender</div>
-        <div className="col-span-3 py-1 px-3">Payload</div>
-        <div className="col-span-1 py-1 px-3">WebSockets</div>
-        <div className="col-span-1 py-1 px-3">Webhooks</div>
-        <div className="col-span-2 py-1 px-3">Sent At</div>
-      </div>
-
-      {/* Scrollable Content Area */}
-      <div className="flex-1 min-h-0 overflow-auto px-4 pb-4 relative">
-        <div className="flex flex-col gap-2">
-          {isLoadingMessages ? (
-            <>
-              {[...Array(4)].map((_, i) => (
-                <Skeleton key={i} className="h-14 rounded-[8px]" />
-              ))}
-            </>
-          ) : messages.length >= 1 ? (
-            <>
-              {messages.map((message) => (
-                <MessageRow
-                  key={message.id}
-                  message={message}
-                  onClick={() => setSelectedMessage(message)}
-                />
-              ))}
-            </>
-          ) : (
-            <RealtimeEmptyState type="messages" />
-          )}
+        {/* Table Body */}
+        <div className="flex flex-col items-center px-3 pb-4">
+          <div className="max-w-[1024px] w-4/5 flex flex-col gap-1 pt-1">
+            {isLoadingMessages ? (
+              <>
+                {[...Array(4)].map((_, i) => (
+                  <Skeleton key={i} className="h-12 rounded" />
+                ))}
+              </>
+            ) : filteredMessages.length >= 1 ? (
+              <>
+                {filteredMessages.map((message) => (
+                  <MessageRow key={message.id} message={message} />
+                ))}
+              </>
+            ) : (
+              <RealtimeEmptyState type="messages" />
+            )}
+          </div>
         </div>
 
         {/* Loading mask overlay */}
         {isRefreshing && (
-          <div className="absolute inset-0 bg-white dark:bg-neutral-800 flex items-center justify-center z-50">
+          <div className="absolute inset-0 bg-[rgb(var(--semantic-1))] flex items-center justify-center z-50">
             <div className="flex items-center gap-1">
-              <div className="w-5 h-5 border-2 border-zinc-500 dark:border-neutral-700 border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-zinc-500 dark:text-zinc-400">Loading</span>
+              <div className="w-5 h-5 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm text-muted-foreground">Loading</span>
             </div>
           </div>
         )}
       </div>
 
       {/* Pagination */}
-      {messages.length > 0 && (
+      {filteredMessages.length > 0 && (
         <div className="shrink-0">
           <PaginationControls
             currentPage={messagesCurrentPage}

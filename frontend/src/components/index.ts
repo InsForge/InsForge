@@ -8,25 +8,19 @@ export * from './layout';
 export * from './radix';
 
 // Custom UI components
-export { ButtonWithLoading } from './ButtonWithLoading';
-export { Checkbox } from './Checkbox';
-export { CodeBlock } from './CodeBlock';
 export { CodeEditor } from './CodeEditor';
-export { ConfirmDialog } from './ConfirmDialog';
 export { ConnectCTA } from './ConnectCTA';
-export { CopyButton } from './CopyButton';
+export { DataGridEmptyState } from './DataGridEmptyState';
 export { DeleteActionButton } from './DeleteActionButton';
 export { EmptyState } from './EmptyState';
 export { ErrorState } from './ErrorState';
-export { FeatureSidebar } from './FeatureSidebar';
-export { FeatureSidebarItem } from './FeatureSidebarItem';
 export { JsonHighlight } from './JsonHighlight';
 export { LoadingState } from './LoadingState';
 export { PaginationControls, type PaginationControlsProps } from './PaginationControls';
 export { PromptDialog } from './PromptDialog';
-export { SearchInput } from './SearchInput';
 export { SelectionClearButton } from './SelectionClearButton';
 export { CircularStepper, LinearStepper, VerticalStepper } from './Stepper';
-export { ThemeToggle } from './ThemeToggle';
+export { TableHeader } from './TableHeader';
+export { ThemeSelect } from './ThemeSelect';
 export { TypeBadge } from './TypeBadge';
 export { ZoomedVideo } from './ZoomedVideo';

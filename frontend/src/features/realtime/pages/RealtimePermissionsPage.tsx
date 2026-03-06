@@ -1,15 +1,18 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
+  DataGridEmptyState,
   DataGrid,
   type ConvertedValue,
   type DataGridColumn,
   type DataGridRowType,
   EmptyState,
+  TableHeader,
+  SortableHeaderRenderer,
 } from '@/components';
 import { SQLModal, SQLCellButton } from '@/features/database';
 import { useRealtimePermissions } from '../hooks/useRealtimePermissions';
 import type { RlsPolicy } from '../services/realtime.service';
-import { cn } from '@/lib/utils/utils';
+import { Tabs, Tab } from '@insforge/ui';
 
 type TabType = 'subscribe' | 'publish';
 
@@ -36,6 +39,7 @@ function mapPoliciesToRows(policies: RlsPolicy[]): PolicyRow[] {
 
 export default function RealtimePermissionsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('subscribe');
+  const [searchQuery, setSearchQuery] = useState('');
   const [sqlModal, setSqlModal] = useState({ open: false, title: '', value: '' });
 
   const {
@@ -43,6 +47,10 @@ export default function RealtimePermissionsPage() {
     isLoadingPermissions: isLoading,
     permissionsError: error,
   } = useRealtimePermissions();
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+  }, []);
 
   const subscribePolicies = useMemo(
     () => (permissions ? mapPoliciesToRows(permissions.subscribe.policies) : []),
@@ -56,6 +64,15 @@ export default function RealtimePermissionsPage() {
 
   const activePolicies = activeTab === 'subscribe' ? subscribePolicies : publishPolicies;
 
+  const filteredPolicies = searchQuery
+    ? activePolicies.filter(
+        (p) =>
+          p.policyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.command.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.roles.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : activePolicies;
+
   const columns: DataGridColumn<PolicyRow>[] = useMemo(
     () => [
       {
@@ -64,6 +81,21 @@ export default function RealtimePermissionsPage() {
         width: 'minmax(200px, 2fr)',
         resizable: true,
         sortable: true,
+        renderHeaderCell: (props) => (
+          <div className="flex h-full w-full items-center pl-2">
+            <SortableHeaderRenderer
+              column={props.column as DataGridColumn<PolicyRow>}
+              sortDirection={props.sortDirection}
+            />
+          </div>
+        ),
+        renderCell: ({ row }) => (
+          <div className="flex h-full w-full items-center pl-2">
+            <span className="truncate text-foreground" title={row.policyName}>
+              {row.policyName}
+            </span>
+          </div>
+        ),
       },
       {
         key: 'command',
@@ -71,13 +103,11 @@ export default function RealtimePermissionsPage() {
         width: 'minmax(100px, 1fr)',
         resizable: true,
         sortable: true,
-        renderCell: ({ row }) => {
-          return (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-xs font-medium bg-slate-600 text-white">
-              {row.command}
-            </span>
-          );
-        },
+        renderCell: ({ row }) => (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-alpha-8 text-muted-foreground">
+            {row.command}
+          </span>
+        ),
       },
       {
         key: 'roles',
@@ -130,54 +160,49 @@ export default function RealtimePermissionsPage() {
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      {/* Fixed Header */}
-      <div className="shrink-0 bg-bg-gray dark:bg-neutral-800 p-4 flex flex-col gap-6">
-        {/* Title */}
-        <h1 className="text-xl font-normal text-zinc-950 dark:text-white">Permissions</h1>
-
-        {/* Tabs */}
-        <div className="flex gap-6 items-start">
-          <button
-            onClick={() => setActiveTab('subscribe')}
-            className={cn(
-              'h-8 text-sm font-medium transition-colors',
-              activeTab === 'subscribe'
-                ? 'text-zinc-950 dark:text-white border-b-2 border-zinc-950 dark:border-white'
-                : 'text-zinc-500 dark:text-neutral-400 hover:text-zinc-700 dark:hover:text-neutral-300'
-            )}
-          >
-            Subscribe Policies
-          </button>
-          <button
-            onClick={() => setActiveTab('publish')}
-            className={cn(
-              'h-8 text-sm font-medium transition-colors',
-              activeTab === 'publish'
-                ? 'text-zinc-950 dark:text-white border-b-2 border-zinc-950 dark:border-white'
-                : 'text-zinc-500 dark:text-neutral-400 hover:text-zinc-700 dark:hover:text-neutral-300'
-            )}
-          >
-            Publish Policies
-          </button>
-        </div>
-      </div>
+    <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
+      <TableHeader
+        className="min-w-[800px]"
+        leftContent={
+          <div className="flex flex-1 items-center overflow-clip">
+            <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">
+              Permissions
+            </h1>
+            <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+              <div className="h-5 w-px bg-[var(--alpha-8)]" />
+            </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <Tab value="subscribe">Subscribe Policies</Tab>
+              <Tab value="publish">Publish Policies</Tab>
+            </Tabs>
+          </div>
+        }
+        searchValue={searchQuery}
+        onSearchChange={handleSearchChange}
+        searchDebounceTime={300}
+        searchPlaceholder="Search policies"
+      />
 
       {/* Content */}
-      <div className="flex-1 min-h-0 overflow-hidden px-3 pb-2">
+      <div className="flex-1 min-h-0 overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <EmptyState title="Loading policies..." description="Please wait" />
           </div>
         ) : (
           <DataGrid
-            data={activePolicies}
+            data={filteredPolicies}
             columns={columns}
             showSelection={false}
             showPagination={false}
             noPadding={true}
+            className="h-full"
             emptyState={
-              <div className="text-sm text-zinc-500 dark:text-zinc-400">No policies defined</div>
+              <DataGridEmptyState
+                message={
+                  searchQuery ? 'No policies match your search criteria' : 'No policies found'
+                }
+              />
             }
           />
         )}

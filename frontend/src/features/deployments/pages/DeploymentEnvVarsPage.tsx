@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
-import { Button, Skeleton, ConfirmDialog } from '@/components';
+import { Button, ConfirmDialog } from '@insforge/ui';
+import { Skeleton } from '@/components';
 import { EnvVarRow } from '../components/EnvVarRow';
 import { EnvVarDialog } from '../components/EnvVarDialog';
 import EnvVarsEmptyState from '../components/EnvVarsEmptyState';
@@ -23,7 +24,7 @@ export default function DeploymentEnvVarsPage() {
   };
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       <div className="pt-6 px-6">
         <div className="w-full max-w-[1080px] mx-auto flex flex-col gap-6">
           {/* Header with Add Button */}

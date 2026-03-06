@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Lock, Mail } from 'lucide-react';
+import { Loader2, Lock, Mail } from 'lucide-react';
 import {
   Alert,
   AlertDescription,
@@ -18,9 +18,8 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  Input,
-  ButtonWithLoading,
 } from '@/components';
+import { Button, Input } from '@insforge/ui';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { loginFormSchema, LoginForm } from '@/lib/utils/schemaValidations';
@@ -139,14 +138,10 @@ export default function LoginPage() {
                 )}
               </CardContent>
               <CardFooter className="flex flex-col space-y-4">
-                <ButtonWithLoading
-                  type="submit"
-                  className="w-full"
-                  loading={isSubmitting}
-                  disabled={isSubmitting}
-                >
-                  Sign in
-                </ButtonWithLoading>
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isSubmitting ? 'Signing in...' : 'Sign in'}
+                </Button>
                 <p className="text-xs text-center text-muted-foreground">
                   Use the credentials configured in your .env file
                 </p>

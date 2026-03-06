@@ -10,11 +10,10 @@ import {
   ChartLine,
   BookOpen,
   GitFork,
-  Users,
-  Table,
   ChartBarBig,
   Settings,
   Rocket,
+  SquarePen,
 } from 'lucide-react';
 import { postMessageToParent } from './cloudMessaging';
 
@@ -36,6 +35,75 @@ export interface PrimaryMenuItem {
   sectionEnd?: boolean;
 }
 
+export const databaseSecondaryMenuItems: SecondaryMenuItem[] = [
+  {
+    id: 'database-tables',
+    label: 'Tables',
+    href: '/dashboard/database/tables',
+    sectionEnd: true,
+  },
+  {
+    id: 'indexes',
+    label: 'Indexes',
+    href: '/dashboard/database/indexes',
+  },
+  {
+    id: 'functions',
+    label: 'Functions',
+    href: '/dashboard/database/functions',
+  },
+  {
+    id: 'triggers',
+    label: 'Triggers',
+    href: '/dashboard/database/triggers',
+  },
+  {
+    id: 'policies',
+    label: 'Policies',
+    href: '/dashboard/database/policies',
+  },
+  {
+    id: 'sql-editor',
+    label: 'SQL Editor',
+    href: '/dashboard/sql-editor',
+  },
+  {
+    id: 'templates',
+    label: 'Templates',
+    href: '/dashboard/database/templates',
+    sectionEnd: true,
+  },
+];
+
+export const databaseStudioMenuItems: SecondaryMenuItem[] = [
+  {
+    id: 'indexes',
+    label: 'Indexes',
+    href: '/dashboard/database/indexes',
+  },
+  {
+    id: 'triggers',
+    label: 'Triggers',
+    href: '/dashboard/database/triggers',
+  },
+  {
+    id: 'functions',
+    label: 'Functions',
+    href: '/dashboard/database/functions',
+  },
+  {
+    id: 'policies',
+    label: 'Policies',
+    href: '/dashboard/database/policies',
+    sectionEnd: true,
+  },
+  {
+    id: 'templates',
+    label: 'Templates',
+    href: '/dashboard/database/templates',
+  },
+];
+
 /**
  * Static menu items configuration
  * Primary menu items appear as icons in the left sidebar
@@ -49,33 +117,20 @@ export const staticMenuItems: PrimaryMenuItem[] = [
     icon: Home,
   },
   {
-    id: 'users',
-    label: 'Users',
-    href: '/dashboard/users',
-    icon: Users,
-  },
-  {
-    id: 'tables',
-    label: 'Tables',
-    href: '/dashboard/tables',
-    icon: Table,
-    sectionEnd: true,
-  },
-  {
     id: 'authentication',
     label: 'Authentication',
-    href: '/dashboard/authentication',
+    href: '/dashboard/authentication/users',
     icon: Lock,
     secondaryMenu: [
+      {
+        id: 'users-list',
+        label: 'Users',
+        href: '/dashboard/authentication/users',
+      },
       {
         id: 'auth-methods',
         label: 'Auth Methods',
         href: '/dashboard/authentication/auth-methods',
-      },
-      {
-        id: 'configuration',
-        label: 'Configurations',
-        href: '/dashboard/authentication/config',
       },
     ],
   },
@@ -84,45 +139,20 @@ export const staticMenuItems: PrimaryMenuItem[] = [
     label: 'Database',
     href: '/dashboard/database',
     icon: Database,
-    secondaryMenu: [
-      {
-        id: 'indexes',
-        label: 'Indexes',
-        href: '/dashboard/database/indexes',
-      },
-      {
-        id: 'functions',
-        label: 'Functions',
-        href: '/dashboard/database/functions',
-      },
-      {
-        id: 'triggers',
-        label: 'Triggers',
-        href: '/dashboard/database/triggers',
-      },
-      {
-        id: 'policies',
-        label: 'Policies',
-        href: '/dashboard/database/policies',
-      },
-      {
-        id: 'sql-editor',
-        label: 'SQL Editor',
-        href: '/dashboard/database/sql-editor',
-      },
-      {
-        id: 'templates',
-        label: 'Templates',
-        href: '/dashboard/database/templates',
-        sectionEnd: true,
-      },
-    ],
+    secondaryMenu: databaseSecondaryMenuItems,
   },
   {
     id: 'storage',
     label: 'Storage',
     href: '/dashboard/storage',
     icon: HardDrive,
+    sectionEnd: true,
+  },
+  {
+    id: 'sql-editor',
+    label: 'SQL Editor',
+    href: '/dashboard/sql-editor',
+    icon: SquarePen,
   },
   {
     id: 'functions',
@@ -132,7 +162,7 @@ export const staticMenuItems: PrimaryMenuItem[] = [
     secondaryMenu: [
       {
         id: 'functions-list',
-        label: 'Functions',
+        label: 'Edge Functions',
         href: '/dashboard/functions/list',
       },
       {
@@ -216,7 +246,7 @@ export const usageMenuItem: PrimaryMenuItem = {
 export const settingsMenuItem: PrimaryMenuItem = {
   id: 'settings',
   label: 'Settings',
-  href: '/dashboard/settings',
+  href: '',
   icon: Settings,
 };
 

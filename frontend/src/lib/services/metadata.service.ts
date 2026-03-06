@@ -4,6 +4,7 @@ import {
   AppMetadataSchema,
   DatabaseConnectionInfo,
   DatabasePasswordInfo,
+  ProjectIdResponse,
 } from '@insforge/shared-schemas';
 
 export interface RotateApiKeyResponse {
@@ -17,6 +18,13 @@ export class MetadataService {
   async fetchApiKey(): Promise<string> {
     const data: ApiKeyResponse = await apiClient.request('/metadata/api-key');
     return data.apiKey;
+  }
+
+  async fetchProjectId(): Promise<string | null> {
+    const data: ProjectIdResponse = await apiClient.request('/metadata/project-id', {
+      headers: apiClient.withAccessToken(),
+    });
+    return data.projectId;
   }
 
   async getFullMetadata(): Promise<AppMetadataSchema> {

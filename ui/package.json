@@ -1,0 +1,75 @@
+{
+  "name": "@insforge/ui",
+  "version": "0.1.3",
+  "author": "InsForge",
+  "description": "React UI component library, design tokens, and Tailwind preset for InsForge apps",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/InsForge/InsForge/tree/main/ui",
+  "bugs": {
+    "url": "https://github.com/InsForge/InsForge/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/InsForge/InsForge.git",
+    "directory": "ui"
+  },
+  "keywords": [
+    "insforge",
+    "react",
+    "ui",
+    "component-library",
+    "design-system",
+    "tailwindcss",
+    "radix-ui",
+    "typescript"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "./dist/styles.css"
+  ],
+  "files": [
+    "dist",
+    "tailwind-preset.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./styles.css": "./dist/styles.css",
+    "./tailwind-preset": "./tailwind-preset.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && cp src/styles.css dist/styles.css",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@radix-ui/react-checkbox": "^1.3.3",
+    "@radix-ui/react-dialog": "^1.1.14",
+    "@radix-ui/react-dropdown-menu": "^2.1.15",
+    "@radix-ui/react-select": "^2.2.5",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-switch": "^1.2.6",
+    "@radix-ui/react-tooltip": "^1.2.8",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.536.0",
+    "tailwind-merge": "^3.3.1"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwindcss": "^4.0.0"
+  }
+}
