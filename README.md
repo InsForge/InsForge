@@ -8,7 +8,7 @@
   </a>
 
   <p>
-    The backend built for agentic coding.<br />
+    The backend built for agentic development.<br />
   </p>
 
   <p>
@@ -24,7 +24,7 @@
     <a href="https://discord.com/invite/MPxwj5xVvW"><img src="https://img.shields.io/badge/Join%20our%20Discord-5865F2?logo=discord&logoColor=white&style=for-the-badge" alt="Join our Discord"></a>
   </p>
   <a href="https://vercel.com/oss">
-    <img alt="Vercel OSS Program" src="https://vercel.com/oss/program-badge.svg" />
+    <img alt="Vercel OSS Program" src="https://vercel.com/oss/program-badge-2026.svg" />
   </a>
 </div>
 
@@ -32,7 +32,7 @@
 InsForge is a backend development platform built for AI coding agents and AI code editors. It exposes backend primitives like databases, auth, storage, and functions through a semantic layer that agents can understand, reason about, and operate end to end.
 
 <p align="center">
-  <video width="100%" src="https://github.com/user-attachments/assets/e4362de8-ab46-4792-8499-4f1eec42a097" controls></video>
+  <video width="100%" src="https://github.com/user-attachments/assets/2e2a43c9-4664-48a6-b61b-4f7cf8eb0ebf" controls></video>
 </p>
 
 ### How it works
