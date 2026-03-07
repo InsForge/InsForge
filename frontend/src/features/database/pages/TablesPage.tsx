@@ -35,12 +35,13 @@ import { DatabaseDataGrid } from '@/features/database/components/DatabaseDataGri
 import { SortColumn } from 'react-data-grid';
 import { convertValueForColumn } from '@/lib/utils/utils';
 import { useCSVImport } from '@/features/database/hooks/useCSVImport';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation } from 'react-router-dom';
 
 const PAGE_SIZE = 50;
 
 export default function TablesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const selectedTableFromQuery = searchParams.get('table')?.trim();
   const [showRecordForm, setShowRecordForm] = useState(false);
   const [isTableFormDirty, setIsTableFormDirty] = useState(false);
@@ -265,6 +266,16 @@ export default function TablesPage() {
       selectTable(tableName);
     }
   };
+
+  // Open create table form when navigated from DatabaseStudioSidebar
+  useEffect(() => {
+    if ((location.state as { createTable?: boolean })?.createTable) {
+      setEditingTable(null);
+      setShowTableForm(true);
+      // Clear the state so it doesn't re-trigger
+      window.history.replaceState({}, '');
+    }
+  }, [location.state]);
 
   const handleCreateTable = () => {
     setEditingTable(null);

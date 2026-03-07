@@ -25,6 +25,7 @@ export function DatabaseStudioSidebar() {
       tables={tables}
       loading={isLoadingTables}
       onTableSelect={(table) => void navigate(`/dashboard/database/tables?table=${table}`)}
+      onNewTable={() => void navigate('/dashboard/database/tables', { state: { createTable: true } })}
     />
   );
 }
