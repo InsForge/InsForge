@@ -72,7 +72,6 @@ export function Pagination({
 }: PaginationProps) {
   const normalizedTotalPages = Math.max(1, totalPages);
   const normalizedCurrentPage = clamp(currentPage, 1, normalizedTotalPages);
-  const startRecord = totalRecords === 0 ? 0 : (normalizedCurrentPage - 1) * pageSize + 1;
   const endRecord =
     totalRecords === 0 ? 0 : Math.min(normalizedCurrentPage * pageSize, totalRecords);
 
