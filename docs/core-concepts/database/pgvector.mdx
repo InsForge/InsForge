@@ -7,6 +7,8 @@ description: Store embeddings and perform similarity search with pgvector
 
 InsForge supports **pgvector**, a PostgreSQL extension for vector similarity search. Use it to build semantic search, recommendations, RAG pipelines, or anything that needs "find similar items" functionality.
 
+InsForge also provides a built-in [embeddings SDK](/sdk-reference/ai/embeddings) through the AI gateway, so you can generate and store vectors without configuring external providers.
+
 ## Enabling the Extension
 
 Enable pgvector via SQL:
@@ -27,44 +29,65 @@ Create a table with a vector column. The dimension must match your embedding mod
 create table documents (
   id bigserial primary key,
   content text,
-  embedding vector(1536)  -- matches OpenAI ada-002
+  embedding vector(1536),
+  created_at timestamptz default now()
 );
 ```
 
-Common embedding dimensions:
+## Generating Embeddings with InsForge AI
+
+Use the InsForge SDK to generate embeddings directly through the AI gateway. No external API keys are needed in your application code.
+
+```typescript
+const response = await insforge.ai.embeddings.create({
+  model: 'openai/text-embedding-3-small',
+  input: 'Your text here',
+});
+
+console.log(response.data[0].embedding);
+```
+
+The method accepts a single string or an array of strings.
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `model` | string | Yes | Embedding model identifier |
+| `input` | string or string[] | Yes | Text to embed |
+| `encoding_format` | string | No | `float` (default) or `base64` |
+| `dimensions` | number | No | Output dimensionality override |
+
+### Available Embedding Models
 
 | Model | Dimensions |
 |-------|------------|
-| OpenAI text-embedding-ada-002 | 1536 |
-| OpenAI text-embedding-3-small | 1536 |
-| OpenAI text-embedding-3-large | 3072 |
-| Cohere embed-english-v3.0 | 1024 |
-| all-MiniLM-L6-v2 | 384 |
+| openai/text-embedding-3-small | 1536 |
+| openai/text-embedding-3-large | 3072 |
+| openai/text-embedding-ada-002 | 1536 |
+| google/gemini-embedding-001 | 768 |
+
+<Tip>
+You can also use any external embedding provider (OpenAI, Cohere, Hugging Face, etc.) and store the resulting vectors in pgvector. The InsForge AI gateway is optional.
+</Tip>
 
 ## Storing Embeddings
 
-Generate embeddings using any provider (OpenAI, Cohere, Hugging Face, etc.), then store them in InsForge.
+Generate an embedding and insert it in one step:
 
-Example using OpenAI:
-
-```javascript
-import OpenAI from 'openai';
-import { insforge } from './lib/insforge';
-
-const openai = new OpenAI();
-
-async function storeDocument(content) {
-  const response = await openai.embeddings.create({
-    model: 'text-embedding-ada-002',
-    input: content
+```typescript
+async function storeDocument(content: string) {
+  const response = await insforge.ai.embeddings.create({
+    model: 'openai/text-embedding-3-small',
+    input: content,
   });
 
   const { data, error } = await insforge.database
     .from('documents')
-    .insert({
+    .insert([{
       content,
-      embedding: response.data[0].embedding
-    })
+      embedding: response.data[0].embedding,
+    }])
     .select();
 
   return { data, error };
@@ -77,7 +100,7 @@ Use distance operators to find similar vectors:
 
 ```sql
 select * from documents
-order by embedding <-> '[0.1, 0.2, ...]'  -- your query embedding
+order by embedding <=> '[0.1, 0.2, ...]'
 limit 5;
 ```
 
@@ -93,9 +116,122 @@ limit 5;
 For normalized embeddings (like OpenAI's), use cosine distance `<=>`. Similarity = `1 - distance`.
 </Tip>
 
+## Similarity Search with RPC
+
+For production use, create a Postgres function that handles similarity search server-side. This avoids round trips and keeps the logic close to the data.
+
+```sql
+create or replace function match_documents(
+  query_embedding vector(1536),
+  match_count int default 5,
+  match_threshold float default 0.78
+)
+returns table (
+  id bigint,
+  content text,
+  similarity float
+)
+language sql stable
+as $$
+  select
+    id,
+    content,
+    1 - (embedding <=> query_embedding) as similarity
+  from documents
+  where 1 - (embedding <=> query_embedding) > match_threshold
+  order by embedding <=> query_embedding
+  limit match_count;
+$$;
+```
+
+Call it from the SDK:
+
+```typescript
+const queryResponse = await insforge.ai.embeddings.create({
+  model: 'openai/text-embedding-3-small',
+  input: 'What is machine learning?',
+});
+
+const { data, error } = await insforge.database.rpc('match_documents', {
+  query_embedding: queryResponse.data[0].embedding,
+  match_count: 5,
+  match_threshold: 0.78,
+});
+```
+
+<Note>
+Adjust `match_threshold` based on your use case. Higher values return fewer but more relevant results. Start with 0.78 and tune from there.
+</Note>
+
+## Building a RAG Pipeline
+
+InsForge provides the core primitives for retrieval-augmented generation: embeddings, vector storage, similarity search, and chat completions.
+
+### Basic RAG Flow
+
+```typescript
+async function askQuestion(question: string) {
+  // 1. Embed the question
+  const embeddingResponse = await insforge.ai.embeddings.create({
+    model: 'openai/text-embedding-3-small',
+    input: question,
+  });
+
+  // 2. Retrieve relevant documents
+  const { data: documents } = await insforge.database.rpc('match_documents', {
+    query_embedding: embeddingResponse.data[0].embedding,
+    match_count: 5,
+    match_threshold: 0.78,
+  });
+
+  // 3. Build context from retrieved documents
+  const context = documents
+    .map((doc: any) => doc.content)
+    .join('\n\n');
+
+  // 4. Generate a response with context
+  const response = await insforge.ai.chat.completions.create({
+    model: 'openai/gpt-4o-mini',
+    messages: [
+      {
+        role: 'system',
+        content: `Answer the question based on the following context:\n\n${context}`,
+      },
+      {
+        role: 'user',
+        content: question,
+      },
+    ],
+  });
+
+  return response;
+}
+```
+
+### Production RAG
+
+The basic flow above works for prototypes. For production systems, you will likely need:
+
+- **Chunking strategies** -- split documents by semantic boundaries, not fixed token counts
+- **Query rewriting** -- rephrase user questions to improve retrieval recall
+- **Re-ranking** -- score retrieved chunks with a cross-encoder before passing them to the LLM
+- **Context assembly** -- format and truncate retrieved chunks to fit the model's context window
+- **Evaluation** -- measure retrieval precision, answer faithfulness, and hallucination rates
+
+We recommend pairing InsForge with an orchestration framework for production RAG:
+
+| Framework | Language | Best For |
+|-----------|----------|----------|
+| [LangChain](https://github.com/langchain-ai/langchain) | Python / TypeScript | Full pipeline orchestration, extensive integrations |
+| [LlamaIndex](https://github.com/run-llama/llama_index) | Python / TypeScript | Document indexing, structured retrieval, query engines |
+| [Haystack](https://github.com/deepset-ai/haystack) | Python | Modular pipelines, evaluation, production components |
+| [Vercel AI SDK](https://github.com/vercel/ai) | TypeScript | Streaming UI, React/Next.js integration |
+
+These frameworks integrate with any Postgres-backed vector store. Point them at your InsForge database, use `insforge.ai.embeddings.create()` for embedding generation, and use `insforge.ai.chat.completions.create()` for the generation step.
+
 ## Indexing
 
-Without an index, pgvector does exact nearest neighbor search - accurate but slow on large datasets. Add an index for faster approximate search.
+Without an index, pgvector does exact nearest neighbor search -- accurate but slow on large datasets. Add an index for faster approximate search.
 
 ### HNSW (Recommended)
 
@@ -127,12 +263,15 @@ Match your distance operator:
 | Cosine | `vector_cosine_ops` |
 
 <Warning>
-Create indexes **after** inserting initial data. IVFFlat needs representative data to build effective clusters.
+Create IVFFlat indexes **after** inserting initial data. IVFFlat needs representative data to build effective clusters. HNSW can be created on an empty table.
 </Warning>
 
 ## Best Practices
 
-- **Match dimensions** - Vector dimensions must match your embedding model
-- **Normalize embeddings** - Use cosine distance for scores between 0 and 1
-- **Index at scale** - Add indexes when you have ~10k+ vectors
-- **Batch inserts** - Generate and insert embeddings in batches
+- **Match dimensions** -- vector dimensions must match your embedding model
+- **Use the InsForge AI gateway** -- generate embeddings with `insforge.ai.embeddings.create()` to keep API keys out of your application code
+- **Use RPC functions for search** -- keep similarity logic in Postgres rather than computing distances client-side
+- **Normalize embeddings** -- use cosine distance for scores between 0 and 1
+- **Index at scale** -- add indexes when you have ~10k+ vectors
+- **Batch inserts** -- generate and insert embeddings in batches to respect rate limits
+- **Use an orchestration framework for production RAG** -- raw retrieval works for prototypes, but production systems need chunking, re-ranking, and evaluation
