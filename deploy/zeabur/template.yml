@@ -70,12 +70,13 @@ spec:
     services:
         - name: postgres
           icon: https://raw.githubusercontent.com/zeabur/service-icons/main/marketplace/postgresql.svg
-          template: PREBUILT
+          template: PREBUILT_V2
           spec:
             source:
-                image: postgres:15.13
+                image: ghcr.io/insforge/postgres:v15.13.2
                 command:
                     - docker-entrypoint.sh
+                    - postgres
                     - -c
                     - config_file=/etc/postgresql/postgresql.conf
             ports:
@@ -153,8 +154,8 @@ spec:
                     # Set max WAL senders
                     max_wal_senders = 10
 
-                    # Shared preload libraries (if needed)
-                    # shared_preload_libraries = 'pg_stat_statements'
+                    shared_preload_libraries = 'pg_cron,http,pgcrypto'
+                    cron.database_name = 'insforge'
                 - path: /docker-entrypoint-initdb.d/01-init.sql
                   template: |
                     -- init.sql
@@ -270,7 +271,7 @@ spec:
           icon: https://avatars.githubusercontent.com/u/15115011?s=96&v=4
           dependencies:
             - postgres
-          template: PREBUILT
+          template: PREBUILT_V2
           spec:
             source:
                 image: postgrest/postgrest:v12.2.12
@@ -315,7 +316,7 @@ spec:
           dependencies:
             - postgres
             - postgrest
-          template: PREBUILT
+          template: PREBUILT_V2
           spec:
             source:
                 image: denoland/deno:alpine-2.0.6
@@ -856,10 +857,10 @@ spec:
             - postgres
             - postgrest
             - deno
-          template: PREBUILT
+          template: PREBUILT_V2
           spec:
             source:
-                image: ghcr.io/insforge/insforge-oss:v1.4.3
+                image: ghcr.io/insforge/insforge-oss:v2.0.0
             ports:
                 - id: web
                   port: 7130
