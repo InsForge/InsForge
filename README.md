@@ -229,19 +229,6 @@ Show your project is built with InsForge.
 </a>
 ```
 
-## Translations
-
-- [Arabic | العربية](/i18n/README.ar.md)
-- [Spanish | Español](/i18n/README.es.md)
-- [French | Français](/i18n/README.fr.md)
-- [Hindi | हिंदी](/i18n/README.hi.md)
-- [Japanese | 日本語](/i18n/README.ja.md)
-- [Korean | 한국어](/i18n/README.ko.md)
-- [Portuguese (Brazilian) / Português Brasileiro](/i18n/README.pt-BR.md)
-- [Russian | Русский](/i18n/README.ru.md)
-- [Chinese (Simplified) | 简体中文](/i18n/README.zh-CN.md)
-
----
 
 <p align="center">⭐ <b>Star us on GitHub</b> to get notified about new releases!</p>
 
