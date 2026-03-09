@@ -15,7 +15,7 @@ interface UseCloudProjectInfoOptions {
   timeoutMs?: number;
 }
 
-const CLOUD_PROJECT_INFO_QUERY_KEY = ['cloud-project-info'];
+export const CLOUD_PROJECT_INFO_QUERY_KEY = ['cloud-project-info'];
 
 function requestCloudProjectInfo(timeoutMs: number): Promise<CloudProjectInfo> {
   return new Promise((resolve) => {

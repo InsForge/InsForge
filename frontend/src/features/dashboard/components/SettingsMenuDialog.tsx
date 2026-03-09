@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Cpu, HardDrive, Plug, Settings } from 'lucide-react';
 import {
   Button,
@@ -23,7 +24,11 @@ import {
 import type { InstanceInfoEvent } from '@insforge/shared-schemas';
 import { useApiKey } from '@/lib/hooks/useMetadata';
 import { useHealth } from '@/lib/hooks/useHealth';
-import { useCloudProjectInfo } from '@/lib/hooks/useCloudProjectInfo';
+import {
+  CLOUD_PROJECT_INFO_QUERY_KEY,
+  useCloudProjectInfo,
+  type CloudProjectInfo,
+} from '@/lib/hooks/useCloudProjectInfo';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
 import { useModal } from '@/lib/contexts/ModalContext';
@@ -53,6 +58,7 @@ export default function SettingsMenuDialog() {
   const { projectInfo, isLoading: isProjectInfoLoading } = useCloudProjectInfo();
   const { confirm, confirmDialogProps } = useConfirm();
   const { showToast } = useToast();
+  const queryClient = useQueryClient();
 
   const isCloud = isInsForgeCloudProject();
   const isInIframe = isIframe();
@@ -173,7 +179,10 @@ export default function SettingsMenuDialog() {
             setSelectedInstanceType(null);
           }
           postMessageToParent({ type: 'REQUEST_INSTANCE_INFO' }, '*');
-          showToast('Compute size updated successfully', 'success');
+          showToast(
+            'Project is updating compute size, please wait a few seconds and refresh the page.',
+            'success'
+          );
           return;
         }
 
@@ -254,6 +263,11 @@ export default function SettingsMenuDialog() {
       },
       '*'
     );
+
+    queryClient.setQueryData<CloudProjectInfo>(CLOUD_PROJECT_INFO_QUERY_KEY, (previous = {}) => ({
+      ...previous,
+      name: nextProjectName,
+    }));
 
     setProjectName(nextProjectName);
     setProjectNameInitialValue(nextProjectName);
