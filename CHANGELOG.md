@@ -1,5 +1,7 @@
 # Changelog
 
+## [2.0.1](https://github.com/InsForge/insforge/compare/v2.0.0-fix-settings-2...v2.0.1) (2026-03-09)
+
 # [2.0.0](https://github.com/InsForge/insforge/compare/v1.5.9-ui-6...v2.0.0) (2026-03-06)
 
 
