@@ -179,10 +179,6 @@ export default function SettingsMenuDialog() {
             setSelectedInstanceType(null);
           }
           postMessageToParent({ type: 'REQUEST_INSTANCE_INFO' }, '*');
-          showToast(
-            'Project is updating compute size, please wait a few seconds and refresh the page.',
-            'success'
-          );
           return;
         }
 
@@ -284,6 +280,10 @@ export default function SettingsMenuDialog() {
     }
 
     setIsChangingInstanceType(true);
+    showToast(
+      'Project is updating compute size, please wait a few seconds and refresh the page.',
+      'success'
+    );
     postMessageToParent(
       {
         type: 'REQUEST_INSTANCE_TYPE_CHANGE',
