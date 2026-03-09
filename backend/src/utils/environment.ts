@@ -25,3 +25,11 @@ export function isOAuthSharedKeysAvailable(): boolean {
 export function getApiBaseUrl(): string {
   return process.env.API_BASE_URL || 'http://localhost:7130';
 }
+
+export function isDevelopment(): boolean {
+  return process.env.NODE_ENV !== 'production';
+}
+
+export function isProduction(): boolean {
+  return process.env.NODE_ENV === 'production';
+}

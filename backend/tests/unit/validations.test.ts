@@ -7,7 +7,7 @@ import {
   escapeSqlLikePattern,
   escapeRegexPattern,
 } from '../../src/utils/validations';
-import { AppError } from '../../src/api/middleware/error';
+import { AppError } from '../../src/api/middlewares/error';
 import { describe, test, expect } from 'vitest';
 
 describe('Validations Utils', () => {
@@ -51,8 +51,9 @@ describe('Validations Utils', () => {
       expect(validateTableName('users')).toBe(true);
     });
 
-    test('table name starting with _ throws AppError', () => {
-      expect(() => validateTableName('_internal')).toThrow(AppError);
+    // _ prefix is allowed since system tables moved to separate schemas (system.*, auth.*, etc.)
+    test('table name starting with _ is valid', () => {
+      expect(validateTableName('_internal')).toBe(true);
     });
   });
 
