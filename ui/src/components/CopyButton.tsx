@@ -81,7 +81,7 @@ export function CopyButton({
         !showText && copied && 'text-primary cursor-default hover:bg-transparent',
         showText &&
           copied &&
-          'bg-primary text-[rgb(var(--inverse))] cursor-default hover:bg-primary',
+          'bg-transparent text-primary before:hidden cursor-default hover:bg-transparent',
         className
       )}
     >

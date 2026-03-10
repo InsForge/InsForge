@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
 import { ThemeProvider } from '@/lib/contexts/ThemeContext';
@@ -10,9 +10,39 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
+const SIDEBAR_AUTO_COLLAPSE_BREAKPOINT = '(max-width: 1023px)';
+
 export default function Layout({ children }: LayoutProps) {
-  // Sidebar is expanded by default; user can toggle via UI
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return window.matchMedia(SIDEBAR_AUTO_COLLAPSE_BREAKPOINT).matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const mediaQuery = window.matchMedia(SIDEBAR_AUTO_COLLAPSE_BREAKPOINT);
+    const handleBreakpointChange = (event: MediaQueryListEvent) => {
+      if (event.matches) {
+        setSidebarCollapsed(true);
+      }
+    };
+
+    if (mediaQuery.matches) {
+      setSidebarCollapsed(true);
+    }
+
+    mediaQuery.addEventListener('change', handleBreakpointChange);
+
+    return () => {
+      mediaQuery.removeEventListener('change', handleBreakpointChange);
+    };
+  }, []);
 
   const handleToggleCollapse = () => {
     setSidebarCollapsed(!sidebarCollapsed);

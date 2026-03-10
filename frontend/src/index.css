@@ -111,6 +111,26 @@
     cursor: pointer;
   }
 
+  .dashboard-preview-flow .react-flow__renderer {
+    top: 19px !important;
+    left: 1px !important;
+    width: calc(100% - 1px) !important;
+    height: calc(100% - 19px) !important;
+  }
+
+  .dashboard-preview-panel:hover [data-testid='rf__node-agent-connector'] button,
+  .dashboard-preview-flow:hover [data-testid='rf__node-agent-connector'] button {
+    border-color: transparent !important;
+    background-color: rgb(var(--primary)) !important;
+    color: rgb(var(--inverse)) !important;
+  }
+
+  .dashboard-preview-panel:hover [data-testid='rf__node-agent-connector'] button:hover,
+  .dashboard-preview-flow:hover [data-testid='rf__node-agent-connector'] button:hover {
+    background-color: rgb(var(--primary)) !important;
+    opacity: 0.9;
+  }
+
   input:focus {
     outline: none !important;
   }
