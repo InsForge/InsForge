@@ -30,6 +30,7 @@ WORKDIR /app
 # COPY --from uses content-based cache: if output is identical,
 # this layer and npm install below stay cached across releases.
 COPY --from=package-prep /out/package.json ./package.json
+COPY package-lock.json ./package-lock.json
 
 COPY backend/package.json     ./backend/package.json
 COPY frontend/package.json    ./frontend/package.json
@@ -37,7 +38,7 @@ COPY auth/package.json        ./auth/package.json
 COPY shared-schemas/package.json ./shared-schemas/package.json
 COPY ui/package.json          ./ui/package.json
 
-RUN npm install && npm cache clean --force
+RUN npm ci && npm cache clean --force
 
 
 # ============================================================
@@ -63,6 +64,7 @@ FROM node:20-alpine AS prod-deps
 WORKDIR /app
 
 COPY --from=package-prep /out/package.json ./package.json
+COPY package-lock.json ./package-lock.json
 
 COPY backend/package.json     ./backend/package.json
 COPY frontend/package.json    ./frontend/package.json
@@ -70,7 +72,7 @@ COPY auth/package.json        ./auth/package.json
 COPY shared-schemas/package.json ./shared-schemas/package.json
 COPY ui/package.json          ./ui/package.json
 
-RUN npm install --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force
 
 
 # ============================================================
@@ -104,7 +106,7 @@ COPY --from=build /app/backend/package.json ./backend/package.json
 COPY --from=build /app/package.json ./package.json
 
 # tsx is a devDependency but required at runtime for migrate:bootstrap
-RUN npm install -g tsx && npm cache clean --force
+RUN npm install -g "tsx@^4.7.1" && npm cache clean --force
 
 # Run as non-root using the built-in node user (uid 1000)
 RUN chown -R node:node /app
