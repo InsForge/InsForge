@@ -4,6 +4,10 @@
 # Separate stage so that COPY --from uses content-based caching.
 # Even if this stage rebuilds on version bump, the OUTPUT is
 # identical (version removed), so downstream COPY --from hits cache.
+# Pinned deno version — matches docker-compose deno runtime (denoland/deno:alpine-2.0.6)
+ARG DENO_VERSION=2.0.6
+FROM denoland/deno:alpine-${DENO_VERSION} AS deno-bin
+
 FROM node:20-alpine AS package-prep
 
 RUN apk add --no-cache jq
@@ -26,6 +30,7 @@ WORKDIR /app
 # COPY --from uses content-based cache: if output is identical,
 # this layer and npm install below stay cached across releases.
 COPY --from=package-prep /out/package.json ./package.json
+COPY package-lock.json ./package-lock.json
 
 COPY backend/package.json     ./backend/package.json
 COPY frontend/package.json    ./frontend/package.json
@@ -33,7 +38,7 @@ COPY auth/package.json        ./auth/package.json
 COPY shared-schemas/package.json ./shared-schemas/package.json
 COPY ui/package.json          ./ui/package.json
 
-RUN npm install && npm cache clean --force
+RUN npm ci && npm cache clean --force
 
 
 # ============================================================
@@ -59,6 +64,7 @@ FROM node:20-alpine AS prod-deps
 WORKDIR /app
 
 COPY --from=package-prep /out/package.json ./package.json
+COPY package-lock.json ./package-lock.json
 
 COPY backend/package.json     ./backend/package.json
 COPY frontend/package.json    ./frontend/package.json
@@ -66,7 +72,7 @@ COPY auth/package.json        ./auth/package.json
 COPY shared-schemas/package.json ./shared-schemas/package.json
 COPY ui/package.json          ./ui/package.json
 
-RUN npm install --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force
 
 
 # ============================================================
@@ -96,9 +102,24 @@ COPY --from=build /app/backend/package.json ./backend/package.json
 COPY --from=build /app/package.json ./package.json
 
 # tsx is a devDependency but required at runtime for migrate:bootstrap
-RUN npm install -g tsx && npm cache clean --force
+RUN npm install -g "tsx@^4.7.1" && npm cache clean --force
+
+# Run as non-root using the built-in node user (uid 1000)
+RUN chown -R node:node /app
+USER node
 
 EXPOSE 7130 7131
 
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["sh", "-c", "cd backend && npm run migrate:up && cd .. && npm start"]
+CMD ["sh", "-c", "cd backend && npm run migrate:up && cd .. && exec npm start"]
+
+
+# ============================================================
+# Stage: dev — development image (used by docker-compose)
+# ============================================================
+# Source code is mounted via volumes, only needs Node.js + Deno.
+FROM node:20-alpine AS dev
+
+COPY --from=deno-bin /bin/deno /usr/local/bin/deno
+
+WORKDIR /app

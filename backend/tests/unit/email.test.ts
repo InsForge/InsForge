@@ -1,5 +1,5 @@
-import { EmailService } from '../../src/core/email/email';
-import { AppError } from '../../src/api/middleware/error';
+import { EmailService } from '../../src/services/email/email.service';
+import { AppError } from '../../src/api/middlewares/error';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
@@ -14,7 +14,7 @@ vi.mock('../../src/utils/logger', () => ({
     warn: vi.fn(),
   },
 }));
-vi.mock('../../src/app.config', () => ({
+vi.mock('../../src/infra/config/app.config', () => ({
   config: {
     app: {
       jwtSecret: 'test-jwt-secret',
@@ -35,7 +35,7 @@ describe('EmailService', () => {
     vi.resetAllMocks();
 
     // Mock config values
-    const { config } = await import('../../src/app.config');
+    const { config } = await import('../../src/infra/config/app.config');
     config.cloud.projectId = 'test-project-123';
     config.app.jwtSecret = 'test-jwt-secret';
     config.cloud.apiHost = 'https://api.test.com';
@@ -155,7 +155,7 @@ describe('EmailService', () => {
     });
 
     it('throws error if PROJECT_ID is not configured', async () => {
-      const { config } = await import('../../src/app.config');
+      const { config } = await import('../../src/infra/config/app.config');
       config.cloud.projectId = 'local';
 
       await expect(
@@ -175,7 +175,7 @@ describe('EmailService', () => {
     });
 
     it('throws error if JWT_SECRET is not configured', async () => {
-      const { config } = await import('../../src/app.config');
+      const { config } = await import('../../src/infra/config/app.config');
       config.app.jwtSecret = '';
 
       await expect(
