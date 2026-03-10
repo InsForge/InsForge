@@ -13,10 +13,12 @@ COPY package.json ./
 COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
 COPY auth/package.json ./auth/
-COPY shared-schemas/package.json ./shared-schemas/
 COPY ui/package.json ./ui/
 
-# Install all dependencies - will generate Linux-compatible lock file
+# Copy full shared-schemas before install - its "prepare" script runs tsc during install
+COPY shared-schemas/ ./shared-schemas/
+
+# Install all dependencies
 RUN npm install && npm cache clean --force && rm -rf /tmp/*
 
 # Copy source code

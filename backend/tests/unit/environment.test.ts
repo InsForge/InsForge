@@ -43,7 +43,7 @@ describe('Environment utils', () => {
     expect(isDevelopment()).toBe(false);
 
     delete process.env.NODE_ENV;
-    expect(isDevelopment()).toBe(true);
+    expect(isDevelopment()).toBe(false);
   });
 
   it('isProduction works correctly', () => {

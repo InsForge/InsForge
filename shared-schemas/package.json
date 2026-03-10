@@ -19,7 +19,8 @@
   ],
   "scripts": {
     "build": "tsc",
-        "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "prepare": "npm run build",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
