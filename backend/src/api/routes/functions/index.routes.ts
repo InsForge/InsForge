@@ -61,7 +61,9 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
     const result = await functionService.createFunction(validation.data);
 
     // Log audit event
-    logger.info(`Function ${result.function.name} (${result.function.slug}) created by ${req.user?.email}`);
+    logger.info(
+      `Function ${result.function.name} (${result.function.slug}) created by ${req.user?.email}`
+    );
     await auditService.log({
       actor: req.user?.email || 'api-key',
       action: 'CREATE_FUNCTION',
