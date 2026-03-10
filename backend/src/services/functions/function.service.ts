@@ -5,6 +5,7 @@ import {
   UpdateFunctionRequest,
   FunctionSchema,
   ListFunctionsResponse,
+  DeploymentResult,
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { DatabaseError, Pool } from 'pg';
@@ -136,28 +137,30 @@ export class FunctionService {
 
   /**
    * Create a new function
+   * Saves to DB, then synchronously deploys if active + Subhosting configured.
+   * Returns the function record and optional deployment result.
    */
-  async createFunction(data: UploadFunctionRequest): Promise<FunctionSchema> {
+  async createFunction(
+    data: UploadFunctionRequest
+  ): Promise<{ function: FunctionSchema; deployment?: DeploymentResult | null }> {
+    const { name, code, description, status } = data;
+    const slug = data.slug || name.toLowerCase().replace(/\s+/g, '-');
+
+    // Validate code with regex checks
+    this.validateCode(code);
+
+    // Save to DB (release client before deployment polling)
+    let created: FunctionSchema;
     const client = await this.getPool().connect();
     try {
-      const { name, code, description, status } = data;
-      const slug = data.slug || name.toLowerCase().replace(/\s+/g, '-');
-
-      // Validate code — regex checks + deno type check on transformed code
-      this.validateCode(code);
-      await this.denoSubhostingProvider.checkCode(code, slug);
-
-      // Generate UUID
       const id = crypto.randomUUID();
 
-      // Insert function
       await client.query(
         `INSERT INTO functions.definitions (id, slug, name, description, code, status)
         VALUES ($1, $2, $3, $4, $5, $6)`,
         [id, slug, name, description || null, code, status]
       );
 
-      // If status is active, update deployed_at
       if (status === 'active') {
         await client.query(
           `UPDATE functions.definitions SET deployed_at = CURRENT_TIMESTAMP WHERE id = $1`,
@@ -165,21 +168,13 @@ export class FunctionService {
         );
       }
 
-      // Fetch the created function
       const result = await client.query(
         `SELECT id, slug, name, description, status, created_at as "createdAt"
         FROM functions.definitions WHERE id = $1`,
         [id]
       );
-
-      // Trigger deployment to Deno Subhosting (async, non-blocking)
-      if (status === 'active') {
-        this.scheduleDeployment();
-      }
-
-      return result.rows[0];
+      created = result.rows[0];
     } catch (error) {
-      // Re-throw AppErrors as-is
       if (error instanceof AppError) {
         throw error;
       }
@@ -189,7 +184,6 @@ export class FunctionService {
         operation: 'createFunction',
       });
 
-      // Handle unique constraint error
       if (error instanceof DatabaseError && error.code === '23505') {
         throw new AppError(
           'Function with this slug already exists',
@@ -202,18 +196,34 @@ export class FunctionService {
     } finally {
       client.release();
     }
+
+    // Deploy synchronously after releasing the DB client
+    let deployment: DeploymentResult | null = null;
+    if (status === 'active') {
+      deployment = await this.deployAndWait();
+    }
+
+    return { function: created, deployment };
   }
 
   /**
    * Update an existing function
+   * Saves to DB, then synchronously deploys if code/status changed + Subhosting configured.
    */
   async updateFunction(
     slug: string,
     updates: UpdateFunctionRequest
-  ): Promise<FunctionSchema | null> {
+  ): Promise<{ function: FunctionSchema; deployment?: DeploymentResult | null } | null> {
+    // Validate code if provided
+    if (updates.code !== undefined) {
+      this.validateCode(updates.code);
+    }
+
+    // Save to DB (release client before deployment polling)
+    let updated: FunctionSchema;
+    const shouldDeploy = updates.code !== undefined || updates.status !== undefined;
     const client = await this.getPool().connect();
     try {
-      // Check if function exists
       const existingResult = await client.query(
         'SELECT id FROM functions.definitions WHERE slug = $1',
         [slug]
@@ -222,13 +232,6 @@ export class FunctionService {
         return null;
       }
 
-      // Validate code if provided — regex checks + deno type check
-      if (updates.code !== undefined) {
-        this.validateCode(updates.code);
-        await this.denoSubhostingProvider.checkCode(updates.code, slug);
-      }
-
-      // Update fields
       if (updates.name !== undefined) {
         await client.query('UPDATE functions.definitions SET name = $1 WHERE slug = $2', [
           updates.name,
@@ -256,7 +259,6 @@ export class FunctionService {
           slug,
         ]);
 
-        // Update deployed_at if status changes to active
         if (updates.status === 'active') {
           await client.query(
             'UPDATE functions.definitions SET deployed_at = CURRENT_TIMESTAMP WHERE slug = $1',
@@ -265,26 +267,17 @@ export class FunctionService {
         }
       }
 
-      // Update updated_at
       await client.query(
         'UPDATE functions.definitions SET updated_at = CURRENT_TIMESTAMP WHERE slug = $1',
         [slug]
       );
 
-      // Fetch updated function
       const result = await client.query(
         `SELECT id, slug, name, description, status, updated_at as "updatedAt", deployed_at as "deployedAt"
         FROM functions.definitions WHERE slug = $1`,
         [slug]
       );
-
-      // Trigger deployment if code or status changed
-      const shouldDeploy = updates.code !== undefined || updates.status !== undefined;
-      if (shouldDeploy) {
-        this.scheduleDeployment();
-      }
-
-      return result.rows[0];
+      updated = result.rows[0];
     } catch (error) {
       logger.error('Failed to update function', {
         error: error instanceof Error ? error.message : String(error),
@@ -295,6 +288,14 @@ export class FunctionService {
     } finally {
       client.release();
     }
+
+    // Deploy synchronously after releasing the DB client
+    let deployment: DeploymentResult | null = null;
+    if (shouldDeploy) {
+      deployment = await this.deployAndWait();
+    }
+
+    return { function: updated, deployment };
   }
 
   /**
@@ -386,6 +387,99 @@ export class FunctionService {
    */
   private getDenoProjectId(): string {
     return process.env.APP_KEY || 'local';
+  }
+
+  /**
+   * Deploy all active functions synchronously and wait for the result.
+   * Returns null if Subhosting is not configured (local mode).
+   * Never throws — returns a failed DeploymentResult on error.
+   */
+  private async deployAndWait(): Promise<DeploymentResult | null> {
+    if (!this.denoSubhostingProvider.isConfigured()) {
+      logger.debug('Deno Subhosting not configured, skipping deployment');
+      return null;
+    }
+
+    const projectId = this.getDenoProjectId();
+    let savedDeploymentId: string | null = null;
+
+    try {
+      const activeFunctions = await this.getActiveFunctionsWithCode();
+      const secrets = await this.getFunctionSecrets();
+      const functionSlugs = activeFunctions.map((f) => f.slug);
+
+      logger.info('Deploying to Deno Subhosting (sync)', {
+        projectId,
+        functionCount: activeFunctions.length,
+        functions: functionSlugs,
+      });
+
+      const result = await this.denoSubhostingProvider.deployFunctions(
+        projectId,
+        activeFunctions,
+        secrets
+      );
+
+      savedDeploymentId = result.id;
+
+      await this.saveDeployment({
+        id: result.id,
+        projectId: result.projectId,
+        status: 'pending',
+        url: result.url,
+        functionCount: activeFunctions.length,
+        functions: functionSlugs,
+      });
+
+      // Wait for deployment to reach final status
+      const finalResult = await this.denoSubhostingProvider.waitForDeployment(result.id);
+
+      const errorMessage = finalResult.buildLogs?.find((log) => log.includes('[error]'));
+
+      await this.updateDeployment(result.id, {
+        status: finalResult.status,
+        url: finalResult.url,
+        errorMessage,
+        buildLogs: finalResult.buildLogs,
+      });
+
+      if (finalResult.status === 'success' && finalResult.url) {
+        this.cachedDeploymentUrl = finalResult.url;
+      }
+
+      logger.info('Deno Subhosting deployment completed', {
+        deploymentId: result.id,
+        status: finalResult.status,
+      });
+
+      return {
+        id: result.id,
+        status: finalResult.status,
+        url: finalResult.url,
+        buildLogs: finalResult.buildLogs,
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+
+      logger.error('Deno Subhosting deployment failed', { error: errorMsg, projectId });
+
+      // Update DB record so it doesn't stay stuck in 'pending'
+      if (savedDeploymentId) {
+        await this.updateDeployment(savedDeploymentId, {
+          status: 'failed',
+          url: null,
+          errorMessage: errorMsg,
+          buildLogs: [errorMsg],
+        }).catch((e) => logger.warn('Failed to update deployment record', { error: e }));
+      }
+
+      return {
+        id: savedDeploymentId || 'unknown',
+        status: 'failed',
+        url: null,
+        buildLogs: [errorMsg],
+      };
+    }
   }
 
   /**

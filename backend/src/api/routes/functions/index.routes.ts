@@ -58,19 +58,19 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
       throw new AppError(JSON.stringify(validation.error.issues), 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    const created = await functionService.createFunction(validation.data);
+    const result = await functionService.createFunction(validation.data);
 
     // Log audit event
-    logger.info(`Function ${created.name} (${created.slug}) created by ${req.user?.email}`);
+    logger.info(`Function ${result.function.name} (${result.function.slug}) created by ${req.user?.email}`);
     await auditService.log({
       actor: req.user?.email || 'api-key',
       action: 'CREATE_FUNCTION',
       module: 'FUNCTIONS',
       details: {
-        functionId: created.id,
-        slug: created.slug,
-        name: created.name,
-        status: created.status,
+        functionId: result.function.id,
+        slug: result.function.slug,
+        name: result.function.name,
+        status: result.function.status,
       },
       ip_address: req.ip,
     });
@@ -86,8 +86,9 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
     successResponse(
       res,
       {
-        success: true,
-        function: created,
+        success: result.deployment?.status || true,
+        function: result.function,
+        deployment: result.deployment,
       },
       201
     );
@@ -109,9 +110,9 @@ router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response, next: 
       throw new AppError(JSON.stringify(validation.error.issues), 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    const updated = await functionService.updateFunction(slug, validation.data);
+    const result = await functionService.updateFunction(slug, validation.data);
 
-    if (!updated) {
+    if (!result) {
       throw new AppError('Function not found', 404, ERROR_CODES.NOT_FOUND);
     }
 
@@ -137,8 +138,9 @@ router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response, next: 
     );
 
     successResponse(res, {
-      success: true,
-      function: updated,
+      success: result.deployment?.status || true,
+      function: result.function,
+      deployment: result.deployment,
     });
   } catch (error) {
     next(error);

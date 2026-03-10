@@ -30,6 +30,21 @@ export const listFunctionsResponseSchema = z.object({
   deploymentUrl: z.string().nullable().optional(),
 });
 
+export const deploymentResultSchema = z.object({
+  id: z.string(),
+  status: z.enum(['success', 'failed']),
+  url: z.string().nullable(),
+  buildLogs: z.array(z.string()).optional(),
+});
+
+export const functionResponseSchema = z.object({
+  success: z.literal(true),
+  function: functionSchema,
+  deployment: deploymentResultSchema.nullable().optional(),
+});
+
 export type UploadFunctionRequest = z.infer<typeof uploadFunctionRequestSchema>;
 export type UpdateFunctionRequest = z.infer<typeof updateFunctionRequestSchema>;
 export type ListFunctionsResponse = z.infer<typeof listFunctionsResponseSchema>;
+export type DeploymentResult = z.infer<typeof deploymentResultSchema>;
+export type FunctionResponse = z.infer<typeof functionResponseSchema>;
