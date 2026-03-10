@@ -4,6 +4,10 @@
 # Separate stage so that COPY --from uses content-based caching.
 # Even if this stage rebuilds on version bump, the OUTPUT is
 # identical (version removed), so downstream COPY --from hits cache.
+# Pinned deno version — matches docker-compose deno runtime (denoland/deno:alpine-2.0.6)
+ARG DENO_VERSION=2.0.6
+FROM denoland/deno:alpine-${DENO_VERSION} AS deno-bin
+
 FROM node:20-alpine AS package-prep
 
 RUN apk add --no-cache jq
@@ -75,12 +79,11 @@ RUN npm install --omit=dev && npm cache clean --force
 FROM node:20-alpine AS runner
 
 # tini: proper PID 1 for signal forwarding and zombie reaping
+RUN apk add --no-cache tini
+
 # deno: required for pre-deploy type checking (checkCode) with Deno Subhosting
-RUN apk add --no-cache tini \
-    && apk add --no-cache \
-    --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \
-    --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community \
-    deno
+# Copied from official image to pin exact version (no Alpine edge dependency)
+COPY --from=deno-bin /usr/bin/deno /usr/local/bin/deno
 
 WORKDIR /app
 
@@ -103,10 +106,14 @@ COPY --from=build /app/package.json ./package.json
 # tsx is a devDependency but required at runtime for migrate:bootstrap
 RUN npm install -g tsx && npm cache clean --force
 
+# Run as non-root using the built-in node user (uid 1000)
+RUN chown -R node:node /app
+USER node
+
 EXPOSE 7130 7131
 
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["sh", "-c", "cd backend && npm run migrate:up && cd .. && npm start"]
+CMD ["sh", "-c", "cd backend && npm run migrate:up && cd .. && exec npm start"]
 
 
 # ============================================================
@@ -115,9 +122,6 @@ CMD ["sh", "-c", "cd backend && npm run migrate:up && cd .. && npm start"]
 # Source code is mounted via volumes, only needs Node.js + Deno.
 FROM node:20-alpine AS dev
 
-RUN apk add --no-cache \
-    --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \
-    --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community \
-    deno
+COPY --from=deno-bin /usr/bin/deno /usr/local/bin/deno
 
 WORKDIR /app
