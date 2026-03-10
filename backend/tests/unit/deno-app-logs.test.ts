@@ -91,7 +91,14 @@ function createMockResponse(body: unknown, status = 200, headers: Record<string,
     status,
     statusText: status === 200 ? 'OK' : 'Error',
     json: () => Promise.resolve(body),
-    text: () => Promise.resolve(typeof body === 'string' ? body : JSON.stringify(body)),
+    text: () =>
+      Promise.resolve(
+        typeof body === 'string'
+          ? body
+          : Array.isArray(body)
+            ? body.map((item) => JSON.stringify(item)).join('\n')
+            : JSON.stringify(body)
+      ),
     headers: {
       get: (name: string) => headers[name.toLowerCase()] || null,
     },
@@ -140,7 +147,7 @@ describe('DenoSubhostingProvider.getDeploymentAppLogs', () => {
     expect(mockFetch).toHaveBeenCalledWith(
       'https://api.deno.com/v1/deployments/deploy-123/app_logs',
       expect.objectContaining({
-        headers: { Authorization: 'Bearer test-deno-token' },
+        headers: expect.objectContaining({ Authorization: 'Bearer test-deno-token' }),
       })
     );
   });
