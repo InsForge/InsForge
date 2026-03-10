@@ -26,6 +26,10 @@
   <a href="https://vercel.com/oss">
     <img alt="Vercel OSS Program" src="https://vercel.com/oss/program-badge-2026.svg" />
   </a>
+  <br />
+  <a href="https://trendshift.io/repositories/19834" target="_blank">
+    <img src="https://trendshift.io/api/badge/repositories/19834" alt="InsForge%2FInsForge | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/>
+  </a>
 </div>
 
 ## InsForge
