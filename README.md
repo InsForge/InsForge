@@ -23,6 +23,7 @@
     <a href="https://www.linkedin.com/company/insforge"><img src="https://img.shields.io/badge/Follow%20on%20LinkedIn-0A66C2?logo=linkedin&logoColor=white&style=for-the-badge" alt="Follow on LinkedIn"></a>
     <a href="https://discord.com/invite/MPxwj5xVvW"><img src="https://img.shields.io/badge/Join%20our%20Discord-5865F2?logo=discord&logoColor=white&style=for-the-badge" alt="Join our Discord"></a>
   </p>
+  <br />
   <a href="https://trendshift.io/repositories/19834" target="_blank">
     <img src="https://trendshift.io/api/badge/repositories/19834" alt="InsForge%2FInsForge | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/>
   </a>
