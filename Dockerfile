@@ -83,7 +83,7 @@ RUN apk add --no-cache tini
 
 # deno: required for pre-deploy type checking (checkCode) with Deno Subhosting
 # Copied from official image to pin exact version (no Alpine edge dependency)
-COPY --from=deno-bin /usr/bin/deno /usr/local/bin/deno
+COPY --from=deno-bin /bin/deno /usr/local/bin/deno
 
 WORKDIR /app
 
@@ -122,6 +122,6 @@ CMD ["sh", "-c", "cd backend && npm run migrate:up && cd .. && exec npm start"]
 # Source code is mounted via volumes, only needs Node.js + Deno.
 FROM node:20-alpine AS dev
 
-COPY --from=deno-bin /usr/bin/deno /usr/local/bin/deno
+COPY --from=deno-bin /bin/deno /usr/local/bin/deno
 
 WORKDIR /app
