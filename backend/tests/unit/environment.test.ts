@@ -42,8 +42,11 @@ describe('Environment utils', () => {
     process.env.NODE_ENV = 'production';
     expect(isDevelopment()).toBe(false);
 
+    process.env.NODE_ENV = 'test';
+    expect(isDevelopment()).toBe(false);
+
     delete process.env.NODE_ENV;
-    expect(isDevelopment()).toBe(true);
+    expect(isDevelopment()).toBe(false);
   });
 
   it('isProduction works correctly', () => {
