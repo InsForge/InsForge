@@ -52,7 +52,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: base
+      target: dev
     image: insforge-dev
     container_name: insforge
     working_dir: /app

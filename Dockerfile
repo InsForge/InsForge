@@ -75,7 +75,7 @@ RUN npm install --omit=dev && npm cache clean --force
 FROM node:20-alpine AS runner
 
 # tini: proper PID 1 for signal forwarding and zombie reaping
-# deno: needed for pre-deploy type checking (checkCode) when Deno Subhosting is enabled
+# deno: required for pre-deploy type checking (checkCode) with Deno Subhosting
 RUN apk add --no-cache tini \
     && apk add --no-cache \
     --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \
@@ -107,3 +107,17 @@ EXPOSE 7130 7131
 
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["sh", "-c", "cd backend && npm run migrate:up && cd .. && npm start"]
+
+
+# ============================================================
+# Stage: dev — development image (used by docker-compose)
+# ============================================================
+# Source code is mounted via volumes, only needs Node.js + Deno.
+FROM node:20-alpine AS dev
+
+RUN apk add --no-cache \
+    --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \
+    --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community \
+    deno
+
+WORKDIR /app
