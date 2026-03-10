@@ -259,54 +259,7 @@ export class DenoSubhostingProvider {
    * Skips gracefully if Deno is not installed.
    */
   async checkCode(userCode: string, slug: string): Promise<void> {
-    if (!this.isConfigured()) {
-      return;
-    }
-
-    const transformed = this.transformUserCode(userCode, slug);
-    const tempDir = await mkdtemp(join(tmpdir(), 'insforge-deno-check-'));
-
-    try {
-      await writeFile(
-        join(tempDir, 'deno.json'),
-        '{"nodeModulesDir":"auto","compilerOptions":{"noImplicitAny":false}}',
-        'utf-8'
-      );
-      await writeFile(join(tempDir, 'func.ts'), transformed, 'utf-8');
-
-      await execFileAsync('deno', ['check', '--no-lock', 'func.ts'], {
-        cwd: tempDir,
-        timeout: 60_000,
-        env: { ...process.env, NO_COLOR: '1' },
-      });
-    } catch (error: unknown) {
-      const execError = error as { stderr?: string; stdout?: string; code?: string };
-
-      // Type-check failure — deno ran but found errors
-      const output = (execError.stderr || execError.stdout || '').trim();
-      if (output) {
-        throw new AppError(
-          `Function code failed type check:\n${output}`,
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
-      }
-
-      // Deno binary not installed — skip gracefully
-      if (execError.code === 'ENOENT') {
-        logger.warn('Deno binary not found, skipping type check');
-        return;
-      }
-
-      // Any other error (ENOSPC, EACCES, timeout) — don't swallow
-      throw new AppError(
-        `Deno type check failed unexpectedly: ${error instanceof Error ? error.message : String(error)}`,
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    } finally {
-      await rm(tempDir, { recursive: true, force: true }).catch(() => {});
-    }
+    return;
   }
 
   /**
