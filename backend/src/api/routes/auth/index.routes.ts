@@ -21,6 +21,7 @@ import {
   createUserRequestSchema,
   createSessionRequestSchema,
   createAdminSessionRequestSchema,
+  refreshSessionRequestSchema,
   deleteUsersRequestSchema,
   listUsersRequestSchema,
   sendVerificationEmailRequestSchema,
@@ -310,7 +311,7 @@ router.post('/id-token', async (req: Request, res: Response, next: NextFunction)
 // POST /api/auth/refresh - Refresh access token
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
 // Web clients: uses httpOnly cookie + X-CSRF-Token header
-// Non-web clients (mobile, desktop, server): use refresh_token in request body
+// Non-web clients (mobile, desktop, server): use refreshToken in request body
 router.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
   const clientType = parseClientType(req.query.client_type);
 
@@ -336,11 +337,24 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     } else {
       // Non-web clients (mobile, desktop, server): get refresh token from request body.
       // This includes trusted server-side callers that store the token outside the browser.
-      refreshToken = req.body?.refresh_token;
+      const normalizedRefreshRequest = {
+        refreshToken: req.body?.refreshToken ?? req.body?.refresh_token,
+      };
+      const validationResult = refreshSessionRequestSchema.safeParse(normalizedRefreshRequest);
+
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      refreshToken = validationResult.data.refreshToken;
 
       if (typeof refreshToken !== 'string' || refreshToken.length === 0) {
         throw new AppError(
-          'No refresh token provided. For mobile, desktop, and server clients, pass refresh_token in request body.',
+          'No refresh token provided. For mobile, desktop, and server clients, pass refreshToken in request body.',
           401,
           ERROR_CODES.AUTH_UNAUTHORIZED
         );

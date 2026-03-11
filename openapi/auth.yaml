@@ -1257,6 +1257,17 @@ paths:
         The code_verifier must match the code_challenge sent during OAuth initiation.
       tags:
         - Client
+      parameters:
+        - name: client_type
+          in: query
+          schema:
+            type: string
+            enum: [web, mobile, desktop, server]
+            default: web
+          description: |
+            Client type determines how refresh tokens are returned:
+            - web: Refresh token stored in httpOnly cookie, csrfToken returned in response
+            - mobile/desktop/server: refreshToken returned directly in response body
       requestBody:
         required: true
         content:

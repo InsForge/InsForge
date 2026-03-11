@@ -55,6 +55,14 @@ export const createSessionRequestSchema = z.object({
  */
 export const createAdminSessionRequestSchema = createSessionRequestSchema;
 
+/**
+ * POST /api/auth/refresh - Refresh session
+ * Non-web clients send refreshToken in the request body
+ */
+export const refreshSessionRequestSchema = z.object({
+  refreshToken: z.string().min(1, 'refreshToken is required'),
+});
+
 export const exchangeAdminSessionRequestSchema = z.object({
   code: z.string(),
 });
@@ -390,6 +398,7 @@ export type AuthOptions = z.infer<typeof authOptionsSchema>;
 export type CreateUserRequest = z.infer<typeof createUserRequestSchema>;
 export type CreateSessionRequest = z.infer<typeof createSessionRequestSchema>;
 export type CreateAdminSessionRequest = z.infer<typeof createAdminSessionRequestSchema>;
+export type RefreshSessionRequest = z.infer<typeof refreshSessionRequestSchema>;
 export type ListUsersRequest = z.infer<typeof listUsersRequestSchema>;
 export type DeleteUsersRequest = z.infer<typeof deleteUsersRequestSchema>;
 export type UpdateProfileRequest = z.infer<typeof updateProfileRequestSchema>;
