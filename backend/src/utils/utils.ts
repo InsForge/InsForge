@@ -118,15 +118,16 @@ export function generateSecureToken(bytes: number = 32): string {
  * - web: Browser-based clients (default) - uses httpOnly cookies for refresh tokens
  * - mobile: Mobile app clients - refresh token returned in response body
  * - desktop: Desktop app clients - refresh token returned in response body
+ * - server: Trusted server-side clients (SSR/BFF/CLI) - refresh token returned in response body
  */
-export type ClientType = 'web' | 'mobile' | 'desktop';
+export type ClientType = 'web' | 'mobile' | 'desktop' | 'server';
 
 /**
  * Parse and validate client_type query parameter
  * Returns 'web' as default if not provided or invalid
  */
 export function parseClientType(value: unknown): ClientType {
-  if (value === 'mobile' || value === 'desktop') {
+  if (value === 'mobile' || value === 'desktop' || value === 'server') {
     return value;
   }
   return 'web';

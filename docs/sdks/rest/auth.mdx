@@ -35,7 +35,7 @@ POST /api/auth/users
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `client_type` | string | No | Client type: `web` (default), `mobile`, or `desktop` |
+| `client_type` | string | No | Client type: `web` (default), `mobile`, `desktop`, or `server` |
 
 ### Request Body
 
@@ -57,7 +57,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/users" \
   }'
 ```
 
-### Example (Mobile/Desktop Client)
+### Example (Non-Web Client)
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/users?client_type=mobile" \
@@ -87,7 +87,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/users?client_type=mobile" \
 }
 ```
 
-### Response (Mobile/Desktop Client)
+### Response (Non-Web Client)
 
 ```json
 {
@@ -107,7 +107,8 @@ curl -X POST "https://your-app.insforge.app/api/auth/users?client_type=mobile" \
 
 <Note>
 - For **web clients**: A `csrfToken` is returned and the refresh token is stored in an httpOnly cookie.
-- For **mobile/desktop clients**: A `refreshToken` is returned directly in the response. Store it securely on the device.
+- For **non-web clients** (`mobile`, `desktop`, `server`): A `refreshToken` is returned directly in the response. Store it securely in your client or server runtime.
+- Use **`server`** for trusted server-side callers such as SSR apps, BFFs, or CLIs that cannot rely on browser cookies.
 - If `requireEmailVerification` is `true`, `accessToken` and tokens will be `null` and the user must verify their email before logging in.
 </Note>
 
@@ -125,7 +126,7 @@ POST /api/auth/sessions
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `client_type` | string | No | Client type: `web` (default), `mobile`, or `desktop` |
+| `client_type` | string | No | Client type: `web` (default), `mobile`, `desktop`, or `server` |
 
 ### Request Body
 
@@ -145,7 +146,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions" \
   }'
 ```
 
-### Example (Mobile/Desktop Client)
+### Example (Non-Web Client)
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile" \
@@ -173,7 +174,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile
 }
 ```
 
-### Response (Mobile/Desktop Client)
+### Response (Non-Web Client)
 
 ```json
 {
@@ -192,7 +193,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/sessions?client_type=mobile
 
 <Note>
 - For **web clients**: A `csrfToken` is returned and the refresh token is stored in an httpOnly cookie. Include the `csrfToken` in the `X-CSRF-Token` header when calling `/api/auth/refresh`.
-- For **mobile/desktop clients**: A `refreshToken` is returned directly. Store it securely on the device and include it in the request body when calling `/api/auth/refresh`.
+- For **non-web clients** (`mobile`, `desktop`, `server`): A `refreshToken` is returned directly. Store it securely and include it in the request body when calling `/api/auth/refresh`.
 </Note>
 
 ---
@@ -209,7 +210,7 @@ POST /api/auth/refresh
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `client_type` | string | No | Client type: `web` (default), `mobile`, or `desktop` |
+| `client_type` | string | No | Client type: `web` (default), `mobile`, `desktop`, or `server` |
 
 ### Headers (Web Client)
 
@@ -217,7 +218,7 @@ POST /api/auth/refresh
 |--------|------|----------|-------------|
 | `X-CSRF-Token` | string | Yes | CSRF token received from login/register response |
 
-### Request Body (Mobile/Desktop Client)
+### Request Body (Non-Web Client)
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -231,7 +232,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/refresh" \
   --cookie "refresh_token=..."
 ```
 
-### Example (Mobile/Desktop Client)
+### Example (Non-Web Client)
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/refresh?client_type=mobile" \
@@ -258,7 +259,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/refresh?client_type=mobile"
 }
 ```
 
-### Response (Mobile/Desktop Client)
+### Response (Non-Web Client)
 
 ```json
 {
@@ -278,7 +279,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/refresh?client_type=mobile"
 <Note>
 Token rotation is implemented for security:
 - **Web clients**: Each refresh returns a new `csrfToken` that must be used for subsequent refresh requests.
-- **Mobile/Desktop clients**: Each refresh returns a new `refreshToken`. You must persist this new token and use it for the next refresh. Update the `accessToken` in memory.
+- **Non-web clients** (`mobile`, `desktop`, `server`): Each refresh returns a new `refreshToken`. You must persist this new token and use it for the next refresh. Update the `accessToken` in memory.
 </Note>
 
 ---
@@ -448,7 +449,7 @@ POST /api/auth/email/verify
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `client_type` | string | No | Client type: `web` (default), `mobile`, or `desktop` |
+| `client_type` | string | No | Client type: `web` (default), `mobile`, `desktop`, or `server` |
 
 ### Request Body
 
@@ -468,7 +469,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/email/verify" \
   }'
 ```
 
-### Example (Mobile/Desktop Client)
+### Example (Non-Web Client)
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/email/verify?client_type=mobile" \
@@ -493,7 +494,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/email/verify?client_type=mo
 }
 ```
 
-### Response (Mobile/Desktop Client)
+### Response (Non-Web Client)
 
 ```json
 {
@@ -673,7 +674,7 @@ POST /api/auth/oauth/exchange
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `client_type` | string | No | Client type: `web` (default), `mobile`, or `desktop` |
+| `client_type` | string | No | Client type: `web` (default), `mobile`, `desktop`, or `server` |
 
 ### Request Body
 
@@ -713,7 +714,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/oauth/exchange?client_type=
 
 <Note>
 - For **web clients**: The `refreshToken` will be `null` and a `csrfToken` is returned instead. The refresh token is stored in an httpOnly cookie.
-- For **mobile/desktop clients**: A `refreshToken` is returned directly. Store it securely on the device.
+- For **non-web clients** (`mobile`, `desktop`, `server`): A `refreshToken` is returned directly. Store it securely.
 </Note>
 
 ---
@@ -731,7 +732,7 @@ GET /{baseURL}/auth/sign-in
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `redirect` | string | Yes | URL-encoded redirect URI |
-| `client_type` | string | No | Client type: `web` (default), `mobile`, or `desktop` |
+| `client_type` | string | No | Client type: `web` (default), `mobile`, `desktop`, or `server` |
 | `code_challenge` | string | Yes | PKCE code challenge |
 
 ### Example
@@ -756,7 +757,7 @@ Then exchange the code for tokens using `/api/auth/oauth/exchange` as described 
 
 ---
 
-### Complete OAuth Flow Example (Mobile/Desktop)
+### Complete OAuth Flow Example (Non-Web)
 
 ```swift
 // 1. Generate PKCE code verifier and challenge

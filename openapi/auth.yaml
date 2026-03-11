@@ -303,12 +303,12 @@ paths:
           in: query
           schema:
             type: string
-            enum: [web, mobile, desktop]
+            enum: [web, mobile, desktop, server]
             default: web
           description: |
             Client type determines how refresh tokens are returned:
             - web: Refresh token stored in httpOnly cookie, csrfToken returned in response
-            - mobile/desktop: refreshToken returned directly in response body
+            - mobile/desktop/server: refreshToken returned directly in response body
       requestBody:
         required: true
         content:
@@ -351,7 +351,7 @@ paths:
                   refreshToken:
                     type: string
                     nullable: true
-                    description: Refresh token for mobile/desktop clients (null for web clients or if email verification required)
+                    description: Refresh token for mobile/desktop/server clients (null for web clients or if email verification required)
                   requireEmailVerification:
                     type: boolean
                     description: Whether email verification is required before login
@@ -487,7 +487,7 @@ paths:
   /api/auth/sessions:
     post:
       summary: User login
-      description: Authenticates user and returns access token. For web clients, sets httpOnly refresh token cookie. For mobile/desktop clients, returns refreshToken in response body.
+      description: Authenticates user and returns access token. For web clients, sets httpOnly refresh token cookie. For mobile/desktop/server clients, returns refreshToken in response body.
       tags:
         - Client
       parameters:
@@ -495,12 +495,12 @@ paths:
           in: query
           schema:
             type: string
-            enum: [web, mobile, desktop]
+            enum: [web, mobile, desktop, server]
             default: web
           description: |
             Client type determines how refresh tokens are returned:
             - web: Refresh token stored in httpOnly cookie, csrfToken returned in response
-            - mobile/desktop: refreshToken returned directly in response body
+            - mobile/desktop/server: refreshToken returned directly in response body
       requestBody:
         required: true
         content:
@@ -535,7 +535,7 @@ paths:
                   refreshToken:
                     type: string
                     nullable: true
-                    description: Refresh token for mobile/desktop clients (null for web clients)
+                    description: Refresh token for mobile/desktop/server clients (null for web clients)
                   redirectTo:
                     type: string
                     format: uri
@@ -551,7 +551,7 @@ paths:
       description: |
         Refresh access token using refresh token.
         - Web clients: Use httpOnly refresh token cookie with X-CSRF-Token header
-        - Mobile/Desktop clients: Send refreshToken in request body
+        - Mobile/Desktop/Server clients: Send refreshToken in request body
       tags:
         - Client
       parameters:
@@ -559,12 +559,12 @@ paths:
           in: query
           schema:
             type: string
-            enum: [web, mobile, desktop]
+            enum: [web, mobile, desktop, server]
             default: web
           description: |
             Client type determines how refresh tokens are handled:
             - web: Refresh token from httpOnly cookie, requires X-CSRF-Token header
-            - mobile/desktop: refreshToken provided in request body, new refreshToken returned in response
+            - mobile/desktop/server: refreshToken provided in request body, new refreshToken returned in response
         - name: X-CSRF-Token
           in: header
           schema:
@@ -578,7 +578,7 @@ paths:
               properties:
                 refreshToken:
                   type: string
-                  description: Refresh token (required for mobile/desktop clients only)
+                  description: Refresh token (required for mobile/desktop/server clients only)
       responses:
         '200':
           description: Token refreshed successfully
@@ -598,7 +598,7 @@ paths:
                   refreshToken:
                     type: string
                     nullable: true
-                    description: New refresh token for mobile/desktop clients (must be persisted for next refresh)
+                    description: New refresh token for mobile/desktop/server clients (must be persisted for next refresh)
         '401':
           description: No refresh token provided or user not found
         '403':
@@ -815,12 +815,12 @@ paths:
           in: query
           schema:
             type: string
-            enum: [web, mobile, desktop]
+            enum: [web, mobile, desktop, server]
             default: web
           description: |
             Client type determines how refresh tokens are returned:
             - web: Refresh token stored in httpOnly cookie, csrfToken returned in response
-            - mobile/desktop: refreshToken returned directly in response body
+            - mobile/desktop/server: refreshToken returned directly in response body
       requestBody:
         required: true
         content:
@@ -859,7 +859,7 @@ paths:
                   refreshToken:
                     type: string
                     nullable: true
-                    description: Refresh token for mobile/desktop clients (null for web clients)
+                    description: Refresh token for mobile/desktop/server clients (null for web clients)
                   redirectTo:
                     type: string
                     format: uri
@@ -1196,7 +1196,7 @@ paths:
       description: |
         Generate OAuth authorization URL for any supported provider using PKCE flow.
 
-        For mobile/desktop clients using PKCE:
+        For mobile/desktop/server clients using PKCE:
         1. Generate code_verifier (random string, 43-128 chars)
         2. Generate code_challenge = Base64URL(SHA256(code_verifier))
         3. Call this endpoint with code_challenge
@@ -1223,9 +1223,9 @@ paths:
           schema:
             type: string
           description: |
-            PKCE code challenge for mobile/desktop clients.
+            PKCE code challenge for mobile/desktop/server clients.
             Generate using: Base64URL(SHA256(code_verifier))
-            Required for secure token exchange in native apps.
+            Required for secure token exchange in native apps or trusted server-side clients.
       responses:
         '200':
           description: OAuth authorization URL
@@ -1249,7 +1249,7 @@ paths:
       description: |
         Exchange the insforge_code (received from OAuth callback) for access and refresh tokens.
 
-        This endpoint is used for PKCE flow in mobile/desktop clients:
+        This endpoint is used for PKCE flow in mobile/desktop/server clients:
         1. After OAuth callback, your redirect_uri receives `insforge_code` parameter
         2. Call this endpoint with the code and your original code_verifier
         3. Receive access token and refresh token in response

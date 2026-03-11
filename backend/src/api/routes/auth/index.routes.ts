@@ -174,7 +174,7 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
 });
 
 // POST /api/auth/users - Create a new user (registration)
-// Query params: client_type (optional) - 'web' (default), 'mobile', or 'desktop'
+// Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
 router.post('/users', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const clientType = parseClientType(req.query.client_type);
@@ -201,7 +201,8 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
         setRefreshTokenCookie(res, refreshToken);
         result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
       } else {
-        // Mobile/Desktop clients: return refresh token in response body
+        // Non-web clients (mobile, desktop, server): return refresh token in response body.
+        // Server clients cannot rely on browser cookies, so they follow the native-app flow.
         result.refreshToken = refreshToken;
       }
     }
@@ -221,7 +222,7 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
 });
 
 // POST /api/auth/sessions - Create a new session (login)
-// Query params: client_type (optional) - 'web' (default), 'mobile', or 'desktop'
+// Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
 router.post('/sessions', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const clientType = parseClientType(req.query.client_type);
@@ -247,7 +248,8 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
       setRefreshTokenCookie(res, refreshToken);
       result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
     } else {
-      // Mobile/Desktop clients: return refresh token in response body
+      // Non-web clients (mobile, desktop, server): return refresh token in response body.
+      // Server clients cannot rely on browser cookies, so they follow the native-app flow.
       result.refreshToken = refreshToken;
     }
 
@@ -258,7 +260,7 @@ router.post('/sessions', async (req: Request, res: Response, next: NextFunction)
 });
 
 // POST /api/auth/id-token - Sign in with ID token from native SDK (Google One Tap, etc.)
-// Query params: client_type (optional) - 'web' (default), 'mobile', or 'desktop'
+// Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
 router.post('/id-token', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const clientType = parseClientType(req.query.client_type);
@@ -294,7 +296,8 @@ router.post('/id-token', async (req: Request, res: Response, next: NextFunction)
       setRefreshTokenCookie(res, refreshToken);
       result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
     } else {
-      // Mobile/Desktop clients: return refresh token in response body
+      // Non-web clients (mobile, desktop, server): return refresh token in response body.
+      // Server clients cannot rely on browser cookies, so they follow the native-app flow.
       result.refreshToken = refreshToken;
     }
 
@@ -305,9 +308,9 @@ router.post('/id-token', async (req: Request, res: Response, next: NextFunction)
 });
 
 // POST /api/auth/refresh - Refresh access token
-// Query params: client_type (optional) - 'web' (default), 'mobile', or 'desktop'
+// Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
 // Web clients: uses httpOnly cookie + X-CSRF-Token header
-// Mobile/Desktop clients: uses refresh_token in request body
+// Non-web clients (mobile, desktop, server): use refresh_token in request body
 router.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
   const clientType = parseClientType(req.query.client_type);
 
@@ -331,12 +334,13 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
         throw new AppError('Invalid CSRF token', 403, ERROR_CODES.AUTH_UNAUTHORIZED);
       }
     } else {
-      // Mobile/Desktop clients: get refresh token from request body
+      // Non-web clients (mobile, desktop, server): get refresh token from request body.
+      // This includes trusted server-side callers that store the token outside the browser.
       refreshToken = req.body?.refresh_token;
 
       if (typeof refreshToken !== 'string' || refreshToken.length === 0) {
         throw new AppError(
-          'No refresh token provided. For mobile/desktop clients, pass refresh_token in request body.',
+          'No refresh token provided. For mobile, desktop, and server clients, pass refresh_token in request body.',
           401,
           ERROR_CODES.AUTH_UNAUTHORIZED
         );
@@ -380,7 +384,8 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
         csrfToken: newCsrfToken,
       });
     } else {
-      // Mobile/Desktop clients: return refresh token in body
+      // Non-web clients (mobile, desktop, server): return refresh token in body.
+      // Server callers are expected to persist the rotated token between requests.
       successResponse(res, {
         accessToken: newAccessToken,
         user,
@@ -397,9 +402,9 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
 });
 
 // POST /api/auth/logout - Logout and clear refresh token cookie
-// Query params: client_type (optional) - 'web' (default), 'mobile', or 'desktop'
+// Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
 // Web clients: clears the httpOnly refresh token cookie
-// Mobile/Desktop clients: no server-side action needed (client should discard token)
+// Non-web clients (mobile, desktop, server): no server-side action needed (client should discard token)
 router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
   try {
     const clientType = parseClientType(req.query.client_type);
@@ -407,8 +412,8 @@ router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
     if (clientType === 'web') {
       clearRefreshTokenCookie(res);
     }
-    // For mobile/desktop: no server-side cleanup needed
-    // Client is responsible for discarding the refresh token
+    // For non-web clients: no server-side cleanup needed.
+    // The caller is responsible for discarding the refresh token it stored.
 
     successResponse(res, {
       success: true,
@@ -680,7 +685,7 @@ router.post(
 // Uses verifyEmailMethod from auth config to determine verification type:
 // - 'code': expects email + 6-digit numeric code
 // - 'link': expects 64-char hex token only
-// Query params: client_type (optional) - 'web' (default), 'mobile', or 'desktop'
+// Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
 router.post(
   '/email/verify',
   verifyOTPLimiter,
@@ -729,7 +734,8 @@ router.post(
         setRefreshTokenCookie(res, refreshToken);
         result.csrfToken = tokenManager.generateCsrfToken(refreshToken);
       } else {
-        // Mobile/Desktop clients: return refresh token in response body
+        // Non-web clients (mobile, desktop, server): return refresh token in response body.
+        // Server clients cannot rely on browser cookies, so they follow the native-app flow.
         result.refreshToken = refreshToken;
       }
 
