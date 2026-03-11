@@ -169,7 +169,8 @@ export class FunctionService {
       }
 
       const result = await client.query(
-        `SELECT id, slug, name, description, status, created_at as "createdAt"
+        `SELECT id, slug, name, description, status,
+          created_at as "createdAt", updated_at as "updatedAt", deployed_at as "deployedAt"
         FROM functions.definitions WHERE id = $1`,
         [id]
       );
@@ -273,7 +274,8 @@ export class FunctionService {
       );
 
       const result = await client.query(
-        `SELECT id, slug, name, description, status, updated_at as "updatedAt", deployed_at as "deployedAt"
+        `SELECT id, slug, name, description, status,
+          created_at as "createdAt", updated_at as "updatedAt", deployed_at as "deployedAt"
         FROM functions.definitions WHERE slug = $1`,
         [slug]
       );

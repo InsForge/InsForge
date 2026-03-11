@@ -88,7 +88,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
     successResponse(
       res,
       {
-        success: result.deployment?.status || true,
+        success: !result.deployment || result.deployment.status === 'success',
         function: result.function,
         deployment: result.deployment,
       },
@@ -140,7 +140,7 @@ router.put('/:slug', verifyAdmin, async (req: AuthRequest, res: Response, next: 
     );
 
     successResponse(res, {
-      success: result.deployment?.status || true,
+      success: !result.deployment || result.deployment.status === 'success',
       function: result.function,
       deployment: result.deployment,
     });
