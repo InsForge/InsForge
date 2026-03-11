@@ -351,14 +351,6 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       }
 
       refreshToken = validationResult.data.refreshToken;
-
-      if (typeof refreshToken !== 'string' || refreshToken.length === 0) {
-        throw new AppError(
-          'No refresh token provided. For mobile, desktop, and server clients, pass refreshToken in request body.',
-          401,
-          ERROR_CODES.AUTH_UNAUTHORIZED
-        );
-      }
     }
 
     const payload = tokenManager.verifyRefreshToken(refreshToken);
