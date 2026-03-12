@@ -18,6 +18,14 @@ import { DatabaseError, type PoolClient } from 'pg';
 export class DatabaseAdvanceService {
   private static instance: DatabaseAdvanceService;
   private dbManager = DatabaseManager.getInstance();
+  
+  /**
+   * Safely format SQL with proper identifier quoting (defense in depth)
+   * Uses pg-format %I placeholder for safe identifier interpolation
+   */
+  private safeFormat(sql: string, ...args: unknown[]): string {
+    return format(sql, ...args);
+  }
 
   private constructor() {}
 
@@ -37,7 +45,10 @@ export class DatabaseAdvanceService {
     table: string,
     rowLimit: number | undefined
   ): Promise<{ rows: Record<string, unknown>[]; totalRows: number; wasTruncated: boolean }> {
-    const query = rowLimit ? `SELECT * FROM ${table} LIMIT ${rowLimit}` : `SELECT * FROM ${table}`;
+    // Use pg-format %I for safe identifier interpolation (defense in depth)
+    const query = rowLimit 
+      ? this.safeFormat('SELECT * FROM %I LIMIT %L', table, rowLimit)
+      : this.safeFormat('SELECT * FROM %I', table);
 
     let wasTruncated = false;
     let totalRows = 0;
@@ -45,7 +56,7 @@ export class DatabaseAdvanceService {
     // Check for truncation upfront if rowLimit is set
     if (rowLimit) {
       try {
-        const countResult = await client.query(`SELECT COUNT(*) FROM ${table}`);
+        const countResult = await client.query(this.safeFormat('SELECT COUNT(*) FROM %I', table));
         totalRows = parseInt(countResult.rows[0].count);
         wasTruncated = totalRows > rowLimit;
       } catch (err) {
