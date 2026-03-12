@@ -28,6 +28,14 @@ export class DatabaseAdvanceService {
     return DatabaseAdvanceService.instance;
   }
 
+  private quoteTableIdentifier(table: string): string {
+    validateTableName(table);
+    return table
+      .split('.')
+      .map((part) => format.ident(part))
+      .join('.');
+  }
+
   /**
    * Get table data using simple SELECT query
    * More reliable than streaming for moderate datasets
@@ -37,7 +45,8 @@ export class DatabaseAdvanceService {
     table: string,
     rowLimit: number | undefined
   ): Promise<{ rows: Record<string, unknown>[]; totalRows: number; wasTruncated: boolean }> {
-    const query = rowLimit ? `SELECT * FROM ${table} LIMIT ${rowLimit}` : `SELECT * FROM ${table}`;
+    const safeTable = this.quoteTableIdentifier(table);
+    const query = rowLimit ? `SELECT * FROM ${safeTable} LIMIT ${rowLimit}` : `SELECT * FROM ${safeTable}`;
 
     let wasTruncated = false;
     let totalRows = 0;
@@ -45,7 +54,7 @@ export class DatabaseAdvanceService {
     // Check for truncation upfront if rowLimit is set
     if (rowLimit) {
       try {
-        const countResult = await client.query(`SELECT COUNT(*) FROM ${table}`);
+        const countResult = await client.query(`SELECT COUNT(*) FROM ${safeTable}`);
         totalRows = parseInt(countResult.rows[0].count);
         wasTruncated = totalRows > rowLimit;
       } catch (err) {
@@ -148,6 +157,7 @@ export class DatabaseAdvanceService {
   }
 
   private async exportTableSchemaBySQL(client: PoolClient, table: string): Promise<string> {
+    const safeTable = this.quoteTableIdentifier(table);
     let sqlExport = '';
     // Always export table schema with defaults
     const schemaResult = await client.query(
@@ -257,7 +267,7 @@ export class DatabaseAdvanceService {
       (rlsResult.rows[0].relrowsecurity === true || rlsResult.rows[0].relrowsecurity === 1);
     if (rlsEnabled) {
       sqlExport += `-- RLS enabled for table: ${table}\n`;
-      sqlExport += `ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;\n\n`;
+      sqlExport += `ALTER TABLE ${safeTable} ENABLE ROW LEVEL SECURITY;\n\n`;
     }
 
     // Export RLS policies
@@ -383,6 +393,7 @@ export class DatabaseAdvanceService {
 
           // Export data if requested - using simple SELECT query
           if (includeData) {
+            const safeTable = this.quoteTableIdentifier(table);
             let tableDataSql = '';
 
             const { rows, wasTruncated } = await this.getTableData(client, table, rowLimit);
@@ -408,12 +419,12 @@ export class DatabaseAdvanceService {
                     return String(val);
                   }
                 });
-                tableDataSql += `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${values.join(', ')});\n`;
+                tableDataSql += `INSERT INTO ${safeTable} (${columns.join(', ')}) VALUES (${values.join(', ')});\n`;
               }
             }
 
             if (wasTruncated) {
-              const countResult = await client.query(`SELECT COUNT(*) FROM ${table}`);
+              const countResult = await client.query(`SELECT COUNT(*) FROM ${safeTable}`);
               const totalRowsInTable = parseInt(countResult.rows[0].count);
               tableDataSql =
                 `-- WARNING: Table contains ${totalRowsInTable} rows, but only ${rowLimit} rows exported due to row limit\n` +
