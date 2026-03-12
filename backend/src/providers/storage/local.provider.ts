@@ -15,7 +15,16 @@ export class LocalStorageProvider implements StorageProvider {
   }
 
   private getFilePath(bucket: string, key: string): string {
-    return path.join(this.baseDir, bucket, key);
+    const filePath = path.join(this.baseDir, bucket, key);
+    const resolvedPath = path.resolve(filePath);
+
+    // Prevent path traversal by ensuring the resolved path starts with the base directory
+    const resolvedBaseDir = path.resolve(this.baseDir);
+    if (!resolvedPath.startsWith(resolvedBaseDir)) {
+      throw new Error('Access denied: Path is outside the base directory');
+    }
+
+    return resolvedPath;
   }
 
   async putObject(bucket: string, key: string, file: Express.Multer.File): Promise<void> {
