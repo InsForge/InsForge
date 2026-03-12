@@ -1,6 +1,5 @@
-import { Radio } from 'lucide-react';
+import { Radio, Plus } from 'lucide-react';
 import { Button } from '@insforge/ui';
-import { Plus } from 'lucide-react';
 
 interface RealtimeEmptyStateProps {
   type: 'channels' | 'messages';

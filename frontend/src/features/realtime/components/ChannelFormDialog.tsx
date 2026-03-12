@@ -68,7 +68,9 @@ export function ChannelFormDialog({
 
   // Populate form when opening
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      return;
+    }
 
     if (mode === 'create') {
       setForm(DEFAULT_FORM);
@@ -92,8 +94,7 @@ export function ChannelFormDialog({
   const handleRemoveWebhook = (index: number) => {
     setForm((f) => ({
       ...f,
-      webhookUrls:
-        f.webhookUrls.length === 1 ? [''] : f.webhookUrls.filter((_, i) => i !== index),
+      webhookUrls: f.webhookUrls.length === 1 ? [''] : f.webhookUrls.filter((_, i) => i !== index),
     }));
   };
 
@@ -113,34 +114,51 @@ export function ChannelFormDialog({
         pattern: form.pattern,
         enabled: form.enabled,
       };
-      if (form.description) data.description = form.description;
-      if (filteredWebhooks.length > 0) data.webhookUrls = filteredWebhooks;
-      onCreate!(data);
+      if (form.description) {
+        data.description = form.description;
+      }
+      if (filteredWebhooks.length > 0) {
+        data.webhookUrls = filteredWebhooks;
+      }
+      onCreate?.(data);
       return;
     }
 
-    if (!channel) return;
+    if (!channel) {
+      return;
+    }
 
     const updates: UpdateChannelRequest = {};
 
-    if (form.pattern !== channel.pattern) updates.pattern = form.pattern;
-    if (form.description !== (channel.description || ''))
+    if (form.pattern !== channel.pattern) {
+      updates.pattern = form.pattern;
+    }
+    if (form.description !== (channel.description || '')) {
       updates.description = form.description || undefined;
-    if (form.enabled !== channel.enabled) updates.enabled = form.enabled;
+    }
+    if (form.enabled !== channel.enabled) {
+      updates.enabled = form.enabled;
+    }
 
     const originalWebhooks = channel.webhookUrls || [];
     const webhooksChanged =
       filteredWebhooks.length !== originalWebhooks.length ||
       filteredWebhooks.some((url, i) => url !== originalWebhooks[i]);
-    if (webhooksChanged) updates.webhookUrls = filteredWebhooks;
+    if (webhooksChanged) {
+      updates.webhookUrls = filteredWebhooks;
+    }
 
-    onSave!(channel.id, updates);
+    onSave?.(channel.id, updates);
   };
 
   const canSave = () => {
-    if (mode === 'create') return form.pattern.trim().length > 0;
+    if (mode === 'create') {
+      return form.pattern.trim().length > 0;
+    }
 
-    if (!channel) return false;
+    if (!channel) {
+      return false;
+    }
     const originalWebhooks = channel.webhookUrls || [];
     const webhooksChanged =
       filteredWebhooks.length !== originalWebhooks.length ||
