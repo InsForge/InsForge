@@ -498,7 +498,7 @@ router.get('/:provider/callback', handleOAuthCallback);
 router.post('/:provider/callback', handleOAuthCallback);
 
 // POST /api/auth/oauth/exchange - Exchange code for tokens (PKCE flow)
-// Query params: client_type (optional) - 'web' (default), 'mobile', or 'desktop'
+// Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
 router.post('/exchange', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const clientType = parseClientType(req.query.client_type);
@@ -533,7 +533,8 @@ router.post('/exchange', async (req: Request, res: Response, next: NextFunction)
         redirectTo: result.redirectTo,
       });
     } else {
-      // Mobile/Desktop clients: return refresh token in response body
+      // Non-web clients (mobile, desktop, server): return refresh token in response body.
+      // Server clients cannot rely on browser cookies, so they follow the native-app flow.
       successResponse(res, {
         accessToken: result.accessToken,
         user: result.user,
