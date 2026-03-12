@@ -14,105 +14,141 @@ import {
 } from '@insforge/ui';
 import { Label, Textarea } from '@/components';
 import type { RealtimeChannel } from '../services/realtime.service';
-import type { UpdateChannelRequest } from '@insforge/shared-schemas';
+import type { CreateChannelRequest, UpdateChannelRequest } from '@insforge/shared-schemas';
 
-interface EditChannelModalProps {
-  channel: RealtimeChannel | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSave: (id: string, data: UpdateChannelRequest) => void;
-  isUpdating?: boolean;
+// ── Shared form state ──────────────────────────────────────────────────────────
+
+interface FormState {
+  pattern: string;
+  description: string;
+  enabled: boolean;
+  webhookUrls: string[];
 }
 
-export function EditChannelModal({
+const DEFAULT_FORM: FormState = {
+  pattern: '',
+  description: '',
+  enabled: true,
+  webhookUrls: [''],
+};
+
+// ── Props ──────────────────────────────────────────────────────────────────────
+
+type CreateProps = {
+  mode: 'create';
+  channel?: never;
+  onSave?: never;
+  onCreate: (data: CreateChannelRequest) => void;
+  isUpdating?: boolean;
+};
+
+type EditProps = {
+  mode?: 'edit';
+  channel: RealtimeChannel | null;
+  onSave: (id: string, data: UpdateChannelRequest) => void;
+  onCreate?: never;
+  isUpdating?: boolean;
+};
+
+type ChannelFormDialogProps = (CreateProps | EditProps) & {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+};
+
+export function ChannelFormDialog({
+  mode = 'edit',
   channel,
   open,
   onOpenChange,
   onSave,
+  onCreate,
   isUpdating,
-}: EditChannelModalProps) {
-  const [pattern, setPattern] = useState('');
-  const [description, setDescription] = useState('');
-  const [enabled, setEnabled] = useState(true);
-  const [webhookUrls, setWebhookUrls] = useState<string[]>(['']);
+}: ChannelFormDialogProps) {
+  const [form, setForm] = useState<FormState>(DEFAULT_FORM);
 
+  // Populate form when opening
   useEffect(() => {
-    if (channel) {
-      setPattern(channel.pattern);
-      setDescription(channel.description || '');
-      setEnabled(channel.enabled);
-      // Default to at least one empty input if no webhooks configured
-      const urls =
-        channel.webhookUrls && channel.webhookUrls.length > 0 ? channel.webhookUrls : [''];
-      setWebhookUrls(urls);
+    if (!open) return;
+
+    if (mode === 'create') {
+      setForm(DEFAULT_FORM);
+    } else if (channel) {
+      setForm({
+        pattern: channel.pattern,
+        description: channel.description || '',
+        enabled: channel.enabled,
+        webhookUrls:
+          channel.webhookUrls && channel.webhookUrls.length > 0 ? channel.webhookUrls : [''],
+      });
     }
-  }, [channel]);
+  }, [open, mode, channel]);
+
+  // ── Webhook helpers ────────────────────────────────────────────────────────
 
   const handleAddWebhook = () => {
-    setWebhookUrls([...webhookUrls, '']);
+    setForm((f) => ({ ...f, webhookUrls: [...f.webhookUrls, ''] }));
   };
 
   const handleRemoveWebhook = (index: number) => {
-    if (webhookUrls.length === 1) {
-      // Keep at least one input, just clear it
-      setWebhookUrls(['']);
-    } else {
-      setWebhookUrls(webhookUrls.filter((_, i) => i !== index));
-    }
+    setForm((f) => ({
+      ...f,
+      webhookUrls:
+        f.webhookUrls.length === 1 ? [''] : f.webhookUrls.filter((_, i) => i !== index),
+    }));
   };
 
   const handleWebhookChange = (index: number, value: string) => {
-    const updated = [...webhookUrls];
-    updated[index] = value;
-    setWebhookUrls(updated);
+    setForm((f) => {
+      const updated = [...f.webhookUrls];
+      updated[index] = value;
+      return { ...f, webhookUrls: updated };
+    });
   };
 
+  const filteredWebhooks = form.webhookUrls.filter((url) => url.trim() !== '');
+
   const handleSave = () => {
-    if (!channel) {
+    if (mode === 'create') {
+      const data: CreateChannelRequest = {
+        pattern: form.pattern,
+        enabled: form.enabled,
+      };
+      if (form.description) data.description = form.description;
+      if (filteredWebhooks.length > 0) data.webhookUrls = filteredWebhooks;
+      onCreate!(data);
       return;
     }
 
+    if (!channel) return;
+
     const updates: UpdateChannelRequest = {};
 
-    if (pattern !== channel.pattern) {
-      updates.pattern = pattern;
-    }
-    if (description !== (channel.description || '')) {
-      updates.description = description || undefined;
-    }
-    if (enabled !== channel.enabled) {
-      updates.enabled = enabled;
-    }
+    if (form.pattern !== channel.pattern) updates.pattern = form.pattern;
+    if (form.description !== (channel.description || ''))
+      updates.description = form.description || undefined;
+    if (form.enabled !== channel.enabled) updates.enabled = form.enabled;
 
-    // Filter out empty webhook URLs and compare
-    const filteredWebhooks = webhookUrls.filter((url) => url.trim() !== '');
     const originalWebhooks = channel.webhookUrls || [];
     const webhooksChanged =
       filteredWebhooks.length !== originalWebhooks.length ||
       filteredWebhooks.some((url, i) => url !== originalWebhooks[i]);
+    if (webhooksChanged) updates.webhookUrls = filteredWebhooks;
 
-    if (webhooksChanged) {
-      updates.webhookUrls = filteredWebhooks;
-    }
-
-    onSave(channel.id, updates);
+    onSave!(channel.id, updates);
   };
 
-  const hasChanges = () => {
-    if (!channel) {
-      return false;
-    }
+  const canSave = () => {
+    if (mode === 'create') return form.pattern.trim().length > 0;
 
-    const filteredWebhooks = webhookUrls.filter((url) => url.trim() !== '');
+    if (!channel) return false;
     const originalWebhooks = channel.webhookUrls || [];
     const webhooksChanged =
       filteredWebhooks.length !== originalWebhooks.length ||
       filteredWebhooks.some((url, i) => url !== originalWebhooks[i]);
-
     return (
-      pattern !== channel.pattern ||
-      description !== (channel.description || '') ||
-      enabled !== channel.enabled ||
+      form.pattern !== channel.pattern ||
+      form.description !== (channel.description || '') ||
+      form.enabled !== channel.enabled ||
       webhooksChanged
     );
   };
@@ -121,14 +157,14 @@ export function EditChannelModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit Channel</DialogTitle>
+          <DialogTitle>{mode === 'create' ? 'Add Channel' : 'Edit Channel'}</DialogTitle>
         </DialogHeader>
 
         <DialogBody>
           {/* Pattern */}
           <div className="flex gap-6 items-start">
             <div className="flex w-[200px] shrink-0 flex-col gap-2">
-              <Label htmlFor="pattern" className="leading-5 text-foreground">
+              <Label htmlFor="channel-pattern" className="leading-5 text-foreground">
                 Pattern
               </Label>
               <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
@@ -137,9 +173,9 @@ export function EditChannelModal({
             </div>
             <div className="min-w-0 flex-1">
               <Input
-                id="pattern"
-                value={pattern}
-                onChange={(e) => setPattern(e.target.value)}
+                id="channel-pattern"
+                value={form.pattern}
+                onChange={(e) => setForm((f) => ({ ...f, pattern: e.target.value }))}
                 placeholder="e.g., room:%, chat:lobby"
                 className="h-8 rounded bg-[var(--alpha-4)] px-1.5 py-1.5 text-[13px] leading-[18px]"
               />
@@ -148,19 +184,18 @@ export function EditChannelModal({
 
           <DialogDivider />
 
-          {/* Description */}
           <div className="flex gap-6 items-start">
             <div className="w-[200px] shrink-0">
-              <Label htmlFor="description" className="leading-5 text-foreground">
+              <Label htmlFor="channel-description" className="leading-5 text-foreground">
                 Description
               </Label>
             </div>
             <div className="min-w-0 flex-1">
               <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Enter your message here"
+                id="channel-description"
+                value={form.description}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                placeholder="Optional description"
                 rows={3}
                 className="min-h-[80px] rounded bg-[var(--alpha-4)] border-[var(--alpha-12)] text-foreground px-2.5 py-1.5 text-[13px] leading-[18px] resize-none"
               />
@@ -169,15 +204,18 @@ export function EditChannelModal({
 
           <DialogDivider />
 
-          {/* Enabled */}
           <div className="flex gap-6 items-center">
             <div className="w-[200px] shrink-0">
-              <Label htmlFor="enabled" className="leading-5 text-foreground">
+              <Label htmlFor="channel-enabled" className="leading-5 text-foreground">
                 Enabled
               </Label>
             </div>
             <div className="min-w-0 flex-1 flex justify-end">
-              <Switch id="enabled" checked={enabled} onCheckedChange={setEnabled} />
+              <Switch
+                id="channel-enabled"
+                checked={form.enabled}
+                onCheckedChange={(v) => setForm((f) => ({ ...f, enabled: v }))}
+              />
             </div>
           </div>
 
@@ -192,7 +230,7 @@ export function EditChannelModal({
               </p>
             </div>
             <div className="min-w-0 flex-1 flex flex-col gap-2 items-end">
-              {webhookUrls.map((url, index) => (
+              {form.webhookUrls.map((url, index) => (
                 <div key={index} className="flex w-full items-center gap-1.5">
                   <Input
                     value={url}
@@ -236,10 +274,16 @@ export function EditChannelModal({
           <Button
             type="button"
             onClick={handleSave}
-            disabled={!hasChanges() || isUpdating}
+            disabled={!canSave() || isUpdating}
             className="h-8 rounded px-2"
           >
-            {isUpdating ? 'Saving...' : 'Save Changes'}
+            {isUpdating
+              ? mode === 'create'
+                ? 'Creating...'
+                : 'Saving...'
+              : mode === 'create'
+                ? 'Create Channel'
+                : 'Save Changes'}
           </Button>
         </DialogFooter>
       </DialogContent>
