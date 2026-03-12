@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Plus, X } from 'lucide-react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import {
   Button,
   Dialog,
@@ -15,12 +16,7 @@ import {
   Switch,
 } from '@insforge/ui';
 import { Label, Textarea } from '@/components';
-import {
-  createChannelRequestSchema,
-  updateChannelRequestSchema,
-  type CreateChannelRequest,
-  type UpdateChannelRequest,
-} from '@insforge/shared-schemas';
+import { type CreateChannelRequest, type UpdateChannelRequest } from '@insforge/shared-schemas';
 import type { RealtimeChannel } from '../services/realtime.service';
 
 // ── Shared form state ──────────────────────────────────────────────────────────
@@ -38,6 +34,17 @@ const DEFAULT_VALUES: FormValues = {
   enabled: true,
   webhookUrls: [{ url: '' }],
 };
+
+const formSchema = z.object({
+  pattern: z.string().min(1, 'Channel pattern is required'),
+  description: z.string(),
+  enabled: z.boolean(),
+  webhookUrls: z.array(
+    z.object({
+      url: z.string().url('Invalid URL format').or(z.literal('')),
+    })
+  ),
+});
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 
@@ -71,8 +78,6 @@ export function ChannelFormDialog({
   onCreate,
   isUpdating,
 }: ChannelFormDialogProps) {
-  const schema = mode === 'create' ? createChannelRequestSchema : updateChannelRequestSchema;
-
   const {
     register,
     handleSubmit,
@@ -80,7 +85,7 @@ export function ChannelFormDialog({
     reset,
     formState: { errors, isDirty, isValid },
   } = useForm<FormValues>({
-    resolver: zodResolver(schema as any),
+    resolver: zodResolver(formSchema),
     defaultValues: DEFAULT_VALUES,
     mode: 'onChange',
   });
@@ -113,9 +118,7 @@ export function ChannelFormDialog({
 
   const onFormSubmit = (values: FormValues) => {
     // Filter out empty URLs for the API
-    const webhookUrls = values.webhookUrls
-      .map((w) => w.url.trim())
-      .filter((url) => url.length > 0);
+    const webhookUrls = values.webhookUrls.map((w) => w.url.trim()).filter((url) => url.length > 0);
 
     if (mode === 'create') {
       const data: CreateChannelRequest = {
@@ -157,7 +160,7 @@ export function ChannelFormDialog({
           <DialogTitle>{mode === 'create' ? 'Add Channel' : 'Edit Channel'}</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onFormSubmit)}>
+        <form onSubmit={(e) => void handleSubmit(onFormSubmit)(e)}>
           <DialogBody>
             {/* Pattern */}
             <div className="flex gap-6 items-start">
@@ -258,7 +261,9 @@ export function ChannelFormDialog({
                       )}
                     </div>
                     {errors.webhookUrls?.[index]?.url && (
-                      <p className="text-xs text-red-500">{errors.webhookUrls[index].url.message}</p>
+                      <p className="text-xs text-red-500">
+                        {errors.webhookUrls[index].url.message}
+                      </p>
                     )}
                   </div>
                 ))}
@@ -286,7 +291,7 @@ export function ChannelFormDialog({
             </Button>
             <Button
               type="submit"
-              disabled={(!isDirty || !isValid) || isUpdating}
+              disabled={!isDirty || !isValid || isUpdating}
               className="h-8 rounded px-2"
             >
               {isUpdating
