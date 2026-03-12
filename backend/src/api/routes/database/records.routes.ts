@@ -30,8 +30,7 @@ function handleProxyError(error: unknown, res: Response, next: NextFunction) {
  * Forward database table requests to PostgREST
  */
 const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  const { tableName } = req.params;
-  const wildcardPath = req.params[0] || '';
+  const { tableName, path: wildcardPath } = req.params;
   const path = wildcardPath ? `/${tableName}/${wildcardPath}` : `/${tableName}`;
 
   try {
@@ -119,6 +118,6 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
 
 // Forward all database operations to PostgREST
 router.all('/:tableName', forwardToPostgrest);
-router.all('/:tableName/*', forwardToPostgrest);
+router.all('/:tableName/*path', forwardToPostgrest);
 
 export { router as databaseRecordsRouter };
