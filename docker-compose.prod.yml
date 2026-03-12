@@ -21,11 +21,15 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    security_opt:
+      - no-new-privileges:true
 
   postgrest:
     image: postgrest/postgrest:v12.2.12
     container_name: insforge-postgrest
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     environment:
       #POSTGRES_USER: ${POSTGRES_USER:-postgres}
       #POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -119,12 +123,16 @@ services:
     restart: unless-stopped
     networks:
       - insforge-network
+    security_opt:
+      - no-new-privileges:true
 
   # Deno serverless runtime for edge functions
   deno:
     image: denoland/deno:alpine-2.0.6
     container_name: insforge-deno
     working_dir: /app
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       - postgres
       - postgrest
@@ -165,6 +173,8 @@ services:
     container_name: insforge-vector
     image: timberio/vector:0.28.1-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       postgres:
         condition: service_healthy

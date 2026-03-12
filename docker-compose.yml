@@ -16,6 +16,8 @@ services:
       - ./deploy/docker-init/db/postgresql.conf:/etc/postgresql/postgresql.conf
     ports:
       - "5432:5432"
+    security_opt:
+      - no-new-privileges:true
     networks:
       - insforge-network
     healthcheck:
@@ -45,6 +47,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
     networks:
       - insforge-network
 
@@ -146,6 +150,8 @@ services:
       - storage-data:/insforge-storage
     command: sh -c "npm install && cd backend && npm run migrate:up && cd .. && npm run dev"
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     networks:
       - insforge-network
 
@@ -186,6 +192,8 @@ services:
         deno run --allow-net --allow-env --allow-read=./functions/worker-template.js --watch functions/server.ts
       "
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     networks:
       - insforge-network
 
@@ -219,6 +227,8 @@ services:
       - PROJECT_ID=${PROJECT_ID:-}
       - HOSTNAME_OVERRIDE=${HOSTNAME_OVERRIDE:-}
     command: ["--config", "/etc/vector/vector.yml"]
+    security_opt:
+      - no-new-privileges:true
     networks:
       - insforge-network
 
