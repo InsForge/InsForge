@@ -83,10 +83,6 @@ FROM node:20-alpine AS runner
 # tini: proper PID 1 for signal forwarding and zombie reaping
 RUN apk add --no-cache tini
 
-# deno: required for pre-deploy type checking (checkCode) with Deno Subhosting
-# Copied from official image to pin exact version (no Alpine edge dependency)
-COPY --from=deno-bin /bin/deno /usr/local/bin/deno
-
 WORKDIR /app
 
 # Production node_modules (hoisted by npm workspaces)
