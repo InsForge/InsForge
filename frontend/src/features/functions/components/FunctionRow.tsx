@@ -1,19 +1,25 @@
-import { CopyButton } from '@insforge/ui';
+import { Button, CopyButton } from '@insforge/ui';
 import { FunctionSchema } from '@insforge/shared-schemas';
 import { cn, getBackendUrl } from '@/lib/utils/utils';
 import { format, formatDistance } from 'date-fns';
+import { Trash2 } from 'lucide-react';
+
 interface FunctionRowProps {
   function: FunctionSchema;
   onClick: () => void;
+  onDelete: () => void;
   className?: string;
   deploymentUrl?: string | null;
+  isDeleting?: boolean;
 }
 
 export function FunctionRow({
   function: func,
   onClick,
+  onDelete,
   className,
   deploymentUrl,
+  isDeleting,
 }: FunctionRowProps) {
   // Use deployment URL if available (cloud mode), otherwise fall back to proxy URL
   const functionUrl = deploymentUrl
@@ -67,6 +73,24 @@ export function FunctionRow({
               ? formatDistance(new Date(func.deployedAt), new Date(), { addSuffix: true })
               : 'Never'}
           </span>
+        </div>
+
+        {/* Delete Button Column */}
+        <div className="w-12 h-12 flex items-center justify-end px-2.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete();
+            }}
+            disabled={isDeleting}
+            className="size-8 p-1.5 text-muted-foreground hover:text-foreground hover:bg-[var(--alpha-8)] opacity-0 group-hover:opacity-100 transition-opacity"
+            title="Delete function"
+            aria-label={`Delete function ${func.name}`}
+          >
+            <Trash2 className="w-5 h-5" />
+          </Button>
         </div>
       </div>
     </div>

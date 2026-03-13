@@ -5,7 +5,14 @@ import { useFunctions } from '../hooks/useFunctions';
 import { useToast } from '@/lib/hooks/useToast';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
+import {
+  Button,
+  ConfirmDialog,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@insforge/ui';
 import { CodeEditor, Skeleton, TableHeader } from '@/components';
 
 export default function FunctionsPage() {
@@ -20,10 +27,13 @@ export default function FunctionsPage() {
     isRuntimeAvailable,
     selectedFunction,
     isLoading,
+    isDeleting,
     selectFunction,
     clearSelection,
+    deleteFunction,
     refetch,
     deploymentUrl,
+    confirmDialogProps,
   } = useFunctions();
 
   const handleScroll = useCallback(() => {
@@ -141,6 +151,7 @@ export default function FunctionsPage() {
             <div className="flex-[3] py-1.5 px-2.5">URL</div>
             <div className="flex-[1.5] py-1.5 px-2.5">Created</div>
             <div className="flex-1 py-1.5 px-2.5">Last Update</div>
+            <div className="w-12" />
           </div>
         </div>
 
@@ -160,7 +171,9 @@ export default function FunctionsPage() {
                     key={func.id}
                     function={func}
                     onClick={() => void selectFunction(func)}
+                    onDelete={() => void deleteFunction(func)}
                     deploymentUrl={deploymentUrl}
+                    isDeleting={isDeleting}
                   />
                 ))}
               </>
@@ -180,6 +193,8 @@ export default function FunctionsPage() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog {...confirmDialogProps} />
     </div>
   );
 }

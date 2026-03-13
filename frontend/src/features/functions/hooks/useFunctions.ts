@@ -3,10 +3,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { functionService } from '../services/function.service';
 import { FunctionSchema } from '@insforge/shared-schemas';
 import { useToast } from '@/lib/hooks/useToast';
+import { useConfirm } from '@/lib/hooks/useConfirm';
 
 export function useFunctions() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
+  const { confirm, confirmDialogProps } = useConfirm();
   const [selectedFunction, setSelectedFunction] = useState<FunctionSchema | null>(null);
 
   // Query to fetch all functions
@@ -47,13 +49,11 @@ export function useFunctions() {
     setSelectedFunction(null);
   }, []);
 
-  // Delete function mutation (for future use)
   const deleteFunctionMutation = useMutation({
     mutationFn: (slug: string) => functionService.deleteFunction(slug),
     onSuccess: (_, slug) => {
       void queryClient.invalidateQueries({ queryKey: ['functions'] });
       showToast('Function deleted successfully', 'success');
-      // Clear selection if deleted function was selected
       if (selectedFunction && selectedFunction.slug === slug) {
         setSelectedFunction(null);
       }
@@ -63,6 +63,30 @@ export function useFunctions() {
       showToast(errorMessage, 'error');
     },
   });
+
+  const deleteFunction = useCallback(
+    async (func: FunctionSchema) => {
+      const shouldDelete = await confirm({
+        title: 'Delete Function',
+        description: `Are you sure you want to delete "${func.name}"?`,
+        confirmText: 'Delete',
+        cancelText: 'Cancel',
+        destructive: true,
+      });
+
+      if (!shouldDelete) {
+        return false;
+      }
+
+      try {
+        await deleteFunctionMutation.mutateAsync(func.slug);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [confirm, deleteFunctionMutation]
+  );
 
   // Helper to check if a function is selected
   const isViewingDetail = selectedFunction !== null;
@@ -95,8 +119,11 @@ export function useFunctions() {
     // Actions
     selectFunction,
     clearSelection,
-    deleteFunction: deleteFunctionMutation.mutate,
+    deleteFunction,
     refetch,
+
+    // Confirm dialog props
+    confirmDialogProps,
 
     // Helpers
     getFunctionBySlug: useCallback(
