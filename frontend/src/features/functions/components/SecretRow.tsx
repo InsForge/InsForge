@@ -50,7 +50,7 @@ export function SecretRow({ secret, onDelete, className }: SecretRowProps) {
       await navigator.clipboard.writeText(value);
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
-    } catch (_err) {
+    } catch {
       showToast('Failed to copy to clipboard', 'error');
     }
   };
