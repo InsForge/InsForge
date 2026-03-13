@@ -35,6 +35,7 @@ export interface DataGridProps<TRow extends DataGridRowType = DataGridRow> {
   onSelectedRowsChange?: (selectedRows: Set<string>) => void;
   sortColumns?: SortColumn[];
   onSortColumnsChange?: (sortColumns: SortColumn[]) => void;
+  onColumnResize?: (columnKey: string, width: number) => void;
   onCellClick?: (args: CellClickArgs<TRow>, event: CellMouseEvent) => void;
   currentPage?: number;
   totalPages?: number;
@@ -76,6 +77,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
   onSelectedRowsChange,
   sortColumns,
   onSortColumnsChange,
+  onColumnResize,
   onCellClick,
   currentPage,
   totalPages,
@@ -245,6 +247,22 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
     selectionHeaderLabel,
   ]);
 
+  const handleGridColumnResize = useCallback(
+    (idx: number, width: number) => {
+      if (!onColumnResize) {
+        return;
+      }
+
+      const column = gridColumns[idx];
+      if (!column || column.key === SELECT_COLUMN_KEY) {
+        return;
+      }
+
+      onColumnResize(String(column.key), width);
+    },
+    [gridColumns, onColumnResize]
+  );
+
   // Loading state - only show full loading screen if not sorting
   if (loading && !isSorting) {
     return (
@@ -277,6 +295,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
             onSelectedRowsChange={onSelectedRowsChange}
             sortColumns={sortColumns || []}
             onSortColumnsChange={onSortColumnsChange}
+            onColumnResize={handleGridColumnResize}
             onCellClick={onCellClick}
             rowClass={rowClass}
             className={cn(

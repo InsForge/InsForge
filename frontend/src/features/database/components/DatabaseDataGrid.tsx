@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   DataGrid,
   createDefaultCellRenderer,
@@ -18,6 +18,77 @@ import { ForeignKeyCell } from './ForeignKeyCell';
 // Create a type adapter for database records
 // Database records are dynamic and must have string id for DataGrid compatibility
 type DatabaseDataGridRow = DataGridRowType;
+
+type PersistedColumnWidths = Record<string, number>;
+
+interface DatabaseGridPreferences {
+  columnWidthsByTable?: Record<string, PersistedColumnWidths>;
+}
+
+const DATABASE_GRID_PREFERENCES_STORAGE_KEY = 'database-grid-preferences';
+const DEFAULT_COLUMN_WIDTH = 'minmax(200px, 1fr)';
+
+function loadPersistedColumnWidths(
+  tableName?: string,
+  schema?: TableSchema
+): PersistedColumnWidths {
+  if (typeof window === 'undefined' || !tableName) {
+    return {};
+  }
+
+  try {
+    const stored = localStorage.getItem(DATABASE_GRID_PREFERENCES_STORAGE_KEY);
+    if (!stored) {
+      return {};
+    }
+
+    const parsed = JSON.parse(stored) as DatabaseGridPreferences;
+    const savedWidths = parsed.columnWidthsByTable?.[tableName];
+    if (!savedWidths || typeof savedWidths !== 'object') {
+      return {};
+    }
+
+    const validColumnNames = new Set(schema?.columns.map((column) => column.columnName) ?? []);
+
+    return Object.fromEntries(
+      Object.entries(savedWidths).filter(
+        ([columnName, width]) =>
+          validColumnNames.has(columnName) &&
+          typeof width === 'number' &&
+          Number.isFinite(width) &&
+          width > 0
+      )
+    );
+  } catch (error) {
+    console.error('Failed to load database grid widths from localStorage:', error);
+    return {};
+  }
+}
+
+function persistColumnWidths(tableName: string, columnWidths: PersistedColumnWidths) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    const stored = localStorage.getItem(DATABASE_GRID_PREFERENCES_STORAGE_KEY);
+    const parsed = stored ? (JSON.parse(stored) as DatabaseGridPreferences) : {};
+    const columnWidthsByTable = {
+      ...(parsed.columnWidthsByTable ?? {}),
+      [tableName]: columnWidths,
+    };
+
+    localStorage.setItem(
+      DATABASE_GRID_PREFERENCES_STORAGE_KEY,
+      JSON.stringify({
+        ...parsed,
+        columnWidthsByTable,
+      })
+    );
+  } catch (error) {
+    console.error('Failed to save database grid widths to localStorage:', error);
+  }
+}
 
 // Custom cell editor wrapper components that handle database-specific logic
 function DatabaseTextCellEditor({
@@ -175,7 +246,8 @@ function DatabaseJsonCellEditor({
 export function convertSchemaToColumns(
   schema?: TableSchema,
   onCellEdit?: (rowId: string, columnKey: string, newValue: string) => Promise<void>,
-  onJumpToTable?: (tableName: string) => void
+  onJumpToTable?: (tableName: string) => void,
+  columnWidths: PersistedColumnWidths = {}
 ): DataGridColumn<DatabaseDataGridRow>[] {
   if (!schema?.columns) {
     return [];
@@ -205,7 +277,7 @@ export function convertSchemaToColumns(
       key: col.columnName,
       name: col.columnName,
       type: col.type as ColumnType,
-      width: 'minmax(200px, 1fr)',
+      width: columnWidths[col.columnName] ?? DEFAULT_COLUMN_WIDTH,
       resizable: true,
       sortable: isSortable,
       editable: isEditable,
@@ -297,14 +369,47 @@ export function DatabaseDataGrid({
   onJumpToTable,
   ...props
 }: DatabaseDataGridProps) {
+  const tableName = schema?.tableName;
+  const schemaSignature = useMemo(
+    () => schema?.columns.map((column) => column.columnName).join('|') ?? '',
+    [schema]
+  );
+  const [columnWidths, setColumnWidths] = useState<PersistedColumnWidths>(() =>
+    loadPersistedColumnWidths(tableName, schema)
+  );
+
+  useEffect(() => {
+    setColumnWidths(loadPersistedColumnWidths(tableName, schema));
+  }, [schema, schemaSignature, tableName]);
+
+  const handleColumnResize = useCallback(
+    (columnKey: string, width: number) => {
+      if (!tableName || !Number.isFinite(width) || width <= 0) {
+        return;
+      }
+
+      setColumnWidths((previous) => {
+        const next = {
+          ...previous,
+          [columnKey]: width,
+        };
+
+        persistColumnWidths(tableName, next);
+        return next;
+      });
+    },
+    [tableName]
+  );
+
   const columns = useMemo(() => {
-    return convertSchemaToColumns(schema, onCellEdit, onJumpToTable);
-  }, [schema, onCellEdit, onJumpToTable]);
+    return convertSchemaToColumns(schema, onCellEdit, onJumpToTable, columnWidths);
+  }, [schema, onCellEdit, onJumpToTable, columnWidths]);
 
   return (
     <DataGrid<DatabaseDataGridRow>
       {...props}
       columns={columns}
+      onColumnResize={handleColumnResize}
       showSelection={true}
       showPagination={true}
     />
