@@ -43,30 +43,30 @@ describe('SecretRow', () => {
 
   it('reveals value when eye icon is clicked', async () => {
     vi.mocked(secretService.getSecretValue).mockResolvedValue('secret-value-123');
-    
+
     render(<SecretRow secret={mockSecret} onDelete={mockOnDelete} />);
-    
+
     const revealButton = screen.getByTitle('Reveal value');
     fireEvent.click(revealButton);
-    
+
     await waitFor(() => {
       expect(secretService.getSecretValue).toHaveBeenCalledWith('TEST_SECRET');
     });
-    
+
     expect(screen.getByText('secret-value-123')).toBeInTheDocument();
     expect(screen.queryByText('••••••••••••••••')).not.toBeInTheDocument();
   });
 
   it('shows copy button only when value is revealed', async () => {
     vi.mocked(secretService.getSecretValue).mockResolvedValue('secret-value-123');
-    
+
     render(<SecretRow secret={mockSecret} onDelete={mockOnDelete} />);
-    
+
     expect(screen.queryByTitle('Copy to clipboard')).not.toBeInTheDocument();
-    
+
     const revealButton = screen.getByTitle('Reveal value');
     fireEvent.click(revealButton);
-    
+
     await waitFor(() => {
       expect(screen.getByTitle('Copy to clipboard')).toBeInTheDocument();
     });
@@ -74,19 +74,19 @@ describe('SecretRow', () => {
 
   it('masks value again when eye-off icon is clicked', async () => {
     vi.mocked(secretService.getSecretValue).mockResolvedValue('secret-value-123');
-    
+
     render(<SecretRow secret={mockSecret} onDelete={mockOnDelete} />);
-    
+
     const revealButton = screen.getByTitle('Reveal value');
     fireEvent.click(revealButton);
-    
+
     await waitFor(() => {
       expect(screen.getByText('secret-value-123')).toBeInTheDocument();
     });
-    
+
     const hideButton = screen.getByTitle('Hide value');
     fireEvent.click(hideButton);
-    
+
     expect(screen.getByText('••••••••••••••••')).toBeInTheDocument();
     expect(screen.queryByText('secret-value-123')).not.toBeInTheDocument();
   });
