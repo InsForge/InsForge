@@ -29,6 +29,15 @@ vi.mock('../../src/utils/logger', () => ({
 
 import { DatabaseAdvanceService } from '../../src/services/database/database-advance.service';
 
+type DatabaseAdvanceServiceTestApi = {
+  quoteTableIdentifier: (table: string) => string;
+  getTableData: (
+    client: typeof mockClient,
+    table: string,
+    rowLimit: number | undefined
+  ) => Promise<{ rows: { id: number }[]; totalRows: number; wasTruncated: boolean }>;
+};
+
 describe('DatabaseAdvanceService table identifier quoting', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -36,7 +45,7 @@ describe('DatabaseAdvanceService table identifier quoting', () => {
   });
 
   it('quotes dangerous table names while preserving schema-qualified identifiers', () => {
-    const service = DatabaseAdvanceService.getInstance() as any;
+    const service = DatabaseAdvanceService.getInstance() as unknown as DatabaseAdvanceServiceTestApi;
 
     expect(service.quoteTableIdentifier('users')).toBe('users');
     expect(service.quoteTableIdentifier('public.users')).toMatch(/^"?public"?\."?users"?$/);
@@ -50,7 +59,7 @@ describe('DatabaseAdvanceService table identifier quoting', () => {
       .mockResolvedValueOnce({ rows: [{ count: '3' }] })
       .mockResolvedValueOnce({ rows: [{ id: 1 }], rowCount: 1 });
 
-    const service = DatabaseAdvanceService.getInstance() as any;
+    const service = DatabaseAdvanceService.getInstance() as unknown as DatabaseAdvanceServiceTestApi;
     const result = await service.getTableData(mockClient, 'users; DROP TABLE audit_log;--', 2);
 
     expect(mockClient.query).toHaveBeenNthCalledWith(

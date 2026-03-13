@@ -46,7 +46,9 @@ export class DatabaseAdvanceService {
     rowLimit: number | undefined
   ): Promise<{ rows: Record<string, unknown>[]; totalRows: number; wasTruncated: boolean }> {
     const safeTable = this.quoteTableIdentifier(table);
-    const query = rowLimit ? `SELECT * FROM ${safeTable} LIMIT ${rowLimit}` : `SELECT * FROM ${safeTable}`;
+    const query = rowLimit
+      ? `SELECT * FROM ${safeTable} LIMIT ${rowLimit}`
+      : `SELECT * FROM ${safeTable}`;
 
     let wasTruncated = false;
     let totalRows = 0;
