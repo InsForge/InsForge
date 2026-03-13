@@ -969,10 +969,10 @@ export class DatabaseAdvanceService {
         if (updateColumns.length) {
           // Build UPDATE SET clause
           const updateClause = updateColumns
-            .map((col) => format('%I = EXCLUDED.%I', col, col))
+            .map((col) => pgFormat('%I = EXCLUDED.%I', col, col))
             .join(', ');
 
-          query = format(
+          query = pgFormat(
             'INSERT INTO %I (%I) VALUES %L ON CONFLICT (%I) DO UPDATE SET %s',
             table,
             columns,
@@ -982,7 +982,7 @@ export class DatabaseAdvanceService {
           );
         } else {
           // No columns to update, just do nothing on conflict
-          query = format(
+          query = pgFormat(
             'INSERT INTO %I (%I) VALUES %L ON CONFLICT (%I) DO NOTHING',
             table,
             columns,
@@ -992,7 +992,7 @@ export class DatabaseAdvanceService {
         }
       } else {
         // Simple insert
-        query = format('INSERT INTO %I (%I) VALUES %L', table, columns, values);
+        query = pgFormat('INSERT INTO %I (%I) VALUES %L', table, columns, values);
       }
 
       // Execute query
