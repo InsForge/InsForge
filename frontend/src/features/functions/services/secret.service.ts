@@ -5,6 +5,7 @@ import {
   CreateSecretResponse,
   ListSecretsResponse,
   DeleteSecretResponse,
+  GetSecretValueResponse,
 } from '@insforge/shared-schemas';
 
 export class SecretService {
@@ -33,6 +34,13 @@ export class SecretService {
       }
     );
     return response;
+  }
+
+  async getSecretValue(key: string): Promise<string> {
+    const data = (await apiClient.request(`/secrets/${encodeURIComponent(key)}`, {
+      headers: apiClient.withAccessToken(),
+    })) as GetSecretValueResponse;
+    return data.value;
   }
 }
 

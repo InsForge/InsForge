@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Button, ConfirmDialog, Input } from '@insforge/ui';
 import { Skeleton, TableHeader } from '@/components';
 import { SecretRow } from '../components/SecretRow';
@@ -52,7 +52,9 @@ export default function SecretsPage() {
                 <Input
                   placeholder="e.g CLIENT_KEY"
                   value={newSecretKey}
-                  onChange={(e) => setNewSecretKey(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setNewSecretKey(e.target.value)
+                  }
                 />
               </div>
               <div className="flex-1">
@@ -61,7 +63,9 @@ export default function SecretsPage() {
                   placeholder="Enter Value"
                   type="text"
                   value={newSecretValue}
-                  onChange={(e) => setNewSecretValue(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setNewSecretValue(e.target.value)
+                  }
                 />
               </div>
               <Button
@@ -80,6 +84,9 @@ export default function SecretsPage() {
             <div className="flex items-center pl-1.5">
               <div className="flex-1 h-8 flex items-center px-2.5">
                 <span className="text-sm text-muted-foreground">Name</span>
+              </div>
+              <div className="flex-1 h-8 flex items-center px-2.5">
+                <span className="text-sm text-muted-foreground">Value</span>
               </div>
               <div className="flex-1 h-8 flex items-center px-2.5">
                 <span className="text-sm text-muted-foreground">Updated at</span>
