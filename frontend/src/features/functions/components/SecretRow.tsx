@@ -50,7 +50,7 @@ export function SecretRow({ secret, onDelete, className }: SecretRowProps) {
       await navigator.clipboard.writeText(value);
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
-    } catch (err) {
+    } catch (_err) {
       showToast('Failed to copy to clipboard', 'error');
     }
   };
@@ -79,7 +79,9 @@ export function SecretRow({ secret, onDelete, className }: SecretRowProps) {
             <Button
               variant="ghost"
               size="icon"
-              onClick={handleToggleVisibility}
+              onClick={(e) => {
+                void handleToggleVisibility(e);
+              }}
               disabled={isLoading}
               className="size-7 p-1.5 text-muted-foreground hover:text-foreground hover:bg-[var(--alpha-8)]"
               title={isVisible ? 'Hide value' : 'Reveal value'}
@@ -96,7 +98,9 @@ export function SecretRow({ secret, onDelete, className }: SecretRowProps) {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={handleCopy}
+                onClick={(e) => {
+                  void handleCopy(e);
+                }}
                 className="size-7 p-1.5 text-muted-foreground hover:text-foreground hover:bg-[var(--alpha-8)]"
                 title="Copy to clipboard"
               >

@@ -10,9 +10,10 @@ vi.mock('../services/secret.service', () => ({
   },
 }));
 
+const mockShowToast = vi.fn();
 vi.mock('@/lib/hooks/useToast', () => ({
   useToast: () => ({
-    showToast: vi.fn(),
+    showToast: mockShowToast,
   }),
 }));
 
