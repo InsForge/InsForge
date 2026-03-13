@@ -36,6 +36,16 @@ type DatabaseAdvanceServiceTestApi = {
     table: string,
     rowLimit: number | undefined
   ) => Promise<{ rows: { id: number }[]; totalRows: number; wasTruncated: boolean }>;
+  exportTableSchemaBySQL: (client: typeof mockClient, table: string) => Promise<string>;
+  exportDatabase: (
+    tables?: string[],
+    format?: 'sql' | 'json',
+    includeData?: boolean,
+    includeFunctions?: boolean,
+    includeSequences?: boolean,
+    includeViews?: boolean,
+    rowLimit?: number
+  ) => Promise<{ data: string }>;
 };
 
 describe('DatabaseAdvanceService table identifier quoting', () => {
@@ -45,7 +55,8 @@ describe('DatabaseAdvanceService table identifier quoting', () => {
   });
 
   it('quotes dangerous table names while preserving schema-qualified identifiers', () => {
-    const service = DatabaseAdvanceService.getInstance() as unknown as DatabaseAdvanceServiceTestApi;
+    const service =
+      DatabaseAdvanceService.getInstance() as unknown as DatabaseAdvanceServiceTestApi;
 
     expect(service.quoteTableIdentifier('users')).toBe('users');
     expect(service.quoteTableIdentifier('public.users')).toMatch(/^"?public"?\."?users"?$/);
@@ -59,7 +70,8 @@ describe('DatabaseAdvanceService table identifier quoting', () => {
       .mockResolvedValueOnce({ rows: [{ count: '3' }] })
       .mockResolvedValueOnce({ rows: [{ id: 1 }], rowCount: 1 });
 
-    const service = DatabaseAdvanceService.getInstance() as unknown as DatabaseAdvanceServiceTestApi;
+    const service =
+      DatabaseAdvanceService.getInstance() as unknown as DatabaseAdvanceServiceTestApi;
     const result = await service.getTableData(mockClient, 'users; DROP TABLE audit_log;--', 2);
 
     expect(mockClient.query).toHaveBeenNthCalledWith(
@@ -75,5 +87,20 @@ describe('DatabaseAdvanceService table identifier quoting', () => {
       totalRows: 3,
       wasTruncated: true,
     });
+  });
+
+  it('quotes column identifiers in exported INSERT statements', async () => {
+    mockClient.query.mockResolvedValueOnce({ rows: [{ count: '1' }] }).mockResolvedValueOnce({
+      rows: [{ 'display name': 'Magnum' }],
+      rowCount: 1,
+    });
+
+    const service =
+      DatabaseAdvanceService.getInstance() as unknown as DatabaseAdvanceServiceTestApi;
+    service.exportTableSchemaBySQL = vi.fn().mockResolvedValue('');
+
+    const result = await service.exportDatabase(['users'], 'sql', true, false, false, false, 5);
+
+    expect(result.data).toContain('INSERT INTO users ("display name") VALUES (\'Magnum\');');
   });
 });

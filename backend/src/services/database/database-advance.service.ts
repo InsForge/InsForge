@@ -11,7 +11,7 @@ import logger from '@/utils/logger.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { parseSQLStatements, checkAuthSchemaOperations } from '@/utils/sql-parser.js';
 import { validateTableName } from '@/utils/validations.js';
-import format from 'pg-format';
+import pgFormat from 'pg-format';
 import { parse } from 'csv-parse/sync';
 import { DatabaseError, type PoolClient } from 'pg';
 
@@ -32,7 +32,7 @@ export class DatabaseAdvanceService {
     validateTableName(table);
     return table
       .split('.')
-      .map((part) => format.ident(part))
+      .map((part) => pgFormat.ident(part))
       .join('.');
   }
 
@@ -398,13 +398,18 @@ export class DatabaseAdvanceService {
             const safeTable = this.quoteTableIdentifier(table);
             let tableDataSql = '';
 
-            const { rows, wasTruncated } = await this.getTableData(client, table, rowLimit);
+            const { rows, totalRows, wasTruncated } = await this.getTableData(
+              client,
+              table,
+              rowLimit
+            );
 
             if (rows.length) {
               tableDataSql += `-- Data for table: ${table}\n`;
 
               for (const row of rows) {
                 const columns = Object.keys(row);
+                const columnsSql = columns.map((column) => pgFormat.ident(column)).join(', ');
                 const values = Object.values(row).map((val) => {
                   if (val === null) {
                     return 'NULL';
@@ -421,15 +426,13 @@ export class DatabaseAdvanceService {
                     return String(val);
                   }
                 });
-                tableDataSql += `INSERT INTO ${safeTable} (${columns.join(', ')}) VALUES (${values.join(', ')});\n`;
+                tableDataSql += `INSERT INTO ${safeTable} (${columnsSql}) VALUES (${values.join(', ')});\n`;
               }
             }
 
             if (wasTruncated) {
-              const countResult = await client.query(`SELECT COUNT(*) FROM ${safeTable}`);
-              const totalRowsInTable = parseInt(countResult.rows[0].count);
               tableDataSql =
-                `-- WARNING: Table contains ${totalRowsInTable} rows, but only ${rowLimit} rows exported due to row limit\n` +
+                `-- WARNING: Table contains ${totalRows} rows, but only ${rowLimit} rows exported due to row limit\n` +
                 tableDataSql;
               truncatedTables.push(table);
             }
@@ -783,7 +786,8 @@ export class DatabaseAdvanceService {
 
         for (const row of tablesResult.rows) {
           try {
-            await client.query(`TRUNCATE TABLE ${row.tablename} CASCADE`);
+            const safeTable = this.quoteTableIdentifier(row.tablename);
+            await client.query(`TRUNCATE TABLE ${safeTable} CASCADE`);
             logger.info(`Truncated table: ${row.tablename}`);
           } catch (err) {
             logger.warn(`Could not truncate table ${row.tablename}:`, err);
