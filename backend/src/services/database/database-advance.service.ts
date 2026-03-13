@@ -18,7 +18,7 @@ import { DatabaseError, type PoolClient } from 'pg';
 export class DatabaseAdvanceService {
   private static instance: DatabaseAdvanceService;
   private dbManager = DatabaseManager.getInstance();
-  
+
   /**
    * Safely format SQL with proper identifier quoting (defense in depth)
    * Uses pg-format %I placeholder for safe identifier interpolation
@@ -46,7 +46,7 @@ export class DatabaseAdvanceService {
     rowLimit: number | undefined
   ): Promise<{ rows: Record<string, unknown>[]; totalRows: number; wasTruncated: boolean }> {
     // Use pg-format %I for safe identifier interpolation (defense in depth)
-    const query = rowLimit 
+    const query = rowLimit
       ? this.safeFormat('SELECT * FROM %I LIMIT %L', table, rowLimit)
       : this.safeFormat('SELECT * FROM %I', table);
 
@@ -164,16 +164,16 @@ export class DatabaseAdvanceService {
     const schemaResult = await client.query(
       `
       SELECT 'CREATE TABLE IF NOT EXISTS ' || table_name || ' (' ||
-      string_agg(column_name || ' ' || 
-        CASE 
+      string_agg(column_name || ' ' ||
+        CASE
           WHEN data_type = 'character varying' THEN 'varchar' || COALESCE('(' || character_maximum_length || ')', '')
           WHEN data_type = 'timestamp with time zone' THEN 'timestamptz'
           ELSE data_type
-        END || 
+        END ||
         CASE WHEN is_nullable = 'NO' THEN ' NOT NULL' ELSE '' END ||
         CASE WHEN column_default IS NOT NULL THEN ' DEFAULT ' || column_default ELSE '' END,
         ', ') || ');' as create_statement
-      FROM information_schema.columns 
+      FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name = $1
       GROUP BY table_name
     `,
@@ -188,11 +188,11 @@ export class DatabaseAdvanceService {
     // Export indexes (excluding primary key indexes)
     const indexesResult = await client.query(
       `
-      SELECT 
+      SELECT
         indexname,
         indexdef
-      FROM pg_indexes 
-      WHERE tablename = $1 
+      FROM pg_indexes
+      WHERE tablename = $1
       AND schemaname = 'public'
       AND indexname NOT LIKE '%_pkey'
       ORDER BY indexname
@@ -256,8 +256,8 @@ export class DatabaseAdvanceService {
     // Check if RLS is enabled on the table
     const rlsResult = await client.query(
       `
-          SELECT relrowsecurity 
-          FROM pg_class 
+          SELECT relrowsecurity
+          FROM pg_class
           WHERE relname = $1
           AND relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')
         `,
@@ -268,28 +268,28 @@ export class DatabaseAdvanceService {
       (rlsResult.rows[0].relrowsecurity === true || rlsResult.rows[0].relrowsecurity === 1);
     if (rlsEnabled) {
       sqlExport += `-- RLS enabled for table: ${table}\n`;
-      sqlExport += `ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;\n\n`;
+      sqlExport += this.safeFormat('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;\n\n', table);
     }
 
     // Export RLS policies
     const policiesResult = await client.query(
       `
-      SELECT 
+      SELECT
         'CREATE POLICY ' || quote_ident(policyname) || ' ON ' || quote_ident(tablename) ||
         ' FOR ' || cmd ||
-        CASE 
+        CASE
           WHEN roles != '{}'::name[] THEN ' TO ' || array_to_string(roles, ', ')
           ELSE ''
         END ||
-        CASE 
+        CASE
           WHEN qual IS NOT NULL THEN ' USING (' || qual || ')'
           ELSE ''
         END ||
-        CASE 
+        CASE
           WHEN with_check IS NOT NULL THEN ' WITH CHECK (' || with_check || ')'
           ELSE ''
         END || ';' as policy_statement
-      FROM pg_policies 
+      FROM pg_policies
       WHERE schemaname = 'public' AND tablename = $1
       ORDER BY policyname
     `,
@@ -307,32 +307,32 @@ export class DatabaseAdvanceService {
     // Export triggers for this table
     const triggersResult = await client.query(
       `
-      SELECT 
-        'CREATE TRIGGER ' || quote_ident(trigger_name) || 
+      SELECT
+        'CREATE TRIGGER ' || quote_ident(trigger_name) ||
         ' ' || action_timing || ' ' || event_manipulation ||
         ' ON ' || quote_ident(event_object_table) ||
-        CASE 
-          WHEN action_reference_new_table IS NOT NULL OR action_reference_old_table IS NOT NULL 
+        CASE
+          WHEN action_reference_new_table IS NOT NULL OR action_reference_old_table IS NOT NULL
           THEN ' REFERENCING ' ||
-            CASE WHEN action_reference_new_table IS NOT NULL 
-              THEN 'NEW TABLE AS ' || quote_ident(action_reference_new_table) 
-              ELSE '' 
+            CASE WHEN action_reference_new_table IS NOT NULL
+              THEN 'NEW TABLE AS ' || quote_ident(action_reference_new_table)
+              ELSE ''
             END ||
-            CASE WHEN action_reference_old_table IS NOT NULL 
-              THEN ' OLD TABLE AS ' || quote_ident(action_reference_old_table) 
-              ELSE '' 
+            CASE WHEN action_reference_old_table IS NOT NULL
+              THEN ' OLD TABLE AS ' || quote_ident(action_reference_old_table)
+              ELSE ''
             END
           ELSE ''
         END ||
         ' FOR EACH ' || action_orientation ||
-        CASE 
-          WHEN action_condition IS NOT NULL 
+        CASE
+          WHEN action_condition IS NOT NULL
           THEN ' WHEN (' || action_condition || ')'
           ELSE ''
         END ||
         ' ' || action_statement || ';' as trigger_statement
       FROM information_schema.triggers
-      WHERE event_object_schema = 'public' 
+      WHERE event_object_schema = 'public'
       AND event_object_table = $1
       ORDER BY trigger_name
     `,
@@ -368,9 +368,9 @@ export class DatabaseAdvanceService {
         tablesToExport = tables;
       } else {
         const tablesResult = await client.query(`
-          SELECT tablename 
-          FROM pg_tables 
-          WHERE schemaname = 'public' 
+          SELECT tablename
+          FROM pg_tables
+          WHERE schemaname = 'public'
           ORDER BY tablename
         `);
         tablesToExport = tablesResult.rows.map((row: { tablename: string }) => row.tablename);
@@ -419,12 +419,17 @@ export class DatabaseAdvanceService {
                     return String(val);
                   }
                 });
-                tableDataSql += `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${values.join(', ')});\n`;
+                // Use safeFormat for safe identifier interpolation
+                tableDataSql += this.safeFormat('INSERT INTO %I (%s) VALUES (%s);\n', 
+                  table, 
+                  columns.join(', '), 
+                  values.join(', ')
+                );
               }
             }
 
             if (wasTruncated) {
-              const countResult = await client.query(`SELECT COUNT(*) FROM ${table}`);
+              const countResult = await client.query(this.safeFormat('SELECT COUNT(*) FROM %I', table));
               const totalRowsInTable = parseInt(countResult.rows[0].count);
               tableDataSql =
                 `-- WARNING: Table contains ${totalRowsInTable} rows, but only ${rowLimit} rows exported due to row limit\n` +
@@ -441,7 +446,7 @@ export class DatabaseAdvanceService {
         // Export all functions in public schema
         if (includeFunctions) {
           const functionsResult = await client.query(`
-            SELECT 
+            SELECT
               pg_get_functiondef(p.oid) || ';' as function_def,
               p.proname as function_name
             FROM pg_proc p
@@ -468,7 +473,7 @@ export class DatabaseAdvanceService {
         // Export all sequences in public schema
         if (includeSequences) {
           const sequencesResult = await client.query(`
-            SELECT 
+            SELECT
               'CREATE SEQUENCE IF NOT EXISTS ' || quote_ident(sequence_name) ||
               ' START WITH ' || start_value ||
               ' INCREMENT BY ' || increment ||
@@ -494,8 +499,8 @@ export class DatabaseAdvanceService {
         // Export all views in public schema
         if (includeViews) {
           const viewsResult = await client.query(`
-            SELECT 
-              'CREATE OR REPLACE VIEW ' || quote_ident(table_name) || ' AS ' || 
+            SELECT
+              'CREATE OR REPLACE VIEW ' || quote_ident(table_name) || ' AS ' ||
               view_definition as view_statement,
               table_name as view_name
             FROM information_schema.views
@@ -535,13 +540,13 @@ export class DatabaseAdvanceService {
           // Get schema
           const schemaResult = await client.query(
             `
-            SELECT 
+            SELECT
               column_name as "columnName",
-              data_type as "dataType", 
+              data_type as "dataType",
               character_maximum_length as "characterMaximumLength",
               is_nullable as "isNullable",
               column_default as "columnDefault"
-            FROM information_schema.columns 
+            FROM information_schema.columns
             WHERE table_schema = 'public' AND table_name = $1
             ORDER BY ordinal_position
           `,
@@ -599,8 +604,8 @@ export class DatabaseAdvanceService {
           // Check if RLS is enabled on the table
           const rlsResult = await client.query(
             `
-                SELECT relrowsecurity 
-                FROM pg_class 
+                SELECT relrowsecurity
+                FROM pg_class
                 WHERE relname = $1
                 AND relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public')
               `,
@@ -614,13 +619,13 @@ export class DatabaseAdvanceService {
           // Get policies
           const policiesResult = await client.query(
             `
-            SELECT 
+            SELECT
               policyname,
               cmd,
               roles,
               qual,
               with_check as "withCheck"
-            FROM pg_policies 
+            FROM pg_policies
             WHERE schemaname = 'public' AND tablename = $1
           `,
             [table]
@@ -629,7 +634,7 @@ export class DatabaseAdvanceService {
           // Get triggers
           const triggersResult = await client.query(
             `
-            SELECT 
+            SELECT
               trigger_name as "triggerName",
               action_timing as "actionTiming",
               event_manipulation as "eventManipulation",
@@ -639,7 +644,7 @@ export class DatabaseAdvanceService {
               action_reference_new_table as "newTable",
               action_reference_old_table as "oldTable"
             FROM information_schema.triggers
-            WHERE event_object_schema = 'public' 
+            WHERE event_object_schema = 'public'
             AND event_object_table = $1
             ORDER BY trigger_name
           `,
@@ -682,7 +687,7 @@ export class DatabaseAdvanceService {
         // Get all functions
         if (includeFunctions) {
           const functionsResult = await client.query(`
-            SELECT 
+            SELECT
               p.proname as "functionName",
               pg_get_functiondef(p.oid) as "functionDef",
               p.prokind as "kind"
@@ -703,7 +708,7 @@ export class DatabaseAdvanceService {
         // Get all sequences
         if (includeSequences) {
           const sequencesResult = await client.query(`
-            SELECT 
+            SELECT
               sequence_name as "sequenceName",
               start_value as "startValue",
               increment as "increment",
@@ -720,7 +725,7 @@ export class DatabaseAdvanceService {
         // Get all views
         if (includeViews) {
           const viewsResult = await client.query(`
-            SELECT 
+            SELECT
               table_name as "viewName",
               view_definition as "definition"
             FROM information_schema.views
@@ -774,8 +779,8 @@ export class DatabaseAdvanceService {
       // If truncate is requested, truncate all public tables first
       if (truncate) {
         const tablesResult = await client.query(`
-          SELECT tablename 
-          FROM pg_tables 
+          SELECT tablename
+          FROM pg_tables
           WHERE schemaname = 'public'
         `);
 
