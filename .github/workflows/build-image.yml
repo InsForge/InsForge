@@ -28,13 +28,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.GHCR_REGISTRY }}
           username: ${{ github.actor }}
@@ -42,7 +42,7 @@ jobs:
 
       - name: Extract metadata for GHCR
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.GHCR_REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -50,7 +50,7 @@ jobs:
             type=raw,value=${{ github.event.inputs.test_tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
 
       - name: Build and push Docker image to GHCR
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -75,7 +75,7 @@ jobs:
 
     steps:
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ECR_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_ECR_REGION }}
@@ -85,14 +85,14 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.GHCR_REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
       - name: Install crane
-        uses: imjasonh/setup-crane@31b88efe9de28ae0ffa220711af4b60be9435f6e # v0.4
+        uses: imjasonh/setup-crane@6da1ae018866400525525ce74ff892880c099987  # v0.5
 
       - name: Copy multi-arch image to ECR
         env:
