@@ -420,16 +420,19 @@ export class DatabaseAdvanceService {
                   }
                 });
                 // Use safeFormat for safe identifier interpolation
-                tableDataSql += this.safeFormat('INSERT INTO %I (%s) VALUES (%s);\n', 
-                  table, 
-                  columns.join(', '), 
+                tableDataSql += this.safeFormat(
+                  'INSERT INTO %I (%s) VALUES (%s);\n',
+                  table,
+                  columns.join(', '),
                   values.join(', ')
                 );
               }
             }
 
             if (wasTruncated) {
-              const countResult = await client.query(this.safeFormat('SELECT COUNT(*) FROM %I', table));
+              const countResult = await client.query(
+                this.safeFormat('SELECT COUNT(*) FROM %I', table)
+              );
               const totalRowsInTable = parseInt(countResult.rows[0].count);
               tableDataSql =
                 `-- WARNING: Table contains ${totalRowsInTable} rows, but only ${rowLimit} rows exported due to row limit\n` +
