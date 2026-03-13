@@ -31,6 +31,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@insforge/ui': path.resolve(__dirname, '../ui/src'),
     },
   },
 });

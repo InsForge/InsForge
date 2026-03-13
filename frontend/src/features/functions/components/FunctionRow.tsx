@@ -76,7 +76,10 @@ export function FunctionRow({
         </div>
 
         {/* Delete Button Column */}
-        <div className="w-12 h-12 flex items-center justify-end px-2.5">
+        <div
+          className="w-12 h-12 flex items-center justify-end px-2.5"
+          onClick={(event) => event.stopPropagation()}
+        >
           <Button
             variant="ghost"
             size="icon"
@@ -85,7 +88,7 @@ export function FunctionRow({
               onDelete();
             }}
             disabled={isDeleting}
-            className="size-8 p-1.5 text-muted-foreground hover:text-foreground hover:bg-[var(--alpha-8)] opacity-0 group-hover:opacity-100 transition-opacity"
+            className="size-8 p-1.5 text-muted-foreground hover:text-foreground hover:bg-[var(--alpha-8)] opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 focus-visible:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             title="Delete function"
             aria-label={`Delete function ${func.name}`}
           >

@@ -81,7 +81,8 @@ export function useFunctions() {
       try {
         await deleteFunctionMutation.mutateAsync(func.slug);
         return true;
-      } catch {
+      } catch (error) {
+        console.error('Failed to delete function:', { slug: func.slug, error });
         return false;
       }
     },

@@ -53,4 +53,28 @@ describe('FunctionRow', () => {
     expect(onDelete).toHaveBeenCalledTimes(1);
     expect(onClick).not.toHaveBeenCalled();
   });
+
+  it('does not trigger delete while deletion is in progress', () => {
+    const onClick = vi.fn();
+    const onDelete = vi.fn();
+
+    render(
+      <FunctionRow
+        function={mockFunction}
+        onClick={onClick}
+        onDelete={onDelete}
+        deploymentUrl="https://functions.example.com"
+        isDeleting
+      />
+    );
+
+    const deleteButton = screen.getByRole('button', { name: 'Delete function Hello World' });
+    expect(deleteButton).toBeDisabled();
+
+    fireEvent.click(deleteButton);
+
+    expect(onDelete).not.toHaveBeenCalled();
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
 });
