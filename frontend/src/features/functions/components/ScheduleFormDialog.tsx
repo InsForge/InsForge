@@ -8,6 +8,7 @@ import {
   Button,
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -186,6 +187,9 @@ export function ScheduleFormDialog({
         <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col">
           <DialogHeader>
             <DialogTitle>{mode === 'create' ? 'Create Schedule' : 'Edit Schedule'}</DialogTitle>
+            <DialogDescription className="sr-only">
+              {mode === 'create' ? 'Create a new scheduled function' : 'Edit scheduled function settings'}
+            </DialogDescription>
           </DialogHeader>
 
           <ScrollArea className="h-full overflow-auto max-h-[680px]">
