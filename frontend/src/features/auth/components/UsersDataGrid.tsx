@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Mail, User } from 'lucide-react';
 import {
   Avatar,
@@ -21,7 +21,14 @@ import MicrosoftLogo from '@/assets/logos/microsoft.svg?react';
 import SpotifyLogo from '@/assets/logos/spotify.svg?react';
 import TiktokLogo from '@/assets/logos/tiktok.svg?react';
 import XLogo from '@/assets/logos/x.svg?react';
-import { Badge, Checkbox } from '@insforge/ui';
+import {
+  Badge,
+  Checkbox,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@insforge/ui';
 import { cn, formatTime } from '@/lib/utils/utils';
 import type { UserSchema } from '@insforge/shared-schemas';
 
@@ -77,23 +84,61 @@ const ProviderBadge = ({ provider }: { provider: string }) => {
 };
 
 const ProvidersCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
+  const BADGE_WIDTH = 90;
   const providers = row.providers;
+  const hasProviders = Array.isArray(providers) && providers.length > 0;
+  const uniqueProviders = hasProviders ? [...new Set(providers)] : [];
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState(300);
 
-  if (!providers || !Array.isArray(providers) || !providers.length) {
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+
+    // Walk up the DOM to find the actual grid cell element
+    const cell = container.closest('[role="gridcell"]') as HTMLElement | null;
+    const target = cell ?? container;
+
+    const observer = new ResizeObserver(() => {
+      setContainerWidth(target.getBoundingClientRect().width);
+    });
+
+    observer.observe(target);
+    setContainerWidth(target.getBoundingClientRect().width);
+
+    return () => observer.disconnect();
+  }, []);
+
+  const maxBadgesThatFit = Math.max(1, Math.floor(containerWidth / BADGE_WIDTH));
+  const hasOverflow = uniqueProviders.length > maxBadgesThatFit;
+  const visibleProviderCount = hasOverflow ? maxBadgesThatFit : uniqueProviders.length;
+  const visibleProviders = uniqueProviders.slice(0, visibleProviderCount);
+  const hiddenProviders = uniqueProviders.slice(visibleProviderCount);
+
+  if (!hasProviders) {
     return <span className="truncate text-[13px] leading-[18px] text-muted-foreground">null</span>;
   }
 
-  const uniqueProviders = [...new Set(providers)];
-
   return (
-    <div className="flex items-center gap-1" title={providers.join(', ')}>
-      {uniqueProviders.slice(0, 1).map((provider) => (
+    <div ref={containerRef} className="flex items-center gap-1 w-full overflow-hidden">
+      {visibleProviders.map((provider) => (
         <ProviderBadge key={provider} provider={provider} />
       ))}
-      {uniqueProviders.length > 1 && (
-        <Badge className="h-5 rounded bg-[var(--alpha-8)] px-1.5 py-0 text-xs font-medium leading-4 text-muted-foreground">
-          +{uniqueProviders.length - 1}
-        </Badge>
+      {hiddenProviders.length > 0 && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge className="h-5 rounded bg-[var(--alpha-8)] px-1.5 py-0 text-xs font-medium leading-4 text-muted-foreground">
+                +{hiddenProviders.length}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent side="top" align="center">
+              {hiddenProviders.join(', ')}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )}
     </div>
   );
