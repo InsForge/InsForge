@@ -151,6 +151,65 @@ sequenceDiagram
   <Card title="Rate Limiting" icon="gauge">
     Protection against brute force attacks
   </Card>
+  
+  <Card title="Redirect Validation" icon="shield-check">
+    Configurable whitelist for auth redirect URLs
+  </Card>
+</CardGroup>
+
+## Redirect URL Validation
+
+InsForge implements a security feature to prevent open redirect vulnerabilities by validating redirect URLs against a configurable whitelist.
+
+### How It Works
+
+1. **Whitelist Configuration**: Admins can configure allowed redirect URLs in Auth Settings
+2. **Runtime Validation**: All auth flows validate redirect targets before use
+3. **Development Fallback**: Empty whitelist allows all URLs for development convenience
+4. **Production Security**: Configured whitelist enforces strict validation
+
+### Supported Auth Flows
+
+- **OAuth Authentication**: Both init and callback redirects are validated
+- **Email Verification**: Redirect URLs in verification links are checked
+- **Password Reset**: Reset link redirects go through validation
+- **Sign In Redirects**: Post-authentication redirects are validated
+
+### Configuration
+
+```typescript
+// Auth config schema
+{
+  redirectUrlWhitelist: string[]; // Array of allowed URLs
+  signInRedirectTo: string | null; // Default redirect URL
+}
+```
+
+### Validation Rules
+
+- **Exact Match**: URLs must match exactly (after normalization)
+- **Normalization**: Trailing slashes are removed for comparison
+- **Empty Whitelist**: Allows all URLs with warning for development
+- **Error Handling**: Invalid URLs fail with clear error messages
+
+### Security Benefits
+
+<CardGroup cols={2}>
+  <Card title="Open Redirect Prevention" icon="shield-x">
+    Blocks malicious redirect attempts
+  </Card>
+  
+  <Card title="Phishing Protection" icon="user-shield">
+    Prevents redirect to fake login pages
+  </Card>
+  
+  <Card title="Configurable Security" icon="settings">
+    Admins control allowed destinations
+  </Card>
+  
+  <Card title="Development Friendly" icon="code">
+    Permissive by default for easy development
+  </Card>
 </CardGroup>
 
 ## API Endpoints

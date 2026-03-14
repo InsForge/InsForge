@@ -105,6 +105,7 @@ export const authConfigSchema = z.object({
     .union([z.string().url(), z.literal(''), z.null()])
     .optional()
     .transform((val) => (val === '' ? null : val)),
+  redirectUrlWhitelist: z.array(z.string().url()).optional().default([]),
   createdAt: z.string(), // PostgreSQL timestamp
   updatedAt: z.string(), // PostgreSQL timestamp
 });

@@ -17,6 +17,7 @@ import type {
 } from '@insforge/shared-schemas';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { AuthConfigService } from './auth-config.service.js';
+import { RedirectValidationService } from './redirect-validation.service.js';
 import { AuthOTPService, OTPPurpose, OTPType } from './auth-otp.service.js';
 import { GoogleOAuthProvider } from '@/providers/oauth/google.provider.js';
 import { GitHubOAuthProvider } from '@/providers/oauth/github.provider.js';
@@ -67,6 +68,9 @@ export class AuthService {
   private xOAuthProvider: XOAuthProvider;
   private appleOAuthProvider: AppleOAuthProvider;
 
+  // Service instances
+  private redirectValidationService: RedirectValidationService;
+
   private constructor() {
     this.adminEmail = process.env.ADMIN_EMAIL ?? '';
     this.adminPassword = process.env.ADMIN_PASSWORD ?? '';
@@ -87,6 +91,9 @@ export class AuthService {
     this.microsoftOAuthProvider = MicrosoftOAuthProvider.getInstance();
     this.xOAuthProvider = XOAuthProvider.getInstance();
     this.appleOAuthProvider = AppleOAuthProvider.getInstance();
+
+    // Initialize services
+    this.redirectValidationService = RedirectValidationService.getInstance();
 
     logger.info('AuthService initialized');
   }
@@ -275,6 +282,11 @@ export class AuthService {
    * The link contains only the token (no email) for better privacy and security
    */
   async sendVerificationEmailWithLink(email: string, emailRedirectTo?: string): Promise<void> {
+    // Validate redirect URL if provided
+    if (emailRedirectTo) {
+      await this.redirectValidationService.validateRedirectUrl(emailRedirectTo);
+    }
+
     // Check if user exists
     const pool = this.getPool();
     const result = await pool.query('SELECT * FROM auth.users WHERE email = $1', [email]);

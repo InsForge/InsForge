@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Lock, Mail, Settings } from 'lucide-react';
+import { Lock, Mail, Settings, Plus, X } from 'lucide-react';
 import {
   Button,
   Checkbox,
@@ -51,6 +51,7 @@ const defaultValues: UpdateAuthConfigRequest = {
   verifyEmailMethod: 'code',
   resetPasswordMethod: 'code',
   signInRedirectTo: null,
+  redirectUrlWhitelist: [],
 };
 
 const toFormValues = (config?: AuthConfigSchema): UpdateAuthConfigRequest => {
@@ -68,6 +69,7 @@ const toFormValues = (config?: AuthConfigSchema): UpdateAuthConfigRequest => {
     verifyEmailMethod: config.verifyEmailMethod,
     resetPasswordMethod: config.resetPasswordMethod,
     signInRedirectTo: config.signInRedirectTo ?? null,
+    redirectUrlWhitelist: config.redirectUrlWhitelist ?? [],
   };
 };
 
@@ -199,23 +201,84 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
             >
               <MenuDialogBody>
                 {activeSection === 'general' && (
-                  <SettingRow
-                    label="Redirect URL After Sign In"
-                    description="Your app url after successful authentication"
-                  >
-                    <Input
-                      type="url"
-                      placeholder="https://yourapp.com/dashboard"
-                      {...form.register('signInRedirectTo')}
-                      className={form.formState.errors.signInRedirectTo ? 'border-destructive' : ''}
-                    />
-                    {form.formState.errors.signInRedirectTo && (
-                      <p className="pt-1 text-xs text-destructive">
-                        {form.formState.errors.signInRedirectTo.message ||
-                          'Please enter a valid URL'}
-                      </p>
-                    )}
-                  </SettingRow>
+                  <>
+                    <SettingRow
+                      label="Redirect URL After Sign In"
+                      description="Your app url after successful authentication"
+                    >
+                      <Input
+                        type="url"
+                        placeholder="https://yourapp.com/dashboard"
+                        {...form.register('signInRedirectTo')}
+                        className={form.formState.errors.signInRedirectTo ? 'border-destructive' : ''}
+                      />
+                      {form.formState.errors.signInRedirectTo && (
+                        <p className="pt-1 text-xs text-destructive">
+                          {form.formState.errors.signInRedirectTo.message ||
+                            'Please enter a valid URL'}
+                        </p>
+                      )}
+                    </SettingRow>
+
+                    <SettingRow
+                      label="Redirect URL Whitelist"
+                      description="Allowed redirect URLs for auth flows. Leave empty for development (⚠️ insecure for production)"
+                    >
+                      <Controller
+                        name="redirectUrlWhitelist"
+                        control={form.control}
+                        render={({ field }) => (
+                          <div className="space-y-2">
+                            {(field.value || []).map((url: string, index: number) => (
+                              <div key={index} className="flex items-center gap-2">
+                                <Input
+                                  type="url"
+                                  placeholder="https://yourapp.com/callback"
+                                  value={url}
+                                  onChange={(e) => {
+                                    const newValue = [...(field.value || [])];
+                                    newValue[index] = e.target.value;
+                                    field.onChange(newValue);
+                                  }}
+                                  className="flex-1"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    const newValue = [...(field.value || [])];
+                                    newValue.splice(index, 1);
+                                    field.onChange(newValue);
+                                  }}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                field.onChange([...(field.value || []), '']);
+                              }}
+                              className="w-full"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add URL
+                            </Button>
+                            {(field.value || []).length === 0 && (
+                              <p className="text-xs text-muted-foreground">
+                                ⚠️ No whitelist configured. All redirect URLs are allowed for development convenience.
+                                Configure URLs for production security.
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      />
+                    </SettingRow>
+                  </>
                 )}
 
                 {activeSection === 'email-verification' && (

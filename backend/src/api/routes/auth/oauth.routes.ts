@@ -3,6 +3,7 @@ import { AuthService } from '@/services/auth/auth.service.js';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { OAuthPKCEService } from '@/services/auth/oauth-pkce.service.js';
+import { RedirectValidationService } from '@/services/auth/redirect-validation.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
@@ -28,6 +29,7 @@ const authService = AuthService.getInstance();
 const authConfigService = AuthConfigService.getInstance();
 const oAuthConfigService = OAuthConfigService.getInstance();
 const oAuthPKCEService = OAuthPKCEService.getInstance();
+const redirectValidationService = RedirectValidationService.getInstance();
 const auditService = AuditService.getInstance();
 
 // Helper function to validate JWT_SECRET
@@ -271,6 +273,9 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
       throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
+    // Validate redirect URI against whitelist
+    await redirectValidationService.validateRedirectUrl(redirectUri);
+
     const jwtPayload = {
       provider: validatedProvider,
       redirectUri,
@@ -334,6 +339,9 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       logger.warn('Invalid state parameter', { state });
       throw new AppError('Invalid state parameter', 400, ERROR_CODES.INVALID_INPUT);
     }
+
+    // Validate redirect URI against whitelist
+    await redirectValidationService.validateRedirectUrl(redirectUri);
 
     // Validate provider using OAuthProvidersSchema
     const providerValidation = oAuthProvidersSchema.safeParse(provider);
@@ -432,6 +440,9 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
     if (!redirectUri) {
       throw new AppError('redirectUri is required', 400, ERROR_CODES.INVALID_INPUT);
     }
+
+    // Validate redirect URI against whitelist
+    await redirectValidationService.validateRedirectUrl(redirectUri);
 
     if (!codeChallenge) {
       throw new AppError('code_challenge is required in state', 400, ERROR_CODES.INVALID_INPUT);
