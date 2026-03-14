@@ -1,0 +1,14 @@
+FROM denoland/deno:alpine-2.0.6
+
+WORKDIR /app
+
+COPY functions /app/functions
+
+RUN deno cache functions/server.ts
+
+EXPOSE 7133
+
+ENV PORT=7133
+ENV HOST=::
+
+CMD ["deno", "run", "--allow-net", "--allow-env", "--allow-read=./functions/worker-template.js", "functions/server.ts"]
