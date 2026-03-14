@@ -72,9 +72,25 @@ export class RealtimeAuthService {
       // If query returns a row, user has permission
       return result.rowCount !== null && result.rowCount > 0;
     } catch (error) {
-      // Rollback transaction on error
-      await client.query('ROLLBACK').catch(() => {});
-      logger.debug('Subscribe permission denied', { channelName, userId, error });
+      // Rollback transaction on error with proper error handling
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError) {
+        logger.error('Critical: Failed to rollback transaction in checkSubscribePermission', {
+          originalError: error instanceof Error ? error.message : String(error),
+          rollbackError: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+          channelName,
+          userId,
+        });
+        // Re-throw to ensure connection is properly released and errors are visible
+        throw rollbackError;
+      }
+
+      logger.debug('Subscribe permission denied', {
+        channelName,
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return false;
     } finally {
       // Reset role back to default before releasing connection
