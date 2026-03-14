@@ -5,6 +5,53 @@ import type { SecretSchema, CreateSecretRequest } from '@insforge/shared-schemas
 import { useToast } from '@/lib/hooks/useToast';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 
+export function useSecretValue(secret: Pick<SecretSchema, 'key' | 'updatedAt'>) {
+  const { showToast } = useToast();
+  const [isValueVisible, setIsValueVisible] = useState(false);
+  const [valueError, setValueError] = useState<string | null>(null);
+  const {
+    data: revealedSecret,
+    isFetching: isFetchingValue,
+    refetch: refetchSecretValue,
+  } = useQuery({
+    queryKey: ['secret-value', secret.key, secret.updatedAt ?? 'never'],
+    queryFn: () => secretService.getSecretValue(secret.key),
+    enabled: false,
+    retry: false,
+  });
+
+  const toggleValue = useCallback(async () => {
+    if (isValueVisible) {
+      setIsValueVisible(false);
+      return;
+    }
+
+    setValueError(null);
+
+    if (!revealedSecret) {
+      const { data, error } = await refetchSecretValue();
+
+      if (error || !data) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Failed to fetch secret value';
+        setValueError(errorMessage);
+        showToast(errorMessage, 'error');
+        return;
+      }
+    }
+
+    setIsValueVisible(true);
+  }, [isValueVisible, revealedSecret, refetchSecretValue, showToast]);
+
+  return {
+    isValueVisible,
+    valueError,
+    revealedSecret,
+    isFetchingValue,
+    toggleValue,
+  };
+}
+
 export function useSecrets() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();

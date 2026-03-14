@@ -1,12 +1,9 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Eye, EyeOff, Loader2, Trash2 } from 'lucide-react';
 import { Button, CopyButton } from '@insforge/ui';
 import { SecretSchema } from '@insforge/shared-schemas';
 import { cn } from '@/lib/utils/utils';
 import { formatDistance } from 'date-fns';
-import { secretService } from '../services/secret.service';
-import { useToast } from '@/lib/hooks/useToast';
+import { useSecretValue } from '../hooks/useSecrets';
 
 interface SecretRowProps {
   secret: SecretSchema;
@@ -15,19 +12,13 @@ interface SecretRowProps {
 }
 
 export function SecretRow({ secret, onDelete, className }: SecretRowProps) {
-  const { showToast } = useToast();
-  const [isValueVisible, setIsValueVisible] = useState(false);
-  const [valueError, setValueError] = useState<string | null>(null);
   const {
-    data: revealedSecret,
-    isFetching: isFetchingValue,
-    refetch: refetchSecretValue,
-  } = useQuery({
-    queryKey: ['secret-value', secret.key, secret.updatedAt ?? 'never'],
-    queryFn: () => secretService.getSecretValue(secret.key),
-    enabled: false,
-    retry: false,
-  });
+    isValueVisible,
+    valueError,
+    revealedSecret,
+    isFetchingValue,
+    toggleValue,
+  } = useSecretValue(secret);
 
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -36,27 +27,7 @@ export function SecretRow({ secret, onDelete, className }: SecretRowProps) {
 
   const handleToggleValue = async (e: React.MouseEvent) => {
     e.stopPropagation();
-
-    if (isValueVisible) {
-      setIsValueVisible(false);
-      return;
-    }
-
-    setValueError(null);
-
-    if (!revealedSecret) {
-      const { data, error } = await refetchSecretValue();
-
-      if (error || !data) {
-        const errorMessage =
-          error instanceof Error ? error.message : 'Failed to fetch secret value';
-        setValueError(errorMessage);
-        showToast(errorMessage, 'error');
-        return;
-      }
-    }
-
-    setIsValueVisible(true);
+    await toggleValue();
   };
 
   const maskedValue = '************';
