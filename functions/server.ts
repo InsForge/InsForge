@@ -2,8 +2,14 @@ import { Client } from 'https://deno.land/x/postgres@v0.17.0/mod.ts';
 import { join, dirname, fromFileUrl } from 'https://deno.land/std@0.224.0/path/mod.ts';
 
 /* eslint-disable no-console */
-const port = parseInt(Deno.env.get('PORT') ?? '7133', 10);
+const rawPort = Deno.env.get('PORT');
+const parsedPort = Number.parseInt(rawPort ?? '7133', 10);
+const port = Number.isInteger(parsedPort) && parsedPort >= 1 && parsedPort <= 65535 ? parsedPort : 7133;
 const hostname = Deno.env.get('HOST') ?? '::';
+
+if (rawPort !== undefined && port === 7133 && rawPort !== '7133') {
+  console.warn(`Invalid PORT value "${rawPort}", falling back to 7133`);
+}
 
 console.log(`Deno serverless runtime running on ${hostname}:${port}`);
 
