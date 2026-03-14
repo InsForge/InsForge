@@ -82,6 +82,9 @@ export default function SecretsPage() {
                 <span className="text-sm text-muted-foreground">Name</span>
               </div>
               <div className="flex-1 h-8 flex items-center px-2.5">
+                <span className="text-sm text-muted-foreground">Value</span>
+              </div>
+              <div className="flex-1 h-8 flex items-center px-2.5">
                 <span className="text-sm text-muted-foreground">Updated at</span>
               </div>
               <div className="w-12" />

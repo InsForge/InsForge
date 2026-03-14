@@ -15,6 +15,14 @@ export class SecretService {
     return data.secrets as SecretSchema[];
   }
 
+  async getSecret(key: string): Promise<{ key: string; value: string }> {
+    const response = await apiClient.request(`/secrets/${encodeURIComponent(key)}`, {
+      method: 'GET',
+      headers: apiClient.withAccessToken(),
+    });
+    return response as { key: string; value: string };
+  }
+
   async createSecret(input: CreateSecretRequest): Promise<CreateSecretResponse> {
     const response: CreateSecretResponse = await apiClient.request('/secrets', {
       method: 'POST',
