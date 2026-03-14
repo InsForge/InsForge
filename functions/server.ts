@@ -2,9 +2,10 @@ import { Client } from 'https://deno.land/x/postgres@v0.17.0/mod.ts';
 import { join, dirname, fromFileUrl } from 'https://deno.land/std@0.224.0/path/mod.ts';
 
 /* eslint-disable no-console */
-const port = parseInt(Deno.env.get('PORT') ?? '7133');
+const port = parseInt(Deno.env.get('PORT') ?? '7133', 10);
+const hostname = Deno.env.get('HOST') ?? '::';
 
-console.log(`Deno serverless runtime running on port ${port}`);
+console.log(`Deno serverless runtime running on ${hostname}:${port}`);
 
 // Configuration
 const WORKER_TIMEOUT_MS = parseInt(Deno.env.get('WORKER_TIMEOUT_MS') ?? '60000');
@@ -220,7 +221,7 @@ async function executeInWorker(code: string, request: Request): Promise<Response
   });
 }
 
-Deno.serve({ port }, async (req: Request) => {
+Deno.serve({ hostname, port }, async (req: Request) => {
   const url = new URL(req.url);
   const pathname = url.pathname;
 
