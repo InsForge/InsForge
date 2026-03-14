@@ -21,7 +21,7 @@ describe('RedirectValidationService', () => {
     };
 
     // Mock the getInstance method
-    (AuthConfigService.getInstance as unknown as jest.MockedFunction<typeof AuthConfigService.getInstance>).mockReturnValue(mockAuthConfigService);
+    (AuthConfigService.getInstance as ReturnType<typeof vi.fn>).mockReturnValue(mockAuthConfigService);
 
     // Reset the singleton instance to get a fresh one with the mock
     (RedirectValidationService as unknown as { instance: RedirectValidationService | null }).instance = null;
