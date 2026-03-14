@@ -7,7 +7,9 @@ vi.mock('@/services/auth/auth-config.service.js');
 
 describe('RedirectValidationService', () => {
   let redirectValidationService: RedirectValidationService;
-  let mockAuthConfigService: any;
+  let mockAuthConfigService: {
+    getAuthConfig: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     // Clear all mocks
@@ -19,10 +21,10 @@ describe('RedirectValidationService', () => {
     };
 
     // Mock the getInstance method
-    (AuthConfigService.getInstance as any).mockReturnValue(mockAuthConfigService);
+    (AuthConfigService.getInstance as unknown as jest.MockedFunction<typeof AuthConfigService.getInstance>).mockReturnValue(mockAuthConfigService);
 
     // Reset the singleton instance to get a fresh one with the mock
-    (RedirectValidationService as any).instance = null;
+    (RedirectValidationService as unknown as { instance: RedirectValidationService | null }).instance = null;
     redirectValidationService = RedirectValidationService.getInstance();
   });
 

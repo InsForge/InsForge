@@ -30,10 +30,13 @@ export class RedirectValidationService {
 
       // If whitelist is empty, allow all redirects (permissive mode for DX)
       if (whitelist.length === 0) {
-        logger.warn('Redirect URL whitelist is empty - allowing redirect for development convenience', {
-          redirectUrl,
-          warning: 'Configure redirect URL whitelist for production security'
-        });
+        logger.warn(
+          'Redirect URL whitelist is empty - allowing redirect for development convenience',
+          {
+            redirectUrl,
+            warning: 'Configure redirect URL whitelist for production security',
+          }
+        );
         return true;
       }
 
@@ -41,7 +44,7 @@ export class RedirectValidationService {
       const normalizedRedirectUrl = this.normalizeUrl(redirectUrl);
 
       // Check if the normalized URL is in the whitelist
-      const isAllowed = whitelist.some(allowedUrl => {
+      const isAllowed = whitelist.some((allowedUrl) => {
         const normalizedAllowedUrl = this.normalizeUrl(allowedUrl);
         return normalizedRedirectUrl === normalizedAllowedUrl;
       });
@@ -49,7 +52,7 @@ export class RedirectValidationService {
       if (!isAllowed) {
         logger.warn('Redirect URL not in whitelist', {
           redirectUrl: normalizedRedirectUrl,
-          whitelist: whitelist.map(url => this.normalizeUrl(url)),
+          whitelist: whitelist.map((url) => this.normalizeUrl(url)),
         });
         throw new AppError(
           `Redirect URL '${redirectUrl}' is not in the allowed whitelist. Please configure the redirect URL whitelist in Auth Settings.`,
@@ -64,11 +67,7 @@ export class RedirectValidationService {
         throw error;
       }
       logger.error('Failed to validate redirect URL', { error, redirectUrl });
-      throw new AppError(
-        'Failed to validate redirect URL',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
+      throw new AppError('Failed to validate redirect URL', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 

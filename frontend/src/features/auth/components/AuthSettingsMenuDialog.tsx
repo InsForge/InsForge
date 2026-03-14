@@ -210,7 +210,9 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                         type="url"
                         placeholder="https://yourapp.com/dashboard"
                         {...form.register('signInRedirectTo')}
-                        className={form.formState.errors.signInRedirectTo ? 'border-destructive' : ''}
+                        className={
+                          form.formState.errors.signInRedirectTo ? 'border-destructive' : ''
+                        }
                       />
                       {form.formState.errors.signInRedirectTo && (
                         <p className="pt-1 text-xs text-destructive">
@@ -270,8 +272,8 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                             </Button>
                             {(field.value || []).length === 0 && (
                               <p className="text-xs text-muted-foreground">
-                                ⚠️ No whitelist configured. All redirect URLs are allowed for development convenience.
-                                Configure URLs for production security.
+                                ⚠️ No whitelist configured. All redirect URLs are allowed for
+                                development convenience. Configure URLs for production security.
                               </p>
                             )}
                           </div>
