@@ -169,6 +169,18 @@ const MenuDialogTitle = React.forwardRef<
 ));
 MenuDialogTitle.displayName = DialogPrimitive.Title.displayName;
 
+const MenuDialogDescription = React.forwardRef<
+  React.ComponentRef<typeof DialogPrimitive.Description>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
+>(({ className, ...props }, ref) => (
+  <DialogPrimitive.Description
+    ref={ref}
+    className={cn('text-sm text-muted-foreground', className)}
+    {...props}
+  />
+));
+MenuDialogDescription.displayName = DialogPrimitive.Description.displayName;
+
 const MenuDialogBody = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
     <div
@@ -225,6 +237,7 @@ export {
   MenuDialogClose,
   MenuDialogOverlay,
   MenuDialogContent,
+  MenuDialogDescription,
   MenuDialogSideNav,
   MenuDialogSideNavHeader,
   MenuDialogSideNavTitle,
