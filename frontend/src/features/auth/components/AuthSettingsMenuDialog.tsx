@@ -250,7 +250,9 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                         type="url"
                         placeholder="https://yourapp.com/dashboard"
                         {...form.register('signInRedirectTo')}
-                        className={form.formState.errors.signInRedirectTo ? 'border-destructive' : ''}
+                        className={
+                          form.formState.errors.signInRedirectTo ? 'border-destructive' : ''
+                        }
                       />
                       {form.formState.errors.signInRedirectTo && (
                         <p className="pt-1 text-xs text-destructive">

@@ -98,7 +98,9 @@ export class AuthConfigService {
    */
   async getAuthConfig(): Promise<AuthConfigSchema> {
     try {
-      const result = await this.getPool().query(`SELECT ${AUTH_CONFIG_SELECT} FROM auth.configs LIMIT 1`);
+      const result = await this.getPool().query(
+        `SELECT ${AUTH_CONFIG_SELECT} FROM auth.configs LIMIT 1`
+      );
 
       // If no config exists, return fallback values
       if (!result.rows.length) {

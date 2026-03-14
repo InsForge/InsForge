@@ -18,7 +18,11 @@ export class RedirectValidationService {
     try {
       return new URL(url).toString();
     } catch {
-      throw new AppError(`${sourceLabel} must be a valid absolute URL`, 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError(
+        `${sourceLabel} must be a valid absolute URL`,
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
     }
   }
 
