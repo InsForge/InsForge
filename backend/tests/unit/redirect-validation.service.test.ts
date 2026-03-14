@@ -5,10 +5,7 @@ describe('RedirectValidationService', () => {
   it('normalizes and deduplicates whitelist entries', () => {
     const config = RedirectValidationService.validateAuthConfigOrThrow({
       signInRedirectTo: 'https://app.example.com',
-      redirectUrlWhitelist: [
-        'https://app.example.com',
-        'https://app.example.com/',
-      ],
+      redirectUrlWhitelist: ['https://app.example.com', 'https://app.example.com/'],
     });
 
     expect(config.signInRedirectTo).toBe('https://app.example.com/');
