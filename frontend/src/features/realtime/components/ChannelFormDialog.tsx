@@ -48,26 +48,15 @@ const formSchema = z.object({
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 
-type CreateProps = {
-  mode: 'create';
-  channel?: never;
-  onSave?: never;
-  onCreate: (data: CreateChannelRequest) => void;
-  isUpdating?: boolean;
-};
-
-type EditProps = {
-  mode?: 'edit';
-  channel: RealtimeChannel | null;
-  onSave: (id: string, data: UpdateChannelRequest) => void;
-  onCreate?: never;
-  isUpdating?: boolean;
-};
-
-type ChannelFormDialogProps = (CreateProps | EditProps) & {
+interface ChannelFormDialogProps {
+  mode: 'create' | 'edit';
+  channel?: RealtimeChannel | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-};
+  onSave?: (id: string, data: UpdateChannelRequest) => void;
+  onCreate?: (data: CreateChannelRequest) => void;
+  isUpdating?: boolean;
+}
 
 export function ChannelFormDialog({
   mode = 'edit',
