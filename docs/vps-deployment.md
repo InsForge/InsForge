@@ -21,7 +21,7 @@ Update your system and install Docker:
 
 ```bash
 sudo apt update
-sudo apt install docker.io docker-compose -y
+sudo apt install docker.io docker-compose-plugin -y
 ```
 
 Enable and start Docker:
@@ -113,6 +113,30 @@ Restart Nginx:
 ```bash
 sudo systemctl restart nginx
 ```
+
+---
+
+## Enable HTTPS with Certbot
+
+Install Certbot and the Nginx plugin:
+
+```bash
+sudo apt install certbot python3-certbot-nginx -y
+```
+
+Obtain an SSL certificate:
+
+```bash
+sudo certbot --nginx -d your-domain.com
+```
+
+Test automatic renewal:
+
+```bash
+sudo certbot renew --dry-run
+```
+
+Certbot will automatically configure HTTPS and redirect HTTP traffic to HTTPS.
 
 ---
 
@@ -212,6 +236,6 @@ docker compose up -d --build
 
 ## Conclusion
 
-You now have InsForge running on a VPS with Docker, Nginx reverse proxy, and basic security practices.
+You now have InsForge running on a VPS with Docker, Nginx reverse proxy, HTTPS via Certbot, and basic security practices.
 
 For further configuration, refer to the project documentation.
