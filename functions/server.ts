@@ -3,7 +3,8 @@ import { join, dirname, fromFileUrl } from 'https://deno.land/std@0.224.0/path/m
 
 /* eslint-disable no-console */
 const rawPort = Deno.env.get('PORT');
-const parsedPort = Number.parseInt(rawPort ?? '7133', 10);
+const hasValidNumericPort = rawPort !== undefined && /^\d+$/.test(rawPort);
+const parsedPort = hasValidNumericPort ? Number(rawPort) : Number.NaN;
 const port =
   Number.isInteger(parsedPort) && parsedPort >= 1 && parsedPort <= 65535 ? parsedPort : 7133;
 const hostname = Deno.env.get('HOST') ?? '::';
