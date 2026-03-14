@@ -135,7 +135,11 @@ const ProvidersCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
               </Badge>
             </TooltipTrigger>
             <TooltipContent side="top" align="center">
-              {hiddenProviders.join(', ')}
+              {hiddenProviders
+                .map(
+                  (p) => providerLabelMap[p.toLowerCase()] ?? p.charAt(0).toUpperCase() + p.slice(1)
+                )
+                .join(', ')}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
