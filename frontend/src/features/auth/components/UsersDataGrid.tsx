@@ -83,12 +83,26 @@ const ProviderBadge = ({ provider }: { provider: string }) => {
   );
 };
 
+// Limits how often a function can fire, useful for resize events
+const throttle = <T extends (...args: unknown[]) => void>(fn: T, ms: number) => {
+  let lastCall = 0;
+  return (...args: Parameters<T>) => {
+    const now = Date.now();
+    if (now - lastCall >= ms) {
+      lastCall = now;
+      fn(...args);
+    }
+  };
+};
+
 const ProvidersCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
   const BADGE_WIDTH = 90;
+  const OVERFLOW_BADGE_WIDTH = 40;
   const providers = row.providers;
   const hasProviders = Array.isArray(providers) && providers.length > 0;
   const uniqueProviders = hasProviders ? [...new Set(providers)] : [];
   const containerRef = useRef<HTMLDivElement | null>(null);
+  // Reasonable default before ResizeObserver fires
   const [containerWidth, setContainerWidth] = useState(300);
 
   useEffect(() => {
@@ -101,9 +115,11 @@ const ProvidersCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
     const cell = container.closest('[role="gridcell"]') as HTMLElement | null;
     const target = cell ?? container;
 
-    const observer = new ResizeObserver(() => {
+    const updateWidth = throttle(() => {
       setContainerWidth(target.getBoundingClientRect().width);
-    });
+    }, 50);
+
+    const observer = new ResizeObserver(updateWidth);
 
     observer.observe(target);
     setContainerWidth(target.getBoundingClientRect().width);
@@ -113,7 +129,9 @@ const ProvidersCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
 
   const maxBadgesThatFit = Math.max(1, Math.floor(containerWidth / BADGE_WIDTH));
   const hasOverflow = uniqueProviders.length > maxBadgesThatFit;
-  const visibleProviderCount = hasOverflow ? maxBadgesThatFit : uniqueProviders.length;
+  const visibleProviderCount = hasOverflow
+    ? Math.max(1, Math.floor((containerWidth - OVERFLOW_BADGE_WIDTH) / BADGE_WIDTH))
+    : uniqueProviders.length;
   const visibleProviders = uniqueProviders.slice(0, visibleProviderCount);
   const hiddenProviders = uniqueProviders.slice(visibleProviderCount);
 
