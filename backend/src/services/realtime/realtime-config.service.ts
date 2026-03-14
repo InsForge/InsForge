@@ -91,7 +91,10 @@ export class RealtimeConfigService {
 
       if (updates.length) {
         updates.push('updated_at = NOW()');
-        await client.query(`UPDATE realtime.configs SET ${updates.join(', ')} WHERE singleton = TRUE`, values);
+        await client.query(
+          `UPDATE realtime.configs SET ${updates.join(', ')} WHERE singleton = TRUE`,
+          values
+        );
       }
 
       await client.query('SELECT realtime.sync_message_cleanup_schedule()');

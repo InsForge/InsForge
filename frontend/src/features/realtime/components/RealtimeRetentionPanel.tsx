@@ -23,7 +23,9 @@ export function RealtimeRetentionPanel() {
   const isRetentionValid = Number.isInteger(parsedRetentionDays) && parsedRetentionDays >= 1;
   const isDirty =
     !!config &&
-    (enabled !== config.enabled || parsedRetentionDays !== config.retentionDays || !isRetentionValid);
+    (enabled !== config.enabled ||
+      parsedRetentionDays !== config.retentionDays ||
+      !isRetentionValid);
 
   const handleSave = () => {
     if (!config || !isRetentionValid) {
@@ -67,7 +69,11 @@ export function RealtimeRetentionPanel() {
                 Disabling retention keeps all historical realtime message rows.
               </p>
             </div>
-            <Switch checked={enabled} onCheckedChange={setEnabled} disabled={!isEditing || isUpdating} />
+            <Switch
+              checked={enabled}
+              onCheckedChange={setEnabled}
+              disabled={!isEditing || isUpdating}
+            />
           </div>
 
           <div className="flex flex-col gap-2">

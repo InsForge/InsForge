@@ -57,23 +57,27 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
   }
 });
 
-router.post('/cleanup', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const deletedCount = await configService.runMessageCleanup();
+router.post(
+  '/cleanup',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const deletedCount = await configService.runMessageCleanup();
 
-    await auditService.log({
-      actor: req.user?.email || 'api-key',
-      action: 'RUN_REALTIME_MESSAGE_CLEANUP',
-      module: 'REALTIME',
-      details: { deletedCount },
-      ip_address: req.ip,
-    });
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'RUN_REALTIME_MESSAGE_CLEANUP',
+        module: 'REALTIME',
+        details: { deletedCount },
+        ip_address: req.ip,
+      });
 
-    successResponse(res, { deletedCount });
-  } catch (error) {
-    next(error);
+      successResponse(res, { deletedCount });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // List messages
 router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
