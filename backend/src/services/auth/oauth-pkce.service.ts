@@ -7,6 +7,7 @@ import { generateSecureToken } from '@/utils/utils.js';
 import type { CreateSessionResponse } from '@insforge/shared-schemas';
 import { AuthService } from './auth.service.js';
 import { AuthConfigService } from './auth-config.service.js';
+import { RedirectValidationService } from './redirect-validation.service.js';
 
 /**
  * Minimal data stored for each PKCE code
@@ -160,7 +161,7 @@ export class OAuthPKCEService {
     return {
       user,
       accessToken,
-      redirectTo: authConfig.signInRedirectTo || undefined,
+      redirectTo: RedirectValidationService.getValidatedConfiguredRedirect(authConfig),
     };
   }
 

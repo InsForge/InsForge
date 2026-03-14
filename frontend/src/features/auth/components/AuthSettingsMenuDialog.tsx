@@ -33,6 +33,7 @@ import {
 } from '@insforge/shared-schemas';
 import { useAuthConfig } from '@/features/auth/hooks/useAuthConfig';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
+import { Textarea } from '@/components/radix';
 
 interface AuthSettingsMenuDialogProps {
   open: boolean;
@@ -51,6 +52,7 @@ const defaultValues: UpdateAuthConfigRequest = {
   verifyEmailMethod: 'code',
   resetPasswordMethod: 'code',
   signInRedirectTo: null,
+  redirectUrlWhitelist: [],
 };
 
 const toFormValues = (config?: AuthConfigSchema): UpdateAuthConfigRequest => {
@@ -68,7 +70,35 @@ const toFormValues = (config?: AuthConfigSchema): UpdateAuthConfigRequest => {
     verifyEmailMethod: config.verifyEmailMethod,
     resetPasswordMethod: config.resetPasswordMethod,
     signInRedirectTo: config.signInRedirectTo ?? null,
+    redirectUrlWhitelist: config.redirectUrlWhitelist ?? [],
   };
+};
+
+const redirectWhitelistToText = (redirectUrls?: string[]) => (redirectUrls ?? []).join('\n');
+
+const parseRedirectWhitelist = (value: string) =>
+  value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+const getRedirectWhitelistErrorMessage = (error: unknown): string | undefined => {
+  if (!error || typeof error !== 'object') {
+    return undefined;
+  }
+
+  if ('message' in error && typeof error.message === 'string' && error.message.length > 0) {
+    return error.message;
+  }
+
+  for (const value of Object.values(error)) {
+    const nestedMessage = getRedirectWhitelistErrorMessage(value);
+    if (nestedMessage) {
+      return nestedMessage;
+    }
+  }
+
+  return undefined;
 };
 
 interface SettingRowProps {
@@ -106,6 +136,10 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
   });
 
   const requireEmailVerification = form.watch('requireEmailVerification');
+  const redirectUrlWhitelist = form.watch('redirectUrlWhitelist') ?? [];
+  const redirectWhitelistError = getRedirectWhitelistErrorMessage(
+    form.formState.errors.redirectUrlWhitelist
+  );
 
   const resetForm = useCallback(() => {
     form.reset(toFormValues(config));
@@ -199,23 +233,59 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
             >
               <MenuDialogBody>
                 {activeSection === 'general' && (
-                  <SettingRow
-                    label="Redirect URL After Sign In"
-                    description="Your app url after successful authentication"
-                  >
-                    <Input
-                      type="url"
-                      placeholder="https://yourapp.com/dashboard"
-                      {...form.register('signInRedirectTo')}
-                      className={form.formState.errors.signInRedirectTo ? 'border-destructive' : ''}
-                    />
-                    {form.formState.errors.signInRedirectTo && (
-                      <p className="pt-1 text-xs text-destructive">
-                        {form.formState.errors.signInRedirectTo.message ||
-                          'Please enter a valid URL'}
-                      </p>
+                  <>
+                    {redirectUrlWhitelist.length === 0 && (
+                      <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
+                        Redirect URL whitelist is empty. InsForge will currently allow any auth
+                        redirect target, which is convenient for local development but insecure for
+                        production.
+                      </div>
                     )}
-                  </SettingRow>
+
+                    <SettingRow
+                      label="Redirect URL After Sign In"
+                      description="Optional default redirect used after successful sign-in. If a whitelist is configured, this URL must also appear in it."
+                    >
+                      <Input
+                        type="url"
+                        placeholder="https://yourapp.com/dashboard"
+                        {...form.register('signInRedirectTo')}
+                        className={form.formState.errors.signInRedirectTo ? 'border-destructive' : ''}
+                      />
+                      {form.formState.errors.signInRedirectTo && (
+                        <p className="pt-1 text-xs text-destructive">
+                          {form.formState.errors.signInRedirectTo.message ||
+                            'Please enter a valid URL'}
+                        </p>
+                      )}
+                    </SettingRow>
+
+                    <SettingRow
+                      label="Redirect URL Whitelist"
+                      description="Add one trusted redirect URL per line. InsForge matches exact normalized URLs only, not prefixes."
+                    >
+                      <Controller
+                        name="redirectUrlWhitelist"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Textarea
+                            value={redirectWhitelistToText(field.value)}
+                            onChange={(event) =>
+                              field.onChange(parseRedirectWhitelist(event.target.value))
+                            }
+                            rows={6}
+                            placeholder={
+                              'https://yourapp.com/dashboard\nhttps://staging.yourapp.com/callback'
+                            }
+                            className={redirectWhitelistError ? 'border-destructive' : ''}
+                          />
+                        )}
+                      />
+                      {redirectWhitelistError && (
+                        <p className="pt-1 text-xs text-destructive">{redirectWhitelistError}</p>
+                      )}
+                    </SettingRow>
+                  </>
                 )}
 
                 {activeSection === 'email-verification' && (

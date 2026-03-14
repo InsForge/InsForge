@@ -45,6 +45,7 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { EmailService } from '@/services/email/email.service.js';
 import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
 import { AppleOAuthProvider } from '@/providers/oauth/apple.provider.js';
+import { RedirectValidationService } from './redirect-validation.service.js';
 
 /**
  * Simplified JWT-based auth service
@@ -164,8 +165,7 @@ export class AuthService {
     if (emailAuthConfig.requireEmailVerification) {
       try {
         if (emailAuthConfig.verifyEmailMethod === 'link') {
-          const redirectTo = emailAuthConfig.signInRedirectTo || options?.emailRedirectTo;
-          await this.sendVerificationEmailWithLink(email, redirectTo);
+          await this.sendVerificationEmailWithLink(email, options?.emailRedirectTo);
         } else {
           await this.sendVerificationEmailWithCode(email);
         }
@@ -189,7 +189,7 @@ export class AuthService {
       user,
       accessToken,
       requireEmailVerification: false,
-      redirectTo: emailAuthConfig.signInRedirectTo || undefined,
+      redirectTo: RedirectValidationService.getValidatedConfiguredRedirect(emailAuthConfig),
     };
   }
 
@@ -232,7 +232,7 @@ export class AuthService {
     const response: CreateSessionResponse = {
       user,
       accessToken,
-      redirectTo: emailAuthConfig.signInRedirectTo || undefined,
+      redirectTo: RedirectValidationService.getValidatedConfiguredRedirect(emailAuthConfig),
     };
 
     return response;
@@ -293,9 +293,16 @@ export class AuthService {
       OTPType.HASH_TOKEN
     );
 
-    // Build verification link URL using backend API endpoint
-    // Include redirectTo parameter if provided
-    const linkUrl = `${getApiBaseUrl()}/auth/verify-email?token=${token}${emailRedirectTo ? `&redirectTo=${encodeURIComponent(emailRedirectTo)}` : ''}`;
+    const authConfigService = AuthConfigService.getInstance();
+    const authConfig = await authConfigService.getAuthConfig();
+    const redirectTo = RedirectValidationService.resolveOptionalRedirect(
+      authConfig,
+      emailRedirectTo,
+      'Email verification redirect URL'
+    );
+
+    // Build verification link URL using backend API endpoint.
+    const linkUrl = `${getApiBaseUrl()}/auth/verify-email?token=${token}${redirectTo ? `&redirectTo=${encodeURIComponent(redirectTo)}` : ''}`;
 
     // Send email with verification link
     const emailService = EmailService.getInstance();
@@ -361,7 +368,7 @@ export class AuthService {
       return {
         user,
         accessToken,
-        redirectTo: emailAuthConfig.signInRedirectTo || undefined,
+        redirectTo: RedirectValidationService.getValidatedConfiguredRedirect(emailAuthConfig),
       };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -427,7 +434,7 @@ export class AuthService {
       return {
         user,
         accessToken,
-        redirectTo: emailAuthConfig.signInRedirectTo || undefined,
+        redirectTo: RedirectValidationService.getValidatedConfiguredRedirect(emailAuthConfig),
       };
     } catch (error) {
       await client.query('ROLLBACK');

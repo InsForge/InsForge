@@ -22,6 +22,7 @@ import {
   oAuthProvidersSchema,
 } from '@insforge/shared-schemas';
 import { isOAuthSharedKeysAvailable } from '@/utils/environment.js';
+import { RedirectValidationService } from '@/services/auth/redirect-validation.service.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -265,11 +266,11 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
     const validatedProvider = providerValidation.data;
     const authConfig = await authConfigService.getAuthConfig();
 
-    const redirectUri = authConfig.signInRedirectTo || redirect_uri;
-
-    if (!redirectUri) {
-      throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
-    }
+    const redirectUri = RedirectValidationService.resolveRequiredRedirect(
+      authConfig,
+      redirect_uri,
+      'Redirect URI'
+    );
 
     const jwtPayload = {
       provider: validatedProvider,
@@ -346,9 +347,12 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       );
     }
     const validatedProvider = providerValidation.data;
-    if (!redirectUri) {
-      throw new AppError('redirectUri is required', 400, ERROR_CODES.INVALID_INPUT);
-    }
+    const authConfig = await authConfigService.getAuthConfig();
+    const validatedRedirectUri = RedirectValidationService.validateRedirectOrThrow(
+      authConfig,
+      redirectUri,
+      'OAuth redirect URI'
+    );
 
     if (!codeChallenge) {
       throw new AppError('code_challenge is required in state', 400, ERROR_CODES.INVALID_INPUT);
@@ -357,7 +361,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     if (success !== 'true') {
       const errorMessage = error || 'OAuth Authentication Failed';
       logger.warn('Shared OAuth callback failed', { error: errorMessage, provider });
-      const errorUrl = new URL(redirectUri);
+      const errorUrl = new URL(validatedRedirectUri);
       errorUrl.searchParams.set('error', String(errorMessage));
       return res.redirect(errorUrl.toString());
     }
@@ -382,7 +386,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     });
 
     // Redirect with only the exchange code (no sensitive tokens in URL)
-    const successUrl = new URL(redirectUri);
+    const successUrl = new URL(validatedRedirectUri);
     successUrl.searchParams.set('insforge_code', exchangeCode);
     res.redirect(successUrl.toString());
   } catch (error) {
@@ -429,9 +433,12 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
       throw new AppError('Invalid state parameter', 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    if (!redirectUri) {
-      throw new AppError('redirectUri is required', 400, ERROR_CODES.INVALID_INPUT);
-    }
+    const authConfig = await authConfigService.getAuthConfig();
+    const validatedRedirectUri = RedirectValidationService.validateRedirectOrThrow(
+      authConfig,
+      redirectUri,
+      'OAuth redirect URI'
+    );
 
     if (!codeChallenge) {
       throw new AppError('code_challenge is required in state', 400, ERROR_CODES.INVALID_INPUT);
@@ -465,7 +472,7 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
       });
 
       // Redirect with only the exchange code (no sensitive tokens in URL)
-      const successUrl = new URL(redirectUri);
+      const successUrl = new URL(validatedRedirectUri);
       successUrl.searchParams.set('insforge_code', exchangeCode);
       return res.redirect(successUrl.toString());
     } catch (error) {
@@ -481,7 +488,7 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
       const errorMessage = error instanceof Error ? error.message : 'OAuth Authentication Failed';
 
       // Redirect with error in URL parameters
-      const errorUrl = new URL(redirectUri);
+      const errorUrl = new URL(validatedRedirectUri);
       errorUrl.searchParams.set('error', errorMessage);
       return res.redirect(errorUrl.toString());
     }

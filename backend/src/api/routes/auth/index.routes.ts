@@ -661,8 +661,7 @@ router.post(
       // Note: User enumeration is prevented at service layer
       // Service returns gracefully (no error) if user not found
       if (method === 'link') {
-        const redirectTo = authConfig.signInRedirectTo || options?.emailRedirectTo;
-        await authService.sendVerificationEmailWithLink(email, redirectTo);
+        await authService.sendVerificationEmailWithLink(email, options?.emailRedirectTo);
       } else {
         await authService.sendVerificationEmailWithCode(email);
       }

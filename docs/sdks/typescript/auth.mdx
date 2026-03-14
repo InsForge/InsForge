@@ -19,7 +19,7 @@ Create a new user account with email and password.
 - `password` (string, required) - User's password
 - `name` (string, optional) - User's display name
 - `options` (object, optional) - Additional options
-  - `emailRedirectTo` (string, optional) - Custom URL to redirect to after email verification. It's a fallback if you didn't set default redirect URL configured in your dashboard.
+  - `emailRedirectTo` (string, optional) - Custom URL to redirect to after email verification. It's a fallback if you didn't set the default redirect URL in your dashboard, and it must match the redirect URL whitelist when one is configured.
 
 ### Returns
 
@@ -38,6 +38,10 @@ Create a new user account with email and password.
 
 <Note>
   When `requireEmailVerification` is true, `accessToken` will be null until the user verifies their email. InsForge sends a verification email with either a link or a 6-digit code, based on your dashboard configuration (`verifyEmailMethod`). For code verification, implement a page that prompts the user to enter the code (see [verifyEmail()](#verifyemail)). For link verification, redirect users to the sign-in page—the insforge backend handles verification automatically when the link is clicked.
+</Note>
+
+<Note>
+  Redirect destinations are checked against the Auth Settings redirect URL whitelist when one is configured. Matching uses exact normalized URLs, not prefix matching. If the whitelist is empty, InsForge stays permissive for development convenience, but that state is insecure for production.
 </Note>
 
 ### Example
@@ -163,7 +167,7 @@ Start OAuth authentication flow with supported providers (Google, GitHub, Micros
 ### Parameters
 
 - `provider` (string, required) - OAuth provider name (e.g., 'google', 'github', 'microsoft', 'discord')
-- `redirectTo` (string, optional) - URL to redirect after authentication
+- `redirectTo` (string, optional) - URL to redirect after authentication. It must match the redirect URL whitelist when one is configured.
 - `skipBrowserRedirect` (boolean, optional) - If true, returns OAuth URL without auto-redirecting (for mobile apps)
 
 ### Returns
@@ -178,6 +182,10 @@ Start OAuth authentication flow with supported providers (Google, GitHub, Micros
 <Note>
   After OAuth redirect, SDK automatically detects callback parameters and saves session. No manual
   handling needed.
+</Note>
+
+<Note>
+  OAuth redirect matching uses exact normalized URLs, not prefix matching. If the redirect URL whitelist is empty, InsForge allows redirects for development convenience, but that state is insecure for production.
 </Note>
 
 ### Example

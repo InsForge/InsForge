@@ -613,7 +613,7 @@ GET /api/auth/oauth/{provider}
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `redirect_uri` | string | Yes | URL to redirect after authentication |
+| `redirect_uri` | string | Yes | URL to redirect after authentication. Must match the redirect URL whitelist when one is configured. |
 | `code_challenge` | string | Yes | PKCE code challenge (Base64 URL-encoded SHA256 hash of code_verifier) |
 
 ### Supported Providers
@@ -715,6 +715,8 @@ curl -X POST "https://your-app.insforge.app/api/auth/oauth/exchange?client_type=
 <Note>
 - For **web clients**: The `refreshToken` will be `null` and a `csrfToken` is returned instead. The refresh token is stored in an httpOnly cookie.
 - For **non-web clients** (`mobile`, `desktop`, `server`): A `refreshToken` is returned directly. Store it securely.
+- Redirect URL matching uses exact normalized URLs. `https://app.example.com/callback` and `https://app.example.com/callback/extra` are treated as different URLs.
+- If the redirect URL whitelist is empty, InsForge remains permissive for development convenience, but that state is insecure for production and should be avoided.
 </Note>
 
 ---
@@ -731,7 +733,7 @@ GET /{baseURL}/auth/sign-in
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `redirect` | string | Yes | URL-encoded redirect URI |
+| `redirect` | string | Yes | URL-encoded redirect URI. Must match the redirect URL whitelist when one is configured. |
 | `client_type` | string | No | Client type: `web` (default), `mobile`, `desktop`, or `server` |
 | `code_challenge` | string | Yes | PKCE code challenge |
 
@@ -817,7 +819,11 @@ curl "https://your-app.insforge.app/api/auth/public-config"
   "requireUppercase": false,
   "requireSpecialChar": false,
   "verifyEmailMethod": "code",
-  "resetPasswordMethod": "link"
+  "resetPasswordMethod": "link",
+  "redirectUrlWhitelist": [
+    "https://myapp.com/dashboard",
+    "https://staging.myapp.com/callback"
+  ]
 }
 ```
 
@@ -882,9 +888,11 @@ curl "https://your-app.insforge.app/api/auth/config" \
   "requireSpecialChar": false,
   "verifyEmailMethod": "code",
   "resetPasswordMethod": "link",
-  "verifyEmailRedirectTo": "https://myapp.com/verify-success",
-  "resetPasswordRedirectTo": "https://myapp.com/reset-success",
   "signInRedirectTo": "https://myapp.com/dashboard",
+  "redirectUrlWhitelist": [
+    "https://myapp.com/dashboard",
+    "https://staging.myapp.com/callback"
+  ],
   "createdAt": "2024-01-15T10:30:00Z",
   "updatedAt": "2024-01-15T10:30:00Z"
 }
@@ -910,9 +918,8 @@ PUT /api/auth/config
 | `requireSpecialChar` | boolean | No | Require special characters in password |
 | `verifyEmailMethod` | string | No | Email verification method (`code` or `link`) |
 | `resetPasswordMethod` | string | No | Password reset method (`code` or `link`) |
-| `verifyEmailRedirectTo` | string | No | Redirect URL after email verification |
-| `resetPasswordRedirectTo` | string | No | Redirect URL after password reset |
 | `signInRedirectTo` | string | No | Redirect URL after sign in |
+| `redirectUrlWhitelist` | string[] | No | Exact trusted redirect URLs. If configured, `signInRedirectTo`, OAuth `redirect_uri`, and email verification redirects must match one of these URLs. |
 
 #### Example
 
@@ -923,7 +930,12 @@ curl -X PUT "https://your-app.insforge.app/api/auth/config" \
   -d '{
     "requireEmailVerification": true,
     "passwordMinLength": 10,
-    "verifyEmailMethod": "link"
+    "verifyEmailMethod": "link",
+    "signInRedirectTo": "https://myapp.com/dashboard",
+    "redirectUrlWhitelist": [
+      "https://myapp.com/dashboard",
+      "https://staging.myapp.com/callback"
+    ]
   }'
 ```
 

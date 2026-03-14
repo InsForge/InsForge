@@ -24,6 +24,8 @@ export const nameSchema = z
 export const roleSchema = z.enum(['anon', 'authenticated', 'project_admin']);
 
 export const verificationMethodSchema = z.enum(['code', 'link']);
+export const redirectUrlSchema = z.string().url('Invalid redirect URL format');
+export const redirectUrlWhitelistSchema = z.array(redirectUrlSchema);
 
 /**
  * User profile schema with default fields and passthrough for custom fields
@@ -102,9 +104,10 @@ export const authConfigSchema = z.object({
   verifyEmailMethod: verificationMethodSchema,
   resetPasswordMethod: verificationMethodSchema,
   signInRedirectTo: z
-    .union([z.string().url(), z.literal(''), z.null()])
+    .union([redirectUrlSchema, z.literal(''), z.null()])
     .optional()
     .transform((val) => (val === '' ? null : val)),
+  redirectUrlWhitelist: redirectUrlWhitelistSchema.default([]),
   createdAt: z.string(), // PostgreSQL timestamp
   updatedAt: z.string(), // PostgreSQL timestamp
 });

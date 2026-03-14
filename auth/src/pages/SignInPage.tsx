@@ -3,14 +3,19 @@ import { useSearchParams } from 'react-router-dom';
 import { SignIn } from '@insforge/react';
 import broadcastService, { BroadcastEventType, BroadcastEvent } from '../lib/broadcastService';
 import { ErrorCard } from '../components/ErrorCard';
+import { useValidatedRedirectTarget } from '../lib/redirectValidation';
 
 export function SignInPage() {
   const [searchParams] = useSearchParams();
   const redirectUrl = searchParams.get('redirect');
+  const { validatedRedirect, validationError, isLoading } = useValidatedRedirectTarget(
+    redirectUrl,
+    'Redirect URL'
+  );
 
   // Listen for email verification success from other tabs
   useEffect(() => {
-    if (!redirectUrl) {
+    if (!validatedRedirect) {
       return;
     }
 
@@ -21,7 +26,7 @@ export function SignInPage() {
         if (accessToken && user) {
           // Email verified in another tab, redirect with token
           try {
-            const finalUrl = new URL(redirectUrl, window.location.origin);
+            const finalUrl = new URL(validatedRedirect);
             const params = new URLSearchParams();
             params.set('access_token', accessToken);
             params.set('user_id', user.id);
@@ -42,7 +47,7 @@ export function SignInPage() {
     return () => {
       unsubscribeVerified();
     };
-  }, [redirectUrl]);
+  }, [validatedRedirect]);
 
   const handleError = useCallback((error: Error) => {
     console.error('Sign in failed:', error);
@@ -52,6 +57,22 @@ export function SignInPage() {
     return (
       <ErrorCard title="Missing Redirect URL">
         <p>No redirect URL provided. Please check the URL and try again.</p>
+      </ErrorCard>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <ErrorCard title="Validating Redirect URL">
+        <p>Please wait while InsForge validates your redirect destination.</p>
+      </ErrorCard>
+    );
+  }
+
+  if (validationError) {
+    return (
+      <ErrorCard title="Invalid Redirect URL">
+        <p>{validationError}</p>
       </ErrorCard>
     );
   }

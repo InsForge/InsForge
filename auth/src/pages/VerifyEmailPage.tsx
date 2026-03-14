@@ -1,11 +1,33 @@
 import { useSearchParams } from 'react-router-dom';
 import { VerifyEmail } from '@insforge/react';
 import broadcastService, { BroadcastEventType } from '../lib/broadcastService';
+import { ErrorCard } from '../components/ErrorCard';
+import { useValidatedRedirectTarget } from '../lib/redirectValidation';
 
 export function VerifyEmailPage() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   const redirectTo = searchParams.get('redirectTo');
+  const { validatedRedirect, validationError, isLoading } = useValidatedRedirectTarget(
+    redirectTo,
+    'Email verification redirect URL'
+  );
+
+  if (redirectTo && isLoading) {
+    return (
+      <ErrorCard title="Validating Redirect URL">
+        <p>Please wait while InsForge validates your redirect destination.</p>
+      </ErrorCard>
+    );
+  }
+
+  if (validationError) {
+    return (
+      <ErrorCard title="Invalid Redirect URL">
+        <p>{validationError}</p>
+      </ErrorCard>
+    );
+  }
 
   return (
     <VerifyEmail
@@ -13,10 +35,10 @@ export function VerifyEmailPage() {
       onSuccess={(data) => {
         broadcastService.broadcast(BroadcastEventType.EMAIL_VERIFIED_SUCCESS, data);
         // Redirect to custom URL if provided
-        if (redirectTo) {
+        if (validatedRedirect) {
           const { accessToken, user, csrfToken } = data;
           if (accessToken && user) {
-            const finalUrl = new URL(redirectTo, window.location.origin);
+            const finalUrl = new URL(validatedRedirect);
             const params = new URLSearchParams();
             params.set('access_token', accessToken);
             params.set('user_id', user.id);
