@@ -188,7 +188,9 @@ export function ScheduleFormDialog({
           <DialogHeader>
             <DialogTitle>{mode === 'create' ? 'Create Schedule' : 'Edit Schedule'}</DialogTitle>
             <DialogDescription className="sr-only">
-              {mode === 'create' ? 'Create a new scheduled function' : 'Edit scheduled function settings'}
+              {mode === 'create'
+                ? 'Create a new scheduled function'
+                : 'Edit scheduled function settings'}
             </DialogDescription>
           </DialogHeader>
 
