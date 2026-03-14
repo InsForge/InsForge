@@ -48,7 +48,8 @@ export function SecretRow({ secret, onDelete, className }: SecretRowProps) {
       const { data, error } = await refetchSecretValue();
 
       if (error || !data) {
-        const errorMessage = error instanceof Error ? error.message : 'Failed to fetch secret value';
+        const errorMessage =
+          error instanceof Error ? error.message : 'Failed to fetch secret value';
         setValueError(errorMessage);
         showToast(errorMessage, 'error');
         return;
@@ -59,8 +60,10 @@ export function SecretRow({ secret, onDelete, className }: SecretRowProps) {
   };
 
   const maskedValue = '************';
-  const displayedValue = isValueVisible && revealedSecret ? revealedSecret.value : valueError ?? maskedValue;
-  const valueTitle = isValueVisible && revealedSecret ? revealedSecret.value : valueError ?? 'Reveal secret value';
+  const displayedValue =
+    isValueVisible && revealedSecret ? revealedSecret.value : (valueError ?? maskedValue);
+  const valueTitle =
+    isValueVisible && revealedSecret ? revealedSecret.value : (valueError ?? 'Reveal secret value');
 
   return (
     <div className={cn('group rounded border border-[var(--alpha-8)] bg-card', className)}>
@@ -81,7 +84,9 @@ export function SecretRow({ secret, onDelete, className }: SecretRowProps) {
             disabled={isFetchingValue}
             className="size-7 shrink-0 rounded text-muted-foreground hover:text-foreground"
             title={isValueVisible ? 'Hide secret value' : 'Reveal secret value'}
-            aria-label={isValueVisible ? `Hide value for ${secret.key}` : `Reveal value for ${secret.key}`}
+            aria-label={
+              isValueVisible ? `Hide value for ${secret.key}` : `Reveal value for ${secret.key}`
+            }
           >
             {isFetchingValue ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -94,7 +99,9 @@ export function SecretRow({ secret, onDelete, className }: SecretRowProps) {
           <span
             className={cn(
               'min-w-0 flex-1 truncate text-sm',
-              isValueVisible && revealedSecret ? 'font-mono text-foreground' : 'text-muted-foreground',
+              isValueVisible && revealedSecret
+                ? 'font-mono text-foreground'
+                : 'text-muted-foreground',
               valueError && 'text-destructive'
             )}
             title={valueTitle}
