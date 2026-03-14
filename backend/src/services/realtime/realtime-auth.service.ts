@@ -76,16 +76,13 @@ export class RealtimeAuthService {
       try {
         await client.query('ROLLBACK');
       } catch (rollbackError) {
-        logger.error(
-          'Critical: Failed to rollback transaction in checkSubscribePermission',
-          {
-            originalError: error instanceof Error ? error.message : String(error),
-            rollbackError:
-              rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
-            channelName,
-            userId,
-          }
-        );
+        logger.error('Critical: Failed to rollback transaction in checkSubscribePermission', {
+          originalError: error instanceof Error ? error.message : String(error),
+          rollbackError:
+            rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+          channelName,
+          userId,
+        });
         // Re-throw to ensure connection is properly released and errors are visible
         throw rollbackError;
       }
