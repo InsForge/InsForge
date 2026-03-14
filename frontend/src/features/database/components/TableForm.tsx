@@ -370,6 +370,7 @@ export function TableForm({
       form.reset();
       setError(null);
       setForeignKeys([]);
+      setForeignKeysDirty(false);
       onSuccess?.(data.tableName);
     },
     onError: (err) => {

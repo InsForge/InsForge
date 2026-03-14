@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 const STORAGE_KEY = 'insforge.database.tables.preferences.v1';
 
@@ -108,6 +108,10 @@ export function useTableColumnWidthsPreference(
 ) {
   const [preferences, setPreferences] = useState<DatabaseGridPreferences>(loadPreferences);
 
+  useEffect(() => {
+    savePreferences(preferences);
+  }, [preferences]);
+
   const columnWidths = useMemo(() => {
     if (!tableName) {
       return {};
@@ -140,8 +144,6 @@ export function useTableColumnWidthsPreference(
             [tableName]: nextWidths,
           },
         };
-
-        savePreferences(nextPreferences);
 
         return nextPreferences;
       });
