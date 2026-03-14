@@ -1,8 +1,12 @@
-import { Trash2 } from 'lucide-react';
-import { Button } from '@insforge/ui';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Eye, EyeOff, Loader2, Trash2 } from 'lucide-react';
+import { Button, CopyButton } from '@insforge/ui';
 import { SecretSchema } from '@insforge/shared-schemas';
 import { cn } from '@/lib/utils/utils';
 import { formatDistance } from 'date-fns';
+import { secretService } from '../services/secret.service';
+import { useToast } from '@/lib/hooks/useToast';
 
 interface SecretRowProps {
   secret: SecretSchema;
@@ -11,10 +15,52 @@ interface SecretRowProps {
 }
 
 export function SecretRow({ secret, onDelete, className }: SecretRowProps) {
+  const { showToast } = useToast();
+  const [isValueVisible, setIsValueVisible] = useState(false);
+  const [valueError, setValueError] = useState<string | null>(null);
+  const {
+    data: revealedSecret,
+    isFetching: isFetchingValue,
+    refetch: refetchSecretValue,
+  } = useQuery({
+    queryKey: ['secret-value', secret.key, secret.updatedAt ?? 'never'],
+    queryFn: () => secretService.getSecretValue(secret.key),
+    enabled: false,
+    retry: false,
+  });
+
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onDelete(secret);
   };
+
+  const handleToggleValue = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (isValueVisible) {
+      setIsValueVisible(false);
+      return;
+    }
+
+    setValueError(null);
+
+    if (!revealedSecret) {
+      const { data, error } = await refetchSecretValue();
+
+      if (error || !data) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to fetch secret value';
+        setValueError(errorMessage);
+        showToast(errorMessage, 'error');
+        return;
+      }
+    }
+
+    setIsValueVisible(true);
+  };
+
+  const maskedValue = '************';
+  const displayedValue = isValueVisible && revealedSecret ? revealedSecret.value : valueError ?? maskedValue;
+  const valueTitle = isValueVisible && revealedSecret ? revealedSecret.value : valueError ?? 'Reveal secret value';
 
   return (
     <div className={cn('group rounded border border-[var(--alpha-8)] bg-card', className)}>
@@ -24,6 +70,46 @@ export function SecretRow({ secret, onDelete, className }: SecretRowProps) {
           <p className="text-sm text-foreground truncate" title={secret.key}>
             {secret.key}
           </p>
+        </div>
+
+        {/* Value Column */}
+        <div className="flex-[1.5] min-w-0 h-12 flex items-center gap-2 px-2.5">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={(e) => void handleToggleValue(e)}
+            disabled={isFetchingValue}
+            className="size-7 shrink-0 rounded text-muted-foreground hover:text-foreground"
+            title={isValueVisible ? 'Hide secret value' : 'Reveal secret value'}
+            aria-label={isValueVisible ? `Hide value for ${secret.key}` : `Reveal value for ${secret.key}`}
+          >
+            {isFetchingValue ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : isValueVisible ? (
+              <EyeOff className="h-4 w-4" />
+            ) : (
+              <Eye className="h-4 w-4" />
+            )}
+          </Button>
+          <span
+            className={cn(
+              'min-w-0 flex-1 truncate text-sm',
+              isValueVisible && revealedSecret ? 'font-mono text-foreground' : 'text-muted-foreground',
+              valueError && 'text-destructive'
+            )}
+            title={valueTitle}
+          >
+            {displayedValue}
+          </span>
+          {isValueVisible && revealedSecret ? (
+            <CopyButton
+              showText={false}
+              text={revealedSecret.value}
+              copyText="Copy secret value"
+              copiedText="Copied secret value"
+              className="size-6 shrink-0"
+            />
+          ) : null}
         </div>
 
         {/* Updated at Column */}

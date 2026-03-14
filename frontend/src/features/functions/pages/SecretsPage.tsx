@@ -31,7 +31,7 @@ export default function SecretsPage() {
     <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
       <TableHeader
         title="Secrets"
-        className="min-w-[800px]"
+        className="min-w-[960px]"
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
         searchDebounceTime={300}
@@ -80,6 +80,9 @@ export default function SecretsPage() {
             <div className="flex items-center pl-1.5">
               <div className="flex-1 h-8 flex items-center px-2.5">
                 <span className="text-sm text-muted-foreground">Name</span>
+              </div>
+              <div className="flex-[1.5] h-8 flex items-center px-2.5">
+                <span className="text-sm text-muted-foreground">Value</span>
               </div>
               <div className="flex-1 h-8 flex items-center px-2.5">
                 <span className="text-sm text-muted-foreground">Updated at</span>
