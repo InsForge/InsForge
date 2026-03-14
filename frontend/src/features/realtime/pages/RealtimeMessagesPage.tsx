@@ -6,6 +6,7 @@ import { Skeleton, PaginationControls, TableHeader } from '@/components';
 import { useRealtimeMessages } from '../hooks/useRealtimeMessages';
 import { MessageRow } from '../components/MessageRow';
 import RealtimeEmptyState from '../components/RealtimeEmptyState';
+import { RealtimeRetentionPanel } from '../components/RealtimeRetentionPanel';
 import type { RealtimeMessage } from '../services/realtime.service';
 
 export default function RealtimeMessagesPage() {
@@ -157,8 +158,12 @@ export default function RealtimeMessagesPage() {
         onScroll={handleScroll}
         className="flex-1 min-h-0 overflow-y-auto relative"
       >
+        <div className="px-3 pt-4">
+          <RealtimeRetentionPanel />
+        </div>
+
         {/* Top spacing */}
-        <div className="h-10" />
+        <div className="h-6" />
 
         {/* Sticky Table Header */}
         <div

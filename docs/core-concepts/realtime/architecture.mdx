@@ -87,6 +87,23 @@ The `realtime.messages` table stores all published messages for audit purposes:
 | `wh_audience_count` | INTEGER | Webhook URLs configured |
 | `wh_delivered_count` | INTEGER | Successful webhook deliveries |
 
+### Message Retention
+
+Realtime message history is retained automatically so the `realtime.messages` table does not grow without bound.
+
+| Setting | Default | Notes |
+|--------|---------|-------|
+| **Retention period** | 30 days | Configurable per project by admins |
+| **Cleanup cadence** | Every 15 minutes | Scheduled automatically with `pg_cron` |
+| **Cleanup batch size** | 1000 rows | Oldest rows are deleted first |
+| **Minimum retention** | 1 day | Prevents cleanup from racing fresh delivery updates |
+
+Admins can review and update the retention policy from the Realtime Messages page in the dashboard, or through the admin API at `/api/realtime/messages/config`.
+
+<Note>
+Cleanup only prunes historical rows from `realtime.messages`. Channel definitions in `realtime.channels` are left untouched.
+</Note>
+
 ## Permission Model
 
 InsForge Realtime uses PostgreSQL grants and optional Row Level Security (RLS) to control channel access.
@@ -407,6 +424,7 @@ System events are trusted and bypass publish RLS checks. User events must pass I
 | **Latency** | ~10-50ms | Database to client, depends on network |
 | **Throughput** | High | Limited by PostgreSQL NOTIFY and Socket.IO |
 | **Persistence** | Full | All messages stored in database |
+| **Retention** | Automatic | Old rows are pruned in batches after the configured retention period |
 | **Reconnection** | Automatic | Socket.IO handles reconnection |
 | **Webhook Timeout** | 10s | Per webhook request |
 

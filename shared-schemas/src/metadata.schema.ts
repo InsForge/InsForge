@@ -1,7 +1,10 @@
 import { z } from 'zod';
 import { storageBucketSchema } from './storage.schema';
 import { realtimeChannelSchema } from './realtime.schema';
-import { realtimePermissionsResponseSchema } from './realtime-api.schema';
+import {
+  realtimePermissionsResponseSchema,
+  realtimeMessageRetentionConfigSchema,
+} from './realtime-api.schema';
 import { getPublicAuthConfigResponseSchema } from './auth-api.schema';
 
 export const authMetadataSchema = getPublicAuthConfigResponseSchema;
@@ -46,6 +49,7 @@ export const aiMetadataSchema = z.object({
 export const realtimeMetadataSchema = z.object({
   channels: z.array(realtimeChannelSchema),
   permissions: realtimePermissionsResponseSchema,
+  messageRetention: realtimeMessageRetentionConfigSchema,
 });
 
 export const appMetaDataSchema = z.object({

@@ -357,6 +357,70 @@ paths:
                 message: "since: Invalid datetime"
                 statusCode: 400
 
+  /api/realtime/messages/config:
+    get:
+      summary: Get Message Retention Policy
+      description: Retrieve the effective realtime message retention settings for the project
+      tags:
+        - Messages
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      responses:
+        '200':
+          description: Realtime message retention settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageRetentionConfig'
+    put:
+      summary: Update Message Retention Policy
+      description: Update the realtime message retention period and enable or disable automatic cleanup
+      tags:
+        - Messages
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMessageRetentionConfigRequest'
+            example:
+              enabled: true
+              retentionDays: 14
+      responses:
+        '200':
+          description: Updated realtime message retention settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageRetentionConfig'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/realtime/messages/cleanup:
+    post:
+      summary: Run Realtime Message Cleanup
+      description: Trigger an immediate cleanup pass for expired realtime messages
+      tags:
+        - Messages
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      responses:
+        '200':
+          description: Cleanup execution result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunMessageCleanupResponse'
+
   /api/realtime/permissions:
     get:
       summary: Get Realtime Permissions
@@ -609,6 +673,70 @@ components:
                 minimum: 0
                 description: Number of occurrences
                 example: 450
+
+    MessageRetentionConfig:
+      type: object
+      required:
+        - enabled
+        - retentionDays
+        - cleanupBatchSize
+        - cleanupSchedule
+        - createdAt
+        - updatedAt
+      properties:
+        enabled:
+          type: boolean
+          description: Whether automatic cleanup is enabled
+          example: true
+        retentionDays:
+          type: integer
+          minimum: 1
+          description: Number of days to retain realtime message history
+          example: 30
+        cleanupBatchSize:
+          type: integer
+          minimum: 100
+          description: Maximum number of expired rows deleted per cleanup run
+          example: 1000
+        cleanupSchedule:
+          type: string
+          description: Cron schedule used for automatic cleanup
+          example: "*/15 * * * *"
+        cronJobId:
+          type: integer
+          nullable: true
+          description: Internal pg_cron job id for the cleanup schedule
+          example: 42
+        createdAt:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+
+    UpdateMessageRetentionConfigRequest:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          example: true
+        retentionDays:
+          type: integer
+          minimum: 1
+          maximum: 3650
+          example: 14
+
+    RunMessageCleanupResponse:
+      type: object
+      required:
+        - deletedCount
+      properties:
+        deletedCount:
+          type: integer
+          minimum: 0
+          example: 250
 
     RlsPolicy:
       type: object

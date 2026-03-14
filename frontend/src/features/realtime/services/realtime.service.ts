@@ -6,11 +6,20 @@ import type {
   UpdateChannelRequest,
   ListMessagesRequest,
   MessageStatsResponse,
+  RealtimeMessageRetentionConfig,
   RlsPolicy,
   RealtimePermissionsResponse,
+  RunRealtimeMessageCleanupResponse,
+  UpdateRealtimeMessageRetentionRequest,
 } from '@insforge/shared-schemas';
 
-export type { RealtimeChannel, RealtimeMessage, RlsPolicy, RealtimePermissionsResponse };
+export type {
+  RealtimeChannel,
+  RealtimeMessage,
+  RealtimeMessageRetentionConfig,
+  RlsPolicy,
+  RealtimePermissionsResponse,
+};
 
 export class RealtimeService {
   // ============================================================================
@@ -89,6 +98,29 @@ export class RealtimeService {
     const endpoint = `/realtime/messages/stats${query ? `?${query}` : ''}`;
 
     return apiClient.request(endpoint, {
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  async getMessageRetentionConfig(): Promise<RealtimeMessageRetentionConfig> {
+    return apiClient.request('/realtime/messages/config', {
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  async updateMessageRetentionConfig(
+    data: UpdateRealtimeMessageRetentionRequest
+  ): Promise<RealtimeMessageRetentionConfig> {
+    return apiClient.request('/realtime/messages/config', {
+      method: 'PUT',
+      headers: apiClient.withAccessToken(),
+      body: JSON.stringify(data),
+    });
+  }
+
+  async runMessageCleanup(): Promise<RunRealtimeMessageCleanupResponse> {
+    return apiClient.request('/realtime/messages/cleanup', {
+      method: 'POST',
       headers: apiClient.withAccessToken(),
     });
   }

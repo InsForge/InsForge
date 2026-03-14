@@ -3,6 +3,7 @@ import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
+import { RealtimeConfigService } from './realtime-config.service.js';
 import type {
   RealtimeChannel,
   CreateChannelRequest,
@@ -161,11 +162,16 @@ export class RealtimeChannelService {
    * Get realtime metadata including channels and permissions
    */
   async getMetadata(): Promise<RealtimeMetadataSchema> {
-    const [channels, permissions] = await Promise.all([this.list(), this.getPermissions()]);
+    const [channels, permissions, messageRetention] = await Promise.all([
+      this.list(),
+      this.getPermissions(),
+      RealtimeConfigService.getInstance().getMessageRetentionConfig(),
+    ]);
 
     return {
       channels,
       permissions,
+      messageRetention,
     };
   }
 

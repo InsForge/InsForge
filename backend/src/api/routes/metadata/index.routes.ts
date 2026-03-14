@@ -31,12 +31,13 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
     // Gather metadata from all modules
 
     // Fetch all metadata in parallel for better performance
-    const [auth, database, storage, aiConfig, functions] = await Promise.all([
+    const [auth, database, storage, aiConfig, functions, realtime] = await Promise.all([
       authService.getMetadata(),
       dbManager.getMetadata(),
       storageService.getMetadata(),
       aiConfigService.getMetadata(),
       functionService.getMetadata(),
+      realtimeChannelService.getMetadata(),
     ]);
 
     // Get version from package.json or default
@@ -48,6 +49,7 @@ router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
       storage,
       functions,
       aiIntegration: aiConfig,
+      realtime,
       version,
     };
 

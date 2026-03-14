@@ -85,6 +85,33 @@ export const messageStatsResponseSchema = z.object({
 export type MessageStatsRequest = z.infer<typeof messageStatsRequestSchema>;
 export type MessageStatsResponse = z.infer<typeof messageStatsResponseSchema>;
 
+export const realtimeMessageRetentionConfigSchema = z.object({
+  enabled: z.boolean(),
+  retentionDays: z.number().int().min(1),
+  cleanupBatchSize: z.number().int().min(100),
+  cleanupSchedule: z.string().min(1),
+  cronJobId: z.number().int().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export const updateRealtimeMessageRetentionRequestSchema = z.object({
+  enabled: z.boolean().optional(),
+  retentionDays: z.coerce.number().int().min(1).max(3650).optional(),
+});
+
+export const runRealtimeMessageCleanupResponseSchema = z.object({
+  deletedCount: z.number().int().min(0),
+});
+
+export type RealtimeMessageRetentionConfig = z.infer<typeof realtimeMessageRetentionConfigSchema>;
+export type UpdateRealtimeMessageRetentionRequest = z.infer<
+  typeof updateRealtimeMessageRetentionRequestSchema
+>;
+export type RunRealtimeMessageCleanupResponse = z.infer<
+  typeof runRealtimeMessageCleanupResponseSchema
+>;
+
 // ============================================================================
 // Permissions Schemas
 // ============================================================================
