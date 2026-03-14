@@ -12,13 +12,8 @@ interface SecretRowProps {
 }
 
 export function SecretRow({ secret, onDelete, className }: SecretRowProps) {
-  const {
-    isValueVisible,
-    valueError,
-    revealedSecret,
-    isFetchingValue,
-    toggleValue,
-  } = useSecretValue(secret);
+  const { isValueVisible, valueError, revealedSecret, isFetchingValue, toggleValue } =
+    useSecretValue(secret);
 
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
