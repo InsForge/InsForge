@@ -98,5 +98,8 @@
     "monorepo"
   ],
   "author": "InsForge",
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "dependencies": {
+    "fast-xml-parser": "^5.3.5"
+  }
 }
