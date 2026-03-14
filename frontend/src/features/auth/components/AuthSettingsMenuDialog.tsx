@@ -187,6 +187,9 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
         <MenuDialogMain>
           <MenuDialogHeader>
             <MenuDialogTitle>{sectionTitle}</MenuDialogTitle>
+            <MenuDialogDescription className="sr-only">
+              {sectionTitle} settings
+            </MenuDialogDescription>
             <MenuDialogCloseButton className="ml-auto" />
           </MenuDialogHeader>
 
