@@ -7,20 +7,21 @@ import { useConfirm } from '@/lib/hooks/useConfirm';
 
 export function useSecretValue(secret: Pick<SecretSchema, 'key' | 'updatedAt'>) {
   const { showToast } = useToast();
+  const updatedAtKey = secret.updatedAt ?? 'never';
   const [isValueVisible, setIsValueVisible] = useState(false);
   const [valueError, setValueError] = useState<string | null>(null);
 
   useEffect(() => {
     setIsValueVisible(false);
     setValueError(null);
-  }, [secret.key, secret.updatedAt ?? 'never']);
+  }, [secret.key, updatedAtKey]);
 
   const {
     data: revealedSecret,
     isFetching: isFetchingValue,
     refetch: refetchSecretValue,
   } = useQuery({
-    queryKey: ['secret-value', secret.key, secret.updatedAt ?? 'never'],
+    queryKey: ['secret-value', secret.key, updatedAtKey],
     queryFn: () => secretService.getSecretValue(secret.key),
     enabled: false,
     retry: false,
