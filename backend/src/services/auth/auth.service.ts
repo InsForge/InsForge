@@ -69,7 +69,7 @@ export class AuthService {
   private appleOAuthProvider: AppleOAuthProvider;
 
   // Service instances
-  private redirectValidationService: RedirectValidationService;
+  private redirectValidationService: RedirectValidationService | null = null;
 
   private constructor() {
     this.adminEmail = process.env.ADMIN_EMAIL ?? '';
@@ -92,8 +92,7 @@ export class AuthService {
     this.xOAuthProvider = XOAuthProvider.getInstance();
     this.appleOAuthProvider = AppleOAuthProvider.getInstance();
 
-    // Initialize services
-    this.redirectValidationService = RedirectValidationService.getInstance();
+    // Note: redirectValidationService is initialized lazily to avoid timing issues
 
     logger.info('AuthService initialized');
   }
@@ -111,6 +110,13 @@ export class AuthService {
       this.pool = dbManager.getPool();
     }
     return this.pool;
+  }
+
+  private getRedirectValidationService(): RedirectValidationService {
+    if (!this.redirectValidationService) {
+      this.redirectValidationService = RedirectValidationService.getInstance();
+    }
+    return this.redirectValidationService;
   }
 
   /**
@@ -284,7 +290,7 @@ export class AuthService {
   async sendVerificationEmailWithLink(email: string, emailRedirectTo?: string): Promise<void> {
     // Validate redirect URL if provided
     if (emailRedirectTo) {
-      await this.redirectValidationService.validateRedirectUrl(emailRedirectTo);
+      await this.getRedirectValidationService().validateRedirectUrl(emailRedirectTo);
     }
 
     // Check if user exists
