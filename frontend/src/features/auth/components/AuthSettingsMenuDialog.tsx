@@ -10,6 +10,7 @@ import {
   MenuDialogBody,
   MenuDialogCloseButton,
   MenuDialogContent,
+  MenuDialogDescription,
   MenuDialogFooter,
   MenuDialogHeader,
   MenuDialogMain,
@@ -150,6 +151,9 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
         <MenuDialogSideNav>
           <MenuDialogSideNavHeader>
             <MenuDialogSideNavTitle>Auth Settings</MenuDialogSideNavTitle>
+            <MenuDialogDescription className="sr-only">
+              Authentication settings
+            </MenuDialogDescription>
           </MenuDialogSideNavHeader>
           <MenuDialogNav>
             <MenuDialogNavList>
@@ -183,6 +187,9 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
         <MenuDialogMain>
           <MenuDialogHeader>
             <MenuDialogTitle>{sectionTitle}</MenuDialogTitle>
+            <MenuDialogDescription className="sr-only">
+              {sectionTitle} settings
+            </MenuDialogDescription>
             <MenuDialogCloseButton className="ml-auto" />
           </MenuDialogHeader>
 

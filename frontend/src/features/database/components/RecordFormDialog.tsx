@@ -8,6 +8,7 @@ import {
   Dialog,
   DialogCloseButton,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -103,6 +104,9 @@ export function RecordFormDialog({
                 <DialogTitle className="text-base font-medium leading-7 text-foreground">
                   Add Record
                 </DialogTitle>
+                <DialogDescription className="sr-only">
+                  Add a new record to {tableName}
+                </DialogDescription>
               </div>
               <DialogCloseButton
                 className="relative right-auto top-auto h-8 w-8 rounded p-1 text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground"
