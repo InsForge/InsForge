@@ -2,22 +2,9 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Load .env file from the root directory (parent of backend)
-const envPath = path.resolve(__dirname, '../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
-} else {
-  // Fallback to default behavior (looks in current working directory)
-  dotenv.config();
-}
 
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import cookieParser from 'cookie-parser';
-import rateLimit from 'express-rate-limit';
 import authRouter from '@/api/routes/auth/index.routes.js';
 import databaseRouter from '@/api/routes/database/index.routes.js';
 import { storageRouter } from '@/api/routes/storage/index.routes.js';
@@ -49,6 +36,18 @@ import { FunctionService } from '@/services/functions/function.service.js';
 import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load .env file from the root directory (parent of backend)
+const envPath = path.resolve(__dirname, '../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath });
+} else {
+  // Fallback to default behavior (looks in current working directory)
+  dotenv.config();
+}
+
 export async function createApp() {
   // Initialize database first
   const dbManager = DatabaseManager.getInstance();
@@ -70,13 +69,6 @@ export async function createApp() {
   // Enable trust proxy setting for rate limiting behind proxies/load balancers
   app.set('trust proxy', 2);
 
-  const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 3000,
-    message: 'Too many requests from this IP',
-    skip: (req) => req.path === '/api/health',
-  });
-
   // Basic middleware
   app.use(
     cors({
@@ -84,8 +76,6 @@ export async function createApp() {
       credentials: true, // Allow cookies/credentials
     })
   );
-  app.use(cookieParser()); // Parse cookies for refresh token handling
-  app.use(limiter);
   app.use((req: Request, res: Response, next: NextFunction) => {
     const startTime = Date.now();
     const originalSend = res.send;
