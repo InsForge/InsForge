@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { Plus } from 'lucide-react';
+import { CirclePlus } from 'lucide-react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import {
   Button,
@@ -21,8 +21,7 @@ import type { CreateChannelRequest, UpdateChannelRequest } from '@insforge/share
 export default function RealtimeChannelsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState<RealtimeChannel | null>(null);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isScrolled, setIsScrolled] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -70,7 +69,7 @@ export default function RealtimeChannelsPage() {
 
   const handleRowClick = (channel: RealtimeChannel) => {
     setSelectedChannel(channel);
-    setIsEditModalOpen(true);
+    setIsDialogOpen(true);
   };
 
   const handleToggleEnabled = (channel: RealtimeChannel, enabled: boolean) => {
@@ -95,7 +94,7 @@ export default function RealtimeChannelsPage() {
       { id, data },
       {
         onSuccess: () => {
-          setIsEditModalOpen(false);
+          setIsDialogOpen(false);
           setSelectedChannel(null);
         },
       }
@@ -105,12 +104,15 @@ export default function RealtimeChannelsPage() {
   const handleCreate = (data: CreateChannelRequest) => {
     createChannel(data, {
       onSuccess: () => {
-        setIsCreateModalOpen(false);
+        setIsDialogOpen(false);
       },
     });
   };
 
-  const openCreateModal = () => setIsCreateModalOpen(true);
+  const openCreateDialog = () => {
+    setSelectedChannel(null);
+    setIsDialogOpen(true);
+  };
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
@@ -140,14 +142,23 @@ export default function RealtimeChannelsPage() {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+
+            <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+              <div className="h-5 w-px bg-[var(--alpha-8)]" />
+            </div>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 rounded px-1.5 text-primary hover:bg-[var(--alpha-4)] hover:text-primary active:bg-[var(--alpha-8)]"
+              onClick={openCreateDialog}
+            >
+              <CirclePlus className="h-6 w-6 stroke-[1.5] text-primary" />
+              <span className="px-1 text-sm font-medium leading-5">Add Channel</span>
+            </Button>
           </div>
         }
-        rightActions={
-          <Button onClick={openCreateModal} className="h-8 rounded px-2 flex items-center gap-1.5">
-            <Plus className="size-4" />
-            Add Channel
-          </Button>
-        }
+        rightActions={null}
         searchValue={searchQuery}
         onSearchChange={handleSearchChange}
         searchDebounceTime={300}
@@ -202,7 +213,7 @@ export default function RealtimeChannelsPage() {
                 ))}
               </>
             ) : (
-              <RealtimeEmptyState type="channels" onCreateChannel={openCreateModal} />
+              <RealtimeEmptyState type="channels" onCreateChannel={openCreateDialog} />
             )}
           </div>
         </div>
@@ -218,28 +229,20 @@ export default function RealtimeChannelsPage() {
         )}
       </div>
 
-      {/* Edit Modal */}
+      {/* Create/Edit Dialog */}
       <ChannelFormDialog
-        mode="edit"
+        mode={selectedChannel ? 'edit' : 'create'}
         channel={selectedChannel}
-        open={isEditModalOpen}
+        open={isDialogOpen}
         onOpenChange={(open) => {
-          setIsEditModalOpen(open);
+          setIsDialogOpen(open);
           if (!open) {
             setSelectedChannel(null);
           }
         }}
         onSave={handleEditSave}
-        isUpdating={isUpdating}
-      />
-
-      {/* Create Modal */}
-      <ChannelFormDialog
-        mode="create"
-        open={isCreateModalOpen}
-        onOpenChange={setIsCreateModalOpen}
         onCreate={handleCreate}
-        isUpdating={isCreating}
+        isUpdating={selectedChannel ? isUpdating : isCreating}
       />
 
       <ConfirmDialog {...confirmDialogProps} />
