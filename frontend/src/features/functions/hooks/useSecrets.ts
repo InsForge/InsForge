@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { secretService } from '@/features/functions/services/secret.service';
 import type { SecretSchema, CreateSecretRequest } from '@insforge/shared-schemas';
@@ -9,6 +9,12 @@ export function useSecretValue(secret: Pick<SecretSchema, 'key' | 'updatedAt'>) 
   const { showToast } = useToast();
   const [isValueVisible, setIsValueVisible] = useState(false);
   const [valueError, setValueError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIsValueVisible(false);
+    setValueError(null);
+  }, [secret.key, secret.updatedAt ?? 'never']);
+
   const {
     data: revealedSecret,
     isFetching: isFetchingValue,
