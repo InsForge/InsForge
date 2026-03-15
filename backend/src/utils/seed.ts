@@ -292,10 +292,10 @@ async function seedDefaultSchedules(apiKey: string): Promise<void> {
       httpMethod: 'POST',
       functionUrl: functionUrl,
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
       },
-      body: { batchSize: 1000 }
+      body: { batchSize: 1000 },
     });
 
     logger.info('✅ Realtime message cleanup schedule created');
