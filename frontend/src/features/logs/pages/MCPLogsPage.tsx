@@ -4,6 +4,11 @@ import { LogsDataGrid, type LogsColumnDef } from '../components';
 import { useMcpUsage } from '../hooks/useMcpUsage';
 import { formatTime } from '@/lib/utils/utils';
 
+/**
+ * MCP Logs Page Component.
+ * * This page displays a paginated grid of Model Context Protocol (MCP) tool usage records.
+ * It includes search functionality, error handling, and data visualization via a DataGrid.
+ */
 export default function MCPLogsPage() {
   const {
     records: mcpLogs,
