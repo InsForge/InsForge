@@ -415,13 +415,10 @@ class TestHttpClient:
             },
             status=404,
         )
-        with pytest.raises(InsForgeError) as exc_info:
-            client.database.from_("nonexistent").select().execute()
-        # execute() catches and returns error in the result dict
-        # The raw HTTP layer raises InsForgeError which execute() wraps
-        # Let's verify the error is propagated in result
+        # execute() catches InsForgeError and returns it in the result dict
         result = client.database.from_("nonexistent").select().execute()
         assert result["error"] is not None
+        assert isinstance(result["error"], InsForgeError)
 
     def test_auth_header_uses_anon_key_when_no_session(self, client):
         headers = client._http._build_headers()

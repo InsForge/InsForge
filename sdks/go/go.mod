@@ -1,4 +1,4 @@
-module github.com/InsForge/InsForge/sdks/go/insforge
+module github.com/InsForge/InsForge/sdks/go
 
 go 1.21
 
