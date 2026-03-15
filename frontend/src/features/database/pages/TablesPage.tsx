@@ -36,7 +36,24 @@ import { useCSVImport } from '@/features/database/hooks/useCSVImport';
 import { useTableColumnWidthsPreference } from '@/features/database/hooks/useTableColumnWidthsPreference';
 import { useLocation, useSearchParams } from 'react-router-dom';
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE_OPTIONS = [50, 100, 250, 500, 1000];
+const DEFAULT_PAGE_SIZE = 50;
+const PAGE_SIZE_STORAGE_KEY = 'insforge-db-table-page-size';
+
+function getStoredPageSize(): number {
+  try {
+    const stored = localStorage.getItem(PAGE_SIZE_STORAGE_KEY);
+    if (stored) {
+      const parsed = Number(stored);
+      if (PAGE_SIZE_OPTIONS.includes(parsed)) {
+        return parsed;
+      }
+    }
+  } catch {
+    // localStorage unavailable or corrupt — fall back to default
+  }
+  return DEFAULT_PAGE_SIZE;
+}
 
 export default function TablesPage() {
   const location = useLocation();
@@ -52,6 +69,7 @@ export default function TablesPage() {
   const searchQuery = searchValue.trim();
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
+  const [pageSize, setPageSize] = useState(getStoredPageSize);
   const [currentPage, setCurrentPage] = useState(1);
   const [isSorting, setIsSorting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -111,6 +129,16 @@ export default function TablesPage() {
 
     selectTable(selectedTable, true);
   }, [selectedTable, selectedTableFromQuery, isLoadingTables, selectTable]);
+
+  const handlePageSizeChange = useCallback((newPageSize: number) => {
+    setPageSize(newPageSize);
+    setCurrentPage(1);
+    try {
+      localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(newPageSize));
+    } catch {
+      // localStorage unavailable — preference won't persist
+    }
+  }, []);
 
   // Reset page when search query or selected table changes
   useEffect(() => {
@@ -188,14 +216,14 @@ export default function TablesPage() {
   });
 
   // Fetch table records using the hook
-  const offset = (currentPage - 1) * PAGE_SIZE;
+  const offset = (currentPage - 1) * pageSize;
   const {
     data: recordsData,
     isLoading: isLoadingRecords,
     error: recordsError,
     refetch: refetchRecords,
   } = recordsHook.useTableRecords(
-    PAGE_SIZE,
+    pageSize,
     offset,
     searchQuery,
     sortColumns,
@@ -373,7 +401,7 @@ export default function TablesPage() {
   const error = tablesError || tableError;
 
   // Calculate pagination
-  const totalPages = Math.ceil((tableData?.totalRecords || 0) / PAGE_SIZE);
+  const totalPages = Math.ceil((tableData?.totalRecords || 0) / pageSize);
 
   // Show empty state when there are no tables and not loading
   const showEmptyState = !isLoadingTables && tables?.length === 0 && !showTableForm;
@@ -557,10 +585,12 @@ export default function TablesPage() {
                   onJumpToTable={(tableName) => selectTable(tableName)}
                   currentPage={currentPage}
                   totalPages={totalPages}
-                  pageSize={PAGE_SIZE}
+                  pageSize={pageSize}
+                  pageSizeOptions={PAGE_SIZE_OPTIONS}
                   totalRecords={tableData?.totalRecords || 0}
                   paginationRecordLabel="records"
                   onPageChange={setCurrentPage}
+                  onPageSizeChange={handlePageSizeChange}
                   emptyState={
                     <div className="flex flex-col items-center gap-2 pb-12 pt-6 text-center">
                       <EmptyBoxSvg
