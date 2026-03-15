@@ -223,40 +223,11 @@ export function FilePreviewDialog({ open, onOpenChange, file, bucket }: FilePrev
               </div>
             ) : error ? (
               <div
-                className="flex w-full h-full items-center justify-center rounded bg-neutral-100 dark:bg-neutral-700 px-4"
+                className="flex w-full h-full items-center justify-center rounded bg-neutral-100 dark:bg-neutral-700 px-4 text-center"
                 role="alert"
                 aria-live="polite"
               >
-                <div className="flex max-w-lg flex-col items-center gap-3 text-center">
-                  <p className="text-sm text-zinc-600 dark:text-neutral-200">
-                    {error}. Please try again, or use Download / Open in new tab.
-                  </p>
-                  <div className="flex flex-wrap justify-center gap-3">
-                    <Button
-                      variant="outline"
-                      className="h-9 px-3 dark:bg-neutral-600 dark:text-zinc-300 dark:border-neutral-600 dark:hover:bg-neutral-700"
-                      onClick={handleDownload}
-                    >
-                      <Download className="h-4 w-4" />
-                      <span className="text-sm font-medium dark:text-white">Download</span>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="h-9 px-3 dark:bg-neutral-600 dark:text-zinc-300 dark:border-neutral-600 dark:hover:bg-neutral-700"
-                      onClick={openInNewTab}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      <span className="text-sm font-medium dark:text-white">Open in new tab</span>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="h-9 px-3 dark:bg-neutral-600 dark:text-zinc-300 dark:border-neutral-600 dark:hover:bg-neutral-700"
-                      onClick={() => onOpenChange(false)}
-                    >
-                      Close
-                    </Button>
-                  </div>
-                </div>
+                <p className="text-sm text-zinc-600 dark:text-neutral-200">{error}</p>
               </div>
             ) : (
               renderPreview()
