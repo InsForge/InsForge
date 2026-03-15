@@ -49,8 +49,8 @@ function getStoredPageSize(): number {
         return parsed;
       }
     }
-  } catch {
-    // localStorage unavailable or corrupt — fall back to default
+  } catch (error) {
+    console.warn('Failed to read page size preference from localStorage', error);
   }
   return DEFAULT_PAGE_SIZE;
 }
@@ -138,8 +138,8 @@ export default function TablesPage() {
     setCurrentPage(1);
     try {
       localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(newPageSize));
-    } catch {
-      // localStorage unavailable — preference won't persist
+    } catch (error) {
+      console.warn('Failed to persist page size preference', error);
     }
   }, []);
 
