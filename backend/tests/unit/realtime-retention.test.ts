@@ -57,7 +57,9 @@ describe('RealtimeMessageService - Retention', () => {
   describe('getStats', () => {
     it('includes retentionDays from _config', async () => {
       mockPool.query
-        .mockResolvedValueOnce({ rows: [{ total_messages: '10', wh_audience_total: '2', wh_delivered_total: '2' }] }) // statsResult
+        .mockResolvedValueOnce({
+          rows: [{ total_messages: '10', wh_audience_total: '2', wh_delivered_total: '2' }],
+        }) // statsResult
         .mockResolvedValueOnce({ rows: [] }) // topEventsResult
         .mockResolvedValueOnce({ rows: [{ value: '45' }] }); // configResult
 

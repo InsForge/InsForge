@@ -21,7 +21,7 @@ BEGIN
   -- Using COALESCE to handle NULL or missing config row
   -- _config is in public schema or search path
   SELECT COALESCE(value::INT, 30) INTO v_retention_days
-  FROM _config WHERE key = 'realtime_retention_days';
+  FROM public._config WHERE key = 'realtime_retention_days';
   
   -- Calculate cutoff time
   v_cutoff := NOW() - (v_retention_days || ' days')::INTERVAL;
@@ -58,6 +58,6 @@ REVOKE ALL ON FUNCTION realtime.cleanup_messages FROM PUBLIC;
 -- ============================================================================
 -- Insert default retention period (30 days)
 
-INSERT INTO _config (key, value)
+INSERT INTO public._config (key, value)
 VALUES ('realtime_retention_days', '30')
 ON CONFLICT (key) DO NOTHING;
