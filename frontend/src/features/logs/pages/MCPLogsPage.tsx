@@ -3,12 +3,17 @@ import { EmptyState, TableHeader } from '@/components';
 import { LogsDataGrid, type LogsColumnDef } from '../components';
 import { useMcpUsage } from '../hooks/useMcpUsage';
 import { formatTime } from '@/lib/utils/utils';
+import { LOGS_PAGE_SIZE } from '../helpers';
 
 export default function MCPLogsPage() {
   const {
     records: mcpLogs,
     searchQuery: mcpSearchQuery,
     setSearchQuery: setMcpSearchQuery,
+    currentPage: mcpCurrentPage,
+    setCurrentPage: setMcpCurrentPage,
+    totalPages: mcpTotalPages,
+    recordsCount: mcpRecordsCount,
     isLoading: mcpLoading,
     error: mcpError,
   } = useMcpUsage({ successFilter: null });
@@ -59,7 +64,12 @@ export default function MCPLogsPage() {
             columnDefs={mcpColumns}
             data={mcpLogs}
             loading={mcpLoading}
-            showPagination={false}
+            showPagination={true}
+            currentPage={mcpCurrentPage}
+            totalPages={mcpTotalPages}
+            pageSize={LOGS_PAGE_SIZE}
+            totalRecords={mcpRecordsCount}
+            onPageChange={setMcpCurrentPage}
             gridContainerClassName="border-t border-[var(--alpha-8)]"
             emptyState={
               <div className="text-[13px] text-muted-foreground">
