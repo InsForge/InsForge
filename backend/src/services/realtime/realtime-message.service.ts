@@ -207,6 +207,7 @@ export class RealtimeMessageService {
     totalMessages: number;
     whDeliveryRate: number;
     topEvents: { eventName: string; count: number }[];
+    retentionDays: number;
   }> {
     const { channelId, since } = options;
 
@@ -244,6 +245,12 @@ export class RealtimeMessageService {
       params
     );
 
+    // Get retention days from _config
+    const configResult = await this.getPool().query(
+      "SELECT value FROM _config WHERE key = 'realtime_retention_days'"
+    );
+    const retentionDays = configResult.rows[0]?.value ? parseInt(configResult.rows[0].value) : 30;
+
     const stats = statsResult.rows[0];
     const whAudienceTotal = parseInt(stats.wh_audience_total) || 0;
     const whDeliveredTotal = parseInt(stats.wh_delivered_total) || 0;
@@ -255,6 +262,20 @@ export class RealtimeMessageService {
         eventName: row.event_name,
         count: parseInt(row.count),
       })),
+      retentionDays,
     };
+  }
+
+  /**
+   * Cleanup old realtime messages based on retention policy
+   * @param batchSize Number of messages to delete in one batch
+   * @returns Number of messages deleted
+   */
+  async cleanupMessages(batchSize: number = 1000): Promise<number> {
+    const result = await this.getPool().query(
+      'SELECT realtime.cleanup_messages($1) as "deletedCount"',
+      [batchSize]
+    );
+    return result.rows[0]?.deletedCount || 0;
   }
 }

@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { fetchS3Config } from '@/utils/s3-config-loader.js';
 import { ADMIN_ID, ANON_ID } from '@/utils/constants.js';
+import { ScheduleService } from '@/services/schedules/schedule.service.js';
 
 /**
  * Seeds system users (admin and anon) if they don't exist in the database
@@ -265,6 +266,46 @@ async function seedLocalOAuthConfigs(): Promise<void> {
   }
 }
 
+/**
+ * Seeds default scheduled jobs (e.g., realtime message cleanup)
+ */
+async function seedDefaultSchedules(apiKey: string): Promise<void> {
+  const scheduleService = ScheduleService.getInstance();
+
+  try {
+    // Check if the cleanup job already exists
+    const existingJobs = await scheduleService.listSchedules();
+    const hasCleanupJob = existingJobs.some((job) => job.name === 'Realtime Message Daily Cleanup');
+
+    if (hasCleanupJob) {
+      logger.info('✅ Realtime message cleanup schedule already exists');
+      return;
+    }
+
+    // Get INSFORGE_INTERNAL_URL or fallback
+    const internalUrl = process.env.INSFORGE_INTERNAL_URL || 'http://insforge:7130';
+    const functionUrl = `${internalUrl}/api/realtime/messages/cleanup`;
+
+    await scheduleService.createSchedule({
+      name: 'Realtime Message Daily Cleanup',
+      cronSchedule: '0 0 * * *', // Daily at midnight
+      httpMethod: 'POST',
+      functionUrl: functionUrl,
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: { batchSize: 1000 }
+    });
+
+    logger.info('✅ Realtime message cleanup schedule created');
+  } catch (error) {
+    logger.warn('Failed to seed default schedules', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 // Create api key, admin user, and default AI configs
 export async function seedBackend(): Promise<void> {
   const secretService = SecretService.getInstance();
@@ -346,6 +387,9 @@ export async function seedBackend(): Promise<void> {
       });
       logger.info('✅ INSFORGE_BASE_URL secret initialized');
     }
+
+    // Seed default schedules (e.g. realtime cleanup)
+    await seedDefaultSchedules(apiKey);
 
     logger.info(`API key generated: ${apiKey}`);
     logger.info(`Setup complete:
