@@ -19,7 +19,7 @@ Requirements:
 from __future__ import annotations
 
 import threading
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Callable
 
 
 class RealtimeClient:
@@ -34,13 +34,13 @@ class RealtimeClient:
 
     def __init__(self, http: Any) -> None:
         self._http = http
-        self._sio: Optional[Any] = None
+        self._sio: Any | None = None
         self._state: str = "disconnected"
-        self._subscribed_channels: Set[str] = set()
-        self._listeners: Dict[str, List[Callable]] = {}
+        self._subscribed_channels: set[str] = set()
+        self._listeners: dict[str, list[Callable]] = {}
         self._connect_lock = threading.Lock()
         self._connect_event = threading.Event()
-        self._socket_id: Optional[str] = None
+        self._socket_id: str | None = None
 
     # ------------------------------------------------------------------
     # Connection
@@ -134,7 +134,7 @@ class RealtimeClient:
     # Subscriptions
     # ------------------------------------------------------------------
 
-    def subscribe(self, channel: str) -> Dict[str, Any]:
+    def subscribe(self, channel: str) -> dict[str, Any]:
         """
         Subscribe to a channel.
 
@@ -157,9 +157,9 @@ class RealtimeClient:
                 }
 
         result_event = threading.Event()
-        result_container: Dict[str, Any] = {}
+        result_container: dict[str, Any] = {}
 
-        def ack(data: Dict[str, Any]) -> None:
+        def ack(data: dict[str, Any]) -> None:
             result_container.update(data)
             result_event.set()
 
@@ -182,7 +182,7 @@ class RealtimeClient:
         if self._sio and self._state == "connected":
             self._sio.emit("unsubscribe", {"channel": channel})
 
-    def get_subscribed_channels(self) -> List[str]:
+    def get_subscribed_channels(self) -> list[str]:
         """Return a list of currently subscribed channels."""
         return list(self._subscribed_channels)
 
@@ -190,7 +190,7 @@ class RealtimeClient:
     # Publish
     # ------------------------------------------------------------------
 
-    def publish(self, channel: str, event: str, payload: Dict[str, Any]) -> None:
+    def publish(self, channel: str, event: str, payload: dict[str, Any]) -> None:
         """
         Publish a message to a channel.
 
@@ -267,7 +267,7 @@ class RealtimeClient:
         return self._state
 
     @property
-    def socket_id(self) -> Optional[str]:
+    def socket_id(self) -> str | None:
         """Socket ID, available when connected."""
         return self._socket_id
 

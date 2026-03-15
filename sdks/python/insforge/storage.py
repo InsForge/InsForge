@@ -14,7 +14,7 @@ import io
 import mimetypes
 import os
 import uuid
-from typing import Any, BinaryIO, Dict, Optional, Union
+from typing import Any, BinaryIO
 
 
 class StorageBucket:
@@ -31,9 +31,9 @@ class StorageBucket:
     def upload(
         self,
         path: str,
-        file: Union[bytes, BinaryIO],
-        content_type: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        file: bytes | BinaryIO,
+        content_type: str | None = None,
+    ) -> dict[str, Any]:
         """
         Upload a file at the given path/key.
 
@@ -115,10 +115,10 @@ class StorageBucket:
 
     def upload_auto(
         self,
-        file: Union[bytes, BinaryIO],
-        content_type: Optional[str] = None,
-        original_filename: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        file: bytes | BinaryIO,
+        content_type: str | None = None,
+        original_filename: str | None = None,
+    ) -> dict[str, Any]:
         """
         Upload a file with an auto-generated unique key.
 
@@ -137,7 +137,7 @@ class StorageBucket:
     # Download
     # ------------------------------------------------------------------
 
-    def download(self, path: str) -> Dict[str, Any]:
+    def download(self, path: str) -> dict[str, Any]:
         """
         Download a file as bytes.
 
@@ -174,7 +174,7 @@ class StorageBucket:
     # Remove
     # ------------------------------------------------------------------
 
-    def remove(self, path: str) -> Dict[str, Any]:
+    def remove(self, path: str) -> dict[str, Any]:
         """
         Delete a file from the bucket.
 
@@ -199,11 +199,11 @@ class StorageBucket:
     def list(
         self,
         *,
-        prefix: Optional[str] = None,
-        search: Optional[str] = None,
+        prefix: str | None = None,
+        search: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         List objects in the bucket.
 
@@ -216,7 +216,7 @@ class StorageBucket:
         Returns:
             Dict with keys: data (list of objects), pagination, error.
         """
-        params: Dict[str, Any] = {"limit": limit, "offset": offset}
+        params: dict[str, Any] = {"limit": limit, "offset": offset}
         if prefix:
             params["prefix"] = prefix
         if search:

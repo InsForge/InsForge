@@ -24,7 +24,7 @@ Usage:
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Generator, Iterator, List, Optional, Union
+from typing import Any, Iterator
 
 
 class _ChatCompletions:
@@ -35,17 +35,17 @@ class _ChatCompletions:
         self,
         *,
         model: str,
-        messages: List[Dict[str, Any]],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
-        top_p: Optional[float] = None,
+        messages: list[dict[str, Any]],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        top_p: float | None = None,
         stream: bool = False,
-        web_search: Optional[Dict[str, Any]] = None,
-        file_parser: Optional[Dict[str, Any]] = None,
-        tools: Optional[List[Dict[str, Any]]] = None,
-        tool_choice: Optional[Any] = None,
-        parallel_tool_calls: Optional[bool] = None,
-    ) -> Union[Dict[str, Any], Iterator[Dict[str, Any]]]:
+        web_search: dict[str, Any] | None = None,
+        file_parser: dict[str, Any] | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        tool_choice: Any | None = None,
+        parallel_tool_calls: bool | None = None,
+    ) -> dict[str, Any] | Iterator[dict[str, Any]]:
         """
         Create a chat completion.
 
@@ -69,7 +69,7 @@ class _ChatCompletions:
         Raises:
             InsForgeError: On API error.
         """
-        payload: Dict[str, Any] = {"model": model, "messages": messages, "stream": stream}
+        payload: dict[str, Any] = {"model": model, "messages": messages, "stream": stream}
         if temperature is not None:
             payload["temperature"] = temperature
         if max_tokens is not None:
@@ -92,7 +92,7 @@ class _ChatCompletions:
 
         return self._http.post("/api/ai/chat/completions", data=payload)
 
-    def _stream(self, payload: Dict[str, Any]) -> Iterator[Dict[str, Any]]:
+    def _stream(self, payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
         """Internal SSE streaming generator."""
         import requests as _requests
 
@@ -134,10 +134,10 @@ class _Embeddings:
         self,
         *,
         model: str,
-        input: Union[str, List[str]],
+        input: str | list[str],
         encoding_format: str = "float",
-        dimensions: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        dimensions: int | None = None,
+    ) -> dict[str, Any]:
         """
         Generate vector embeddings for text input.
 
@@ -151,7 +151,7 @@ class _Embeddings:
             Dict with keys: object ('list'), data (list of embedding objects),
             metadata (model, usage).
         """
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "model": model,
             "input": input,
             "encoding_format": encoding_format,
@@ -170,14 +170,14 @@ class _Images:
         *,
         model: str,
         prompt: str,
-        images: Optional[List[Union[str, Dict[str, Any]]]] = None,
-        width: Optional[int] = None,
-        height: Optional[int] = None,
-        size: Optional[str] = None,
-        num_images: Optional[int] = None,
-        quality: Optional[str] = None,
-        style: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        images: list[str | dict[str, Any]] | None = None,
+        width: int | None = None,
+        height: int | None = None,
+        size: str | None = None,
+        num_images: int | None = None,
+        quality: str | None = None,
+        style: str | None = None,
+    ) -> dict[str, Any]:
         """
         Generate images using an AI model.
 
@@ -195,7 +195,7 @@ class _Images:
         Returns:
             Dict with keys: created (timestamp), data (list of ImageData).
         """
-        payload: Dict[str, Any] = {"model": model, "prompt": prompt}
+        payload: dict[str, Any] = {"model": model, "prompt": prompt}
         if images is not None:
             payload["images"] = images
         if width is not None:

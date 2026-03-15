@@ -11,8 +11,7 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
-from urllib.parse import urlencode
+from typing import Any, Sequence
 
 
 class QueryBuilder:
@@ -32,22 +31,22 @@ class QueryBuilder:
     def __init__(self, http: Any, table: str) -> None:
         self._http = http
         self._table = table
-        self._operation: Optional[str] = None
+        self._operation: str | None = None
         self._columns: str = "*"
         self._body: Any = None
-        self._filters: List[Tuple[str, str, Any]] = []
-        self._order_col: Optional[str] = None
+        self._filters: list[tuple[str, str, Any]] = []
+        self._order_col: str | None = None
         self._order_asc: bool = True
-        self._order_nulls_first: Optional[bool] = None
-        self._limit_val: Optional[int] = None
-        self._range_from: Optional[int] = None
-        self._range_to: Optional[int] = None
+        self._order_nulls_first: bool | None = None
+        self._limit_val: int | None = None
+        self._range_from: int | None = None
+        self._range_to: int | None = None
         self._single: bool = False
         self._maybe_single: bool = False
-        self._count: Optional[str] = None
+        self._count: str | None = None
         self._head: bool = False
         self._return_select: bool = False
-        self._upsert_resolution: Optional[str] = None
+        self._upsert_resolution: str | None = None
 
     # ------------------------------------------------------------------
     # Operations
@@ -57,7 +56,7 @@ class QueryBuilder:
         self,
         columns: str = "*",
         *,
-        count: Optional[str] = None,
+        count: str | None = None,
         head: bool = False,
     ) -> "QueryBuilder":
         """Select columns from the table."""
@@ -69,9 +68,9 @@ class QueryBuilder:
 
     def insert(
         self,
-        values: Union[Dict[str, Any], List[Dict[str, Any]]],
+        values: dict[str, Any] | list[dict[str, Any]],
         *,
-        count: Optional[str] = None,
+        count: str | None = None,
     ) -> "QueryBuilder":
         """Insert one or more records."""
         self._operation = self._OP_INSERT
@@ -81,9 +80,9 @@ class QueryBuilder:
 
     def update(
         self,
-        values: Dict[str, Any],
+        values: dict[str, Any],
         *,
-        count: Optional[str] = None,
+        count: str | None = None,
     ) -> "QueryBuilder":
         """Update records matching the applied filters."""
         self._operation = self._OP_UPDATE
@@ -91,7 +90,7 @@ class QueryBuilder:
         self._count = count
         return self
 
-    def delete(self, *, count: Optional[str] = None) -> "QueryBuilder":
+    def delete(self, *, count: str | None = None) -> "QueryBuilder":
         """Delete records matching the applied filters."""
         self._operation = self._OP_DELETE
         self._count = count
@@ -99,9 +98,9 @@ class QueryBuilder:
 
     def upsert(
         self,
-        values: Union[Dict[str, Any], List[Dict[str, Any]]],
+        values: dict[str, Any] | list[dict[str, Any]],
         *,
-        on_conflict: Optional[str] = None,
+        on_conflict: str | None = None,
         ignore_duplicates: bool = False,
     ) -> "QueryBuilder":
         """Insert or update on conflict."""
@@ -176,7 +175,7 @@ class QueryBuilder:
         column: str,
         *,
         ascending: bool = True,
-        nulls_first: Optional[bool] = None,
+        nulls_first: bool | None = None,
     ) -> "QueryBuilder":
         self._order_col = column
         self._order_asc = ascending
@@ -204,7 +203,7 @@ class QueryBuilder:
     # Execution
     # ------------------------------------------------------------------
 
-    def execute(self) -> Dict[str, Any]:
+    def execute(self) -> dict[str, Any]:
         """
         Execute the built query.
 
@@ -245,8 +244,8 @@ class QueryBuilder:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _build_params(self) -> Dict[str, Any]:
-        params: Dict[str, Any] = {}
+    def _build_params(self) -> dict[str, Any]:
+        params: dict[str, Any] = {}
 
         if self._operation == self._OP_SELECT:
             if self._columns and self._columns != "*":
@@ -280,8 +279,8 @@ class QueryBuilder:
 
         return params
 
-    def _build_headers(self) -> Dict[str, str]:
-        headers: Dict[str, str] = {}
+    def _build_headers(self) -> dict[str, str]:
+        headers: dict[str, str] = {}
 
         if self._operation in (self._OP_INSERT, self._OP_UPDATE, self._OP_DELETE, self._OP_UPSERT):
             headers["Prefer"] = "return=representation"
@@ -296,12 +295,12 @@ class QueryBuilder:
 class RpcBuilder:
     """Builds and executes an RPC (stored function) call."""
 
-    def __init__(self, http: Any, function_name: str, args: Optional[Dict[str, Any]] = None) -> None:
+    def __init__(self, http: Any, function_name: str, args: dict[str, Any] | None = None) -> None:
         self._http = http
         self._function_name = function_name
         self._args = args or {}
 
-    def execute(self) -> Dict[str, Any]:
+    def execute(self) -> dict[str, Any]:
         path = f"/api/database/rpc/{self._function_name}"
         try:
             raw = self._http.post(path, data=self._args)
@@ -331,7 +330,7 @@ class DatabaseClient:
         """
         return QueryBuilder(self._http, table)
 
-    def rpc(self, function_name: str, args: Optional[Dict[str, Any]] = None) -> RpcBuilder:
+    def rpc(self, function_name: str, args: dict[str, Any] | None = None) -> RpcBuilder:
         """
         Call a PostgreSQL stored function.
 

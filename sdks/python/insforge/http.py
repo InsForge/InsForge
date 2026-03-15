@@ -5,9 +5,8 @@ Handles authentication, request building, and response parsing.
 
 from __future__ import annotations
 
-import json
 import threading
-from typing import Any, Dict, Optional
+from typing import Any
 from urllib.parse import urljoin
 
 import requests
@@ -20,9 +19,9 @@ class InsForgeError(Exception):
     def __init__(
         self,
         message: str,
-        status_code: Optional[int] = None,
-        error_code: Optional[str] = None,
-        next_actions: Optional[str] = None,
+        status_code: int | None = None,
+        error_code: str | None = None,
+        next_actions: str | None = None,
     ) -> None:
         super().__init__(message)
         self.message = message
@@ -43,18 +42,18 @@ class _SessionState:
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._access_token: Optional[str] = None
-        self._refresh_token: Optional[str] = None
-        self._csrf_token: Optional[str] = None
-        self._user: Optional[Dict[str, Any]] = None
+        self._access_token: str | None = None
+        self._refresh_token: str | None = None
+        self._csrf_token: str | None = None
+        self._user: dict[str, Any] | None = None
 
     def set(
         self,
         *,
-        access_token: Optional[str] = None,
-        refresh_token: Optional[str] = None,
-        csrf_token: Optional[str] = None,
-        user: Optional[Dict[str, Any]] = None,
+        access_token: str | None = None,
+        refresh_token: str | None = None,
+        csrf_token: str | None = None,
+        user: dict[str, Any] | None = None,
     ) -> None:
         with self._lock:
             if access_token is not None:
@@ -74,22 +73,22 @@ class _SessionState:
             self._user = None
 
     @property
-    def access_token(self) -> Optional[str]:
+    def access_token(self) -> str | None:
         with self._lock:
             return self._access_token
 
     @property
-    def refresh_token(self) -> Optional[str]:
+    def refresh_token(self) -> str | None:
         with self._lock:
             return self._refresh_token
 
     @property
-    def csrf_token(self) -> Optional[str]:
+    def csrf_token(self) -> str | None:
         with self._lock:
             return self._csrf_token
 
     @property
-    def user(self) -> Optional[Dict[str, Any]]:
+    def user(self) -> dict[str, Any] | None:
         with self._lock:
             return self._user
 
@@ -101,7 +100,7 @@ class HttpClient:
         self,
         base_url: str,
         anon_key: str,
-        edge_function_token: Optional[str] = None,
+        edge_function_token: str | None = None,
         timeout: int = 30,
     ) -> None:
         self.base_url = base_url.rstrip("/")
@@ -122,8 +121,8 @@ class HttpClient:
         """Return the best available bearer token."""
         return self._state.access_token or self.anon_key
 
-    def _build_headers(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
-        headers: Dict[str, str] = {
+    def _build_headers(self, extra: dict[str, str] | None = None) -> dict[str, str]:
+        headers: dict[str, str] = {
             "Authorization": f"Bearer {self._get_auth_token()}",
             "Content-Type": "application/json",
         }
@@ -156,8 +155,8 @@ class HttpClient:
     def get(
         self,
         path: str,
-        params: Optional[Dict[str, Any]] = None,
-        extra_headers: Optional[Dict[str, str]] = None,
+        params: dict[str, Any] | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> Any:
         r = self._session.get(
             self._url(path),
@@ -172,8 +171,8 @@ class HttpClient:
         self,
         path: str,
         data: Any = None,
-        params: Optional[Dict[str, Any]] = None,
-        extra_headers: Optional[Dict[str, str]] = None,
+        params: dict[str, Any] | None = None,
+        extra_headers: dict[str, str] | None = None,
         raw: bool = False,
     ) -> Any:
         headers = self._build_headers(extra_headers)
@@ -193,8 +192,8 @@ class HttpClient:
         self,
         path: str,
         data: Any = None,
-        params: Optional[Dict[str, Any]] = None,
-        extra_headers: Optional[Dict[str, str]] = None,
+        params: dict[str, Any] | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> Any:
         r = self._session.patch(
             self._url(path),
@@ -210,8 +209,8 @@ class HttpClient:
         self,
         path: str,
         data: Any = None,
-        extra_headers: Optional[Dict[str, str]] = None,
-        files: Optional[Dict[str, Any]] = None,
+        extra_headers: dict[str, str] | None = None,
+        files: dict[str, Any] | None = None,
     ) -> Any:
         headers = self._build_headers(extra_headers)
         if files:
@@ -236,9 +235,9 @@ class HttpClient:
     def delete(
         self,
         path: str,
-        params: Optional[Dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
         data: Any = None,
-        extra_headers: Optional[Dict[str, str]] = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> Any:
         r = self._session.delete(
             self._url(path),
@@ -253,9 +252,9 @@ class HttpClient:
     def post_multipart(
         self,
         path: str,
-        files: Dict[str, Any],
-        data: Optional[Dict[str, Any]] = None,
-        extra_headers: Optional[Dict[str, str]] = None,
+        files: dict[str, Any],
+        data: dict[str, Any] | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> Any:
         headers = self._build_headers(extra_headers)
         headers.pop("Content-Type", None)  # let requests set multipart boundary
@@ -272,7 +271,7 @@ class HttpClient:
     def get_raw(
         self,
         path: str,
-        extra_headers: Optional[Dict[str, str]] = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> bytes:
         r = self._session.get(
             self._url(path),
@@ -285,9 +284,9 @@ class HttpClient:
     def post_external(
         self,
         url: str,
-        files: Optional[Dict[str, Any]] = None,
-        data: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
+        files: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> Response:
         """POST to an external URL (e.g., S3 presigned upload)."""
         r = self._session.post(url, files=files, data=data, headers=headers, timeout=self.timeout)

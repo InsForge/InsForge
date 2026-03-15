@@ -10,7 +10,7 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .http import HttpClient, InsForgeError
 
@@ -30,9 +30,9 @@ class AuthClient:
         *,
         email: str,
         password: str,
-        name: Optional[str] = None,
-        email_redirect_to: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        name: str | None = None,
+        email_redirect_to: str | None = None,
+    ) -> dict[str, Any]:
         """
         Create a new user account.
 
@@ -49,7 +49,7 @@ class AuthClient:
         Raises:
             InsForgeError: On API error.
         """
-        payload: Dict[str, Any] = {"email": email, "password": password}
+        payload: dict[str, Any] = {"email": email, "password": password}
         if name is not None:
             payload["name"] = name
         if email_redirect_to is not None:
@@ -72,7 +72,7 @@ class AuthClient:
         *,
         email: str,
         password: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Sign in with email and password.
 
@@ -96,7 +96,7 @@ class AuthClient:
         provider: str,
         redirect_to: str,
         code_challenge: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Initiate an OAuth flow (PKCE). Returns the provider auth URL.
 
@@ -119,7 +119,7 @@ class AuthClient:
         *,
         code: str,
         code_verifier: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Exchange an OAuth authorization code (PKCE) for tokens.
 
@@ -138,7 +138,7 @@ class AuthClient:
         self._persist_session(data)
         return data
 
-    def sign_out(self) -> Dict[str, Any]:
+    def sign_out(self) -> dict[str, Any]:
         """
         Sign out the current user and clear the local session.
 
@@ -157,7 +157,7 @@ class AuthClient:
     # Session management
     # ------------------------------------------------------------------
 
-    def get_current_session(self) -> Dict[str, Any]:
+    def get_current_session(self) -> dict[str, Any]:
         """
         Return the current session by calling the server with the stored token.
 
@@ -179,7 +179,7 @@ class AuthClient:
         except InsForgeError:
             return {"session": None}
 
-    def get_current_user(self) -> Dict[str, Any]:
+    def get_current_user(self) -> dict[str, Any]:
         """
         Return the currently authenticated user.
 
@@ -191,8 +191,8 @@ class AuthClient:
 
     def refresh_session(
         self,
-        refresh_token: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        refresh_token: str | None = None,
+    ) -> dict[str, Any]:
         """
         Refresh the access token using the stored (or provided) refresh token.
 
@@ -217,7 +217,7 @@ class AuthClient:
     # Profile
     # ------------------------------------------------------------------
 
-    def get_profile(self, user_id: str) -> Dict[str, Any]:
+    def get_profile(self, user_id: str) -> dict[str, Any]:
         """
         Fetch a public user profile by ID.
 
@@ -230,7 +230,7 @@ class AuthClient:
         data = self._http.get(f"/api/auth/profiles/{user_id}")
         return data
 
-    def set_profile(self, profile: Dict[str, Any]) -> Dict[str, Any]:
+    def set_profile(self, profile: dict[str, Any]) -> dict[str, Any]:
         """
         Update the current user's profile.
 
@@ -251,15 +251,15 @@ class AuthClient:
         self,
         *,
         email: str,
-        email_redirect_to: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        email_redirect_to: str | None = None,
+    ) -> dict[str, Any]:
         """
         Resend an email verification message.
 
         Returns:
             Dict with keys: success, message.
         """
-        payload: Dict[str, Any] = {"email": email}
+        payload: dict[str, Any] = {"email": email}
         if email_redirect_to:
             payload["emailRedirectTo"] = email_redirect_to
         return self._http.post("/api/auth/email/send-verification", data=payload)
@@ -268,8 +268,8 @@ class AuthClient:
         self,
         *,
         otp: str,
-        email: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        email: str | None = None,
+    ) -> dict[str, Any]:
         """
         Verify an email address with a code or magic link token.
 
@@ -280,7 +280,7 @@ class AuthClient:
         Returns:
             Dict with keys: user, access_token, refresh_token, redirect_to.
         """
-        payload: Dict[str, Any] = {"otp": otp}
+        payload: dict[str, Any] = {"otp": otp}
         if email:
             payload["email"] = email
         data = self._http.post(
@@ -295,7 +295,7 @@ class AuthClient:
     # Password reset
     # ------------------------------------------------------------------
 
-    def send_reset_password_email(self, *, email: str) -> Dict[str, Any]:
+    def send_reset_password_email(self, *, email: str) -> dict[str, Any]:
         """
         Send a password reset email.
 
@@ -311,7 +311,7 @@ class AuthClient:
         *,
         email: str,
         code: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Exchange a 6-digit reset code for a reset token (code method only).
 
@@ -328,7 +328,7 @@ class AuthClient:
         *,
         new_password: str,
         otp: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Reset the user's password with a token.
 
@@ -348,7 +348,7 @@ class AuthClient:
     # Public config
     # ------------------------------------------------------------------
 
-    def get_public_config(self) -> Dict[str, Any]:
+    def get_public_config(self) -> dict[str, Any]:
         """
         Fetch public authentication configuration (no auth required).
 
@@ -361,11 +361,11 @@ class AuthClient:
     # Internal
     # ------------------------------------------------------------------
 
-    def _persist_session(self, data: Optional[Dict[str, Any]]) -> None:
+    def _persist_session(self, data: dict[str, Any] | None) -> None:
         """Store tokens from an auth response into the shared session state."""
         if not data:
             return
-        kwargs: Dict[str, Any] = {}
+        kwargs: dict[str, Any] = {}
         if "accessToken" in data:
             kwargs["access_token"] = data["accessToken"]
         if "refreshToken" in data:
