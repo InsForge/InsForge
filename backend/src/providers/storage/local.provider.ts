@@ -14,8 +14,20 @@ export class LocalStorageProvider implements StorageProvider {
     await fs.mkdir(this.baseDir, { recursive: true });
   }
 
+  private getValidatedPath(...parts: string[]): string {
+    const resolvedBaseDir = path.resolve(this.baseDir);
+    const resolvedPath = path.resolve(this.baseDir, ...parts);
+    const relativePath = path.relative(resolvedBaseDir, resolvedPath);
+
+    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+      throw new Error('Access denied: Path is outside the base directory');
+    }
+
+    return resolvedPath;
+  }
+
   private getFilePath(bucket: string, key: string): string {
-    return path.join(this.baseDir, bucket, key);
+    return this.getValidatedPath(bucket, key);
   }
 
   async putObject(bucket: string, key: string, file: Express.Multer.File): Promise<void> {
@@ -28,8 +40,11 @@ export class LocalStorageProvider implements StorageProvider {
     try {
       const filePath = this.getFilePath(bucket, key);
       return await fs.readFile(filePath);
-    } catch {
-      return null;
+    } catch (error) {
+      if ((error as any).code === 'ENOENT') {
+        return null;
+      }
+      throw error;
     }
   }
 
@@ -37,21 +52,28 @@ export class LocalStorageProvider implements StorageProvider {
     try {
       const filePath = this.getFilePath(bucket, key);
       await fs.unlink(filePath);
-    } catch {
-      // File might not exist, continue
+    } catch (error) {
+      // Re-throw if it's not a "file not found" error (e.g., validation or permission error)
+      if ((error as any).code !== 'ENOENT') {
+        throw error;
+      }
     }
   }
 
   async createBucket(bucket: string): Promise<void> {
-    const bucketPath = path.join(this.baseDir, bucket);
+    const bucketPath = this.getValidatedPath(bucket);
     await fs.mkdir(bucketPath, { recursive: true });
   }
 
   async deleteBucket(bucket: string): Promise<void> {
     try {
-      await fs.rmdir(path.join(this.baseDir, bucket), { recursive: true });
-    } catch {
-      // Directory might not exist
+      const bucketPath = this.getValidatedPath(bucket);
+      await fs.rm(bucketPath, { recursive: true, force: true });
+    } catch (error) {
+      // Re-throw if it's not a "not found" error
+      if ((error as any).code !== 'ENOENT') {
+        throw error;
+      }
     }
   }
 
@@ -95,9 +117,11 @@ export class LocalStorageProvider implements StorageProvider {
       const filePath = this.getFilePath(bucket, key);
       await fs.access(filePath);
       return true;
-    } catch {
-      // File doesn't exist
-      return false;
+    } catch (error) {
+      if ((error as any).code === 'ENOENT') {
+        return false;
+      }
+      throw error;
     }
   }
 }

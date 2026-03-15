@@ -48,6 +48,11 @@ export class EncryptionManager {
     const authTag = Buffer.from(parts[1], 'hex');
     const encrypted = parts[2];
 
+    // Ensure the authentication tag is exactly 16 bytes for GCM mode
+    if (authTag.length !== 16) {
+      throw new Error('Invalid authentication tag length');
+    }
+
     const decipher = crypto.createDecipheriv('aes-256-gcm', encryptionKey, iv);
     decipher.setAuthTag(authTag);
 
