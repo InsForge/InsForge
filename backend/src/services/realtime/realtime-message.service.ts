@@ -92,11 +92,28 @@ export class RealtimeMessageService {
         senderId: userId || null,
       };
     } catch (error) {
-      // Rollback transaction on error
-      await client.query('ROLLBACK').catch(() => {});
+      // Rollback transaction on error with proper error handling
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError) {
+        logger.error('Critical: Failed to rollback transaction in insertMessage', {
+          originalError: error instanceof Error ? error.message : String(error),
+          rollbackError:
+            rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+          channelName,
+          userId,
+        });
+        // Re-throw to ensure connection is properly released and errors are visible
+        throw rollbackError;
+      }
 
       // RLS policy denied the INSERT or other error
-      logger.debug('Message insert denied or failed', { channelName, eventName, userId, error });
+      logger.debug('Message insert denied or failed', {
+        channelName,
+        eventName,
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return null;
     } finally {
       // Reset role back to default before releasing connection

@@ -307,10 +307,20 @@ export class DeploymentService {
         error: error instanceof Error ? error.message : String(error),
         id,
       });
-      // Update status to ERROR
-      await this.updateDeploymentStatus(id, DeploymentStatus.ERROR, {
-        error: error instanceof Error ? error.message : 'Unknown error',
-      }).catch(() => {});
+      // Update status to ERROR with proper error handling
+      try {
+        await this.updateDeploymentStatus(id, DeploymentStatus.ERROR, {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      } catch (updateError) {
+        logger.error('Critical: Failed to update deployment status to ERROR', {
+          deploymentId: id,
+          originalError: error instanceof Error ? error.message : String(error),
+          updateError: updateError instanceof Error ? updateError.message : String(updateError),
+        });
+        // Don't re-throw here - the original deployment error is more important
+        // But log it so we know the status update failed
+      }
       throw new AppError('Failed to start deployment', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }

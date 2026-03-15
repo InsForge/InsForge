@@ -29,6 +29,18 @@ export class FunctionService {
     this.secretService = SecretService.getInstance();
   }
 
+  /**
+   * Clean up resources for graceful shutdown
+   * Clears any pending deployment timers
+   */
+  destroy(): void {
+    if (this.deploymentTimer) {
+      clearTimeout(this.deploymentTimer);
+      this.deploymentTimer = null;
+    }
+    logger.info('FunctionService destroyed - deployment timer cleared');
+  }
+
   static getInstance(): FunctionService {
     if (!FunctionService.instance) {
       FunctionService.instance = new FunctionService();

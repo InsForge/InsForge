@@ -368,6 +368,15 @@ async function cleanup() {
   }
 
   try {
+    const functionService = FunctionService.getInstance();
+    functionService.destroy();
+  } catch (error) {
+    logger.error('Error closing FunctionService', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  try {
     destroyEmailCooldownInterval();
   } catch (error) {
     logger.error('Error clearing email cooldown interval', {
