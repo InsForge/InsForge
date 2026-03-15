@@ -1,3 +1,5 @@
+SET search_path = public, system, "$user";
+
 -- Migration 023: Add Realtime Message Retention
 --
 -- Adds automatic cleanup mechanism for realtime.messages table.
@@ -21,7 +23,7 @@ BEGIN
   -- Using COALESCE to handle NULL or missing config row
   -- _config is in public schema or search path
   SELECT COALESCE(value::INT, 30) INTO v_retention_days
-  FROM public._config WHERE key = 'realtime_retention_days';
+  FROM _config WHERE key = 'realtime_retention_days';
   
   -- Calculate cutoff time
   v_cutoff := NOW() - (v_retention_days || ' days')::INTERVAL;
@@ -48,7 +50,7 @@ EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'realtime.cleanup_messages failed: %', SQLERRM;
   RETURN 0;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, system, "$user";
 
 -- Revoke execute from public, only superuser/backend can call this
 REVOKE ALL ON FUNCTION realtime.cleanup_messages FROM PUBLIC;
@@ -58,6 +60,6 @@ REVOKE ALL ON FUNCTION realtime.cleanup_messages FROM PUBLIC;
 -- ============================================================================
 -- Insert default retention period (30 days)
 
-INSERT INTO public._config (key, value)
+INSERT INTO _config (key, value)
 VALUES ('realtime_retention_days', '30')
 ON CONFLICT (key) DO NOTHING;
