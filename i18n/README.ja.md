@@ -170,5 +170,5 @@ InsForge is my backend platform, what is my current backend structure?
 ---
 
 
-[![Star History Chart](https://api.star-history.com/svg?repos=InsForge/insforge\&type=Date)](https://www.star-history.com/#InsForge/insforge&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=InsForge/insforge&type=Date)](https://www.star-history.com/#InsForge/insforge&Date)
 

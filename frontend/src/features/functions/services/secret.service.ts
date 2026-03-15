@@ -5,6 +5,7 @@ import {
   CreateSecretResponse,
   ListSecretsResponse,
   DeleteSecretResponse,
+  GetSecretValueResponse,
 } from '@insforge/shared-schemas';
 
 export class SecretService {
@@ -29,6 +30,16 @@ export class SecretService {
       `/secrets/${encodeURIComponent(key)}`,
       {
         method: 'DELETE',
+        headers: apiClient.withAccessToken(),
+      }
+    );
+    return response;
+  }
+
+  async getSecretValue(key: string): Promise<GetSecretValueResponse> {
+    const response: GetSecretValueResponse = await apiClient.request(
+      `/secrets/${encodeURIComponent(key)}`,
+      {
         headers: apiClient.withAccessToken(),
       }
     );
