@@ -15,6 +15,10 @@ import mimetypes
 import uuid
 from typing import Any, BinaryIO
 
+from requests import RequestException
+
+from .http import InsForgeError
+
 
 class StorageBucket:
     """Scoped operations on a single bucket."""
@@ -82,12 +86,24 @@ class StorageBucket:
             self._http.post_external(upload_url, files=multipart_data)
 
             if confirm_required:
+                # Server explicitly requires a confirm round-trip
                 confirm_url = strategy["confirmUrl"]
-                result = self._http.post(
+                return self._http.post(
                     confirm_url,
                     data={"size": size, "contentType": content_type},
                 )
-                return result
+            elif "confirmUrl" in strategy:
+                # confirmUrl is present but confirmRequired is False — still call it
+                return self._http.post(
+                    strategy["confirmUrl"],
+                    data={"size": size, "contentType": content_type},
+                )
+            else:
+                # No confirmUrl — use the same metadata endpoint as the PUT branch
+                return self._http.post(
+                    f"/api/storage/buckets/{self._bucket}/objects/{key}/confirm-upload",
+                    data={"size": size, "contentType": content_type},
+                )
         else:
             # Direct upload via PUT
             self._http.put_external(
@@ -96,21 +112,10 @@ class StorageBucket:
                 content_type=content_type,
             )
             # Fetch object metadata
-            result = self._http.post(
+            return self._http.post(
                 f"/api/storage/buckets/{self._bucket}/objects/{key}/confirm-upload",
                 data={"size": size, "contentType": content_type},
             )
-            return result
-
-        # Fallback: reconstruct minimal response
-        base_url = self._http.base_url
-        return {
-            "bucket": self._bucket,
-            "key": key,
-            "size": size,
-            "mimeType": content_type,
-            "url": f"{base_url}/api/storage/buckets/{self._bucket}/objects/{key}",
-        }
 
     def upload_auto(
         self,
@@ -157,16 +162,15 @@ class StorageBucket:
             )
             url = strategy.get("url", "")
             if url.startswith("http"):
-                # External URL (S3 presigned)
-                import requests as _requests
-                r = _requests.get(url, timeout=self._http.timeout)
+                # External URL (S3 presigned) — use the SDK's configured session
+                r = self._http._session.get(url, timeout=self._http.timeout)
                 r.raise_for_status()
                 return {"data": r.content, "error": None}
             else:
                 # Local storage — relative URL
                 content = self._http.get_raw(url)
                 return {"data": content, "error": None}
-        except Exception as exc:
+        except (RequestException, InsForgeError) as exc:
             return {"data": None, "error": exc}
 
     # ------------------------------------------------------------------
