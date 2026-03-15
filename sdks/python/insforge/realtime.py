@@ -19,7 +19,8 @@ Requirements:
 from __future__ import annotations
 
 import threading
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 
 class RealtimeClient:
@@ -111,7 +112,7 @@ class RealtimeClient:
                     headers={"Authorization": f"Bearer {token}"},
                     wait_timeout=self._CONNECT_TIMEOUT,
                 )
-            except Exception as exc:
+            except Exception:
                 self._state = "disconnected"
                 self._connect_event.set()
                 raise

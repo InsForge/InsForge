@@ -8,7 +8,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
-	"path"
 	"strings"
 	"sync"
 	"time"
@@ -108,7 +107,7 @@ func (h *httpClient) bearerToken() string {
 
 func (h *httpClient) buildURL(p string) string {
 	base, _ := url.Parse(h.baseURL)
-	base.Path = path.Join(base.Path, p)
+	base.Path = base.Path + "/" + strings.TrimLeft(p, "/")
 	return base.String()
 }
 
@@ -244,52 +243,6 @@ func (h *httpClient) doStream(method, p string, reqBody any) (io.ReadCloser, err
 		return nil, h.parseError(resp)
 	}
 	return resp.Body, nil
-}
-
-// doMultipart performs a multipart/form-data POST to an InsForge path.
-func (h *httpClient) doMultipart(p string, fields map[string]string, fileField, filename string, fileContent []byte, contentType string, out any) error {
-	var buf bytes.Buffer
-	w := multipart.NewWriter(&buf)
-
-	for k, v := range fields {
-		_ = w.WriteField(k, v)
-	}
-
-	if fileField != "" {
-		fw, err := w.CreateFormFile(fileField, filename)
-		if err != nil {
-			return err
-		}
-		if _, err = fw.Write(fileContent); err != nil {
-			return err
-		}
-	}
-	w.Close()
-
-	req, err := http.NewRequest(http.MethodPost, h.buildURL(p), &buf)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", "Bearer "+h.bearerToken())
-	req.Header.Set("Content-Type", w.FormDataContentType())
-
-	resp, err := h.client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		return h.parseError(resp)
-	}
-	if out == nil {
-		return nil
-	}
-	respBody, _ := io.ReadAll(resp.Body)
-	if len(respBody) == 0 {
-		return nil
-	}
-	return json.Unmarshal(respBody, out)
 }
 
 // doPutExternal PUTs raw bytes to an external URL (e.g., presigned S3).

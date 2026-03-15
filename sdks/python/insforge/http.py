@@ -9,7 +9,6 @@ import threading
 from typing import Any
 from urllib.parse import urljoin
 
-import requests
 from requests import Response, Session
 
 

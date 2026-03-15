@@ -8,7 +8,7 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class FunctionsClient:
@@ -21,10 +21,10 @@ class FunctionsClient:
         self,
         slug: str,
         *,
-        body: Optional[Any] = None,
-        headers: Optional[Dict[str, str]] = None,
+        body: Any | None = None,
+        headers: dict[str, str] | None = None,
         method: str = "POST",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Invoke a serverless function by its slug.
 

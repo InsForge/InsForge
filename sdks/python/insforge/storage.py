@@ -61,7 +61,7 @@ class StorageBucket:
             content_type, _ = mimetypes.guess_type(path)
             content_type = content_type or "application/octet-stream"
 
-        filename = os.path.basename(path)
+        filename = path
         size = len(content)
 
         # Step 1: get upload strategy

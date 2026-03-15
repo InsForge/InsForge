@@ -204,6 +204,22 @@ func (q *QueryBuilder) Execute(out any) error {
 		if q.singleRow {
 			extraHeaders["Accept"] = "application/vnd.pgrst.object+json"
 		}
+		if q.maybeSingle {
+			// Fetch up to 2 rows; if >1, error
+			twoLimit := 2
+			params.Set("limit", fmt.Sprintf("%d", twoLimit))
+			var rows []json.RawMessage
+			if err := q.http.do("GET", path, nil, params, &rows, extraHeaders); err != nil {
+				return err
+			}
+			if len(rows) > 1 {
+				return &InsForgeError{Message: "MaybeSingle: multiple rows returned", StatusCode: 0}
+			}
+			if len(rows) == 0 {
+				return nil
+			}
+			return json.Unmarshal(rows[0], out)
+		}
 		return q.http.do("GET", path, nil, params, out, extraHeaders)
 
 	case "insert":
@@ -214,8 +230,7 @@ func (q *QueryBuilder) Execute(out any) error {
 
 	case "upsert":
 		extraHeaders := map[string]string{
-			"Prefer":     "return=representation",
-			"Resolution": "merge-duplicates",
+			"Prefer": "return=representation,resolution=merge-duplicates",
 		}
 		return q.http.do("POST", path, q.body, params, out, extraHeaders)
 

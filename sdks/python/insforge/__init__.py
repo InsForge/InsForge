@@ -13,6 +13,7 @@ Usage:
 """
 
 from .client import InsForgeClient, create_client
+from .http import InsForgeError
 
-__all__ = ["InsForgeClient", "create_client"]
+__all__ = ["InsForgeClient", "create_client", "InsForgeError"]
 __version__ = "1.0.0"

@@ -70,9 +70,10 @@ type OAuthURL struct {
 
 // SignInWithOAuth returns the OAuth provider redirect URL.
 // provider is e.g. "google" or "github".
-func (a *AuthClient) SignInWithOAuth(provider, redirectURL string) (*OAuthURL, error) {
+func (a *AuthClient) SignInWithOAuth(provider, redirectURL, codeChallenge string) (*OAuthURL, error) {
 	params := url.Values{}
-	params.Set("redirect_url", redirectURL)
+	params.Set("redirect_uri", redirectURL)
+	params.Set("code_challenge", codeChallenge)
 	params.Set("client_type", "server")
 	var result OAuthURL
 	if err := a.http.do("GET", "/api/auth/oauth/"+provider, nil, params, &result, nil); err != nil {
@@ -82,12 +83,12 @@ func (a *AuthClient) SignInWithOAuth(provider, redirectURL string) (*OAuthURL, e
 }
 
 // ExchangeOAuthCode exchanges an OAuth authorization code for a session.
-func (a *AuthClient) ExchangeOAuthCode(provider, code, state string) (*AuthSession, error) {
+func (a *AuthClient) ExchangeOAuthCode(provider, code, codeVerifier string) (*AuthSession, error) {
 	body := map[string]any{
-		"provider":    provider,
-		"code":        code,
-		"state":       state,
-		"client_type": "server",
+		"provider":      provider,
+		"code":          code,
+		"code_verifier": codeVerifier,
+		"client_type":   "server",
 	}
 	var session AuthSession
 	if err := a.http.do("POST", "/api/auth/oauth/exchange", body, nil, &session, nil); err != nil {

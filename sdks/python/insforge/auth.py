@@ -187,7 +187,7 @@ class AuthClient:
             Dict with key: user.
         """
         data = self._http.get("/api/auth/sessions/current")
-        return data
+        return {"user": data.get("user") if data else None}
 
     def refresh_session(
         self,

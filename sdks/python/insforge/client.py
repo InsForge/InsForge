@@ -35,8 +35,6 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Optional
-
 from .ai import AIClient
 from .auth import AuthClient
 from .database import DatabaseClient
@@ -65,8 +63,8 @@ class InsForgeClient:
         self,
         *,
         base_url: str,
-        anon_key: Optional[str] = None,
-        edge_function_token: Optional[str] = None,
+        anon_key: str | None = None,
+        edge_function_token: str | None = None,
         timeout: int = 30,
     ) -> None:
         """
@@ -82,6 +80,8 @@ class InsForgeClient:
         """
         if not base_url:
             raise ValueError("base_url is required")
+        if not anon_key and not edge_function_token:
+            raise ValueError("either anon_key or edge_function_token is required")
 
         self._http = HttpClient(
             base_url=base_url,
@@ -101,8 +101,8 @@ class InsForgeClient:
 def create_client(
     *,
     base_url: str,
-    anon_key: Optional[str] = None,
-    edge_function_token: Optional[str] = None,
+    anon_key: str | None = None,
+    edge_function_token: str | None = None,
     timeout: int = 30,
 ) -> InsForgeClient:
     """

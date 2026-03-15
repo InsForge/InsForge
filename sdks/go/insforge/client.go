@@ -45,6 +45,9 @@ type InsForgeClient struct {
 
 // CreateClient creates and returns a new InsForgeClient.
 func CreateClient(cfg Config) *InsForgeClient {
+	if cfg.BaseURL == "" {
+		panic("insforge: Config.BaseURL is required")
+	}
 	if cfg.TimeoutSeconds <= 0 {
 		cfg.TimeoutSeconds = 30
 	}

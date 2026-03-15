@@ -52,11 +52,11 @@ session, err := client.Auth.SignUp("user@example.com", "password", map[string]an
 session, err := client.Auth.SignInWithPassword("user@example.com", "password")
 
 // OAuth — get redirect URL
-oauthURL, err := client.Auth.SignInWithOAuth("google", "https://myapp.com/callback")
+oauthURL, err := client.Auth.SignInWithOAuth("google", "https://myapp.com/callback", codeChallenge)
 // Redirect the user to oauthURL.URL
 
 // Exchange OAuth code after redirect
-session, err := client.Auth.ExchangeOAuthCode("google", code, state)
+session, err := client.Auth.ExchangeOAuthCode("google", code, codeVerifier)
 
 // Sign out
 err = client.Auth.SignOut()
@@ -164,7 +164,7 @@ err = client.Storage.From("avatars").Remove("user-123/avatar.png")
 ```go
 // Chat completion
 resp, err := client.AI.Chat.Create(insforge.ChatCompletionRequest{
-    Model: "gpt-4o",
+    Model: "openai/gpt-4o",
     Messages: []insforge.ChatMessage{
         {Role: "system", Content: "You are a helpful assistant."},
         {Role: "user", Content: "What is the capital of France?"},
@@ -174,7 +174,7 @@ fmt.Println(resp.Choices[0].Message.Content)
 
 // Streaming chat completion
 req := insforge.ChatCompletionRequest{
-    Model:    "gpt-4o",
+    Model:    "openai/gpt-4o",
     Messages: []insforge.ChatMessage{{Role: "user", Content: "Tell me a story"}},
 }
 chunks, errs := client.AI.Chat.CreateStream(req)
@@ -189,7 +189,7 @@ if err := <-errs; err != nil {
 
 // Embeddings
 embResp, err := client.AI.CreateEmbeddings(insforge.EmbeddingsRequest{
-    Model: "text-embedding-3-small",
+    Model: "openai/text-embedding-3-small",
     Input: []string{"Hello, world!"},
 })
 fmt.Println(embResp.Data[0].Embedding[:5])

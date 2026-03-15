@@ -11,7 +11,8 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 
 class QueryBuilder:
@@ -47,6 +48,7 @@ class QueryBuilder:
         self._head: bool = False
         self._return_select: bool = False
         self._upsert_resolution: str | None = None
+        self._on_conflict: str | None = None
 
     # ------------------------------------------------------------------
     # Operations
@@ -58,7 +60,7 @@ class QueryBuilder:
         *,
         count: str | None = None,
         head: bool = False,
-    ) -> "QueryBuilder":
+    ) -> QueryBuilder:
         """Select columns from the table."""
         self._operation = self._OP_SELECT
         self._columns = columns
@@ -71,7 +73,7 @@ class QueryBuilder:
         values: dict[str, Any] | list[dict[str, Any]],
         *,
         count: str | None = None,
-    ) -> "QueryBuilder":
+    ) -> QueryBuilder:
         """Insert one or more records."""
         self._operation = self._OP_INSERT
         self._body = values if isinstance(values, list) else [values]
@@ -83,14 +85,14 @@ class QueryBuilder:
         values: dict[str, Any],
         *,
         count: str | None = None,
-    ) -> "QueryBuilder":
+    ) -> QueryBuilder:
         """Update records matching the applied filters."""
         self._operation = self._OP_UPDATE
         self._body = values
         self._count = count
         return self
 
-    def delete(self, *, count: str | None = None) -> "QueryBuilder":
+    def delete(self, *, count: str | None = None) -> QueryBuilder:
         """Delete records matching the applied filters."""
         self._operation = self._OP_DELETE
         self._count = count
@@ -102,10 +104,11 @@ class QueryBuilder:
         *,
         on_conflict: str | None = None,
         ignore_duplicates: bool = False,
-    ) -> "QueryBuilder":
+    ) -> QueryBuilder:
         """Insert or update on conflict."""
         self._operation = self._OP_UPSERT
         self._body = values if isinstance(values, list) else [values]
+        self._on_conflict = on_conflict
         if ignore_duplicates:
             self._upsert_resolution = "ignore-duplicates"
         else:
@@ -116,7 +119,7 @@ class QueryBuilder:
     # Post-operation modifiers
     # ------------------------------------------------------------------
 
-    def select_after(self, columns: str = "*") -> "QueryBuilder":
+    def select_after(self, columns: str = "*") -> QueryBuilder:
         """Chain .select() after insert/update to return created/updated rows."""
         self._return_select = True
         self._columns = columns
@@ -126,43 +129,43 @@ class QueryBuilder:
     # Filters
     # ------------------------------------------------------------------
 
-    def eq(self, column: str, value: Any) -> "QueryBuilder":
+    def eq(self, column: str, value: Any) -> QueryBuilder:
         self._filters.append((column, "eq", value))
         return self
 
-    def neq(self, column: str, value: Any) -> "QueryBuilder":
+    def neq(self, column: str, value: Any) -> QueryBuilder:
         self._filters.append((column, "neq", value))
         return self
 
-    def gt(self, column: str, value: Any) -> "QueryBuilder":
+    def gt(self, column: str, value: Any) -> QueryBuilder:
         self._filters.append((column, "gt", value))
         return self
 
-    def gte(self, column: str, value: Any) -> "QueryBuilder":
+    def gte(self, column: str, value: Any) -> QueryBuilder:
         self._filters.append((column, "gte", value))
         return self
 
-    def lt(self, column: str, value: Any) -> "QueryBuilder":
+    def lt(self, column: str, value: Any) -> QueryBuilder:
         self._filters.append((column, "lt", value))
         return self
 
-    def lte(self, column: str, value: Any) -> "QueryBuilder":
+    def lte(self, column: str, value: Any) -> QueryBuilder:
         self._filters.append((column, "lte", value))
         return self
 
-    def like(self, column: str, pattern: str) -> "QueryBuilder":
+    def like(self, column: str, pattern: str) -> QueryBuilder:
         self._filters.append((column, "like", pattern))
         return self
 
-    def ilike(self, column: str, pattern: str) -> "QueryBuilder":
+    def ilike(self, column: str, pattern: str) -> QueryBuilder:
         self._filters.append((column, "ilike", pattern))
         return self
 
-    def in_(self, column: str, values: Sequence[Any]) -> "QueryBuilder":
+    def in_(self, column: str, values: Sequence[Any]) -> QueryBuilder:
         self._filters.append((column, "in", values))
         return self
 
-    def is_(self, column: str, value: Any) -> "QueryBuilder":
+    def is_(self, column: str, value: Any) -> QueryBuilder:
         self._filters.append((column, "is", value))
         return self
 
@@ -176,26 +179,26 @@ class QueryBuilder:
         *,
         ascending: bool = True,
         nulls_first: bool | None = None,
-    ) -> "QueryBuilder":
+    ) -> QueryBuilder:
         self._order_col = column
         self._order_asc = ascending
         self._order_nulls_first = nulls_first
         return self
 
-    def limit(self, count: int) -> "QueryBuilder":
+    def limit(self, count: int) -> QueryBuilder:
         self._limit_val = count
         return self
 
-    def range(self, from_: int, to: int) -> "QueryBuilder":
+    def range(self, from_: int, to: int) -> QueryBuilder:
         self._range_from = from_
         self._range_to = to
         return self
 
-    def single(self) -> "QueryBuilder":
+    def single(self) -> QueryBuilder:
         self._single = True
         return self
 
-    def maybe_single(self) -> "QueryBuilder":
+    def maybe_single(self) -> QueryBuilder:
         self._maybe_single = True
         return self
 
@@ -225,7 +228,7 @@ class QueryBuilder:
             elif self._operation == self._OP_DELETE:
                 raw = self._http.delete(path, params=params, extra_headers=headers)
             else:
-                raise ValueError(f"No operation set. Call .select(), .insert(), .update(), or .delete() first.")
+                raise ValueError("No operation set. Call .select(), .insert(), .update(), or .delete() first.")
         except Exception as exc:
             return {"data": None, "error": exc, "count": None}
 
@@ -236,6 +239,8 @@ class QueryBuilder:
                 return {"data": None, "error": Exception("Multiple rows returned, expected one"), "count": None}
             data = data[0] if data else None
         elif self._maybe_single:
+            if len(data) > 1:
+                return {"data": None, "error": Exception("MaybeSingle: multiple rows returned"), "count": None}
             data = data[0] if data else None
 
         return {"data": data, "error": None, "count": None}
@@ -288,6 +293,8 @@ class QueryBuilder:
         if self._operation == self._OP_UPSERT and self._upsert_resolution:
             existing = headers.get("Prefer", "")
             headers["Prefer"] = f"{self._upsert_resolution},{existing}".strip(",")
+            if self._on_conflict:
+                headers["Prefer"] += f",on_conflict={self._on_conflict}"
 
         return headers
 

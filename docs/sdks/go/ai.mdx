@@ -13,7 +13,7 @@ go get github.com/InsForge/InsForge/sdks/go/insforge@latest
 
 ```go
 resp, err := client.AI.Chat.Create(insforge.ChatCompletionRequest{
-    Model: "gpt-4o",
+    Model: "openai/gpt-4o",
     Messages: []insforge.ChatMessage{
         {Role: "system", Content: "You are a helpful assistant."},
         {Role: "user", Content: "What is the capital of France?"},
@@ -29,7 +29,7 @@ fmt.Println(resp.Choices[0].Message.Content)
 
 ```go
 req := insforge.ChatCompletionRequest{
-    Model:    "gpt-4o",
+    Model:    "openai/gpt-4o",
     Messages: []insforge.ChatMessage{{Role: "user", Content: "Tell me a story"}},
 }
 
@@ -50,7 +50,7 @@ if err := <-errs; err != nil {
 
 ```go
 embResp, err := client.AI.CreateEmbeddings(insforge.EmbeddingsRequest{
-    Model: "text-embedding-3-small",
+    Model: "openai/text-embedding-3-small",
     Input: []string{"Hello, world!", "Another sentence"},
 })
 if err != nil {
@@ -64,7 +64,7 @@ fmt.Println("Embedding size:", len(embResp.Data[0].Embedding))
 ```go
 imgResp, err := client.AI.GenerateImage(insforge.ImageGenerationRequest{
     Prompt: "A serene mountain lake at sunrise, photorealistic",
-    Model:  "dall-e-3",
+    Model:  "openai/dall-e-3",
     N:      1,
     Size:   "1024x1024",
 })
@@ -80,7 +80,7 @@ fmt.Println(imgResp.Data[0].URL)
 
 | Field | Type | Description |
 |---|---|---|
-| `Model` | string | Model name, e.g. `"gpt-4o"` |
+| `Model` | string | Model name, e.g. `"openai/gpt-4o"` |
 | `Messages` | `[]ChatMessage` | Conversation messages |
 | `MaxTokens` | int | Maximum tokens to generate |
 | `Temperature` | float64 | Sampling temperature (0.0–2.0) |
@@ -91,6 +91,6 @@ fmt.Println(imgResp.Data[0].URL)
 | Field | Type | Description |
 |---|---|---|
 | `Prompt` | string | Text description of the image |
-| `Model` | string | Model name, e.g. `"dall-e-3"` |
+| `Model` | string | Model name, e.g. `"openai/dall-e-3"` |
 | `N` | int | Number of images to generate |
 | `Size` | string | Dimensions, e.g. `"1024x1024"` |

@@ -115,6 +115,9 @@ func (r *RealtimeClient) readLoop(conn *websocket.Conn, stopCh chan struct{}) {
 	defer func() {
 		r.mu.Lock()
 		r.state = ConnectionStateDisconnected
+		r.conn = nil
+		r.socketID = ""
+		r.stopCh = nil
 		r.mu.Unlock()
 	}()
 
