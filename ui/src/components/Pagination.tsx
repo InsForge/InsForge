@@ -7,13 +7,7 @@ import {
   MoreHorizontal,
 } from 'lucide-react';
 import { cn } from '../lib';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from './Select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './Select';
 
 type PaginationItem = number | 'ellipsis-left' | 'ellipsis-right';
 const FIXED_CENTER_SLOT_COUNT = 5;
