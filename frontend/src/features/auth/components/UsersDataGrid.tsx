@@ -84,7 +84,7 @@ const ProviderBadge = ({ provider }: { provider: string }) => {
 };
 
 // Width estimates for badge layout calculation
-const BADGE_WIDTH = 84;
+const BADGE_WIDTH = 82;
 const OVERFLOW_BADGE_WIDTH = 40;
 
 const ProvidersCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
@@ -122,10 +122,10 @@ const ProvidersCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
     };
   }, []);
 
-  const maxBadgesThatFit = Math.max(1, Math.floor(containerWidth / BADGE_WIDTH));
+  const maxBadgesThatFit = Math.max(0, Math.floor(containerWidth / BADGE_WIDTH));
   const hasOverflow = uniqueProviders.length > maxBadgesThatFit;
   const visibleProviderCount = hasOverflow
-    ? Math.max(1, Math.floor((containerWidth - OVERFLOW_BADGE_WIDTH) / BADGE_WIDTH))
+    ? Math.max(0, Math.floor((containerWidth - OVERFLOW_BADGE_WIDTH) / BADGE_WIDTH))
     : uniqueProviders.length;
   const visibleProviders = uniqueProviders.slice(0, visibleProviderCount);
   const hiddenProviders = uniqueProviders.slice(visibleProviderCount);
