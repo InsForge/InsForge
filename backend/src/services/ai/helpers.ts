@@ -7,6 +7,7 @@ const PROVIDER_ORDER: Record<string, number> = {
   anthropic: 2,
   google: 3,
   amazon: 4,
+  minimax: 5,
 };
 
 /**

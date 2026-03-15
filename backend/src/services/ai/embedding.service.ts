@@ -1,4 +1,5 @@
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
+import { MiniMaxProvider } from '@/providers/ai/minimax.provider.js';
 import type { EmbeddingsRequest, EmbeddingsResponse } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { AIConfigService } from './ai-config.service.js';
@@ -7,6 +8,7 @@ import { AIUsageService } from './ai-usage.service.js';
 export class EmbeddingService {
   private static instance: EmbeddingService;
   private openRouterProvider = OpenRouterProvider.getInstance();
+  private minimaxProvider = MiniMaxProvider.getInstance();
   private aiConfigService = AIConfigService.getInstance();
   private aiUsageService = AIUsageService.getInstance();
 
@@ -29,7 +31,8 @@ export class EmbeddingService {
     try {
       // Send request with automatic renewal and retry logic (same pattern as chat-completion)
       const aiConfig = await this.aiConfigService.findByModelId(options.model);
-      const response = await this.openRouterProvider.sendRequest((client) =>
+      const provider = aiConfig?.provider === 'minimax' ? this.minimaxProvider : this.openRouterProvider;
+      const response = await provider.sendRequest((client) =>
         client.embeddings.create({
           model: options.model,
           input: options.input,

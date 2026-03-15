@@ -82,7 +82,7 @@ graph TB
 - **Authentication**: User management, authentication, and sessions
 - **Database**: Postgres relational database
 - **Storage**: S3 compatible file storage
-- **Model Gateway**: OpenAI compatible API across multiple LLM providers
+- **Model Gateway**: OpenAI compatible API across multiple LLM providers (OpenRouter, MiniMax, and more)
 - **Edge Functions**: Serverless code running on the edge
 - **Site Deployment**: Site build and deployment
 

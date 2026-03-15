@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { AIUsageService } from './ai-usage.service.js';
 import { AIConfigService } from './ai-config.service.js';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
+import { MiniMaxProvider } from '@/providers/ai/minimax.provider.js';
 import type {
   AIConfigurationSchema,
   ChatCompletionResponse,
@@ -65,6 +66,17 @@ export class ChatCompletionService {
   private aiUsageService = AIUsageService.getInstance();
   private aiConfigService = AIConfigService.getInstance();
   private openRouterProvider = OpenRouterProvider.getInstance();
+  private minimaxProvider = MiniMaxProvider.getInstance();
+
+  /**
+   * Get the appropriate provider based on the AI config's provider field
+   */
+  private getProvider(provider?: string): OpenRouterProvider | MiniMaxProvider {
+    if (provider === 'minimax') {
+      return this.minimaxProvider;
+    }
+    return this.openRouterProvider;
+  }
 
   private constructor() {}
 
@@ -282,7 +294,11 @@ export class ChatCompletionService {
       // Apply system prompt from config if available
       const formattedMessages = this.formatMessages(messages, aiConfig?.systemPrompt);
 
-      // Build request with optional plugins (web search, file parser)
+      // Get the appropriate provider based on config
+      const provider = this.getProvider(aiConfig?.provider);
+      const isOpenRouter = aiConfig?.provider !== 'minimax';
+
+      // Build request with optional plugins (OpenRouter-only: web search, file parser)
       const request: OpenRouterChatCompletionRequest = {
         model: modelId,
         messages: formattedMessages,
@@ -290,14 +306,14 @@ export class ChatCompletionService {
         max_tokens: options.maxTokens ?? 4096,
         top_p: options.topP,
         stream: false,
-        plugins: this.buildPlugins(options),
+        plugins: isOpenRouter ? this.buildPlugins(options) : undefined,
         tools: options.tools,
         tool_choice: options.toolChoice,
         parallel_tool_calls: options.parallelToolCalls,
       };
 
-      // Send request with automatic renewal and retry logic
-      const response = await this.openRouterProvider.sendRequest((client) =>
+      // Send request via the appropriate provider
+      const response = await provider.sendRequest((client) =>
         client.chat.completions.create(
           request as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming
         )
@@ -387,7 +403,11 @@ export class ChatCompletionService {
       // Apply system prompt from config if available
       const formattedMessages = this.formatMessages(messages, aiConfig?.systemPrompt);
 
-      // Build request with optional plugins (web search, file parser)
+      // Get the appropriate provider based on config
+      const provider = this.getProvider(aiConfig?.provider);
+      const isOpenRouter = aiConfig?.provider !== 'minimax';
+
+      // Build request with optional plugins (OpenRouter-only: web search, file parser)
       const request: OpenRouterChatCompletionStreamingRequest = {
         model: modelId,
         messages: formattedMessages,
@@ -395,14 +415,14 @@ export class ChatCompletionService {
         max_tokens: options.maxTokens ?? 4096,
         top_p: options.topP,
         stream: true,
-        plugins: this.buildPlugins(options),
+        plugins: isOpenRouter ? this.buildPlugins(options) : undefined,
         tools: options.tools,
         tool_choice: options.toolChoice,
         parallel_tool_calls: options.parallelToolCalls,
       };
 
-      // Send request with automatic renewal and retry logic
-      const stream = await this.openRouterProvider.sendRequest((client) =>
+      // Send request via the appropriate provider
+      const stream = await provider.sendRequest((client) =>
         client.chat.completions.create(request as OpenAI.Chat.ChatCompletionCreateParamsStreaming)
       );
 
