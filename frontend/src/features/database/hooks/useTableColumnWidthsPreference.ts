@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 const STORAGE_KEY = 'insforge.database.tables.preferences.v1';
+const STORAGE_SAVE_DEBOUNCE_MS = 300;
 
 export type TableColumnWidths = Record<string, number>;
 
@@ -107,10 +108,38 @@ export function useTableColumnWidthsPreference(
   availableColumns?: string[]
 ) {
   const [preferences, setPreferences] = useState<DatabaseGridPreferences>(loadPreferences);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestPreferencesRef = useRef(preferences);
+  const hasMountedRef = useRef(false);
 
   useEffect(() => {
-    savePreferences(preferences);
+    latestPreferencesRef.current = preferences;
+
+    // Skip persistence on first mount to avoid unnecessary localStorage writes.
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(() => {
+      savePreferences(latestPreferencesRef.current);
+      saveTimeoutRef.current = null;
+    }, STORAGE_SAVE_DEBOUNCE_MS);
   }, [preferences]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+        savePreferences(latestPreferencesRef.current);
+      }
+    };
+  }, []);
 
   const columnWidths = useMemo(() => {
     if (!tableName) {
