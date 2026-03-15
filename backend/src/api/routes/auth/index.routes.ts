@@ -8,6 +8,7 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin, verifyToken } from '@/api/middlewares/auth.js';
+import { isAdminCreatingUser } from './create-user.helper.js';
 import oauthRouter from './oauth.routes.js';
 import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-limiters.js';
 import {
@@ -174,8 +175,10 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
   }
 });
 
-// POST /api/auth/users - Create a new user (registration)
+// POST /api/auth/users - Create a new user (registration or admin adding user)
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
+// When called with a valid admin token (e.g. dashboard adding a user), we do NOT set session
+// cookie or return csrf/refresh tokens, so the admin's session is not overwritten.
 router.post('/users', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const clientType = parseClientType(req.query.client_type);
@@ -192,8 +195,14 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
     const { email, password, name, options } = validationResult.data;
     const result: CreateUserResponse = await authService.register(email, password, name, options);
 
-    // Set refresh token based on client type
-    if (result.accessToken && result.user) {
+    // If the request is from an authenticated admin (e.g. dashboard "Add User"), do not set
+    // refresh token cookie or return session tokens. Otherwise the admin's cookie would be
+    // overwritten with the new user's refresh token and the next token refresh would fail (CSRF
+    // mismatch), forcing the admin to re-login.
+    const adminCreatingUser = isAdminCreatingUser(req);
+
+    // Set refresh token based on client type (skip when admin is adding a user)
+    if (result.accessToken && result.user && !adminCreatingUser) {
       const tokenManager = TokenManager.getInstance();
       const refreshToken = tokenManager.generateRefreshToken(result.user.id);
 
