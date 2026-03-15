@@ -1,15 +1,25 @@
 SET search_path = public, system, "$user";
 
--- Migration 023: Add Realtime Message Retention
+-- Migration 024: Add Realtime Message Retention
 --
 -- Adds automatic cleanup mechanism for realtime.messages table.
 -- Creates a SQL function to prune old messages based on retention policy.
 
 -- ============================================================================
+-- CONFIGURATION TABLE
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS realtime.config (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================================
 -- CLEANUP FUNCTION
 -- ============================================================================
 -- Deletes messages older than the configured retention period.
--- Default retention is 30 days if not set in _config.
+-- Default retention is 30 days if not set in realtime.config.
 -- Deletes in batches to prevent performance impact.
 
 CREATE OR REPLACE FUNCTION realtime.cleanup_messages(p_batch_size INT DEFAULT 1000)
@@ -19,19 +29,15 @@ DECLARE
   v_cutoff TIMESTAMPTZ;
   v_deleted_count INT := 0;
 BEGIN
-  -- Get retention days from _config, fallback to 30
+  -- Get retention days from realtime.config, fallback to 30
   -- Using COALESCE to handle NULL or missing config row
-  -- _config is in public schema or search path
   SELECT COALESCE(value::INT, 30) INTO v_retention_days
-  FROM _config WHERE key = 'realtime_retention_days';
+  FROM realtime.config WHERE key = 'realtime_retention_days';
   
   -- Calculate cutoff time
   v_cutoff := NOW() - (v_retention_days || ' days')::INTERVAL;
   
-  -- Delete batch ordered by created_at DESC (preserve newer, delete older first)
-  -- Wait, the issue states "ordered by created_at"
-  -- Generally, we delete older first, so ORDER BY created_at ASC is safer
-  -- to ensure we prune the oldest ones first in case of safety floors.
+  -- Delete batch ordered by created_at ASC to prune oldest first
   WITH deleted AS (
     DELETE FROM realtime.messages
     WHERE id IN (
@@ -60,6 +66,6 @@ REVOKE ALL ON FUNCTION realtime.cleanup_messages FROM PUBLIC;
 -- ============================================================================
 -- Insert default retention period (30 days)
 
-INSERT INTO _config (key, value)
+INSERT INTO realtime.config (key, value)
 VALUES ('realtime_retention_days', '30')
 ON CONFLICT (key) DO NOTHING;
