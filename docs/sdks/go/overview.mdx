@@ -1,0 +1,69 @@
+---
+title: Go SDK
+description: Official Go SDK for InsForge — backend services for Go applications
+---
+
+The InsForge Go SDK provides a Go client for interacting with InsForge services from server-side applications, APIs, CLIs, and microservices.
+
+## Installation
+
+```bash
+go get github.com/InsForge/InsForge/sdks/go/insforge@latest
+```
+
+## Quick Start
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/InsForge/InsForge/sdks/go/insforge"
+)
+
+func main() {
+    client := insforge.CreateClient(insforge.Config{
+        BaseURL: "https://your-app.region.insforge.app",
+        AnonKey: "your-anon-key",
+    })
+
+    session, err := client.Auth.SignInWithPassword("user@example.com", "password")
+    if err != nil {
+        panic(err)
+    }
+    fmt.Println("Logged in as:", session.User.Email)
+}
+```
+
+## Features
+
+- **Database** - Type-safe CRUD operations with a fluent query builder
+- **Authentication** - Email/password and OAuth authentication
+- **Storage** - File upload, download, and management
+- **Functions** - Invoke serverless edge functions
+- **AI** - Chat completions (streaming + non-streaming) and image generation
+- **Realtime** - WebSocket-based pub/sub messaging
+- **Thread-safe** - Concurrent token management with `sync.RWMutex`
+
+## SDK Reference
+
+<CardGroup cols={2}>
+  <Card title="Database" icon="database" href="/sdks/go/database">
+    CRUD operations, filters, and queries
+  </Card>
+  <Card title="Authentication" icon="lock" href="/sdks/go/auth">
+    Sign up, sign in, OAuth, and user management
+  </Card>
+  <Card title="Storage" icon="cloud-arrow-up" href="/sdks/go/storage">
+    File upload, download, and management
+  </Card>
+  <Card title="Functions" icon="bolt" href="/sdks/go/functions">
+    Invoke serverless edge functions
+  </Card>
+  <Card title="AI" icon="brain" href="/sdks/go/ai">
+    Chat completions and image generation
+  </Card>
+  <Card title="Realtime" icon="signal-stream" href="/sdks/go/realtime">
+    WebSocket pub/sub messaging
+  </Card>
+</CardGroup>

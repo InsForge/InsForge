@@ -1,0 +1,68 @@
+---
+title: Functions — Python SDK
+description: Invoke serverless edge functions with the InsForge Python SDK
+---
+
+## Installation
+
+```bash
+pip install insforge
+```
+
+## invoke()
+
+Call a deployed InsForge serverless function.
+
+```python
+result = client.functions.invoke(
+    slug="send-welcome-email",
+    body={"to": "user@example.com", "name": "Jane"}
+)
+print(result)  # Parsed JSON response
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `slug` | str | required | Function name/identifier |
+| `body` | dict | `None` | JSON request body |
+| `method` | str | `"POST"` | HTTP method |
+| `headers` | dict | `{}` | Additional request headers |
+
+### HTTP Methods
+
+```python
+# GET request
+result = client.functions.invoke("get-stats", method="GET")
+
+# PUT request
+result = client.functions.invoke("update-config", method="PUT", body={"key": "value"})
+```
+
+### Custom Headers
+
+```python
+result = client.functions.invoke(
+    "process-webhook",
+    headers={"X-Webhook-Secret": "my-secret"},
+    body=webhook_payload
+)
+```
+
+### Error Handling
+
+```python
+from insforge import InsForgeError
+
+try:
+    result = client.functions.invoke("my-function", body={"data": "..."})
+except InsForgeError as e:
+    print(f"Function error {e.status_code}: {e.message}")
+```
+
+## Notes
+
+- Functions are deployed at `/functions/{slug}` (no `/api/` prefix)
+- Function slugs must match the deployed function name exactly
+- The SDK automatically sends the current auth token as a Bearer token

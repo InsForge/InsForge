@@ -1,0 +1,113 @@
+---
+title: Authentication — Go SDK
+description: User authentication and profile management with the InsForge Go SDK
+---
+
+## Installation
+
+```bash
+go get github.com/InsForge/InsForge/sdks/go/insforge@latest
+```
+
+## SignUp()
+
+Register a new user.
+
+```go
+session, err := client.Auth.SignUp("user@example.com", "password123", map[string]any{
+    "display_name": "Jane Doe",
+})
+if err != nil {
+    // handle error
+}
+fmt.Println(session.User.ID)
+fmt.Println(session.AccessToken)
+```
+
+## SignInWithPassword()
+
+Authenticate with email and password.
+
+```go
+session, err := client.Auth.SignInWithPassword("user@example.com", "password123")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println("Signed in:", session.User.Email)
+```
+
+## OAuth
+
+```go
+// 1. Get redirect URL
+oauthURL, err := client.Auth.SignInWithOAuth("google", "https://myapp.com/callback")
+// Redirect user to oauthURL.URL
+
+// 2. Exchange code after redirect
+session, err := client.Auth.ExchangeOAuthCode("google", code, state)
+```
+
+## SignOut()
+
+```go
+err := client.Auth.SignOut()
+```
+
+## GetCurrentSession() / GetCurrentUser()
+
+```go
+session, err := client.Auth.GetCurrentSession()
+user, err := client.Auth.GetCurrentUser()
+```
+
+## RefreshSession()
+
+```go
+session, err := client.Auth.RefreshSession()
+```
+
+## Profile Management
+
+```go
+profile, err := client.Auth.GetProfile(userID)
+
+profile, err = client.Auth.SetProfile(userID, map[string]any{
+    "bio": "Hello, world!",
+})
+```
+
+## Password Reset
+
+```go
+// 1. Send reset email
+err = client.Auth.SendResetPasswordEmail("user@example.com")
+
+// 2. Exchange token from email link
+session, err = client.Auth.ExchangeResetPasswordToken(token)
+
+// 3. Set new password
+err = client.Auth.ResetPassword("new-secure-password")
+```
+
+## Email Verification
+
+```go
+// Resend verification email
+err = client.Auth.ResendVerificationEmail("user@example.com")
+
+// Verify
+err = client.Auth.VerifyEmail(token)
+```
+
+## Error Handling
+
+```go
+session, err := client.Auth.SignInWithPassword("bad@example.com", "wrong")
+if err != nil {
+    var insErr *insforge.InsForgeError
+    if errors.As(err, &insErr) {
+        fmt.Printf("API error [%s]: %s (HTTP %d)\n",
+            insErr.ErrorCode, insErr.Message, insErr.StatusCode)
+    }
+}
+```

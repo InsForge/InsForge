@@ -1,0 +1,125 @@
+---
+title: Database — Python SDK
+description: CRUD operations and queries with the InsForge Python SDK
+---
+
+## Installation
+
+```bash
+pip install insforge
+```
+
+## Selecting Data
+
+```python
+# Fetch all rows
+rows = client.db.from_("todos").select("*").execute()
+
+# Select specific columns
+rows = client.db.from_("todos").select("id, title, done").execute()
+```
+
+## Filtering
+
+```python
+# Equality
+rows = client.db.from_("todos").select("*").eq("done", False).execute()
+
+# Comparison operators
+rows = client.db.from_("products").select("*") \
+    .gte("price", 10) \
+    .lte("price", 100) \
+    .execute()
+
+# IN list
+rows = client.db.from_("products").select("*") \
+    .in_("category", ["electronics", "books"]) \
+    .execute()
+
+# LIKE / ILIKE
+rows = client.db.from_("users").select("*").ilike("name", "%jane%").execute()
+
+# IS NULL
+rows = client.db.from_("todos").select("*").is_("deleted_at", "null").execute()
+```
+
+## Ordering and Pagination
+
+```python
+# Order
+rows = client.db.from_("todos").select("*").order("created_at", desc=True).execute()
+
+# Limit
+rows = client.db.from_("todos").select("*").limit(10).execute()
+
+# Range (pagination)
+rows = client.db.from_("todos").select("*").range(0, 9).execute()  # first 10 rows
+```
+
+## Single Row
+
+```python
+# Raises InsForgeError if not exactly one row
+todo = client.db.from_("todos").select("*").eq("id", 1).single().execute()
+
+# Returns None if not found, raises if multiple rows
+todo = client.db.from_("todos").select("*").eq("id", 1).maybe_single().execute()
+```
+
+## Inserting Data
+
+```python
+# Insert one row — returns list of inserted rows
+rows = client.db.from_("todos").insert([{"title": "Buy milk", "done": False}]).execute()
+
+# Insert multiple rows
+rows = client.db.from_("todos").insert([
+    {"title": "Walk dog", "done": False},
+    {"title": "Read book", "done": True},
+]).execute()
+```
+
+## Updating Data
+
+```python
+rows = client.db.from_("todos") \
+    .update({"done": True}) \
+    .eq("id", 1) \
+    .execute()
+```
+
+## Deleting Data
+
+```python
+client.db.from_("todos").delete().eq("id", 1).execute()
+```
+
+## Upsert
+
+```python
+rows = client.db.from_("todos").upsert([
+    {"id": 1, "title": "Updated title", "done": True}
+]).execute()
+```
+
+## Calling Postgres Functions (RPC)
+
+```python
+result = client.db.rpc("calculate_stats", {"user_id": "abc123"}).execute()
+print(result)
+```
+
+## Available Filters
+
+| Method | PostgREST operator | Description |
+|---|---|---|
+| `.eq(col, val)` | `eq` | Equal |
+| `.neq(col, val)` | `neq` | Not equal |
+| `.gt(col, val)` | `gt` | Greater than |
+| `.gte(col, val)` | `gte` | Greater than or equal |
+| `.lt(col, val)` | `lt` | Less than |
+| `.lte(col, val)` | `lte` | Less than or equal |
+| `.like(col, pat)` | `like` | LIKE (case-sensitive) |
+| `.ilike(col, pat)` | `ilike` | ILIKE (case-insensitive) |
+| `.in_(col, vals)` | `in` | Value in list |
+| `.is_(col, val)` | `is` | IS NULL / IS TRUE / IS FALSE |

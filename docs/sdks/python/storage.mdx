@@ -1,0 +1,71 @@
+---
+title: Storage — Python SDK
+description: File upload, download, and management with the InsForge Python SDK
+---
+
+## Installation
+
+```bash
+pip install insforge
+```
+
+## Uploading Files
+
+```python
+with open("avatar.png", "rb") as f:
+    data = f.read()
+
+public_url = client.storage.from_("avatars").upload(
+    key="user-123/avatar.png",
+    data=data,
+    content_type="image/png"
+)
+print(public_url)  # https://cdn.example.com/avatars/user-123/avatar.png
+```
+
+### upload_auto()
+
+Convenience wrapper that reads from a file path:
+
+```python
+public_url = client.storage.from_("avatars").upload_auto(
+    key="user-123/photo.jpg",
+    file_path="/tmp/photo.jpg"
+)
+```
+
+## Downloading Files
+
+```python
+data = client.storage.from_("avatars").download("user-123/avatar.png")
+with open("downloaded_avatar.png", "wb") as f:
+    f.write(data)
+```
+
+## Listing Files
+
+```python
+objects = client.storage.from_("avatars").list(prefix="user-123/")
+for obj in objects:
+    print(obj["key"], obj["size"])
+```
+
+## Deleting Files
+
+```python
+client.storage.from_("avatars").remove("user-123/avatar.png")
+```
+
+## Typical Pattern: Store URL in Database
+
+```python
+# 1. Upload to storage
+public_url = client.storage.from_("avatars").upload(
+    key=f"users/{user_id}/avatar.png",
+    data=image_bytes,
+    content_type="image/png"
+)
+
+# 2. Save URL in database
+client.db.from_("profiles").update({"avatar_url": public_url}).eq("user_id", user_id).execute()
+```

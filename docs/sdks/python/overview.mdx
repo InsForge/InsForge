@@ -1,0 +1,61 @@
+---
+title: Python SDK
+description: Official Python SDK for InsForge — backend services for Python applications and scripts
+---
+
+The InsForge Python SDK provides a Python client for interacting with InsForge services from server-side scripts, APIs, data pipelines, and automation.
+
+## Installation
+
+```bash
+pip install insforge
+```
+
+For Realtime support (WebSocket pub/sub):
+
+```bash
+pip install "insforge[realtime]"
+```
+
+## Quick Start
+
+```python
+from insforge import create_client
+
+client = create_client(
+    base_url="https://your-app.region.insforge.app",
+    anon_key="your-anon-key"
+)
+```
+
+## Features
+
+- **Database** - CRUD operations with a fluent query builder (PostgREST-compatible)
+- **Authentication** - Email/password, OAuth, profile management
+- **Storage** - File upload, download, and management
+- **Functions** - Invoke serverless edge functions
+- **AI** - Chat completions (streaming + non-streaming) and image generation
+- **Realtime** - WebSocket-based pub/sub messaging
+
+## SDK Reference
+
+<CardGroup cols={2}>
+  <Card title="Database" icon="database" href="/sdks/python/database">
+    CRUD operations, filters, and queries
+  </Card>
+  <Card title="Authentication" icon="lock" href="/sdks/python/auth">
+    Sign up, sign in, OAuth, and user management
+  </Card>
+  <Card title="Storage" icon="cloud-arrow-up" href="/sdks/python/storage">
+    File upload, download, and management
+  </Card>
+  <Card title="Functions" icon="bolt" href="/sdks/python/functions">
+    Invoke serverless edge functions
+  </Card>
+  <Card title="AI" icon="brain" href="/sdks/python/ai">
+    Chat completions and image generation
+  </Card>
+  <Card title="Realtime" icon="signal-stream" href="/sdks/python/realtime">
+    WebSocket pub/sub messaging
+  </Card>
+</CardGroup>

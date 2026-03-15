@@ -1,0 +1,73 @@
+---
+title: Storage — Go SDK
+description: File upload, download, and management with the InsForge Go SDK
+---
+
+## Installation
+
+```bash
+go get github.com/InsForge/InsForge/sdks/go/insforge@latest
+```
+
+## Uploading Files
+
+```go
+import "os"
+
+data, _ := os.ReadFile("avatar.png")
+
+publicURL, err := client.Storage.From("avatars").Upload(
+    "user-123/avatar.png",
+    data,
+    "image/png",
+)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(publicURL)
+```
+
+## Downloading Files
+
+```go
+data, err := client.Storage.From("avatars").Download("user-123/avatar.png")
+if err != nil {
+    log.Fatal(err)
+}
+os.WriteFile("downloaded.png", data, 0644)
+```
+
+## Listing Files
+
+```go
+objects, err := client.Storage.From("avatars").List("user-123/")
+if err != nil {
+    log.Fatal(err)
+}
+for _, obj := range objects {
+    fmt.Printf("%s (%d bytes)\n", obj.Key, obj.Size)
+}
+```
+
+## Deleting Files
+
+```go
+err = client.Storage.From("avatars").Remove("user-123/avatar.png")
+```
+
+## Typical Pattern: Store URL in Database
+
+```go
+// 1. Upload to storage
+publicURL, err := client.Storage.From("avatars").Upload(
+    fmt.Sprintf("users/%s/avatar.png", userID),
+    imageBytes,
+    "image/png",
+)
+
+// 2. Save URL in database
+err = client.DB.From("profiles").
+    Update(map[string]any{"avatar_url": publicURL}).
+    Eq("user_id", userID).
+    Execute(nil)
+```

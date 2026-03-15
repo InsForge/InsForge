@@ -160,6 +160,32 @@
             ]
           },
           {
+            "group": "Python",
+            "icon": "python",
+            "pages": [
+              "sdks/python/overview",
+              "sdks/python/database",
+              "sdks/python/auth",
+              "sdks/python/storage",
+              "sdks/python/functions",
+              "sdks/python/ai",
+              "sdks/python/realtime"
+            ]
+          },
+          {
+            "group": "Go",
+            "icon": "golang",
+            "pages": [
+              "sdks/go/overview",
+              "sdks/go/database",
+              "sdks/go/auth",
+              "sdks/go/storage",
+              "sdks/go/functions",
+              "sdks/go/ai",
+              "sdks/go/realtime"
+            ]
+          },
+          {
             "group": "REST API",
             "icon": "code",
             "pages": [

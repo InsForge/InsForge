@@ -1,0 +1,141 @@
+---
+title: Authentication — Python SDK
+description: User authentication and profile management with the InsForge Python SDK
+---
+
+## Installation
+
+```bash
+pip install insforge
+```
+
+## sign_up()
+
+Register a new user with email and password.
+
+```python
+session = client.auth.sign_up(
+    email="user@example.com",
+    password="password123",
+    metadata={"display_name": "Jane Doe"}  # optional
+)
+print(session["user"]["id"])
+print(session["accessToken"])
+```
+
+## sign_in_with_password()
+
+Authenticate with email and password.
+
+```python
+session = client.auth.sign_in_with_password(
+    email="user@example.com",
+    password="password123"
+)
+print(session["accessToken"])
+```
+
+## sign_in_with_oauth()
+
+Get the OAuth provider redirect URL.
+
+```python
+result = client.auth.sign_in_with_oauth(
+    provider="google",           # or "github"
+    redirect_url="https://myapp.com/callback"
+)
+# Redirect the user to result["url"]
+print(result["url"])
+```
+
+## exchange_oauth_code()
+
+Exchange an OAuth authorization code for a session after the redirect.
+
+```python
+session = client.auth.exchange_oauth_code(
+    provider="google",
+    code=request.args["code"],
+    state=request.args["state"]
+)
+```
+
+## sign_out()
+
+Invalidate the current session.
+
+```python
+client.auth.sign_out()
+```
+
+## get_current_session()
+
+Fetch the current session from the server.
+
+```python
+session = client.auth.get_current_session()
+print(session["user"]["email"])
+```
+
+## get_current_user()
+
+Return the currently authenticated user.
+
+```python
+user = client.auth.get_current_user()
+print(user["id"], user["email"])
+```
+
+## refresh_session()
+
+Exchange the stored refresh token for a new access token.
+
+```python
+session = client.auth.refresh_session()
+```
+
+## get_profile() / set_profile()
+
+Read and update user profile data.
+
+```python
+profile = client.auth.get_profile(user_id)
+
+updated = client.auth.set_profile(user_id, {"bio": "Hello, world!"})
+```
+
+## Password Reset Flow
+
+```python
+# 1. Send reset email
+client.auth.send_reset_password_email("user@example.com")
+
+# 2. User clicks link — exchange token
+session = client.auth.exchange_reset_password_token(token)
+
+# 3. Set new password
+client.auth.reset_password("new-secure-password")
+```
+
+## Email Verification
+
+```python
+# Resend verification email
+client.auth.resend_verification_email("user@example.com")
+
+# Verify with token from email link
+client.auth.verify_email(token)
+```
+
+## Error Handling
+
+```python
+from insforge import InsForgeError
+
+try:
+    client.auth.sign_in_with_password("bad@example.com", "wrong")
+except InsForgeError as e:
+    print(e.error_code)   # e.g. "INVALID_CREDENTIALS"
+    print(e.status_code)  # e.g. 401
+    print(e.message)
+```

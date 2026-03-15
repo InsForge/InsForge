@@ -1,0 +1,75 @@
+name: Go SDK
+
+on:
+  pull_request:
+    branches: [main, master, develop]
+    paths:
+      - 'sdks/go/**'
+  push:
+    branches: [main, master]
+    paths:
+      - 'sdks/go/**'
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Go SDK Tests
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        go-version: ["1.21", "1.22"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache-dependency-path: sdks/go/go.sum
+
+      - name: Download dependencies
+        working-directory: sdks/go
+        run: go mod download
+
+      - name: Run tests
+        working-directory: sdks/go
+        run: go test ./... -v -race
+
+  lint:
+    name: Go SDK Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          working-directory: sdks/go
+          version: latest
+
+  vet:
+    name: Go SDK Vet
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: go vet
+        working-directory: sdks/go
+        run: go vet ./...

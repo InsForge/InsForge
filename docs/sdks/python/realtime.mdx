@@ -1,0 +1,96 @@
+---
+title: Realtime — Python SDK
+description: WebSocket pub/sub messaging with the InsForge Python SDK
+---
+
+## Installation
+
+```bash
+pip install "insforge[realtime]"
+```
+
+The `[realtime]` extra installs `python-socketio` for WebSocket support.
+
+## Connecting
+
+```python
+client.realtime.connect()
+```
+
+## Subscribing to Channels
+
+```python
+def on_message(channel, payload):
+    print(f"[{channel}] {payload}")
+
+client.realtime.subscribe("todos", on_message)
+```
+
+## Publishing Messages
+
+```python
+client.realtime.publish("todos", {"action": "created", "id": 42})
+```
+
+## One-Time Handlers
+
+```python
+def handle_once(channel, payload):
+    print(f"Got one message on {channel}: {payload}")
+
+client.realtime.once("notifications", handle_once)
+```
+
+## Removing Handlers
+
+```python
+# Remove all handlers for a channel (does not unsubscribe)
+client.realtime.off("todos")
+
+# Unsubscribe from a channel (removes handlers + server subscription)
+client.realtime.unsubscribe("todos")
+```
+
+## Connection Status
+
+```python
+print(client.realtime.is_connected)          # bool
+print(client.realtime.connection_state)       # "connected" | "disconnected" | ...
+print(client.realtime.socket_id)              # server-assigned socket ID
+print(client.realtime.get_subscribed_channels())  # list of channel names
+```
+
+## Disconnecting
+
+```python
+client.realtime.disconnect()
+```
+
+## Full Example
+
+```python
+import time
+from insforge import create_client
+
+client = create_client(
+    base_url="https://your-app.region.insforge.app",
+    anon_key="your-anon-key"
+)
+
+# Sign in first if the channel requires auth
+client.auth.sign_in_with_password("user@example.com", "password")
+
+# Connect and subscribe
+client.realtime.connect()
+client.realtime.subscribe("room:general", lambda ch, data: print(f"New message: {data}"))
+
+# Publish a message
+client.realtime.publish("room:general", {"text": "Hello everyone!"})
+
+# Keep alive
+try:
+    while True:
+        time.sleep(1)
+except KeyboardInterrupt:
+    client.realtime.disconnect()
+```

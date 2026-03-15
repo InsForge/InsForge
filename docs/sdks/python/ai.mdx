@@ -1,0 +1,79 @@
+---
+title: AI — Python SDK
+description: Chat completions, embeddings, and image generation with the InsForge Python SDK
+---
+
+## Installation
+
+```bash
+pip install insforge
+```
+
+## Chat Completions
+
+```python
+response = client.ai.chat.completions.create(
+    model="gpt-4o",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "What is the capital of France?"},
+    ]
+)
+print(response["choices"][0]["message"]["content"])
+```
+
+## Streaming Chat Completions
+
+```python
+for chunk in client.ai.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "Tell me a long story"}],
+    stream=True
+):
+    delta = chunk["choices"][0]["delta"].get("content", "")
+    print(delta, end="", flush=True)
+```
+
+## Embeddings
+
+```python
+response = client.ai.embeddings.create(
+    model="text-embedding-3-small",
+    input=["Hello, world!", "Another sentence"]
+)
+vector = response["data"][0]["embedding"]
+print(f"Embedding dimension: {len(vector)}")
+```
+
+## Image Generation
+
+```python
+response = client.ai.images.generate(
+    prompt="A serene mountain lake at sunrise, photorealistic",
+    model="dall-e-3",
+    n=1,
+    size="1024x1024"
+)
+print(response["data"][0]["url"])
+```
+
+## Parameters
+
+### Chat Completions
+
+| Parameter | Type | Description |
+|---|---|---|
+| `model` | str | Model name, e.g. `"gpt-4o"` |
+| `messages` | list | Conversation messages (`role` + `content`) |
+| `max_tokens` | int | Maximum tokens to generate |
+| `temperature` | float | Sampling temperature (0.0–2.0) |
+| `stream` | bool | Enable streaming response |
+
+### Image Generation
+
+| Parameter | Type | Description |
+|---|---|---|
+| `prompt` | str | Text description of the image |
+| `model` | str | Model name, e.g. `"dall-e-3"` |
+| `n` | int | Number of images to generate |
+| `size` | str | Image dimensions, e.g. `"1024x1024"` |

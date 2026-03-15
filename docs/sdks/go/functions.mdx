@@ -1,0 +1,80 @@
+---
+title: Functions — Go SDK
+description: Invoke serverless edge functions with the InsForge Go SDK
+---
+
+## Installation
+
+```bash
+go get github.com/InsForge/InsForge/sdks/go/insforge@latest
+```
+
+## Invoke()
+
+Call a deployed InsForge serverless function.
+
+```go
+result, err := client.Functions.Invoke("send-welcome-email", &insforge.InvokeOptions{
+    Body: map[string]any{
+        "to":   "user@example.com",
+        "name": "Jane",
+    },
+})
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(result.Data)
+fmt.Println(result.StatusCode) // e.g. 200
+```
+
+### InvokeOptions
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `Method` | string | `"POST"` | HTTP method |
+| `Body` | any | `nil` | JSON-serializable request body |
+| `Headers` | `map[string]string` | `nil` | Extra HTTP headers |
+
+### GET Request
+
+```go
+result, err := client.Functions.Invoke("get-stats", &insforge.InvokeOptions{
+    Method: "GET",
+})
+```
+
+### Custom Headers
+
+```go
+result, err := client.Functions.Invoke("process-webhook", &insforge.InvokeOptions{
+    Headers: map[string]string{"X-Webhook-Secret": "my-secret"},
+    Body:    webhookPayload,
+})
+```
+
+### Raw Response
+
+```go
+result, err := client.Functions.Invoke("my-function", nil)
+if err == nil {
+    fmt.Println(string(result.RawBody))
+}
+```
+
+### Error Handling
+
+```go
+result, err := client.Functions.Invoke("my-function", nil)
+if err != nil {
+    var insErr *insforge.InsForgeError
+    if errors.As(err, &insErr) {
+        fmt.Printf("Function error %d: %s\n", insErr.StatusCode, insErr.Message)
+    }
+}
+```
+
+## Notes
+
+- Functions live at `/functions/{slug}` (not under `/api/`)
+- The SDK automatically forwards the current Bearer token
+- `result.Data` contains the parsed JSON response; `result.RawBody` contains raw bytes

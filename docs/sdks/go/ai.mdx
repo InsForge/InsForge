@@ -1,0 +1,96 @@
+---
+title: AI — Go SDK
+description: Chat completions, embeddings, and image generation with the InsForge Go SDK
+---
+
+## Installation
+
+```bash
+go get github.com/InsForge/InsForge/sdks/go/insforge@latest
+```
+
+## Chat Completions
+
+```go
+resp, err := client.AI.Chat.Create(insforge.ChatCompletionRequest{
+    Model: "gpt-4o",
+    Messages: []insforge.ChatMessage{
+        {Role: "system", Content: "You are a helpful assistant."},
+        {Role: "user", Content: "What is the capital of France?"},
+    },
+})
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(resp.Choices[0].Message.Content)
+```
+
+## Streaming Chat Completions
+
+```go
+req := insforge.ChatCompletionRequest{
+    Model:    "gpt-4o",
+    Messages: []insforge.ChatMessage{{Role: "user", Content: "Tell me a story"}},
+}
+
+chunks, errs := client.AI.Chat.CreateStream(req)
+
+for chunk := range chunks {
+    if len(chunk.Choices) > 0 {
+        fmt.Print(chunk.Choices[0].Delta.Content)
+    }
+}
+
+if err := <-errs; err != nil {
+    log.Println("stream error:", err)
+}
+```
+
+## Embeddings
+
+```go
+embResp, err := client.AI.CreateEmbeddings(insforge.EmbeddingsRequest{
+    Model: "text-embedding-3-small",
+    Input: []string{"Hello, world!", "Another sentence"},
+})
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println("Embedding size:", len(embResp.Data[0].Embedding))
+```
+
+## Image Generation
+
+```go
+imgResp, err := client.AI.GenerateImage(insforge.ImageGenerationRequest{
+    Prompt: "A serene mountain lake at sunrise, photorealistic",
+    Model:  "dall-e-3",
+    N:      1,
+    Size:   "1024x1024",
+})
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(imgResp.Data[0].URL)
+```
+
+## Parameters
+
+### ChatCompletionRequest
+
+| Field | Type | Description |
+|---|---|---|
+| `Model` | string | Model name, e.g. `"gpt-4o"` |
+| `Messages` | `[]ChatMessage` | Conversation messages |
+| `MaxTokens` | int | Maximum tokens to generate |
+| `Temperature` | float64 | Sampling temperature (0.0–2.0) |
+| `Stream` | bool | Managed automatically by `Create`/`CreateStream` |
+
+### ImageGenerationRequest
+
+| Field | Type | Description |
+|---|---|---|
+| `Prompt` | string | Text description of the image |
+| `Model` | string | Model name, e.g. `"dall-e-3"` |
+| `N` | int | Number of images to generate |
+| `Size` | string | Dimensions, e.g. `"1024x1024"` |

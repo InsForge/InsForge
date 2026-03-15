@@ -1,0 +1,109 @@
+---
+title: Realtime — Go SDK
+description: WebSocket pub/sub messaging with the InsForge Go SDK
+---
+
+## Installation
+
+```bash
+go get github.com/InsForge/InsForge/sdks/go/insforge@latest
+```
+
+## Connecting
+
+```go
+if err := client.Realtime.Connect(); err != nil {
+    log.Fatal(err)
+}
+defer client.Realtime.Disconnect()
+```
+
+## Subscribing to Channels
+
+```go
+err := client.Realtime.Subscribe("todos", func(msg insforge.RealtimeMessage) {
+    fmt.Printf("[%s] %v\n", msg.Channel, msg.Payload)
+})
+```
+
+## Publishing Messages
+
+```go
+err := client.Realtime.Publish("todos", map[string]any{
+    "action": "created",
+    "id":     42,
+})
+```
+
+## One-Time Handlers
+
+```go
+client.Realtime.Once("notifications", func(msg insforge.RealtimeMessage) {
+    fmt.Println("Got one notification:", msg.Payload)
+})
+```
+
+## Removing Handlers
+
+```go
+// Remove all handlers for a channel (keeps server subscription)
+client.Realtime.Off("todos")
+
+// Unsubscribe from channel (removes handlers + server subscription)
+err := client.Realtime.Unsubscribe("todos")
+```
+
+## Connection Status
+
+```go
+fmt.Println(client.Realtime.IsConnected())            // bool
+fmt.Println(client.Realtime.ConnectionStateValue())    // ConnectionState
+fmt.Println(client.Realtime.SocketID())                // server-assigned ID
+fmt.Println(client.Realtime.GetSubscribedChannels())   // []string
+```
+
+## Disconnecting
+
+```go
+client.Realtime.Disconnect()
+```
+
+## Full Example
+
+```go
+package main
+
+import (
+    "fmt"
+    "os"
+    "os/signal"
+    "github.com/InsForge/InsForge/sdks/go/insforge"
+)
+
+func main() {
+    client := insforge.CreateClient(insforge.Config{
+        BaseURL: "https://your-app.region.insforge.app",
+        AnonKey: os.Getenv("INSFORGE_ANON_KEY"),
+    })
+
+    if _, err := client.Auth.SignInWithPassword("user@example.com", "password"); err != nil {
+        panic(err)
+    }
+
+    if err := client.Realtime.Connect(); err != nil {
+        panic(err)
+    }
+    defer client.Realtime.Disconnect()
+
+    client.Realtime.Subscribe("room:general", func(msg insforge.RealtimeMessage) {
+        fmt.Printf("New message: %v\n", msg.Payload)
+    })
+
+    client.Realtime.Publish("room:general", map[string]any{"text": "Hello!"})
+
+    // Wait for interrupt
+    c := make(chan os.Signal, 1)
+    signal.Notify(c, os.Interrupt)
+    <-c
+}
+```

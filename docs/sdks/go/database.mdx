@@ -1,0 +1,128 @@
+---
+title: Database — Go SDK
+description: CRUD operations and queries with the InsForge Go SDK
+---
+
+## Installation
+
+```bash
+go get github.com/InsForge/InsForge/sdks/go/insforge@latest
+```
+
+## Selecting Data
+
+```go
+var rows []map[string]any
+err := client.DB.From("todos").Select("*").Execute(&rows)
+
+// Typed structs
+type Todo struct {
+    ID    int    `json:"id"`
+    Title string `json:"title"`
+    Done  bool   `json:"done"`
+}
+var todos []Todo
+err = client.DB.From("todos").Select("*").Execute(&todos)
+```
+
+## Filtering
+
+```go
+// Equality
+err = client.DB.From("todos").Select("*").Eq("done", false).Execute(&todos)
+
+// Comparisons
+err = client.DB.From("products").Select("*").
+    Gte("price", 10).
+    Lte("price", 100).
+    Execute(&rows)
+
+// IN list
+err = client.DB.From("products").Select("*").
+    In("category", []any{"electronics", "books"}).
+    Execute(&rows)
+
+// LIKE / ILIKE
+err = client.DB.From("users").Select("*").ILike("name", "%jane%").Execute(&rows)
+
+// IS NULL
+err = client.DB.From("todos").Select("*").Is("deleted_at", "null").Execute(&rows)
+```
+
+## Ordering and Pagination
+
+```go
+// Order ascending / descending
+err = client.DB.From("todos").Select("*").Order("created_at", "desc").Execute(&todos)
+
+// Limit
+err = client.DB.From("todos").Select("*").Limit(10).Execute(&todos)
+
+// Range (0-based, inclusive)
+err = client.DB.From("todos").Select("*").Range(0, 9).Execute(&todos)
+```
+
+## Single Row
+
+```go
+// Errors if != 1 row
+var todo Todo
+err = client.DB.From("todos").Select("*").Eq("id", 1).Single().Execute(&todo)
+
+// Returns zero value if not found; errors if > 1
+err = client.DB.From("todos").Select("*").Eq("id", 1).MaybeSingle().Execute(&todo)
+```
+
+## Inserting Data
+
+```go
+var inserted []Todo
+err = client.DB.From("todos").
+    Insert([]map[string]any{{"title": "Buy milk", "done": false}}).
+    Execute(&inserted)
+```
+
+## Updating Data
+
+```go
+err = client.DB.From("todos").
+    Update(map[string]any{"done": true}).
+    Eq("id", 1).
+    Execute(&inserted)
+```
+
+## Deleting Data
+
+```go
+err = client.DB.From("todos").Delete().Eq("id", 1).Execute(nil)
+```
+
+## Upsert
+
+```go
+err = client.DB.From("todos").
+    Upsert([]map[string]any{{"id": 1, "title": "Updated", "done": true}}).
+    Execute(&inserted)
+```
+
+## Calling Postgres Functions (RPC)
+
+```go
+var result map[string]any
+err = client.DB.Rpc("calculate_stats", map[string]any{"user_id": "abc123"}).Execute(&result)
+```
+
+## Available Filters
+
+| Method | Description |
+|---|---|
+| `Eq(col, val)` | Equal |
+| `Neq(col, val)` | Not equal |
+| `Gt(col, val)` | Greater than |
+| `Gte(col, val)` | Greater than or equal |
+| `Lt(col, val)` | Less than |
+| `Lte(col, val)` | Less than or equal |
+| `Like(col, pat)` | LIKE (case-sensitive) |
+| `ILike(col, pat)` | ILIKE (case-insensitive) |
+| `In(col, vals)` | Value in list |
+| `Is(col, val)` | IS NULL / IS TRUE / IS FALSE |
