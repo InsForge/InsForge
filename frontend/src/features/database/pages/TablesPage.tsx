@@ -131,6 +131,9 @@ export default function TablesPage() {
   }, [selectedTable, selectedTableFromQuery, isLoadingTables, selectTable]);
 
   const handlePageSizeChange = useCallback((newPageSize: number) => {
+    if (!PAGE_SIZE_OPTIONS.includes(newPageSize)) {
+      return;
+    }
     setPageSize(newPageSize);
     setCurrentPage(1);
     try {
