@@ -83,24 +83,14 @@ const ProviderBadge = ({ provider }: { provider: string }) => {
   );
 };
 
-// Limits how often a function can fire, useful for resize events
-const throttle = <T extends (...args: unknown[]) => void>(fn: T, ms: number) => {
-  let lastCall = 0;
-  return (...args: Parameters<T>) => {
-    const now = Date.now();
-    if (now - lastCall >= ms) {
-      lastCall = now;
-      fn(...args);
-    }
-  };
-};
+// Width estimates for badge layout calculation
+const BADGE_WIDTH = 84;
+const OVERFLOW_BADGE_WIDTH = 40;
 
 const ProvidersCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
-  const BADGE_WIDTH = 90;
-  const OVERFLOW_BADGE_WIDTH = 40;
   const providers = row.providers;
   const hasProviders = Array.isArray(providers) && providers.length > 0;
-  const uniqueProviders = hasProviders ? [...new Set(providers)] : [];
+  const uniqueProviders = hasProviders ? (providers as string[]) : [];
   const containerRef = useRef<HTMLDivElement | null>(null);
   // Reasonable default before ResizeObserver fires
   const [containerWidth, setContainerWidth] = useState(300);
@@ -115,16 +105,21 @@ const ProvidersCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
     const cell = container.closest('[role="gridcell"]') as HTMLElement | null;
     const target = cell ?? container;
 
-    const updateWidth = throttle(() => {
-      setContainerWidth(target.getBoundingClientRect().width);
-    }, 50);
-
-    const observer = new ResizeObserver(updateWidth);
+    let frameId: number;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(() => {
+        setContainerWidth(target.getBoundingClientRect().width);
+      });
+    });
 
     observer.observe(target);
     setContainerWidth(target.getBoundingClientRect().width);
 
-    return () => observer.disconnect();
+    return () => {
+      cancelAnimationFrame(frameId);
+      observer.disconnect();
+    };
   }, []);
 
   const maxBadgesThatFit = Math.max(1, Math.floor(containerWidth / BADGE_WIDTH));
