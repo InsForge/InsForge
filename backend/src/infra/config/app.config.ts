@@ -27,6 +27,18 @@ export interface AppConfig {
     organizationId: string;
     domain: string;
   };
+  email: {
+    provider: string;
+    smtp: {
+      host: string;
+      port: number;
+      secure: boolean;
+      user: string;
+      pass: string;
+      fromName: string;
+      fromEmail: string;
+    };
+  };
 }
 
 export const config: AppConfig = {
@@ -57,5 +69,17 @@ export const config: AppConfig = {
     token: process.env.DENO_SUBHOSTING_TOKEN || '',
     organizationId: process.env.DENO_SUBHOSTING_ORG_ID || '',
     domain: 'functions.insforge.app',
+  },
+  email: {
+    provider: process.env.EMAIL_PROVIDER || 'cloud',
+    smtp: {
+      host: process.env.SMTP_HOST || 'localhost',
+      port: parseInt(process.env.SMTP_PORT || '587', 10),
+      secure: process.env.SMTP_SECURE === 'true',
+      user: process.env.SMTP_USER || '',
+      pass: process.env.SMTP_PASSWORD || '',
+      fromName: process.env.SMTP_FROM_NAME || 'InsForge',
+      fromEmail: process.env.SMTP_FROM_EMAIL || 'noreply@insforge.local',
+    },
   },
 };

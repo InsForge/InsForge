@@ -1,7 +1,9 @@
 import { EmailProvider } from '@/providers/email/base.provider.js';
 import { CloudEmailProvider } from '@/providers/email/cloud.provider.js';
+import { SMTPEmailProvider } from '@/providers/email/smtp.provider.js';
 import { EmailTemplate } from '@/types/email.js';
 import { SendRawEmailRequest } from '@insforge/shared-schemas';
+import { config } from '@/infra/config/app.config.js';
 import logger from '@/utils/logger.js';
 
 /**
@@ -12,19 +14,13 @@ export class EmailService {
   private provider: EmailProvider;
 
   private constructor() {
-    // For now, we only support cloud provider
-    // In the future, this can be configured via environment variables
-    // Example:
-    // if (process.env.EMAIL_PROVIDER === 'smtp') {
-    //   this.provider = new SMTPEmailProvider(config.email.smtp);
-    // } else if (process.env.EMAIL_PROVIDER === 'sendgrid') {
-    //   this.provider = new SendGridEmailProvider(config.email.sendgrid);
-    // } else {
-    //   this.provider = new CloudEmailProvider();
-    // }
-
-    this.provider = new CloudEmailProvider();
-    logger.info('Using email provider: Cloud (Insforge)');
+    if (config.email.provider === 'smtp') {
+      this.provider = new SMTPEmailProvider();
+      logger.info('Using email provider: Custom SMTP');
+    } else {
+      this.provider = new CloudEmailProvider();
+      logger.info('Using email provider: Cloud (Insforge)');
+    }
   }
 
   /**
