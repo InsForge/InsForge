@@ -29,8 +29,16 @@ const authService = AuthService.getInstance();
 const authConfigService = AuthConfigService.getInstance();
 const oAuthConfigService = OAuthConfigService.getInstance();
 const oAuthPKCEService = OAuthPKCEService.getInstance();
-const redirectValidationService = RedirectValidationService.getInstance();
+// Note: redirectValidationService is initialized lazily to avoid timing issues
+let redirectValidationService: RedirectValidationService | null = null;
 const auditService = AuditService.getInstance();
+
+const getRedirectValidationService = (): RedirectValidationService => {
+  if (!redirectValidationService) {
+    redirectValidationService = RedirectValidationService.getInstance();
+  }
+  return redirectValidationService;
+};
 
 // Helper function to validate JWT_SECRET
 const validateJwtSecret = (): string => {
@@ -274,7 +282,7 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
     }
 
     // Validate redirect URI against whitelist
-    await redirectValidationService.validateRedirectUrl(redirectUri);
+    await getRedirectValidationService().validateRedirectUrl(redirectUri);
 
     const jwtPayload = {
       provider: validatedProvider,
@@ -341,7 +349,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     }
 
     // Validate redirect URI against whitelist
-    await redirectValidationService.validateRedirectUrl(redirectUri);
+    await getRedirectValidationService().validateRedirectUrl(redirectUri);
 
     // Validate provider using OAuthProvidersSchema
     const providerValidation = oAuthProvidersSchema.safeParse(provider);
@@ -442,7 +450,7 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
     }
 
     // Validate redirect URI against whitelist
-    await redirectValidationService.validateRedirectUrl(redirectUri);
+    await getRedirectValidationService().validateRedirectUrl(redirectUri);
 
     if (!codeChallenge) {
       throw new AppError('code_challenge is required in state', 400, ERROR_CODES.INVALID_INPUT);
