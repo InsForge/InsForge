@@ -227,14 +227,14 @@ router.get(
 
 // PUT /api/storage/buckets/:bucketName/objects/:objectKey - Upload object to bucket (requires auth)
 router.put(
-  '/buckets/:bucketName/objects/*splat',
+  '/buckets/:bucketName/objects/:objectKey*',
   verifyUser,
   upload.single('file'),
   handleUploadError,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
-      const objectKey = req.params['splat']; // Everything after objects
+      const objectKey = req.params.objectKey; // Everything after objects
 
       if (!objectKey) {
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
@@ -313,12 +313,12 @@ router.post(
 
 // GET /api/storage/buckets/:bucketName/objects/:objectKey - Download object from bucket (conditional auth)
 router.get(
-  '/buckets/:bucketName/objects/*splat',
+  '/buckets/:bucketName/objects/:objectKey*',
   conditionalAuth,
   async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
-      const objectKey = req.params['splat']; // Everything after objects
+      const objectKey = req.params.objectKey; // Everything after objects
 
       if (!objectKey) {
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
@@ -406,12 +406,12 @@ router.delete(
 
 // DELETE /api/storage/buckets/:bucketName/objects/:objectKey - Delete object from bucket (requires auth)
 router.delete(
-  '/buckets/:bucketName/objects/*splat',
+  '/buckets/:bucketName/objects/:objectKey*',
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
-      const objectKey = req.params['splat']; // Everything after objects
+      const objectKey = req.params.objectKey; // Everything after objects
 
       if (!objectKey) {
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
