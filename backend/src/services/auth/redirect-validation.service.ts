@@ -33,7 +33,8 @@ export class RedirectValidationService {
         logger.warn(
           'Redirect URL whitelist is empty - allowing redirect for development convenience',
           {
-            redirectUrl,
+            sanitizedRedirect: this.sanitizeUrl(redirectUrl),
+            whitelistLength: whitelist.length,
             warning: 'Configure redirect URL whitelist for production security',
           }
         );
@@ -51,8 +52,8 @@ export class RedirectValidationService {
 
       if (!isAllowed) {
         logger.warn('Redirect URL not in whitelist', {
-          redirectUrl: normalizedRedirectUrl,
-          whitelist: whitelist.map((url) => this.normalizeUrl(url)),
+          sanitizedRedirect: this.sanitizeUrl(normalizedRedirectUrl),
+          whitelistLength: whitelist.length,
         });
         throw new AppError(
           `Redirect URL '${redirectUrl}' is not in the allowed whitelist. Please configure the redirect URL whitelist in Auth Settings.`,
@@ -66,7 +67,7 @@ export class RedirectValidationService {
       if (error instanceof AppError) {
         throw error;
       }
-      logger.error('Failed to validate redirect URL', { error, redirectUrl });
+      logger.error('Failed to validate redirect URL', { error, sanitizedRedirect: this.sanitizeUrl(redirectUrl) });
       throw new AppError('Failed to validate redirect URL', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
@@ -86,7 +87,7 @@ export class RedirectValidationService {
       return urlObj.toString();
     } catch (error) {
       // If URL parsing fails, return as-is for basic comparison
-      logger.warn('Failed to parse URL for normalization', { url, error });
+      logger.warn('Failed to parse URL for normalization', { sanitizedUrl: this.sanitizeUrl(url), error });
       return url;
     }
   }
@@ -98,5 +99,20 @@ export class RedirectValidationService {
   async isWhitelistConfigured(): Promise<boolean> {
     const authConfig = await this.authConfigService.getAuthConfig();
     return (authConfig.redirectUrlWhitelist || []).length > 0;
+  }
+
+  /**
+   * Sanitize a URL for logging by extracting only origin and path, removing sensitive parts
+   * @param url The URL to sanitize
+   * @returns Sanitized URL string with only origin and path
+   */
+  private sanitizeUrl(url: string): string {
+    try {
+      const urlObj = new URL(url);
+      return `${urlObj.origin}${urlObj.pathname}`;
+    } catch (error) {
+      // If URL parsing fails, return a generic placeholder
+      return '[invalid-url]';
+    }
   }
 }
