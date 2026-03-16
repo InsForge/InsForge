@@ -7,12 +7,12 @@ import logger from '@/utils/logger.js';
 
 export class LocalFileProvider extends BaseLogProvider {
   private logsDir: string = '';
-  private logFiles: Record<string, string> = {
-    'insforge.logs': 'insforge.logs.jsonl',
-    'postgres.logs': 'postgres.logs.jsonl',
-    'postgREST.logs': 'postgrest.logs.jsonl',
-    'function.logs': 'function.logs.jsonl',
-  };
+  private logFiles = new Map<string, string>([
+    ['insforge.logs', 'insforge.logs.jsonl'],
+    ['postgres.logs', 'postgres.logs.jsonl'],
+    ['postgREST.logs', 'postgrest.logs.jsonl'],
+    ['function.logs', 'function.logs.jsonl'],
+  ]);
 
   async initialize(): Promise<void> {
     this.logsDir = process.env.LOGS_DIR || path.resolve(process.cwd(), 'insforge-logs');
@@ -28,11 +28,23 @@ export class LocalFileProvider extends BaseLogProvider {
     const sources: LogSourceSchema[] = [];
     let id = 1;
 
-    for (const [name, filename] of Object.entries(this.logFiles)) {
+    for (const [name, filename] of this.logFiles.entries()) {
       sources.push({ id: String(id++), name, token: filename });
     }
 
     return Promise.resolve(sources);
+  }
+
+  private getValidatedPath(filename: string): string {
+    const resolvedBaseDir = path.resolve(this.logsDir);
+    const resolvedPath = path.resolve(this.logsDir, filename);
+    const relativePath = path.relative(resolvedBaseDir, resolvedPath);
+
+    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+      throw new Error('Access denied: Path is outside the logs directory');
+    }
+
+    return resolvedPath;
   }
 
   async getLogsBySource(
@@ -44,12 +56,12 @@ export class LocalFileProvider extends BaseLogProvider {
     total: number;
     tableName: string;
   }> {
-    const filename = this.logFiles[sourceName];
+    const filename = this.logFiles.get(sourceName);
     if (!filename) {
       return { logs: [], total: 0, tableName: sourceName };
     }
 
-    const filePath = path.join(this.logsDir, filename);
+    const filePath = this.getValidatedPath(filename);
     const logs = await this.readLogsFromFile(filePath, limit, beforeTimestamp);
 
     return {
@@ -66,8 +78,11 @@ export class LocalFileProvider extends BaseLogProvider {
   ): Promise<LogSchema[]> {
     try {
       await fs.access(filePath);
-    } catch {
-      return [];
+    } catch (error) {
+      if ((error as any).code === 'ENOENT') {
+        return [];
+      }
+      throw error;
     }
 
     const logs: LogSchema[] = [];
@@ -120,8 +135,8 @@ export class LocalFileProvider extends BaseLogProvider {
   async getLogSourceStats(): Promise<LogStatsSchema[]> {
     const stats: LogStatsSchema[] = [];
 
-    for (const [name, filename] of Object.entries(this.logFiles)) {
-      const filePath = path.join(this.logsDir, filename);
+    for (const [name, filename] of this.logFiles.entries()) {
+      const filePath = this.getValidatedPath(filename);
       try {
         const fileStats = await fs.stat(filePath);
         const logs = await this.readLogsFromFile(filePath, 1000);
@@ -131,8 +146,11 @@ export class LocalFileProvider extends BaseLogProvider {
           count: logs.length,
           lastActivity: fileStats.mtime.toISOString(),
         });
-      } catch {
-        // File doesn't exist
+      } catch (error) {
+        if ((error as any).code !== 'ENOENT') {
+          throw error;
+        }
+        // File doesn't exist, skip
       }
     }
 
@@ -151,16 +169,21 @@ export class LocalFileProvider extends BaseLogProvider {
     const results: (LogSchema & { source: string })[] = [];
     const searchLower = query.toLowerCase();
 
-    const filesToSearch = sourceName
-      ? [{ name: sourceName, filename: this.logFiles[sourceName] }]
-      : Object.entries(this.logFiles).map(([name, filename]) => ({ name, filename }));
+    let filesToSearch: { name: string; filename: string }[] = [];
+    if (sourceName) {
+      const filename = this.logFiles.get(sourceName);
+      if (filename) {
+        filesToSearch.push({ name: sourceName, filename });
+      }
+    } else {
+      filesToSearch = Array.from(this.logFiles.entries()).map(([name, filename]) => ({
+        name,
+        filename,
+      }));
+    }
 
     for (const { name, filename } of filesToSearch) {
-      if (!filename) {
-        continue;
-      }
-
-      const filePath = path.join(this.logsDir, filename);
+      const filePath = this.getValidatedPath(filename);
       const logs = await this.readLogsFromFile(filePath, 10000);
 
       for (const log of logs) {

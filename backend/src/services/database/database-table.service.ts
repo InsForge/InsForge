@@ -32,6 +32,12 @@ const reservedColumns = {
 
 const SAFE_FUNCS = new Set(['now()', 'gen_random_uuid()']);
 
+/**
+ * Generate a safe dollar-quoted literal for PostgreSQL
+ * Ensures the tag doesn't conflict with the content by appending underscores
+ * @param s - The string to quote
+ * @returns A dollar-quoted string safe for use in SQL
+ */
 function getSafeDollarQuotedLiteral(s: string) {
   let tag = 'val';
   while (s.includes(`$${tag}$`)) {
@@ -40,6 +46,13 @@ function getSafeDollarQuotedLiteral(s: string) {
   return `$${tag}$${s}$${tag}$`;
 }
 
+/**
+ * Get the system default value for a column type
+ * Returns null for nullable columns or types without defaults
+ * @param columnType - The column type
+ * @param isNullable - Whether the column is nullable
+ * @returns The default value clause or null
+ */
 function getSystemDefault(columnType?: ColumnType, isNullable?: boolean): string | null {
   if (!columnType || isNullable) {
     return null;
@@ -56,6 +69,14 @@ function getSystemDefault(columnType?: ColumnType, isNullable?: boolean): string
   return `DEFAULT ${getSafeDollarQuotedLiteral(def)}`;
 }
 
+/**
+ * Format a default value for PostgreSQL column definition
+ * Handles special functions (now(), gen_random_uuid()) and escapes string values
+ * @param input - The default value input
+ * @param columnType - The column type for system defaults
+ * @param isNullable - Whether the column is nullable
+ * @returns Formatted DEFAULT clause for SQL
+ */
 export function formatDefaultValue(
   input: string | null | undefined,
   columnType?: ColumnType,

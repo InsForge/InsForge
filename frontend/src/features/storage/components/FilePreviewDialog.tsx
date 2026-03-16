@@ -151,7 +151,7 @@ export function FilePreviewDialog({ open, onOpenChange, file, bucket }: FilePrev
         <video
           src={previewUrl}
           controls
-          className="w-full h-full"
+          className="w-full h-full object-contain"
           onError={() => setError('Failed to load video')}
         >
           Your browser does not support the video tag.
@@ -180,7 +180,7 @@ export function FilePreviewDialog({ open, onOpenChange, file, bucket }: FilePrev
 
     if (mimeType === 'application/pdf') {
       return (
-        <div className="w-full h-[602px] overflow-hidden">
+        <div className="w-full h-full min-h-0 overflow-hidden">
           <iframe
             src={`${previewUrl}#toolbar=0&navpanes=0`}
             className="w-full h-full"
@@ -205,12 +205,12 @@ export function FilePreviewDialog({ open, onOpenChange, file, bucket }: FilePrev
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="p-0 w-[800px] max-w-[calc(100vw-2rem)] h-[min(820px,calc(100vh-2rem))] max-h-[calc(100vh-2rem)]">
         <DialogHeader>
           <DialogTitle>{fileName}</DialogTitle>
           <DialogDescription className="sr-only">Preview of {fileName}</DialogDescription>
         </DialogHeader>
-        <div className="w-[800px] min-h-[500px] max-h-[820px] bg-white dark:bg-neutral-800 border border-zinc-200 dark:border-neutral-700 flex flex-col">
+        <div className="w-full h-full flex flex-col bg-white dark:bg-neutral-800">
           {/* Header */}
           <div className="px-6 py-3">
             <div className="flex flex-col items-start gap-1">
@@ -227,10 +227,18 @@ export function FilePreviewDialog({ open, onOpenChange, file, bucket }: FilePrev
           </div>
 
           {/* Preview Content */}
-          <div className="flex flex-1 overflow-hidden p-6 border-y border-zinc-200 dark:border-neutral-600">
+          <div className="flex flex-1 min-h-0 overflow-hidden p-6 border-y border-zinc-200 dark:border-neutral-600">
             {isLoading ? (
-              <div className="flex items-center justify-center w-full min-h-[400px]">
+              <div className="flex items-center justify-center w-full h-full min-h-0">
                 <LoadingState />
+              </div>
+            ) : error ? (
+              <div
+                className="flex w-full h-full items-center justify-center rounded bg-neutral-100 dark:bg-neutral-700 px-4 text-center"
+                role="alert"
+                aria-live="polite"
+              >
+                <p className="text-sm text-zinc-600 dark:text-neutral-200">{error}</p>
               </div>
             ) : (
               renderPreview()
@@ -239,10 +247,10 @@ export function FilePreviewDialog({ open, onOpenChange, file, bucket }: FilePrev
 
           {/* Footer Actions */}
           <div className="px-6 py-6">
-            <div className="flex justify-end gap-3">
+            <div className="flex flex-wrap justify-end gap-3">
               <Button
                 variant="outline"
-                className="flex-1 h-10 px-3 gap-1.5 dark:bg-neutral-600 dark:text-zinc-300 dark:border-neutral-600 dark:hover:bg-neutral-700"
+                className="flex-1 min-w-[160px] h-10 px-3 gap-1.5 dark:bg-neutral-600 dark:text-zinc-300 dark:border-neutral-600 dark:hover:bg-neutral-700"
                 onClick={handleDownload}
               >
                 <Download className="h-5 w-5" />
@@ -250,7 +258,7 @@ export function FilePreviewDialog({ open, onOpenChange, file, bucket }: FilePrev
               </Button>
               <Button
                 variant="outline"
-                className="flex-1 h-10 px-3 gap-1.5 dark:bg-neutral-600 dark:text-zinc-300 dark:border-neutral-600 dark:hover:bg-neutral-700"
+                className="flex-1 min-w-[160px] h-10 px-3 gap-1.5 dark:bg-neutral-600 dark:text-zinc-300 dark:border-neutral-600 dark:hover:bg-neutral-700"
                 onClick={openInNewTab}
               >
                 <ExternalLink className="h-5 w-5" />

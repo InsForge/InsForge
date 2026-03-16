@@ -1,9 +1,63 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { secretService } from '@/features/functions/services/secret.service';
 import type { SecretSchema, CreateSecretRequest } from '@insforge/shared-schemas';
 import { useToast } from '@/lib/hooks/useToast';
 import { useConfirm } from '@/lib/hooks/useConfirm';
+
+export function useSecretValue(secret: Pick<SecretSchema, 'key' | 'updatedAt'>) {
+  const { showToast } = useToast();
+  const updatedAtKey = secret.updatedAt ?? 'never';
+  const [isValueVisible, setIsValueVisible] = useState(false);
+  const [valueError, setValueError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIsValueVisible(false);
+    setValueError(null);
+  }, [secret.key, updatedAtKey]);
+
+  const {
+    data: revealedSecret,
+    isFetching: isFetchingValue,
+    refetch: refetchSecretValue,
+  } = useQuery({
+    queryKey: ['secret-value', secret.key, updatedAtKey],
+    queryFn: () => secretService.getSecretValue(secret.key),
+    enabled: false,
+    retry: false,
+  });
+
+  const toggleValue = useCallback(async () => {
+    if (isValueVisible) {
+      setIsValueVisible(false);
+      return;
+    }
+
+    setValueError(null);
+
+    if (!revealedSecret) {
+      const { data, error } = await refetchSecretValue();
+
+      if (error || !data) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Failed to fetch secret value';
+        setValueError(errorMessage);
+        showToast(errorMessage, 'error');
+        return;
+      }
+    }
+
+    setIsValueVisible(true);
+  }, [isValueVisible, revealedSecret, refetchSecretValue, showToast]);
+
+  return {
+    isValueVisible,
+    valueError,
+    revealedSecret,
+    isFetchingValue,
+    toggleValue,
+  };
+}
 
 export function useSecrets() {
   const queryClient = useQueryClient();

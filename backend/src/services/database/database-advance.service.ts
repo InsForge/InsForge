@@ -11,7 +11,7 @@ import logger from '@/utils/logger.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { parseSQLStatements, checkAuthSchemaOperations } from '@/utils/sql-parser.js';
 import { validateTableName } from '@/utils/validations.js';
-import format from 'pg-format';
+import pgFormat from 'pg-format';
 import { parse } from 'csv-parse/sync';
 import { DatabaseError, type PoolClient } from 'pg';
 
@@ -37,7 +37,9 @@ export class DatabaseAdvanceService {
     table: string,
     rowLimit: number | undefined
   ): Promise<{ rows: Record<string, unknown>[]; totalRows: number; wasTruncated: boolean }> {
-    const query = rowLimit ? `SELECT * FROM ${table} LIMIT ${rowLimit}` : `SELECT * FROM ${table}`;
+    const safeTable = pgFormat('SELECT * FROM %I', table);
+    const query = rowLimit ? `${safeTable} LIMIT $1` : safeTable;
+    const queryParams: unknown[] = rowLimit ? [rowLimit] : [];
 
     let wasTruncated = false;
     let totalRows = 0;
@@ -45,7 +47,7 @@ export class DatabaseAdvanceService {
     // Check for truncation upfront if rowLimit is set
     if (rowLimit) {
       try {
-        const countResult = await client.query(`SELECT COUNT(*) FROM ${table}`);
+        const countResult = await client.query(pgFormat('SELECT COUNT(*) FROM %I', table));
         totalRows = parseInt(countResult.rows[0].count);
         wasTruncated = totalRows > rowLimit;
       } catch (err) {
@@ -53,7 +55,7 @@ export class DatabaseAdvanceService {
       }
     }
 
-    const result = await client.query(query);
+    const result = await client.query(query, queryParams);
     const rows = result.rows || [];
 
     if (!rowLimit) {
@@ -257,7 +259,7 @@ export class DatabaseAdvanceService {
       (rlsResult.rows[0].relrowsecurity === true || rlsResult.rows[0].relrowsecurity === 1);
     if (rlsEnabled) {
       sqlExport += `-- RLS enabled for table: ${table}\n`;
-      sqlExport += `ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;\n\n`;
+      sqlExport += `ALTER TABLE ${pgFormat('%I', table)} ENABLE ROW LEVEL SECURITY;\n\n`;
     }
 
     // Export RLS policies
@@ -408,12 +410,12 @@ export class DatabaseAdvanceService {
                     return String(val);
                   }
                 });
-                tableDataSql += `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${values.join(', ')});\n`;
+                tableDataSql += `INSERT INTO ${pgFormat('%I', table)} (${columns.map((c) => pgFormat('%I', c)).join(', ')}) VALUES (${values.join(', ')});\n`;
               }
             }
 
             if (wasTruncated) {
-              const countResult = await client.query(`SELECT COUNT(*) FROM ${table}`);
+              const countResult = await client.query(pgFormat('SELECT COUNT(*) FROM %I', table));
               const totalRowsInTable = parseInt(countResult.rows[0].count);
               tableDataSql =
                 `-- WARNING: Table contains ${totalRowsInTable} rows, but only ${rowLimit} rows exported due to row limit\n` +
@@ -770,7 +772,7 @@ export class DatabaseAdvanceService {
 
         for (const row of tablesResult.rows) {
           try {
-            await client.query(`TRUNCATE TABLE ${row.tablename} CASCADE`);
+            await client.query(pgFormat('TRUNCATE TABLE %I CASCADE', row.tablename));
             logger.info(`Truncated table: ${row.tablename}`);
           } catch (err) {
             logger.warn(`Could not truncate table ${row.tablename}:`, err);
@@ -952,10 +954,10 @@ export class DatabaseAdvanceService {
         if (updateColumns.length) {
           // Build UPDATE SET clause
           const updateClause = updateColumns
-            .map((col) => format('%I = EXCLUDED.%I', col, col))
+            .map((col) => pgFormat('%I = EXCLUDED.%I', col, col))
             .join(', ');
 
-          query = format(
+          query = pgFormat(
             'INSERT INTO %I (%I) VALUES %L ON CONFLICT (%I) DO UPDATE SET %s',
             table,
             columns,
@@ -965,7 +967,7 @@ export class DatabaseAdvanceService {
           );
         } else {
           // No columns to update, just do nothing on conflict
-          query = format(
+          query = pgFormat(
             'INSERT INTO %I (%I) VALUES %L ON CONFLICT (%I) DO NOTHING',
             table,
             columns,
@@ -975,7 +977,7 @@ export class DatabaseAdvanceService {
         }
       } else {
         // Simple insert
-        query = format('INSERT INTO %I (%I) VALUES %L', table, columns, values);
+        query = pgFormat('INSERT INTO %I (%I) VALUES %L', table, columns, values);
       }
 
       // Execute query

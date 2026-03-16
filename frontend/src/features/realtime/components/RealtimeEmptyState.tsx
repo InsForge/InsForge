@@ -1,10 +1,12 @@
-import { Radio } from 'lucide-react';
+import { Radio, Plus } from 'lucide-react';
+import { Button } from '@insforge/ui';
 
 interface RealtimeEmptyStateProps {
   type: 'channels' | 'messages';
+  onCreateChannel?: () => void;
 }
 
-export default function RealtimeEmptyState({ type }: RealtimeEmptyStateProps) {
+export default function RealtimeEmptyState({ type, onCreateChannel }: RealtimeEmptyStateProps) {
   const content = {
     channels: {
       title: 'No channels available',
@@ -25,6 +27,15 @@ export default function RealtimeEmptyState({ type }: RealtimeEmptyStateProps) {
           {content[type].description}
         </p>
       </div>
+      {type === 'channels' && onCreateChannel && (
+        <Button
+          onClick={onCreateChannel}
+          className="h-8 rounded px-2 flex items-center gap-1.5 mt-1"
+        >
+          <Plus className="size-4" />
+          Add Channel
+        </Button>
+      )}
     </div>
   );
 }
