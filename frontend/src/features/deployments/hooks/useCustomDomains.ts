@@ -4,6 +4,11 @@ import { useToast } from '@/lib/hooks/useToast';
 
 const QUERY_KEY = ['deployments', 'custom-domains'];
 
+/**
+ * Hook for managing user-owned custom domains on a deployment.
+ * Provides methods to list, add, verify DNS, and remove custom domains,
+ * each backed by React Query mutations with toast feedback.
+ */
 export function useCustomDomains() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
