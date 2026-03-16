@@ -13,6 +13,10 @@ import { AuditService } from '@/services/logs/audit.service.js';
 const router = Router();
 const auditService = AuditService.getInstance();
 
+/** Normalize Express 5 wildcard param — :name* may be a string or string[] */
+const getSplatPath = (splat: string | string[] | undefined): string =>
+  Array.isArray(splat) ? splat.join('/') : (splat ?? '');
+
 // Middleware to conditionally apply authentication based on bucket visibility
 const conditionalAuth = async (req: Request, res: Response, next: NextFunction) => {
   // For GET and HEAD requests to download objects, check if bucket is public
@@ -234,7 +238,7 @@ router.put(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
-      const objectKey = req.params.objectKey; // Everything after objects
+      const objectKey = getSplatPath(req.params.objectKey); // Everything after objects
 
       if (!objectKey) {
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
@@ -318,7 +322,7 @@ router.get(
   async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
-      const objectKey = req.params.objectKey; // Everything after objects
+      const objectKey = getSplatPath(req.params.objectKey); // Everything after objects
 
       if (!objectKey) {
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
@@ -411,7 +415,7 @@ router.delete(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
-      const objectKey = req.params.objectKey; // Everything after objects
+      const objectKey = getSplatPath(req.params.objectKey); // Everything after objects
 
       if (!objectKey) {
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
