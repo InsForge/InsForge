@@ -287,7 +287,9 @@ export class RealtimeMessageService {
       'SELECT retention_days as "retentionDays" FROM realtime.config LIMIT 1'
     );
     // Explicitly return null if null in DB, fallback to 30 if no row
-    if (result.rows.length === 0) return 30;
+    if (result.rows.length === 0) {
+      return 30;
+    }
     return result.rows[0].retentionDays;
   }
 
