@@ -66,4 +66,97 @@ describe('useTableColumnWidthsPreference', () => {
     };
     expect(parsed.tableColumnWidths.users.name).toBe(260);
   });
+
+  it('commits width to state only after resize becomes idle', () => {
+    const { result } = renderHook(() => useTableColumnWidthsPreference('users', ['name']));
+
+    expect(result.current.columnWidths).toEqual({});
+
+    act(() => {
+      result.current.setColumnWidth('name', 200);
+      vi.advanceTimersByTime(100);
+      result.current.setColumnWidth('name', 220);
+      vi.advanceTimersByTime(100);
+      result.current.setColumnWidth('name', 240);
+    });
+
+    // Resize events only update refs before idle timeout; no React state commit yet.
+    expect(result.current.columnWidths).toEqual({});
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(result.current.columnWidths).toEqual({ name: 240 });
+  });
+
+  it('batches multiple columns resized in quick succession', () => {
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
+    const { result } = renderHook(() =>
+      useTableColumnWidthsPreference('users', ['name', 'email'])
+    );
+
+    act(() => {
+      result.current.setColumnWidth('name', 150);
+      vi.advanceTimersByTime(50);
+      result.current.setColumnWidth('email', 300);
+      vi.advanceTimersByTime(50);
+      result.current.setColumnWidth('name', 180);
+    });
+
+    expect(setItemSpy).not.toHaveBeenCalled();
+    expect(result.current.columnWidths).toEqual({});
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(setItemSpy).toHaveBeenCalledTimes(1);
+    expect(result.current.columnWidths).toEqual({ name: 180, email: 300 });
+  });
+
+  it('unmount flush persists to localStorage without updating state', () => {
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
+    const { result, unmount } = renderHook(() =>
+      useTableColumnWidthsPreference('users', ['name'])
+    );
+
+    act(() => {
+      result.current.setColumnWidth('name', 400);
+    });
+
+    const widthsBeforeUnmount = result.current.columnWidths;
+    expect(widthsBeforeUnmount).toEqual({});
+
+    unmount();
+
+    expect(setItemSpy).toHaveBeenCalledTimes(1);
+    // columnWidths should still reflect the pre-flush state (no setState on unmount)
+    expect(widthsBeforeUnmount).toEqual({});
+  });
+
+  it('does not persist when width is unchanged from committed value', () => {
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
+    const { result } = renderHook(() => useTableColumnWidthsPreference('users', ['name']));
+
+    act(() => {
+      result.current.setColumnWidth('name', 250);
+    });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(setItemSpy).toHaveBeenCalledTimes(1);
+    setItemSpy.mockClear();
+
+    // Set the same width again — should be a no-op
+    act(() => {
+      result.current.setColumnWidth('name', 250);
+    });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(setItemSpy).not.toHaveBeenCalled();
+  });
 });

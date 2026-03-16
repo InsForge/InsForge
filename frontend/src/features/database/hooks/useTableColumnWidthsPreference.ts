@@ -110,36 +110,87 @@ export function useTableColumnWidthsPreference(
   const [preferences, setPreferences] = useState<DatabaseGridPreferences>(loadPreferences);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestPreferencesRef = useRef(preferences);
-  const hasMountedRef = useRef(false);
+  const pendingWidthsRef = useRef<Record<string, TableColumnWidths>>({});
 
   useEffect(() => {
     latestPreferencesRef.current = preferences;
+  }, [preferences]);
 
-    // Skip persistence on first mount to avoid unnecessary localStorage writes.
-    if (!hasMountedRef.current) {
-      hasMountedRef.current = true;
+  const flushPendingWidths = useCallback((skipStateUpdate: boolean = false) => {
+    const pendingWidthsByTable = pendingWidthsRef.current;
+    const tableEntries = Object.entries(pendingWidthsByTable);
+
+    if (!tableEntries.length) {
       return;
     }
 
+    pendingWidthsRef.current = {};
+
+    let hasChanges = false;
+    let nextTableColumnWidths = latestPreferencesRef.current.tableColumnWidths;
+
+    tableEntries.forEach(([pendingTableName, pendingWidths]) => {
+      if (!Object.keys(pendingWidths).length) {
+        return;
+      }
+
+      const currentWidths = nextTableColumnWidths[pendingTableName] ?? {};
+      let tableChanged = false;
+
+      const mergedWidths: TableColumnWidths = { ...currentWidths };
+      Object.entries(pendingWidths).forEach(([columnKey, width]) => {
+        if (mergedWidths[columnKey] !== width) {
+          mergedWidths[columnKey] = width;
+          tableChanged = true;
+        }
+      });
+
+      if (!tableChanged) {
+        return;
+      }
+
+      if (!hasChanges) {
+        nextTableColumnWidths = { ...nextTableColumnWidths };
+        hasChanges = true;
+      }
+
+      nextTableColumnWidths[pendingTableName] = mergedWidths;
+    });
+
+    if (!hasChanges) {
+      return;
+    }
+
+    const nextPreferences: DatabaseGridPreferences = {
+      tableColumnWidths: nextTableColumnWidths,
+    };
+    latestPreferencesRef.current = nextPreferences;
+    if (!skipStateUpdate) {
+      setPreferences(nextPreferences);
+    }
+    savePreferences(nextPreferences);
+  }, [setPreferences]);
+
+  const scheduleFlushPendingWidths = useCallback(() => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
 
     saveTimeoutRef.current = setTimeout(() => {
-      savePreferences(latestPreferencesRef.current);
       saveTimeoutRef.current = null;
+      flushPendingWidths();
     }, STORAGE_SAVE_DEBOUNCE_MS);
-  }, [preferences]);
+  }, [flushPendingWidths]);
 
   useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
-        savePreferences(latestPreferencesRef.current);
       }
+      flushPendingWidths(true);
     };
-  }, []);
+  }, [flushPendingWidths]);
 
   const columnWidths = useMemo(() => {
     if (!tableName) {
@@ -156,28 +207,33 @@ export function useTableColumnWidthsPreference(
         return;
       }
 
-      setPreferences((previousPreferences) => {
-        const currentWidths = previousPreferences.tableColumnWidths[tableName] ?? {};
-        if (currentWidths[columnKey] === width) {
-          return previousPreferences;
-        }
+      if (availableColumns?.length && !availableColumns.includes(columnKey)) {
+        return;
+      }
 
-        const nextWidths = filterWidthsByColumns(
-          { ...currentWidths, [columnKey]: width },
-          availableColumns
-        );
+      const committedWidth = latestPreferencesRef.current.tableColumnWidths[tableName]?.[columnKey];
+      const pendingWidth = pendingWidthsRef.current[tableName]?.[columnKey];
 
-        const nextPreferences: DatabaseGridPreferences = {
-          tableColumnWidths: {
-            ...previousPreferences.tableColumnWidths,
-            [tableName]: nextWidths,
-          },
-        };
+      if (committedWidth === width && pendingWidth === undefined) {
+        return;
+      }
 
-        return nextPreferences;
-      });
+      if (pendingWidth === width) {
+        return;
+      }
+
+      const tablePendingWidths = pendingWidthsRef.current[tableName] ?? {};
+      pendingWidthsRef.current = {
+        ...pendingWidthsRef.current,
+        [tableName]: {
+          ...tablePendingWidths,
+          [columnKey]: width,
+        },
+      };
+
+      scheduleFlushPendingWidths();
     },
-    [tableName, availableColumns]
+    [tableName, availableColumns, scheduleFlushPendingWidths]
   );
 
   return {
