@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Cpu, HardDrive, Plug, Settings } from 'lucide-react';
+import { Cpu, Gauge, HardDrive, Plug, Settings } from 'lucide-react';
 import {
   Button,
   CopyButton,
@@ -21,7 +21,11 @@ import {
   MenuDialogFooter,
   MenuDialogCloseButton,
 } from '@insforge/ui';
-import type { InstanceInfoEvent } from '@insforge/shared-schemas';
+import type {
+  GetRateLimitConfigResponse,
+  InstanceInfoEvent,
+  UpdateRateLimitConfigRequest,
+} from '@insforge/shared-schemas';
 import { useApiKey } from '@/lib/hooks/useMetadata';
 import { useHealth } from '@/lib/hooks/useHealth';
 import {
@@ -35,11 +39,91 @@ import { useModal } from '@/lib/contexts/ModalContext';
 import { cn, compareVersions, isIframe, isInsForgeCloudProject } from '@/lib/utils/utils';
 import { MCPSection, CLISection, ConnectionStringSection } from '@/features/connect';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
+import { useRateLimitConfig } from '@/features/dashboard/hooks/useRateLimitConfig';
 
-type TabType = 'info' | 'compute' | 'connect';
+type TabType = 'info' | 'compute' | 'connect' | 'rate-limits';
 
 const INFO_FIELD_CLASS =
   'flex h-8 w-full items-center rounded border border-[var(--alpha-12)] bg-[var(--alpha-4)] px-2.5 text-sm leading-5 text-foreground';
+
+type RateLimitFormField =
+  | 'sendEmailOtpMaxRequests'
+  | 'sendEmailOtpWindowMinutes'
+  | 'verifyOtpMaxAttempts'
+  | 'verifyOtpWindowMinutes'
+  | 'emailCooldownSeconds';
+
+type RateLimitFormValues = Record<RateLimitFormField, string>;
+
+const DEFAULT_RATE_LIMIT_FORM_VALUES: RateLimitFormValues = {
+  sendEmailOtpMaxRequests: '5',
+  sendEmailOtpWindowMinutes: '15',
+  verifyOtpMaxAttempts: '10',
+  verifyOtpWindowMinutes: '15',
+  emailCooldownSeconds: '60',
+};
+
+const RATE_LIMIT_BOUNDS: Record<RateLimitFormField, { min: number; max: number }> = {
+  sendEmailOtpMaxRequests: { min: 1, max: 100 },
+  sendEmailOtpWindowMinutes: { min: 1, max: 1440 },
+  verifyOtpMaxAttempts: { min: 1, max: 100 },
+  verifyOtpWindowMinutes: { min: 1, max: 1440 },
+  emailCooldownSeconds: { min: 5, max: 3600 },
+};
+
+function toRateLimitFormValues(config?: GetRateLimitConfigResponse | null): RateLimitFormValues {
+  if (!config) {
+    return { ...DEFAULT_RATE_LIMIT_FORM_VALUES };
+  }
+
+  return {
+    sendEmailOtpMaxRequests: String(config.sendEmailOtpMaxRequests),
+    sendEmailOtpWindowMinutes: String(config.sendEmailOtpWindowMinutes),
+    verifyOtpMaxAttempts: String(config.verifyOtpMaxAttempts),
+    verifyOtpWindowMinutes: String(config.verifyOtpWindowMinutes),
+    emailCooldownSeconds: String(config.emailCooldownSeconds),
+  };
+}
+
+function parseRateLimitFormValues(values: RateLimitFormValues): {
+  parsed: UpdateRateLimitConfigRequest | null;
+  errors: Partial<Record<RateLimitFormField, string>>;
+} {
+  const errors: Partial<Record<RateLimitFormField, string>> = {};
+  const parsed: Partial<Record<RateLimitFormField, number>> = {};
+
+  (Object.keys(values) as RateLimitFormField[]).forEach((field) => {
+    const rawValue = values[field].trim();
+    const bounds = RATE_LIMIT_BOUNDS[field];
+    const numericValue = Number(rawValue);
+
+    if (!rawValue) {
+      errors[field] = 'Value is required';
+      return;
+    }
+
+    if (!Number.isInteger(numericValue)) {
+      errors[field] = 'Value must be a whole number';
+      return;
+    }
+
+    if (numericValue < bounds.min || numericValue > bounds.max) {
+      errors[field] = `Must be between ${bounds.min} and ${bounds.max}`;
+      return;
+    }
+
+    parsed[field] = numericValue;
+  });
+
+  if (Object.keys(errors).length > 0) {
+    return { parsed: null, errors };
+  }
+
+  return {
+    parsed: parsed as UpdateRateLimitConfigRequest,
+    errors: {},
+  };
+}
 
 export default function SettingsMenuDialog() {
   const { isSettingsDialogOpen, settingsDefaultTab, closeSettingsDialog } = useModal();
@@ -52,10 +136,22 @@ export default function SettingsMenuDialog() {
   const [instanceInfo, setInstanceInfo] = useState<Omit<InstanceInfoEvent, 'type'> | null>(null);
   const [selectedInstanceType, setSelectedInstanceType] = useState<string | null>(null);
   const [isChangingInstanceType, setIsChangingInstanceType] = useState(false);
+  const [rateLimitFormValues, setRateLimitFormValues] = useState<RateLimitFormValues>(
+    DEFAULT_RATE_LIMIT_FORM_VALUES
+  );
+  const [rateLimitInitialValues, setRateLimitInitialValues] = useState<RateLimitFormValues>(
+    DEFAULT_RATE_LIMIT_FORM_VALUES
+  );
 
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
   const { version, isLoading: isVersionLoading } = useHealth();
   const { projectInfo, isLoading: isProjectInfoLoading } = useCloudProjectInfo();
+  const {
+    config: rateLimitConfig,
+    isLoading: isRateLimitConfigLoading,
+    isUpdating: isUpdatingRateLimits,
+    updateConfig: updateRateLimitConfig,
+  } = useRateLimitConfig();
   const { confirm, confirmDialogProps } = useConfirm();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
@@ -72,8 +168,25 @@ export default function SettingsMenuDialog() {
       ? 'Connect Project'
       : activeTab === 'compute'
         ? 'Compute & Disk'
-        : 'Project Information';
+        : activeTab === 'rate-limits'
+          ? 'API Rate Limits'
+          : 'Project Information';
   const isProjectNameDirty = projectName !== projectNameInitialValue;
+  const isRateLimitDirty = useMemo(() => {
+    return (Object.keys(rateLimitFormValues) as RateLimitFormField[]).some(
+      (field) => rateLimitFormValues[field] !== rateLimitInitialValues[field]
+    );
+  }, [rateLimitFormValues, rateLimitInitialValues]);
+  const rateLimitValidation = useMemo(
+    () => parseRateLimitFormValues(rateLimitFormValues),
+    [rateLimitFormValues]
+  );
+  const showRateLimitActions = activeTab === 'rate-limits';
+  const saveRateLimitsDisabled =
+    !isRateLimitDirty ||
+    !rateLimitValidation.parsed ||
+    isUpdatingRateLimits ||
+    isRateLimitConfigLoading;
   const showProjectNameActions =
     isCloud && activeTab === 'info' && (isProjectNameFocused || isProjectNameDirty);
   const showComputeActions =
@@ -220,6 +333,23 @@ export default function SettingsMenuDialog() {
     projectInfo.name,
   ]);
 
+  useEffect(() => {
+    if (!isSettingsDialogOpen || isRateLimitConfigLoading || isRateLimitDirty) {
+      return;
+    }
+
+    const values = toRateLimitFormValues(rateLimitConfig);
+    setRateLimitFormValues(values);
+    setRateLimitInitialValues(values);
+  }, [
+    isSettingsDialogOpen,
+    isRateLimitConfigLoading,
+    isRateLimitDirty,
+    rateLimitConfig,
+    setRateLimitFormValues,
+    setRateLimitInitialValues,
+  ]);
+
   const handleDeleteProject = async () => {
     const confirmed = await confirm({
       title: 'Delete Project',
@@ -293,6 +423,34 @@ export default function SettingsMenuDialog() {
     );
   };
 
+  const handleRateLimitInputChange = (field: RateLimitFormField, value: string) => {
+    setRateLimitFormValues((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
+  };
+
+  const handleCancelRateLimitChanges = () => {
+    setRateLimitFormValues(rateLimitInitialValues);
+  };
+
+  const handleSaveRateLimitChanges = () => {
+    if (!rateLimitValidation.parsed) {
+      showToast('Please fix invalid rate-limit values before saving', 'error');
+      return;
+    }
+
+    void updateRateLimitConfig(rateLimitValidation.parsed)
+      .then((updatedConfig) => {
+        const nextValues = toRateLimitFormValues(updatedConfig);
+        setRateLimitFormValues(nextValues);
+        setRateLimitInitialValues(nextValues);
+      })
+      .catch(() => {
+        // Error toast is handled in useRateLimitConfig.
+      });
+  };
+
   return (
     <>
       <ConfirmDialog {...confirmDialogProps} />
@@ -324,6 +482,13 @@ export default function SettingsMenuDialog() {
                   onClick={() => setActiveTab('connect')}
                 >
                   Connect
+                </MenuDialogNavItem>
+                <MenuDialogNavItem
+                  icon={<Gauge className="size-5" />}
+                  active={activeTab === 'rate-limits'}
+                  onClick={() => setActiveTab('rate-limits')}
+                >
+                  Rate Limits
                 </MenuDialogNavItem>
                 {isCloud && isInIframe && (
                   <MenuDialogNavItem
@@ -626,6 +791,188 @@ export default function SettingsMenuDialog() {
                   )}
                 </div>
               )}
+
+              {activeTab === 'rate-limits' && (
+                <div className="flex w-full flex-col gap-5">
+                  <div className="rounded border border-[var(--alpha-12)] bg-[var(--alpha-4)] p-3">
+                    <p className="text-sm leading-5 text-foreground">
+                      These controls currently apply to authentication-sensitive endpoints only:
+                      send verification/reset emails and OTP verification.
+                    </p>
+                  </div>
+
+                  {isRateLimitConfigLoading ? (
+                    <div className="flex min-h-[100px] items-center justify-center text-sm text-muted-foreground">
+                      Loading rate-limit configuration...
+                    </div>
+                  ) : (
+                    <div className="flex w-full flex-col gap-4">
+                      <div className="flex items-start gap-6">
+                        <div className="w-[200px] shrink-0">
+                          <p className="py-1.5 text-sm leading-5 text-foreground">
+                            Send OTP (per IP)
+                          </p>
+                          <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
+                            Max email verification/reset requests per window.
+                          </p>
+                        </div>
+                        <div className="grid min-w-0 flex-1 grid-cols-2 gap-3">
+                          <div className="flex flex-col gap-1">
+                            <Input
+                              type="number"
+                              min={RATE_LIMIT_BOUNDS.sendEmailOtpMaxRequests.min}
+                              max={RATE_LIMIT_BOUNDS.sendEmailOtpMaxRequests.max}
+                              value={rateLimitFormValues.sendEmailOtpMaxRequests}
+                              onChange={(event) =>
+                                handleRateLimitInputChange(
+                                  'sendEmailOtpMaxRequests',
+                                  event.target.value
+                                )
+                              }
+                              className={cn(
+                                rateLimitValidation.errors.sendEmailOtpMaxRequests &&
+                                  'border-destructive'
+                              )}
+                            />
+                            <p className="text-xs text-muted-foreground">Requests</p>
+                            {rateLimitValidation.errors.sendEmailOtpMaxRequests && (
+                              <p className="text-xs text-destructive">
+                                {rateLimitValidation.errors.sendEmailOtpMaxRequests}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <Input
+                              type="number"
+                              min={RATE_LIMIT_BOUNDS.sendEmailOtpWindowMinutes.min}
+                              max={RATE_LIMIT_BOUNDS.sendEmailOtpWindowMinutes.max}
+                              value={rateLimitFormValues.sendEmailOtpWindowMinutes}
+                              onChange={(event) =>
+                                handleRateLimitInputChange(
+                                  'sendEmailOtpWindowMinutes',
+                                  event.target.value
+                                )
+                              }
+                              className={cn(
+                                rateLimitValidation.errors.sendEmailOtpWindowMinutes &&
+                                  'border-destructive'
+                              )}
+                            />
+                            <p className="text-xs text-muted-foreground">Window (minutes)</p>
+                            {rateLimitValidation.errors.sendEmailOtpWindowMinutes && (
+                              <p className="text-xs text-destructive">
+                                {rateLimitValidation.errors.sendEmailOtpWindowMinutes}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex h-1 items-center">
+                        <div className="h-px w-full bg-[var(--alpha-8)]" />
+                      </div>
+
+                      <div className="flex items-start gap-6">
+                        <div className="w-[200px] shrink-0">
+                          <p className="py-1.5 text-sm leading-5 text-foreground">
+                            Verify OTP (per IP)
+                          </p>
+                          <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
+                            Max failed OTP verification attempts per window.
+                          </p>
+                        </div>
+                        <div className="grid min-w-0 flex-1 grid-cols-2 gap-3">
+                          <div className="flex flex-col gap-1">
+                            <Input
+                              type="number"
+                              min={RATE_LIMIT_BOUNDS.verifyOtpMaxAttempts.min}
+                              max={RATE_LIMIT_BOUNDS.verifyOtpMaxAttempts.max}
+                              value={rateLimitFormValues.verifyOtpMaxAttempts}
+                              onChange={(event) =>
+                                handleRateLimitInputChange(
+                                  'verifyOtpMaxAttempts',
+                                  event.target.value
+                                )
+                              }
+                              className={cn(
+                                rateLimitValidation.errors.verifyOtpMaxAttempts &&
+                                  'border-destructive'
+                              )}
+                            />
+                            <p className="text-xs text-muted-foreground">Attempts</p>
+                            {rateLimitValidation.errors.verifyOtpMaxAttempts && (
+                              <p className="text-xs text-destructive">
+                                {rateLimitValidation.errors.verifyOtpMaxAttempts}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <Input
+                              type="number"
+                              min={RATE_LIMIT_BOUNDS.verifyOtpWindowMinutes.min}
+                              max={RATE_LIMIT_BOUNDS.verifyOtpWindowMinutes.max}
+                              value={rateLimitFormValues.verifyOtpWindowMinutes}
+                              onChange={(event) =>
+                                handleRateLimitInputChange(
+                                  'verifyOtpWindowMinutes',
+                                  event.target.value
+                                )
+                              }
+                              className={cn(
+                                rateLimitValidation.errors.verifyOtpWindowMinutes &&
+                                  'border-destructive'
+                              )}
+                            />
+                            <p className="text-xs text-muted-foreground">Window (minutes)</p>
+                            {rateLimitValidation.errors.verifyOtpWindowMinutes && (
+                              <p className="text-xs text-destructive">
+                                {rateLimitValidation.errors.verifyOtpWindowMinutes}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex h-1 items-center">
+                        <div className="h-px w-full bg-[var(--alpha-8)]" />
+                      </div>
+
+                      <div className="flex items-start gap-6">
+                        <div className="w-[200px] shrink-0">
+                          <p className="py-1.5 text-sm leading-5 text-foreground">
+                            Per-email cooldown
+                          </p>
+                          <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
+                            Minimum time between OTP send requests for the same email address.
+                          </p>
+                        </div>
+                        <div className="flex min-w-0 flex-1 flex-col gap-1">
+                          <Input
+                            type="number"
+                            min={RATE_LIMIT_BOUNDS.emailCooldownSeconds.min}
+                            max={RATE_LIMIT_BOUNDS.emailCooldownSeconds.max}
+                            value={rateLimitFormValues.emailCooldownSeconds}
+                            onChange={(event) =>
+                              handleRateLimitInputChange('emailCooldownSeconds', event.target.value)
+                            }
+                            className={cn(
+                              'max-w-[280px]',
+                              rateLimitValidation.errors.emailCooldownSeconds &&
+                                'border-destructive'
+                            )}
+                          />
+                          <p className="text-xs text-muted-foreground">Cooldown (seconds)</p>
+                          {rateLimitValidation.errors.emailCooldownSeconds && (
+                            <p className="text-xs text-destructive">
+                              {rateLimitValidation.errors.emailCooldownSeconds}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </MenuDialogBody>
             {showProjectNameActions && (
               <MenuDialogFooter className="border-t border-[var(--alpha-8)]">
@@ -675,6 +1022,30 @@ export default function SettingsMenuDialog() {
                   className="h-8 rounded px-3 text-sm font-medium"
                 >
                   {isChangingInstanceType ? 'Applying...' : 'Apply Changes'}
+                </Button>
+              </MenuDialogFooter>
+            )}
+            {showRateLimitActions && (
+              <MenuDialogFooter className="border-t border-[var(--alpha-8)]">
+                <div className="mr-auto text-sm text-muted-foreground">
+                  Changes apply to auth OTP-related limits.
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleCancelRateLimitChanges}
+                  className="h-8 rounded border-[var(--alpha-8)] bg-card px-3 text-sm font-medium"
+                  disabled={!isRateLimitDirty || isUpdatingRateLimits}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleSaveRateLimitChanges}
+                  disabled={saveRateLimitsDisabled}
+                  className="h-8 rounded px-3 text-sm font-medium"
+                >
+                  {isUpdatingRateLimits ? 'Saving...' : 'Save Changes'}
                 </Button>
               </MenuDialogFooter>
             )}

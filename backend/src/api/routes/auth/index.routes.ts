@@ -9,7 +9,11 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin, verifyToken } from '@/api/middlewares/auth.js';
 import oauthRouter from './oauth.routes.js';
-import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-limiters.js';
+import {
+  sendEmailOTPLimiter,
+  verifyOTPLimiter,
+  invalidateRateLimitConfigCache,
+} from '@/api/middlewares/rate-limiters.js';
 import {
   REFRESH_TOKEN_COOKIE_NAME,
   setRefreshTokenCookie,
@@ -44,16 +48,20 @@ import {
   exchangeAdminSessionRequestSchema,
   type GetAuthConfigResponse,
   updateAuthConfigRequestSchema,
+  type GetRateLimitConfigResponse,
+  updateRateLimitConfigRequestSchema,
 } from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import logger from '@/utils/logger.js';
+import { RateLimitConfigService } from '@/services/auth/rate-limit-config.service.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
 const authConfigService = AuthConfigService.getInstance();
 const oAuthConfigService = OAuthConfigService.getInstance();
 const auditService = AuditService.getInstance();
+const rateLimitConfigService = RateLimitConfigService.getInstance();
 
 // Mount OAuth routes
 router.use('/oauth', oauthRouter);
@@ -173,6 +181,58 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
     next(error);
   }
 });
+
+// GET /api/auth/rate-limits - Get auth rate-limit configurations (admin only)
+router.get(
+  '/rate-limits',
+  verifyAdmin,
+  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const config: GetRateLimitConfigResponse = await rateLimitConfigService.getConfig();
+      successResponse(res, config);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// PUT /api/auth/rate-limits - Update auth rate-limit configurations (admin only)
+router.put(
+  '/rate-limits',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validationResult = updateRateLimitConfigRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const input = validationResult.data;
+      const config: GetRateLimitConfigResponse = await rateLimitConfigService.updateConfig(input);
+
+      // Ensure new values are picked up immediately by middleware cache.
+      invalidateRateLimitConfigCache();
+
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'UPDATE_RATE_LIMIT_CONFIG',
+        module: 'AUTH',
+        details: {
+          updatedFields: Object.keys(input),
+        },
+        ip_address: req.ip,
+      });
+
+      successResponse(res, config);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 // POST /api/auth/users - Create a new user (registration)
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'

@@ -292,6 +292,129 @@ paths:
         '403':
           description: Forbidden - Admin only
 
+  /api/auth/rate-limits:
+    get:
+      summary: Get auth rate-limit configuration
+      description: Get persisted authentication-related rate-limit settings (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Rate-limit configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  sendEmailOtpMaxRequests:
+                    type: integer
+                    minimum: 1
+                    maximum: 100
+                    description: Maximum email OTP send requests allowed per IP in each window
+                  sendEmailOtpWindowMinutes:
+                    type: integer
+                    minimum: 1
+                    maximum: 1440
+                    description: Time window for sendEmailOtpMaxRequests in minutes
+                  verifyOtpMaxAttempts:
+                    type: integer
+                    minimum: 1
+                    maximum: 100
+                    description: Maximum OTP verification attempts allowed per IP in each window
+                  verifyOtpWindowMinutes:
+                    type: integer
+                    minimum: 1
+                    maximum: 1440
+                    description: Time window for verifyOtpMaxAttempts in minutes
+                  emailCooldownSeconds:
+                    type: integer
+                    minimum: 5
+                    maximum: 3600
+                    description: Minimum cooldown between OTP send requests for the same email
+                  createdAt:
+                    type: string
+                    format: date-time
+                  updatedAt:
+                    type: string
+                    format: date-time
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+
+    put:
+      summary: Update auth rate-limit configuration
+      description: Update persisted authentication-related rate-limit settings (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sendEmailOtpMaxRequests:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+                sendEmailOtpWindowMinutes:
+                  type: integer
+                  minimum: 1
+                  maximum: 1440
+                verifyOtpMaxAttempts:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+                verifyOtpWindowMinutes:
+                  type: integer
+                  minimum: 1
+                  maximum: 1440
+                emailCooldownSeconds:
+                  type: integer
+                  minimum: 5
+                  maximum: 3600
+      responses:
+        '200':
+          description: Rate-limit configuration updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  sendEmailOtpMaxRequests:
+                    type: integer
+                  sendEmailOtpWindowMinutes:
+                    type: integer
+                  verifyOtpMaxAttempts:
+                    type: integer
+                  verifyOtpWindowMinutes:
+                    type: integer
+                  emailCooldownSeconds:
+                    type: integer
+                  createdAt:
+                    type: string
+                    format: date-time
+                  updatedAt:
+                    type: string
+                    format: date-time
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+
   /api/auth/users:
     post:
       summary: Register new user

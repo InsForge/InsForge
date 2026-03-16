@@ -153,6 +153,20 @@ sequenceDiagram
   </Card>
 </CardGroup>
 
+## Rate Limit Settings
+
+Authentication-sensitive rate limits can be configured by project admins from **Project Settings -> Rate Limits** in the dashboard.
+
+These controls cover:
+- **Send OTP (per IP)**: maximum email verification/reset requests in a time window
+- **Verify OTP (per IP)**: maximum OTP verification attempts in a time window
+- **Per-email cooldown**: minimum delay before requesting another code for the same email
+
+Guidance:
+- Lower limits increase abuse resistance but may block legitimate users more often.
+- Higher limits reduce friction but increase brute-force and spam risk.
+- Changes are persisted in backend configuration and applied consistently across restarts.
+
 ## API Endpoints
 
 ### Authentication Endpoints
