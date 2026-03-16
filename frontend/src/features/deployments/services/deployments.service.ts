@@ -14,6 +14,10 @@ import type {
   UpdateSlugRequest,
   UpdateSlugResponse,
   DeploymentMetadataResponse,
+  CustomDomain,
+  AddCustomDomainRequest,
+  ListCustomDomainsResponse,
+  VerifyCustomDomainResponse,
 } from '@insforge/shared-schemas';
 
 export type {
@@ -30,6 +34,10 @@ export type {
   UpdateSlugRequest,
   UpdateSlugResponse,
   DeploymentMetadataResponse,
+  CustomDomain,
+  AddCustomDomainRequest,
+  ListCustomDomainsResponse,
+  VerifyCustomDomainResponse,
 };
 
 export class DeploymentsService {
@@ -134,6 +142,40 @@ export class DeploymentsService {
 
   async getMetadata(): Promise<DeploymentMetadataResponse> {
     return apiClient.request('/deployments/metadata', {
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  // ============================================================================
+  // Custom Domains (user-owned)
+  // ============================================================================
+
+  async listCustomDomains(): Promise<CustomDomain[]> {
+    const data = (await apiClient.request('/deployments/domains', {
+      headers: apiClient.withAccessToken(),
+    })) as ListCustomDomainsResponse;
+    return data.domains;
+  }
+
+  async addCustomDomain(domain: string): Promise<CustomDomain> {
+    const body: AddCustomDomainRequest = { domain };
+    return apiClient.request('/deployments/domains', {
+      method: 'POST',
+      headers: apiClient.withAccessToken(),
+      body: JSON.stringify(body),
+    });
+  }
+
+  async verifyCustomDomain(domain: string): Promise<VerifyCustomDomainResponse> {
+    return apiClient.request(`/deployments/domains/${encodeURIComponent(domain)}/verify`, {
+      method: 'POST',
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  async removeCustomDomain(domain: string): Promise<void> {
+    return apiClient.request(`/deployments/domains/${encodeURIComponent(domain)}`, {
+      method: 'DELETE',
       headers: apiClient.withAccessToken(),
     });
   }
