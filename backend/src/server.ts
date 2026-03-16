@@ -24,6 +24,7 @@ import { errorMiddleware } from '@/api/middlewares/error.js';
 import { destroyEmailCooldownInterval } from '@/api/middlewares/rate-limiters.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { RealtimeManager } from '@/infra/realtime/realtime.manager.js';
+import { DatabaseWebhookManager } from '@/infra/database-webhooks/database-webhook.manager.js';
 import fetch from 'node-fetch';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { LogService } from '@/services/logs/log.service.js';
@@ -319,6 +320,10 @@ async function initializeServer() {
     const realtimeManager = RealtimeManager.getInstance();
     await realtimeManager.initialize();
 
+    // Initialize DatabaseWebhookManager (pg_notify listener for db_webhook channel)
+    const dbWebhookManager = DatabaseWebhookManager.getInstance();
+    await dbWebhookManager.initialize();
+
     // Sync existing functions to Deno Subhosting (non-blocking)
     const functionService = FunctionService.getInstance();
     functionService.syncDeployment().catch((err) => {
@@ -345,6 +350,15 @@ async function cleanup() {
     await realtimeManager.close();
   } catch (error) {
     logger.error('Error closing RealtimeManager', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  try {
+    const dbWebhookManager = DatabaseWebhookManager.getInstance();
+    await dbWebhookManager.close();
+  } catch (error) {
+    logger.error('Error closing DatabaseWebhookManager', {
       error: error instanceof Error ? error.message : String(error),
     });
   }

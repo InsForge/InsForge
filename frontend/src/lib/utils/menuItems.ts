@@ -95,6 +95,11 @@ export const databaseStudioMenuItems: SecondaryMenuItem[] = [
     id: 'policies',
     label: 'Policies',
     href: '/dashboard/database/policies',
+  },
+  {
+    id: 'webhooks',
+    label: 'Webhooks',
+    href: '/dashboard/database/webhooks',
     sectionEnd: true,
   },
   {

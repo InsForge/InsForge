@@ -24,6 +24,7 @@ import IndexesPage from '@/features/database/pages/IndexesPage';
 import DatabaseFunctionsPage from '@/features/database/pages/FunctionsPage';
 import TriggersPage from '@/features/database/pages/TriggersPage';
 import PoliciesPage from '@/features/database/pages/PoliciesPage';
+import WebhooksPage from '@/features/database/pages/WebhooksPage';
 import TemplatesPage from '@/features/database/pages/TemplatesPage';
 import AuditsPage from '@/features/logs/pages/AuditsPage';
 import DeploymentLogsPage from '@/features/deployments/pages/DeploymentLogsPage';
@@ -74,6 +75,7 @@ export function AppRoutes() {
                 <Route path="/dashboard/database/functions" element={<DatabaseFunctionsPage />} />
                 <Route path="/dashboard/database/triggers" element={<TriggersPage />} />
                 <Route path="/dashboard/database/policies" element={<PoliciesPage />} />
+                <Route path="/dashboard/database/webhooks" element={<WebhooksPage />} />
                 <Route
                   path="/dashboard/database/sql-editor"
                   element={<Navigate to="/dashboard/sql-editor" replace />}

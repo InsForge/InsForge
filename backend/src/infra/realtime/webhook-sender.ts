@@ -76,6 +76,52 @@ export class WebhookSender {
     };
   }
 
+  /**
+   * Send a payload to a single URL with custom headers and retry logic.
+   * Used by DatabaseWebhookManager for database event delivery.
+   */
+  async sendWithHeaders(
+    url: string,
+    body: object,
+    headers: Record<string, string>
+  ): Promise<WebhookResult> {
+    let lastError: string | undefined;
+
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      try {
+        const response = await axios.post(url, body, {
+          timeout: this.timeout,
+          headers,
+        });
+
+        return {
+          url,
+          success: response.status >= 200 && response.status < 300,
+          statusCode: response.status,
+        };
+      } catch (error) {
+        const axiosError = error as AxiosError;
+        lastError = axiosError.message;
+
+        if (axiosError.response) {
+          return {
+            url,
+            success: false,
+            statusCode: axiosError.response.status,
+            error: `HTTP ${axiosError.response.status}`,
+          };
+        }
+
+        if (attempt < this.maxRetries) {
+          await this.delay(1000 * (attempt + 1));
+        }
+      }
+    }
+
+    logger.warn('Webhook delivery failed after retries', { url, error: lastError });
+    return { url, success: false, error: lastError };
+  }
+
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
