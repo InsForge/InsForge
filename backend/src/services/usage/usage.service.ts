@@ -22,11 +22,6 @@ export interface MCPUsageRecord {
   created_at: string;
 }
 
-export interface MCPUsagePage {
-  records: MCPUsageRecord[];
-  total: number;
-}
-
 /**
  * UsageService - Handles usage tracking and statistics
  * Business logic layer for MCP usage, system resource tracking, and AI usage
@@ -74,49 +69,20 @@ export class UsageService {
   }
 
   /**
-   * Get paginated MCP usage records
+   * Get recent MCP usage records
    */
-  async getMCPUsage(
-    limit: number = 50,
-    offset: number = 0,
-    success: boolean | null = true,
-    toolName?: string
-  ): Promise<MCPUsagePage> {
+  async getMCPUsage(limit: number = 5, success: boolean = true): Promise<MCPUsageRecord[]> {
     try {
-      const conditions: string[] = [];
-      const params: (boolean | number | string)[] = [];
-
-      if (success !== null) {
-        params.push(success);
-        conditions.push(`success = $${params.length}`);
-      }
-
-      if (toolName) {
-        params.push(`%${toolName}%`);
-        conditions.push(`tool_name ILIKE $${params.length}`);
-      }
-
-      const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-
-      const countResult = await this.getPool().query(
-        `SELECT COUNT(*) as total FROM system.mcp_usage ${where}`,
-        params
-      );
-
-      params.push(limit, offset);
-      const dataResult = await this.getPool().query(
+      const result = await this.getPool().query(
         `SELECT tool_name, success, created_at
          FROM system.mcp_usage
-         ${where}
+         WHERE success = $1
          ORDER BY created_at DESC
-         LIMIT $${params.length - 1} OFFSET $${params.length}`,
-        params
+         LIMIT $2`,
+        [success, limit]
       );
 
-      return {
-        records: dataResult.rows as MCPUsageRecord[],
-        total: parseInt(countResult.rows[0]?.total || '0'),
-      };
+      return result.rows as MCPUsageRecord[];
     } catch (error) {
       logger.error('Failed to get MCP usage', { error });
       throw new Error('Failed to get MCP usage');
