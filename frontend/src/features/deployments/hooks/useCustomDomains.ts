@@ -13,7 +13,12 @@ export function useCustomDomains() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
-  const { data: domains = [], isLoading } = useQuery({
+  const {
+    data: domains = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
     queryKey: QUERY_KEY,
     queryFn: () => deploymentsService.listCustomDomains(),
   });
@@ -21,7 +26,10 @@ export function useCustomDomains() {
   const addMutation = useMutation({
     mutationFn: (domain: string) => deploymentsService.addCustomDomain(domain),
     onSuccess: (domain) => {
-      showToast(`Domain ${domain.domain} added. Configure your DNS records to verify it.`, 'success');
+      showToast(
+        `Domain ${domain.domain} added. Configure your DNS records to verify it.`,
+        'success'
+      );
       void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
     },
     onError: (error: Error) => {
@@ -58,6 +66,8 @@ export function useCustomDomains() {
   return {
     domains,
     isLoading,
+    isError,
+    error,
     addDomain: addMutation.mutateAsync,
     isAdding: addMutation.isPending,
     verifyDomain: verifyMutation.mutateAsync,

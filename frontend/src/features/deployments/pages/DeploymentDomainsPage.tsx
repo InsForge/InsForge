@@ -165,7 +165,11 @@ function CustomDomainRow({
               onClick={() => setShowDns((v) => !v)}
               className="h-8 px-2 gap-1 text-zinc-950 dark:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700"
             >
-              {showDns ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              {showDns ? (
+                <ChevronUp className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5" />
+              )}
               <span className="text-xs">DNS</span>
             </Button>
           )}
@@ -185,7 +189,9 @@ function CustomDomainRow({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => window.open(`https://${domain.domain}`, '_blank', 'noopener,noreferrer')}
+              onClick={() =>
+                window.open(`https://${domain.domain}`, '_blank', 'noopener,noreferrer')
+              }
               className="h-8 px-2 gap-1 text-zinc-950 dark:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700"
             >
               <ExternalLink className="w-3.5 h-3.5" />
@@ -197,6 +203,7 @@ function CustomDomainRow({
             size="sm"
             onClick={() => onRemove(domain.domain)}
             disabled={isRemoving}
+            aria-label={`Remove ${domain.domain}`}
             className="h-8 px-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -250,7 +257,9 @@ export default function DeploymentDomainsPage() {
   const savedCustomSlug = extractSlugFromUrl(customDomainUrl);
 
   const handleCopyDefaultDomain = async () => {
-    if (!defaultDomain) return;
+    if (!defaultDomain) {
+      return;
+    }
     try {
       await navigator.clipboard.writeText(defaultDomain);
       setCopiedDefault(true);
@@ -261,7 +270,9 @@ export default function DeploymentDomainsPage() {
   };
 
   const handleCopyCustomDomain = async () => {
-    if (!customDomainUrl) return;
+    if (!customDomainUrl) {
+      return;
+    }
     try {
       await navigator.clipboard.writeText(customDomainUrl);
       setCopiedCustom(true);
@@ -311,7 +322,9 @@ export default function DeploymentDomainsPage() {
 
   const handleAddDomain = async () => {
     const trimmed = newDomain.trim().toLowerCase();
-    if (!trimmed) return;
+    if (!trimmed) {
+      return;
+    }
     try {
       await addDomain(trimmed);
       setNewDomain('');
@@ -386,8 +399,7 @@ export default function DeploymentDomainsPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() =>
-                        deploymentUrl &&
-                        window.open(deploymentUrl, '_blank', 'noopener,noreferrer')
+                        deploymentUrl && window.open(deploymentUrl, '_blank', 'noopener,noreferrer')
                       }
                       className="h-9 px-3 gap-1 text-zinc-950 dark:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700"
                     >
@@ -563,7 +575,9 @@ export default function DeploymentDomainsPage() {
                   onChange={(e) => setNewDomain(e.target.value)}
                   placeholder="myapp.com"
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && newDomain.trim()) void handleAddDomain();
+                    if (e.key === 'Enter' && newDomain.trim()) {
+                      void handleAddDomain();
+                    }
                   }}
                   autoFocus
                 />
