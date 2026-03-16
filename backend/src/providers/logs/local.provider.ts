@@ -15,6 +15,7 @@ interface RawLogData {
   stack?: string;
   eventMessage?: string;
   body?: unknown;
+  [key: string]: unknown; // Index signature for additional properties
 }
 
 export class LocalFileProvider extends BaseLogProvider {
