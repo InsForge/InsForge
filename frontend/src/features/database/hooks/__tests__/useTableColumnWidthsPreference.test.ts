@@ -92,9 +92,7 @@ describe('useTableColumnWidthsPreference', () => {
 
   it('batches multiple columns resized in quick succession', () => {
     const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
-    const { result } = renderHook(() =>
-      useTableColumnWidthsPreference('users', ['name', 'email'])
-    );
+    const { result } = renderHook(() => useTableColumnWidthsPreference('users', ['name', 'email']));
 
     act(() => {
       result.current.setColumnWidth('name', 150);
@@ -117,9 +115,7 @@ describe('useTableColumnWidthsPreference', () => {
 
   it('unmount flush persists to localStorage without updating state', () => {
     const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
-    const { result, unmount } = renderHook(() =>
-      useTableColumnWidthsPreference('users', ['name'])
-    );
+    const { result, unmount } = renderHook(() => useTableColumnWidthsPreference('users', ['name']));
 
     act(() => {
       result.current.setColumnWidth('name', 400);
