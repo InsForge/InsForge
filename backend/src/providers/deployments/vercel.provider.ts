@@ -563,6 +563,123 @@ export class VercelProvider {
     return slug ? `https://${slug}.insforge.site` : null;
   }
 
+  // ============================================================================
+  // Custom Domain Management
+  // ============================================================================
+
+  /**
+   * Add a custom domain to the Vercel project
+   * POST /v10/projects/:id/domains
+   */
+  async addCustomDomain(domain: string): Promise<{
+    name: string;
+    apexName: string;
+    projectId: string;
+    redirect: string | null;
+    redirectStatusCode: number | null;
+    gitBranch: string | null;
+    updatedAt: number;
+    createdAt: number;
+    verified: boolean;
+    verification: Array<{ type: string; domain: string; value: string; reason: string }>;
+  }> {
+    const credentials = await this.getCredentials();
+
+    try {
+      const response = await axios.post(
+        `https://api.vercel.com/v10/projects/${credentials.projectId}/domains?teamId=${credentials.teamId}`,
+        { name: domain },
+        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      );
+
+      logger.info('Custom domain added to Vercel project', { domain });
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const msg = (error.response?.data as { error?: { message?: string } })?.error?.message;
+        if (status === 409) {
+          throw new AppError(
+            msg || `Domain ${domain} is already added to this project`,
+            409,
+            ERROR_CODES.ALREADY_EXISTS
+          );
+        }
+        if (status === 400) {
+          throw new AppError(msg || `Invalid domain: ${domain}`, 400, ERROR_CODES.INVALID_INPUT);
+        }
+      }
+      logger.error('Failed to add custom domain to Vercel', {
+        error: error instanceof Error ? error.message : String(error),
+        domain,
+      });
+      throw new AppError('Failed to add custom domain', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+  }
+
+  /**
+   * Remove a custom domain from the Vercel project
+   * DELETE /v9/projects/:id/domains/:domain
+   */
+  async removeCustomDomain(domain: string): Promise<void> {
+    const credentials = await this.getCredentials();
+
+    try {
+      await axios.delete(
+        `https://api.vercel.com/v9/projects/${credentials.projectId}/domains/${domain}?teamId=${credentials.teamId}`,
+        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      );
+
+      logger.info('Custom domain removed from Vercel project', { domain });
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        // Domain not found on Vercel side – treat as already removed
+        return;
+      }
+      logger.error('Failed to remove custom domain from Vercel', {
+        error: error instanceof Error ? error.message : String(error),
+        domain,
+      });
+      throw new AppError('Failed to remove custom domain', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+  }
+
+  /**
+   * Verify a custom domain's DNS configuration
+   * POST /v9/projects/:id/domains/:domain/verify
+   */
+  async verifyCustomDomain(domain: string): Promise<{
+    verified: boolean;
+    verification?: Array<{ type: string; domain: string; value: string; reason: string }>;
+  }> {
+    const credentials = await this.getCredentials();
+
+    try {
+      const response = await axios.post(
+        `https://api.vercel.com/v9/projects/${credentials.projectId}/domains/${domain}/verify?teamId=${credentials.teamId}`,
+        {},
+        { headers: { Authorization: `Bearer ${credentials.token}` } }
+      );
+
+      const data = response.data as {
+        verified: boolean;
+        verification?: Array<{ type: string; domain: string; value: string; reason: string }>;
+      };
+
+      logger.info('Custom domain verification result', { domain, verified: data.verified });
+      return data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        throw new AppError(`Domain not found on Vercel: ${domain}`, 404, ERROR_CODES.NOT_FOUND);
+      }
+      logger.error('Failed to verify custom domain', {
+        error: error instanceof Error ? error.message : String(error),
+        domain,
+      });
+      throw new AppError('Failed to verify custom domain', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+  }
+
   /**
    * Upload a single file to Vercel
    * POST /v2/files

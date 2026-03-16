@@ -164,3 +164,75 @@ export type DeleteEnvVarResponse = z.infer<typeof deleteEnvVarResponseSchema>;
 export type UpdateSlugRequest = z.infer<typeof updateSlugRequestSchema>;
 export type UpdateSlugResponse = z.infer<typeof updateSlugResponseSchema>;
 export type DeploymentMetadataResponse = z.infer<typeof deploymentMetadataResponseSchema>;
+
+// ============================================================================
+// Custom Domain Management API (user-owned domains)
+// ============================================================================
+
+/**
+ * Verification record returned by Vercel for a domain
+ */
+export const domainVerificationRecordSchema = z.object({
+  type: z.string(),
+  domain: z.string(),
+  value: z.string(),
+  reason: z.string(),
+});
+
+/**
+ * A custom domain entry stored in the database
+ */
+export const customDomainSchema = z.object({
+  id: z.string().uuid(),
+  domain: z.string(),
+  status: z.enum(['PENDING', 'VERIFIED', 'FAILED']),
+  cnameValue: z.string().nullable(),
+  aRecordValue: z.string().nullable(),
+  verificationType: z.string().nullable(),
+  verificationDomain: z.string().nullable(),
+  verificationValue: z.string().nullable(),
+  error: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+/**
+ * Request to add a custom domain
+ */
+export const addCustomDomainRequestSchema = z.object({
+  domain: z
+    .string()
+    .trim()
+    .min(1, 'Domain is required')
+    .regex(
+      /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i,
+      'Invalid domain format (e.g. myapp.com or www.myapp.com)'
+    ),
+});
+
+/**
+ * Response from adding a custom domain
+ */
+export const addCustomDomainResponseSchema = customDomainSchema;
+
+/**
+ * Response from listing custom domains
+ */
+export const listCustomDomainsResponseSchema = z.object({
+  domains: z.array(customDomainSchema),
+});
+
+/**
+ * Response from verifying a custom domain
+ */
+export const verifyCustomDomainResponseSchema = z.object({
+  verified: z.boolean(),
+  domain: customDomainSchema,
+});
+
+export type DomainVerificationRecord = z.infer<typeof domainVerificationRecordSchema>;
+export type CustomDomain = z.infer<typeof customDomainSchema>;
+export type AddCustomDomainRequest = z.infer<typeof addCustomDomainRequestSchema>;
+export type AddCustomDomainResponse = z.infer<typeof addCustomDomainResponseSchema>;
+export type ListCustomDomainsResponse = z.infer<typeof listCustomDomainsResponseSchema>;
+export type VerifyCustomDomainResponse = z.infer<typeof verifyCustomDomainResponseSchema>;
