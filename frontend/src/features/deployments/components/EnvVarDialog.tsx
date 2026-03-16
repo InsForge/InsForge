@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Button, Dialog, DialogContent, Input } from '@insforge/ui';
+import { Button, Dialog, DialogContent, DialogDescription, DialogTitle, Input } from '@insforge/ui';
 import type { DeploymentEnvVar } from '@insforge/shared-schemas';
 
 interface EnvVarDialogProps {
@@ -53,8 +53,11 @@ export function EnvVarDialog({
       <DialogContent>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-3 border-b border-neutral-200 dark:border-neutral-700">
-          <h2 className="text-lg font-semibold text-zinc-950 dark:text-white leading-7">{title}</h2>
+          <DialogTitle className="text-lg font-semibold text-zinc-950 dark:text-white leading-7">{title}</DialogTitle>
         </div>
+        <DialogDescription className="sr-only">
+          Configure environment variable key and value
+        </DialogDescription>
 
         {/* Form */}
         <div className="flex flex-col gap-6 p-6">
