@@ -67,7 +67,10 @@ export class RedirectValidationService {
       if (error instanceof AppError) {
         throw error;
       }
-      logger.error('Failed to validate redirect URL', { error, sanitizedRedirect: this.sanitizeUrl(redirectUrl) });
+      logger.error('Failed to validate redirect URL', {
+        error,
+        sanitizedRedirect: this.sanitizeUrl(redirectUrl),
+      });
       throw new AppError('Failed to validate redirect URL', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
@@ -87,7 +90,10 @@ export class RedirectValidationService {
       return urlObj.toString();
     } catch (error) {
       // If URL parsing fails, return as-is for basic comparison
-      logger.warn('Failed to parse URL for normalization', { sanitizedUrl: this.sanitizeUrl(url), error });
+      logger.warn('Failed to parse URL for normalization', {
+        sanitizedUrl: this.sanitizeUrl(url),
+        error,
+      });
       return url;
     }
   }
@@ -110,7 +116,7 @@ export class RedirectValidationService {
     try {
       const urlObj = new URL(url);
       return `${urlObj.origin}${urlObj.pathname}`;
-    } catch (error) {
+    } catch {
       // If URL parsing fails, return a generic placeholder
       return '[invalid-url]';
     }

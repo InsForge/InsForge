@@ -209,6 +209,7 @@ describe('EmailService', () => {
         emailService.sendWithTemplate(
           'user@example.com',
           'John',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           '123456' as any,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           'invalid-template' as any
