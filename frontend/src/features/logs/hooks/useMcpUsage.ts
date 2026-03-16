@@ -105,6 +105,7 @@ export function useMcpUsage(options: UseMcpUsageOptions = {}) {
   // Computed values
   const hasCompletedOnboarding = useMemo(() => !!records.length, [records]);
   const recordsCount = useMemo(() => records.length, [records]);
+  const filteredRecordsCount = useMemo(() => filteredRecords.length, [filteredRecords.length]);
   const latestRecord = useMemo(() => records[0] || null, [records]);
 
   return {
@@ -115,6 +116,7 @@ export function useMcpUsage(options: UseMcpUsageOptions = {}) {
     hasCompletedOnboarding,
     latestRecord,
     recordsCount,
+    filteredRecordsCount,
 
     // Search
     searchQuery,
@@ -124,6 +126,7 @@ export function useMcpUsage(options: UseMcpUsageOptions = {}) {
     currentPage,
     setCurrentPage,
     totalPages,
+    pageSize: LOGS_PAGE_SIZE,
 
     // Loading states
     isLoading,

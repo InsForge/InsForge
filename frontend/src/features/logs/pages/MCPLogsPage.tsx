@@ -9,6 +9,11 @@ export default function MCPLogsPage() {
     records: mcpLogs,
     searchQuery: mcpSearchQuery,
     setSearchQuery: setMcpSearchQuery,
+    currentPage: mcpCurrentPage,
+    setCurrentPage: setMcpCurrentPage,
+    totalPages: mcpTotalPages,
+    pageSize: mcpPageSize,
+    filteredRecordsCount: mcpFilteredRecordsCount,
     isLoading: mcpLoading,
     error: mcpError,
   } = useMcpUsage({ successFilter: null });
@@ -59,7 +64,12 @@ export default function MCPLogsPage() {
             columnDefs={mcpColumns}
             data={mcpLogs}
             loading={mcpLoading}
-            showPagination={false}
+            showPagination={true}
+            currentPage={mcpCurrentPage}
+            totalPages={mcpTotalPages}
+            pageSize={mcpPageSize}
+            totalRecords={mcpFilteredRecordsCount}
+            onPageChange={setMcpCurrentPage}
             gridContainerClassName="border-t border-[var(--alpha-8)]"
             emptyState={
               <div className="text-[13px] text-muted-foreground">
