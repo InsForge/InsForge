@@ -16,6 +16,8 @@ const OBJECT_ROUTE_PATTERN = /^\/buckets\/([^/]+)\/objects\/(.+)$/;
 
 function getObjectRouteParams(req: Request): { bucketName?: string; objectKey?: string } {
   const directParams = req.params as Record<string, string | string[] | undefined>;
+  const regexBucketName = directParams['0'];
+  const regexObjectKey = directParams['1'];
 
   if (typeof directParams.bucketName === 'string') {
     const wildcardParam = directParams.objectKey;
@@ -26,15 +28,14 @@ function getObjectRouteParams(req: Request): { bucketName?: string; objectKey?: 
     };
   }
 
-  const match = req.path.match(OBJECT_ROUTE_PATTERN);
-  if (!match) {
-    return {};
+  if (typeof regexBucketName === 'string' && typeof regexObjectKey === 'string') {
+    return {
+      bucketName: regexBucketName,
+      objectKey: regexObjectKey,
+    };
   }
 
-  return {
-    bucketName: match[1],
-    objectKey: match[2],
-  };
+  return {};
 }
 
 // Middleware to conditionally apply authentication based on bucket visibility
