@@ -892,6 +892,14 @@ export class DeploymentService {
    * List all custom domains
    */
   async listCustomDomains(): Promise<ListCustomDomainsResponse> {
+    if (!isCloudEnvironment()) {
+      throw new AppError(
+        'Custom domains are only available in cloud environment.',
+        503,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+
     try {
       const result = await this.getPool().query(
         `SELECT
@@ -969,57 +977,68 @@ export class DeploymentService {
       );
     }
 
-    const existing = await this.getPool().query(
-      `SELECT id FROM system.custom_domains WHERE domain = $1`,
-      [domain]
-    );
+    try {
+      const existing = await this.getPool().query(
+        `SELECT id FROM system.custom_domains WHERE domain = $1`,
+        [domain]
+      );
 
-    if (!existing.rows.length) {
-      throw new AppError(`Custom domain not found: ${domain}`, 404, ERROR_CODES.NOT_FOUND);
-    }
+      if (!existing.rows.length) {
+        throw new AppError(`Custom domain not found: ${domain}`, 404, ERROR_CODES.NOT_FOUND);
+      }
 
-    const vercelResult = await this.vercelProvider.verifyCustomDomain(domain);
+      const vercelResult = await this.vercelProvider.verifyCustomDomain(domain);
 
-    const newStatus = vercelResult.verified ? 'VERIFIED' : 'PENDING';
+      const newStatus = vercelResult.verified ? 'VERIFIED' : 'PENDING';
 
-    const verificationRecord = vercelResult.verification?.[0];
+      const verificationRecord = vercelResult.verification?.[0];
 
-    const result = await this.getPool().query(
-      `UPDATE system.custom_domains
-       SET status = $1,
-           error = NULL,
-           verification_type = $3,
-           verification_domain = $4,
-           verification_value = $5,
-           updated_at = NOW()
-       WHERE domain = $2
-       RETURNING
-         id,
-         domain,
-         status,
-         cname_value        as "cnameValue",
-         a_record_value     as "aRecordValue",
-         verification_type  as "verificationType",
-         verification_domain as "verificationDomain",
-         verification_value  as "verificationValue",
-         error,
-         created_at as "createdAt",
-         updated_at as "updatedAt"`,
-      [
-        newStatus,
+      const result = await this.getPool().query(
+        `UPDATE system.custom_domains
+         SET status = $1,
+             error = NULL,
+             verification_type = $3,
+             verification_domain = $4,
+             verification_value = $5,
+             updated_at = NOW()
+         WHERE domain = $2
+         RETURNING
+           id,
+           domain,
+           status,
+           cname_value        as "cnameValue",
+           a_record_value     as "aRecordValue",
+           verification_type  as "verificationType",
+           verification_domain as "verificationDomain",
+           verification_value  as "verificationValue",
+           error,
+           created_at as "createdAt",
+           updated_at as "updatedAt"`,
+        [
+          newStatus,
+          domain,
+          verificationRecord?.type ?? null,
+          verificationRecord?.domain ?? null,
+          verificationRecord?.value ?? null,
+        ]
+      );
+
+      logger.info('Custom domain verification result', { domain, verified: vercelResult.verified });
+
+      return {
+        verified: vercelResult.verified,
+        domain: result.rows[0] as CustomDomain,
+      };
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      logger.error('Failed to verify custom domain', {
+        error: error instanceof Error ? error.message : String(error),
         domain,
-        verificationRecord?.type ?? null,
-        verificationRecord?.domain ?? null,
-        verificationRecord?.value ?? null,
-      ]
-    );
-
-    logger.info('Custom domain verification result', { domain, verified: vercelResult.verified });
-
-    return {
-      verified: vercelResult.verified,
-      domain: result.rows[0] as CustomDomain,
-    };
+      });
+      throw new AppError('Failed to verify custom domain', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
   }
 
   /**

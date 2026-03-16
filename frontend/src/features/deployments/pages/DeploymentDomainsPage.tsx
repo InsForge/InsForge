@@ -235,6 +235,8 @@ export default function DeploymentDomainsPage() {
   const {
     domains,
     isLoading: isLoadingDomains,
+    isError: isDomainsError,
+    error: domainsError,
     addDomain,
     isAdding,
     verifyDomain,
@@ -530,7 +532,18 @@ export default function DeploymentDomainsPage() {
               </Button>
             </div>
 
-            {domains.length === 0 ? (
+            {isDomainsError ? (
+              <div className="bg-white dark:bg-[#333] rounded-lg px-4 py-6 flex flex-col items-center gap-2 text-center">
+                <p className="text-sm text-red-500">
+                  {domainsError instanceof Error
+                    ? domainsError.message
+                    : 'Failed to load custom domains.'}
+                </p>
+                <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+                  Retry
+                </Button>
+              </div>
+            ) : domains.length === 0 ? (
               <div className="bg-white dark:bg-[#333] rounded-lg px-4 py-6 flex flex-col items-center gap-2 text-center">
                 <Globe className="w-8 h-8 text-muted-foreground dark:text-neutral-500" />
                 <p className="text-sm text-muted-foreground dark:text-neutral-400">
