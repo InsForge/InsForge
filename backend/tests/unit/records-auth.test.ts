@@ -17,7 +17,7 @@ describe('Database Records Route Authentication', () => {
   );
 
   test('imports verifyUser middleware', () => {
-    expect(recordsSource).toContain("import { AuthRequest, extractApiKey, verifyUser }");
+    expect(recordsSource).toContain('import { AuthRequest, extractApiKey, verifyUser }');
   });
 
   test('applies verifyUser to /:tableName route', () => {
@@ -30,9 +30,7 @@ describe('Database Records Route Authentication', () => {
 
   test('no route without verifyUser middleware', () => {
     // Ensure there are no router.all calls without verifyUser
-    const routeLines = recordsSource
-      .split('\n')
-      .filter((line) => line.includes('router.all('));
+    const routeLines = recordsSource.split('\n').filter((line) => line.includes('router.all('));
     for (const line of routeLines) {
       expect(line).toContain('verifyUser');
     }
@@ -46,7 +44,7 @@ describe('Database RPC Route Authentication', () => {
   );
 
   test('imports verifyUser middleware', () => {
-    expect(rpcSource).toContain("import { AuthRequest, extractApiKey, verifyUser }");
+    expect(rpcSource).toContain('import { AuthRequest, extractApiKey, verifyUser }');
   });
 
   test('applies verifyUser to /:functionName route', () => {
@@ -54,9 +52,7 @@ describe('Database RPC Route Authentication', () => {
   });
 
   test('no route without verifyUser middleware', () => {
-    const routeLines = rpcSource
-      .split('\n')
-      .filter((line) => line.includes('router.all('));
+    const routeLines = rpcSource.split('\n').filter((line) => line.includes('router.all('));
     for (const line of routeLines) {
       expect(line).toContain('verifyUser');
     }
