@@ -289,12 +289,9 @@ export async function createApp() {
   if (fs.existsSync(frontendPath)) {
     app.use(express.static(frontendPath, { index: false }));
     // Catch all handler for SPA routes
-    app.get(
-      ['/cloud{/*splat}', '/dashboard{/*splat}'],
-      (_req: Request, res: Response) => {
-        res.sendFile(path.join(frontendPath, 'index.html'));
-      }
-    );
+    app.get(['/cloud{/*splat}', '/dashboard{/*splat}'], (_req: Request, res: Response) => {
+      res.sendFile(path.join(frontendPath, 'index.html'));
+    });
     // Catch-all 404 for routes not handled by SPA or API
     app.use(notFoundHandler);
   } else {
