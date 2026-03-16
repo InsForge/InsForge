@@ -50,15 +50,15 @@ export function useMcpUsage(options: UseMcpUsageOptions = {}) {
   }, [debouncedSearch, successFilter]);
 
   // Query to fetch one page of MCP logs from the server
-  const {
-    data,
-    isLoading,
-    error,
-    refetch,
-  } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['mcp-usage', successFilter, currentPage, LOGS_PAGE_SIZE, debouncedSearch],
     queryFn: () =>
-      usageService.getMcpUsage(successFilter, currentPage, LOGS_PAGE_SIZE, debouncedSearch || undefined),
+      usageService.getMcpUsage(
+        successFilter,
+        currentPage,
+        LOGS_PAGE_SIZE,
+        debouncedSearch || undefined
+      ),
     enabled: isAuthenticated,
     staleTime: 30 * 1000, // Cache for 30 seconds
     refetchInterval: false,
@@ -66,7 +66,9 @@ export function useMcpUsage(options: UseMcpUsageOptions = {}) {
     placeholderData: (prev) => prev,
   });
 
-  const records: McpUsageRecord[] = data?.records ?? [];
+  const records: McpUsageRecord[] = useMemo(() => {
+    return data?.records ?? [];
+  }, [data?.records]);
   const total: number = data?.total ?? 0;
 
   // Calculate pagination from server-reported total
