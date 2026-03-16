@@ -38,6 +38,8 @@ COPY auth/package.json        ./auth/package.json
 COPY shared-schemas/package.json ./shared-schemas/package.json
 COPY ui/package.json          ./ui/package.json
 
+RUN node -e "const fs=require('fs'); const path='./shared-schemas/package.json'; const pkg=JSON.parse(fs.readFileSync(path,'utf8')); if (pkg.scripts) { delete pkg.scripts.prepare; delete pkg.scripts.prepublishOnly; } fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');"
+
 RUN npm ci && npm cache clean --force
 
 
@@ -72,7 +74,9 @@ COPY auth/package.json        ./auth/package.json
 COPY shared-schemas/package.json ./shared-schemas/package.json
 COPY ui/package.json          ./ui/package.json
 
-RUN npm ci --omit=dev && npm cache clean --force
+RUN node -e "const fs=require('fs'); const path='./shared-schemas/package.json'; const pkg=JSON.parse(fs.readFileSync(path,'utf8')); if (pkg.scripts) { delete pkg.scripts.prepare; delete pkg.scripts.prepublishOnly; } fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');"
+
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 
 # ============================================================
