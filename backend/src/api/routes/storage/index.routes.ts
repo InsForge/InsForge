@@ -263,7 +263,11 @@ router.put(
       const { bucketName, objectKey } = getObjectRouteParams(req);
 
       if (!bucketName || !objectKey) {
-        throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
+        throw new AppError(
+          'Bucket name and object key are required',
+          400,
+          ERROR_CODES.STORAGE_INVALID_PARAMETER
+        );
       }
 
       if (!req.file) {
@@ -346,7 +350,11 @@ router.get(
       const { bucketName, objectKey } = getObjectRouteParams(req);
 
       if (!bucketName || !objectKey) {
-        throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
+        throw new AppError(
+          'Bucket name and object key are required',
+          400,
+          ERROR_CODES.STORAGE_INVALID_PARAMETER
+        );
       }
 
       const storageService = StorageService.getInstance();
@@ -438,7 +446,11 @@ router.delete(
       const { bucketName, objectKey } = getObjectRouteParams(req);
 
       if (!bucketName || !objectKey) {
-        throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
+        throw new AppError(
+          'Bucket name and object key are required',
+          400,
+          ERROR_CODES.STORAGE_INVALID_PARAMETER
+        );
       }
 
       const storageService = StorageService.getInstance();
