@@ -286,8 +286,16 @@ export async function createApp() {
         res.sendFile(path.join(frontendPath, 'index.html'));
       }
     );
+    // Catch-all 404 for routes not handled by SPA or API
+    app.use((req: Request, res: Response) => {
+      res.status(404).json({
+        error: 'NOT_FOUND',
+        message: `Endpoint ${req.originalUrl} not found`,
+        statusCode: 404,
+        nextActions: 'Please check the API documentation for available endpoints',
+      });
+    });
   } else {
-    // Catch-all for 404 errors - Traditional REST format
     app.use((req: Request, res: Response) => {
       res.status(404).json({
         error: 'NOT_FOUND',
