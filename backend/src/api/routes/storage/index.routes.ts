@@ -12,24 +12,40 @@ import { AuditService } from '@/services/logs/audit.service.js';
 
 const router = Router();
 const auditService = AuditService.getInstance();
+const OBJECT_ROUTE_PATTERN = /^\/buckets\/([^/]+)\/objects\/(.+)$/;
 
-function getObjectKeyParam(req: Request): string | undefined {
-  const wildcardParam = (req.params as Record<string, string | string[] | undefined>).objectKey;
+function getObjectRouteParams(req: Request): { bucketName?: string; objectKey?: string } {
+  const directParams = req.params as Record<string, string | string[] | undefined>;
 
-  if (Array.isArray(wildcardParam)) {
-    return wildcardParam.join('/');
+  if (typeof directParams.bucketName === 'string') {
+    const wildcardParam = directParams.objectKey;
+
+    return {
+      bucketName: directParams.bucketName,
+      objectKey: Array.isArray(wildcardParam) ? wildcardParam.join('/') : wildcardParam,
+    };
   }
 
-  return wildcardParam;
+  const match = req.path.match(OBJECT_ROUTE_PATTERN);
+  if (!match) {
+    return {};
+  }
+
+  return {
+    bucketName: match[1],
+    objectKey: match[2],
+  };
 }
 
 // Middleware to conditionally apply authentication based on bucket visibility
 const conditionalAuth = async (req: Request, res: Response, next: NextFunction) => {
   // For GET and HEAD requests to download objects, check if bucket is public
-  if ((req.method === 'GET' || req.method === 'HEAD') && req.params.bucketName) {
+  const { bucketName } = getObjectRouteParams(req);
+
+  if ((req.method === 'GET' || req.method === 'HEAD') && bucketName) {
     try {
       const storageService = StorageService.getInstance();
-      const isPublic = await storageService.isBucketPublic(req.params.bucketName);
+      const isPublic = await storageService.isBucketPublic(bucketName);
 
       if (isPublic) {
         // Public bucket - skip authentication
@@ -237,16 +253,15 @@ router.get(
 
 // PUT /api/storage/buckets/:bucketName/objects/:objectKey - Upload object to bucket (requires auth)
 router.put(
-  '/buckets/:bucketName/objects/*objectKey',
+  OBJECT_ROUTE_PATTERN,
   verifyUser,
   upload.single('file'),
   handleUploadError,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const { bucketName } = req.params;
-      const objectKey = getObjectKeyParam(req);
+      const { bucketName, objectKey } = getObjectRouteParams(req);
 
-      if (!objectKey) {
+      if (!bucketName || !objectKey) {
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
@@ -323,14 +338,13 @@ router.post(
 
 // GET /api/storage/buckets/:bucketName/objects/:objectKey - Download object from bucket (conditional auth)
 router.get(
-  '/buckets/:bucketName/objects/*objectKey',
+  OBJECT_ROUTE_PATTERN,
   conditionalAuth,
   async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
     try {
-      const { bucketName } = req.params;
-      const objectKey = getObjectKeyParam(req);
+      const { bucketName, objectKey } = getObjectRouteParams(req);
 
-      if (!objectKey) {
+      if (!bucketName || !objectKey) {
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
@@ -416,14 +430,13 @@ router.delete(
 
 // DELETE /api/storage/buckets/:bucketName/objects/:objectKey - Delete object from bucket (requires auth)
 router.delete(
-  '/buckets/:bucketName/objects/*objectKey',
+  OBJECT_ROUTE_PATTERN,
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const { bucketName } = req.params;
-      const objectKey = getObjectKeyParam(req);
+      const { bucketName, objectKey } = getObjectRouteParams(req);
 
-      if (!objectKey) {
+      if (!bucketName || !objectKey) {
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 

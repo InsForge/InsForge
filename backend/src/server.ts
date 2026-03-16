@@ -193,6 +193,14 @@ export async function createApp() {
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);
+  app.use('/api', (req: Request, res: Response) => {
+    res.status(404).json({
+      error: 'NOT_FOUND',
+      message: `Endpoint ${req.originalUrl} not found`,
+      statusCode: 404,
+      nextActions: 'Please check the API documentation for available endpoints',
+    });
+  });
 
   // Proxy function execution to Deno Subhosting or local runtime
   // this logic is used for backward compatibility, we will let the sdk directly call the edge function
