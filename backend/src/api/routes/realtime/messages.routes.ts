@@ -63,4 +63,29 @@ router.post(
   }
 );
 
+// Get retention config
+router.get('/config', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const retentionDays = await messageService.getRetentionDays();
+    successResponse(res, { retentionDays });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Update retention config
+router.post('/config', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { retentionDays } = req.body;
+    // Handle both null (Never) and number
+    if (retentionDays !== null && typeof retentionDays !== 'number') {
+      throw new AppError('retentionDays must be a number or null', 400, ERROR_CODES.INVALID_INPUT);
+    }
+    await messageService.updateRetentionDays(retentionDays);
+    successResponse(res, { message: 'Retention config updated successfully' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export { router as messagesRouter };

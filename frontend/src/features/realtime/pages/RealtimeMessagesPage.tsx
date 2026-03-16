@@ -1,10 +1,11 @@
 import { useState, useCallback, useRef } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Settings } from 'lucide-react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import { Skeleton, PaginationControls, TableHeader } from '@/components';
 import { useRealtimeMessages } from '../hooks/useRealtimeMessages';
 import { MessageRow } from '../components/MessageRow';
+import { RealtimeSettingsMenuDialog } from '../components/RealtimeSettingsMenuDialog';
 import RealtimeEmptyState from '../components/RealtimeEmptyState';
 import type { RealtimeMessage } from '../services/realtime.service';
 
@@ -13,6 +14,7 @@ export default function RealtimeMessagesPage() {
   const [selectedMessage, setSelectedMessage] = useState<RealtimeMessage | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const handleScroll = useCallback(() => {
@@ -120,7 +122,7 @@ export default function RealtimeMessagesPage() {
       <TableHeader
         className="min-w-[800px]"
         leftContent={
-          <div className="flex flex-1 items-center overflow-clip">
+          <div className="flex flex-1 items-center overflow-clip gap-1">
             <h1 className="shrink-0 text-base font-medium leading-7 text-foreground">Messages</h1>
             <div className="flex h-5 w-5 shrink-0 items-center justify-center">
               <div className="h-5 w-px bg-[var(--alpha-8)]" />
@@ -140,6 +142,25 @@ export default function RealtimeMessagesPage() {
                 </TooltipTrigger>
                 <TooltipContent side="bottom" align="center">
                   <p>{isRefreshing ? 'Refreshing...' : 'Refresh'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            {/* Settings Dialog Trigger */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsSettingsOpen(true)}
+                    className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
+                  >
+                    <Settings className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="center">
+                  <p>Settings</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -222,6 +243,8 @@ export default function RealtimeMessagesPage() {
           />
         </div>
       )}
+      {/* Settings Dialog */}
+      <RealtimeSettingsMenuDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
     </div>
   );
 }

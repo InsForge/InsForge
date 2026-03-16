@@ -102,6 +102,32 @@ export class RealtimeService {
       headers: apiClient.withAccessToken(),
     });
   }
+
+  // ============================================================================
+  // Configuration & Cleanup
+  // ============================================================================
+
+  async getRetentionConfig(): Promise<{ retentionDays: number | null }> {
+    return apiClient.request('/realtime/messages/config', {
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  async updateRetentionConfig(retentionDays: number | null): Promise<void> {
+    return apiClient.request('/realtime/messages/config', {
+      method: 'POST',
+      headers: apiClient.withAccessToken(),
+      body: JSON.stringify({ retentionDays }),
+    });
+  }
+
+  async cleanupMessages(batchSize?: number): Promise<{ deletedCount: number; message: string }> {
+    return apiClient.request('/realtime/messages/cleanup', {
+      method: 'POST',
+      headers: apiClient.withAccessToken(),
+      body: JSON.stringify({ batchSize }),
+    });
+  }
 }
 
 export const realtimeService = new RealtimeService();

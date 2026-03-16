@@ -245,11 +245,11 @@ export class RealtimeMessageService {
       params
     );
 
-    // Get retention days from _config
+    // Get retention days from realtime.config
     const configResult = await this.getPool().query(
-      "SELECT value FROM _config WHERE key = 'realtime_retention_days'"
+      'SELECT retention_days as "retentionDays" FROM realtime.config LIMIT 1'
     );
-    const retentionDays = configResult.rows[0]?.value ? parseInt(configResult.rows[0].value) : 30;
+    const retentionDays = configResult.rows[0]?.retentionDays ?? 30;
 
     const stats = statsResult.rows[0];
     const whAudienceTotal = parseInt(stats.wh_audience_total) || 0;
@@ -277,5 +277,27 @@ export class RealtimeMessageService {
       [batchSize]
     );
     return result.rows[0]?.deletedCount || 0;
+  }
+
+  /**
+   * Get retention days config
+   */
+  async getRetentionDays(): Promise<number | null> {
+    const result = await this.getPool().query(
+      'SELECT retention_days as "retentionDays" FROM realtime.config LIMIT 1'
+    );
+    // Explicitly return null if null in DB, fallback to 30 if no row
+    if (result.rows.length === 0) return 30;
+    return result.rows[0].retentionDays;
+  }
+
+  /**
+   * Update retention days config
+   */
+  async updateRetentionDays(retentionDays: number | null): Promise<void> {
+    await this.getPool().query(
+      'UPDATE realtime.config SET retention_days = $1, updated_at = NOW()',
+      [retentionDays]
+    );
   }
 }
