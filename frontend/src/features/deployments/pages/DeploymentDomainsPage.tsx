@@ -576,7 +576,16 @@ export default function DeploymentDomainsPage() {
           </div>
 
           {/* Add Domain Dialog */}
-          <Dialog open={isAddDomainOpen} onOpenChange={setIsAddDomainOpen}>
+          <Dialog
+            open={isAddDomainOpen}
+            onOpenChange={(open) => {
+              setIsAddDomainOpen(open);
+              if (!open) {
+                setNewDomain('');
+                setDomainError('');
+              }
+            }}
+          >
             <DialogContent>
               <div className="flex items-center justify-between px-6 py-3 border-b border-neutral-200 dark:border-neutral-700">
                 <DialogTitle className="text-lg font-semibold text-zinc-950 dark:text-white leading-7">
