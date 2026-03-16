@@ -4,11 +4,21 @@ import { LogsDataGrid, type LogsColumnDef } from '../components';
 import { useMcpUsage } from '../hooks/useMcpUsage';
 import { formatTime } from '@/lib/utils/utils';
 
+/**
+ * MCP Logs Page Component.
+ * * This page displays a paginated grid of Model Context Protocol (MCP) tool usage records.
+ * It includes search functionality, error handling, and data visualization via a DataGrid.
+ */
 export default function MCPLogsPage() {
   const {
     records: mcpLogs,
     searchQuery: mcpSearchQuery,
     setSearchQuery: setMcpSearchQuery,
+    currentPage: mcpCurrentPage,
+    setCurrentPage: setMcpCurrentPage,
+    totalPages: mcpTotalPages,
+    pageSize: mcpPageSize,
+    filteredRecordsCount: mcpFilteredRecordsCount,
     isLoading: mcpLoading,
     error: mcpError,
   } = useMcpUsage({ successFilter: null });
@@ -59,7 +69,12 @@ export default function MCPLogsPage() {
             columnDefs={mcpColumns}
             data={mcpLogs}
             loading={mcpLoading}
-            showPagination={false}
+            showPagination={true}
+            currentPage={mcpCurrentPage}
+            totalPages={mcpTotalPages}
+            pageSize={mcpPageSize}
+            totalRecords={mcpFilteredRecordsCount}
+            onPageChange={setMcpCurrentPage}
             gridContainerClassName="border-t border-[var(--alpha-8)]"
             emptyState={
               <div className="text-[13px] text-muted-foreground">

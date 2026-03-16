@@ -53,12 +53,23 @@ usageRouter.get(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const { limit = '5', success = 'true' } = req.query;
+      const { limit = '50', offset = '0', success, tool_name } = req.query;
+
+      const successFilter = success === undefined ? null : success === 'true';
+
+      // Ensure limit >= 1 and offset >= 0
+      const parsedLimit = Math.max(1, parseInt(limit as string) || 50);
+      const parsedOffset = Math.max(0, parseInt(offset as string) || 0);
 
       // Get MCP usage records via service
-      const records = await usageService.getMCPUsage(parseInt(limit as string), success === 'true');
+      const result = await usageService.getMCPUsage(
+        parsedLimit,
+        parsedOffset,
+        successFilter,
+        tool_name as string | undefined
+      );
 
-      successResponse(res, { records });
+      successResponse(res, result);
     } catch (error) {
       next(error);
     }
