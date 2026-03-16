@@ -7,30 +7,38 @@ export interface McpUsageRecord {
   created_at: string;
 }
 
-export interface McpUsageResponse {
+export interface McpUsagePage {
   records: McpUsageRecord[];
+  total: number;
 }
 
 export class UsageService {
   /**
-   * Get MCP usage records
+   * Get paginated MCP usage records
    */
   async getMcpUsage(
-    success: boolean | null = true,
-    limit: number = 200
-  ): Promise<McpUsageRecord[]> {
+    success: boolean | null = null,
+    page: number = 1,
+    pageSize: number = 50,
+    toolName?: string
+  ): Promise<McpUsagePage> {
+    const offset = (page - 1) * pageSize;
     const params = new URLSearchParams({
-      limit: limit.toString(),
+      limit: pageSize.toString(),
+      offset: offset.toString(),
     });
     if (success !== null) {
       params.append('success', success.toString());
     }
+    if (toolName) {
+      params.append('tool_name', toolName);
+    }
 
     const data = (await apiClient.request(`/usage/mcp?${params.toString()}`, {
       headers: apiClient.withAccessToken(),
-    })) as McpUsageResponse;
+    })) as McpUsagePage;
 
-    return data.records || [];
+    return { records: data.records || [], total: data.total ?? 0 };
   }
 }
 
