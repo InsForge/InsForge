@@ -1,5 +1,8 @@
-import { Pool } from 'pg';
+import { Pool, DatabaseError } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
+
+// PostgreSQL error code for insufficient_privilege (RLS denial)
+const PG_INSUFFICIENT_PRIVILEGE = '42501';
 import logger from '@/utils/logger.js';
 import type { RealtimeMessage, RoleSchema } from '@insforge/shared-schemas';
 import { RealtimeChannelService } from './realtime-channel.service.js';
@@ -92,12 +95,33 @@ export class RealtimeMessageService {
         senderId: userId || null,
       };
     } catch (error) {
-      // Rollback transaction on error
-      await client.query('ROLLBACK').catch(() => {});
+      // Rollback transaction on error with proper error handling
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError) {
+        logger.error('Critical: Failed to rollback transaction in insertMessage', {
+          originalError: error,
+          rollbackError,
+          channelName,
+          userId,
+        });
+        // Re-throw to ensure connection is properly released and errors are visible
+        throw rollbackError;
+      }
 
-      // RLS policy denied the INSERT or other error
-      logger.debug('Message insert denied or failed', { channelName, eventName, userId, error });
-      return null;
+      // Only treat RLS/permission denials as a null result; rethrow operational failures
+      // so the caller receives INTERNAL_ERROR instead of UNAUTHORIZED.
+      if (error instanceof DatabaseError && error.code === PG_INSUFFICIENT_PRIVILEGE) {
+        logger.debug('Message insert denied by RLS policy', {
+          channelName,
+          eventName,
+          userId,
+          error,
+        });
+        return null;
+      }
+
+      throw error;
     } finally {
       // Reset role back to default before releasing connection
       await client.query('RESET ROLE');

@@ -60,8 +60,9 @@ export class TokenManager {
   }
 
   /**
-   * Generate API key token (never expires)
+   * Generate API key token with 30-day expiration
    * Used for internal API key authenticated requests to PostgREST
+   * SECURITY: API keys must expire to prevent indefinite access if compromised
    */
   generateApiKeyToken(): string {
     const payload = {
@@ -71,7 +72,7 @@ export class TokenManager {
     };
     return jwt.sign(payload, JWT_SECRET, {
       algorithm: 'HS256',
-      // No expiresIn means token never expires
+      expiresIn: '30d', // 30-day expiration for security
     });
   }
 

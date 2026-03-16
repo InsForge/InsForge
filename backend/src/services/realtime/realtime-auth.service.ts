@@ -1,7 +1,10 @@
-import { Pool, PoolClient } from 'pg';
+import { Pool, PoolClient, DatabaseError } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
 import { RoleSchema } from '@insforge/shared-schemas';
+
+// PostgreSQL error code for insufficient_privilege (RLS denial)
+const PG_INSUFFICIENT_PRIVILEGE = '42501';
 
 /**
  * Handles channel authorization by checking RLS policies on the messages table.
@@ -72,10 +75,32 @@ export class RealtimeAuthService {
       // If query returns a row, user has permission
       return result.rowCount !== null && result.rowCount > 0;
     } catch (error) {
-      // Rollback transaction on error
-      await client.query('ROLLBACK').catch(() => {});
-      logger.debug('Subscribe permission denied', { channelName, userId, error });
-      return false;
+      // Rollback transaction on error with proper error handling
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError) {
+        logger.error('Critical: Failed to rollback transaction in checkSubscribePermission', {
+          originalError: error,
+          rollbackError,
+          channelName,
+          userId,
+        });
+        // Re-throw to ensure connection is properly released and errors are visible
+        throw rollbackError;
+      }
+
+      // Only treat RLS/permission denials as a false result; rethrow operational failures
+      // so the caller receives INTERNAL_ERROR instead of UNAUTHORIZED.
+      if (error instanceof DatabaseError && error.code === PG_INSUFFICIENT_PRIVILEGE) {
+        logger.debug('Subscribe permission denied by RLS policy', {
+          channelName,
+          userId,
+          error,
+        });
+        return false;
+      }
+
+      throw error;
     } finally {
       // Reset role back to default before releasing connection
       await client.query('RESET ROLE');
