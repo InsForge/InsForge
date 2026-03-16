@@ -45,6 +45,7 @@ export class DeploymentsService {
   // Deployments
   // ============================================================================
 
+  /** Returns a paginated list of deployments for the project. */
   async listDeployments(limit = 50, offset = 0): Promise<ListDeploymentsResponse> {
     const searchParams = new URLSearchParams();
     searchParams.set('limit', String(limit));
@@ -56,12 +57,14 @@ export class DeploymentsService {
     });
   }
 
+  /** Returns a single deployment by its ID. */
   async getDeployment(id: string): Promise<DeploymentSchema> {
     return apiClient.request(`/deployments/${id}`, {
       headers: apiClient.withAccessToken(),
     });
   }
 
+  /** Creates a new deployment record and returns a pre-signed S3 upload URL. */
   async createDeployment(): Promise<CreateDeploymentResponse> {
     return apiClient.request('/deployments', {
       method: 'POST',
@@ -69,6 +72,7 @@ export class DeploymentsService {
     });
   }
 
+  /** Triggers the Vercel deployment after the file upload to S3 is complete. */
   async startDeployment(id: string, data?: StartDeploymentRequest): Promise<DeploymentSchema> {
     return apiClient.request(`/deployments/${id}/start`, {
       method: 'POST',
@@ -77,6 +81,7 @@ export class DeploymentsService {
     });
   }
 
+  /** Polls Vercel and syncs the latest deployment state back to the database. */
   async syncDeployment(id: string): Promise<DeploymentSchema> {
     return apiClient.request(`/deployments/${id}/sync`, {
       method: 'POST',
@@ -84,6 +89,7 @@ export class DeploymentsService {
     });
   }
 
+  /** Cancels an in-progress deployment on Vercel. */
   async cancelDeployment(id: string): Promise<void> {
     return apiClient.request(`/deployments/${id}/cancel`, {
       method: 'POST',
@@ -95,6 +101,7 @@ export class DeploymentsService {
   // Environment Variables
   // ============================================================================
 
+  /** Returns all environment variable keys (without values) for the Vercel project. */
   async listEnvVars(): Promise<DeploymentEnvVar[]> {
     const data = (await apiClient.request('/deployments/env-vars', {
       headers: apiClient.withAccessToken(),
@@ -102,6 +109,7 @@ export class DeploymentsService {
     return data.envVars;
   }
 
+  /** Returns a single environment variable including its decrypted value. */
   async getEnvVar(id: string): Promise<DeploymentEnvVarWithValue> {
     // TODO: Remove mock data after testing
     const mockValues: Record<string, DeploymentEnvVarWithValue> = {
@@ -134,6 +142,7 @@ export class DeploymentsService {
     return data.envVar;
   }
 
+  /** Creates or updates an environment variable on the Vercel project. */
   async upsertEnvVar(input: UpsertEnvVarRequest): Promise<UpsertEnvVarResponse> {
     return apiClient.request('/deployments/env-vars', {
       method: 'POST',
@@ -142,6 +151,7 @@ export class DeploymentsService {
     });
   }
 
+  /** Deletes an environment variable from the Vercel project by its Vercel ID. */
   async deleteEnvVar(id: string): Promise<DeleteEnvVarResponse> {
     return apiClient.request(`/deployments/env-vars/${encodeURIComponent(id)}`, {
       method: 'DELETE',
@@ -153,6 +163,7 @@ export class DeploymentsService {
   // Custom Slug/Domain
   // ============================================================================
 
+  /** Updates the custom insforge.site slug (subdomain) for the deployment. */
   async updateSlug(slug: string | null): Promise<UpdateSlugResponse> {
     return apiClient.request('/deployments/slug', {
       method: 'PUT',
@@ -165,6 +176,7 @@ export class DeploymentsService {
   // Metadata
   // ============================================================================
 
+  /** Returns deployment metadata including the current deployment ID and domain URLs. */
   async getMetadata(): Promise<DeploymentMetadataResponse> {
     return apiClient.request('/deployments/metadata', {
       headers: apiClient.withAccessToken(),
@@ -175,6 +187,7 @@ export class DeploymentsService {
   // Custom Domains (user-owned)
   // ============================================================================
 
+  /** Returns all user-owned custom domains for the project. */
   async listCustomDomains(): Promise<CustomDomain[]> {
     const data = (await apiClient.request('/deployments/domains', {
       headers: apiClient.withAccessToken(),
@@ -182,6 +195,7 @@ export class DeploymentsService {
     return data.domains;
   }
 
+  /** Registers a user-owned domain on the Vercel project and persists it to the database. */
   async addCustomDomain(domain: string): Promise<CustomDomain> {
     const body: AddCustomDomainRequest = { domain };
     return apiClient.request('/deployments/domains', {
@@ -191,6 +205,7 @@ export class DeploymentsService {
     });
   }
 
+  /** Triggers Vercel DNS verification for a domain and updates its status in the database. */
   async verifyCustomDomain(domain: string): Promise<VerifyCustomDomainResponse> {
     return apiClient.request(`/deployments/domains/${encodeURIComponent(domain)}/verify`, {
       method: 'POST',
@@ -198,6 +213,7 @@ export class DeploymentsService {
     });
   }
 
+  /** Removes a user-owned domain from both the Vercel project and the database. */
   async removeCustomDomain(domain: string): Promise<void> {
     return apiClient.request(`/deployments/domains/${encodeURIComponent(domain)}`, {
       method: 'DELETE',
