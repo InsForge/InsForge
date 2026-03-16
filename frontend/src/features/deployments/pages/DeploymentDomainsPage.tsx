@@ -20,7 +20,10 @@ import { useCustomDomains } from '../hooks/useCustomDomains';
 import { useToast } from '@/lib/hooks/useToast';
 import type { CustomDomain } from '../services/deployments.service';
 
-// Extract slug from custom domain URL (e.g., "https://my-slug.insforge.site" -> "my-slug")
+/**
+ * Extracts the slug portion from a custom insforge.site domain URL.
+ * e.g. "https://my-slug.insforge.site" -> "my-slug"
+ */
 function extractSlugFromUrl(url: string | null): string {
   if (!url) {
     return '';
@@ -29,6 +32,9 @@ function extractSlugFromUrl(url: string | null): string {
   return match?.[1] ?? '';
 }
 
+/**
+ * Displays a colored badge indicating the verification status of a custom domain.
+ */
 function StatusBadge({ status }: { status: CustomDomain['status'] }) {
   const styles: Record<CustomDomain['status'], string> = {
     VERIFIED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
@@ -47,6 +53,10 @@ function StatusBadge({ status }: { status: CustomDomain['status'] }) {
   );
 }
 
+/**
+ * Renders the DNS configuration instructions for a pending custom domain,
+ * showing the required CNAME and/or A record values the user must set with their registrar.
+ */
 function DnsInstructions({ domain }: { domain: CustomDomain }) {
   const isApex = !domain.domain.split('.').slice(0, -2).join('.'); // no subdomain
   return (
@@ -106,6 +116,11 @@ function DnsInstructions({ domain }: { domain: CustomDomain }) {
   );
 }
 
+/**
+ * A single row in the custom domains list showing the domain name, status badge,
+ * and action buttons (Verify, Visit, Remove). Expands to show DNS instructions
+ * when the domain is not yet verified.
+ */
 function CustomDomainRow({
   domain,
   onVerify,
@@ -200,6 +215,11 @@ function CustomDomainRow({
   );
 }
 
+/**
+ * Page for managing deployment domains.
+ * Shows the auto-generated default domain, the insforge.site custom slug,
+ * and user-owned custom domains with full DNS verification workflow.
+ */
 export default function DeploymentDomainsPage() {
   const [copiedDefault, setCopiedDefault] = useState(false);
   const [copiedCustom, setCopiedCustom] = useState(false);
