@@ -18,6 +18,7 @@ export function useCustomDomains() {
     isLoading,
     isError,
     error,
+    refetch: refetchDomains,
   } = useQuery({
     queryKey: QUERY_KEY,
     queryFn: () => deploymentsService.listCustomDomains(),
@@ -68,6 +69,7 @@ export function useCustomDomains() {
     isLoading,
     isError,
     error,
+    refetchDomains,
     addDomain: addMutation.mutateAsync,
     isAdding: addMutation.isPending,
     verifyDomain: verifyMutation.mutateAsync,

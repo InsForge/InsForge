@@ -228,6 +228,7 @@ export default function DeploymentDomainsPage() {
   const [customSlug, setCustomSlug] = useState('');
   const [isAddDomainOpen, setIsAddDomainOpen] = useState(false);
   const [newDomain, setNewDomain] = useState('');
+  const [domainError, setDomainError] = useState('');
 
   const { deployments, isLoadingDeployments } = useDeployments();
   const { updateSlug, isUpdating } = useDeploymentSlug();
@@ -237,6 +238,7 @@ export default function DeploymentDomainsPage() {
     isLoading: isLoadingDomains,
     isError: isDomainsError,
     error: domainsError,
+    refetchDomains,
     addDomain,
     isAdding,
     verifyDomain,
@@ -322,11 +324,18 @@ export default function DeploymentDomainsPage() {
     }
   };
 
+  const DOMAIN_REGEX = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
+
   const handleAddDomain = async () => {
     const trimmed = newDomain.trim().toLowerCase();
     if (!trimmed) {
       return;
     }
+    if (!DOMAIN_REGEX.test(trimmed)) {
+      setDomainError('Invalid domain format (e.g. myapp.com or www.myapp.com)');
+      return;
+    }
+    setDomainError('');
     try {
       await addDomain(trimmed);
       setNewDomain('');
@@ -539,7 +548,7 @@ export default function DeploymentDomainsPage() {
                     ? domainsError.message
                     : 'Failed to load custom domains.'}
                 </p>
-                <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+                <Button variant="outline" size="sm" onClick={() => void refetchDomains()}>
                   Retry
                 </Button>
               </div>
@@ -585,7 +594,10 @@ export default function DeploymentDomainsPage() {
 
                 <Input
                   value={newDomain}
-                  onChange={(e) => setNewDomain(e.target.value)}
+                  onChange={(e) => {
+                    setNewDomain(e.target.value);
+                    setDomainError('');
+                  }}
                   placeholder="myapp.com"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && newDomain.trim()) {
@@ -594,6 +606,7 @@ export default function DeploymentDomainsPage() {
                   }}
                   autoFocus
                 />
+                {domainError && <p className="text-xs text-red-500">{domainError}</p>}
 
                 <div className="flex justify-end gap-2">
                   <Button
@@ -602,6 +615,7 @@ export default function DeploymentDomainsPage() {
                     onClick={() => {
                       setIsAddDomainOpen(false);
                       setNewDomain('');
+                      setDomainError('');
                     }}
                     disabled={isAdding}
                     className="h-9 px-4 bg-neutral-200 dark:bg-neutral-600 hover:bg-neutral-300 dark:hover:bg-neutral-500 text-zinc-950 dark:text-white"
@@ -611,7 +625,7 @@ export default function DeploymentDomainsPage() {
                   <Button
                     size="sm"
                     onClick={() => void handleAddDomain()}
-                    disabled={!newDomain.trim() || isAdding}
+                    disabled={!newDomain.trim() || !!domainError || isAdding}
                     className="h-9 px-4 bg-zinc-950 text-white hover:bg-zinc-800 disabled:opacity-40 dark:bg-emerald-300 dark:text-zinc-950 dark:hover:bg-emerald-400"
                   >
                     {isAdding ? 'Adding...' : 'Add Domain'}
