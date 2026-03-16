@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { dbWebhookEventSchema } from './database-webhooks.schema.js';
+import { dbWebhookEventSchema } from './database-webhooks.schema';
 
 // ============================================================================
 // Create Webhook Request
