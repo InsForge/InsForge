@@ -76,7 +76,7 @@ COPY ui/package.json          ./ui/package.json
 
 RUN node -e "const fs=require('fs'); const path='./shared-schemas/package.json'; const pkg=JSON.parse(fs.readFileSync(path,'utf8')); if (pkg.scripts) { delete pkg.scripts.prepare; delete pkg.scripts.prepublishOnly; } fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');"
 
-RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force
 
 
 # ============================================================
@@ -109,7 +109,7 @@ COPY --from=build /app/package.json ./package.json
 RUN npm install -g "tsx@^4.7.1" && npm cache clean --force
 
 # Run as non-root using the built-in node user (uid 1000)
-RUN chown -R node:node /app
+RUN mkdir -p /data && chown -R node:node /app /data
 USER node
 
 EXPOSE 7130 7131
