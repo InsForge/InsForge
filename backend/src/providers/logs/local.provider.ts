@@ -5,6 +5,18 @@ import { LogSchema, LogSourceSchema, LogStatsSchema } from '@insforge/shared-sch
 import { BaseLogProvider } from './base.provider.js';
 import logger from '@/utils/logger.js';
 
+// Interface for raw log data from JSON lines
+interface RawLogData {
+  appname?: string;
+  timestamp: string;
+  event_message?: string;
+  level: string;
+  error?: string;
+  stack?: string;
+  eventMessage?: string;
+  body?: unknown;
+}
+
 export class LocalFileProvider extends BaseLogProvider {
   private logsDir: string = '';
   private logFiles: Record<string, string> = {
@@ -82,7 +94,7 @@ export class LocalFileProvider extends BaseLogProvider {
       }
 
       try {
-        const log = JSON.parse(line);
+        const log: RawLogData = JSON.parse(line);
 
         // Only process Vector-transformed logs (have appname field)
         if (!log.appname) {

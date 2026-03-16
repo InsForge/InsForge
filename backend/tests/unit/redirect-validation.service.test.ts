@@ -21,10 +21,14 @@ describe('RedirectValidationService', () => {
     };
 
     // Mock the getInstance method
-    (AuthConfigService.getInstance as ReturnType<typeof vi.fn>).mockReturnValue(mockAuthConfigService);
+    (AuthConfigService.getInstance as ReturnType<typeof vi.fn>).mockReturnValue(
+      mockAuthConfigService
+    );
 
     // Reset the singleton instance to get a fresh one with the mock
-    (RedirectValidationService as unknown as { instance: RedirectValidationService | null }).instance = null;
+    (
+      RedirectValidationService as unknown as { instance: RedirectValidationService | null }
+    ).instance = null;
     redirectValidationService = RedirectValidationService.getInstance();
   });
 
@@ -34,7 +38,9 @@ describe('RedirectValidationService', () => {
         redirectUrlWhitelist: [],
       });
 
-      const result = await redirectValidationService.validateRedirectUrl('https://example.com/callback');
+      const result = await redirectValidationService.validateRedirectUrl(
+        'https://example.com/callback'
+      );
 
       expect(result).toBe(true);
       expect(mockAuthConfigService.getAuthConfig).toHaveBeenCalledTimes(1);
@@ -45,7 +51,9 @@ describe('RedirectValidationService', () => {
         redirectUrlWhitelist: ['https://example.com/callback', 'https://app.com/redirect'],
       });
 
-      const result = await redirectValidationService.validateRedirectUrl('https://example.com/callback');
+      const result = await redirectValidationService.validateRedirectUrl(
+        'https://example.com/callback'
+      );
 
       expect(result).toBe(true);
       expect(mockAuthConfigService.getAuthConfig).toHaveBeenCalledTimes(1);
@@ -58,7 +66,7 @@ describe('RedirectValidationService', () => {
 
       await expect(
         redirectValidationService.validateRedirectUrl('https://evil.com/callback')
-      ).rejects.toThrow('Redirect URL \'https://evil.com/callback\' is not in the allowed whitelist');
+      ).rejects.toThrow("Redirect URL 'https://evil.com/callback' is not in the allowed whitelist");
       expect(mockAuthConfigService.getAuthConfig).toHaveBeenCalledTimes(1);
     });
 
@@ -68,7 +76,9 @@ describe('RedirectValidationService', () => {
       });
 
       // Should allow URL with trailing slash removed
-      const result = await redirectValidationService.validateRedirectUrl('https://example.com/callback/');
+      const result = await redirectValidationService.validateRedirectUrl(
+        'https://example.com/callback/'
+      );
 
       expect(result).toBe(true);
       expect(mockAuthConfigService.getAuthConfig).toHaveBeenCalledTimes(1);
