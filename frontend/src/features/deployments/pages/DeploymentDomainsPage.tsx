@@ -203,6 +203,7 @@ function CustomDomainRow({
             size="sm"
             onClick={() => onRemove(domain.domain)}
             disabled={isRemoving}
+            aria-label={`Remove ${domain.domain}`}
             className="h-8 px-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -256,7 +257,9 @@ export default function DeploymentDomainsPage() {
   const savedCustomSlug = extractSlugFromUrl(customDomainUrl);
 
   const handleCopyDefaultDomain = async () => {
-    if (!defaultDomain) return;
+    if (!defaultDomain) {
+      return;
+    }
     try {
       await navigator.clipboard.writeText(defaultDomain);
       setCopiedDefault(true);
@@ -267,7 +270,9 @@ export default function DeploymentDomainsPage() {
   };
 
   const handleCopyCustomDomain = async () => {
-    if (!customDomainUrl) return;
+    if (!customDomainUrl) {
+      return;
+    }
     try {
       await navigator.clipboard.writeText(customDomainUrl);
       setCopiedCustom(true);
@@ -317,7 +322,9 @@ export default function DeploymentDomainsPage() {
 
   const handleAddDomain = async () => {
     const trimmed = newDomain.trim().toLowerCase();
-    if (!trimmed) return;
+    if (!trimmed) {
+      return;
+    }
     try {
       await addDomain(trimmed);
       setNewDomain('');
@@ -571,7 +578,9 @@ export default function DeploymentDomainsPage() {
                   onChange={(e) => setNewDomain(e.target.value)}
                   placeholder="myapp.com"
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && newDomain.trim()) void handleAddDomain();
+                    if (e.key === 'Enter' && newDomain.trim()) {
+                      void handleAddDomain();
+                    }
                   }}
                   autoFocus
                 />

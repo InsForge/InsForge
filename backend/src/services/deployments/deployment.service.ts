@@ -866,7 +866,18 @@ export class DeploymentService {
       logger.info('Custom domain added', { domain, verified: vercelData.verified });
       return result.rows[0] as AddCustomDomainResponse;
     } catch (error) {
-      if (error instanceof AppError) throw error;
+      if (error instanceof AppError) {
+        throw error;
+      }
+      // DB insert failed — remove domain from Vercel to avoid stranding it
+      try {
+        await this.vercelProvider.removeCustomDomain(domain);
+      } catch (rollbackErr) {
+        logger.warn('Failed to rollback Vercel domain after DB error', {
+          error: rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr),
+          domain,
+        });
+      }
       logger.error('Failed to persist custom domain', {
         error: error instanceof Error ? error.message : String(error),
         domain,
@@ -931,7 +942,15 @@ export class DeploymentService {
     // Remove from Vercel (best-effort – don't fail if already gone)
     await this.vercelProvider.removeCustomDomain(domain);
 
-    await this.getPool().query(`DELETE FROM system.custom_domains WHERE domain = $1`, [domain]);
+    try {
+      await this.getPool().query(`DELETE FROM system.custom_domains WHERE domain = $1`, [domain]);
+    } catch (error) {
+      logger.error('Failed to delete custom domain from DB after Vercel removal', {
+        error: error instanceof Error ? error.message : String(error),
+        domain,
+      });
+      throw new AppError('Failed to remove custom domain', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
 
     logger.info('Custom domain removed', { domain });
   }
@@ -961,9 +980,16 @@ export class DeploymentService {
 
     const newStatus = vercelResult.verified ? 'VERIFIED' : 'PENDING';
 
+    const verificationRecord = vercelResult.verification?.[0];
+
     const result = await this.getPool().query(
       `UPDATE system.custom_domains
-       SET status = $1, error = NULL, updated_at = NOW()
+       SET status = $1,
+           error = NULL,
+           verification_type = $3,
+           verification_domain = $4,
+           verification_value = $5,
+           updated_at = NOW()
        WHERE domain = $2
        RETURNING
          id,
@@ -977,7 +1003,13 @@ export class DeploymentService {
          error,
          created_at as "createdAt",
          updated_at as "updatedAt"`,
-      [newStatus, domain]
+      [
+        newStatus,
+        domain,
+        verificationRecord?.type ?? null,
+        verificationRecord?.domain ?? null,
+        verificationRecord?.value ?? null,
+      ]
     );
 
     logger.info('Custom domain verification result', { domain, verified: vercelResult.verified });
