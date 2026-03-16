@@ -64,11 +64,8 @@ export class PostgrestProxyService {
   private static instance: PostgrestProxyService;
   private tokenManager = TokenManager.getInstance();
   private secretService = SecretService.getInstance();
-  private adminToken: string;
 
-  private constructor() {
-    this.adminToken = this.tokenManager.generateApiKeyToken();
-  }
+  private constructor() {}
 
   public static getInstance(): PostgrestProxyService {
     if (!PostgrestProxyService.instance) {
@@ -114,10 +111,12 @@ export class PostgrestProxyService {
     };
 
     // Use admin token if valid API key provided
+    // Generate a fresh token per request so the 30-day expiry never bites a
+    // long-running process that cached the token at startup.
     if (request.apiKey) {
       const isValid = await this.secretService.verifyApiKey(request.apiKey);
       if (isValid) {
-        axiosConfig.headers.authorization = `Bearer ${this.adminToken}`;
+        axiosConfig.headers.authorization = `Bearer ${this.tokenManager.generateApiKeyToken()}`;
       }
     }
 

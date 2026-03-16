@@ -304,12 +304,16 @@ export async function createApp() {
 // Use PORT from environment variable, fallback to 7130
 const PORT = parseInt(process.env.PORT || '7130');
 
+// Module-level server reference so cleanup() can close it before process.exit
+let httpServer: ReturnType<typeof import('http').createServer> | null = null;
+
 async function initializeServer() {
   try {
     const app = await createApp();
     const server = app.listen(PORT, () => {
       logger.info(`Backend API service listening on port ${PORT}`);
     });
+    httpServer = server;
 
     // Initialize Socket.IO service
     const socketService = SocketManager.getInstance();
@@ -380,6 +384,22 @@ async function cleanup() {
     destroyEmailCooldownInterval();
   } catch (error) {
     logger.error('Error clearing email cooldown interval', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  // Close HTTP server to stop accepting new connections and drain in-flight requests
+  if (httpServer) {
+    await new Promise<void>((resolve) => {
+      httpServer!.close(() => resolve());
+    });
+  }
+
+  // Drain the database connection pool
+  try {
+    await DatabaseManager.getInstance().close();
+  } catch (error) {
+    logger.error('Error closing database pool', {
       error: error instanceof Error ? error.message : String(error),
     });
   }

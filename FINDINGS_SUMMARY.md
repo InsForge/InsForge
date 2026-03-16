@@ -8,9 +8,9 @@
 
 | # | Issue | Category | Impact | Difficulty | Time | Status |
 |---|-------|----------|--------|-----------|------|--------|
-| 1 | Silent Error Handling in DB Transactions | Reliability | 🔴 CRITICAL | MEDIUM | 2-3h | Must Fix |
-| 2 | Missing Graceful Shutdown | Reliability | 🔴 HIGH | HARD | 3-4h | Critical |
-| 3 | API Key Token Never Expires | 🔒 Security | 🔴 CRITICAL | EASY | 1-2h | Must Fix |
+| 1 | Silent Error Handling in DB Transactions | Reliability | 🔴 CRITICAL | MEDIUM | 2-3h | ✅ Resolved in PR #878 |
+| 2 | Missing Graceful Shutdown | Reliability | 🔴 HIGH | HARD | 3-4h | ✅ Resolved in PR #878 |
+| 3 | API Key Token Never Expires | 🔒 Security | 🔴 CRITICAL | EASY | 1-2h | ✅ Resolved in PR #878 |
 | 4 | Unhandled Storage Errors | Reliability | 🟡 MEDIUM | MEDIUM | 2-3h | Important |
 | 5 | Missing Error Context in Auth | Debug/UX | 🟡 MEDIUM | EASY | 1-2h | Nice-to-have |
 | 6 | Database Pool Optimization | Performance | 🟡 MEDIUM | HARD | 4-5h | Important |
@@ -21,10 +21,10 @@
 
 ## 🔴 CRITICAL ISSUES
 
-### Issue #1: Silent Error Handling in Database Transactions
-**Problem:** `.catch(() => {})` silently swallows transaction rollback errors  
-**Impact:** Production data corruption not visible, debugging impossible  
-**Files Affected:** 4 core services (realtime, deployments, functions)  
+### Issue #1 (✅ Resolved in PR #878): Silent Error Handling in Database Transactions
+**Previous Problem:** `.catch(() => {})` silently swallowed transaction rollback errors  
+**Impact (before fix):** Production data corruption not visible, debugging impossible  
+**Files Fixed:** `realtime-auth.service.ts`, `realtime-message.service.ts`, `deployment.service.ts`  
 **Fix Complexity:** Medium - Proper error logging and cleanup  
 **Business Value:** 🔥 CRITICAL - Prevents data corruption in production
 
@@ -51,10 +51,10 @@
 
 ---
 
-### Issue #2: Missing Graceful Shutdown for Background Intervals
-**Problem:** `setInterval()` timers not cleaned up on shutdown  
-**Impact:** Memory leaks, hanging deployments, container timeouts  
-**Files Affected:** Multiple services (OAuth, Functions, etc.)  
+### Issue #2 (✅ Resolved in PR #878): Missing Graceful Shutdown for Background Timers
+**Previous Problem:** Background timers/intervals not cleaned up on shutdown  
+**Impact (before fix):** Memory leaks, hanging deployments, container timeouts  
+**Files Fixed:** `function.service.ts`, `server.ts` (HTTP server close + DB pool drain added)  
 **Fix Complexity:** Hard - Requires coordination across services  
 **Business Value:** 🔥 CRITICAL - Causes deployment failures
 
@@ -83,10 +83,10 @@ destroy(): void {
 
 ---
 
-### Issue #3: API Key Token Never Expires 🔒
-**Problem:** Generated tokens have no expiration time  
-**Impact:** Security risk - compromised keys are valid forever  
-**Files Affected:** Auth service  
+### Issue #3 (✅ Resolved in PR #878): API Key Token Never Expires 🔒
+**Previous Problem:** Generated tokens had no expiration time  
+**Impact (before fix):** Security risk - compromised keys were valid forever  
+**Files Fixed:** `token.manager.ts` (30-day expiry added), `postgrest-proxy.service.ts` (fresh token per request to avoid stale-cached token)  
 **Fix Complexity:** Easy - Add expiration logic  
 **Business Value:** 🔥 SECURITY CRITICAL
 

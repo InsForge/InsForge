@@ -7,30 +7,14 @@ This document identifies 8 high-impact, production-ready pull request opportunit
 
 ## 🔴 HIGH IMPACT ISSUES
 
-### 1. **Silent Error Handling in Database Transactions (CRITICAL)**
+### 1. ✅ **Silent Error Handling in Database Transactions (CRITICAL) — Resolved in PR #878**
 
 **Issue Title:** Fix Silent Error Swallowing in Transaction Rollbacks
 
 **Description:**
-Multiple critical services use `.catch(() => {})` to silently catch errors during transaction rollbacks. This anti-pattern masks database failures and makes debugging extremely difficult.
+Multiple critical services used `.catch(() => {})` to silently catch errors during transaction rollbacks. This anti-pattern masked database failures. Now fixed in PR #878 with proper try/catch logging and rethrowing of non-RLS errors.
 
-**Current Code Problem:**
-```typescript
-// File: backend/src/services/realtime/realtime-message.service.ts (Line 96)
-try {
-  // ... do database work
-  return { /* success */ };
-} catch (error) {
-  // Rollback transaction on error
-  await client.query('ROLLBACK').catch(() => {});  // ❌ SILENT ERROR!
-  
-  logger.debug('Message insert denied or failed', { channelName, eventName, userId, error });
-  return null;
-}
-
-// File: backend/src/services/deployments/deployment.service.ts (Line 313)
-}).catch(() => {});  // ❌ Another silent catch
-```
+> **Note:** The code snippets below illustrate the *pre-fix* pattern. They no longer reflect the current implementation.
 
 **Business Impact:**
 - Database transaction failures go unnoticed
@@ -98,36 +82,14 @@ try {
 
 ---
 
-### 2. **Missing Graceful Shutdown for Background Intervals (HIGH)**
+### 2. ✅ **Missing Graceful Shutdown for Background Intervals (HIGH) — Resolved in PR #878**
 
 **Issue Title:** Implement Proper Cleanup for Background Intervals on Server Shutdown
 
 **Description:**
-Multiple services use `setInterval()` but don't properly clean up these intervals during server shutdown. This can cause memory leaks and hanging processes.
+Multiple services used `setInterval()` but didn't properly clean up on server shutdown. Fixed in PR #878 with `FunctionService.destroy()`, HTTP server close, and database pool drain before `process.exit`.
 
-**Current Code Problem:**
-```typescript
-// File: backend/src/services/auth/oauth-pkce.service.ts
-export class OAuthPKCEService {
-  private static instance: OAuthPKCEService;
-  private cleanupInterval: ReturnType<typeof setInterval> | null = null;
-
-  private constructor() {
-    // Cleanup interval reference (for graceful shutdown)
-    this.cleanupInterval = setInterval(() => this.cleanupExpiredCodes(), this.CLEANUP_INTERVAL_MS);
-  }
-
-  // ❌ NO CLEANUP METHOD EXISTS!
-  // cleanupExpired codes runs every 60 seconds but is never stopped
-}
-
-// File: backend/src/server.ts - Server shutdown
-process.on('SIGTERM', async () => {
-  logger.info('Shutting down gracefully...');
-  // ❌ MISSING: OAuth PKCE cleanup not called
-  // ❌ MISSING: Function service cleanup not called
-  // ❌ MISSING: Other service cleanups not called
-});
+> **Note:** The code snippets below illustrate the *pre-fix* pattern.
 ```
 
 **Business Impact:**
@@ -949,20 +911,21 @@ DB_STATEMENT_TIMEOUT_MS=30000
 
 ---
 
-### 7. **API Key Token Never Expires (SECURITY) (HIGH)**
+### 7. ✅ **API Key Token Never Expires (SECURITY) (HIGH) — Resolved in PR #878**
 
 **Issue Title:** Remove Non-Expiring API Key Tokens and Implement Proper Key Rotation
 
 **Description:**
-The system generates API key tokens with no expiration time. This violates security best practices and creates security risks if keys are compromised.
+The system previously generated API key tokens with no expiration time. Fixed in PR #878 by adding `expiresIn: '30d'` and generating a fresh token per PostgREST request (instead of caching at startup) so long-running deployments aren't broken.
 
-**Current Code Problem:**
+> **Note:** The code snippets below illustrate the *pre-fix* pattern.
+
+**Pre-fix Code:**
 ```typescript
-// File: backend/src/infra/security/token.manager.ts (Line 69-77)
+// File: backend/src/infra/security/token.manager.ts (before PR #878)
 
 /**
- * Generate API key token (never expires)
- * Used for internal API key authenticated requests to PostgREST
+ * Generate API key token (never expires — pre-fix)
  */
 generateApiKeyToken(): string {
   const payload = {
