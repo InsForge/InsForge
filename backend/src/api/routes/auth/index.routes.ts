@@ -531,21 +531,27 @@ router.get('/users', verifyAdmin, async (req: Request, res: Response, next: Next
     const queryParams = queryValidation.success ? queryValidation.data : req.query;
     const { limit = '10', offset = '0', search, roleFilter = 'users' } = queryParams || {};
 
-    const parsedLimit = parseInt(limit as string);
-    const parsedOffset = parseInt(offset as string);
+    const parsedLimit = Number.parseInt(String(limit), 10);
+    const parsedOffset = Number.parseInt(String(offset), 10);
+    const validatedLimit = Number.isNaN(parsedLimit) ? 10 : parsedLimit;
+    const validatedOffset = Number.isNaN(parsedOffset) ? 0 : parsedOffset;
+    const validatedRoleFilter =
+      roleFilter === 'admins' || roleFilter === 'all' || roleFilter === 'users'
+        ? roleFilter
+        : 'users';
 
     const { users, total } = await authService.listUsers(
-      parsedLimit,
-      parsedOffset,
+      validatedLimit,
+      validatedOffset,
       search as string | undefined,
-      roleFilter as 'users' | 'admins' | 'all'
+      validatedRoleFilter
     );
 
     const response: ListUsersResponse = {
       data: users,
       pagination: {
-        offset: parsedOffset,
-        limit: parsedLimit,
+        offset: validatedOffset,
+        limit: validatedLimit,
         total: total,
       },
     };
@@ -559,7 +565,7 @@ router.get('/users', verifyAdmin, async (req: Request, res: Response, next: Next
 router.patch(
   '/users/:userId/admin',
   verifyAdmin,
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const userIdValidation = userIdSchema.safeParse(req.params.userId);
       if (!userIdValidation.success) {
@@ -579,6 +585,26 @@ router.patch(
         userIdValidation.data,
         validationResult.data.isProjectAdmin
       );
+
+      try {
+        await auditService.log({
+          actor: req.user?.email || 'api-key',
+          action: 'UPDATE_USER_ADMIN_STATUS',
+          module: 'AUTH',
+          details: {
+            userId: userIdValidation.data,
+            email: user.email,
+            isProjectAdmin: validationResult.data.isProjectAdmin,
+            adminSource: user.adminSource,
+          },
+          ip_address: req.ip,
+        });
+      } catch (auditError) {
+        logger.warn('Failed to create audit log for admin status change', {
+          error: auditError instanceof Error ? auditError.message : String(auditError),
+          targetUserId: userIdValidation.data,
+        });
+      }
 
       const response: UpdateUserAdminStatusResponse = { user };
       successResponse(res, response);

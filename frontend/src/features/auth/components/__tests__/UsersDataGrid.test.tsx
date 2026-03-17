@@ -23,7 +23,11 @@ describe('createUsersColumns', () => {
     expect(roleColumn).toBeDefined();
 
     render(
-      <>{roleColumn?.renderCell?.({ row: { ...baseUser, isProjectAdmin: true, adminSource: 'bootstrap' } } as never)}</>
+      <>
+        {roleColumn?.renderCell?.({
+          row: { ...baseUser, isProjectAdmin: true, adminSource: 'bootstrap' },
+        } as never)}
+      </>
     );
 
     expect(screen.getByText('Bootstrap Admin')).toBeInTheDocument();

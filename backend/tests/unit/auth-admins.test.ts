@@ -140,7 +140,10 @@ describe('AuthService project admin support', () => {
     });
     mockGenerateAccessToken.mockReturnValue('db-admin-token');
 
-    const result = await AuthService.getInstance().adminLogin('member@example.com', 'member-password');
+    const result = await AuthService.getInstance().adminLogin(
+      'member@example.com',
+      'member-password'
+    );
 
     expect(result.accessToken).toBe('db-admin-token');
     expect(result.user.id).toBe('8b0a99a2-2787-4e2a-9ef9-19e0d7ce7f67');
@@ -220,10 +223,7 @@ describe('AuthService project admin support', () => {
     const { AuthService } = await import('../../src/services/auth/auth.service');
 
     await expect(
-      AuthService.getInstance().setProjectAdminStatus(
-        '00000000-0000-0000-0000-000000000001',
-        false
-      )
+      AuthService.getInstance().setProjectAdminStatus('00000000-0000-0000-0000-000000000001', false)
     ).rejects.toThrow(AppError);
   });
 });

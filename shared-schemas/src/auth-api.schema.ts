@@ -9,7 +9,6 @@ import {
   oAuthConfigSchema,
   oAuthProvidersSchema,
   authConfigSchema,
-  adminSourceSchema,
 } from './auth.schema';
 
 // ============================================================================
@@ -254,9 +253,7 @@ export const listUsersResponseSchema = z.object({
 });
 
 export const updateUserAdminStatusResponseSchema = z.object({
-  user: userSchema.extend({
-    adminSource: adminSourceSchema,
-  }),
+  user: userSchema,
 });
 
 /**
