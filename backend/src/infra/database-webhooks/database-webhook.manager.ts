@@ -10,6 +10,7 @@ interface DbWebhookPayload {
   table: string;
   record: Record<string, unknown> | null;
   old_record: Record<string, unknown> | null;
+  truncated?: boolean;
 }
 
 /**
@@ -91,7 +92,7 @@ export class DatabaseWebhookManager {
       return;
     }
 
-    const { event, table, record, old_record } = parsed;
+    const { event, table, record, old_record, truncated } = parsed;
 
     try {
       // Find all enabled webhooks for this table that include this event
@@ -102,11 +103,12 @@ export class DatabaseWebhookManager {
         return;
       }
 
-      const body = {
+      const body: Record<string, unknown> = {
         event,
         table,
         record: record ?? null,
         old_record: old_record ?? null,
+        ...(truncated ? { truncated: true } : {}),
       };
 
       await Promise.all(

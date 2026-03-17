@@ -95,7 +95,17 @@ BEGIN
     'old_record', v_old
   );
 
-  -- pg_notify has an 8KB payload limit; truncate if needed
+  -- pg_notify has an 8KB payload limit
+  IF octet_length(v_payload::text) > 7500 THEN
+    v_payload := jsonb_build_object(
+      'event',      TG_OP,
+      'table',      TG_TABLE_NAME,
+      'record',     NULL,
+      'old_record', NULL,
+      'truncated',  TRUE
+    );
+  END IF;
+
   PERFORM pg_notify('db_webhook', v_payload::text);
 
   -- Return appropriate row
