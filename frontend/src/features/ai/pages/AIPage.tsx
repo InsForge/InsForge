@@ -1,10 +1,10 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { Loader2, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Settings } from 'lucide-react';
 import { useAIConfigs } from '../hooks/useAIConfigs';
 import { useAIRemainingCredits } from '../hooks/useAIUsage';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
-import { Tabs, Tab, ConfirmDialog } from '@insforge/ui';
+import { Tabs, Tab, ConfirmDialog, Button } from '@insforge/ui';
 import {
   generateProviderTabs,
   filterModelsByProvider,
@@ -13,7 +13,7 @@ import {
   type SortField,
   type SortDirection,
 } from '../helpers';
-import { ModelRow } from '../components';
+import { ModelRow, GatewayConfigDialog } from '../components';
 import type { AIModelSchema } from '@insforge/shared-schemas';
 
 export default function AIPage() {
@@ -38,6 +38,7 @@ export default function AIPage() {
   const [activeTab, setActiveTab] = useState<string>('');
   const [sortField, setSortField] = useState<SortField>('inputPrice');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [gatewayConfigOpen, setGatewayConfigOpen] = useState(false);
 
   // Set default active tab when providers are loaded
   useEffect(() => {
@@ -153,13 +154,25 @@ export default function AIPage() {
       <div className="flex flex-col items-center px-10 flex-shrink-0">
         <div className="max-w-[1024px] w-full flex flex-col gap-6 pt-10 pb-3">
           <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-medium text-foreground leading-8">Model Gateway</h1>
-              {credits?.remaining && (
-                <span className="text-sm font-normal text-primary mt-[2.5px]">
-                  {formatCredits(credits.remaining)} credit{credits.remaining !== 1 ? 's' : ''} left
-                </span>
-              )}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-medium text-foreground leading-8">Model Gateway</h1>
+                {credits?.remaining && (
+                  <span className="text-sm font-normal text-primary mt-[2.5px]">
+                    {formatCredits(credits.remaining)} credit{credits.remaining !== 1 ? 's' : ''}{' '}
+                    left
+                  </span>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setGatewayConfigOpen(true)}
+                className="flex items-center gap-1.5 shrink-0"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                Gateway credentials
+              </Button>
             </div>
             <p className="text-sm leading-5 text-muted-foreground">
               Your models are ready — build LLM-powered features or add more integrations.
@@ -267,6 +280,9 @@ export default function AIPage() {
 
       {/* Confirm Dialog */}
       <ConfirmDialog {...confirmDialogProps} />
+
+      {/* Gateway Credentials Dialog */}
+      <GatewayConfigDialog open={gatewayConfigOpen} onOpenChange={setGatewayConfigOpen} />
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
 import { AIConfigService } from '@/services/ai/ai-config.service.js';
 import { AIUsageService } from '@/services/ai/ai-usage.service.js';
+import { AIGatewayConfigService } from '@/services/ai/ai-gateway-config.service.js';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import logger from '@/utils/logger.js';
@@ -20,6 +21,7 @@ import {
   chatCompletionRequestSchema,
   imageGenerationRequestSchema,
   embeddingsRequestSchema,
+  setGatewayBYOKKeyRequestSchema,
 } from '@insforge/shared-schemas';
 
 const router = Router();
@@ -27,6 +29,7 @@ const chatService = ChatCompletionService.getInstance();
 const aiConfigService = AIConfigService.getInstance();
 const aiUsageService = AIUsageService.getInstance();
 const auditService = AuditService.getInstance();
+const aiGatewayConfigService = AIGatewayConfigService.getInstance();
 
 /**
  * GET /api/ai/models
@@ -506,6 +509,108 @@ router.post(
         next(
           new AppError(
             error instanceof Error ? error.message : 'Failed to generate embeddings',
+            500,
+            ERROR_CODES.INTERNAL_ERROR
+          )
+        );
+      }
+    }
+  }
+);
+
+/**
+ * GET /api/ai/gateway/config
+ * Get current AI gateway credential configuration (key source + masked key status)
+ */
+router.get(
+  '/gateway/config',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const config = await aiGatewayConfigService.getConfig();
+      successResponse(res, config);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /api/ai/gateway/config
+ * Set a developer-provided (BYOK) OpenRouter API key
+ */
+router.post(
+  '/gateway/config',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validationResult = setGatewayBYOKKeyRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          `Validation error: ${validationResult.error.errors.map((e) => e.message).join(', ')}`,
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      await aiGatewayConfigService.setBYOKKey(validationResult.data.apiKey);
+
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'SET_BYOK_OPENROUTER_KEY',
+        module: 'AI',
+        details: {},
+        ip_address: req.ip,
+      });
+
+      successResponse(res, { message: 'OpenRouter API key configured successfully' });
+    } catch (error) {
+      if (error instanceof AppError) {
+        next(error);
+      } else {
+        next(
+          new AppError(
+            error instanceof Error ? error.message : 'Failed to configure API key',
+            500,
+            ERROR_CODES.INTERNAL_ERROR
+          )
+        );
+      }
+    }
+  }
+);
+
+/**
+ * DELETE /api/ai/gateway/config
+ * Remove the BYOK OpenRouter API key, reverting to the default credential source
+ */
+router.delete(
+  '/gateway/config',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const removed = await aiGatewayConfigService.removeBYOKKey();
+
+      if (!removed) {
+        throw new AppError('No BYOK key configured', 404, ERROR_CODES.NOT_FOUND);
+      }
+
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'REMOVE_BYOK_OPENROUTER_KEY',
+        module: 'AI',
+        details: {},
+        ip_address: req.ip,
+      });
+
+      successResponse(res, { message: 'OpenRouter API key removed successfully' });
+    } catch (error) {
+      if (error instanceof AppError) {
+        next(error);
+      } else {
+        next(
+          new AppError(
+            error instanceof Error ? error.message : 'Failed to remove API key',
             500,
             ERROR_CODES.INTERNAL_ERROR
           )

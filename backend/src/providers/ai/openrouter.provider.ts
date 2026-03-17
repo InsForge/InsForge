@@ -4,6 +4,7 @@ import { isCloudEnvironment } from '@/utils/environment.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
+import { SecretService } from '@/services/secrets/secret.service.js';
 
 interface CloudCredentialsResponse {
   openrouter?: {
@@ -41,6 +42,8 @@ interface OpenRouterLimitation {
   };
 }
 
+export const BYOK_SECRET_KEY = 'AI_GATEWAY_OPENROUTER_KEY';
+
 export class OpenRouterProvider {
   private static instance: OpenRouterProvider;
   private cloudCredentials: CloudCredentials | undefined;
@@ -74,11 +77,42 @@ export class OpenRouterProvider {
   }
 
   /**
-   * Get OpenRouter API key based on environment
-   * In cloud environment: fetches from cloud API with JWT authentication
-   * In local environment: returns from environment variable
+   * Get BYOK API key from secrets store (developer-provided key)
+   * Returns null if no BYOK key is configured
+   */
+  private async getBYOKApiKey(): Promise<string | null> {
+    try {
+      const secretService = SecretService.getInstance();
+      return await secretService.getSecretByKey(BYOK_SECRET_KEY);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Clear cached key and client, forcing re-resolution on next request.
+   * Call this after updating or removing the BYOK key.
+   */
+  clearKeyCache(): void {
+    this.openRouterClient = null;
+    this.currentApiKey = undefined;
+    this.cloudCredentials = undefined;
+  }
+
+  /**
+   * Get OpenRouter API key with priority order:
+   * 1. Developer-provided BYOK key (stored in secrets)
+   * 2. InsForge Cloud-managed key (cloud environment only)
+   * 3. OPENROUTER_API_KEY environment variable (self-hosted fallback)
    */
   async getApiKey(): Promise<string> {
+    // 1. Check for BYOK key (highest priority for both cloud and self-hosted)
+    const byokKey = await this.getBYOKApiKey();
+    if (byokKey) {
+      return byokKey;
+    }
+
+    // 2. Cloud environment: fetch from InsForge Cloud
     if (isCloudEnvironment()) {
       if (this.cloudCredentials) {
         return this.cloudCredentials.apiKey;
@@ -87,10 +121,11 @@ export class OpenRouterProvider {
       }
     }
 
+    // 3. Self-hosted: env variable fallback
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
       throw new AppError(
-        'OPENROUTER_API_KEY not found in environment variables',
+        'OpenRouter API key not configured. Set it via the AI Gateway dashboard or OPENROUTER_API_KEY environment variable.',
         500,
         ERROR_CODES.AI_INVALID_API_KEY
       );
@@ -117,13 +152,22 @@ export class OpenRouterProvider {
   }
 
   /**
-   * Check if AI services are properly configured
+   * Check if AI services are properly configured (sync, env-only check)
    */
   isConfigured(): boolean {
     if (isCloudEnvironment()) {
       return true;
     }
     return !!process.env.OPENROUTER_API_KEY;
+  }
+
+  /**
+   * Check if AI services are properly configured (async, includes BYOK check)
+   */
+  async isConfiguredAsync(): Promise<boolean> {
+    const byokKey = await this.getBYOKApiKey();
+    if (byokKey) return true;
+    return this.isConfigured();
   }
 
   /**

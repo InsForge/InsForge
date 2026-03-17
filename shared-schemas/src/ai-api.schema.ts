@@ -308,6 +308,20 @@ export const getAIUsageSummaryRequestSchema = z.object({
   endDate: z.string().datetime().optional(),
 });
 
+// ============= AI Gateway BYOK Schemas =============
+
+export const keySourceSchema = z.enum(['byok', 'cloud', 'env', 'unconfigured']);
+
+export const gatewayConfigResponseSchema = z.object({
+  keySource: keySourceSchema,
+  hasByokKey: z.boolean(),
+  maskedKey: z.string().optional(),
+});
+
+export const setGatewayBYOKKeyRequestSchema = z.object({
+  apiKey: z.string().min(1, 'API key is required'),
+});
+
 // Export types
 export type ToolFunction = z.infer<typeof toolFunctionSchema>;
 export type Tool = z.infer<typeof toolSchema>;
@@ -337,3 +351,6 @@ export type UpdateAIConfigurationRequest = z.infer<typeof updateAIConfigurationR
 export type ListAIUsageResponse = z.infer<typeof listAIUsageResponseSchema>;
 export type GetAIUsageRequest = z.infer<typeof getAIUsageRequestSchema>;
 export type GetAIUsageSummaryRequest = z.infer<typeof getAIUsageSummaryRequestSchema>;
+export type KeySource = z.infer<typeof keySourceSchema>;
+export type GatewayConfigResponse = z.infer<typeof gatewayConfigResponseSchema>;
+export type SetGatewayBYOKKeyRequest = z.infer<typeof setGatewayBYOKKeyRequestSchema>;
