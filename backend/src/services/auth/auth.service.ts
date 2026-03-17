@@ -615,6 +615,18 @@ export class AuthService {
         throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
       }
 
+      const authConfigService = AuthConfigService.getInstance();
+      const emailAuthConfig = await authConfigService.getAuthConfig();
+
+      if (emailAuthConfig.requireEmailVerification && !dbUser.email_verified) {
+        throw new AppError(
+          'Email verification required',
+          403,
+          ERROR_CODES.FORBIDDEN,
+          'Please verify your email address before logging in'
+        );
+      }
+
       const user = this.transformUserRecordToSchema(dbUser);
       const accessToken = this.tokenManager.generateAccessToken({
         sub: user.id,
@@ -1350,7 +1362,7 @@ export class AuthService {
       throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
     }
 
-    if (existingUser.is_anonymous) {
+    if (isProjectAdmin && existingUser.is_anonymous) {
       throw new AppError(
         'Anonymous users cannot be promoted to admin',
         400,

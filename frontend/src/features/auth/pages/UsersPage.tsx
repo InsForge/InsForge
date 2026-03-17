@@ -69,7 +69,7 @@ export default function UsersPage() {
   // Clear selection when the visible dataset changes
   useEffect(() => {
     setSelectedRows(new Set());
-  }, [currentPage, roleFilter, searchQuery]);
+  }, [currentPage, roleFilter, searchQuery, users]);
 
   // Apply sorting to users data
   const sortedUsers = useMemo(() => {

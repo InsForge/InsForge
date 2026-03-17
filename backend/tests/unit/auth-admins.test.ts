@@ -39,7 +39,23 @@ vi.mock('../../src/services/auth/oauth-config.service', () => ({
 }));
 
 vi.mock('../../src/services/auth/auth-config.service', () => ({
-  AuthConfigService: { getInstance: () => ({}) },
+  AuthConfigService: {
+    getInstance: () => ({
+      getAuthConfig: vi.fn().mockResolvedValue({
+        requireEmailVerification: true,
+        passwordMinLength: 8,
+        requireNumber: false,
+        requireLowercase: false,
+        requireUppercase: false,
+        requireSpecialChar: false,
+        verifyEmailMethod: 'code',
+        resetPasswordMethod: 'code',
+        signInRedirectTo: null,
+        createdAt: '2026-03-01T00:00:00.000Z',
+        updatedAt: '2026-03-01T00:00:00.000Z',
+      }),
+    }),
+  },
 }));
 
 vi.mock('../../src/services/auth/auth-otp.service', () => ({
@@ -183,6 +199,34 @@ describe('AuthService project admin support', () => {
     ).rejects.toThrow(AppError);
   });
 
+  it('rejects unverified database admins when email verification is required', async () => {
+    const { AuthService } = await import('../../src/services/auth/auth.service');
+    const hashedPassword = await bcrypt.hash('member-password', 4);
+
+    mockPool.query.mockResolvedValueOnce({
+      rows: [
+        {
+          id: '8b0a99a2-2787-4e2a-9ef9-19e0d7ce7f67',
+          email: 'member@example.com',
+          password: hashedPassword,
+          email_verified: false,
+          is_project_admin: true,
+          is_anonymous: false,
+          profile: { name: 'Member Admin' },
+          metadata: {},
+          created_at: '2026-03-01T00:00:00.000Z',
+          updated_at: '2026-03-01T00:00:00.000Z',
+          providers: 'email',
+        },
+      ],
+    });
+
+    await expect(
+      AuthService.getInstance().adminLogin('member@example.com', 'member-password')
+    ).rejects.toThrow(AppError);
+    expect(mockGenerateAccessToken).not.toHaveBeenCalled();
+  });
+
   it('lists admins when roleFilter is admins', async () => {
     const { AuthService } = await import('../../src/services/auth/auth.service');
 
@@ -225,5 +269,51 @@ describe('AuthService project admin support', () => {
     await expect(
       AuthService.getInstance().setProjectAdminStatus('00000000-0000-0000-0000-000000000001', false)
     ).rejects.toThrow(AppError);
+  });
+
+  it('allows anonymous users to be demoted from admin', async () => {
+    const { AuthService } = await import('../../src/services/auth/auth.service');
+
+    mockPool.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'd10f0e33-083f-435e-96ee-d4dff79eae1d',
+            email: 'anon@example.com',
+            password: null,
+            email_verified: false,
+            is_project_admin: true,
+            is_anonymous: true,
+            profile: null,
+            metadata: {},
+            created_at: '2026-03-01T00:00:00.000Z',
+            updated_at: '2026-03-01T00:00:00.000Z',
+            providers: 'anonymous',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'd10f0e33-083f-435e-96ee-d4dff79eae1d',
+            email: 'anon@example.com',
+            profile: null,
+            metadata: {},
+            email_verified: false,
+            is_project_admin: false,
+            is_anonymous: true,
+            created_at: '2026-03-01T00:00:00.000Z',
+            updated_at: '2026-03-02T00:00:00.000Z',
+            providers: 'anonymous',
+          },
+        ],
+      });
+
+    const result = await AuthService.getInstance().setProjectAdminStatus(
+      'd10f0e33-083f-435e-96ee-d4dff79eae1d',
+      false
+    );
+
+    expect(result.isProjectAdmin).toBe(false);
   });
 });
