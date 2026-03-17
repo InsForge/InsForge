@@ -63,6 +63,7 @@ export interface DataGridProps<TRow extends DataGridRowType = DataGridRow> {
   gridContainerClassName?: string;
   rowClass?: (row: TRow) => string | undefined;
   rightPanel?: React.ReactNode;
+  onColumnResize?: (columnKey: string, width: number) => void;
 }
 
 // Main DataGrid component
@@ -100,6 +101,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
   gridContainerClassName,
   rowClass,
   rightPanel,
+  onColumnResize,
 }: DataGridProps<TRow>) {
   const { resolvedTheme } = useTheme();
 
@@ -245,6 +247,27 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
     selectionHeaderLabel,
   ]);
 
+  const handleColumnResize = useCallback(
+    (columnIndex: number, width: number) => {
+      if (!onColumnResize) {
+        return;
+      }
+
+      const resizedColumn = gridColumns[columnIndex];
+      if (!resizedColumn) {
+        return;
+      }
+
+      const columnKey = String(resizedColumn.key);
+      if (columnKey === SELECT_COLUMN_KEY) {
+        return;
+      }
+
+      onColumnResize(columnKey, width);
+    },
+    [gridColumns, onColumnResize]
+  );
+
   // Loading state - only show full loading screen if not sorting
   if (loading && !isSorting) {
     return (
@@ -278,6 +301,7 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
             sortColumns={sortColumns || []}
             onSortColumnsChange={onSortColumnsChange}
             onCellClick={onCellClick}
+            onColumnResize={onColumnResize ? handleColumnResize : undefined}
             rowClass={rowClass}
             className={cn(
               `h-full fill-grid insforge-rdg ${resolvedTheme === 'dark' ? 'rdg-dark' : 'rdg-light'}`,

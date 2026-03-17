@@ -357,16 +357,21 @@ export function TableForm({
       void queryClient.invalidateQueries({ queryKey: ['database-metadata'] });
       void queryClient.invalidateQueries({ queryKey: ['tables'] });
       void queryClient.invalidateQueries({ queryKey: ['metadata'] });
+      void queryClient.invalidateQueries({ queryKey: ['tables', editTable?.tableName, 'schema'] });
+      void queryClient.invalidateQueries({ queryKey: ['tables', data.tableName, 'schema'] });
 
       // Invalidate all table data queries for this table (with all parameter combinations)
       void queryClient.invalidateQueries({ queryKey: ['table', editTable?.tableName] });
+      void queryClient.invalidateQueries({ queryKey: ['records', editTable?.tableName] });
+      void queryClient.invalidateQueries({ queryKey: ['records', data.tableName] });
 
       showToast(`Table "${data.tableName}" updated successfully!`, 'success');
 
       form.reset();
       setError(null);
       setForeignKeys([]);
-      onSuccess?.();
+      setForeignKeysDirty(false);
+      onSuccess?.(data.tableName);
     },
     onError: (err) => {
       // Invalidate queries to ensure we have fresh data after failed request
