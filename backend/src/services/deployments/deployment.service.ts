@@ -1,6 +1,7 @@
 import { Pool } from 'pg';
 import AdmZip from 'adm-zip';
 import jwt from 'jsonwebtoken';
+import fs from "fs";
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { VercelProvider } from '@/providers/deployments/vercel.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
@@ -70,10 +71,13 @@ export class DeploymentService {
    * Only available in cloud environment
    */
   isConfigured(): boolean {
-    if (!isCloudEnvironment()) {
-      return false;
+    // Cloud deployments require both Vercel and S3
+    if (isCloudEnvironment()) {
+      return this.vercelProvider.isConfigured() && this.s3Provider !== null;
     }
-    return this.vercelProvider.isConfigured() && this.s3Provider !== null;
+    // Self-hosted deployments only require Vercel credentials
+    return this.vercelProvider.isConfigured();
+
   }
 
   /**
@@ -81,21 +85,23 @@ export class DeploymentService {
    * Returns presigned URL for uploading source zip file
    */
   async createDeployment(): Promise<CreateDeploymentResponse> {
-    if (!isCloudEnvironment()) {
-      throw new AppError(
-        'Deployments are only available in cloud environment.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
-
-    if (!this.s3Provider) {
+    // Cloud deployments require S3
+    if (isCloudEnvironment() && !this.s3Provider) {
       throw new AppError(
         'S3 storage is required for deployments. Please configure AWS_S3_BUCKET.',
         503,
         ERROR_CODES.INTERNAL_ERROR
       );
     }
+
+    // TODO:
+    // if (!this.s3Provider) {
+    //   throw new AppError(
+    //     'S3 storage is required for deployments. Please configure AWS_S3_BUCKET.',
+    //     503,
+    //     ERROR_CODES.INTERNAL_ERROR
+    //   );
+    // }
 
     try {
       // Create deployment record in database with WAITING status
@@ -117,22 +123,39 @@ export class DeploymentService {
       const deployment = result.rows[0] as DeploymentRecord;
 
       // Generate presigned URL for uploading zip file (reuse existing storage method)
-      const uploadInfo = await this.s3Provider.getUploadStrategy(
-        DEPLOYMENT_BUCKET,
-        getDeploymentKey(deployment.id),
-        { size: 100 * 1024 * 1024 } // 100MB max
-      );
+      // Cloud deployment s3 staging
+      if(isCloudEnvironment()) {
+        const uploadInfo = await this.s3Provider?.getUploadStrategy(
+          DEPLOYMENT_BUCKET,
+          getDeploymentKey(deployment.id),
+          { size: 100 * 1024 * 1024 } // 100MB max
+        );
+        
+        return {
+          id: deployment.id,
+          uploadUrl: uploadInfo!?.uploadUrl,
+          uploadFields: uploadInfo?.fields || {},
+        }
+      }
+
+      // const uploadInfo = await this.s3Provider.getUploadStrategy(
+      //   DEPLOYMENT_BUCKET,
+      //   getDeploymentKey(deployment.id),
+      //   { size: 100 * 1024 * 1024 } // 100MB max
+      // );
 
       logger.info('Deployment record created', {
         id: deployment.id,
         status: deployment.status,
+        mode: isCloudEnvironment() ? "cloud" : "self-hosted"
       });
 
-      return {
-        id: deployment.id,
-        uploadUrl: uploadInfo.uploadUrl,
-        uploadFields: uploadInfo.fields || {},
-      };
+    // Self-hosted → upload directly to backend
+    return {
+      id: deployment.id,
+      uploadUrl: `/api/deployments/${deployment.id}/upload`,
+      uploadFields: {},
+    }; 
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
@@ -148,21 +171,21 @@ export class DeploymentService {
    * Start a deployment - download zip from S3, extract, upload to Vercel, create deployment
    */
   async startDeployment(id: string, input: StartDeploymentRequest = {}): Promise<DeploymentRecord> {
-    if (!isCloudEnvironment()) {
-      throw new AppError(
-        'Deployments are only available in cloud environment.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
+    // if (!isCloudEnvironment()) {
+    //   throw new AppError(
+    //     'Deployments are only available in cloud environment.',
+    //     503,
+    //     ERROR_CODES.INTERNAL_ERROR
+    //   );
+    // }
 
-    if (!this.s3Provider) {
-      throw new AppError(
-        'S3 storage is required for deployments. Please configure AWS_S3_BUCKET.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
+    // if (!this.s3Provider) {
+    //   throw new AppError(
+    //     'S3 storage is required for deployments. Please configure AWS_S3_BUCKET.',
+    //     503,
+    //     ERROR_CODES.INTERNAL_ERROR
+    //   );
+    // }
 
     try {
       // Get deployment record
@@ -183,25 +206,36 @@ export class DeploymentService {
 
       // Set UPLOADING status - server is now processing
       await this.updateDeploymentStatus(id, DeploymentStatus.UPLOADING);
-
-      // Check if zip file exists
-      const zipExists = await this.s3Provider.verifyObjectExists(
-        DEPLOYMENT_BUCKET,
-        getDeploymentKey(id)
-      );
-      if (!zipExists) {
-        await this.updateDeploymentStatus(id, DeploymentStatus.ERROR, {
-          error: 'Source zip file not found. Please upload the source files first.',
-        });
-        throw new AppError(
-          'Source zip file not found. Please upload the source files first.',
-          400,
-          ERROR_CODES.INVALID_INPUT
+      if (isCloudEnvironment()) {
+        const zipExists = await this.s3Provider!.verifyObjectExists(
+          DEPLOYMENT_BUCKET,
+          getDeploymentKey(id)
         );
+
+        if (!zipExists) {
+          await this.updateDeploymentStatus(id, DeploymentStatus.ERROR, {
+            error: 'Source zip file not found. Please upload the source files first.',
+          });
+
+          throw new AppError(
+            'Source zip file not found. Please upload the source files first.',
+            400,
+            ERROR_CODES.INVALID_INPUT
+          );
+        }
       }
 
       // Download zip from S3
-      const zipBuffer = await this.s3Provider.getObject(DEPLOYMENT_BUCKET, getDeploymentKey(id));
+      let zipBuffer: Buffer | null = null;
+      if (isCloudEnvironment()) {
+        zipBuffer = await this.s3Provider!.getObject(
+          DEPLOYMENT_BUCKET,
+          getDeploymentKey(id)
+        );
+      } else {
+        const localPath = `/tmp/deployments/${id}.zip`;
+        zipBuffer = await fs.promises.readFile(localPath);
+      }
       if (!zipBuffer) {
         await this.updateDeploymentStatus(id, DeploymentStatus.ERROR, {
           error: 'Failed to download source zip file.',
@@ -285,12 +319,22 @@ export class DeploymentService {
       );
 
       // Clean up S3 deployment zip
-      await this.s3Provider.deleteObject(DEPLOYMENT_BUCKET, getDeploymentKey(id)).catch((error) => {
-        logger.warn('Failed to clean up deployment zip', {
-          deploymentId: id,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      });
+      // await this.s3Provider.deleteObject(DEPLOYMENT_BUCKET, getDeploymentKey(id)).catch((error) => {
+      //   logger.warn('Failed to clean up deployment zip', {
+      //     deploymentId: id,
+      //     error: error instanceof Error ? error.message : String(error),
+      //   });
+      // });
+      if (isCloudEnvironment() && this.s3Provider) {
+        await this.s3Provider
+          .deleteObject(DEPLOYMENT_BUCKET, getDeploymentKey(id))
+          .catch((error) => {
+            logger.warn('Failed to clean up deployment zip', {
+              deploymentId: id,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          });
+      }
 
       logger.info('Deployment started', {
         id,

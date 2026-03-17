@@ -7,7 +7,11 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse, paginatedResponse } from '@/utils/response.js';
 import { startDeploymentRequestSchema, updateSlugRequestSchema } from '@insforge/shared-schemas';
 import { envVarsRouter } from './env-vars.routes.js';
+import multer from "multer";
+import fs from "fs";
+import path from "path";
 
+const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
 const deploymentService = DeploymentService.getInstance();
 const auditService = AuditService.getInstance();
@@ -47,6 +51,43 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
     next(error);
   }
 });
+
+/**
+ * Upload deployment zip (self-hosted deployments)
+ * POST /api/deployments/:id/upload
+*/
+router.post(
+  "/:id/upload",
+  verifyAdmin,
+  upload.single("file"),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+
+      if (!req.file) {
+        throw new AppError(
+          "Zip file is required",
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const deploymentsDir = path.join("/tmp", "deployments");
+      await fs.promises.mkdir(deploymentsDir, { recursive: true });
+
+      const filePath = path.join(deploymentsDir, `${id}.zip`);
+
+      await fs.promises.writeFile(filePath, req.file.buffer);
+
+      successResponse(res, {
+        uploaded: true,
+        message: "Deployment zip uploaded successfully",
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 /**
  * Start a deployment - downloads zip from S3, uploads to Vercel, creates deployment
