@@ -45,6 +45,13 @@ import {
   type GetAuthConfigResponse,
   updateAuthConfigRequestSchema,
 } from '@insforge/shared-schemas';
+import { SmtpConfigService } from '@/services/email/smtp-config.service.js';
+import { EmailTemplateService } from '@/services/email/email-template.service.js';
+import {
+  upsertSmtpConfigRequestSchema,
+  updateEmailTemplateRequestSchema,
+} from '@insforge/shared-schemas';
+import type { EmailTemplate } from '@/types/email.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import logger from '@/utils/logger.js';
@@ -54,6 +61,8 @@ const authService = AuthService.getInstance();
 const authConfigService = AuthConfigService.getInstance();
 const oAuthConfigService = OAuthConfigService.getInstance();
 const auditService = AuditService.getInstance();
+const smtpConfigService = SmtpConfigService.getInstance();
+const emailTemplateService = EmailTemplateService.getInstance();
 
 // Mount OAuth routes
 router.use('/oauth', oauthRouter);
@@ -865,6 +874,122 @@ router.post(
       );
 
       successResponse(res, result); // Return message with optional redirectTo
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// SMTP Configuration Routes
+// GET /api/auth/smtp-config - Get SMTP configuration (admin only)
+router.get(
+  '/smtp-config',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const config = await smtpConfigService.getSmtpConfig();
+      successResponse(res, config);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// PUT /api/auth/smtp-config - Update SMTP configuration (admin only)
+router.put(
+  '/smtp-config',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validationResult = upsertSmtpConfigRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const input = validationResult.data;
+      const config = await smtpConfigService.upsertSmtpConfig(input);
+
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'UPDATE_SMTP_CONFIG',
+        module: 'EMAIL',
+        details: {
+          enabled: input.enabled,
+          host: input.host,
+        },
+        ip_address: req.ip,
+      });
+
+      successResponse(res, config);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Email Template Routes
+// GET /api/auth/email-templates - Get all email templates (admin only)
+router.get(
+  '/email-templates',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const templates = await emailTemplateService.getTemplates();
+      successResponse(res, { data: templates });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// PUT /api/auth/email-templates/:type - Update email template (admin only)
+router.put(
+  '/email-templates/:type',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validTemplateTypes = [
+        'email-verification-code',
+        'email-verification-link',
+        'reset-password-code',
+        'reset-password-link',
+      ];
+
+      if (!validTemplateTypes.includes(req.params.type)) {
+        throw new AppError(
+          `Invalid template type. Must be one of: ${validTemplateTypes.join(', ')}`,
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const validationResult = updateEmailTemplateRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const templateType = req.params.type as EmailTemplate;
+      const template = await emailTemplateService.updateTemplate(templateType, validationResult.data);
+
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'UPDATE_EMAIL_TEMPLATE',
+        module: 'EMAIL',
+        details: {
+          templateType,
+        },
+        ip_address: req.ip,
+      });
+
+      successResponse(res, template);
     } catch (error) {
       next(error);
     }
