@@ -1,8 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  ListEmailTemplatesResponse,
-  UpdateEmailTemplateRequest,
-} from '@insforge/shared-schemas';
+import { ListEmailTemplatesResponse, UpdateEmailTemplateRequest } from '@insforge/shared-schemas';
 import { emailTemplateService } from '../services/email-template.service';
 import { useToast } from '@/lib/hooks/useToast';
 
@@ -11,12 +8,7 @@ export function useEmailTemplates() {
   const { showToast } = useToast();
 
   // Query to fetch email templates
-  const {
-    data,
-    isLoading,
-    error,
-    refetch,
-  } = useQuery<ListEmailTemplatesResponse>({
+  const { data, isLoading, error, refetch } = useQuery<ListEmailTemplatesResponse>({
     queryKey: ['email-templates'],
     queryFn: () => emailTemplateService.getTemplates(),
   });

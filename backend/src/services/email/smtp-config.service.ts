@@ -114,11 +114,7 @@ export class SmtpConfigService {
       };
     } catch (error) {
       logger.error('Failed to get SMTP config', { error });
-      throw new AppError(
-        'Failed to get SMTP configuration',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
+      throw new AppError('Failed to get SMTP configuration', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
@@ -232,9 +228,7 @@ export class SmtpConfigService {
         } catch (verifyError) {
           await client.query('ROLLBACK');
           const message =
-            verifyError instanceof Error
-              ? verifyError.message
-              : 'Unknown connection error';
+            verifyError instanceof Error ? verifyError.message : 'Unknown connection error';
           logger.error('SMTP connection verification failed', {
             host: input.host,
             port: input.port,
@@ -311,11 +305,7 @@ export class SmtpConfigService {
       if (error instanceof AppError) {
         throw error;
       }
-      throw new AppError(
-        'Failed to update SMTP configuration',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
+      throw new AppError('Failed to update SMTP configuration', 500, ERROR_CODES.INTERNAL_ERROR);
     } finally {
       client.release();
     }

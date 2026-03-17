@@ -44,13 +44,11 @@ import {
   exchangeAdminSessionRequestSchema,
   type GetAuthConfigResponse,
   updateAuthConfigRequestSchema,
-} from '@insforge/shared-schemas';
-import { SmtpConfigService } from '@/services/email/smtp-config.service.js';
-import { EmailTemplateService } from '@/services/email/email-template.service.js';
-import {
   upsertSmtpConfigRequestSchema,
   updateEmailTemplateRequestSchema,
 } from '@insforge/shared-schemas';
+import { SmtpConfigService } from '@/services/email/smtp-config.service.js';
+import { EmailTemplateService } from '@/services/email/email-template.service.js';
 import type { EmailTemplate } from '@/types/email.js';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
@@ -977,7 +975,10 @@ router.put(
       }
 
       const templateType = req.params.type as EmailTemplate;
-      const template = await emailTemplateService.updateTemplate(templateType, validationResult.data);
+      const template = await emailTemplateService.updateTemplate(
+        templateType,
+        validationResult.data
+      );
 
       await auditService.log({
         actor: req.user?.email || 'api-key',

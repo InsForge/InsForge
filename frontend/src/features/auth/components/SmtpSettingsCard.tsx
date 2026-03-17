@@ -124,7 +124,10 @@ export function SmtpSettingsCard({ config, isLoading, isUpdating, onSave }: Smtp
 
       <div className={enabled ? '' : 'opacity-50 pointer-events-none'}>
         <div className="flex flex-col gap-6">
-          <SettingRow label="Sender Email" description="The email address that will appear as the sender">
+          <SettingRow
+            label="Sender Email"
+            description="The email address that will appear as the sender"
+          >
             <Input
               type="email"
               placeholder="noreply@yourdomain.com"
@@ -193,7 +196,8 @@ export function SmtpSettingsCard({ config, isLoading, isUpdating, onSave }: Smtp
             />
             {form.formState.errors.minIntervalSeconds && (
               <p className="pt-1 text-xs text-destructive">
-                {form.formState.errors.minIntervalSeconds.message || 'Must be a non-negative number'}
+                {form.formState.errors.minIntervalSeconds.message ||
+                  'Must be a non-negative number'}
               </p>
             )}
           </SettingRow>
@@ -233,12 +237,7 @@ export function SmtpSettingsCard({ config, isLoading, isUpdating, onSave }: Smtp
 
       {form.formState.isDirty && (
         <div className="flex items-center justify-end gap-2 pt-2">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={resetForm}
-            disabled={isUpdating}
-          >
+          <Button type="button" variant="secondary" onClick={resetForm} disabled={isUpdating}>
             Cancel
           </Button>
           <Button type="button" onClick={handleSubmit} disabled={saveDisabled}>

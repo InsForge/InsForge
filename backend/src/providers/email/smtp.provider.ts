@@ -51,10 +51,7 @@ export class SmtpEmailProvider implements EmailProvider {
    * Render a template by replacing {{ placeholder }} with variable values
    * HTML-escapes all values except `link` (which is a URL used in href)
    */
-  private renderTemplate(
-    template: string,
-    variables: Record<string, string>
-  ): string {
+  private renderTemplate(template: string, variables: Record<string, string>): string {
     let rendered = template;
     for (const [key, value] of Object.entries(variables)) {
       const safeValue = key === 'link' ? value : escapeHtml(value);
@@ -83,8 +80,7 @@ export class SmtpEmailProvider implements EmailProvider {
       );
     }
 
-    const emailTemplate =
-      await EmailTemplateService.getInstance().getTemplate(template);
+    const emailTemplate = await EmailTemplateService.getInstance().getTemplate(template);
 
     const allVariables: Record<string, string> = {
       name,
@@ -92,14 +88,8 @@ export class SmtpEmailProvider implements EmailProvider {
       ...variables,
     };
 
-    const renderedSubject = this.renderTemplate(
-      emailTemplate.subject,
-      allVariables
-    );
-    const renderedBody = this.renderTemplate(
-      emailTemplate.bodyHtml,
-      allVariables
-    );
+    const renderedSubject = this.renderTemplate(emailTemplate.subject, allVariables);
+    const renderedBody = this.renderTemplate(emailTemplate.bodyHtml, allVariables);
 
     const transporter = this.createTransporter(smtpConfig);
 
@@ -113,8 +103,7 @@ export class SmtpEmailProvider implements EmailProvider {
 
       logger.info('Email sent via SMTP', { template, to: email });
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unknown SMTP error';
+      const message = error instanceof Error ? error.message : 'Unknown SMTP error';
       logger.error('Failed to send email via SMTP', {
         template,
         to: email,
@@ -159,8 +148,7 @@ export class SmtpEmailProvider implements EmailProvider {
 
       logger.info('Raw email sent via SMTP', { to: options.to });
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unknown SMTP error';
+      const message = error instanceof Error ? error.message : 'Unknown SMTP error';
       logger.error('Failed to send raw email via SMTP', {
         to: options.to,
         error: message,

@@ -47,11 +47,7 @@ export class EmailTemplateService {
       return result.rows;
     } catch (error) {
       logger.error('Failed to get email templates', { error });
-      throw new AppError(
-        'Failed to get email templates',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
+      throw new AppError('Failed to get email templates', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
@@ -88,11 +84,7 @@ export class EmailTemplateService {
         throw error;
       }
       logger.error('Failed to get email template', { templateType, error });
-      throw new AppError(
-        'Failed to get email template',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
+      throw new AppError('Failed to get email template', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
@@ -136,11 +128,7 @@ export class EmailTemplateService {
         throw error;
       }
       logger.error('Failed to update email template', { templateType, error });
-      throw new AppError(
-        'Failed to update email template',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
+      throw new AppError('Failed to update email template', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 }

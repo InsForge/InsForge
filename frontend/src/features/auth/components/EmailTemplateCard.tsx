@@ -1,16 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Button,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  Input,
-} from '@insforge/ui';
-import type {
-  EmailTemplateSchema,
-  UpdateEmailTemplateRequest,
-} from '@insforge/shared-schemas';
+import { Button, Select, SelectContent, SelectItem, SelectTrigger, Input } from '@insforge/ui';
+import type { EmailTemplateSchema, UpdateEmailTemplateRequest } from '@insforge/shared-schemas';
 
 interface EmailTemplateCardProps {
   templates: EmailTemplateSchema[];
@@ -63,10 +53,7 @@ export function EmailTemplateCard({
   isUpdating,
   onSave,
 }: EmailTemplateCardProps) {
-  const templateTypes = useMemo(
-    () => templates.map((t) => t.templateType),
-    [templates]
-  );
+  const templateTypes = useMemo(() => templates.map((t) => t.templateType), [templates]);
 
   const [selectedType, setSelectedType] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'source' | 'preview'>('source');
@@ -107,20 +94,18 @@ export function EmailTemplateCard({
 
   const handleSubjectChange = (value: string) => {
     setSubject(value);
-    setIsDirty(
-      value !== selectedTemplate?.subject || bodyHtml !== selectedTemplate?.bodyHtml
-    );
+    setIsDirty(value !== selectedTemplate?.subject || bodyHtml !== selectedTemplate?.bodyHtml);
   };
 
   const handleBodyChange = (value: string) => {
     setBodyHtml(value);
-    setIsDirty(
-      subject !== selectedTemplate?.subject || value !== selectedTemplate?.bodyHtml
-    );
+    setIsDirty(subject !== selectedTemplate?.subject || value !== selectedTemplate?.bodyHtml);
   };
 
   const handleSave = () => {
-    if (!selectedType) return;
+    if (!selectedType) {
+      return;
+    }
     onSave({
       type: selectedType,
       data: { subject, bodyHtml },
@@ -228,12 +213,7 @@ export function EmailTemplateCard({
 
       {isDirty && (
         <div className="flex items-center justify-end gap-2 pt-2">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleCancel}
-            disabled={isUpdating}
-          >
+          <Button type="button" variant="secondary" onClick={handleCancel} disabled={isUpdating}>
             Cancel
           </Button>
           <Button type="button" onClick={handleSave} disabled={isUpdating}>
