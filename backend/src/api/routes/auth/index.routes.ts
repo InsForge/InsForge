@@ -7,7 +7,12 @@ import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
-import { AuthRequest, verifyAdmin, verifyToken, extractBearerToken } from '@/api/middlewares/auth.js';
+import {
+  AuthRequest,
+  verifyAdmin,
+  verifyToken,
+  extractBearerToken,
+} from '@/api/middlewares/auth.js';
 import oauthRouter from './oauth.routes.js';
 import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-limiters.js';
 import {
