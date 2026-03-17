@@ -9,6 +9,7 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
 import { AuthRequest, verifyAdmin, verifyToken } from '@/api/middlewares/auth.js';
 import oauthRouter from './oauth.routes.js';
+import customOAuthRouter from './custom-oauth.routes.js';
 import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-limiters.js';
 import {
   REFRESH_TOKEN_COOKIE_NAME,
@@ -56,6 +57,7 @@ const oAuthConfigService = OAuthConfigService.getInstance();
 const auditService = AuditService.getInstance();
 
 // Mount OAuth routes
+router.use('/oauth/custom', customOAuthRouter);
 router.use('/oauth', oauthRouter);
 
 // Public Authentication Configuration Routes
