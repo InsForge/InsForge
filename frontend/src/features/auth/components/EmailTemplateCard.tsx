@@ -29,24 +29,49 @@ const TEMPLATE_INFO: Record<string, { title: string; description: string }> = {
   },
 };
 
-const TEMPLATE_VARIABLES: Record<string, { name: string; description: string }[]> = {
-  'email-verification-code': [
-    { name: '{{ code }}', description: '6-digit verification code' },
-    { name: '{{ email }}', description: "User's email address" },
-  ],
-  'email-verification-link': [
-    { name: '{{ link }}', description: 'Email verification URL' },
-    { name: '{{ email }}', description: "User's email address" },
-  ],
-  'reset-password-code': [
-    { name: '{{ code }}', description: '6-digit reset code' },
-    { name: '{{ email }}', description: "User's email address" },
-  ],
-  'reset-password-link': [
-    { name: '{{ link }}', description: 'Password reset URL' },
-    { name: '{{ email }}', description: "User's email address" },
-  ],
-};
+const TEMPLATE_VARIABLES: Record<string, { name: string; description: string; sample: string }[]> =
+  {
+    'email-verification-code': [
+      { name: '{{ code }}', description: '6-digit verification code', sample: '847295' },
+      {
+        name: '{{ email }}',
+        description: "User's email address",
+        sample: 'user@example.com',
+      },
+    ],
+    'email-verification-link': [
+      {
+        name: '{{ link }}',
+        description: 'Email verification URL',
+        sample: 'https://yourapp.com/verify?token=abc123',
+      },
+      {
+        name: '{{ email }}',
+        description: "User's email address",
+        sample: 'user@example.com',
+      },
+    ],
+    'reset-password-code': [
+      { name: '{{ code }}', description: '6-digit reset code', sample: '382916' },
+      {
+        name: '{{ email }}',
+        description: "User's email address",
+        sample: 'user@example.com',
+      },
+    ],
+    'reset-password-link': [
+      {
+        name: '{{ link }}',
+        description: 'Password reset URL',
+        sample: 'https://yourapp.com/reset?token=xyz789',
+      },
+      {
+        name: '{{ email }}',
+        description: "User's email address",
+        sample: 'user@example.com',
+      },
+    ],
+  };
 
 export function EmailTemplateCard({
   templates,
@@ -110,6 +135,19 @@ export function EmailTemplateCard({
 
   const variables = selectedType ? (TEMPLATE_VARIABLES[selectedType] ?? []) : [];
   const info = selectedType ? TEMPLATE_INFO[selectedType] : null;
+
+  // Render preview HTML with sample values replacing placeholders
+  const previewHtml = useMemo(() => {
+    let html = bodyHtml;
+    for (const v of variables) {
+      const pattern = new RegExp(
+        v.name.replace(/[{}]/g, (ch) => `\\${ch}`).replace(/\s+/g, '\\s*'),
+        'g'
+      );
+      html = html.replace(pattern, v.sample);
+    }
+    return html;
+  }, [bodyHtml, variables]);
 
   if (isLoading) {
     return (
@@ -226,7 +264,7 @@ export function EmailTemplateCard({
             <iframe
               title="Email template preview"
               sandbox=""
-              srcDoc={bodyHtml}
+              srcDoc={previewHtml}
               className="h-[350px] w-full border-0"
             />
           </div>
