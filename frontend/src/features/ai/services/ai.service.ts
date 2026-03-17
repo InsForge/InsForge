@@ -8,6 +8,7 @@ import {
   AIUsageRecordSchema,
   ListAIUsageResponse,
   AIConfigurationWithUsageSchema,
+  GatewayConfigResponse,
 } from '@insforge/shared-schemas';
 
 export class AIService {
@@ -140,6 +141,28 @@ export class AIService {
     remaining: number | null;
   }> {
     return apiClient.request('/ai/credits', {
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  // AI Gateway BYOK endpoints
+  async getGatewayConfig(): Promise<GatewayConfigResponse> {
+    return apiClient.request('/ai/gateway/config', {
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  async setGatewayBYOKKey(apiKey: string): Promise<{ message: string }> {
+    return apiClient.request('/ai/gateway/config', {
+      method: 'POST',
+      headers: apiClient.withAccessToken(),
+      body: JSON.stringify({ apiKey }),
+    });
+  }
+
+  async removeGatewayBYOKKey(): Promise<{ message: string }> {
+    return apiClient.request('/ai/gateway/config', {
+      method: 'DELETE',
       headers: apiClient.withAccessToken(),
     });
   }

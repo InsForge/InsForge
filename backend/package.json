@@ -7,7 +7,7 @@
   "main": "../dist/server.js",
   "scripts": {
     "start": "node ../dist/server.js",
-    "dev": "tsx watch src/server.ts",
+    "dev": "dotenv -e ../.env -- tsx watch src/server.ts",
     "build": "tsup",
     "clean": "rimraf dist",
     "prebuild": "npm run clean",
