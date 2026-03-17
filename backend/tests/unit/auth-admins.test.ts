@@ -293,6 +293,9 @@ describe('AuthService project admin support', () => {
         ],
       })
       .mockResolvedValueOnce({
+        rows: [{ id: 'd10f0e33-083f-435e-96ee-d4dff79eae1d' }],
+      })
+      .mockResolvedValueOnce({
         rows: [
           {
             id: 'd10f0e33-083f-435e-96ee-d4dff79eae1d',
@@ -315,5 +318,6 @@ describe('AuthService project admin support', () => {
     );
 
     expect(result.isProjectAdmin).toBe(false);
+    expect(result.providers).toEqual(['anonymous']);
   });
 });

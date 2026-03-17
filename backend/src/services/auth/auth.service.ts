@@ -1393,6 +1393,11 @@ export class AuthService {
       throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
     }
 
-    return this.transformUserRecordToSchema(result.rows[0] as UserRecord);
+    const updatedUser = await this.getUserById(userId);
+    if (!updatedUser) {
+      throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
+    }
+
+    return this.transformUserRecordToSchema(updatedUser);
   }
 }
