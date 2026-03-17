@@ -82,10 +82,24 @@ export class SmtpEmailProvider implements EmailProvider {
 
     const emailTemplate = await EmailTemplateService.getInstance().getTemplate(template);
 
+    // Map auth service variable names to user-friendly template placeholders
+    const mappedVariables: Record<string, string> = {};
+    if (variables) {
+      for (const [key, value] of Object.entries(variables)) {
+        if (key === 'token') {
+          mappedVariables['code'] = value;
+        } else if (key === 'magic_link') {
+          mappedVariables['link'] = value;
+        }
+        // Always keep original key too
+        mappedVariables[key] = value;
+      }
+    }
+
     const allVariables: Record<string, string> = {
       name,
       email,
-      ...variables,
+      ...mappedVariables,
     };
 
     const renderedSubject = this.renderTemplate(emailTemplate.subject, allVariables);
