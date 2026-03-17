@@ -73,6 +73,7 @@ export const exchangeAdminSessionRequestSchema = z.object({
 export const listUsersRequestSchema = paginationSchema
   .extend({
     search: z.string().optional(),
+    roleFilter: z.enum(['users', 'admins', 'all']).optional(),
   })
   .optional();
 
@@ -81,6 +82,10 @@ export const listUsersRequestSchema = paginationSchema
  */
 export const deleteUsersRequestSchema = z.object({
   userIds: z.array(userIdSchema).min(1, 'At least one user ID is required'),
+});
+
+export const updateUserAdminStatusRequestSchema = z.object({
+  isProjectAdmin: z.boolean(),
 });
 
 /**
@@ -245,6 +250,10 @@ export const listUsersResponseSchema = z.object({
     limit: z.number(),
     total: z.number(),
   }),
+});
+
+export const updateUserAdminStatusResponseSchema = z.object({
+  user: userSchema,
 });
 
 /**
@@ -429,6 +438,8 @@ export type GetCurrentSessionResponse = z.infer<typeof getCurrentSessionResponse
 export type GetProfileResponse = z.infer<typeof getProfileResponseSchema>;
 export type ListUsersResponse = z.infer<typeof listUsersResponseSchema>;
 export type DeleteUsersResponse = z.infer<typeof deleteUsersResponseSchema>;
+export type UpdateUserAdminStatusRequest = z.infer<typeof updateUserAdminStatusRequestSchema>;
+export type UpdateUserAdminStatusResponse = z.infer<typeof updateUserAdminStatusResponseSchema>;
 export type GetOauthUrlResponse = z.infer<typeof getOauthUrlResponseSchema>;
 export type ListOAuthConfigsResponse = z.infer<typeof listOAuthConfigsResponseSchema>;
 export type GetAuthConfigResponse = z.infer<typeof getAuthConfigResponseSchema>;
