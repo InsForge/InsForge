@@ -175,7 +175,8 @@ function DatabaseJsonCellEditor({
 export function convertSchemaToColumns(
   schema?: TableSchema,
   onCellEdit?: (rowId: string, columnKey: string, newValue: string) => Promise<void>,
-  onJumpToTable?: (tableName: string) => void
+  onJumpToTable?: (tableName: string) => void,
+  columnWidths?: Record<string, number>
 ): DataGridColumn<DatabaseDataGridRow>[] {
   if (!schema?.columns) {
     return [];
@@ -187,6 +188,14 @@ export function convertSchemaToColumns(
   const cellRenderers = createDefaultCellRenderer<DatabaseDataGridRow>();
 
   return schema.columns.map((col: ColumnSchema) => {
+    const savedColumnWidth = columnWidths?.[col.columnName];
+    const width =
+      typeof savedColumnWidth === 'number' &&
+      Number.isFinite(savedColumnWidth) &&
+      savedColumnWidth > 0
+        ? savedColumnWidth
+        : 'minmax(200px, 1fr)';
+
     const isEditable =
       !col.isPrimaryKey &&
       [
@@ -205,7 +214,7 @@ export function convertSchemaToColumns(
       key: col.columnName,
       name: col.columnName,
       type: col.type as ColumnType,
-      width: 'minmax(200px, 1fr)',
+      width,
       resizable: true,
       sortable: isSortable,
       editable: isEditable,
@@ -288,6 +297,7 @@ export interface DatabaseDataGridProps extends Omit<DataGridProps<DatabaseDataGr
   schema?: TableSchema;
   onCellEdit?: (rowId: string, columnKey: string, newValue: string) => Promise<void>;
   onJumpToTable?: (tableName: string) => void;
+  columnWidths?: Record<string, number>;
 }
 
 // Specialized DataGrid for database tables
@@ -295,11 +305,12 @@ export function DatabaseDataGrid({
   schema,
   onCellEdit,
   onJumpToTable,
+  columnWidths,
   ...props
 }: DatabaseDataGridProps) {
   const columns = useMemo(() => {
-    return convertSchemaToColumns(schema, onCellEdit, onJumpToTable);
-  }, [schema, onCellEdit, onJumpToTable]);
+    return convertSchemaToColumns(schema, onCellEdit, onJumpToTable, columnWidths);
+  }, [schema, onCellEdit, onJumpToTable, columnWidths]);
 
   return (
     <DataGrid<DatabaseDataGridRow>
