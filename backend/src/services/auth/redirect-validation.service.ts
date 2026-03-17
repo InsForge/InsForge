@@ -50,6 +50,7 @@ function matchesEntry(candidate: string, entry: string): boolean {
     try {
       const entryScheme = wildcardMatch[1] || 'https://';
       const entrySuffix = wildcardMatch[2];
+      const hasExplicitPath = /[/?#]/.test(entrySuffix);
       const entryUrl = new URL(entryScheme + 'placeholder.' + entrySuffix);
       const parsedCandidate = new URL(candidate);
 
@@ -72,9 +73,18 @@ function matchesEntry(candidate: string, entry: string): boolean {
       if (!extraPart || extraPart.includes('.')) {
         return false;
       }
-      // Path must match exactly
-      if (parsedCandidate.pathname !== entryUrl.pathname) {
-        return false;
+      // If entry includes explicit path/query/hash, enforce exact match for those parts.
+      // Otherwise '*.example.com' matches any path on matching subdomains.
+      if (hasExplicitPath) {
+        if (parsedCandidate.pathname !== entryUrl.pathname) {
+          return false;
+        }
+        if (entryUrl.search && parsedCandidate.search !== entryUrl.search) {
+          return false;
+        }
+        if (entryUrl.hash && parsedCandidate.hash !== entryUrl.hash) {
+          return false;
+        }
       }
       return true;
     } catch {
