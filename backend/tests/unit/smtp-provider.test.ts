@@ -82,12 +82,9 @@ describe('SmtpEmailProvider', () => {
       const nodemailer = await import('nodemailer');
       const transport = nodemailer.default.createTransport();
 
-      await provider.sendWithTemplate(
-        'user@example.com',
-        'Test App',
-        'email-verification-code',
-        { code: '123456' }
-      );
+      await provider.sendWithTemplate('user@example.com', 'Test App', 'email-verification-code', {
+        code: '123456',
+      });
 
       expect(transport.sendMail).toHaveBeenCalledWith(
         expect.objectContaining({
