@@ -118,7 +118,7 @@ export function Pagination({
             <div className="h-4 w-px bg-[var(--alpha-8)]" />
             <div className="flex items-center gap-1.5">
               <span className="text-[13px] leading-[18px] text-muted-foreground">
-                {recordLabel} per page:
+                {recordLabel.charAt(0).toUpperCase() + recordLabel.slice(1)} per page:
               </span>
               <Select
                 value={String(pageSize)}
