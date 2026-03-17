@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Lock, Mail, Settings } from 'lucide-react';
+import { Lock, Mail, Settings, Shield, X, Plus } from 'lucide-react';
 import {
   Button,
   Checkbox,
@@ -40,7 +40,7 @@ interface AuthSettingsMenuDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type AuthSettingsSection = 'general' | 'email-verification' | 'password';
+type AuthSettingsSection = 'general' | 'email-verification' | 'password' | 'security';
 
 const defaultValues: UpdateAuthConfigRequest = {
   requireEmailVerification: false,
@@ -52,6 +52,7 @@ const defaultValues: UpdateAuthConfigRequest = {
   verifyEmailMethod: 'code',
   resetPasswordMethod: 'code',
   signInRedirectTo: null,
+  redirectUrlWhitelist: [],
 };
 
 const toFormValues = (config?: AuthConfigSchema): UpdateAuthConfigRequest => {
@@ -69,6 +70,7 @@ const toFormValues = (config?: AuthConfigSchema): UpdateAuthConfigRequest => {
     verifyEmailMethod: config.verifyEmailMethod,
     resetPasswordMethod: config.resetPasswordMethod,
     signInRedirectTo: config.signInRedirectTo ?? null,
+    redirectUrlWhitelist: config.redirectUrlWhitelist ?? [],
   };
 };
 
@@ -101,15 +103,22 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
   const [activeSection, setActiveSection] = useState<AuthSettingsSection>('general');
   const { config, isLoading, isUpdating, updateConfig } = useAuthConfig();
 
+  // Local state for the new-URL input in the Security section
+  const [newUrlInput, setNewUrlInput] = useState('');
+  const [newUrlError, setNewUrlError] = useState('');
+
   const form = useForm<UpdateAuthConfigRequest>({
     resolver: zodResolver(updateAuthConfigRequestSchema),
     defaultValues,
   });
 
   const requireEmailVerification = form.watch('requireEmailVerification');
+  const redirectUrlWhitelist = form.watch('redirectUrlWhitelist') ?? [];
 
   const resetForm = useCallback(() => {
     form.reset(toFormValues(config));
+    setNewUrlInput('');
+    setNewUrlError('');
   }, [config, form]);
 
   useEffect(() => {
@@ -140,10 +149,58 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
     if (activeSection === 'password') {
       return 'Password';
     }
+    if (activeSection === 'security') {
+      return 'Security';
+    }
     return 'General';
   }, [activeSection]);
 
   const saveDisabled = !form.formState.isDirty || isUpdating;
+
+  // ---- Redirect URL Whitelist helpers ----
+
+  const handleAddUrl = () => {
+    const trimmed = newUrlInput.trim();
+    if (!trimmed) {
+      setNewUrlError('Please enter a URL');
+      return;
+    }
+
+    // Basic URL validation — allow wildcard subdomain entries like https://*.example.com
+    const testUrl = trimmed.startsWith('*.') ? trimmed.replace('*.', 'placeholder.') : trimmed;
+    try {
+      new URL(testUrl);
+    } catch {
+      setNewUrlError('Please enter a valid URL (e.g. https://yourapp.com/callback)');
+      return;
+    }
+
+    if (redirectUrlWhitelist.includes(trimmed)) {
+      setNewUrlError('This URL is already in the list');
+      return;
+    }
+
+    form.setValue('redirectUrlWhitelist', [...redirectUrlWhitelist, trimmed], {
+      shouldDirty: true,
+    });
+    setNewUrlInput('');
+    setNewUrlError('');
+  };
+
+  const handleRemoveUrl = (urlToRemove: string) => {
+    form.setValue(
+      'redirectUrlWhitelist',
+      redirectUrlWhitelist.filter((u) => u !== urlToRemove),
+      { shouldDirty: true }
+    );
+  };
+
+  const handleNewUrlKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddUrl();
+    }
+  };
 
   return (
     <MenuDialog open={open} onOpenChange={handleOpenChange}>
@@ -176,6 +233,13 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                 onClick={() => setActiveSection('password')}
               >
                 Password
+              </MenuDialogNavItem>
+              <MenuDialogNavItem
+                icon={<Shield className="h-5 w-5" />}
+                active={activeSection === 'security'}
+                onClick={() => setActiveSection('security')}
+              >
+                Security
               </MenuDialogNavItem>
             </MenuDialogNavList>
           </MenuDialogNav>
@@ -402,6 +466,79 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                         />
                       </SettingRow>
                     )}
+                  </>
+                )}
+
+                {activeSection === 'security' && (
+                  <>
+                    {redirectUrlWhitelist.length === 0 && (
+                      <div className="mb-4 rounded-md border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-200">
+                        <strong>Open redirects enabled</strong> — no whitelist is configured. Auth
+                        flows will accept any redirect URL. This is convenient for development but is
+                        not recommended for production deployments. Add at least one trusted URL to
+                        enforce redirect validation.
+                      </div>
+                    )}
+
+                    <SettingRow
+                      label="Redirect URL Whitelist"
+                      description="Only these URLs may be used as redirect targets in auth flows (OAuth, email verification). Leave empty to allow any URL (not recommended for production)."
+                    >
+                      <div className="flex flex-col gap-2">
+                        {/* Existing entries */}
+                        {redirectUrlWhitelist.length > 0 && (
+                          <ul className="flex flex-col gap-1.5">
+                            {redirectUrlWhitelist.map((url) => (
+                              <li
+                                key={url}
+                                className="flex items-center justify-between rounded-md border border-border bg-muted/40 px-3 py-1.5"
+                              >
+                                <span className="min-w-0 truncate text-sm text-foreground">
+                                  {url}
+                                </span>
+                                <button
+                                  type="button"
+                                  aria-label={`Remove ${url}`}
+                                  onClick={() => handleRemoveUrl(url)}
+                                  className="ml-2 shrink-0 rounded p-0.5 text-muted-foreground hover:text-destructive focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+
+                        {/* Add new URL */}
+                        <div className="flex items-start gap-2">
+                          <div className="min-w-0 flex-1">
+                            <Input
+                              type="text"
+                              placeholder="https://yourapp.com/callback"
+                              value={newUrlInput}
+                              onChange={(e) => {
+                                setNewUrlInput(e.target.value);
+                                if (newUrlError) setNewUrlError('');
+                              }}
+                              onKeyDown={handleNewUrlKeyDown}
+                              className={newUrlError ? 'border-destructive' : ''}
+                            />
+                            {newUrlError && (
+                              <p className="pt-1 text-xs text-destructive">{newUrlError}</p>
+                            )}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={handleAddUrl}
+                            className="shrink-0"
+                          >
+                            <Plus className="mr-1.5 h-4 w-4" />
+                            Add
+                          </Button>
+                        </div>
+                      </div>
+                    </SettingRow>
                   </>
                 )}
               </MenuDialogBody>
