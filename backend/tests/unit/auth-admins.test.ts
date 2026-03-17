@@ -197,6 +197,7 @@ describe('AuthService project admin support', () => {
     await expect(
       AuthService.getInstance().adminLogin('member@example.com', 'member-password')
     ).rejects.toThrow(AppError);
+    expect(mockGenerateAccessToken).not.toHaveBeenCalled();
   });
 
   it('rejects unverified database admins when email verification is required', async () => {

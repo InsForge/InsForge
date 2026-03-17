@@ -22,6 +22,12 @@ import { useUsers } from '@/features/auth/hooks/useUsers';
 import type { UserRoleFilter } from '@/features/auth/services/user.service';
 import { formatDeleteUsersToastMessage } from '@/features/auth/utils/userFeedback';
 
+const FILTER_OPTIONS: { label: string; value: UserRoleFilter }[] = [
+  { label: 'Users', value: 'users' },
+  { label: 'Admins', value: 'admins' },
+  { label: 'All', value: 'all' },
+];
+
 export default function UsersPage() {
   const [searchValue, setSearchValue] = useState('');
   const searchQuery = searchValue.trim();
@@ -155,12 +161,6 @@ export default function UsersPage() {
     }
   };
 
-  const filterOptions: { label: string; value: UserRoleFilter }[] = [
-    { label: 'Users', value: 'users' },
-    { label: 'Admins', value: 'admins' },
-    { label: 'All', value: 'all' },
-  ];
-
   const emptyState = (
     <DataGridEmptyState
       message="No Users Found"
@@ -232,7 +232,7 @@ export default function UsersPage() {
         }
         rightActions={
           <div className="flex items-center gap-1 rounded-lg border border-[var(--alpha-8)] p-0.5">
-            {filterOptions.map((option) => (
+            {FILTER_OPTIONS.map((option) => (
               <Button
                 key={option.value}
                 variant={roleFilter === option.value ? 'secondary' : 'ghost'}
