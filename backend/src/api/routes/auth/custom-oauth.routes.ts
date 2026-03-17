@@ -9,6 +9,7 @@ import { AuthService } from '@/services/auth/auth.service.js';
 import { OAuthPKCEService } from '@/services/auth/oauth-pkce.service.js';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
 import { CustomOAuthConfigService } from '@/services/auth/custom-oauth-config.service.js';
+import { AuditService } from '@/services/logs/audit.service.js';
 import { CustomOAuthProvider } from '@/providers/oauth/custom.provider.js';
 import {
   createCustomOAuthConfigRequestSchema,
@@ -24,6 +25,7 @@ const authConfigService = AuthConfigService.getInstance();
 const oAuthPKCEService = OAuthPKCEService.getInstance();
 const customOAuthConfigService = CustomOAuthConfigService.getInstance();
 const customOAuthProvider = CustomOAuthProvider.getInstance();
+const auditService = AuditService.getInstance();
 
 const validateJwtSecret = (): string => {
   const jwtSecret = process.env.JWT_SECRET;
@@ -99,6 +101,16 @@ router.post(
       }
 
       const config = await customOAuthConfigService.createConfig(validationResult.data);
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'CREATE_CUSTOM_OAUTH_CONFIG',
+        module: 'AUTH',
+        details: {
+          key: config.key,
+          name: config.name,
+        },
+        ip_address: req.ip,
+      });
       successResponse(res, config);
     } catch (error) {
       logger.error('Failed to create custom OAuth config', { error });
@@ -133,6 +145,16 @@ router.put(
       }
 
       const config = await customOAuthConfigService.updateConfig(key, validationResult.data);
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'UPDATE_CUSTOM_OAUTH_CONFIG',
+        module: 'AUTH',
+        details: {
+          key,
+          updatedFields: Object.keys(validationResult.data),
+        },
+        ip_address: req.ip,
+      });
       successResponse(res, config);
     } catch (error) {
       logger.error('Failed to update custom OAuth config', { error, key: req.params.key });
@@ -158,6 +180,15 @@ router.delete(
           ERROR_CODES.NOT_FOUND
         );
       }
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'DELETE_CUSTOM_OAUTH_CONFIG',
+        module: 'AUTH',
+        details: {
+          key: keyValidation.data,
+        },
+        ip_address: req.ip,
+      });
       successResponse(res, {
         success: true,
         message: `Custom OAuth configuration for ${req.params.key} deleted successfully`,
@@ -195,7 +226,7 @@ router.get('/:key', async (req: Request, res: Response, next: NextFunction) => {
 
     const { redirect_uri, code_challenge } = queryValidation.data;
     const authConfig = await authConfigService.getAuthConfig();
-    const redirectUri = redirect_uri || authConfig.signInRedirectTo;
+    const redirectUri = authConfig.signInRedirectTo || redirect_uri;
     if (!redirectUri) {
       throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
     }
