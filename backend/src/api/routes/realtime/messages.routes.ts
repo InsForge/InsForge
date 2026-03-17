@@ -45,4 +45,22 @@ router.get('/stats', verifyAdmin, async (req: AuthRequest, res: Response, next: 
   }
 });
 
+// Cleanup old messages
+router.post(
+  '/cleanup',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const batchSize = req.body.batchSize ? Number(req.body.batchSize) : 1000;
+      const deletedCount = await messageService.cleanupMessages(batchSize);
+      successResponse(res, {
+        deletedCount,
+        message: `Deleted ${deletedCount} old messages.`,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export { router as messagesRouter };

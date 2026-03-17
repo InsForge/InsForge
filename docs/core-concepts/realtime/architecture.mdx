@@ -400,6 +400,25 @@ System events are trusted and bypass publish RLS checks. User events must pass I
   </Card>
 </CardGroup>
 
+## Message Retention
+
+To prevent unbounded storage growth and maintain query performance, InsForge implements automatic retention for historical messages.
+
+| Feature | Description |
+|---------|-------------|
+| **Default Policy** | Never (NULL) - keep all messages |
+| **Configurable** | Change `retention_days` in the singleton `realtime.config` table |
+| **Cleanup Schedule** | Runs daily at midnight via native `pg_cron` |
+| **Pruning Path** | Native database deletes executed in batches |
+
+### How It Works
+
+1. A native `pg_cron` job executes `SELECT realtime.cleanup_messages()` daily at midnight.
+2. The function reads the retention threshold from `realtime.config`.
+3. Rows older than the threshold are safely deleted in batches to prevent locking or affecting live traffic.
+
+Admins can also trigger manual cleanups through the dashboard Settings menu on demand.
+
 ## Performance Characteristics
 
 | Metric | Value | Notes |
