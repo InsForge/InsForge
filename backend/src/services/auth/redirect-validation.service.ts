@@ -44,15 +44,16 @@ function matchesEntry(candidate: string, entry: string): boolean {
     return true;
   }
 
-  // 2. Wildcard subdomain — entry must start with '*.'
-  if (entry.startsWith('*.')) {
+  // 2. Wildcard subdomain — entry may be '*.example.com' or 'https://*.example.com'
+  const wildcardMatch = entry.match(/^(https?:\/\/)?\*\.(.+)$/);
+  if (wildcardMatch) {
     try {
-      const parsedEntry = new URL('https://' + entry.slice(2));
+      const entryScheme = wildcardMatch[1] || 'https://';
+      const entrySuffix = wildcardMatch[2];
+      const entryUrl = new URL(entryScheme + 'placeholder.' + entrySuffix);
       const parsedCandidate = new URL(candidate);
 
-      // Scheme must match the entry (re-derive the entry's scheme from the
-      // original entry string which may be 'https://*.example.com')
-      const entryUrl = new URL(entry.replace('*.', 'placeholder.'));
+      // Scheme must match
       if (parsedCandidate.protocol.toLowerCase() !== entryUrl.protocol.toLowerCase()) {
         return false;
       }
@@ -61,7 +62,7 @@ function matchesEntry(candidate: string, entry: string): boolean {
         return false;
       }
       // Hostname of candidate must end with '.<suffix>'
-      const suffix = parsedEntry.hostname.toLowerCase();
+      const suffix = entryUrl.hostname.replace(/^placeholder\./, '').toLowerCase();
       const candidateHost = parsedCandidate.hostname.toLowerCase();
       if (!candidateHost.endsWith('.' + suffix)) {
         return false;
