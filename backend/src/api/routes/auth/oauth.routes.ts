@@ -22,6 +22,7 @@ import {
   oAuthProvidersSchema,
 } from '@insforge/shared-schemas';
 import { isOAuthSharedKeysAvailable } from '@/utils/environment.js';
+import { validateRedirectUrl } from '@/services/auth/redirect-validation.service.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -271,6 +272,10 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
       throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
+    // Validate redirect URI against the whitelist before storing it in the signed state.
+    // If the whitelist is empty, validation is skipped (permissive dev mode).
+    validateRedirectUrl(redirectUri, authConfig.redirectUrlWhitelist ?? []);
+
     const jwtPayload = {
       provider: validatedProvider,
       redirectUri,
@@ -354,6 +359,11 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       throw new AppError('code_challenge is required in state', 400, ERROR_CODES.INVALID_INPUT);
     }
 
+    // Re-validate redirect URI from state against current whitelist before redirecting.
+    // This guards against whitelist changes between state creation and callback.
+    const callbackAuthConfig = await authConfigService.getAuthConfig();
+    validateRedirectUrl(redirectUri, callbackAuthConfig.redirectUrlWhitelist ?? []);
+
     if (success !== 'true') {
       const errorMessage = error || 'OAuth Authentication Failed';
       logger.warn('Shared OAuth callback failed', { error: errorMessage, provider });
@@ -436,6 +446,10 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
     if (!codeChallenge) {
       throw new AppError('code_challenge is required in state', 400, ERROR_CODES.INVALID_INPUT);
     }
+
+    // Re-validate redirect URI against current whitelist before using it.
+    const callbackConfig = await authConfigService.getAuthConfig();
+    validateRedirectUrl(redirectUri, callbackConfig.redirectUrlWhitelist ?? []);
 
     try {
       // Validate provider using OAuthProvidersSchema

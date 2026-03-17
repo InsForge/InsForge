@@ -90,6 +90,12 @@ export const oAuthConfigSchema = z.object({
   updatedAt: z.string(), // PostgreSQL timestamp
 });
 
+/**
+ * Redirect URL whitelist entry schema
+ * Each entry must be a valid URL (exact match after normalization)
+ */
+export const redirectUrlWhitelistSchema = z.array(z.string().url('Each entry must be a valid URL'));
+
 // Email authentication configuration schema
 export const authConfigSchema = z.object({
   id: z.string().uuid(),
@@ -105,6 +111,7 @@ export const authConfigSchema = z.object({
     .union([z.string().url(), z.literal(''), z.null()])
     .optional()
     .transform((val) => (val === '' ? null : val)),
+  redirectUrlWhitelist: redirectUrlWhitelistSchema.optional().default([]),
   createdAt: z.string(), // PostgreSQL timestamp
   updatedAt: z.string(), // PostgreSQL timestamp
 });
@@ -135,3 +142,4 @@ export type TokenPayloadSchema = z.infer<typeof tokenPayloadSchema>;
 export type OAuthConfigSchema = z.infer<typeof oAuthConfigSchema>;
 export type OAuthProvidersSchema = z.infer<typeof oAuthProvidersSchema>;
 export type AuthConfigSchema = z.infer<typeof authConfigSchema>;
+export type RedirectUrlWhitelistSchema = z.infer<typeof redirectUrlWhitelistSchema>;
