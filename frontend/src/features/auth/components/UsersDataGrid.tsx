@@ -211,7 +211,11 @@ const AdminStatusCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
         row.isProjectAdmin ? 'bg-[rgb(var(--success))]' : 'bg-[var(--alpha-8)] text-foreground'
       )}
     >
-      {row.isProjectAdmin ? (row.adminSource === 'bootstrap' ? 'Bootstrap Admin' : 'Admin') : 'User'}
+      {row.isProjectAdmin
+        ? row.adminSource === 'bootstrap'
+          ? 'Bootstrap Admin'
+          : 'Admin'
+        : 'User'}
     </Badge>
   );
 };
@@ -388,10 +392,7 @@ const UserSelectionCell = ({
 };
 
 export function UsersDataGrid({ onToggleAdminStatus, ...props }: UsersDataGridProps) {
-  const columns = useMemo(
-    () => createUsersColumns({ onToggleAdminStatus }),
-    [onToggleAdminStatus]
-  );
+  const columns = useMemo(() => createUsersColumns({ onToggleAdminStatus }), [onToggleAdminStatus]);
 
   return (
     <DataGrid<UserDataGridRow>

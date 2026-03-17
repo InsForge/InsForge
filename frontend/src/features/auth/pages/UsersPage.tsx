@@ -147,9 +147,7 @@ export default function UsersPage() {
       await updateUserAdminStatus({ userId: user.id, isProjectAdmin: nextStatus });
       await refetch();
       showToast(
-        nextStatus
-          ? `${user.email} promoted to admin`
-          : `${user.email} removed from admins`,
+        nextStatus ? `${user.email} promoted to admin` : `${user.email} removed from admins`,
         'success'
       );
     } catch (error) {
@@ -268,7 +266,9 @@ export default function UsersPage() {
           totalRecords={totalUsers}
           onPageChange={setCurrentPage}
           emptyState={emptyState}
-          onToggleAdminStatus={handleToggleAdminStatus}
+          onToggleAdminStatus={(user) => {
+            void handleToggleAdminStatus(user);
+          }}
         />
       </div>
 
@@ -287,7 +287,9 @@ export default function UsersPage() {
         confirmText="Delete"
         cancelText="Cancel"
         destructive
-        onConfirm={handleBulkDelete}
+        onConfirm={() => {
+          void handleBulkDelete();
+        }}
       />
     </div>
   );

@@ -1351,7 +1351,11 @@ export class AuthService {
     }
 
     if (existingUser.is_anonymous) {
-      throw new AppError('Anonymous users cannot be promoted to admin', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError(
+        'Anonymous users cannot be promoted to admin',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
     }
 
     const pool = this.getPool();
