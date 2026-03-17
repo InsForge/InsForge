@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Select, SelectContent, SelectItem, SelectTrigger, Input } from '@insforge/ui';
+import { Button, Input } from '@insforge/ui';
+import { ChevronRight } from 'lucide-react';
 import type { EmailTemplateSchema, UpdateEmailTemplateRequest } from '@insforge/shared-schemas';
 
 interface EmailTemplateCardProps {
@@ -9,42 +10,42 @@ interface EmailTemplateCardProps {
   onSave: (params: { type: string; data: UpdateEmailTemplateRequest }) => void;
 }
 
-interface SettingRowProps {
-  label: string;
-  description?: string;
-  children: React.ReactNode;
-}
-
-function SettingRow({ label, description, children }: SettingRowProps) {
-  return (
-    <div className="flex w-full items-start gap-6">
-      <div className="w-[300px] shrink-0">
-        <div className="py-1.5">
-          <p className="text-sm leading-5 text-foreground">{label}</p>
-        </div>
-        {description && (
-          <p className="pt-1 pb-2 text-[13px] leading-[18px] text-muted-foreground">
-            {description}
-          </p>
-        )}
-      </div>
-      <div className="min-w-0 flex-1">{children}</div>
-    </div>
-  );
-}
-
-const TEMPLATE_LABELS: Record<string, string> = {
-  'email-verification-code': 'Email Verification (Code)',
-  'email-verification-link': 'Email Verification (Link)',
-  'reset-password-code': 'Password Reset (Code)',
-  'reset-password-link': 'Password Reset (Link)',
+const TEMPLATE_INFO: Record<string, { title: string; description: string }> = {
+  'email-verification-code': {
+    title: 'Email Verification (Code)',
+    description: 'Sent when a user needs to verify their email with a 6-digit code.',
+  },
+  'email-verification-link': {
+    title: 'Email Verification (Link)',
+    description: 'Sent when a user needs to verify their email via a magic link.',
+  },
+  'reset-password-code': {
+    title: 'Password Reset (Code)',
+    description: 'Sent when a user requests a password reset with a 6-digit code.',
+  },
+  'reset-password-link': {
+    title: 'Password Reset (Link)',
+    description: 'Sent when a user requests a password reset via a magic link.',
+  },
 };
 
-const TEMPLATE_PLACEHOLDERS: Record<string, string[]> = {
-  'email-verification-code': ['{{ code }}', '{{ email }}'],
-  'email-verification-link': ['{{ link }}', '{{ email }}'],
-  'reset-password-code': ['{{ code }}', '{{ email }}'],
-  'reset-password-link': ['{{ link }}', '{{ email }}'],
+const TEMPLATE_VARIABLES: Record<string, { name: string; description: string }[]> = {
+  'email-verification-code': [
+    { name: '{{ code }}', description: '6-digit verification code' },
+    { name: '{{ email }}', description: "User's email address" },
+  ],
+  'email-verification-link': [
+    { name: '{{ link }}', description: 'Email verification URL' },
+    { name: '{{ email }}', description: "User's email address" },
+  ],
+  'reset-password-code': [
+    { name: '{{ code }}', description: '6-digit reset code' },
+    { name: '{{ email }}', description: "User's email address" },
+  ],
+  'reset-password-link': [
+    { name: '{{ link }}', description: 'Password reset URL' },
+    { name: '{{ email }}', description: "User's email address" },
+  ],
 };
 
 export function EmailTemplateCard({
@@ -55,20 +56,12 @@ export function EmailTemplateCard({
 }: EmailTemplateCardProps) {
   const templateTypes = useMemo(() => templates.map((t) => t.templateType), [templates]);
 
-  const [selectedType, setSelectedType] = useState<string>('');
+  const [selectedType, setSelectedType] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'source' | 'preview'>('source');
   const [subject, setSubject] = useState('');
   const [bodyHtml, setBodyHtml] = useState('');
   const [isDirty, setIsDirty] = useState(false);
 
-  // Set initial selected type when templates load
-  useEffect(() => {
-    if (templateTypes.length > 0 && !selectedType) {
-      setSelectedType(templateTypes[0]);
-    }
-  }, [templateTypes, selectedType]);
-
-  // Load template data when selection changes
   const selectedTemplate = useMemo(
     () => templates.find((t) => t.templateType === selectedType),
     [templates, selectedType]
@@ -86,10 +79,9 @@ export function EmailTemplateCard({
     resetToTemplate();
   }, [resetToTemplate]);
 
-  const handleTypeChange = (type: string) => {
+  const handleSelectTemplate = (type: string) => {
     setSelectedType(type);
     setActiveTab('source');
-    setIsDirty(false);
   };
 
   const handleSubjectChange = (value: string) => {
@@ -103,20 +95,21 @@ export function EmailTemplateCard({
   };
 
   const handleSave = () => {
-    if (!selectedType) {
-      return;
-    }
-    onSave({
-      type: selectedType,
-      data: { subject, bodyHtml },
-    });
+    if (!selectedType) return;
+    onSave({ type: selectedType, data: { subject, bodyHtml } });
   };
 
   const handleCancel = () => {
     resetToTemplate();
   };
 
-  const placeholders = TEMPLATE_PLACEHOLDERS[selectedType] ?? [];
+  const handleBack = () => {
+    setSelectedType(null);
+    setIsDirty(false);
+  };
+
+  const variables = selectedType ? (TEMPLATE_VARIABLES[selectedType] ?? []) : [];
+  const info = selectedType ? TEMPLATE_INFO[selectedType] : null;
 
   if (isLoading) {
     return (
@@ -126,40 +119,80 @@ export function EmailTemplateCard({
     );
   }
 
+  // Template list view
+  if (!selectedType) {
+    return (
+      <div className="flex flex-col">
+        {templateTypes.map((type, index) => {
+          const templateInfo = TEMPLATE_INFO[type];
+          return (
+            <button
+              key={type}
+              type="button"
+              onClick={() => handleSelectTemplate(type)}
+              className={`flex items-center gap-3 px-1 py-3 text-left transition-colors hover:bg-[var(--alpha-4)] ${
+                index < templateTypes.length - 1 ? 'border-b border-[var(--alpha-8)]' : ''
+              }`}
+            >
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-foreground">
+                  {templateInfo?.title ?? type}
+                </p>
+                {templateInfo?.description && (
+                  <p className="mt-0.5 text-[13px] text-muted-foreground">
+                    {templateInfo.description}
+                  </p>
+                )}
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Template editor view
   return (
     <div className="flex flex-col gap-6">
-      <SettingRow label="Template" description="Select the email template to customize">
-        <Select value={selectedType} onValueChange={handleTypeChange}>
-          <SelectTrigger>
-            <span>{TEMPLATE_LABELS[selectedType] ?? selectedType}</span>
-          </SelectTrigger>
-          <SelectContent>
-            {templateTypes.map((type) => (
-              <SelectItem key={type} value={type}>
-                {TEMPLATE_LABELS[type] ?? type}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </SettingRow>
+      {/* Back navigation */}
+      <button
+        type="button"
+        onClick={handleBack}
+        className="flex items-center gap-1 self-start text-sm text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <ChevronRight className="h-3.5 w-3.5 rotate-180" />
+        Back to templates
+      </button>
 
-      <SettingRow label="Subject" description="The email subject line">
+      {info && (
+        <div>
+          <p className="text-sm font-medium text-foreground">{info.title}</p>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">{info.description}</p>
+        </div>
+      )}
+
+      {/* Subject */}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm text-foreground">Subject</label>
         <Input
           type="text"
           value={subject}
           onChange={(e) => handleSubjectChange(e.target.value)}
           placeholder="Email subject"
         />
-      </SettingRow>
+      </div>
 
-      <SettingRow label="Body" description="The email body in HTML format">
-        <div className="flex flex-col gap-2">
-          <div className="flex gap-1">
+      {/* Body with Source/Preview toggle */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <label className="text-sm text-foreground">Body</label>
+          <div className="flex rounded-md border border-[var(--alpha-8)]">
             <button
               type="button"
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={`px-3 py-1 text-xs font-medium transition-colors first:rounded-l-md ${
                 activeTab === 'source'
-                  ? 'bg-muted text-foreground'
+                  ? 'bg-[var(--alpha-8)] text-foreground'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
               onClick={() => setActiveTab('source')}
@@ -168,9 +201,9 @@ export function EmailTemplateCard({
             </button>
             <button
               type="button"
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={`px-3 py-1 text-xs font-medium transition-colors last:rounded-r-md ${
                 activeTab === 'preview'
-                  ? 'bg-muted text-foreground'
+                  ? 'bg-[var(--alpha-8)] text-foreground'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
               onClick={() => setActiveTab('preview')}
@@ -178,46 +211,50 @@ export function EmailTemplateCard({
               Preview
             </button>
           </div>
-
-          {activeTab === 'source' ? (
-            <textarea
-              className="flex min-h-[300px] w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus:border-black focus:outline-none! focus:ring-0! focus:ring-offset-0! dark:focus:border-neutral-500"
-              value={bodyHtml}
-              onChange={(e) => handleBodyChange(e.target.value)}
-              placeholder="Enter HTML template..."
-            />
-          ) : (
-            <div className="min-h-[300px] rounded-md border border-input">
-              <iframe
-                title="Email template preview"
-                sandbox=""
-                srcDoc={bodyHtml}
-                className="h-[300px] w-full rounded-md"
-              />
-            </div>
-          )}
-
-          {placeholders.length > 0 && (
-            <p className="text-xs text-muted-foreground">
-              Available placeholders:{' '}
-              {placeholders.map((p, i) => (
-                <span key={p}>
-                  <code className="rounded bg-muted px-1 py-0.5">{p}</code>
-                  {i < placeholders.length - 1 ? ', ' : ''}
-                </span>
-              ))}
-            </p>
-          )}
         </div>
-      </SettingRow>
 
+        {activeTab === 'source' ? (
+          <textarea
+            className="min-h-[350px] w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs leading-relaxed text-foreground shadow-sm transition-colors placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+            value={bodyHtml}
+            onChange={(e) => handleBodyChange(e.target.value)}
+            placeholder="Enter HTML template..."
+            spellCheck={false}
+          />
+        ) : (
+          <div className="min-h-[350px] overflow-hidden rounded-md border border-input bg-white">
+            <iframe
+              title="Email template preview"
+              sandbox=""
+              srcDoc={bodyHtml}
+              className="h-[350px] w-full border-0"
+            />
+          </div>
+        )}
+
+        {/* Variable reference */}
+        {variables.length > 0 && (
+          <p className="text-[13px] text-muted-foreground">
+            Use{' '}
+            {variables.map((v, i) => (
+              <span key={v.name}>
+                <code className="font-mono text-xs text-foreground">{v.name}</code>
+                {' '}for {v.description.toLowerCase()}
+                {i < variables.length - 1 ? ', ' : '.'}
+              </span>
+            ))}
+          </p>
+        )}
+      </div>
+
+      {/* Footer */}
       {isDirty && (
-        <div className="flex items-center justify-end gap-2 pt-2">
+        <div className="flex items-center justify-end gap-2 border-t border-[var(--alpha-8)] pt-4">
           <Button type="button" variant="secondary" onClick={handleCancel} disabled={isUpdating}>
             Cancel
           </Button>
           <Button type="button" onClick={handleSave} disabled={isUpdating}>
-            {isUpdating ? 'Saving...' : 'Save Changes'}
+            {isUpdating ? 'Saving...' : 'Save changes'}
           </Button>
         </div>
       )}

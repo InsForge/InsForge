@@ -30,21 +30,46 @@ export default function EmailPage() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 sm:px-10">
-        <div className="mx-auto flex w-full max-w-[1024px] flex-col gap-6">
-          <SmtpSettingsCard
-            config={smtpConfig}
-            isLoading={isSmtpLoading}
-            isUpdating={isSmtpUpdating}
-            onSave={updateSmtpConfig}
-          />
-          <div className="border-t border-border" />
-          <EmailTemplateCard
-            templates={templates}
-            isLoading={isTemplatesLoading}
-            isUpdating={isTemplatesUpdating}
-            onSave={updateTemplate}
-          />
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-10 sm:px-10">
+        <div className="mx-auto flex w-full max-w-[1024px] flex-col gap-8">
+          <div className="rounded-lg border border-[var(--alpha-8)] bg-card">
+            <div className="border-b border-[var(--alpha-8)] px-6 py-4">
+              <h2 className="text-base font-medium text-foreground">SMTP Provider</h2>
+              <p className="mt-1 text-[13px] text-muted-foreground">
+                Configure a custom SMTP server for sending emails. Your credentials are always
+                encrypted.
+              </p>
+            </div>
+            <div className="px-6 py-6">
+              <SmtpSettingsCard
+                config={smtpConfig}
+                isLoading={isSmtpLoading}
+                isUpdating={isSmtpUpdating}
+                onSave={updateSmtpConfig}
+              />
+            </div>
+          </div>
+
+          <div
+            className={`rounded-lg border border-[var(--alpha-8)] bg-card ${!smtpConfig?.enabled ? 'pointer-events-none opacity-50' : ''}`}
+          >
+            <div className="border-b border-[var(--alpha-8)] px-6 py-4">
+              <h2 className="text-base font-medium text-foreground">Email Templates</h2>
+              <p className="mt-1 text-[13px] text-muted-foreground">
+                {smtpConfig?.enabled
+                  ? 'Customize the content and appearance of authentication emails.'
+                  : 'Enable custom SMTP above to customize email templates.'}
+              </p>
+            </div>
+            <div className="px-6 py-6">
+              <EmailTemplateCard
+                templates={templates}
+                isLoading={isTemplatesLoading}
+                isUpdating={isTemplatesUpdating}
+                onSave={updateTemplate}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>
