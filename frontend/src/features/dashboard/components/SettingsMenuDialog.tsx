@@ -47,6 +47,8 @@ const INFO_FIELD_CLASS =
   'flex h-8 w-full items-center rounded border border-[var(--alpha-12)] bg-[var(--alpha-4)] px-2.5 text-sm leading-5 text-foreground';
 
 type RateLimitFormField =
+  | 'apiGlobalMaxRequests'
+  | 'apiGlobalWindowMinutes'
   | 'sendEmailOtpMaxRequests'
   | 'sendEmailOtpWindowMinutes'
   | 'verifyOtpMaxAttempts'
@@ -56,6 +58,8 @@ type RateLimitFormField =
 type RateLimitFormValues = Record<RateLimitFormField, string>;
 
 const DEFAULT_RATE_LIMIT_FORM_VALUES: RateLimitFormValues = {
+  apiGlobalMaxRequests: '3000',
+  apiGlobalWindowMinutes: '15',
   sendEmailOtpMaxRequests: '5',
   sendEmailOtpWindowMinutes: '15',
   verifyOtpMaxAttempts: '10',
@@ -64,6 +68,8 @@ const DEFAULT_RATE_LIMIT_FORM_VALUES: RateLimitFormValues = {
 };
 
 const RATE_LIMIT_BOUNDS: Record<RateLimitFormField, { min: number; max: number }> = {
+  apiGlobalMaxRequests: { min: 100, max: 100000 },
+  apiGlobalWindowMinutes: { min: 1, max: 1440 },
   sendEmailOtpMaxRequests: { min: 1, max: 100 },
   sendEmailOtpWindowMinutes: { min: 1, max: 1440 },
   verifyOtpMaxAttempts: { min: 1, max: 100 },
@@ -77,6 +83,8 @@ function toRateLimitFormValues(config?: GetRateLimitConfigResponse | null): Rate
   }
 
   return {
+    apiGlobalMaxRequests: String(config.apiGlobalMaxRequests),
+    apiGlobalWindowMinutes: String(config.apiGlobalWindowMinutes),
     sendEmailOtpMaxRequests: String(config.sendEmailOtpMaxRequests),
     sendEmailOtpWindowMinutes: String(config.sendEmailOtpWindowMinutes),
     verifyOtpMaxAttempts: String(config.verifyOtpMaxAttempts),
@@ -796,8 +804,8 @@ export default function SettingsMenuDialog() {
                 <div className="flex w-full flex-col gap-5">
                   <div className="rounded border border-[var(--alpha-12)] bg-[var(--alpha-4)] p-3">
                     <p className="text-sm leading-5 text-foreground">
-                      These controls currently apply to authentication-sensitive endpoints only:
-                      send verification/reset emails and OTP verification.
+                      These controls apply to the global `/api` per-IP limiter and
+                      authentication-sensitive OTP endpoints.
                     </p>
                   </div>
 
@@ -807,6 +815,71 @@ export default function SettingsMenuDialog() {
                     </div>
                   ) : (
                     <div className="flex w-full flex-col gap-4">
+                      <div className="flex items-start gap-6">
+                        <div className="w-[200px] shrink-0">
+                          <p className="py-1.5 text-sm leading-5 text-foreground">
+                            Global API (per IP)
+                          </p>
+                          <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
+                            Max requests allowed for `/api` routes per window.
+                          </p>
+                        </div>
+                        <div className="grid min-w-0 flex-1 grid-cols-2 gap-3">
+                          <div className="flex flex-col gap-1">
+                            <Input
+                              type="number"
+                              min={RATE_LIMIT_BOUNDS.apiGlobalMaxRequests.min}
+                              max={RATE_LIMIT_BOUNDS.apiGlobalMaxRequests.max}
+                              value={rateLimitFormValues.apiGlobalMaxRequests}
+                              onChange={(event) =>
+                                handleRateLimitInputChange(
+                                  'apiGlobalMaxRequests',
+                                  event.target.value
+                                )
+                              }
+                              className={cn(
+                                rateLimitValidation.errors.apiGlobalMaxRequests &&
+                                  'border-destructive'
+                              )}
+                            />
+                            <p className="text-xs text-muted-foreground">Requests</p>
+                            {rateLimitValidation.errors.apiGlobalMaxRequests && (
+                              <p className="text-xs text-destructive">
+                                {rateLimitValidation.errors.apiGlobalMaxRequests}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <Input
+                              type="number"
+                              min={RATE_LIMIT_BOUNDS.apiGlobalWindowMinutes.min}
+                              max={RATE_LIMIT_BOUNDS.apiGlobalWindowMinutes.max}
+                              value={rateLimitFormValues.apiGlobalWindowMinutes}
+                              onChange={(event) =>
+                                handleRateLimitInputChange(
+                                  'apiGlobalWindowMinutes',
+                                  event.target.value
+                                )
+                              }
+                              className={cn(
+                                rateLimitValidation.errors.apiGlobalWindowMinutes &&
+                                  'border-destructive'
+                              )}
+                            />
+                            <p className="text-xs text-muted-foreground">Window (minutes)</p>
+                            {rateLimitValidation.errors.apiGlobalWindowMinutes && (
+                              <p className="text-xs text-destructive">
+                                {rateLimitValidation.errors.apiGlobalWindowMinutes}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex h-1 items-center">
+                        <div className="h-px w-full bg-[var(--alpha-8)]" />
+                      </div>
+
                       <div className="flex items-start gap-6">
                         <div className="w-[200px] shrink-0">
                           <p className="py-1.5 text-sm leading-5 text-foreground">
@@ -1028,7 +1101,7 @@ export default function SettingsMenuDialog() {
             {showRateLimitActions && (
               <MenuDialogFooter className="border-t border-[var(--alpha-8)]">
                 <div className="mr-auto text-sm text-muted-foreground">
-                  Changes apply to auth OTP-related limits.
+                  Changes apply to global API and auth OTP-related limits.
                 </div>
                 <Button
                   type="button"

@@ -1,7 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -21,7 +20,10 @@ import { emailRouter } from '@/api/routes/email/index.routes.js';
 import { deploymentsRouter } from '@/api/routes/deployments/index.routes.js';
 import { webhooksRouter } from '@/api/routes/webhooks/index.routes.js';
 import { errorMiddleware } from '@/api/middlewares/error.js';
-import { destroyEmailCooldownInterval } from '@/api/middlewares/rate-limiters.js';
+import {
+  destroyEmailCooldownInterval,
+  globalApiRateLimiter,
+} from '@/api/middlewares/rate-limiters.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { RealtimeManager } from '@/infra/realtime/realtime.manager.js';
 import fetch from 'node-fetch';
@@ -69,13 +71,6 @@ export async function createApp() {
   // Enable trust proxy setting for rate limiting behind proxies/load balancers
   app.set('trust proxy', 2);
 
-  const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 3000,
-    message: 'Too many requests from this IP',
-    skip: (req) => req.path === '/api/health',
-  });
-
   // Basic middleware
   app.use(
     cors({
@@ -84,7 +79,7 @@ export async function createApp() {
     })
   );
   app.use(cookieParser()); // Parse cookies for refresh token handling
-  app.use(limiter);
+  app.use('/api', globalApiRateLimiter);
   app.use((req: Request, res: Response, next: NextFunction) => {
     const startTime = Date.now();
     const originalSend = res.send;

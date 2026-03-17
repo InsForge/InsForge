@@ -294,8 +294,8 @@ paths:
 
   /api/auth/rate-limits:
     get:
-      summary: Get auth rate-limit configuration
-      description: Get persisted authentication-related rate-limit settings (admin only)
+      summary: Get API rate-limit configuration
+      description: Get persisted global API and authentication rate-limit settings (admin only)
       tags:
         - Admin
       security:
@@ -311,6 +311,16 @@ paths:
                   id:
                     type: string
                     format: uuid
+                  apiGlobalMaxRequests:
+                    type: integer
+                    minimum: 100
+                    maximum: 100000
+                    description: Maximum requests allowed per IP for /api routes in each window
+                  apiGlobalWindowMinutes:
+                    type: integer
+                    minimum: 1
+                    maximum: 1440
+                    description: Time window for apiGlobalMaxRequests in minutes
                   sendEmailOtpMaxRequests:
                     type: integer
                     minimum: 1
@@ -348,8 +358,8 @@ paths:
           description: Forbidden - Admin only
 
     put:
-      summary: Update auth rate-limit configuration
-      description: Update persisted authentication-related rate-limit settings (admin only)
+      summary: Update API rate-limit configuration
+      description: Update persisted global API and authentication rate-limit settings (admin only)
       tags:
         - Admin
       security:
@@ -361,6 +371,14 @@ paths:
             schema:
               type: object
               properties:
+                apiGlobalMaxRequests:
+                  type: integer
+                  minimum: 100
+                  maximum: 100000
+                apiGlobalWindowMinutes:
+                  type: integer
+                  minimum: 1
+                  maximum: 1440
                 sendEmailOtpMaxRequests:
                   type: integer
                   minimum: 1
@@ -392,6 +410,10 @@ paths:
                   id:
                     type: string
                     format: uuid
+                  apiGlobalMaxRequests:
+                    type: integer
+                  apiGlobalWindowMinutes:
+                    type: integer
                   sendEmailOtpMaxRequests:
                     type: integer
                   sendEmailOtpWindowMinutes:

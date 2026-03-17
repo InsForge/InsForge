@@ -155,9 +155,10 @@ sequenceDiagram
 
 ## Rate Limit Settings
 
-Authentication-sensitive rate limits can be configured by project admins from **Project Settings -> Rate Limits** in the dashboard.
+Global API and authentication-sensitive rate limits can be configured by project admins from **Project Settings -> Rate Limits** in the dashboard.
 
 These controls cover:
+- **Global API (per IP)**: maximum `/api` requests in a time window
 - **Send OTP (per IP)**: maximum email verification/reset requests in a time window
 - **Verify OTP (per IP)**: maximum OTP verification attempts in a time window
 - **Per-email cooldown**: minimum delay before requesting another code for the same email
@@ -165,7 +166,7 @@ These controls cover:
 Guidance:
 - Lower limits increase abuse resistance but may block legitimate users more often.
 - Higher limits reduce friction but increase brute-force and spam risk.
-- Changes are persisted in backend configuration and applied consistently across restarts.
+- Changes are persisted in backend configuration, survive restarts, and are applied live.
 
 ## API Endpoints
 

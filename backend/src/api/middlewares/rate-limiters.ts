@@ -21,6 +21,8 @@ const RATE_LIMIT_CONFIG_CACHE_TTL_MS = 30 * 1000; // 30 seconds
 
 type DynamicRateLimitConfig = Pick<
   RateLimitConfigSchema,
+  | 'apiGlobalMaxRequests'
+  | 'apiGlobalWindowMinutes'
   | 'sendEmailOtpMaxRequests'
   | 'sendEmailOtpWindowMinutes'
   | 'verifyOtpMaxAttempts'
@@ -35,6 +37,7 @@ let cachedConfigVersion = 0;
 
 type RateLimitMiddlewareBundle = {
   key: string;
+  globalApiLimiter: ReturnType<typeof rateLimit>;
   sendEmailOtpIpLimiter: ReturnType<typeof rateLimit>;
   verifyOtpIpLimiter: ReturnType<typeof rateLimit>;
   emailCooldownMiddleware: (req: Request, res: Response, next: NextFunction) => void;
@@ -65,6 +68,8 @@ cleanupInterval = setInterval(
 
 function getConfigKey(config: DynamicRateLimitConfig): string {
   return [
+    config.apiGlobalMaxRequests,
+    config.apiGlobalWindowMinutes,
     config.sendEmailOtpMaxRequests,
     config.sendEmailOtpWindowMinutes,
     config.verifyOtpMaxAttempts,
@@ -74,8 +79,26 @@ function getConfigKey(config: DynamicRateLimitConfig): string {
 }
 
 function createRateLimitBundle(config: DynamicRateLimitConfig): RateLimitMiddlewareBundle {
+  const globalApiWindowMs = config.apiGlobalWindowMinutes * 60 * 1000;
   const sendOtpWindowMs = config.sendEmailOtpWindowMinutes * 60 * 1000;
   const verifyOtpWindowMs = config.verifyOtpWindowMinutes * 60 * 1000;
+
+  const globalApiLimiter = rateLimit({
+    windowMs: globalApiWindowMs,
+    max: config.apiGlobalMaxRequests,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req: Request) => req.path === '/health' || req.path === '/api/health',
+    handler: (_req: Request, _res: Response, next: NextFunction) => {
+      next(
+        new AppError(
+          `Too many API requests from this IP. Please try again in ${config.apiGlobalWindowMinutes} minute${config.apiGlobalWindowMinutes === 1 ? '' : 's'}.`,
+          429,
+          ERROR_CODES.TOO_MANY_REQUESTS
+        )
+      );
+    },
+  });
 
   const sendEmailOtpIpLimiter = rateLimit({
     windowMs: sendOtpWindowMs,
@@ -117,6 +140,7 @@ function createRateLimitBundle(config: DynamicRateLimitConfig): RateLimitMiddlew
 
   return {
     key: getConfigKey(config),
+    globalApiLimiter,
     sendEmailOtpIpLimiter,
     verifyOtpIpLimiter,
     emailCooldownMiddleware,
@@ -135,6 +159,8 @@ async function getDynamicRateLimitConfig(): Promise<DynamicRateLimitConfig> {
     cachedConfigPromise = rateLimitConfigService
       .getConfig()
       .then((config) => ({
+        apiGlobalMaxRequests: config.apiGlobalMaxRequests,
+        apiGlobalWindowMinutes: config.apiGlobalWindowMinutes,
         sendEmailOtpMaxRequests: config.sendEmailOtpMaxRequests,
         sendEmailOtpWindowMinutes: config.sendEmailOtpWindowMinutes,
         verifyOtpMaxAttempts: config.verifyOtpMaxAttempts,
@@ -195,6 +221,22 @@ export function destroyEmailCooldownInterval(): void {
   cachedConfigTimestamp = 0;
   cachedConfigPromise = null;
 }
+
+/**
+ * Global /api rate limiter middleware (per-IP).
+ * Resolved dynamically from persisted configuration.
+ */
+export const globalApiRateLimiter: RequestHandler = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  void getRateLimitBundle()
+    .then((bundle) => {
+      bundle.globalApiLimiter(req, res, next);
+    })
+    .catch(next);
+};
 
 /**
  * Per-IP rate limiter middleware for send email OTP requests.

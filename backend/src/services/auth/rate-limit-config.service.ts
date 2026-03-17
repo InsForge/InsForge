@@ -6,6 +6,8 @@ import logger from '@/utils/logger.js';
 import type { RateLimitConfigSchema, UpdateRateLimitConfigRequest } from '@insforge/shared-schemas';
 
 const DEFAULT_RATE_LIMIT_CONFIG = {
+  apiGlobalMaxRequests: 3000,
+  apiGlobalWindowMinutes: 15,
   sendEmailOtpMaxRequests: 5,
   sendEmailOtpWindowMinutes: 15,
   verifyOtpMaxAttempts: 10,
@@ -37,6 +39,8 @@ export class RateLimitConfigService {
 
   private mapRowToSchema(row: {
     id: string;
+    apiGlobalMaxRequests: number;
+    apiGlobalWindowMinutes: number;
     sendEmailOtpMaxRequests: number;
     sendEmailOtpWindowMinutes: number;
     verifyOtpMaxAttempts: number;
@@ -47,6 +51,8 @@ export class RateLimitConfigService {
   }): RateLimitConfigSchema {
     return {
       id: row.id,
+      apiGlobalMaxRequests: row.apiGlobalMaxRequests,
+      apiGlobalWindowMinutes: row.apiGlobalWindowMinutes,
       sendEmailOtpMaxRequests: row.sendEmailOtpMaxRequests,
       sendEmailOtpWindowMinutes: row.sendEmailOtpWindowMinutes,
       verifyOtpMaxAttempts: row.verifyOtpMaxAttempts,
@@ -59,16 +65,20 @@ export class RateLimitConfigService {
 
   private async createDefaultConfig(client: PoolClient): Promise<RateLimitConfigSchema> {
     const result = await client.query(
-      `INSERT INTO auth.rate_limit_configs (
+      `INSERT INTO system.rate_limit_configs (
+         api_global_max_requests,
+         api_global_window_minutes,
          send_email_otp_max_requests,
          send_email_otp_window_minutes,
          verify_otp_max_attempts,
          verify_otp_window_minutes,
          email_cooldown_seconds
        )
-       VALUES ($1, $2, $3, $4, $5)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING
          id,
+         api_global_max_requests as "apiGlobalMaxRequests",
+         api_global_window_minutes as "apiGlobalWindowMinutes",
          send_email_otp_max_requests as "sendEmailOtpMaxRequests",
          send_email_otp_window_minutes as "sendEmailOtpWindowMinutes",
          verify_otp_max_attempts as "verifyOtpMaxAttempts",
@@ -77,6 +87,8 @@ export class RateLimitConfigService {
          created_at as "createdAt",
          updated_at as "updatedAt"`,
       [
+        DEFAULT_RATE_LIMIT_CONFIG.apiGlobalMaxRequests,
+        DEFAULT_RATE_LIMIT_CONFIG.apiGlobalWindowMinutes,
         DEFAULT_RATE_LIMIT_CONFIG.sendEmailOtpMaxRequests,
         DEFAULT_RATE_LIMIT_CONFIG.sendEmailOtpWindowMinutes,
         DEFAULT_RATE_LIMIT_CONFIG.verifyOtpMaxAttempts,
@@ -98,6 +110,8 @@ export class RateLimitConfigService {
       const result = await client.query(
         `SELECT
            id,
+           api_global_max_requests as "apiGlobalMaxRequests",
+           api_global_window_minutes as "apiGlobalWindowMinutes",
            send_email_otp_max_requests as "sendEmailOtpMaxRequests",
            send_email_otp_window_minutes as "sendEmailOtpWindowMinutes",
            verify_otp_max_attempts as "verifyOtpMaxAttempts",
@@ -105,7 +119,7 @@ export class RateLimitConfigService {
            email_cooldown_seconds as "emailCooldownSeconds",
            created_at as "createdAt",
            updated_at as "updatedAt"
-         FROM auth.rate_limit_configs
+         FROM system.rate_limit_configs
          LIMIT 1`
       );
 
@@ -132,7 +146,7 @@ export class RateLimitConfigService {
       await client.query('BEGIN');
 
       const existingResult = await client.query(
-        'SELECT id FROM auth.rate_limit_configs LIMIT 1 FOR UPDATE'
+        'SELECT id FROM system.rate_limit_configs LIMIT 1 FOR UPDATE'
       );
 
       if (!existingResult.rows.length) {
@@ -142,6 +156,16 @@ export class RateLimitConfigService {
       const updates: string[] = [];
       const values: number[] = [];
       let paramCount = 1;
+
+      if (input.apiGlobalMaxRequests !== undefined) {
+        updates.push(`api_global_max_requests = $${paramCount++}`);
+        values.push(input.apiGlobalMaxRequests);
+      }
+
+      if (input.apiGlobalWindowMinutes !== undefined) {
+        updates.push(`api_global_window_minutes = $${paramCount++}`);
+        values.push(input.apiGlobalWindowMinutes);
+      }
 
       if (input.sendEmailOtpMaxRequests !== undefined) {
         updates.push(`send_email_otp_max_requests = $${paramCount++}`);
@@ -176,10 +200,12 @@ export class RateLimitConfigService {
       updates.push('updated_at = NOW()');
 
       const result = await client.query(
-        `UPDATE auth.rate_limit_configs
+        `UPDATE system.rate_limit_configs
          SET ${updates.join(', ')}
          RETURNING
            id,
+           api_global_max_requests as "apiGlobalMaxRequests",
+           api_global_window_minutes as "apiGlobalWindowMinutes",
            send_email_otp_max_requests as "sendEmailOtpMaxRequests",
            send_email_otp_window_minutes as "sendEmailOtpWindowMinutes",
            verify_otp_max_attempts as "verifyOtpMaxAttempts",

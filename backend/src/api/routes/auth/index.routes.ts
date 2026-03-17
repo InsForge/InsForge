@@ -182,7 +182,7 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
   }
 });
 
-// GET /api/auth/rate-limits - Get auth rate-limit configurations (admin only)
+// GET /api/auth/rate-limits - Get API/auth rate-limit configurations (admin only)
 router.get(
   '/rate-limits',
   verifyAdmin,
@@ -196,7 +196,7 @@ router.get(
   }
 );
 
-// PUT /api/auth/rate-limits - Update auth rate-limit configurations (admin only)
+// PUT /api/auth/rate-limits - Update API/auth rate-limit configurations (admin only)
 router.put(
   '/rate-limits',
   verifyAdmin,
