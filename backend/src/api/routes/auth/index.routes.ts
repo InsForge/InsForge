@@ -606,6 +606,14 @@ router.patch(
         });
       }
 
+      const socket = SocketManager.getInstance();
+      socket.broadcastToRoom(
+        'role:project_admin',
+        ServerEvents.DATA_UPDATE,
+        { resource: DataUpdateResourceType.USERS },
+        'system'
+      );
+
       const response: UpdateUserAdminStatusResponse = { user };
       successResponse(res, response);
     } catch (error) {
