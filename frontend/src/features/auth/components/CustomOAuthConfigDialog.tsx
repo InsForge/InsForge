@@ -9,10 +9,11 @@ import {
   DialogTitle,
   Input,
 } from '@insforge/ui';
-import type {
-  CreateCustomOAuthConfigRequest,
-  CustomOAuthConfigSchema,
-  UpdateCustomOAuthConfigRequest,
+import {
+  oAuthProvidersSchema,
+  type CreateCustomOAuthConfigRequest,
+  type CustomOAuthConfigSchema,
+  type UpdateCustomOAuthConfigRequest,
 } from '@insforge/shared-schemas';
 import { useCustomOAuthConfig } from '@/features/auth/hooks/useCustomOAuthConfig';
 
@@ -32,19 +33,7 @@ interface FormValues {
 }
 
 const keyRegex = /^[a-z0-9_-]+$/;
-const reservedBuiltInProviderSlugs = new Set([
-  'google',
-  'github',
-  'discord',
-  'linkedin',
-  'facebook',
-  'instagram',
-  'tiktok',
-  'apple',
-  'x',
-  'spotify',
-  'microsoft',
-]);
+const reservedBuiltInProviderSlugs = new Set<string>(oAuthProvidersSchema.options);
 
 const isValidUrl = (value: string) => {
   try {

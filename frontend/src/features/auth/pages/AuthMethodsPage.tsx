@@ -1,5 +1,14 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { MoreHorizontal, Plus, Trash2, Pencil, Mail, ChevronDown, Settings } from 'lucide-react';
+import {
+  MoreHorizontal,
+  Plus,
+  Trash2,
+  Pencil,
+  Mail,
+  ChevronDown,
+  Settings,
+  KeyRound,
+} from 'lucide-react';
 import {
   AuthSettingsMenuDialog,
   OAuthConfigDialog,
@@ -275,18 +284,16 @@ export default function AuthMethodsPage({ openSettingsOnMount = false }: AuthMet
               className="flex items-center gap-3 rounded border border-[var(--alpha-8)] bg-card py-4 pl-6 pr-4"
             >
               <div className="flex min-w-0 flex-1 items-center gap-3">
-                <span className="text-sm font-semibold uppercase">
-                  {customConfig.key.slice(0, 2)}
-                </span>
+                <KeyRound className="h-5 w-5 shrink-0 text-muted-foreground" />
                 <span className="truncate text-sm font-medium leading-6 text-foreground">
                   {customConfig.name}
                 </span>
-                <Badge className="h-5 rounded bg-primary/20 px-2 py-0 text-xs font-medium leading-4 text-primary">
-                  Custom
-                </Badge>
               </div>
 
               <div className="flex items-center gap-2">
+                <Badge className="h-5 rounded bg-primary/20 px-2 py-0 text-xs font-medium leading-4 text-primary">
+                  Custom
+                </Badge>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button

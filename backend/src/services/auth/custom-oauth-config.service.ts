@@ -1,5 +1,4 @@
 import { Pool } from 'pg';
-import { createHash } from 'node:crypto';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { AppError } from '@/api/middlewares/error.js';
@@ -56,8 +55,7 @@ export class CustomOAuthConfigService {
   }
 
   private buildSecretKey(providerKey: string): string {
-    const providerKeyHash = createHash('sha256').update(providerKey).digest('hex');
-    return `CUSTOM_OAUTH_${providerKeyHash}_CLIENT_SECRET`;
+    return `CUSTOM_OAUTH_${providerKey}_CLIENT_SECRET`;
   }
 
   private mapRow(row: CustomOAuthConfigRow): CustomOAuthConfigSchema {
