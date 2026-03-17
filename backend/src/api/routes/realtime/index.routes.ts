@@ -31,7 +31,11 @@ router.post('/config', verifyAdmin, async (req: AuthRequest, res: Response, next
     const { retentionDays } = req.body;
     // Handle both null (Never) and positive number
     if (retentionDays !== null && (typeof retentionDays !== 'number' || retentionDays <= 0)) {
-      throw new AppError('retentionDays must be a positive number or null', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError(
+        'retentionDays must be a positive number or null',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
     }
     await messageService.updateRetentionDays(retentionDays);
     successResponse(res, { message: 'Retention config updated successfully' });

@@ -87,9 +87,7 @@ export function RealtimeSettingsMenuDialog({
     }
     setIsCleaning(true);
     try {
-      const result = onCleanup
-        ? await onCleanup()
-        : await realtimeService.cleanupMessages();
+      const result = onCleanup ? await onCleanup() : await realtimeService.cleanupMessages();
       showToast(result.message || 'Old messages have been pruned.', 'success');
     } catch (error) {
       console.error('Failed to cleanup messages', error);

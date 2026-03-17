@@ -265,7 +265,6 @@ async function seedLocalOAuthConfigs(): Promise<void> {
   }
 }
 
-
 // Create api key, admin user, and default AI configs
 export async function seedBackend(): Promise<void> {
   const secretService = SecretService.getInstance();
