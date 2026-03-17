@@ -389,8 +389,9 @@ export class StorageService {
         return false;
       }
 
-      // Delete from storage table first — if this fails, no files are removed
-      // so the bucket remains consistent and the operation can be retried safely
+      // Delete from DB first — if DB delete fails, files remain intact and retry is safe.
+      // If provider.deleteBucket fails after this point, all objects are cascade-deleted
+      // from the database but files remain orphaned in storage.
       await client.query('DELETE FROM storage.buckets WHERE name = $1', [bucket]);
 
       // Delete bucket using backend (handles all files)
