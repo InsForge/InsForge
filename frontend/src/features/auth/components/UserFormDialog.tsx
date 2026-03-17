@@ -5,6 +5,7 @@ import {
   Dialog,
   DialogCloseButton,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -156,6 +157,7 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
                 <DialogTitle className="text-base font-medium leading-7 text-foreground">
                   Add User
                 </DialogTitle>
+                <DialogDescription className="sr-only">Create a new user account</DialogDescription>
               </div>
               <DialogCloseButton
                 className="relative right-auto top-auto h-8 w-8 rounded p-1 text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground"

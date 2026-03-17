@@ -3,7 +3,7 @@ import CodeMirror from '@uiw/react-codemirror';
 import { sql } from '@codemirror/lang-sql';
 import { EditorView } from '@codemirror/view';
 import { vscodeDark, vscodeLight } from '@uiw/codemirror-theme-vscode';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@insforge/ui';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@insforge/ui';
 import { useTheme } from '@/lib/contexts/ThemeContext';
 
 const customTheme = EditorView.theme({
@@ -33,6 +33,7 @@ export function SQLModal({ open, onOpenChange, title, value }: SQLModalProps) {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
+          <DialogDescription className="sr-only">SQL definition view</DialogDescription>
         </DialogHeader>
         <div className="mt-2 rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-900">
           <CodeMirror
