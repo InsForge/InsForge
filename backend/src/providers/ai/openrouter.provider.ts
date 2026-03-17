@@ -84,7 +84,10 @@ export class OpenRouterProvider {
     try {
       const secretService = SecretService.getInstance();
       return await secretService.getSecretByKey(BYOK_SECRET_KEY);
-    } catch {
+    } catch (error) {
+      logger.warn('Failed to read BYOK secret, falling through to next key source', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return null;
     }
   }
@@ -396,7 +399,10 @@ export class OpenRouterProvider {
       return await request(client);
     } catch (error) {
       // Check if error is a 402/403 insufficient credits error in cloud environment
+      // Skip renewal when BYOK key is active — the key is developer-managed
+      const byokActive = !!(await this.getBYOKApiKey());
       if (
+        !byokActive &&
         isCloudEnvironment() &&
         error instanceof OpenAI.APIError &&
         (error.status === 402 || error.status === 403)
