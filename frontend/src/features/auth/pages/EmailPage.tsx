@@ -50,8 +50,9 @@ export default function EmailPage() {
             </div>
           </div>
 
-          <div
-            className={`rounded-lg border border-[var(--alpha-8)] bg-card ${!smtpConfig?.enabled ? 'pointer-events-none opacity-50' : ''}`}
+          <fieldset
+            disabled={!smtpConfig?.enabled}
+            className={`rounded-lg border border-[var(--alpha-8)] bg-card ${!smtpConfig?.enabled ? 'opacity-50' : ''}`}
           >
             <div className="border-b border-[var(--alpha-8)] px-6 py-4">
               <h2 className="text-base font-medium text-foreground">Email Templates</h2>
@@ -69,7 +70,7 @@ export default function EmailPage() {
                 onSave={updateTemplate}
               />
             </div>
-          </div>
+          </fieldset>
         </div>
       </div>
     </div>

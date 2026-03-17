@@ -47,15 +47,15 @@ export class SmtpConfigService {
   /**
    * Decrypt password from encrypted ciphertext
    */
-  private getDecryptedPassword(passwordEncrypted: string): string {
+  private getDecryptedPassword(passwordEncrypted: string): string | null {
     if (!passwordEncrypted) {
-      return '';
+      return null;
     }
     try {
       return EncryptionManager.decrypt(passwordEncrypted);
     } catch (error) {
-      logger.error('Failed to decrypt SMTP password', { error });
-      return '';
+      logger.error('Failed to decrypt SMTP password — credentials may be corrupted', { error });
+      return null;
     }
   }
 
@@ -148,13 +148,19 @@ export class SmtpConfigService {
         return null;
       }
 
+      const password = this.getDecryptedPassword(row.password_encrypted);
+      if (password === null) {
+        logger.error('SMTP config has undecryptable credentials — treating as unconfigured');
+        return null;
+      }
+
       return {
         id: row.id,
         enabled: row.enabled,
         host: row.host,
         port: row.port,
         username: row.username,
-        password: this.getDecryptedPassword(row.password_encrypted),
+        password,
         senderEmail: row.senderEmail,
         senderName: row.senderName,
         minIntervalSeconds: row.minIntervalSeconds,
@@ -200,7 +206,7 @@ export class SmtpConfigService {
       if (input.enabled) {
         const passwordToVerify = input.password
           ? input.password
-          : this.getDecryptedPassword(existingRow.password_encrypted);
+          : (this.getDecryptedPassword(existingRow.password_encrypted) ?? '');
 
         if (!passwordToVerify) {
           await client.query('ROLLBACK');
@@ -254,6 +260,7 @@ export class SmtpConfigService {
            sender_name = $7,
            min_interval_seconds = $8,
            updated_at = NOW()
+         WHERE id = $9
          RETURNING
            id,
            enabled,
@@ -275,6 +282,7 @@ export class SmtpConfigService {
           input.senderEmail,
           input.senderName,
           input.minIntervalSeconds ?? 60,
+          existingRow.id,
         ]
       );
 

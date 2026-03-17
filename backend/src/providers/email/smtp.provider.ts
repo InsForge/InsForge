@@ -21,6 +21,21 @@ function escapeHtml(value: string): string {
 }
 
 /**
+ * Escape special regex characters in a string
+ */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Format RFC 5322 compliant from address with escaped display name
+ */
+function formatFromAddress(name: string, email: string): string {
+  const safeName = name.replace(/"/g, '\\"');
+  return `"${safeName}" <${email}>`;
+}
+
+/**
  * SMTP email provider for sending emails via custom SMTP server
  */
 export class SmtpEmailProvider implements EmailProvider {
@@ -56,7 +71,7 @@ export class SmtpEmailProvider implements EmailProvider {
     for (const [key, value] of Object.entries(variables)) {
       const safeValue = key === 'link' ? value : escapeHtml(value);
       // Match {{ key }} with optional whitespace inside braces
-      const pattern = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
+      const pattern = new RegExp(`\\{\\{\\s*${escapeRegex(key)}\\s*\\}\\}`, 'g');
       rendered = rendered.replace(pattern, safeValue);
     }
     return rendered;
@@ -109,7 +124,7 @@ export class SmtpEmailProvider implements EmailProvider {
 
     try {
       await transporter.sendMail({
-        from: `"${smtpConfig.senderName}" <${smtpConfig.senderEmail}>`,
+        from: formatFromAddress(smtpConfig.senderName, smtpConfig.senderEmail),
         to: email,
         subject: renderedSubject,
         html: renderedBody,
@@ -151,7 +166,7 @@ export class SmtpEmailProvider implements EmailProvider {
 
     try {
       await transporter.sendMail({
-        from: `"${smtpConfig.senderName}" <${smtpConfig.senderEmail}>`,
+        from: formatFromAddress(smtpConfig.senderName, smtpConfig.senderEmail),
         to: options.to,
         subject: options.subject,
         html: options.html,
