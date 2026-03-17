@@ -47,11 +47,13 @@ const toFormValues = (config?: SmtpConfigSchema): SmtpFormValues => {
 };
 
 function FormField({
+  id,
   label,
   description,
   error,
   children,
 }: {
+  id: string;
   label: string;
   description?: string;
   error?: string;
@@ -59,7 +61,9 @@ function FormField({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-sm text-foreground">{label}</label>
+      <label htmlFor={id} className="text-sm text-foreground">
+        {label}
+      </label>
       {children}
       {description && !error && (
         <p className="text-[13px] leading-[18px] text-muted-foreground">{description}</p>
@@ -87,7 +91,12 @@ export function SmtpSettingsCard({ config, isLoading, isUpdating, onSave }: Smtp
 
   const handleSubmit = () => {
     void form.handleSubmit((data) => {
-      onSave(data as UpsertSmtpConfigRequest);
+      // Normalize empty password to undefined so it doesn't overwrite the stored password
+      const normalized = {
+        ...data,
+        password: data.password || undefined,
+      };
+      onSave(normalized as UpsertSmtpConfigRequest);
     })();
   };
 
@@ -138,11 +147,13 @@ export function SmtpSettingsCard({ config, isLoading, isUpdating, onSave }: Smtp
             </div>
             <div className="col-span-8 flex flex-col gap-4">
               <FormField
+                id="smtp-sender-email"
                 label="Sender email address"
                 description="The email address the emails are sent from."
                 error={form.formState.errors.senderEmail?.message}
               >
                 <Input
+                  id="smtp-sender-email"
                   type="email"
                   placeholder="noreply@yourdomain.com"
                   {...form.register('senderEmail')}
@@ -151,11 +162,13 @@ export function SmtpSettingsCard({ config, isLoading, isUpdating, onSave }: Smtp
               </FormField>
 
               <FormField
+                id="smtp-sender-name"
                 label="Sender name"
                 description="Name displayed in the recipient's inbox."
                 error={form.formState.errors.senderName?.message}
               >
                 <Input
+                  id="smtp-sender-name"
                   type="text"
                   placeholder="Your Name"
                   {...form.register('senderName')}
@@ -175,11 +188,13 @@ export function SmtpSettingsCard({ config, isLoading, isUpdating, onSave }: Smtp
             </div>
             <div className="col-span-8 flex flex-col gap-4">
               <FormField
+                id="smtp-host"
                 label="Host"
                 description="Hostname or IP address of your SMTP server."
                 error={form.formState.errors.host?.message}
               >
                 <Input
+                  id="smtp-host"
                   type="text"
                   placeholder="your.smtp.host.com"
                   {...form.register('host')}
@@ -188,11 +203,13 @@ export function SmtpSettingsCard({ config, isLoading, isUpdating, onSave }: Smtp
               </FormField>
 
               <FormField
+                id="smtp-port"
                 label="Port number"
                 description="Port used by your SMTP server. Common ports include 465 and 587."
                 error={form.formState.errors.port?.message}
               >
                 <Input
+                  id="smtp-port"
                   type="number"
                   min="1"
                   max="65535"
@@ -203,12 +220,14 @@ export function SmtpSettingsCard({ config, isLoading, isUpdating, onSave }: Smtp
               </FormField>
 
               <FormField
+                id="smtp-min-interval"
                 label="Minimum interval per user"
                 description="Minimum time in seconds between emails to the same user."
                 error={form.formState.errors.minIntervalSeconds?.message}
               >
                 <div className="flex items-center gap-2">
                   <Input
+                    id="smtp-min-interval"
                     type="number"
                     min="0"
                     className={`flex-1 ${form.formState.errors.minIntervalSeconds ? 'border-destructive' : ''}`}
@@ -219,11 +238,13 @@ export function SmtpSettingsCard({ config, isLoading, isUpdating, onSave }: Smtp
               </FormField>
 
               <FormField
+                id="smtp-username"
                 label="Username"
                 description="Username for your SMTP server."
                 error={form.formState.errors.username?.message}
               >
                 <Input
+                  id="smtp-username"
                   type="text"
                   placeholder="SMTP Username"
                   {...form.register('username')}
@@ -232,11 +253,13 @@ export function SmtpSettingsCard({ config, isLoading, isUpdating, onSave }: Smtp
               </FormField>
 
               <FormField
+                id="smtp-password"
                 label="Password"
                 description="Password for your SMTP server. For security reasons, this password cannot be viewed once saved."
                 error={form.formState.errors.password?.message}
               >
                 <Input
+                  id="smtp-password"
                   type="password"
                   placeholder={config?.hasPassword ? '••••••••••••' : 'Enter SMTP password'}
                   {...form.register('password')}

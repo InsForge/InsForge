@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import dns from 'dns/promises';
 import nodemailer from 'nodemailer';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { EncryptionManager } from '@/infra/security/encryption.manager.js';
@@ -6,6 +7,41 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
 import type { SmtpConfigSchema, UpsertSmtpConfigRequest } from '@insforge/shared-schemas';
+
+const ALLOWED_SMTP_PORTS = [25, 465, 587, 2525];
+
+/**
+ * Check if an IP address is private, loopback, or link-local
+ */
+function isPrivateIp(ip: string): boolean {
+  // IPv4
+  if (ip.startsWith('127.') || ip === '0.0.0.0') {
+    return true;
+  }
+  if (ip.startsWith('10.')) {
+    return true;
+  }
+  if (ip.startsWith('192.168.')) {
+    return true;
+  }
+  if (ip.startsWith('169.254.')) {
+    return true;
+  }
+  if (ip.match(/^172\.(1[6-9]|2\d|3[01])\./)) {
+    return true;
+  }
+  // IPv6 loopback and link-local
+  if (ip === '::1' || ip === '::') {
+    return true;
+  }
+  if (ip.toLowerCase().startsWith('fe80:')) {
+    return true;
+  }
+  if (ip.toLowerCase().startsWith('fc') || ip.toLowerCase().startsWith('fd')) {
+    return true;
+  }
+  return false;
+}
 
 /**
  * Raw SMTP config with decrypted password (for internal provider use)
@@ -202,7 +238,39 @@ export class SmtpConfigService {
         passwordEncrypted = EncryptionManager.encrypt(input.password);
       }
 
-      // Validate SMTP connection before persisting when enabled
+      // Validate SMTP host and port before connecting (SSRF prevention)
+      if (input.enabled) {
+        if (!ALLOWED_SMTP_PORTS.includes(input.port)) {
+          await client.query('ROLLBACK');
+          throw new AppError(
+            `Invalid SMTP port: ${input.port}. Allowed ports: ${ALLOWED_SMTP_PORTS.join(', ')}`,
+            400,
+            ERROR_CODES.INVALID_INPUT
+          );
+        }
+
+        try {
+          const addresses = await dns.resolve4(input.host).catch(() => []);
+          const addresses6 = await dns.resolve6(input.host).catch(() => []);
+          const allAddresses = [...addresses, ...addresses6];
+          const privateAddr = allAddresses.find(isPrivateIp);
+          if (privateAddr) {
+            await client.query('ROLLBACK');
+            throw new AppError(
+              'SMTP host resolves to a private or loopback address, which is not allowed',
+              400,
+              ERROR_CODES.INVALID_INPUT
+            );
+          }
+        } catch (error) {
+          if (error instanceof AppError) {
+            throw error;
+          }
+          // DNS resolution failure is fine — transporter.verify() will catch it
+        }
+      }
+
+      // Validate SMTP connection before persisting
       if (input.enabled) {
         const passwordToVerify = input.password
           ? input.password

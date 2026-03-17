@@ -101,8 +101,10 @@ export function EmailTemplateCard({
   }, [selectedTemplate]);
 
   useEffect(() => {
-    resetToTemplate();
-  }, [resetToTemplate]);
+    if (!isDirty) {
+      resetToTemplate();
+    }
+  }, [resetToTemplate, isDirty]);
 
   const handleSelectTemplate = (type: string) => {
     setSelectedType(type);
@@ -120,7 +122,9 @@ export function EmailTemplateCard({
   };
 
   const handleSave = () => {
-    if (!selectedType) return;
+    if (!selectedType) {
+      return;
+    }
     onSave({ type: selectedType, data: { subject, bodyHtml } });
   };
 
@@ -173,9 +177,7 @@ export function EmailTemplateCard({
               }`}
             >
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-foreground">
-                  {templateInfo?.title ?? type}
-                </p>
+                <p className="text-sm font-medium text-foreground">{templateInfo?.title ?? type}</p>
                 {templateInfo?.description && (
                   <p className="mt-0.5 text-[13px] text-muted-foreground">
                     {templateInfo.description}
@@ -276,8 +278,8 @@ export function EmailTemplateCard({
             Use{' '}
             {variables.map((v, i) => (
               <span key={v.name}>
-                <code className="font-mono text-xs text-foreground">{v.name}</code>
-                {' '}for {v.description.toLowerCase()}
+                <code className="font-mono text-xs text-foreground">{v.name}</code> for{' '}
+                {v.description.toLowerCase()}
                 {i < variables.length - 1 ? ', ' : '.'}
               </span>
             ))}
