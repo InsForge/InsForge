@@ -193,8 +193,8 @@ router.get(
       const { bucketName } = req.params;
       const prefix = req.query.prefix as string;
       const searchQuery = req.query.search as string;
-      const limit = Math.min(parseInt(req.query.limit as string) || 100, 1000);
-      const offset = parseInt(req.query.offset as string) || 0;
+      const limit = Math.min(Math.max(1, parseInt(req.query.limit as string) || 100), 1000);
+      const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
 
       const storageService = StorageService.getInstance();
       const result = await storageService.listObjects(
