@@ -114,24 +114,29 @@ export function Pagination({
           Showing {startRecord} to {endRecord} of {totalRecords} {recordLabel}
         </p>
         {pageSizeOptions && pageSizeOptions.length > 0 && onPageSizeChange && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-[13px] leading-[18px] text-muted-foreground">Rows:</span>
-            <Select
-              value={String(pageSize)}
-              onValueChange={(value) => onPageSizeChange(Number(value))}
-            >
-              <SelectTrigger className="h-7 w-[70px] text-[13px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {pageSizeOptions.map((option) => (
-                  <SelectItem key={option} value={String(option)}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <>
+            <div className="h-4 w-px bg-[var(--alpha-8)]" />
+            <div className="flex items-center gap-1.5">
+              <span className="text-[13px] leading-[18px] text-muted-foreground">
+                {recordLabel} per page:
+              </span>
+              <Select
+                value={String(pageSize)}
+                onValueChange={(value) => onPageSizeChange(Number(value))}
+              >
+                <SelectTrigger className="h-7 w-[70px] text-[13px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {pageSizeOptions.map((option) => (
+                    <SelectItem key={option} value={String(option)}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
         )}
       </div>
       <nav className="flex items-center gap-1" aria-label="Pagination">

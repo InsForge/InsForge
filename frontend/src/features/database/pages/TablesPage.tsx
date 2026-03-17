@@ -35,25 +35,7 @@ import { convertValueForColumn } from '@/lib/utils/utils';
 import { useCSVImport } from '@/features/database/hooks/useCSVImport';
 import { useTableColumnWidthsPreference } from '@/features/database/hooks/useTableColumnWidthsPreference';
 import { useLocation, useSearchParams } from 'react-router-dom';
-
-const PAGE_SIZE_OPTIONS = [50, 100, 250, 500, 1000];
-const DEFAULT_PAGE_SIZE = 50;
-const PAGE_SIZE_STORAGE_KEY = 'insforge-db-table-page-size';
-
-function getStoredPageSize(): number {
-  try {
-    const stored = localStorage.getItem(PAGE_SIZE_STORAGE_KEY);
-    if (stored) {
-      const parsed = Number(stored);
-      if (PAGE_SIZE_OPTIONS.includes(parsed)) {
-        return parsed;
-      }
-    }
-  } catch (error) {
-    console.warn('Failed to read page size preference from localStorage', error);
-  }
-  return DEFAULT_PAGE_SIZE;
-}
+import { usePageSize } from '@/lib/hooks/usePageSize';
 
 export default function TablesPage() {
   const location = useLocation();
@@ -69,7 +51,7 @@ export default function TablesPage() {
   const searchQuery = searchValue.trim();
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
-  const [pageSize, setPageSize] = useState(getStoredPageSize);
+  const { pageSize, pageSizeOptions, onPageSizeChange } = usePageSize('db-table');
   const [currentPage, setCurrentPage] = useState(1);
   const [isSorting, setIsSorting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -130,18 +112,13 @@ export default function TablesPage() {
     selectTable(selectedTable, true);
   }, [selectedTable, selectedTableFromQuery, isLoadingTables, selectTable]);
 
-  const handlePageSizeChange = useCallback((newPageSize: number) => {
-    if (!PAGE_SIZE_OPTIONS.includes(newPageSize)) {
-      return;
-    }
-    setPageSize(newPageSize);
-    setCurrentPage(1);
-    try {
-      localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(newPageSize));
-    } catch (error) {
-      console.warn('Failed to persist page size preference', error);
-    }
-  }, []);
+  const handlePageSizeChange = useCallback(
+    (newPageSize: number) => {
+      onPageSizeChange(newPageSize);
+      setCurrentPage(1);
+    },
+    [onPageSizeChange]
+  );
 
   // Reset page when search query or selected table changes
   useEffect(() => {
@@ -589,7 +566,7 @@ export default function TablesPage() {
                   currentPage={currentPage}
                   totalPages={totalPages}
                   pageSize={pageSize}
-                  pageSizeOptions={PAGE_SIZE_OPTIONS}
+                  pageSizeOptions={pageSizeOptions}
                   totalRecords={tableData?.totalRecords || 0}
                   paginationRecordLabel="records"
                   onPageChange={setCurrentPage}
