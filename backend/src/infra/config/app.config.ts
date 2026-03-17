@@ -43,7 +43,7 @@ export const config: AppConfig = {
     username: process.env.POSTGRES_USERNAME || 'user',
     password: process.env.POSTGRES_PASSWORD || 'password',
     databaseName: process.env.POSTGRES_NAME || 'insforge',
-    recordBrowseCellMaxBytes: parseInt(process.env.RECORD_BROWSE_CELL_MAX_BYTES || '262144', 10),
+    recordBrowseCellMaxBytes: Math.max(parseInt(process.env.RECORD_BROWSE_CELL_MAX_BYTES || '262144', 10) || 262144, 1024),
   },
   cloud: {
     storageBucket: process.env.AWS_S3_BUCKET || 'insforge-test-bucket',

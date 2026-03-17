@@ -88,7 +88,7 @@ BEGIN
     || 'SELECT jsonb_build_object('
     || (
       SELECT string_agg(
-        format('''%s'', %s', col_info.column_name, col_info.expr),
+        format('%L, %s', col_info.column_name, col_info.expr),
         ', '
       )
       FROM (
@@ -111,7 +111,7 @@ BEGIN
             WHEN c.data_type = 'bytea' OR c.udt_name = 'bytea' THEN
               format(
                 'CASE WHEN t.%I IS NULL THEN ''null''::jsonb '
-                'WHEN octet_length(t.%I) > %s THEN jsonb_build_object(''__guarded'', true, ''preview'', ''[binary data]'', ''size'', octet_length(t.%I)) '
+                'WHEN (octet_length(t.%I) * 4 / 3) > %s THEN jsonb_build_object(''__guarded'', true, ''preview'', ''[binary data]'', ''size'', octet_length(t.%I)) '
                 'ELSE to_jsonb(encode(t.%I, ''base64'')) END',
                 c.column_name, c.column_name, p_max_bytes, c.column_name, c.column_name
               )

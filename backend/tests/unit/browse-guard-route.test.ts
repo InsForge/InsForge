@@ -14,31 +14,43 @@ beforeAll(async () => {
 
 describe('Browse guard route helpers', () => {
   describe('isBrowseRequest', () => {
-    test('returns true when limit and offset are present', () => {
-      const query = { limit: '50', offset: '0' };
-      expect(isBrowseRequest('GET', query)).toBe(true);
+    test('returns true for GET with limit and offset only', () => {
+      expect(isBrowseRequest('GET', { limit: '50', offset: '0' }, false)).toBe(true);
+    });
+
+    test('returns true with order and or params', () => {
+      const query = { limit: '50', offset: '0', order: 'id.asc', or: '(name.ilike.*x*)' };
+      expect(isBrowseRequest('GET', query, false)).toBe(true);
     });
 
     test('returns false for POST requests', () => {
-      const query = { limit: '50', offset: '0' };
-      expect(isBrowseRequest('POST', query)).toBe(false);
+      expect(isBrowseRequest('POST', { limit: '50', offset: '0' }, false)).toBe(false);
     });
 
     test('returns false when limit is missing', () => {
-      const query = { offset: '0' };
-      expect(isBrowseRequest('GET', query)).toBe(false);
+      expect(isBrowseRequest('GET', { offset: '0' }, false)).toBe(false);
     });
 
     test('returns false when offset is missing', () => {
-      const query = { limit: '50' };
-      expect(isBrowseRequest('GET', query)).toBe(false);
+      expect(isBrowseRequest('GET', { limit: '50' }, false)).toBe(false);
+    });
+
+    test('returns false for wildcard path requests', () => {
+      expect(isBrowseRequest('GET', { limit: '50', offset: '0' }, true)).toBe(false);
+    });
+
+    test('returns false when non-browse query keys are present', () => {
+      expect(isBrowseRequest('GET', { limit: '50', offset: '0', select: 'id,name' }, false)).toBe(false);
+    });
+
+    test('returns false for column filter queries', () => {
+      expect(isBrowseRequest('GET', { limit: '50', offset: '0', name: 'eq.foo' }, false)).toBe(false);
     });
   });
 
   describe('extractSearchTerm', () => {
     test('extracts search term from PostgREST or filter', () => {
-      const orFilter = '(name.ilike.*hello*,email.ilike.*hello*)';
-      expect(extractSearchTerm(orFilter)).toBe('hello');
+      expect(extractSearchTerm('(name.ilike.*hello*,email.ilike.*hello*)')).toBe('hello');
     });
 
     test('returns null for undefined', () => {
@@ -56,10 +68,7 @@ describe('Browse guard route helpers', () => {
 
   describe('parseOrderParam', () => {
     test('parses order into column and direction', () => {
-      expect(parseOrderParam('created_at.desc')).toEqual({
-        column: 'created_at',
-        direction: 'desc',
-      });
+      expect(parseOrderParam('created_at.desc')).toEqual({ column: 'created_at', direction: 'desc' });
     });
 
     test('defaults direction to asc', () => {

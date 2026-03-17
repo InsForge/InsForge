@@ -13,9 +13,22 @@ import { DatabaseResourceUpdate } from '@/utils/sql-parser.js';
 import { PostgrestProxyService } from '@/services/database/postgrest-proxy.service.js';
 import { config } from '@/infra/config/app.config.js';
 
-/** Detect if this is a browse-pattern request (paginated GET) */
-export function isBrowseRequest(method: string, query: Record<string, unknown>): boolean {
-  return method === 'GET' && query.limit !== undefined && query.offset !== undefined;
+const BROWSE_QUERY_KEYS = new Set(['limit', 'offset', 'order', 'or']);
+
+/** Detect if this is a dashboard browse request (paginated GET with only browse params) */
+export function isBrowseRequest(
+  method: string,
+  query: Record<string, unknown>,
+  hasWildcardPath: boolean
+): boolean {
+  if (method !== 'GET' || hasWildcardPath) {
+    return false;
+  }
+  if (query.limit === undefined || query.offset === undefined) {
+    return false;
+  }
+  // Only intercept if all query keys are browse-specific (no select, filters, embeds)
+  return Object.keys(query).every((key) => BROWSE_QUERY_KEYS.has(key));
 }
 
 /** Extract search term from PostgREST `or` filter format: (col.ilike.*term*,col2.ilike.*term*) */
@@ -39,6 +52,15 @@ export function parseOrderParam(
     column: parts[0],
     direction: parts[1]?.toLowerCase() === 'desc' ? 'desc' : 'asc',
   };
+}
+
+/** Parse a string to a positive integer, returning the fallback if invalid */
+function parsePositiveInt(value: unknown, fallback: number): number {
+  const parsed = parseInt(String(value), 10);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return fallback;
+  }
+  return parsed;
 }
 
 const router = Router();
@@ -77,13 +99,11 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
     const query = req.query as Record<string, unknown>;
 
     // Route browse requests (paginated GETs) to guarded RPC
-    if (isBrowseRequest(method, query)) {
-      const limit = parseInt(String(query.limit), 10) || 50;
-      const offset = parseInt(String(query.offset), 10) || 0;
-      const orderStr = query.order ? String(query.order) : undefined;
-      const orStr = query.or ? String(query.or) : undefined;
-      const order = parseOrderParam(orderStr);
-      const searchTerm = extractSearchTerm(orStr);
+    if (isBrowseRequest(method, query, !!wildcardPath)) {
+      const limit = parsePositiveInt(query.limit, 50);
+      const offset = parsePositiveInt(query.offset, 0);
+      const order = parseOrderParam(query.order ? String(query.order) : undefined);
+      const searchTerm = extractSearchTerm(query.or ? String(query.or) : undefined);
 
       const pool = DatabaseManager.getInstance().getPool();
       const result = await pool.query(
@@ -100,11 +120,16 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
       );
 
       const raw = result.rows[0]?.browse_records_guarded;
-      const rpcResult = typeof raw === 'string' ? JSON.parse(raw) : raw ?? { rows: [], total: 0 };
+      const rpcResult =
+        typeof raw === 'string' ? JSON.parse(raw) : (raw ?? { rows: [], total: 0 });
 
-      const total = rpcResult.total || 0;
-      const endRange = Math.min(offset + limit - 1, total - 1);
-      res.setHeader('content-range', `${offset}-${endRange >= 0 ? endRange : 0}/${total}`);
+      const total: number = rpcResult.total || 0;
+      if (total === 0 || limit === 0) {
+        res.setHeader('content-range', `*/${total}`);
+      } else {
+        const endRange = Math.min(offset + limit - 1, total - 1);
+        res.setHeader('content-range', `${offset}-${endRange}/${total}`);
+      }
 
       return successResponse(res, rpcResult.rows, 200);
     }
