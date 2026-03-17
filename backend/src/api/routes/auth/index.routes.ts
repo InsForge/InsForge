@@ -17,7 +17,6 @@ import {
 } from '@/utils/cookies.js';
 import { parseClientType } from '@/utils/utils.js';
 import {
-  roleSchema,
   userIdSchema,
   createUserRequestSchema,
   createSessionRequestSchema,
@@ -202,7 +201,7 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
       const token = extractBearerToken(req.headers.authorization);
       if (token) {
         const payload = TokenManager.getInstance().verifyToken(token);
-        adminCreatingUser = payload?.role === roleSchema.enum.project_admin;
+        adminCreatingUser = payload?.role === 'project_admin';
       }
     } catch (error) {
       // Not a valid token; treat as normal registration.
