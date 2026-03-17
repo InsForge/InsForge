@@ -163,18 +163,15 @@ export class DatabaseWebhookManager {
       this.listenerClient = null;
     }
 
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+    if (this.reconnectAttempts < this.maxReconnectAttempts && !this.reconnectTimeout) {
       const delay = this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts);
       this.reconnectAttempts++;
-
-      if (!this.reconnectTimeout) {
-        this.reconnectTimeout = setTimeout(() => {
-          this.reconnectTimeout = null;
-          logger.info(`DatabaseWebhookManager reconnecting (attempt ${this.reconnectAttempts})...`);
-          void this.initialize();
-        }, delay);
-      }
-    } else {
+      this.reconnectTimeout = setTimeout(() => {
+        this.reconnectTimeout = null;
+        logger.info(`DatabaseWebhookManager reconnecting (attempt ${this.reconnectAttempts})...`);
+        void this.initialize();
+      }, delay);
+    } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       logger.error('DatabaseWebhookManager max reconnect attempts reached');
     }
   }

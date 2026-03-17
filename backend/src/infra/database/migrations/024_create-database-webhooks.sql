@@ -57,7 +57,7 @@ CREATE INDEX IF NOT EXISTS idx_db_webhook_logs_delivered_at ON _database_webhook
 DROP TRIGGER IF EXISTS trg_database_webhooks_updated_at ON _database_webhooks;
 CREATE TRIGGER trg_database_webhooks_updated_at
   BEFORE UPDATE ON _database_webhooks
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
 
 -- ============================================================================
 -- PG_NOTIFY TRIGGER FUNCTION
