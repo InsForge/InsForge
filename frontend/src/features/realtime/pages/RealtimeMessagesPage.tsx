@@ -27,6 +27,7 @@ export default function RealtimeMessagesPage() {
     messages,
     isLoadingMessages,
     refetchMessages,
+    cleanupMessages,
     messagesCurrentPage,
     messagesTotalPages,
     messagesTotalCount,
@@ -244,7 +245,11 @@ export default function RealtimeMessagesPage() {
         </div>
       )}
       {/* Settings Dialog */}
-      <RealtimeSettingsMenuDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
+      <RealtimeSettingsMenuDialog
+        open={isSettingsOpen}
+        onOpenChange={setIsSettingsOpen}
+        onCleanup={cleanupMessages}
+      />
     </div>
   );
 }

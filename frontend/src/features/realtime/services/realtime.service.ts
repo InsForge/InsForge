@@ -108,13 +108,13 @@ export class RealtimeService {
   // ============================================================================
 
   async getRetentionConfig(): Promise<{ retentionDays: number | null }> {
-    return apiClient.request('/realtime/messages/config', {
+    return apiClient.request('/realtime/config', {
       headers: apiClient.withAccessToken(),
     });
   }
 
   async updateRetentionConfig(retentionDays: number | null): Promise<void> {
-    return apiClient.request('/realtime/messages/config', {
+    return apiClient.request('/realtime/config', {
       method: 'POST',
       headers: apiClient.withAccessToken(),
       body: JSON.stringify({ retentionDays }),

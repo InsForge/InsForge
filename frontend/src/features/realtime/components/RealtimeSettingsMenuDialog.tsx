@@ -13,27 +13,32 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  ConfirmDialog,
 } from '@insforge/ui';
 import { Label } from '@/components';
 import { useToast } from '@/lib/hooks/useToast';
+import { useConfirm } from '@/lib/hooks/useConfirm';
 import { realtimeService } from '../services/realtime.service';
 
 interface RealtimeSettingsMenuDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfigSaved?: () => void;
+  onCleanup?: (batchSize?: number) => Promise<{ deletedCount: number; message: string }>;
 }
 
 export function RealtimeSettingsMenuDialog({
   open,
   onOpenChange,
   onConfigSaved,
+  onCleanup,
 }: RealtimeSettingsMenuDialogProps) {
   const [retentionDays, setRetentionDays] = useState<string>('30');
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isCleaning, setIsCleaning] = useState(false);
   const { showToast } = useToast();
+  const { confirm, confirmDialogProps } = useConfirm();
 
   const fetchConfig = useCallback(async () => {
     setIsLoading(true);
@@ -71,12 +76,20 @@ export function RealtimeSettingsMenuDialog({
   };
 
   const handleCleanup = async () => {
-    if (!confirm('Are you sure you want to clean up old messages? This action cannot be undone.')) {
+    const isConfirmed = await confirm({
+      title: 'Manually Clean Up Messages',
+      description: 'Are you sure you want to clean up old messages? This action cannot be undone.',
+      confirmText: 'Clean up',
+      destructive: true,
+    });
+    if (!isConfirmed) {
       return;
     }
     setIsCleaning(true);
     try {
-      const result = await realtimeService.cleanupMessages();
+      const result = onCleanup
+        ? await onCleanup()
+        : await realtimeService.cleanupMessages();
       showToast(result.message || 'Old messages have been pruned.', 'success');
     } catch (error) {
       console.error('Failed to cleanup messages', error);
@@ -159,6 +172,7 @@ export function RealtimeSettingsMenuDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+      <ConfirmDialog {...confirmDialogProps} />
     </Dialog>
   );
 }

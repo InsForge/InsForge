@@ -406,18 +406,18 @@ To prevent unbounded storage growth and maintain query performance, InsForge imp
 
 | Feature | Description |
 |---------|-------------|
-| **Default Policy** | 30 days of retention |
-| **Configurable** | Change the `realtime_retention_days` value in the `_config` table |
-| **Cleanup Schedule** | Runs daily at midnight via scheduled job runner |
+| **Default Policy** | Never (NULL) - keep all messages |
+| **Configurable** | Change `retention_days` in the singleton `realtime.config` table |
+| **Cleanup Schedule** | Runs daily at midnight via native `pg_cron` |
 | **Pruning Path** | Native database deletes executed in batches |
 
 ### How It Works
 
-1. A background schedule calls the `/api/realtime/messages/cleanup` Admin endpoint daily.
-2. The endpoint invokes the `realtime.cleanup_messages()` PostgreSQL function.
-3. Rows older than the configured threshold are safely deleted in batches to avoid locking the table or impacting live traffic.
+1. A native `pg_cron` job executes `SELECT realtime.cleanup_messages()` daily at midnight.
+2. The function reads the retention threshold from `realtime.config`.
+3. Rows older than the threshold are safely deleted in batches to prevent locking or affecting live traffic.
 
-Admins can view the active `retentionDays` setting in the Realtime Messages page statistics dashboard.
+Admins can also trigger manual cleanups through the dashboard Settings menu on demand.
 
 ## Performance Characteristics
 

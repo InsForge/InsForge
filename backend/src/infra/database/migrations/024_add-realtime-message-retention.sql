@@ -1,5 +1,3 @@
-SET search_path = public, system, "$user";
-
 -- Migration 024: Add Realtime Message Retention
 --
 -- Adds automatic cleanup mechanism for realtime.messages table.
@@ -10,13 +8,26 @@ SET search_path = public, system, "$user";
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS realtime.config (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  retention_days INTEGER DEFAULT 30,
+  retention_days INTEGER DEFAULT NULL CHECK (retention_days IS NULL OR retention_days > 0),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Ensure the column allows NULL for "Never" retention policy
+-- in case the table existed with earlier constraints.
+ALTER TABLE realtime.config ALTER COLUMN retention_days DROP NOT NULL;
+ALTER TABLE realtime.config ALTER COLUMN retention_days SET DEFAULT NULL;
+
+
 -- Ensure only one row exists (singleton pattern)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_realtime_config_singleton ON realtime.config ((1));
+
+-- Trigger for updated_at
+DROP TRIGGER IF EXISTS update_realtime_config_updated_at ON realtime.config;
+CREATE TRIGGER update_realtime_config_updated_at
+  BEFORE UPDATE ON realtime.config
+  FOR EACH ROW
+  EXECUTE FUNCTION system.update_updated_at();
 
 -- ============================================================================
 -- CLEANUP FUNCTION
@@ -33,8 +44,8 @@ DECLARE
   v_deleted_count INT := 0;
   v_total_deleted INT := 0;
 BEGIN
-  -- Get retention days from realtime.config, fallback to 30
-  SELECT COALESCE(retention_days, 30) INTO v_retention_days
+  -- Get retention days from realtime.config
+  SELECT retention_days INTO v_retention_days
   FROM realtime.config LIMIT 1;
   
   -- Handle "Never" (e.g. NULL or < 0)
@@ -69,7 +80,7 @@ EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'realtime.cleanup_messages failed: %', SQLERRM;
   RETURN v_total_deleted;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, system, "$user";
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Revoke execute from public, only superuser/backend can call this
 REVOKE ALL ON FUNCTION realtime.cleanup_messages FROM PUBLIC;
@@ -77,10 +88,10 @@ REVOKE ALL ON FUNCTION realtime.cleanup_messages FROM PUBLIC;
 -- ============================================================================
 -- SEED CONFIGURATION
 -- ============================================================================
--- Insert default retention period (30 days)
+-- Insert default retention period (Never / NULL)
 
 INSERT INTO realtime.config (retention_days)
-SELECT 30
+SELECT NULL
 WHERE NOT EXISTS (SELECT 1 FROM realtime.config);
 
 -- ============================================================================
