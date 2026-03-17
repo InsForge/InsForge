@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { realtimeChannelSchema, realtimeMessageSchema } from './realtime.schema';
+import {
+  realtimeChannelSchema,
+  realtimeConfigSchema,
+  realtimeMessageSchema,
+} from './realtime.schema';
 
 // ============================================================================
 // Channel CRUD Schemas
@@ -80,10 +84,18 @@ export const messageStatsResponseSchema = z.object({
       count: z.number().int().min(0),
     })
   ),
+  retentionDays: realtimeConfigSchema.shape.retentionDays,
 });
 
 export type MessageStatsRequest = z.infer<typeof messageStatsRequestSchema>;
 export type MessageStatsResponse = z.infer<typeof messageStatsResponseSchema>;
+
+// Realtime Config
+export const updateRealtimeConfigRequestSchema = realtimeConfigSchema;
+export const getRealtimeConfigResponseSchema = realtimeConfigSchema;
+
+export type UpdateRealtimeConfigRequest = z.infer<typeof updateRealtimeConfigRequestSchema>;
+export type GetRealtimeConfigResponse = z.infer<typeof getRealtimeConfigResponseSchema>;
 
 // ============================================================================
 // Permissions Schemas
