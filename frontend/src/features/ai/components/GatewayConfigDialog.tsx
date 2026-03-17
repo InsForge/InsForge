@@ -155,7 +155,8 @@ export function GatewayConfigDialog({ open, onOpenChange }: GatewayConfigDialogP
             )}
 
             <p className="text-xs text-muted-foreground">
-              Get your key at <span className="font-mono text-foreground">openrouter.ai/keys</span>. The key is validated and stored encrypted.
+              Get your key at <span className="font-mono text-foreground">openrouter.ai/keys</span>.
+              The key is validated and stored encrypted.
             </p>
           </div>
 
