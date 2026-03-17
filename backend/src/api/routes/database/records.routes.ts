@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import axios from 'axios';
-import { AuthRequest, extractApiKey } from '@/api/middlewares/auth.js';
+import { AuthRequest, extractApiKey, verifyUser } from '@/api/middlewares/auth.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -116,8 +116,8 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
   }
 };
 
-// Forward all database operations to PostgREST
-router.all('/:tableName', forwardToPostgrest);
-router.all('/:tableName/*path', forwardToPostgrest);
+// Forward all database operations to PostgREST (requires authentication)
+router.all('/:tableName', verifyUser, forwardToPostgrest);
+router.all('/:tableName/*path', verifyUser, forwardToPostgrest);
 
 export { router as databaseRecordsRouter };

@@ -33,6 +33,7 @@ import { DatabaseDataGrid } from '@/features/database/components/DatabaseDataGri
 import { SortColumn } from 'react-data-grid';
 import { convertValueForColumn } from '@/lib/utils/utils';
 import { useCSVImport } from '@/features/database/hooks/useCSVImport';
+import { useTableColumnWidthsPreference } from '@/features/database/hooks/useTableColumnWidthsPreference';
 import { useLocation, useSearchParams } from 'react-router-dom';
 
 const PAGE_SIZE = 50;
@@ -140,6 +141,18 @@ export default function TablesPage() {
 
   // Fetch schema for selected table
   const { data: schemaData } = useTableSchema(selectedTable || '', !!selectedTable);
+  const availableColumns = useMemo(
+    () => schemaData?.columns.map((column) => column.columnName) ?? [],
+    [schemaData]
+  );
+  const dataGridKey = useMemo(
+    () => `${selectedTable ?? 'no-table'}:${availableColumns.join('|')}`,
+    [selectedTable, availableColumns]
+  );
+  const { columnWidths, setColumnWidth } = useTableColumnWidthsPreference(
+    selectedTable,
+    availableColumns
+  );
 
   // Fetch schema for editing table
   const { data: editingTableSchema } = useTableSchema(editingTable || '', !!editingTable);
@@ -527,8 +540,10 @@ export default function TablesPage() {
                 </div>
               ) : (
                 <DatabaseDataGrid
+                  key={dataGridKey}
                   data={tableData?.records || []}
                   schema={tableData?.schema}
+                  columnWidths={columnWidths}
                   loading={isLoadingTable && !tableData}
                   isSorting={isSorting}
                   isRefreshing={isRefreshing}
@@ -537,6 +552,7 @@ export default function TablesPage() {
                   onSelectedRowsChange={setSelectedRows}
                   sortColumns={sortColumns}
                   onSortColumnsChange={handleSortColumnsChange}
+                  onColumnResize={setColumnWidth}
                   onCellEdit={handleRecordUpdate}
                   onJumpToTable={(tableName) => selectTable(tableName)}
                   currentPage={currentPage}

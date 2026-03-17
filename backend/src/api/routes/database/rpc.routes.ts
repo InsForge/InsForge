@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import axios from 'axios';
-import { AuthRequest, extractApiKey } from '@/api/middlewares/auth.js';
+import { AuthRequest, extractApiKey, verifyUser } from '@/api/middlewares/auth.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { validateFunctionName } from '@/utils/validations.js';
@@ -64,6 +64,6 @@ const forwardRpcToPostgrest = async (req: AuthRequest, res: Response, next: Next
   }
 };
 
-router.all('/:functionName', forwardRpcToPostgrest);
+router.all('/:functionName', verifyUser, forwardRpcToPostgrest);
 
 export { router as databaseRpcRouter };
