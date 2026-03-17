@@ -92,9 +92,26 @@ export const oAuthConfigSchema = z.object({
 
 /**
  * Redirect URL whitelist entry schema
- * Each entry must be a valid URL (exact match after normalization)
+ * Each entry must be a valid URL or a wildcard subdomain pattern (e.g. https://*.example.com)
  */
-export const redirectUrlWhitelistSchema = z.array(z.string().url('Each entry must be a valid URL'));
+const redirectUrlEntrySchema = z.string().refine(
+  (val) => {
+    // Allow wildcard subdomain patterns like https://*.example.com
+    const testUrl =
+      val.startsWith('https://*.') || val.startsWith('http://*.')
+        ? val.replace('*.', 'placeholder.')
+        : val;
+    try {
+      new URL(testUrl);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  { message: 'Each entry must be a valid URL or wildcard pattern (e.g. https://*.example.com)' }
+);
+
+export const redirectUrlWhitelistSchema = z.array(redirectUrlEntrySchema);
 
 // Email authentication configuration schema
 export const authConfigSchema = z.object({
