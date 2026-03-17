@@ -474,9 +474,9 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                     {redirectUrlWhitelist.length === 0 && (
                       <div className="mb-4 rounded-md border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-200">
                         <strong>Open redirects enabled</strong> — no whitelist is configured. Auth
-                        flows will accept any redirect URL. This is convenient for development but is
-                        not recommended for production deployments. Add at least one trusted URL to
-                        enforce redirect validation.
+                        flows will accept any redirect URL. This is convenient for development but
+                        is not recommended for production deployments. Add at least one trusted URL
+                        to enforce redirect validation.
                       </div>
                     )}
 
@@ -518,7 +518,9 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                               value={newUrlInput}
                               onChange={(e) => {
                                 setNewUrlInput(e.target.value);
-                                if (newUrlError) setNewUrlError('');
+                                if (newUrlError) {
+                                  setNewUrlError('');
+                                }
                               }}
                               onKeyDown={handleNewUrlKeyDown}
                               className={newUrlError ? 'border-destructive' : ''}
