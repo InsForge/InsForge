@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS _database_webhooks (
   table_name  TEXT        NOT NULL,
   events      TEXT[]      NOT NULL CHECK (
                 events <@ ARRAY['INSERT','UPDATE','DELETE']::TEXT[]
-                AND array_length(events, 1) > 0
+                AND cardinality(events) > 0
+                AND array_position(events, NULL) IS NULL
               ),
   url         TEXT        NOT NULL,
   secret      TEXT,                     -- HMAC-SHA256 signing secret (nullable = no signature)
