@@ -153,6 +153,7 @@ export default function RealtimeMessagesPage() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label="Realtime settings"
                     onClick={() => setIsSettingsOpen(true)}
                     className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
                   >

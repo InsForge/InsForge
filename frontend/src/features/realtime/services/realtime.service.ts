@@ -6,8 +6,10 @@ import type {
   UpdateChannelRequest,
   ListMessagesRequest,
   MessageStatsResponse,
+  GetRealtimeConfigResponse,
   RlsPolicy,
   RealtimePermissionsResponse,
+  UpdateRealtimeConfigRequest,
 } from '@insforge/shared-schemas';
 
 export type { RealtimeChannel, RealtimeMessage, RlsPolicy, RealtimePermissionsResponse };
@@ -107,17 +109,17 @@ export class RealtimeService {
   // Configuration & Cleanup
   // ============================================================================
 
-  async getRetentionConfig(): Promise<{ retentionDays: number | null }> {
+  async getRealtimeConfig(): Promise<GetRealtimeConfigResponse> {
     return apiClient.request('/realtime/config', {
       headers: apiClient.withAccessToken(),
     });
   }
 
-  async updateRetentionConfig(retentionDays: number | null): Promise<void> {
+  async updateRealtimeConfig(data: UpdateRealtimeConfigRequest): Promise<void> {
     return apiClient.request('/realtime/config', {
-      method: 'POST',
+      method: 'PATCH',
       headers: apiClient.withAccessToken(),
-      body: JSON.stringify({ retentionDays }),
+      body: JSON.stringify(data),
     });
   }
 }

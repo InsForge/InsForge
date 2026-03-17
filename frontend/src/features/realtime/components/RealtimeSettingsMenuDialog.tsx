@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Button,
   Dialog,
   DialogBody,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -14,104 +15,118 @@ import {
   SelectValue,
 } from '@insforge/ui';
 import { Label } from '@/components';
-import { useToast } from '@/lib/hooks/useToast';
-import { realtimeService } from '../services/realtime.service';
+import { useRealtimeConfig } from '../hooks/useRealtimeConfig';
 
 interface RealtimeSettingsMenuDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfigSaved?: () => void;
+}
+
+type RetentionOption = string;
+
+function toRetentionOption(retentionDays: number | null): RetentionOption {
+  return retentionDays === null ? 'never' : String(retentionDays);
 }
 
 export function RealtimeSettingsMenuDialog({
   open,
   onOpenChange,
-  onConfigSaved,
 }: RealtimeSettingsMenuDialogProps) {
-  const [retentionDays, setRetentionDays] = useState<string>('30');
-  const [initialRetentionDays, setInitialRetentionDays] = useState<string>('30');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const { showToast } = useToast();
-
-  const fetchConfig = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const config = await realtimeService.getRetentionConfig();
-      const nextRetentionDays =
-        config.retentionDays === null ? 'never' : String(config.retentionDays);
-      setRetentionDays(nextRetentionDays);
-      setInitialRetentionDays(nextRetentionDays);
-    } catch (error) {
-      console.error('Failed to fetch realtime config', error);
-      showToast('Failed to fetch realtime configuration.', 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [showToast]);
+  const [retentionDays, setRetentionDays] = useState<RetentionOption | null>(null);
+  const [initialRetentionDays, setInitialRetentionDays] = useState<RetentionOption | null>(null);
+  const { config, isLoading, isUpdating, error, updateConfig } = useRealtimeConfig();
 
   useEffect(() => {
-    if (open) {
-      void fetchConfig();
+    if (!open) {
+      setRetentionDays(null);
+      setInitialRetentionDays(null);
+      return;
     }
-  }, [open, fetchConfig]);
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    try {
-      const value = retentionDays === 'never' ? null : Number(retentionDays);
-      await realtimeService.updateRetentionConfig(value);
-      showToast('Retention settings saved successfully.', 'success');
-      onConfigSaved?.();
-      onOpenChange(false);
-    } catch (error) {
-      console.error('Failed to save realtime config', error);
-      showToast('Failed to save retention settings.', 'error');
-    } finally {
-      setIsSaving(false);
+    if (!config) {
+      return;
     }
+
+    const nextRetentionDays = toRetentionOption(config.retentionDays);
+    setRetentionDays(nextRetentionDays);
+    setInitialRetentionDays(nextRetentionDays);
+  }, [config, open]);
+
+  const isLoaded = retentionDays !== null && initialRetentionDays !== null;
+  const hasChanges = isLoaded && retentionDays !== initialRetentionDays;
+  const canClose = !isUpdating;
+  const isSelectDisabled = !isLoaded || isLoading || isUpdating;
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!canClose) {
+      return;
+    }
+    onOpenChange(nextOpen);
   };
 
-  const hasChanges = retentionDays !== initialRetentionDays;
+  const handleSave = async () => {
+    if (!isLoaded || !hasChanges) {
+      return;
+    }
+
+    await updateConfig({
+      retentionDays: retentionDays === 'never' ? null : Number(retentionDays),
+    });
+    onOpenChange(false);
+  };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent showCloseButton={canClose}>
         <DialogHeader>
           <DialogTitle>Realtime Settings</DialogTitle>
+          <DialogDescription>
+            Configure how long realtime messages are retained before pruning.
+          </DialogDescription>
         </DialogHeader>
 
         <DialogBody className="gap-4">
-          <div className="flex gap-6 items-center">
-            <div className="w-[200px] shrink-0">
-              <Label htmlFor="retention-days" className="leading-5 text-foreground">
-                Message Retention
-              </Label>
-              <p className="mt-1 whitespace-nowrap text-[13px] leading-[18px] text-muted-foreground">
-                How long messages are kept before pruning.
-              </p>
+          {!isLoaded ? (
+            <div className="flex min-h-[92px] items-center justify-center text-sm text-muted-foreground">
+              {isLoading && !error ? 'Loading configuration...' : 'Unable to load configuration.'}
             </div>
-            <div className="min-w-0 flex-1 flex justify-end">
-              <Select value={retentionDays} onValueChange={setRetentionDays} disabled={isLoading}>
-                <SelectTrigger id="retention-days" className="h-9 w-[180px] max-w-full">
-                  <SelectValue placeholder="Select retention" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="30">30 days</SelectItem>
-                  <SelectItem value="90">90 days</SelectItem>
-                  <SelectItem value="180">180 days</SelectItem>
-                  <SelectItem value="never">Never</SelectItem>
-                </SelectContent>
-              </Select>
+          ) : (
+            <div className="flex gap-6 items-center">
+              <div className="w-[200px] shrink-0">
+                <Label htmlFor="retention-days" className="leading-5 text-foreground">
+                  Message Retention
+                </Label>
+                <p className="mt-1 whitespace-nowrap text-[13px] leading-[18px] text-muted-foreground">
+                  How long messages are kept before pruning.
+                </p>
+              </div>
+              <div className="min-w-0 flex-1 flex justify-end">
+                <Select
+                  value={retentionDays ?? undefined}
+                  onValueChange={setRetentionDays}
+                  disabled={isSelectDisabled}
+                >
+                  <SelectTrigger id="retention-days" className="h-9 w-[180px] max-w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="30">30 days</SelectItem>
+                    <SelectItem value="90">90 days</SelectItem>
+                    <SelectItem value="180">180 days</SelectItem>
+                    <SelectItem value="never">Never</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
+          )}
         </DialogBody>
 
         <DialogFooter>
           <Button
             type="button"
             variant="secondary"
-            onClick={() => onOpenChange(false)}
+            onClick={() => handleOpenChange(false)}
+            disabled={!canClose}
             className="h-8 rounded px-3"
           >
             Cancel
@@ -119,10 +134,10 @@ export function RealtimeSettingsMenuDialog({
           <Button
             type="button"
             onClick={() => void handleSave()}
-            disabled={isSaving || isLoading || !hasChanges}
+            disabled={!isLoaded || isUpdating || !hasChanges}
             className="h-8 rounded px-3"
           >
-            {isSaving ? 'Saving...' : 'Save Changes'}
+            {isUpdating ? 'Saving...' : 'Save Changes'}
           </Button>
         </DialogFooter>
       </DialogContent>

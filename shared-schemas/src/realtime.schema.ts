@@ -43,6 +43,16 @@ export const realtimeMessageSchema = z.object({
 export type RealtimeMessage = z.infer<typeof realtimeMessageSchema>;
 
 // ============================================================================
+// Config Schema
+// ============================================================================
+
+export const realtimeConfigSchema = z.object({
+  retentionDays: z.number().int().positive().nullable(),
+});
+
+export type RealtimeConfig = z.infer<typeof realtimeConfigSchema>;
+
+// ============================================================================
 // WebSocket Event Payloads (for SDK/frontend)
 // ============================================================================
 

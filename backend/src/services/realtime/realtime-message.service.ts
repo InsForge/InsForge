@@ -207,7 +207,7 @@ export class RealtimeMessageService {
     totalMessages: number;
     whDeliveryRate: number;
     topEvents: { eventName: string; count: number }[];
-    retentionDays: number;
+    retentionDays: number | null;
   }> {
     const { channelId, since } = options;
 
@@ -249,7 +249,8 @@ export class RealtimeMessageService {
     const configResult = await this.getPool().query(
       'SELECT retention_days as "retentionDays" FROM realtime.config LIMIT 1'
     );
-    const retentionDays = configResult.rows[0]?.retentionDays ?? 30;
+    const retentionDays =
+      configResult.rows.length === 0 ? null : configResult.rows[0].retentionDays;
 
     const stats = statsResult.rows[0];
     const whAudienceTotal = parseInt(stats.wh_audience_total) || 0;
@@ -273,11 +274,7 @@ export class RealtimeMessageService {
     const result = await this.getPool().query(
       'SELECT retention_days as "retentionDays" FROM realtime.config LIMIT 1'
     );
-    // Explicitly return null if null in DB, fallback to 30 if no row
-    if (result.rows.length === 0) {
-      return 30;
-    }
-    return result.rows[0].retentionDays;
+    return result.rows.length === 0 ? null : result.rows[0].retentionDays;
   }
 
   /**
