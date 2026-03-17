@@ -214,19 +214,27 @@ export function EmailTemplateCard({
 
       {/* Subject */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm text-foreground">Subject</label>
+        <label htmlFor="email-template-subject" className="text-sm text-foreground">
+          Subject
+        </label>
         <Input
+          id="email-template-subject"
           type="text"
           value={subject}
           onChange={(e) => handleSubjectChange(e.target.value)}
           placeholder="Email subject"
         />
+        {!subject.trim() && isDirty && (
+          <p className="text-xs text-destructive">Subject is required</p>
+        )}
       </div>
 
       {/* Body with Source/Preview toggle */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <label className="text-sm text-foreground">Body</label>
+          <label htmlFor="email-template-body" className="text-sm text-foreground">
+            Body
+          </label>
           <div className="flex rounded-md border border-[var(--alpha-8)]">
             <button
               type="button"
@@ -255,6 +263,7 @@ export function EmailTemplateCard({
 
         {activeTab === 'source' ? (
           <textarea
+            id="email-template-body"
             className="min-h-[350px] w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs leading-relaxed text-foreground shadow-sm transition-colors placeholder:text-muted-foreground focus:border-primary focus:outline-none"
             value={bodyHtml}
             onChange={(e) => handleBodyChange(e.target.value)}
@@ -293,7 +302,11 @@ export function EmailTemplateCard({
           <Button type="button" variant="secondary" onClick={handleCancel} disabled={isUpdating}>
             Cancel
           </Button>
-          <Button type="button" onClick={handleSave} disabled={isUpdating}>
+          <Button
+            type="button"
+            onClick={handleSave}
+            disabled={isUpdating || !subject.trim() || !bodyHtml.trim()}
+          >
             {isUpdating ? 'Saving...' : 'Save changes'}
           </Button>
         </div>
