@@ -46,7 +46,9 @@ export class DatabaseWebhookManager {
   }
 
   async initialize(): Promise<void> {
-    if (this.isConnected) return;
+    if (this.isConnected) {
+      return;
+    }
 
     this.listenerClient = DatabaseManager.getInstance().createClient();
 
@@ -96,7 +98,9 @@ export class DatabaseWebhookManager {
       const webhooks = await this.webhookService.findActiveByTable(table);
       const matching = webhooks.filter((wh) => wh.events.includes(event));
 
-      if (matching.length === 0) return;
+      if (matching.length === 0) {
+        return;
+      }
 
       const body = {
         event,

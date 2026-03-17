@@ -30,9 +30,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@insforge/ui';
-import { Label } from '@/components';
+import { Label, TableHeader, EmptyState } from '@/components';
 import { DatabaseStudioMenuPanel } from '../components/DatabaseSecondaryMenu';
-import { TableHeader, EmptyState } from '@/components';
 import { useDatabaseWebhooks } from '../hooks/useDatabaseWebhooks';
 import type { DatabaseWebhook, DbWebhookEvent } from '@insforge/shared-schemas';
 
@@ -95,7 +94,9 @@ export default function WebhooksPage() {
   const [showSecret, setShowSecret] = useState(false);
 
   const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return webhooks;
+    if (!searchQuery.trim()) {
+      return webhooks;
+    }
     const q = searchQuery.toLowerCase();
     return webhooks.filter(
       (w) =>
@@ -155,10 +156,18 @@ export default function WebhooksPage() {
   };
 
   const validateForm = (): string | null => {
-    if (!form.name.trim()) return 'Name is required';
-    if (!form.tableName.trim()) return 'Table name is required';
-    if (form.events.length === 0) return 'Select at least one event';
-    if (!form.url.trim()) return 'URL is required';
+    if (!form.name.trim()) {
+      return 'Name is required';
+    }
+    if (!form.tableName.trim()) {
+      return 'Table name is required';
+    }
+    if (form.events.length === 0) {
+      return 'Select at least one event';
+    }
+    if (!form.url.trim()) {
+      return 'URL is required';
+    }
     try {
       new URL(form.url);
     } catch {
@@ -170,7 +179,9 @@ export default function WebhooksPage() {
   const handleSubmit = async () => {
     setFormError('');
     const err = validateForm();
-    if (err) return setFormError(err);
+    if (err) {
+      return setFormError(err);
+    }
 
     setIsSubmitting(true);
     try {
@@ -185,14 +196,24 @@ export default function WebhooksPage() {
         });
       } else if (dialogMode === 'edit' && editingWebhook) {
         const updates: Record<string, unknown> = {};
-        if (form.name.trim() !== editingWebhook.name) updates.name = form.name.trim();
-        if (form.url.trim() !== editingWebhook.url) updates.url = form.url.trim();
-        if (form.enabled !== editingWebhook.enabled) updates.enabled = form.enabled;
-        if (form.secret.trim()) updates.secret = form.secret.trim();
+        if (form.name.trim() !== editingWebhook.name) {
+          updates.name = form.name.trim();
+        }
+        if (form.url.trim() !== editingWebhook.url) {
+          updates.url = form.url.trim();
+        }
+        if (form.enabled !== editingWebhook.enabled) {
+          updates.enabled = form.enabled;
+        }
+        if (form.secret.trim()) {
+          updates.secret = form.secret.trim();
+        }
         const eventsChanged =
           form.events.length !== editingWebhook.events.length ||
           form.events.some((e) => !editingWebhook.events.includes(e));
-        if (eventsChanged) updates.events = form.events;
+        if (eventsChanged) {
+          updates.events = form.events;
+        }
         await updateWebhook(editingWebhook.id, updates);
       }
       closeDialog();
@@ -215,7 +236,9 @@ export default function WebhooksPage() {
   const handleDelete = async (id: string) => {
     await deleteWebhook(id);
     setDeleteConfirmId(null);
-    if (expandedId === id) setExpandedId(null);
+    if (expandedId === id) {
+      setExpandedId(null);
+    }
   };
 
   if (error) {
