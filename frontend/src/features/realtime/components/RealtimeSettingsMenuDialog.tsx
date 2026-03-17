@@ -69,10 +69,14 @@ export function RealtimeSettingsMenuDialog({
       return;
     }
 
-    await updateConfig({
-      retentionDays: retentionDays === 'never' ? null : Number(retentionDays),
-    });
-    onOpenChange(false);
+    try {
+      await updateConfig({
+        retentionDays: retentionDays === 'never' ? null : Number(retentionDays),
+      });
+      onOpenChange(false);
+    } catch {
+      // The mutation hook already handles error toasts; swallow here to avoid an unhandled rejection.
+    }
   };
 
   return (
