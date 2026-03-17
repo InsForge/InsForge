@@ -1,15 +1,35 @@
 import { ColumnType } from '@insforge/shared-schemas';
 import type { ConvertedValue, DataGridRowType } from './datagridTypes';
 import { RenderCellProps } from 'react-data-grid';
-import { cn, formatValueForDisplay, isEmptyValue } from '@/lib/utils/utils';
+import { cn, formatValueForDisplay, isEmptyValue, isGuardedValue } from '@/lib/utils/utils';
 import { Badge } from '@insforge/ui';
 import IdCell from './IdCell';
 
 // Generic cell renderer factory
 function createDefaultCellRenderer<TRow extends DataGridRowType>() {
+  const guardedCell = (value: ConvertedValue) => {
+    if (!isGuardedValue(value)) {
+      return null;
+    }
+    return (
+      <div className="w-full h-full flex items-center">
+        <span
+          className="truncate text-muted-foreground italic"
+          title={`Value too large (${Math.round(value.size / 1024)} KB)`}
+        >
+          {value.preview}...
+        </span>
+      </div>
+    );
+  };
+
   return {
     text: ({ row, column }: RenderCellProps<TRow>) => {
       const value = row[column.key] as ConvertedValue;
+      const guarded = guardedCell(value);
+      if (guarded) {
+        return guarded;
+      }
       const isNull = isEmptyValue(value);
       const displayValue = formatValueForDisplay(value, ColumnType.STRING);
       return (
@@ -29,6 +49,10 @@ function createDefaultCellRenderer<TRow extends DataGridRowType>() {
 
     boolean: ({ row, column }: RenderCellProps<TRow>) => {
       const value = row[column.key] as ConvertedValue;
+      const guarded = guardedCell(value);
+      if (guarded) {
+        return guarded;
+      }
       const isNull = isEmptyValue(value);
       const displayValue = formatValueForDisplay(value, ColumnType.BOOLEAN);
       return (
@@ -47,6 +71,10 @@ function createDefaultCellRenderer<TRow extends DataGridRowType>() {
 
     datetime: ({ row, column }: RenderCellProps<TRow>) => {
       const value = row[column.key] as ConvertedValue;
+      const guarded = guardedCell(value);
+      if (guarded) {
+        return guarded;
+      }
       const isNull = isEmptyValue(value);
       const displayValue = formatValueForDisplay(value, ColumnType.DATETIME);
       const isError = displayValue === 'Invalid date time';
@@ -72,6 +100,10 @@ function createDefaultCellRenderer<TRow extends DataGridRowType>() {
 
     date: ({ row, column }: RenderCellProps<TRow>) => {
       const value = row[column.key] as ConvertedValue;
+      const guarded = guardedCell(value);
+      if (guarded) {
+        return guarded;
+      }
       const isNull = isEmptyValue(value);
       const displayValue = formatValueForDisplay(value, ColumnType.DATE);
       const isError = displayValue === 'Invalid date';
@@ -97,6 +129,10 @@ function createDefaultCellRenderer<TRow extends DataGridRowType>() {
 
     json: ({ row, column }: RenderCellProps<TRow>) => {
       const value = row[column.key] as ConvertedValue;
+      const guarded = guardedCell(value);
+      if (guarded) {
+        return guarded;
+      }
       const isNull = isEmptyValue(value);
       const displayText = formatValueForDisplay(value, ColumnType.JSON);
       const isError = displayText === 'Invalid JSON';
@@ -128,6 +164,10 @@ function createDefaultCellRenderer<TRow extends DataGridRowType>() {
 
     email: ({ row, column }: RenderCellProps<TRow>) => {
       const value = row[column.key] as ConvertedValue;
+      const guarded = guardedCell(value);
+      if (guarded) {
+        return guarded;
+      }
       const isNull = isEmptyValue(value);
       const displayValue = formatValueForDisplay(value, ColumnType.STRING);
       return (

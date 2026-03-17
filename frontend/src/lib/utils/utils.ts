@@ -219,3 +219,20 @@ export function compareVersions(v1: string, v2: string): number {
   }
   return 0;
 }
+
+/**
+ * Type guard for guarded browse values — oversized cell values replaced by the backend
+ * with a sentinel containing a truncated preview.
+ */
+export function isGuardedValue(
+  value: unknown
+): value is { __guarded: true; preview: string; size: number } {
+  return (
+    value !== null &&
+    value !== undefined &&
+    typeof value === 'object' &&
+    (value as Record<string, unknown>).__guarded === true &&
+    typeof (value as Record<string, unknown>).preview === 'string' &&
+    typeof (value as Record<string, unknown>).size === 'number'
+  );
+}

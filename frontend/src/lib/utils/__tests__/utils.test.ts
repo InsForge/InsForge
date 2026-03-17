@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { cn, isEmptyValue, compareVersions, formatTime, formatDate } from '../utils';
+import {
+  cn,
+  isEmptyValue,
+  compareVersions,
+  formatTime,
+  formatDate,
+  isGuardedValue,
+} from '../utils';
 
 describe('cn', () => {
   it('merges class names', () => {
@@ -81,5 +88,39 @@ describe('formatDate', () => {
 
   it('returns original string for invalid timestamp', () => {
     expect(formatDate('not-a-date')).toBe('not-a-date');
+  });
+});
+
+describe('isGuardedValue', () => {
+  it('returns true for valid guarded value', () => {
+    expect(isGuardedValue({ __guarded: true, preview: 'hello...', size: 500000 })).toBe(true);
+  });
+
+  it('returns false for null', () => {
+    expect(isGuardedValue(null)).toBe(false);
+  });
+
+  it('returns false for string', () => {
+    expect(isGuardedValue('just a string')).toBe(false);
+  });
+
+  it('returns false for object missing __guarded', () => {
+    expect(isGuardedValue({ preview: 'hello', size: 100 })).toBe(false);
+  });
+
+  it('returns false for object with wrong __guarded value', () => {
+    expect(isGuardedValue({ __guarded: false, preview: 'hello', size: 100 })).toBe(false);
+  });
+
+  it('returns false for object missing preview', () => {
+    expect(isGuardedValue({ __guarded: true, size: 100 })).toBe(false);
+  });
+
+  it('returns false for object missing size', () => {
+    expect(isGuardedValue({ __guarded: true, preview: 'hello' })).toBe(false);
+  });
+
+  it('returns false for undefined', () => {
+    expect(isGuardedValue(undefined)).toBe(false);
   });
 });
