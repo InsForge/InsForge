@@ -35,7 +35,10 @@ export function PromptDialog({
           </DialogHeader>
           {/* Content */}
           <div className="p-6 flex flex-col gap-4">
-            <p className="text-sm text-zinc-500 font-normal leading-5 dark:text-neutral-400">
+            <p
+              aria-hidden="true"
+              className="text-sm text-zinc-500 font-normal leading-5 dark:text-neutral-400"
+            >
               {subtitle}
             </p>
             {/* Prompt display */}
