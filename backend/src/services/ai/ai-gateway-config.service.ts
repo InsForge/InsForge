@@ -113,7 +113,9 @@ export class AIGatewayConfigService {
         );
       }
     } catch (error) {
-      if (error instanceof AppError) throw error;
+      if (error instanceof AppError) {
+        throw error;
+      }
       throw new AppError(
         'Could not validate OpenRouter API key. Check your network connection and try again.',
         400,
@@ -123,7 +125,9 @@ export class AIGatewayConfigService {
   }
 
   private maskKey(apiKey: string): string {
-    if (apiKey.length <= 8) return '****';
+    if (apiKey.length <= 8) {
+      return '****';
+    }
     return apiKey.substring(0, 4) + '****' + apiKey.substring(apiKey.length - 4);
   }
 }

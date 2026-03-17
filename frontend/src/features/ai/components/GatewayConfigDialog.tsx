@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Settings, Eye, EyeOff, Loader2, CheckCircle2, Cloud, Server, Key } from 'lucide-react';
+import { Eye, EyeOff, Loader2, CheckCircle2, Cloud, Server, Key } from 'lucide-react';
 import {
   Button,
   Dialog,
@@ -50,8 +50,7 @@ interface GatewayConfigDialogProps {
 }
 
 export function GatewayConfigDialog({ open, onOpenChange }: GatewayConfigDialogProps) {
-  const { gatewayConfig, isLoadingGatewayConfig, setBYOKKey, removeBYOKKey } =
-    useAIGatewayConfig();
+  const { gatewayConfig, isLoadingGatewayConfig, setBYOKKey, removeBYOKKey } = useAIGatewayConfig();
 
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [showKey, setShowKey] = useState(false);
@@ -156,9 +155,8 @@ export function GatewayConfigDialog({ open, onOpenChange }: GatewayConfigDialogP
             )}
 
             <p className="text-xs text-muted-foreground">
-              Get your key at{' '}
-              <span className="font-mono text-foreground">openrouter.ai/keys</span>. The key is
-              validated and stored encrypted.
+              Get your key at <span className="font-mono text-foreground">openrouter.ai/keys</span>.
+              The key is validated and stored encrypted.
             </p>
           </div>
 
