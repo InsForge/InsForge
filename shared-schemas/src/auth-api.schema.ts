@@ -9,6 +9,8 @@ import {
   oAuthConfigSchema,
   oAuthProvidersSchema,
   authConfigSchema,
+  smtpConfigSchema,
+  emailTemplateSchema,
 } from './auth.schema';
 
 // ============================================================================
@@ -374,6 +376,48 @@ export const getPublicAuthConfigResponseSchema = z.object({
 });
 
 // ============================================================================
+// SMTP Configuration schemas
+// ============================================================================
+
+/**
+ * PUT /api/auth/smtp-config - Upsert SMTP configuration
+ */
+export const upsertSmtpConfigRequestSchema = z.object({
+  enabled: z.boolean(),
+  host: z.string().min(1, 'SMTP host is required'),
+  port: z.number().int().min(1).max(65535),
+  username: z.string().min(1, 'SMTP username is required'),
+  password: z.string().min(1, 'SMTP password is required').optional(),
+  senderEmail: z.string().email('Invalid sender email'),
+  senderName: z.string().min(1, 'Sender name is required'),
+  minIntervalSeconds: z.number().int().min(0).default(60),
+});
+
+/**
+ * Response for GET /api/auth/smtp-config
+ */
+export const getSmtpConfigResponseSchema = smtpConfigSchema;
+
+// ============================================================================
+// Email Template schemas
+// ============================================================================
+
+/**
+ * PUT /api/auth/email-templates/:type - Update email template
+ */
+export const updateEmailTemplateRequestSchema = z.object({
+  subject: z.string().min(1, 'Subject is required'),
+  bodyHtml: z.string().min(1, 'Template body is required'),
+});
+
+/**
+ * Response for GET /api/auth/email-templates
+ */
+export const listEmailTemplatesResponseSchema = z.object({
+  data: z.array(emailTemplateSchema),
+});
+
+// ============================================================================
 // Error response schema
 // ============================================================================
 
@@ -435,3 +479,7 @@ export type GetAuthConfigResponse = z.infer<typeof getAuthConfigResponseSchema>;
 export type GetPublicAuthConfigResponse = z.infer<typeof getPublicAuthConfigResponseSchema>;
 
 export type AuthErrorResponse = z.infer<typeof authErrorResponseSchema>;
+export type UpsertSmtpConfigRequest = z.infer<typeof upsertSmtpConfigRequestSchema>;
+export type GetSmtpConfigResponse = z.infer<typeof getSmtpConfigResponseSchema>;
+export type UpdateEmailTemplateRequest = z.infer<typeof updateEmailTemplateRequestSchema>;
+export type ListEmailTemplatesResponse = z.infer<typeof listEmailTemplatesResponseSchema>;

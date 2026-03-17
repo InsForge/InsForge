@@ -109,6 +109,31 @@ export const authConfigSchema = z.object({
   updatedAt: z.string(), // PostgreSQL timestamp
 });
 
+// SMTP configuration schema
+export const smtpConfigSchema = z.object({
+  id: z.string().uuid(),
+  enabled: z.boolean(),
+  host: z.string(),
+  port: z.number().int().min(1).max(65535),
+  username: z.string(),
+  hasPassword: z.boolean(), // Never expose actual password
+  senderEmail: z.string(),
+  senderName: z.string(),
+  minIntervalSeconds: z.number().int().min(0),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+// Email template schema
+export const emailTemplateSchema = z.object({
+  id: z.string().uuid(),
+  templateType: z.string(),
+  subject: z.string(),
+  bodyHtml: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
 /**
  * JWT token payload schema
  */
@@ -135,3 +160,5 @@ export type TokenPayloadSchema = z.infer<typeof tokenPayloadSchema>;
 export type OAuthConfigSchema = z.infer<typeof oAuthConfigSchema>;
 export type OAuthProvidersSchema = z.infer<typeof oAuthProvidersSchema>;
 export type AuthConfigSchema = z.infer<typeof authConfigSchema>;
+export type SmtpConfigSchema = z.infer<typeof smtpConfigSchema>;
+export type EmailTemplateSchema = z.infer<typeof emailTemplateSchema>;
