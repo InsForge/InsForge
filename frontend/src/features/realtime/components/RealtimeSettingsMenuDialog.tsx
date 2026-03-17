@@ -38,7 +38,8 @@ export function RealtimeSettingsMenuDialog({
     setIsLoading(true);
     try {
       const config = await realtimeService.getRetentionConfig();
-      const nextRetentionDays = config.retentionDays === null ? 'never' : String(config.retentionDays);
+      const nextRetentionDays =
+        config.retentionDays === null ? 'never' : String(config.retentionDays);
       setRetentionDays(nextRetentionDays);
       setInitialRetentionDays(nextRetentionDays);
     } catch (error) {

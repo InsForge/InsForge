@@ -244,10 +244,7 @@ export default function RealtimeMessagesPage() {
         </div>
       )}
       {/* Settings Dialog */}
-      <RealtimeSettingsMenuDialog
-        open={isSettingsOpen}
-        onOpenChange={setIsSettingsOpen}
-      />
+      <RealtimeSettingsMenuDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
     </div>
   );
 }
