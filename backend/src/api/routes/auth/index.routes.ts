@@ -7,7 +7,7 @@ import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
-import { AuthRequest, verifyAdmin, verifyToken } from '@/api/middlewares/auth.js';
+import { AuthRequest, verifyAdmin, verifyToken, extractBearerToken } from '@/api/middlewares/auth.js';
 import oauthRouter from './oauth.routes.js';
 import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-limiters.js';
 import {
@@ -174,8 +174,10 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
   }
 });
 
-// POST /api/auth/users - Create a new user (registration)
+// POST /api/auth/users - Create a new user (registration or admin adding user)
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
+// When called with a valid admin token (e.g. dashboard adding a user), we do NOT set session
+// cookie or return csrf/refresh tokens, so the admin's session is not overwritten.
 router.post('/users', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const clientType = parseClientType(req.query.client_type);
@@ -192,8 +194,24 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
     const { email, password, name, options } = validationResult.data;
     const result: CreateUserResponse = await authService.register(email, password, name, options);
 
-    // Set refresh token based on client type
-    if (result.accessToken && result.user) {
+    // If the request is from a project_admin, do not set refresh token cookie or return session
+    // tokens, so the admin's session is not overwritten when adding a user (works with multiple admins).
+    let adminCreatingUser = false;
+    try {
+      const token = extractBearerToken(req.headers.authorization);
+      if (token) {
+        const payload = TokenManager.getInstance().verifyToken(token);
+        adminCreatingUser = payload?.role === 'project_admin';
+      }
+    } catch (error) {
+      // Not a valid token; treat as normal registration.
+      logger.debug('[Auth:CreateUser] Admin detection failed', {
+        error: error instanceof Error ? error.message : 'unknown',
+      });
+    }
+
+    // Set refresh token based on client type (skip when admin is adding a user)
+    if (result.accessToken && result.user && !adminCreatingUser) {
       const tokenManager = TokenManager.getInstance();
       const refreshToken = tokenManager.generateRefreshToken(result.user.id);
 
