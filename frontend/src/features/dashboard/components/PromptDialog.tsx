@@ -46,7 +46,10 @@ export function PromptDialog({ open, onOpenChange, promptTemplate }: PromptDialo
 
             {/* Prompt Box */}
             <div className="flex flex-col gap-3">
-              <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
+              <p
+                aria-hidden="true"
+                className="text-sm text-gray-500 dark:text-neutral-400 leading-6"
+              >
                 {promptTemplate.description}
               </p>
               <div className="bg-gray-50 dark:bg-neutral-900 rounded p-3 h-60 overflow-y-auto relative">
