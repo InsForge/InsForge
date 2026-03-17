@@ -120,14 +120,6 @@ export class RealtimeService {
       body: JSON.stringify({ retentionDays }),
     });
   }
-
-  async cleanupMessages(batchSize?: number): Promise<{ deletedCount: number; message: string }> {
-    return apiClient.request('/realtime/messages/cleanup', {
-      method: 'POST',
-      headers: apiClient.withAccessToken(),
-      body: JSON.stringify({ batchSize }),
-    });
-  }
 }
 
 export const realtimeService = new RealtimeService();

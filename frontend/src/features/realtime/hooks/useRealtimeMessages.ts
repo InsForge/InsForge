@@ -46,15 +46,6 @@ export function useRealtimeMessages() {
     }));
   }, []);
 
-  const cleanupMessages = useCallback(
-    async (batchSize?: number) => {
-      const result = await realtimeService.cleanupMessages(batchSize);
-      void refetchStats();
-      return result;
-    },
-    [refetchStats]
-  );
-
   const refetch = useCallback(() => {
     void refetchMessages();
     void refetchStats();
@@ -77,6 +68,5 @@ export function useRealtimeMessages() {
     refetchMessages,
     refetchStats,
     refetch,
-    cleanupMessages,
   };
 }

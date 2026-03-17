@@ -417,8 +417,6 @@ To prevent unbounded storage growth and maintain query performance, InsForge imp
 2. The function reads the retention threshold from `realtime.config`.
 3. Rows older than the threshold are safely deleted in batches to prevent locking or affecting live traffic.
 
-Admins can also trigger manual cleanups through the dashboard Settings menu on demand.
-
 ## Performance Characteristics
 
 | Metric | Value | Notes |

@@ -267,19 +267,6 @@ export class RealtimeMessageService {
   }
 
   /**
-   * Cleanup old realtime messages based on retention policy
-   * @param batchSize Number of messages to delete in one batch
-   * @returns Number of messages deleted
-   */
-  async cleanupMessages(batchSize: number = 1000): Promise<number> {
-    const result = await this.getPool().query(
-      'SELECT realtime.cleanup_messages($1) as "deletedCount"',
-      [batchSize]
-    );
-    return result.rows[0]?.deletedCount || 0;
-  }
-
-  /**
    * Get retention days config
    */
   async getRetentionDays(): Promise<number | null> {
