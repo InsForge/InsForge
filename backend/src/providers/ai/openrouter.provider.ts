@@ -166,7 +166,9 @@ export class OpenRouterProvider {
    */
   async isConfiguredAsync(): Promise<boolean> {
     const byokKey = await this.getBYOKApiKey();
-    if (byokKey) return true;
+    if (byokKey) {
+      return true;
+    }
     return this.isConfigured();
   }
 
