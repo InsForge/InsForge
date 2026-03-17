@@ -46,15 +46,15 @@ function SettingRow({ label, description, children }: SettingRowProps) {
 const TEMPLATE_LABELS: Record<string, string> = {
   'email-verification-code': 'Email Verification (Code)',
   'email-verification-link': 'Email Verification (Link)',
-  'password-reset-code': 'Password Reset (Code)',
-  'password-reset-link': 'Password Reset (Link)',
+  'reset-password-code': 'Password Reset (Code)',
+  'reset-password-link': 'Password Reset (Link)',
 };
 
 const TEMPLATE_PLACEHOLDERS: Record<string, string[]> = {
-  'email-verification-code': ['{{code}}', '{{email}}', '{{appName}}'],
-  'email-verification-link': ['{{link}}', '{{email}}', '{{appName}}'],
-  'password-reset-code': ['{{code}}', '{{email}}', '{{appName}}'],
-  'password-reset-link': ['{{link}}', '{{email}}', '{{appName}}'],
+  'email-verification-code': ['{{ code }}', '{{ email }}'],
+  'email-verification-link': ['{{ link }}', '{{ email }}'],
+  'reset-password-code': ['{{ code }}', '{{ email }}'],
+  'reset-password-link': ['{{ link }}', '{{ email }}'],
 };
 
 export function EmailTemplateCard({
@@ -205,7 +205,7 @@ export function EmailTemplateCard({
             <div className="min-h-[300px] rounded-md border border-input">
               <iframe
                 title="Email template preview"
-                sandbox="allow-same-origin"
+                sandbox=""
                 srcDoc={bodyHtml}
                 className="h-[300px] w-full rounded-md"
               />

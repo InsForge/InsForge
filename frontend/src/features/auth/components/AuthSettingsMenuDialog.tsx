@@ -195,15 +195,13 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
               >
                 Password
               </MenuDialogNavItem>
-              {isCloudProject && (
-                <MenuDialogNavItem
-                  icon={<Send className="h-5 w-5" />}
-                  active={activeSection === 'email'}
-                  onClick={() => setActiveSection('email')}
-                >
-                  Email
-                </MenuDialogNavItem>
-              )}
+              <MenuDialogNavItem
+                icon={<Send className="h-5 w-5" />}
+                active={activeSection === 'email'}
+                onClick={() => setActiveSection('email')}
+              >
+                Email
+              </MenuDialogNavItem>
             </MenuDialogNavList>
           </MenuDialogNav>
         </MenuDialogSideNav>
