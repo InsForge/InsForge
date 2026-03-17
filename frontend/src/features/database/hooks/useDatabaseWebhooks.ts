@@ -89,6 +89,14 @@ export function useDatabaseWebhooks() {
     setLogs((prev) => ({ ...prev, [webhookId]: result }));
   }, []);
 
+  const updateMutation = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateDatabaseWebhookRequest }) =>
+      updateWebhookApi(id, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: WEBHOOKS_KEY });
+    },
+  });
+
   return {
     webhooks,
     logs,
@@ -96,6 +104,8 @@ export function useDatabaseWebhooks() {
     error,
     refetch,
     createWebhook: createMutation.mutateAsync,
+    updateWebhook: (id: string, input: UpdateDatabaseWebhookRequest) =>
+      updateMutation.mutateAsync({ id, input }),
     deleteWebhook: (id: string) => deleteMutation.mutateAsync(id),
     toggleWebhook: (id: string, enabled: boolean) => toggleMutation.mutateAsync({ id, enabled }),
     fetchLogs,
