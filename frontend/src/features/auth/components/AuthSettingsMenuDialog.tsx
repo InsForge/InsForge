@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Lock, Mail, Settings } from 'lucide-react';
+import { Lock, Mail, Send, Settings } from 'lucide-react';
 import {
   Button,
   Checkbox,
@@ -32,6 +32,10 @@ import {
   type UpdateAuthConfigRequest,
 } from '@insforge/shared-schemas';
 import { useAuthConfig } from '@/features/auth/hooks/useAuthConfig';
+import { useSmtpConfig } from '@/features/auth/hooks/useSmtpConfig';
+import { useEmailTemplates } from '@/features/auth/hooks/useEmailTemplates';
+import { SmtpSettingsCard } from './SmtpSettingsCard';
+import { EmailTemplateCard } from './EmailTemplateCard';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
 
 interface AuthSettingsMenuDialogProps {
@@ -39,7 +43,7 @@ interface AuthSettingsMenuDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type AuthSettingsSection = 'general' | 'email-verification' | 'password';
+type AuthSettingsSection = 'general' | 'email-verification' | 'password' | 'email';
 
 const defaultValues: UpdateAuthConfigRequest = {
   requireEmailVerification: false,
@@ -99,6 +103,18 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
   const isCloudProject = isInsForgeCloudProject();
   const [activeSection, setActiveSection] = useState<AuthSettingsSection>('general');
   const { config, isLoading, isUpdating, updateConfig } = useAuthConfig();
+  const {
+    config: smtpConfig,
+    isLoading: isSmtpLoading,
+    isUpdating: isSmtpUpdating,
+    updateConfig: updateSmtpConfig,
+  } = useSmtpConfig();
+  const {
+    templates,
+    isLoading: isTemplatesLoading,
+    isUpdating: isTemplatesUpdating,
+    updateTemplate,
+  } = useEmailTemplates();
 
   const form = useForm<UpdateAuthConfigRequest>({
     resolver: zodResolver(updateAuthConfigRequestSchema),
@@ -139,6 +155,9 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
     if (activeSection === 'password') {
       return 'Password';
     }
+    if (activeSection === 'email') {
+      return 'Email';
+    }
     return 'General';
   }, [activeSection]);
 
@@ -176,6 +195,15 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
               >
                 Password
               </MenuDialogNavItem>
+              {isCloudProject && (
+                <MenuDialogNavItem
+                  icon={<Send className="h-5 w-5" />}
+                  active={activeSection === 'email'}
+                  onClick={() => setActiveSection('email')}
+                >
+                  Email
+                </MenuDialogNavItem>
+              )}
             </MenuDialogNavList>
           </MenuDialogNav>
         </MenuDialogSideNav>
@@ -400,10 +428,28 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                     )}
                   </>
                 )}
+
+                {activeSection === 'email' && (
+                  <>
+                    <SmtpSettingsCard
+                      config={smtpConfig}
+                      isLoading={isSmtpLoading}
+                      isUpdating={isSmtpUpdating}
+                      onSave={updateSmtpConfig}
+                    />
+                    <div className="my-6 border-t border-border" />
+                    <EmailTemplateCard
+                      templates={templates}
+                      isLoading={isTemplatesLoading}
+                      isUpdating={isTemplatesUpdating}
+                      onSave={updateTemplate}
+                    />
+                  </>
+                )}
               </MenuDialogBody>
 
               <MenuDialogFooter>
-                {form.formState.isDirty && (
+                {activeSection !== 'email' && form.formState.isDirty && (
                   <>
                     <Button
                       type="button"
