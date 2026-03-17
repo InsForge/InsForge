@@ -31,6 +31,7 @@ import {
 } from '@insforge/ui';
 import { cn, formatTime } from '@/lib/utils/utils';
 import type { UserSchema } from '@insforge/shared-schemas';
+import { useCustomOAuthConfig } from '@/features/auth/hooks/useCustomOAuthConfig';
 
 type UserDataGridRow = UserSchema & {
   [key: string]: string | number | boolean | null | string[] | Record<string, unknown>;
@@ -65,10 +66,18 @@ const providerLogoMap = {
   microsoft: MicrosoftLogo,
 } as const;
 
-const ProviderBadge = ({ provider }: { provider: string }) => {
+const ProviderBadge = ({
+  provider,
+  customLabels,
+}: {
+  provider: string;
+  customLabels?: Record<string, string>;
+}) => {
   const normalized = provider.toLowerCase();
   const label =
-    providerLabelMap[normalized] ?? normalized.charAt(0).toUpperCase() + normalized.slice(1);
+    providerLabelMap[normalized] ??
+    customLabels?.[normalized] ??
+    normalized.charAt(0).toUpperCase() + normalized.slice(1);
   const ProviderLogo = providerLogoMap[normalized as keyof typeof providerLogoMap];
 
   return (
@@ -83,83 +92,87 @@ const ProviderBadge = ({ provider }: { provider: string }) => {
   );
 };
 
-// Width estimates for badge layout calculation
 const BADGE_WIDTH = 82;
 const OVERFLOW_BADGE_WIDTH = 40;
 
-const ProvidersCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
-  const providers = row.providers;
-  const hasProviders = Array.isArray(providers) && providers.length > 0;
-  const uniqueProviders = hasProviders ? (providers as string[]) : [];
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  // Reasonable default before ResizeObserver fires
-  const [containerWidth, setContainerWidth] = useState(300);
+function createProvidersCellRenderer(customLabels?: Record<string, string>) {
+  return function ProvidersCellRenderer({ row }: RenderCellProps<UserDataGridRow>) {
+    const providers = row.providers;
+    const hasProviders = Array.isArray(providers) && providers.length > 0;
+    const uniqueProviders = hasProviders ? (providers as string[]) : [];
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const [containerWidth, setContainerWidth] = useState(300);
 
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) {
-      return;
+    useEffect(() => {
+      const container = containerRef.current;
+      if (!container) {
+        return;
+      }
+
+      const cell = container.closest('[role="gridcell"]') as HTMLElement | null;
+      const target = cell ?? container;
+
+      let frameId: number;
+      const observer = new ResizeObserver(() => {
+        cancelAnimationFrame(frameId);
+        frameId = requestAnimationFrame(() => {
+          setContainerWidth(target.getBoundingClientRect().width);
+        });
+      });
+
+      observer.observe(target);
+      setContainerWidth(target.getBoundingClientRect().width);
+
+      return () => {
+        cancelAnimationFrame(frameId);
+        observer.disconnect();
+      };
+    }, []);
+
+    const maxBadgesThatFit = Math.max(0, Math.floor(containerWidth / BADGE_WIDTH));
+    const hasOverflow = uniqueProviders.length > maxBadgesThatFit;
+    const visibleProviderCount = hasOverflow
+      ? Math.max(0, Math.floor((containerWidth - OVERFLOW_BADGE_WIDTH) / BADGE_WIDTH))
+      : uniqueProviders.length;
+    const visibleProviders = uniqueProviders.slice(0, visibleProviderCount);
+    const hiddenProviders = uniqueProviders.slice(visibleProviderCount);
+
+    if (!hasProviders) {
+      return (
+        <span className="truncate text-[13px] leading-[18px] text-muted-foreground">null</span>
+      );
     }
 
-    // Walk up the DOM to find the actual grid cell element
-    const cell = container.closest('[role="gridcell"]') as HTMLElement | null;
-    const target = cell ?? container;
-
-    let frameId: number;
-    const observer = new ResizeObserver(() => {
-      cancelAnimationFrame(frameId);
-      frameId = requestAnimationFrame(() => {
-        setContainerWidth(target.getBoundingClientRect().width);
-      });
-    });
-
-    observer.observe(target);
-    setContainerWidth(target.getBoundingClientRect().width);
-
-    return () => {
-      cancelAnimationFrame(frameId);
-      observer.disconnect();
-    };
-  }, []);
-
-  const maxBadgesThatFit = Math.max(0, Math.floor(containerWidth / BADGE_WIDTH));
-  const hasOverflow = uniqueProviders.length > maxBadgesThatFit;
-  const visibleProviderCount = hasOverflow
-    ? Math.max(0, Math.floor((containerWidth - OVERFLOW_BADGE_WIDTH) / BADGE_WIDTH))
-    : uniqueProviders.length;
-  const visibleProviders = uniqueProviders.slice(0, visibleProviderCount);
-  const hiddenProviders = uniqueProviders.slice(visibleProviderCount);
-
-  if (!hasProviders) {
-    return <span className="truncate text-[13px] leading-[18px] text-muted-foreground">null</span>;
-  }
-
-  return (
-    <div ref={containerRef} className="flex items-center gap-1 w-full overflow-hidden">
-      {visibleProviders.map((provider) => (
-        <ProviderBadge key={provider} provider={provider} />
-      ))}
-      {hiddenProviders.length > 0 && (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Badge className="h-5 rounded bg-[var(--alpha-8)] px-1.5 py-0 text-xs font-medium leading-4 text-muted-foreground">
-                +{hiddenProviders.length}
-              </Badge>
-            </TooltipTrigger>
-            <TooltipContent side="top" align="center">
-              {hiddenProviders
-                .map(
-                  (p) => providerLabelMap[p.toLowerCase()] ?? p.charAt(0).toUpperCase() + p.slice(1)
-                )
-                .join(', ')}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )}
-    </div>
-  );
-};
+    return (
+      <div ref={containerRef} className="flex w-full items-center gap-1 overflow-hidden">
+        {visibleProviders.map((provider) => (
+          <ProviderBadge key={provider} provider={provider} customLabels={customLabels} />
+        ))}
+        {hiddenProviders.length > 0 && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge className="h-5 rounded bg-[var(--alpha-8)] px-1.5 py-0 text-xs font-medium leading-4 text-muted-foreground">
+                  +{hiddenProviders.length}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="top" align="center">
+                {hiddenProviders
+                  .map(
+                    (p) =>
+                      providerLabelMap[p.toLowerCase()] ??
+                      customLabels?.[p.toLowerCase()] ??
+                      p.charAt(0).toUpperCase() + p.slice(1)
+                  )
+                  .join(', ')}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </div>
+    );
+  };
+}
 
 const EmailVerifiedCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
   if (typeof row.emailVerified !== 'boolean') {
@@ -198,7 +211,9 @@ const DateTimeCellRenderer = ({
   );
 };
 
-export function createUsersColumns(): DataGridColumn<UserDataGridRow>[] {
+export function createUsersColumns(
+  customProviderLabels?: Record<string, string>
+): DataGridColumn<UserDataGridRow>[] {
   return [
     {
       key: 'id',
@@ -230,7 +245,7 @@ export function createUsersColumns(): DataGridColumn<UserDataGridRow>[] {
       width: '1fr',
       minWidth: 140,
       sortable: true,
-      renderCell: ProvidersCellRenderer,
+      renderCell: createProvidersCellRenderer(customProviderLabels),
     },
     {
       key: 'emailVerified',
@@ -299,7 +314,17 @@ const UserSelectionCell = ({
 };
 
 export function UsersDataGrid(props: UsersDataGridProps) {
-  const columns = useMemo(() => createUsersColumns(), []);
+  const { configs: customConfigs } = useCustomOAuthConfig();
+
+  const customProviderLabels = useMemo(() => {
+    const labels: Record<string, string> = {};
+    for (const config of customConfigs) {
+      labels[config.key] = config.name;
+    }
+    return labels;
+  }, [customConfigs]);
+
+  const columns = useMemo(() => createUsersColumns(customProviderLabels), [customProviderLabels]);
 
   return (
     <DataGrid<UserDataGridRow>
