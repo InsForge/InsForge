@@ -1,5 +1,12 @@
 import { apiClient } from '@/lib/api/client';
-import type { UserSchema, CreateUserResponse, DeleteUsersResponse } from '@insforge/shared-schemas';
+import type {
+  UserSchema,
+  CreateUserResponse,
+  DeleteUsersResponse,
+  UpdateUserAdminStatusResponse,
+} from '@insforge/shared-schemas';
+
+export type UserRoleFilter = 'users' | 'admins' | 'all';
 
 export class UserService {
   /**
@@ -10,7 +17,8 @@ export class UserService {
    */
   async getUsers(
     queryParams: string = '',
-    searchQuery?: string
+    searchQuery?: string,
+    roleFilter: UserRoleFilter = 'users'
   ): Promise<{
     users: UserSchema[];
     pagination: { offset: number; limit: number; total: number };
@@ -21,6 +29,8 @@ export class UserService {
     if (searchQuery && searchQuery.trim()) {
       params.set('search', searchQuery.trim());
     }
+
+    params.set('roleFilter', roleFilter);
 
     if (params.toString()) {
       url += `?${params.toString()}`;
@@ -49,6 +59,16 @@ export class UserService {
     return apiClient.request('/auth/users', {
       method: 'DELETE',
       body: JSON.stringify({ userIds }),
+    });
+  }
+
+  async updateUserAdminStatus(
+    userId: string,
+    isProjectAdmin: boolean
+  ): Promise<UpdateUserAdminStatusResponse> {
+    return apiClient.request(`/auth/users/${userId}/admin`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isProjectAdmin }),
     });
   }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Mail, User } from 'lucide-react';
+import { Mail, MoreHorizontal, ShieldCheck, User } from 'lucide-react';
 import {
   Avatar,
   AvatarFallback,
@@ -28,6 +28,11 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
 } from '@insforge/ui';
 import { cn, formatTime } from '@/lib/utils/utils';
 import type { UserSchema } from '@insforge/shared-schemas';
@@ -198,8 +203,27 @@ const DateTimeCellRenderer = ({
   );
 };
 
-export function createUsersColumns(): DataGridColumn<UserDataGridRow>[] {
-  return [
+const AdminStatusCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
+  return (
+    <Badge
+      className={cn(
+        'h-5 rounded px-1.5 py-0 text-xs font-medium leading-4 text-white',
+        row.isProjectAdmin ? 'bg-[rgb(var(--success))]' : 'bg-[var(--alpha-8)] text-foreground'
+      )}
+    >
+      {row.isProjectAdmin ? (row.adminSource === 'bootstrap' ? 'Bootstrap Admin' : 'Admin') : 'User'}
+    </Badge>
+  );
+};
+
+interface CreateUsersColumnsOptions {
+  onToggleAdminStatus?: (user: UserSchema) => void;
+}
+
+export function createUsersColumns({
+  onToggleAdminStatus,
+}: CreateUsersColumnsOptions = {}): DataGridColumn<UserDataGridRow>[] {
+  const columns: DataGridColumn<UserDataGridRow>[] = [
     {
       key: 'id',
       name: 'ID',
@@ -233,6 +257,14 @@ export function createUsersColumns(): DataGridColumn<UserDataGridRow>[] {
       renderCell: ProvidersCellRenderer,
     },
     {
+      key: 'isProjectAdmin',
+      name: 'Role',
+      width: '0.9fr',
+      minWidth: 140,
+      sortable: true,
+      renderCell: AdminStatusCellRenderer,
+    },
+    {
       key: 'emailVerified',
       name: 'Email Verified',
       width: '1fr',
@@ -257,12 +289,69 @@ export function createUsersColumns(): DataGridColumn<UserDataGridRow>[] {
       renderCell: (props) => <DateTimeCellRenderer {...props} />,
     },
   ];
+
+  if (onToggleAdminStatus) {
+    columns.push({
+      key: 'actions',
+      name: '',
+      width: 56,
+      minWidth: 56,
+      maxWidth: 56,
+      sortable: false,
+      resizable: false,
+      renderCell: ({ row }) => {
+        const actionLabel = row.isProjectAdmin ? 'Remove admin' : 'Promote to admin';
+        const isBootstrapAdmin = row.adminSource === 'bootstrap';
+        const actionDisabled = isBootstrapAdmin && row.isProjectAdmin;
+
+        const trigger = (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="h-7 w-7"
+            aria-label={`Actions for ${row.email}`}
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        );
+
+        return (
+          <div className="flex h-full items-center justify-center">
+            {actionDisabled ? (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+                  <TooltipContent side="top">
+                    Bootstrap admin access is managed through environment credentials.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onSelect={() => onToggleAdminStatus(row)}>
+                    <ShieldCheck className="mr-2 h-4 w-4" />
+                    {actionLabel}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        );
+      },
+    });
+  }
+
+  return columns;
 }
 
 export type UsersDataGridProps = Omit<
   DataGridProps<UserDataGridRow>,
   'columns' | 'selectionColumnWidth' | 'renderSelectionCell' | 'selectionHeaderLabel'
->;
+> & {
+  onToggleAdminStatus?: (user: UserSchema) => void;
+};
 
 const UserSelectionCell = ({
   row,
@@ -298,8 +387,11 @@ const UserSelectionCell = ({
   );
 };
 
-export function UsersDataGrid(props: UsersDataGridProps) {
-  const columns = useMemo(() => createUsersColumns(), []);
+export function UsersDataGrid({ onToggleAdminStatus, ...props }: UsersDataGridProps) {
+  const columns = useMemo(
+    () => createUsersColumns({ onToggleAdminStatus }),
+    [onToggleAdminStatus]
+  );
 
   return (
     <DataGrid<UserDataGridRow>

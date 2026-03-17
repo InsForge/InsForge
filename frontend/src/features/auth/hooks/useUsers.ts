@@ -1,16 +1,17 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { userService } from '@/features/auth/services/user.service';
+import { userService, type UserRoleFilter } from '@/features/auth/services/user.service';
 import { loginService } from '@/features/login/services/login.service';
 
 interface UseUsersOptions {
   pageSize?: number;
   enabled?: boolean;
   searchQuery?: string;
+  roleFilter?: UserRoleFilter;
 }
 
 export function useUsers(options: UseUsersOptions = {}) {
-  const { pageSize = 50, enabled = true, searchQuery = '' } = options;
+  const { pageSize = 50, enabled = true, searchQuery = '', roleFilter = 'users' } = options;
   const [currentPage, setCurrentPage] = useState(1);
   const queryClient = useQueryClient();
 
@@ -21,14 +22,14 @@ export function useUsers(options: UseUsersOptions = {}) {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['users', currentPage, searchQuery],
+    queryKey: ['users', currentPage, searchQuery, roleFilter],
     queryFn: () => {
       const params = new URLSearchParams({
         limit: pageSize.toString(),
         offset: ((currentPage - 1) * pageSize).toString(),
       });
       // Use the user service to get users with search, backend handles filtering
-      return userService.getUsers(params.toString(), searchQuery);
+      return userService.getUsers(params.toString(), searchQuery, roleFilter);
     },
     enabled: enabled,
     placeholderData: (previousData) => previousData, // Keep previous data while loading
@@ -64,6 +65,14 @@ export function useUsers(options: UseUsersOptions = {}) {
     },
   });
 
+  const updateUserAdminStatusMutation = useMutation({
+    mutationFn: ({ userId, isProjectAdmin }: { userId: string; isProjectAdmin: boolean }) =>
+      userService.updateUserAdminStatus(userId, isProjectAdmin),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+
   return {
     // Data
     users: usersData?.users || [],
@@ -79,6 +88,7 @@ export function useUsers(options: UseUsersOptions = {}) {
 
     // Search
     searchQuery,
+    roleFilter,
 
     // Operations
     refetch,
@@ -88,9 +98,11 @@ export function useUsers(options: UseUsersOptions = {}) {
     getCurrentUser,
     register: registerMutation.mutateAsync,
     deleteUsers: deleteUsersMutation.mutateAsync,
+    updateUserAdminStatus: updateUserAdminStatusMutation.mutateAsync,
 
     // Mutation states
     isRegistering: registerMutation.isPending,
     isDeleting: deleteUsersMutation.isPending,
+    isUpdatingUserAdminStatus: updateUserAdminStatusMutation.isPending,
   };
 }

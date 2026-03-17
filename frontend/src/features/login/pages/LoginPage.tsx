@@ -82,7 +82,9 @@ export default function LoginPage() {
             <form onSubmit={(e) => void form.handleSubmit(onSubmit)(e)}>
               <CardHeader>
                 <CardTitle>Sign In</CardTitle>
-                <CardDescription>Enter your admin credentials to continue</CardDescription>
+                <CardDescription>
+                  Sign in with any project admin account or the bootstrap admin credentials
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <FormField
@@ -143,7 +145,8 @@ export default function LoginPage() {
                   {isSubmitting ? 'Signing in...' : 'Sign in'}
                 </Button>
                 <p className="text-xs text-center text-muted-foreground">
-                  Use the credentials configured in your .env file
+                  Use a promoted project admin account, or the bootstrap credentials from your .env
+                  file
                 </p>
               </CardFooter>
             </form>

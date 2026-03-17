@@ -24,6 +24,7 @@ import {
   refreshSessionRequestSchema,
   deleteUsersRequestSchema,
   listUsersRequestSchema,
+  updateUserAdminStatusRequestSchema,
   sendVerificationEmailRequestSchema,
   verifyEmailRequestSchema,
   sendResetPasswordEmailRequestSchema,
@@ -40,6 +41,7 @@ import {
   type GetProfileResponse,
   type ListUsersResponse,
   type DeleteUsersResponse,
+  type UpdateUserAdminStatusResponse,
   type GetPublicAuthConfigResponse,
   exchangeAdminSessionRequestSchema,
   type GetAuthConfigResponse,
@@ -470,7 +472,7 @@ router.post('/admin/sessions/exchange', async (req: Request, res: Response, next
 });
 
 // POST /api/auth/admin/sessions - Create admin session (web only)
-router.post('/admin/sessions', (req: Request, res: Response, next: NextFunction) => {
+router.post('/admin/sessions', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validationResult = createAdminSessionRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
@@ -482,7 +484,7 @@ router.post('/admin/sessions', (req: Request, res: Response, next: NextFunction)
     }
 
     const { email, password } = validationResult.data;
-    const result: CreateAdminSessionResponse = authService.adminLogin(email, password);
+    const result: CreateAdminSessionResponse = await authService.adminLogin(email, password);
 
     // Set refresh token as httpOnly cookie + CSRF token for web clients
     const tokenManager = TokenManager.getInstance();
@@ -527,7 +529,7 @@ router.get('/users', verifyAdmin, async (req: Request, res: Response, next: Next
   try {
     const queryValidation = listUsersRequestSchema.safeParse(req.query);
     const queryParams = queryValidation.success ? queryValidation.data : req.query;
-    const { limit = '10', offset = '0', search } = queryParams || {};
+    const { limit = '10', offset = '0', search, roleFilter = 'users' } = queryParams || {};
 
     const parsedLimit = parseInt(limit as string);
     const parsedOffset = parseInt(offset as string);
@@ -535,7 +537,8 @@ router.get('/users', verifyAdmin, async (req: Request, res: Response, next: Next
     const { users, total } = await authService.listUsers(
       parsedLimit,
       parsedOffset,
-      search as string | undefined
+      search as string | undefined,
+      roleFilter as 'users' | 'admins' | 'all'
     );
 
     const response: ListUsersResponse = {
@@ -552,6 +555,38 @@ router.get('/users', verifyAdmin, async (req: Request, res: Response, next: Next
     next(error);
   }
 });
+
+router.patch(
+  '/users/:userId/admin',
+  verifyAdmin,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userIdValidation = userIdSchema.safeParse(req.params.userId);
+      if (!userIdValidation.success) {
+        throw new AppError('Invalid user ID format', 400, ERROR_CODES.INVALID_INPUT);
+      }
+
+      const validationResult = updateUserAdminStatusRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const user = await authService.setProjectAdminStatus(
+        userIdValidation.data,
+        validationResult.data.isProjectAdmin
+      );
+
+      const response: UpdateUserAdminStatusResponse = { user };
+      successResponse(res, response);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 // GET /api/auth/users/:userId - Get specific user (admin only)
 router.get(
