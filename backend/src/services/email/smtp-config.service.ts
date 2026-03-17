@@ -11,33 +11,22 @@ import type { SmtpConfigSchema, UpsertSmtpConfigRequest } from '@insforge/shared
 const ALLOWED_SMTP_PORTS = [25, 465, 587, 2525];
 
 /**
- * Check if an IP address is private, loopback, or link-local
+ * Check if an IP address is private, loopback, or link-local (RFC 1918 / RFC 4193)
  */
 function isPrivateIp(ip: string): boolean {
-  // IPv4
-  if (ip.startsWith('127.') || ip === '0.0.0.0') {
+  const lower = ip.toLowerCase();
+  // IPv4: loopback, private, link-local, unspecified
+  if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.0\.0\.0)/.test(ip)) {
     return true;
   }
-  if (ip.startsWith('10.')) {
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(ip)) {
     return true;
   }
-  if (ip.startsWith('192.168.')) {
+  // IPv6: loopback, unspecified, link-local (fe80:), unique local (fc/fd)
+  if (lower === '::1' || lower === '::') {
     return true;
   }
-  if (ip.startsWith('169.254.')) {
-    return true;
-  }
-  if (ip.match(/^172\.(1[6-9]|2\d|3[01])\./)) {
-    return true;
-  }
-  // IPv6 loopback and link-local
-  if (ip === '::1' || ip === '::') {
-    return true;
-  }
-  if (ip.toLowerCase().startsWith('fe80:')) {
-    return true;
-  }
-  if (ip.toLowerCase().startsWith('fc') || ip.toLowerCase().startsWith('fd')) {
+  if (/^(fe80:|f[cd])/.test(lower)) {
     return true;
   }
   return false;
