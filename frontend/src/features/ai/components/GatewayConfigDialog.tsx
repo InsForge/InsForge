@@ -56,6 +56,15 @@ export function GatewayConfigDialog({ open, onOpenChange }: GatewayConfigDialogP
   const [showKey, setShowKey] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setApiKeyInput('');
+      setShowKey(false);
+      setErrorMsg('');
+    }
+    onOpenChange(nextOpen);
+  };
+
   const handleSave = async () => {
     if (!apiKeyInput.trim()) {
       setErrorMsg('Please enter an API key.');
@@ -84,7 +93,7 @@ export function GatewayConfigDialog({ open, onOpenChange }: GatewayConfigDialogP
   const isBusy = isSaving || isRemoving;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Gateway Credentials</DialogTitle>
@@ -138,7 +147,6 @@ export function GatewayConfigDialog({ open, onOpenChange }: GatewayConfigDialogP
                 type="button"
                 onClick={() => setShowKey((v) => !v)}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                tabIndex={-1}
                 aria-label={showKey ? 'Hide key' : 'Show key'}
               >
                 {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -180,7 +188,7 @@ export function GatewayConfigDialog({ open, onOpenChange }: GatewayConfigDialogP
         </DialogBody>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isBusy}>
+          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isBusy}>
             Cancel
           </Button>
           <Button onClick={() => void handleSave()} disabled={isBusy || !apiKeyInput.trim()}>

@@ -98,12 +98,18 @@ export class AIGatewayConfigService {
    */
   private async validateOpenRouterKey(apiKey: string): Promise<void> {
     try {
-      const response = await fetch('https://openrouter.ai/api/v1/key', {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-        },
-      });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      let response: Response;
+      try {
+        response = await fetch('https://openrouter.ai/api/v1/key', {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${apiKey}` },
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
 
       if (!response.ok) {
         throw new AppError(
