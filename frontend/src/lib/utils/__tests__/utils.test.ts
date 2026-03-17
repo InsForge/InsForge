@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { cn, isEmptyValue, compareVersions, formatTime, formatDate } from '../utils';
+import {
+  cn,
+  isEmptyValue,
+  compareVersions,
+  formatTime,
+  formatDate,
+  formatValueForDisplay,
+  isGuardedBrowseValue,
+} from '../utils';
+import { ColumnType, guardedValueDisplayText, guardedValueFlag } from '@insforge/shared-schemas';
 
 describe('cn', () => {
   it('merges class names', () => {
@@ -81,5 +90,26 @@ describe('formatDate', () => {
 
   it('returns original string for invalid timestamp', () => {
     expect(formatDate('not-a-date')).toBe('not-a-date');
+  });
+});
+
+describe('guarded browse values', () => {
+  const guardedValue = {
+    [guardedValueFlag]: true as const,
+    message: guardedValueDisplayText,
+  };
+
+  it('detects the guarded sentinel object only', () => {
+    expect(isGuardedBrowseValue(guardedValue)).toBe(true);
+    expect(isGuardedBrowseValue(guardedValueDisplayText)).toBe(false);
+    expect(isGuardedBrowseValue({ message: guardedValueDisplayText })).toBe(false);
+  });
+
+  it('formats guarded values using the sentinel message for string columns', () => {
+    expect(formatValueForDisplay(guardedValue, ColumnType.STRING)).toBe(guardedValueDisplayText);
+  });
+
+  it('formats guarded values using the sentinel message for json columns', () => {
+    expect(formatValueForDisplay(guardedValue, ColumnType.JSON)).toBe(guardedValueDisplayText);
   });
 });

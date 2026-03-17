@@ -89,6 +89,8 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-insforge}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - RECORD_BROWSE_CELL_MAX_BYTES=${RECORD_BROWSE_CELL_MAX_BYTES:-262144}
+      - RECORD_BROWSE_MAX_ROWS=${RECORD_BROWSE_MAX_ROWS:-1000}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-insforge}
       - POSTGREST_BASE_URL=http://postgrest:3000
       # Deno Runtime URL for serverless functions

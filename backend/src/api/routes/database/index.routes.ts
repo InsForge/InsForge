@@ -1,4 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
+import { databaseBrowseRouter } from './browse.routes.js';
 import { databaseTablesRouter } from './tables.routes.js';
 import { databaseRecordsRouter } from './records.routes.js';
 import { databaseRpcRouter } from './rpc.routes.js';
@@ -12,6 +13,7 @@ const router = Router();
 const databaseService = DatabaseService.getInstance();
 
 // Mount database sub-routes
+router.use('/browse', databaseBrowseRouter);
 router.use('/tables', databaseTablesRouter);
 router.use('/records', databaseRecordsRouter);
 router.use('/rpc', databaseRpcRouter);

@@ -11,6 +11,8 @@ export interface AppConfig {
     username: string;
     password: string;
     databaseName: string;
+    recordBrowseCellMaxBytes: number;
+    recordBrowseMaxRows: number;
   };
   cloud: {
     storageBucket: string;
@@ -42,6 +44,8 @@ export const config: AppConfig = {
     username: process.env.POSTGRES_USERNAME || 'user',
     password: process.env.POSTGRES_PASSWORD || 'password',
     databaseName: process.env.POSTGRES_NAME || 'insforge',
+    recordBrowseCellMaxBytes: parseInt(process.env.RECORD_BROWSE_CELL_MAX_BYTES || '262144', 10),
+    recordBrowseMaxRows: parseInt(process.env.RECORD_BROWSE_MAX_ROWS || '1000', 10),
   },
   cloud: {
     storageBucket: process.env.AWS_S3_BUCKET || 'insforge-test-bucket',

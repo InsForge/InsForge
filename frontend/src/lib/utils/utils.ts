@@ -1,4 +1,8 @@
-import { ColumnType } from '@insforge/shared-schemas';
+import {
+  ColumnType,
+  guardedValueDisplayText,
+  isGuardedValue as isSharedGuardedValue,
+} from '@insforge/shared-schemas';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { z } from 'zod';
@@ -99,6 +103,10 @@ export function formatValueForDisplay(value: ConvertedValue, type?: ColumnType):
     return 'null';
   }
 
+  if (isGuardedBrowseValue(value)) {
+    return value.message || guardedValueDisplayText;
+  }
+
   // Handle different column types
   switch (type) {
     case ColumnType.BOOLEAN:
@@ -146,6 +154,12 @@ export function formatValueForDisplay(value: ConvertedValue, type?: ColumnType):
       return String(value);
     }
   }
+}
+
+export function isGuardedBrowseValue(
+  value: unknown
+): value is { __GuardedValue: true; message: string } {
+  return isSharedGuardedValue(value);
 }
 
 /**

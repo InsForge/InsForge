@@ -1,7 +1,6 @@
 import { ConvertedValue } from '@/components/datagrid/datagridTypes';
 import { apiClient } from '@/lib/api/client';
-import { ColumnSchema, BulkUpsertResponse } from '@insforge/shared-schemas';
-import { tableService } from './table.service';
+import { BulkUpsertResponse } from '@insforge/shared-schemas';
 
 export class RecordService {
   /**
@@ -25,29 +24,10 @@ export class RecordService {
     params.set('limit', limit.toString());
     params.set('offset', offset.toString());
 
-    // Construct PostgREST filter directly in frontend if search query is provided
     if (searchQuery && searchQuery.trim()) {
-      const searchValue = searchQuery.trim();
-
-      // Get table schema to identify text columns
-      const schema = await tableService.getTableSchema(tableName);
-      const textColumns = schema.columns
-        .filter((col: ColumnSchema) => {
-          const type = col.type.toLowerCase();
-          return type === 'string';
-        })
-        .map((col: ColumnSchema) => col.columnName);
-
-      if (textColumns.length) {
-        // Create PostgREST OR filter for text columns
-        const orFilters = textColumns
-          .map((column: string) => `${column}.ilike.*${searchValue}*`)
-          .join(',');
-        params.set('or', `(${orFilters})`);
-      }
+      params.set('search', searchQuery.trim());
     }
 
-    // Add sorting if provided - PostgREST uses "order" parameter
     if (sortColumns && sortColumns.length) {
       const orderParam = sortColumns
         .map((col) => `${col.columnKey}.${col.direction.toLowerCase()}`)
@@ -58,7 +38,7 @@ export class RecordService {
     const response: {
       data: { [key: string]: ConvertedValue }[];
       pagination: { offset: number; limit: number; total: number };
-    } = await apiClient.request(`/database/records/${tableName}?${params.toString()}`, {
+    } = await apiClient.request(`/database/browse/${tableName}?${params.toString()}`, {
       headers: {
         Prefer: 'count=exact',
       },

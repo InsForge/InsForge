@@ -1,7 +1,7 @@
 import { ColumnType } from '@insforge/shared-schemas';
 import type { ConvertedValue, DataGridRowType } from './datagridTypes';
 import { RenderCellProps } from 'react-data-grid';
-import { cn, formatValueForDisplay, isEmptyValue } from '@/lib/utils/utils';
+import { cn, formatValueForDisplay, isEmptyValue, isGuardedBrowseValue } from '@/lib/utils/utils';
 import { Badge } from '@insforge/ui';
 import IdCell from './IdCell';
 
@@ -11,13 +11,14 @@ function createDefaultCellRenderer<TRow extends DataGridRowType>() {
     text: ({ row, column }: RenderCellProps<TRow>) => {
       const value = row[column.key] as ConvertedValue;
       const isNull = isEmptyValue(value);
+      const isGuarded = isGuardedBrowseValue(value);
       const displayValue = formatValueForDisplay(value, ColumnType.STRING);
       return (
         <div className="w-full h-full flex items-center">
           <span
             className={cn(
               'truncate',
-              isNull ? 'text-muted-foreground italic pr-1' : 'dark:text-zinc-300'
+              isNull || isGuarded ? 'text-muted-foreground italic pr-1' : 'dark:text-zinc-300'
             )}
             title={displayValue}
           >
@@ -30,13 +31,14 @@ function createDefaultCellRenderer<TRow extends DataGridRowType>() {
     boolean: ({ row, column }: RenderCellProps<TRow>) => {
       const value = row[column.key] as ConvertedValue;
       const isNull = isEmptyValue(value);
+      const isGuarded = isGuardedBrowseValue(value);
       const displayValue = formatValueForDisplay(value, ColumnType.BOOLEAN);
       return (
         <div className="w-full h-full flex items-center justify-start">
           <Badge
             className={cn(
               'py-0.5 px-1.5 border border-transparent text-white',
-              isNull && 'text-muted-foreground italic'
+              (isNull || isGuarded) && 'text-muted-foreground italic'
             )}
           >
             {displayValue}
@@ -48,6 +50,7 @@ function createDefaultCellRenderer<TRow extends DataGridRowType>() {
     datetime: ({ row, column }: RenderCellProps<TRow>) => {
       const value = row[column.key] as ConvertedValue;
       const isNull = isEmptyValue(value);
+      const isGuarded = isGuardedBrowseValue(value);
       const displayValue = formatValueForDisplay(value, ColumnType.DATETIME);
       const isError = displayValue === 'Invalid date time';
 
@@ -56,7 +59,7 @@ function createDefaultCellRenderer<TRow extends DataGridRowType>() {
           <span
             className={cn(
               'truncate',
-              isNull
+              isNull || isGuarded
                 ? 'text-muted-foreground italic pr-1'
                 : isError
                   ? 'text-red-500'
@@ -73,6 +76,7 @@ function createDefaultCellRenderer<TRow extends DataGridRowType>() {
     date: ({ row, column }: RenderCellProps<TRow>) => {
       const value = row[column.key] as ConvertedValue;
       const isNull = isEmptyValue(value);
+      const isGuarded = isGuardedBrowseValue(value);
       const displayValue = formatValueForDisplay(value, ColumnType.DATE);
       const isError = displayValue === 'Invalid date';
 
@@ -81,7 +85,7 @@ function createDefaultCellRenderer<TRow extends DataGridRowType>() {
           <span
             className={cn(
               'truncate',
-              isNull
+              isNull || isGuarded
                 ? 'text-muted-foreground italic pr-1'
                 : isError
                   ? 'text-red-500'
@@ -98,6 +102,7 @@ function createDefaultCellRenderer<TRow extends DataGridRowType>() {
     json: ({ row, column }: RenderCellProps<TRow>) => {
       const value = row[column.key] as ConvertedValue;
       const isNull = isEmptyValue(value);
+      const isGuarded = isGuardedBrowseValue(value);
       const displayText = formatValueForDisplay(value, ColumnType.JSON);
       const isError = displayText === 'Invalid JSON';
 
@@ -106,7 +111,7 @@ function createDefaultCellRenderer<TRow extends DataGridRowType>() {
           <span
             className={cn(
               'truncate text-sm max-w-full overflow-hidden whitespace-nowrap',
-              isNull
+              isNull || isGuarded
                 ? 'text-muted-foreground italic pr-1'
                 : isError
                   ? 'text-red-500'
@@ -129,12 +134,13 @@ function createDefaultCellRenderer<TRow extends DataGridRowType>() {
     email: ({ row, column }: RenderCellProps<TRow>) => {
       const value = row[column.key] as ConvertedValue;
       const isNull = isEmptyValue(value);
+      const isGuarded = isGuardedBrowseValue(value);
       const displayValue = formatValueForDisplay(value, ColumnType.STRING);
       return (
         <span
           className={cn(
             'text-sm truncate',
-            isNull
+            isNull || isGuarded
               ? 'text-muted-foreground italic pr-1'
               : 'text-gray-800 font-medium dark:text-zinc-300'
           )}
