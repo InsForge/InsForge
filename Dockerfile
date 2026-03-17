@@ -38,6 +38,14 @@ COPY auth/package.json        ./auth/package.json
 COPY shared-schemas/package.json ./shared-schemas/package.json
 COPY ui/package.json          ./ui/package.json
 
+# Strip prepare/build scripts from shared-schemas to prevent tsc
+# from running during install (source files aren't copied yet).
+# The actual build happens in the build stage with full source.
+RUN apk add --no-cache jq && \
+    jq 'del(.scripts.prepare, .scripts.build)' \
+      shared-schemas/package.json > shared-schemas/package.json.tmp && \
+    mv shared-schemas/package.json.tmp shared-schemas/package.json
+
 RUN npm ci && npm cache clean --force
 
 
@@ -72,6 +80,14 @@ COPY auth/package.json        ./auth/package.json
 COPY shared-schemas/package.json ./shared-schemas/package.json
 COPY ui/package.json          ./ui/package.json
 
+# Strip prepare/build scripts from shared-schemas to prevent tsc
+# from running during install (tsc is a devDependency, not available here).
+# The compiled output comes from the build stage instead.
+RUN apk add --no-cache jq && \
+    jq 'del(.scripts.prepare, .scripts.build)' \
+      shared-schemas/package.json > shared-schemas/package.json.tmp && \
+    mv shared-schemas/package.json.tmp shared-schemas/package.json
+
 RUN npm ci --omit=dev && npm cache clean --force
 
 
@@ -105,7 +121,7 @@ COPY --from=build /app/package.json ./package.json
 RUN npm install -g "tsx@^4.7.1" && npm cache clean --force
 
 # Run as non-root using the built-in node user (uid 1000)
-RUN chown -R node:node /app
+RUN mkdir -p /data && chown -R node:node /app /data
 USER node
 
 EXPOSE 7130 7131
