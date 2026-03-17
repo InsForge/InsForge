@@ -1,30 +1,24 @@
 import { EmailProvider } from '@/providers/email/base.provider.js';
 import { CloudEmailProvider } from '@/providers/email/cloud.provider.js';
+import { SmtpEmailProvider } from '@/providers/email/smtp.provider.js';
+import { SmtpConfigService } from '@/services/email/smtp-config.service.js';
 import { EmailTemplate } from '@/types/email.js';
 import { SendRawEmailRequest } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 
 /**
  * Email service that orchestrates different email providers
+ * Resolves provider per-call so SMTP config changes take effect without restart
  */
 export class EmailService {
   private static instance: EmailService;
-  private provider: EmailProvider;
+  private cloudProvider: CloudEmailProvider;
+  private smtpProvider: SmtpEmailProvider;
 
   private constructor() {
-    // For now, we only support cloud provider
-    // In the future, this can be configured via environment variables
-    // Example:
-    // if (process.env.EMAIL_PROVIDER === 'smtp') {
-    //   this.provider = new SMTPEmailProvider(config.email.smtp);
-    // } else if (process.env.EMAIL_PROVIDER === 'sendgrid') {
-    //   this.provider = new SendGridEmailProvider(config.email.sendgrid);
-    // } else {
-    //   this.provider = new CloudEmailProvider();
-    // }
-
-    this.provider = new CloudEmailProvider();
-    logger.info('Using email provider: Cloud (Insforge)');
+    this.cloudProvider = new CloudEmailProvider();
+    this.smtpProvider = new SmtpEmailProvider();
+    logger.info('EmailService initialized (cloud + SMTP providers available)');
   }
 
   /**
@@ -35,6 +29,26 @@ export class EmailService {
       EmailService.instance = new EmailService();
     }
     return EmailService.instance;
+  }
+
+  /**
+   * Resolve which provider to use based on current SMTP configuration
+   * Checked per-call so config changes take effect without restart
+   * Falls back to cloud provider on any error checking SMTP config
+   */
+  private async resolveProvider(): Promise<EmailProvider> {
+    try {
+      const smtpConfig = await SmtpConfigService.getInstance().getRawSmtpConfig();
+      if (smtpConfig) {
+        logger.debug('Using SMTP email provider');
+        return this.smtpProvider;
+      }
+    } catch (error) {
+      logger.warn('Error checking SMTP config, falling back to cloud provider', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+    return this.cloudProvider;
   }
 
   /**
@@ -50,7 +64,8 @@ export class EmailService {
     template: EmailTemplate,
     variables?: Record<string, string>
   ): Promise<void> {
-    return this.provider.sendWithTemplate(email, name, template, variables);
+    const provider = await this.resolveProvider();
+    return provider.sendWithTemplate(email, name, template, variables);
   }
 
   /**
@@ -58,16 +73,18 @@ export class EmailService {
    * @param options - Email options (to, subject, html, cc, bcc, from, replyTo)
    */
   public async sendRaw(options: SendRawEmailRequest): Promise<void> {
-    if (!this.provider.sendRaw) {
+    const provider = await this.resolveProvider();
+    if (!provider.sendRaw) {
       throw new Error('Current email provider does not support raw email sending');
     }
-    return this.provider.sendRaw(options);
+    return provider.sendRaw(options);
   }
 
   /**
    * Check if current provider supports templates
    */
   public supportsTemplates(): boolean {
-    return this.provider.supportsTemplates();
+    // Both providers support templates
+    return true;
   }
 }
