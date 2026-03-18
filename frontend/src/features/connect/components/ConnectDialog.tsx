@@ -7,6 +7,7 @@ import {
   DialogBody,
   DialogCloseButton,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogTitle,
   TooltipProvider,
@@ -102,6 +103,9 @@ export function ConnectDialog() {
             <div className="flex items-start gap-3">
               <div className="flex-1">
                 <DialogTitle>Connect Project</DialogTitle>
+                <DialogDescription className="sr-only">
+                  Connect your project to the InsForge platform
+                </DialogDescription>
                 <div className="mt-3 flex items-start gap-6 overflow-x-auto">
                   {visibleTabs.map((tab) => {
                     const isActive = activeTab === tab.id;

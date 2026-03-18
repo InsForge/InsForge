@@ -1,4 +1,11 @@
-import { CopyButton, Dialog, DialogContent, DialogHeader, DialogTitle } from '@insforge/ui';
+import {
+  CopyButton,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@insforge/ui';
 import { cn } from '@/lib/utils/utils';
 
 interface PromptDialogProps {
@@ -24,10 +31,14 @@ export function PromptDialog({
         <div className="flex flex-col">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
+            <DialogDescription className="sr-only">{subtitle}</DialogDescription>
           </DialogHeader>
           {/* Content */}
           <div className="p-6 flex flex-col gap-4">
-            <p className="text-sm text-zinc-500 font-normal leading-5 dark:text-neutral-400">
+            <p
+              aria-hidden="true"
+              className="text-sm text-zinc-500 font-normal leading-5 dark:text-neutral-400"
+            >
               {subtitle}
             </p>
             {/* Prompt display */}

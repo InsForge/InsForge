@@ -8,6 +8,7 @@ import {
   CopyButton,
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -188,6 +189,9 @@ export function OAuthConfigDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{provider?.name}</DialogTitle>
+          <DialogDescription className="sr-only">
+            Configure OAuth settings for {provider?.name}
+          </DialogDescription>
         </DialogHeader>
         {isLoadingProvider ? (
           <div className="p-6 flex items-center justify-center">

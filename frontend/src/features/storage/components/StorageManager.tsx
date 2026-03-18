@@ -9,6 +9,7 @@ import { FilePreviewDialog } from './FilePreviewDialog';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
 import { SortColumn } from 'react-data-grid';
+import { usePageSize } from '@/lib/hooks/usePageSize';
 
 interface StorageManagerProps {
   bucketName: string;
@@ -36,7 +37,11 @@ export function StorageManager({
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(50);
+  const {
+    pageSize,
+    pageSizeOptions,
+    onPageSizeChange: handlePageSizeChange,
+  } = usePageSize('storage');
 
   // Reset page when search query or selected table changes
   useEffect(() => {
@@ -196,7 +201,13 @@ export function StorageManager({
           sortColumns={sortColumns}
           currentPage={currentPage}
           totalPages={totalPages}
+          pageSize={pageSize}
+          pageSizeOptions={pageSizeOptions}
           onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            handlePageSizeChange(newSize);
+            setCurrentPage(1);
+          }}
           onSortColumnsChange={setSortColumns}
           onPreview={handlePreview}
           onDownload={(file) => void handleDownload(file)}
