@@ -72,7 +72,9 @@ export class StorageConfigService {
       logger.error('Failed to get storage config, returning fallback values', { error });
       // Return the effective fallback so the UI still sees the active cap
       const envValue = parseInt(process.env.MAX_FILE_SIZE || '');
-      const effectiveMb = envValue ? Math.round(envValue / (1024 * 1024)) : DEFAULT_MAX_FILE_SIZE_MB;
+      const effectiveMb = envValue
+        ? Math.round(envValue / (1024 * 1024))
+        : DEFAULT_MAX_FILE_SIZE_MB;
       return {
         id: '00000000-0000-0000-0000-000000000000',
         maxFileSizeMb: effectiveMb,
