@@ -60,6 +60,34 @@ export class DeploymentsService {
       headers: apiClient.withAccessToken(),
     });
   }
+// ============================================================================
+// Upload Source Zip (for Self-hosted deployments)
+// ============================================================================
+
+async uploadDeployment(
+  id: string,
+  file: File
+): Promise<{ uploaded: boolean; message: string }> {
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const token = apiClient.getAccessToken();
+
+  const response = await fetch(`/api/deployments/${id}/upload`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Upload failed: ${text}`);
+  }
+
+  return response.json();
+}
 
   async startDeployment(id: string, data?: StartDeploymentRequest): Promise<DeploymentSchema> {
     return apiClient.request(`/deployments/${id}/start`, {

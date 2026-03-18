@@ -9,7 +9,6 @@ import {
   type PrimaryMenuItem,
 } from '@/lib/utils/menuItems';
 import { useLocation, matchPath } from 'react-router-dom';
-import { isInsForgeCloudProject } from '@/lib/utils/utils';
 import { useModal } from '@/lib/contexts/ModalContext';
 
 interface AppSidebarProps extends React.HTMLAttributes<HTMLElement> {

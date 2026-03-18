@@ -52,17 +52,24 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
   }
 });
 
+
 /**
- * Upload deployment zip (self-hosted deployments)
- * POST /api/deployments/:id/upload
-*/
+ * Automatic deployment (create + upload + start)
+ * POST /api/deployments/deploy
+ */
 router.post(
-  "/:id/upload",
+  "/deploy",
   verifyAdmin,
   upload.single("file"),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const { id } = req.params;
+      if (!deploymentService.isConfigured()) {
+        throw new AppError(
+          "Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID.",
+          503,
+          ERROR_CODES.INTERNAL_ERROR
+        );
+      }
 
       if (!req.file) {
         throw new AppError(
@@ -72,17 +79,33 @@ router.post(
         );
       }
 
+      // 1️⃣ Create deployment
+      const deployment = await deploymentService.createDeployment();
+
+      // 2️⃣ Save uploaded zip
       const deploymentsDir = path.join("/tmp", "deployments");
       await fs.promises.mkdir(deploymentsDir, { recursive: true });
 
-      const filePath = path.join(deploymentsDir, `${id}.zip`);
-
+      const filePath = path.join(deploymentsDir, `${deployment.id}.zip`);
       await fs.promises.writeFile(filePath, req.file.buffer);
 
-      successResponse(res, {
-        uploaded: true,
-        message: "Deployment zip uploaded successfully",
+      // 3️⃣ Start deployment
+      const startedDeployment = await deploymentService.startDeployment(
+        deployment.id,
+        {}
+      );
+
+      // Audit log
+      await auditService.log({
+        actor: req.user?.email || "api-key",
+        action: "AUTO_DEPLOYMENT",
+        module: "DEPLOYMENTS",
+        details: { id: deployment.id },
+        ip_address: req.ip,
       });
+
+      successResponse(res, startedDeployment);
+
     } catch (error) {
       next(error);
     }
