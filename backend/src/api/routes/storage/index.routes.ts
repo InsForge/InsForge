@@ -227,7 +227,7 @@ router.get(
 
 // PUT /api/storage/buckets/:bucketName/objects/:objectKey - Upload object to bucket (requires auth)
 router.put(
-  '/buckets/:bucketName/objects/*objectKey',
+  '/buckets/:bucketName/objects/:objectKey(.*)',
   verifyUser,
   upload.single('file'),
   handleUploadError,
@@ -235,10 +235,7 @@ router.put(
     try {
       const { bucketName, objectKey } = req.params;
 
-      // objectKey is captured as an array, join it to get the full path
-      const fullObjectKey = Array.isArray(objectKey) ? objectKey.join('/') : objectKey;
-
-      if (!fullObjectKey) {
+      if (!objectKey) {
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
@@ -249,7 +246,7 @@ router.put(
       const storageService = StorageService.getInstance();
       const storedFile = await storageService.putObject(
         bucketName,
-        fullObjectKey,
+        objectKey,
         req.file,
         req.user?.id
       );
@@ -315,29 +312,26 @@ router.post(
 
 // GET /api/storage/buckets/:bucketName/objects/:objectKey - Download object from bucket (conditional auth)
 router.get(
-  '/buckets/:bucketName/objects/*objectKey',
+  '/buckets/:bucketName/objects/:objectKey(.*)',
   conditionalAuth,
   async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName, objectKey } = req.params;
 
-      // objectKey is captured as an array, join it to get the full path
-      const fullObjectKey = Array.isArray(objectKey) ? objectKey.join('/') : objectKey;
-
-      if (!fullObjectKey) {
+      if (!objectKey) {
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
       const storageService = StorageService.getInstance();
 
       // Get download strategy (service auto-calculates expiry based on bucket visibility)
-      const strategy = await storageService.getDownloadStrategy(bucketName, fullObjectKey);
+      const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
 
       if (strategy.method === 'presigned') {
         return res.redirect(strategy.url);
       }
 
-      const result = await storageService.getObject(bucketName, fullObjectKey);
+      const result = await storageService.getObject(bucketName, objectKey);
       if (!result) {
         throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
       }
@@ -410,23 +404,20 @@ router.delete(
 
 // DELETE /api/storage/buckets/:bucketName/objects/:objectKey - Delete object from bucket (requires auth)
 router.delete(
-  '/buckets/:bucketName/objects/*objectKey',
+  '/buckets/:bucketName/objects/:objectKey(.*)',
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { bucketName, objectKey } = req.params;
 
-      // objectKey is captured as an array, join it to get the full path
-      const fullObjectKey = Array.isArray(objectKey) ? objectKey.join('/') : objectKey;
-
-      if (!fullObjectKey) {
+      if (!objectKey) {
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
       const storageService = StorageService.getInstance();
       const deleted = await storageService.deleteObject(
         bucketName,
-        fullObjectKey,
+        objectKey,
         req.user?.id || '',
         !!req.apiKey || req.user?.role === 'project_admin'
       );
