@@ -13,6 +13,7 @@ import {
 } from '../components';
 import { formatTime } from '@/lib/utils/utils';
 import { LogSchema } from '@insforge/shared-schemas';
+import { LOGS_PAGE_SIZE } from '../helpers';
 
 type FunctionLogType = 'runtime' | 'build';
 
@@ -23,7 +24,11 @@ export default function FunctionLogsPage() {
   const [selectedLog, setSelectedLog] = useState<LogSchema | null>(null);
 
   const {
+    logs,
     filteredLogs,
+    currentPage,
+    setCurrentPage,
+    totalPages,
     searchQuery: logsSearchQuery,
     setSearchQuery: setLogsSearchQuery,
     severityFilter,
@@ -138,9 +143,13 @@ export default function FunctionLogsPage() {
         ) : (
           <LogsDataGrid
             columnDefs={logsColumns}
-            data={filteredLogs}
+            data={logs}
             loading={logsLoading}
-            showPagination={false}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={LOGS_PAGE_SIZE}
+            totalRecords={filteredLogs.length}
+            onPageChange={setCurrentPage}
             selectedRowId={selectedLog?.id ?? null}
             onRowClick={handleRowClick}
             gridContainerClassName="border-t border-[var(--alpha-8)]"
