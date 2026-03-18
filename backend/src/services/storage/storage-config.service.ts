@@ -59,9 +59,13 @@ export class StorageConfigService {
 
       if (!result.rows.length) {
         logger.warn('No storage config found, returning default fallback values');
+        const envValue = parseInt(process.env.MAX_FILE_SIZE || '');
+        const fallbackMb = envValue
+          ? Math.round(envValue / (1024 * 1024))
+          : DEFAULT_MAX_FILE_SIZE_MB;
         return {
           id: '00000000-0000-0000-0000-000000000000',
-          maxFileSizeMb: DEFAULT_MAX_FILE_SIZE_MB,
+          maxFileSizeMb: fallbackMb,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -145,7 +149,11 @@ export class StorageConfigService {
       logger.info('Storage config updated', { maxFileSizeMb: input.maxFileSizeMb });
       return result.rows[0];
     } catch (error) {
-      await client.query('ROLLBACK');
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError) {
+        logger.error('Rollback failed', { rollbackError });
+      }
       logger.error('Failed to update storage config', { error });
       if (error instanceof AppError) {
         throw error;
