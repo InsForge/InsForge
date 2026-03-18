@@ -36,7 +36,7 @@ async function seedSystemUsers(adminEmail: string, adminPassword: string): Promi
         await client.query(
           `INSERT INTO auth.users (id, email, password, profile, email_verified, is_project_admin, is_anonymous, created_at, updated_at)
            VALUES ($1, $2, $3, $4::jsonb, true, true, false, NOW(), NOW())
-           ON CONFLICT (id) DO NOTHING`,
+           ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.password, updated_at = NOW()`,
           [ADMIN_ID, adminEmail, hashedPassword, profile]
         );
 
@@ -217,32 +217,32 @@ async function seedLocalOAuthConfigs(): Promise<void> {
       clientIdEnv: string;
       clientSecretEnv: string;
     }> = [
-      {
-        provider: 'google',
-        clientIdEnv: 'GOOGLE_CLIENT_ID',
-        clientSecretEnv: 'GOOGLE_CLIENT_SECRET',
-      },
-      {
-        provider: 'github',
-        clientIdEnv: 'GITHUB_CLIENT_ID',
-        clientSecretEnv: 'GITHUB_CLIENT_SECRET',
-      },
-      {
-        provider: 'discord',
-        clientIdEnv: 'DISCORD_CLIENT_ID',
-        clientSecretEnv: 'DISCORD_CLIENT_SECRET',
-      },
-      {
-        provider: 'linkedin',
-        clientIdEnv: 'LINKEDIN_CLIENT_ID',
-        clientSecretEnv: 'LINKEDIN_CLIENT_SECRET',
-      },
-      {
-        provider: 'microsoft',
-        clientIdEnv: 'MICROSOFT_CLIENT_ID',
-        clientSecretEnv: 'MICROSOFT_CLIENT_SECRET',
-      },
-    ];
+        {
+          provider: 'google',
+          clientIdEnv: 'GOOGLE_CLIENT_ID',
+          clientSecretEnv: 'GOOGLE_CLIENT_SECRET',
+        },
+        {
+          provider: 'github',
+          clientIdEnv: 'GITHUB_CLIENT_ID',
+          clientSecretEnv: 'GITHUB_CLIENT_SECRET',
+        },
+        {
+          provider: 'discord',
+          clientIdEnv: 'DISCORD_CLIENT_ID',
+          clientSecretEnv: 'DISCORD_CLIENT_SECRET',
+        },
+        {
+          provider: 'linkedin',
+          clientIdEnv: 'LINKEDIN_CLIENT_ID',
+          clientSecretEnv: 'LINKEDIN_CLIENT_SECRET',
+        },
+        {
+          provider: 'microsoft',
+          clientIdEnv: 'MICROSOFT_CLIENT_ID',
+          clientSecretEnv: 'MICROSOFT_CLIENT_SECRET',
+        },
+      ];
 
     for (const { provider, clientIdEnv, clientSecretEnv } of envMappings) {
       const clientId = process.env[clientIdEnv];
