@@ -235,7 +235,7 @@ router.put(
     try {
       const { bucketName, objectKey } = req.params;
 
-      // Convert objectKey from array to string (wildcard captures as array)
+      // objectKey is an array from wildcard, join it to get the full path
       const objectKeyStr = Array.isArray(objectKey) ? objectKey.join('/') : objectKey;
 
       if (!objectKeyStr) {
@@ -321,7 +321,7 @@ router.get(
     try {
       const { bucketName, objectKey } = req.params;
 
-      // Convert objectKey from array to string (wildcard captures as array)
+      // objectKey is an array from wildcard, join it to get the full path
       const objectKeyStr = Array.isArray(objectKey) ? objectKey.join('/') : objectKey;
 
       if (!objectKeyStr) {
@@ -416,7 +416,7 @@ router.delete(
     try {
       const { bucketName, objectKey } = req.params;
 
-      // Convert objectKey from array to string (wildcard captures as array)
+      // objectKey is an array from wildcard, join it to get the full path
       const objectKeyStr = Array.isArray(objectKey) ? objectKey.join('/') : objectKey;
 
       if (!objectKeyStr) {
@@ -479,15 +479,11 @@ router.post(
 
 // POST /api/storage/buckets/:bucketName/objects/:objectKey/confirm-upload - Confirm presigned upload
 router.post(
-  '/buckets/:bucketName/objects/*objectKey/confirm-upload',
+  '/buckets/:bucketName/objects/:objectKey/confirm-upload',
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { bucketName, objectKey } = req.params;
-
-      // Convert objectKey from array to string (wildcard captures as array)
-      const objectKeyStr = Array.isArray(objectKey) ? objectKey.join('/') : objectKey;
-
       const { size, contentType, etag } = req.body;
 
       if (!size) {
@@ -497,7 +493,7 @@ router.post(
       const storageService = StorageService.getInstance();
       const fileInfo = await storageService.confirmUpload(
         bucketName,
-        objectKeyStr,
+        objectKey,
         {
           size,
           contentType,
@@ -519,19 +515,16 @@ router.post(
   }
 );
 
-// POST /api/storage/buckets/:objectKey/download-strategy - Get download URL (presigned or direct)
+// POST /api/storage/buckets/:bucketName/objects/:objectKey/download-strategy - Get download URL (presigned or direct)
 router.post(
-  '/buckets/:bucketName/objects/*objectKey/download-strategy',
+  '/buckets/:bucketName/objects/:objectKey/download-strategy',
   conditionalAuth,
   async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName, objectKey } = req.params;
 
-      // Convert objectKey from array to string (wildcard captures as array)
-      const objectKeyStr = Array.isArray(objectKey) ? objectKey.join('/') : objectKey;
-
       const storageService = StorageService.getInstance();
-      const strategy = await storageService.getDownloadStrategy(bucketName, objectKeyStr);
+      const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
 
       successResponse(res, strategy);
     } catch (error) {
