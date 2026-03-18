@@ -7,11 +7,12 @@
     <title>InsForge Dashboard</title>
     <!-- Force light mode for login pages -->
     <script>
-      (function() {
+      (function () {
         // Check if we're on a login page
-        const isLoginPage = window.location.pathname.includes('/login') ||
-                           window.location.pathname === '/login' ||
-                           window.location.pathname === '/';
+        const isLoginPage =
+          window.location.pathname.includes('/login') ||
+          window.location.pathname === '/login' ||
+          window.location.pathname === '/';
 
         if (isLoginPage) {
           // Force light mode for login pages
