@@ -164,7 +164,7 @@ export class AuthService {
     if (emailAuthConfig.requireEmailVerification) {
       try {
         if (emailAuthConfig.verifyEmailMethod === 'link') {
-          const redirectTo = emailAuthConfig.signInRedirectTo || options?.emailRedirectTo;
+          const redirectTo = options?.emailRedirectTo;
           await this.sendVerificationEmailWithLink(email, redirectTo);
         } else {
           await this.sendVerificationEmailWithCode(email);
@@ -189,7 +189,6 @@ export class AuthService {
       user,
       accessToken,
       requireEmailVerification: false,
-      redirectTo: emailAuthConfig.signInRedirectTo || undefined,
     };
   }
 
@@ -228,11 +227,9 @@ export class AuthService {
       role: 'authenticated',
     });
 
-    // Include redirect URL if configured
     const response: CreateSessionResponse = {
       user,
       accessToken,
-      redirectTo: emailAuthConfig.signInRedirectTo || undefined,
     };
 
     return response;
@@ -354,14 +351,9 @@ export class AuthService {
         role: 'authenticated',
       });
 
-      // Get redirect URL from auth config if configured
-      const authConfigService = AuthConfigService.getInstance();
-      const emailAuthConfig = await authConfigService.getAuthConfig();
-
       return {
         user,
         accessToken,
-        redirectTo: emailAuthConfig.signInRedirectTo || undefined,
       };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -420,14 +412,9 @@ export class AuthService {
         role: 'authenticated',
       });
 
-      // Get redirect URL from auth config if configured
-      const authConfigService = AuthConfigService.getInstance();
-      const emailAuthConfig = await authConfigService.getAuthConfig();
-
       return {
         user,
         accessToken,
-        redirectTo: emailAuthConfig.signInRedirectTo || undefined,
       };
     } catch (error) {
       await client.query('ROLLBACK');

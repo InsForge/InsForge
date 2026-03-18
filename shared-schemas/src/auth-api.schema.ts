@@ -362,6 +362,7 @@ export const getAuthConfigResponseSchema = authConfigSchema;
 /**
  * Response for GET /api/auth/public-config - Unified public auth configuration endpoint
  * Combines OAuth providers and email auth configuration
+ * Note: redirectUrlWhitelist is intentionally omitted to avoid leaking security configuration.
  */
 export const getPublicAuthConfigResponseSchema = z.object({
   oAuthProviders: z.array(oAuthProvidersSchema),
@@ -369,7 +370,7 @@ export const getPublicAuthConfigResponseSchema = z.object({
     id: true,
     updatedAt: true,
     createdAt: true,
-    signInRedirectTo: true,
+    redirectUrlWhitelist: true,
   }).shape,
 });
 

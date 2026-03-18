@@ -14,7 +14,6 @@ import {
   extractBearerToken,
 } from '@/api/middlewares/auth.js';
 import oauthRouter from './oauth.routes.js';
-import { validateRedirectUrl } from '@/services/auth/redirect-validation.service.js';
 import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-limiters.js';
 import {
   REFRESH_TOKEN_COOKIE_NAME,
@@ -685,10 +684,10 @@ router.post(
       // Note: User enumeration is prevented at service layer
       // Service returns gracefully (no error) if user not found
       if (method === 'link') {
-        const redirectTo = authConfig.signInRedirectTo || options?.emailRedirectTo;
+        const redirectTo = options?.emailRedirectTo;
         // Validate the redirect target against the whitelist when one is provided
         if (redirectTo) {
-          validateRedirectUrl(redirectTo, authConfig.redirectUrlWhitelist ?? []);
+          await authConfigService.validateRedirectUrl(redirectTo);
         }
         await authService.sendVerificationEmailWithLink(email, redirectTo);
       } else {

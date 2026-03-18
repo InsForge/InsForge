@@ -22,7 +22,6 @@ import {
   oAuthProvidersSchema,
 } from '@insforge/shared-schemas';
 import { isOAuthSharedKeysAvailable } from '@/utils/environment.js';
-import { validateRedirectUrl } from '@/services/auth/redirect-validation.service.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -264,9 +263,8 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
 
     const { redirect_uri, code_challenge } = queryValidation.data;
     const validatedProvider = providerValidation.data;
-    const authConfig = await authConfigService.getAuthConfig();
 
-    const redirectUri = authConfig.signInRedirectTo || redirect_uri;
+    const redirectUri = redirect_uri;
 
     if (!redirectUri) {
       throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
@@ -274,7 +272,7 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
 
     // Validate redirect URI against the whitelist before storing it in the signed state.
     // If the whitelist is empty, validation is skipped (permissive dev mode).
-    validateRedirectUrl(redirectUri, authConfig.redirectUrlWhitelist ?? []);
+    await authConfigService.validateRedirectUrl(redirectUri);
 
     const jwtPayload = {
       provider: validatedProvider,
@@ -361,8 +359,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
 
     // Re-validate redirect URI from state against current whitelist before redirecting.
     // This guards against whitelist changes between state creation and callback.
-    const callbackAuthConfig = await authConfigService.getAuthConfig();
-    validateRedirectUrl(redirectUri, callbackAuthConfig.redirectUrlWhitelist ?? []);
+    await authConfigService.validateRedirectUrl(redirectUri);
 
     if (success !== 'true') {
       const errorMessage = error || 'OAuth Authentication Failed';
@@ -448,8 +445,7 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
     }
 
     // Re-validate redirect URI against current whitelist before using it.
-    const callbackConfig = await authConfigService.getAuthConfig();
-    validateRedirectUrl(redirectUri, callbackConfig.redirectUrlWhitelist ?? []);
+    await authConfigService.validateRedirectUrl(redirectUri);
 
     try {
       // Validate provider using OAuthProvidersSchema
