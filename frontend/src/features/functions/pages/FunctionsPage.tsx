@@ -1,12 +1,13 @@
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Download, Edit3, Trash2, Upload } from 'lucide-react';
 import { FunctionRow } from '../components/FunctionRow';
 import FunctionEmptyState from '../components/FunctionEmptyState';
 import { useFunctions } from '../hooks/useFunctions';
 import { useToast } from '@/lib/hooks/useToast';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
+import { Button, ConfirmDialog, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import { CodeEditor, Skeleton, TableHeader } from '@/components';
+import { useConfirm } from '@/lib/hooks/useConfirm';
 
 export default function FunctionsPage() {
   const toastShownRef = useRef(false);
@@ -14,7 +15,11 @@ export default function FunctionsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isScrolled, setIsScrolled] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isEditingCode, setIsEditingCode] = useState(false);
+  const [editedCode, setEditedCode] = useState('');
   const { showToast } = useToast();
+  const { confirm, confirmDialogProps } = useConfirm();
   const {
     functions,
     isRuntimeAvailable,
@@ -24,6 +29,10 @@ export default function FunctionsPage() {
     clearSelection,
     refetch,
     deploymentUrl,
+    deleteFunction,
+    updateFunction,
+    isDeleting,
+    isUpdating,
   } = useFunctions();
 
   const handleScroll = useCallback(() => {
@@ -60,12 +69,109 @@ export default function FunctionsPage() {
     }
   }, [isRuntimeAvailable, showToast]);
 
+  useEffect(() => {
+    setIsEditingCode(false);
+    setEditedCode('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, [selectedFunction?.id]);
+
+  const handleDownloadCode = useCallback(
+    (code: string, slug: string) => {
+      const blob = new Blob([code], { type: 'text/javascript;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${slug}.ts`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    },
+    []
+  );
+
+  const handleDeleteFunction = useCallback(
+    async (slug: string, name: string) => {
+      try {
+        const confirmed = await confirm({
+          title: 'Delete Function',
+          description: `Are you sure you want to delete the function "${name}"? This action cannot be undone.`,
+          confirmText: 'Delete',
+          cancelText: 'Cancel',
+          destructive: true,
+        });
+
+        if (!confirmed) {
+          return;
+        }
+
+        deleteFunction(slug);
+      } catch (error) {
+        console.error('Failed to delete function', error);
+      }
+    },
+    [confirm, deleteFunction]
+  );
+
+  const handleStartEditCode = useCallback(
+    (initialCode: string | null | undefined) => {
+      setEditedCode(initialCode ?? '');
+      setIsEditingCode(true);
+    },
+    []
+  );
+
+  const handleCancelEditCode = useCallback(() => {
+    setIsEditingCode(false);
+    setEditedCode('');
+  }, []);
+
+  const handleSaveCode = useCallback(
+    async (slug: string) => {
+      try {
+        await updateFunction(slug, { code: editedCode });
+        setIsEditingCode(false);
+      } catch (error) {
+        console.error('Failed to update function code', error);
+      }
+    },
+    [editedCode, updateFunction]
+  );
+
+  const handleUploadFile = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileChange = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) {
+        return;
+      }
+      try {
+        const text = await file.text();
+        setEditedCode(text);
+        setIsEditingCode(true);
+      } catch (error) {
+        console.error('Failed to read function file', error);
+        showToast('Failed to read function file', 'error');
+      } finally {
+        // reset input so same file can be selected again
+        // eslint-disable-next-line no-param-reassign
+        event.target.value = '';
+      }
+    },
+    [showToast]
+  );
+
   // Detail view for selected function
   if (selectedFunction) {
     return (
       <div className="h-full flex flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
         <div className="flex items-center shrink-0 border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))]">
-          <div className="flex items-center gap-3 pl-4 pr-3 py-3">
+          <div className="flex flex-1 items-center gap-3 pl-4 pr-3 py-3">
             <button
               onClick={clearSelection}
               className="flex items-center justify-center size-8 rounded border border-[var(--alpha-8)] bg-card hover:bg-[var(--alpha-8)] transition-colors"
@@ -76,10 +182,94 @@ export default function FunctionsPage() {
               {selectedFunction.name}
             </h1>
           </div>
+          <div className="flex items-center gap-2 pr-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".ts,.js,.tsx,.jsx"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() =>
+                selectedFunction.code &&
+                handleDownloadCode(selectedFunction.code, selectedFunction.slug)
+              }
+              disabled={!selectedFunction.code}
+              className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
+              title="Download function code"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleUploadFile}
+              className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
+              title="Upload function file"
+            >
+              <Upload className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleStartEditCode(selectedFunction.code)}
+              className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
+              title="Edit function code"
+              disabled={isUpdating}
+            >
+              <Edit3 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => void handleDeleteFunction(selectedFunction.slug, selectedFunction.name)}
+              className="h-8 w-8 rounded p-1.5 text-destructive hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
+              title="Delete function"
+              disabled={isDeleting}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         <div className="flex-1 min-h-0">
-          <CodeEditor code={selectedFunction.code || '// No code available'} />
+          {isEditingCode ? (
+            <div className="h-full flex flex-col">
+              <div className="flex items-center justify-end gap-2 border-b border-[var(--alpha-8)] bg-[rgb(var(--semantic-0))] px-4 py-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleCancelEditCode}
+                  disabled={isUpdating}
+                  className="h-8 px-2"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => void handleSaveCode(selectedFunction.slug)}
+                  disabled={isUpdating}
+                  className="h-8 px-2"
+                >
+                  {isUpdating ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+              <div className="flex-1 min-h-0">
+                <CodeEditor
+                  value={editedCode}
+                  onChange={(value) => setEditedCode(value)}
+                  editable
+                  language="javascript"
+                />
+              </div>
+            </div>
+          ) : (
+            <CodeEditor code={selectedFunction.code || '// No code available'} />
+          )}
         </div>
+        <ConfirmDialog {...confirmDialogProps} />
       </div>
     );
   }
