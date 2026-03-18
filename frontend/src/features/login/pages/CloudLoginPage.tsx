@@ -34,11 +34,11 @@ export default function CloudLoginPage() {
   // Show error state if authentication failed
   if (error) {
     return (
-      <div className="min-h-screen bg-neutral-800 flex items-center justify-center px-4">
-        <div className="text-center text-white">
-          <LockIcon className="h-12 w-12 mx-auto mb-4 text-red-400" />
+      <div className="min-h-screen bg-[rgb(var(--page))] flex items-center justify-center px-4">
+        <div className="text-center text-foreground">
+          <LockIcon className="h-12 w-12 mx-auto mb-4 text-destructive" />
           <h2 className="text-xl font-semibold mb-2">Authentication Failed</h2>
-          <p className="text-gray-400 text-sm max-w-md">{error.message}</p>
+          <p className="text-muted-foreground text-sm max-w-md">{error.message}</p>
         </div>
       </div>
     );
@@ -46,13 +46,13 @@ export default function CloudLoginPage() {
 
   // Show authenticating state
   return (
-    <div className="min-h-screen bg-neutral-800 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[rgb(var(--page))] flex items-center justify-center px-4">
       <div className="text-center">
         <div className="animate-spin mb-4">
-          <LockIcon className="h-12 w-12 text-white mx-auto" />
+          <LockIcon className="h-12 w-12 text-foreground mx-auto" />
         </div>
-        <h2 className="text-xl font-semibold text-white mb-2">Authenticating...</h2>
-        <p className="text-sm text-gray-400">Please wait while we verify your identity</p>
+        <h2 className="text-xl font-semibold text-foreground mb-2">Authenticating...</h2>
+        <p className="text-sm text-muted-foreground">Please wait while we verify your identity</p>
       </div>
     </div>
   );
