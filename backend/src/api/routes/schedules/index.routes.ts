@@ -49,8 +49,10 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
 router.get('/:id/logs', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const limit = Math.min(Math.max(1, parseInt(req.query.limit as string) || 50), 100);
-    const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
+    const rawLimit = parseInt(req.query.limit as string);
+    const rawOffset = parseInt(req.query.offset as string);
+    const limit = Math.min(Math.max(1, Number.isNaN(rawLimit) ? 50 : rawLimit), 100);
+    const offset = Math.max(0, Number.isNaN(rawOffset) ? 0 : rawOffset);
 
     const result = await scheduleService.getExecutionLogs(id, limit, offset);
     successResponse(res, {

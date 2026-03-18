@@ -552,8 +552,10 @@ router.get('/users', verifyAdmin, async (req: Request, res: Response, next: Next
     const queryParams = queryValidation.success ? queryValidation.data : req.query;
     const { limit = '10', offset = '0', search } = queryParams || {};
 
-    const parsedLimit = Math.max(1, parseInt(limit as string) || 10);
-    const parsedOffset = Math.max(0, parseInt(offset as string) || 0);
+    const rawLimit = parseInt(limit as string);
+    const rawOffset = parseInt(offset as string);
+    const parsedLimit = Math.max(1, Number.isNaN(rawLimit) ? 10 : rawLimit);
+    const parsedOffset = Math.max(0, Number.isNaN(rawOffset) ? 0 : rawOffset);
 
     const { users, total } = await authService.listUsers(
       parsedLimit,

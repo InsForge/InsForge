@@ -106,8 +106,10 @@ router.post(
  */
 router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const limit = Math.max(1, parseInt(req.query.limit as string) || 50);
-    const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
+    const rawLimit = parseInt(req.query.limit as string);
+    const rawOffset = parseInt(req.query.offset as string);
+    const limit = Math.max(1, Number.isNaN(rawLimit) ? 50 : rawLimit);
+    const offset = Math.max(0, Number.isNaN(rawOffset) ? 0 : rawOffset);
 
     const { deployments, total } = await deploymentService.listDeployments(limit, offset);
 
