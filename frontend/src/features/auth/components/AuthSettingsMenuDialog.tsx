@@ -51,7 +51,6 @@ const defaultValues: UpdateAuthConfigRequest = {
   requireSpecialChar: false,
   verifyEmailMethod: 'code',
   resetPasswordMethod: 'code',
-  signInRedirectTo: null,
   redirectUrlWhitelist: [],
 };
 
@@ -69,7 +68,6 @@ const toFormValues = (config?: AuthConfigSchema): UpdateAuthConfigRequest => {
     requireSpecialChar: config.requireSpecialChar,
     verifyEmailMethod: config.verifyEmailMethod,
     resetPasswordMethod: config.resetPasswordMethod,
-    signInRedirectTo: config.signInRedirectTo ?? null,
     redirectUrlWhitelist: config.redirectUrlWhitelist ?? [],
   };
 };
@@ -159,6 +157,10 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
 
   // ---- Redirect URL Whitelist helpers ----
 
+  // Mirrors the backend urlOrWildcardPattern from shared-schemas — only http/https is allowed.
+  const urlOrWildcardPattern =
+    /^https?:\/\/(\*\.)?[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*(:\d+)?(\/.*)?$/;
+
   const handleAddUrl = () => {
     const trimmed = newUrlInput.trim();
     if (!trimmed) {
@@ -166,12 +168,11 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
       return;
     }
 
-    // Basic URL validation — allow wildcard subdomain entries like https://*.example.com
-    const testUrl = trimmed.startsWith('*.') ? trimmed.replace('*.', 'placeholder.') : trimmed;
-    try {
-      new URL(testUrl);
-    } catch {
-      setNewUrlError('Please enter a valid URL (e.g. https://yourapp.com/callback)');
+    // Validate against the same regex used by the backend — rejects ftp://, javascript:, etc.
+    if (!urlOrWildcardPattern.test(trimmed)) {
+      setNewUrlError(
+        'Please enter a valid http/https URL (e.g. https://yourapp.com/callback) or wildcard pattern (e.g. https://*.example.com)'
+      );
       return;
     }
 
@@ -268,21 +269,12 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
               <MenuDialogBody>
                 {activeSection === 'general' && (
                   <SettingRow
-                    label="Redirect URL After Sign In"
-                    description="Your app url after successful authentication"
+                    label="Redirect URL"
+                    description="Configure allowed redirect URLs in the Security section. Your app must supply a redirect URL in each auth request, and it will be validated against the whitelist."
                   >
-                    <Input
-                      type="url"
-                      placeholder="https://yourapp.com/dashboard"
-                      {...form.register('signInRedirectTo')}
-                      className={form.formState.errors.signInRedirectTo ? 'border-destructive' : ''}
-                    />
-                    {form.formState.errors.signInRedirectTo && (
-                      <p className="pt-1 text-xs text-destructive">
-                        {form.formState.errors.signInRedirectTo.message ||
-                          'Please enter a valid URL'}
-                      </p>
-                    )}
+                    <p className="text-sm text-muted-foreground">
+                      Redirect URLs are managed via the whitelist in the Security section.
+                    </p>
                   </SettingRow>
                 )}
 
