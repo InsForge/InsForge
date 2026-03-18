@@ -64,7 +64,7 @@ export class RateLimitConfigService {
   }
 
   private async createDefaultConfig(client: PoolClient): Promise<RateLimitConfigSchema> {
-    const result = await client.query(
+    const insertResult = await client.query(
       `INSERT INTO system.rate_limit_configs (
          api_global_max_requests,
          api_global_window_minutes,
@@ -75,6 +75,7 @@ export class RateLimitConfigService {
          email_cooldown_seconds
        )
        VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT DO NOTHING
        RETURNING
          id,
          api_global_max_requests as "apiGlobalMaxRequests",
@@ -97,7 +98,35 @@ export class RateLimitConfigService {
       ]
     );
 
-    return this.mapRowToSchema(result.rows[0]);
+    if (insertResult.rows.length > 0) {
+      return this.mapRowToSchema(insertResult.rows[0]);
+    }
+
+    const existingResult = await client.query(
+      `SELECT
+         id,
+         api_global_max_requests as "apiGlobalMaxRequests",
+         api_global_window_minutes as "apiGlobalWindowMinutes",
+         send_email_otp_max_requests as "sendEmailOtpMaxRequests",
+         send_email_otp_window_minutes as "sendEmailOtpWindowMinutes",
+         verify_otp_max_attempts as "verifyOtpMaxAttempts",
+         verify_otp_window_minutes as "verifyOtpWindowMinutes",
+         email_cooldown_seconds as "emailCooldownSeconds",
+         created_at as "createdAt",
+         updated_at as "updatedAt"
+       FROM system.rate_limit_configs
+       LIMIT 1`
+    );
+
+    if (!existingResult.rows.length) {
+      throw new AppError(
+        'Failed to create or load rate-limit configuration',
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+
+    return this.mapRowToSchema(existingResult.rows[0]);
   }
 
   /**

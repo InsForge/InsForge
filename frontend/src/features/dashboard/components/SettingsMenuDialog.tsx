@@ -248,6 +248,8 @@ export default function SettingsMenuDialog() {
       setProjectName(cloudProjectName);
       setProjectNameInitialValue(cloudProjectName);
       setIsProjectNameFocused(false);
+      setRateLimitFormValues({ ...DEFAULT_RATE_LIMIT_FORM_VALUES });
+      setRateLimitInitialValues({ ...DEFAULT_RATE_LIMIT_FORM_VALUES });
 
       if (isCloud && isInIframe) {
         postMessageToParent({ type: 'REQUEST_INSTANCE_INFO' }, '*');
@@ -259,6 +261,8 @@ export default function SettingsMenuDialog() {
     setIsChangingInstanceType(false);
     setIsProjectNameFocused(false);
     setSelectedInstanceType(null);
+    setRateLimitFormValues({ ...DEFAULT_RATE_LIMIT_FORM_VALUES });
+    setRateLimitInitialValues({ ...DEFAULT_RATE_LIMIT_FORM_VALUES });
   }, [isSettingsDialogOpen, settingsDefaultTab, projectInfo.name, isCloud, isInIframe]);
 
   useEffect(() => {
@@ -342,7 +346,7 @@ export default function SettingsMenuDialog() {
   ]);
 
   useEffect(() => {
-    if (!isSettingsDialogOpen || isRateLimitConfigLoading || isRateLimitDirty) {
+    if (!isSettingsDialogOpen || isRateLimitConfigLoading || !rateLimitConfig) {
       return;
     }
 
@@ -352,7 +356,6 @@ export default function SettingsMenuDialog() {
   }, [
     isSettingsDialogOpen,
     isRateLimitConfigLoading,
-    isRateLimitDirty,
     rateLimitConfig,
     setRateLimitFormValues,
     setRateLimitInitialValues,

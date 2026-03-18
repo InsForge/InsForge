@@ -36,6 +36,7 @@ import { seedBackend } from '@/utils/seed.js';
 import logger from '@/utils/logger.js';
 import { initSqlParser } from '@/utils/sql-parser.js';
 import { FunctionService } from '@/services/functions/function.service.js';
+import { RedisClientService } from '@/infra/cache/redis.client.js';
 import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 const __filename = fileURLToPath(import.meta.url);
@@ -366,6 +367,14 @@ async function cleanup() {
     destroyEmailCooldownInterval();
   } catch (error) {
     logger.error('Error clearing email cooldown interval', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  try {
+    await RedisClientService.getInstance().disconnect();
+  } catch (error) {
+    logger.error('Error closing Redis client', {
       error: error instanceof Error ? error.message : String(error),
     });
   }

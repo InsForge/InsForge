@@ -1,8 +1,10 @@
 import rateLimit from 'express-rate-limit';
 import { Request, Response, NextFunction, RequestHandler } from 'express';
+import { RedisStore } from 'rate-limit-redis';
 import { AppError } from './error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
+import { RedisClientService, type AppRedisClient } from '@/infra/cache/redis.client.js';
 import {
   RateLimitConfigService,
   DEFAULT_RATE_LIMIT_CONFIG,
@@ -10,14 +12,21 @@ import {
 import type { RateLimitConfigSchema } from '@insforge/shared-schemas';
 
 /**
- * Store for tracking per-email cooldowns
+ * Fallback store for tracking per-email cooldowns when Redis is unavailable
  * Maps email -> last request timestamp
  */
 const emailCooldowns = new Map<string, number>();
 const rateLimitConfigService = RateLimitConfigService.getInstance();
+const redisClientService = RedisClientService.getInstance();
 
 const EMAIL_COOLDOWN_RETENTION_MS = 24 * 60 * 60 * 1000; // 24 hours
 const RATE_LIMIT_CONFIG_CACHE_TTL_MS = 30 * 1000; // 30 seconds
+const REDIS_KEY_PREFIX = {
+  globalApi: 'rl:api:global:',
+  sendOtp: 'rl:auth:send-otp:',
+  verifyOtp: 'rl:auth:verify-otp:',
+  emailCooldown: 'rl:auth:email-cooldown:',
+} as const;
 
 type DynamicRateLimitConfig = Pick<
   RateLimitConfigSchema,
@@ -37,6 +46,7 @@ let cachedConfigVersion = 0;
 
 type RateLimitMiddlewareBundle = {
   key: string;
+  storeMode: 'redis' | 'memory';
   globalApiLimiter: ReturnType<typeof rateLimit>;
   sendEmailOtpIpLimiter: ReturnType<typeof rateLimit>;
   verifyOtpIpLimiter: ReturnType<typeof rateLimit>;
@@ -78,14 +88,89 @@ function getConfigKey(config: DynamicRateLimitConfig): string {
   ].join(':');
 }
 
-function createRateLimitBundle(config: DynamicRateLimitConfig): RateLimitMiddlewareBundle {
+function buildRedisStore(client: AppRedisClient, prefix: string): RedisStore {
+  return new RedisStore({
+    sendCommand: (...args: string[]) => client.sendCommand(args),
+    prefix,
+  });
+}
+
+function buildInMemoryEmailCooldownMiddleware(cooldownSeconds: number): RequestHandler {
+  return perEmailCooldown(cooldownSeconds * 1000);
+}
+
+function buildRedisEmailCooldownMiddleware(
+  redisClient: AppRedisClient,
+  cooldownSeconds: number
+): RequestHandler {
+  const cooldownFallback = buildInMemoryEmailCooldownMiddleware(cooldownSeconds);
+
+  return (req: Request, res: Response, next: NextFunction) => {
+    const email = req.body?.email?.toLowerCase();
+
+    if (!email) {
+      next();
+      return;
+    }
+
+    const key = `${REDIS_KEY_PREFIX.emailCooldown}${email}`;
+
+    void redisClient
+      .set(key, '1', {
+        NX: true,
+        EX: cooldownSeconds,
+      })
+      .then((result) => {
+        if (result === 'OK') {
+          next();
+          return;
+        }
+
+        return redisClient.ttl(key).then((ttl) => {
+          const remainingSec = ttl > 0 ? ttl : cooldownSeconds;
+          next(
+            new AppError(
+              `Please wait ${remainingSec} seconds before requesting another code for this email`,
+              429,
+              ERROR_CODES.TOO_MANY_REQUESTS
+            )
+          );
+        });
+      })
+      .catch((error) => {
+        logger.error('Redis cooldown check failed, falling back to in-memory cooldown', { error });
+        try {
+          cooldownFallback(req, res, next);
+        } catch (fallbackError) {
+          next(fallbackError);
+        }
+      });
+  };
+}
+
+function createRateLimitBundle(
+  config: DynamicRateLimitConfig,
+  storeMode: 'redis' | 'memory',
+  redisClient: AppRedisClient | null
+): RateLimitMiddlewareBundle {
   const globalApiWindowMs = config.apiGlobalWindowMinutes * 60 * 1000;
   const sendOtpWindowMs = config.sendEmailOtpWindowMinutes * 60 * 1000;
   const verifyOtpWindowMs = config.verifyOtpWindowMinutes * 60 * 1000;
 
+  const globalApiStore = redisClient
+    ? buildRedisStore(redisClient, REDIS_KEY_PREFIX.globalApi)
+    : undefined;
+  const sendOtpStore = redisClient
+    ? buildRedisStore(redisClient, REDIS_KEY_PREFIX.sendOtp)
+    : undefined;
+  const verifyOtpStore = redisClient
+    ? buildRedisStore(redisClient, REDIS_KEY_PREFIX.verifyOtp)
+    : undefined;
+
   const globalApiLimiter = rateLimit({
     windowMs: globalApiWindowMs,
     max: config.apiGlobalMaxRequests,
+    ...(globalApiStore ? { store: globalApiStore } : {}),
     standardHeaders: true,
     legacyHeaders: false,
     skip: (req: Request) => req.path === '/health' || req.path === '/api/health',
@@ -103,6 +188,7 @@ function createRateLimitBundle(config: DynamicRateLimitConfig): RateLimitMiddlew
   const sendEmailOtpIpLimiter = rateLimit({
     windowMs: sendOtpWindowMs,
     max: config.sendEmailOtpMaxRequests,
+    ...(sendOtpStore ? { store: sendOtpStore } : {}),
     standardHeaders: true,
     legacyHeaders: false,
     handler: (_req: Request, _res: Response, next: NextFunction) => {
@@ -121,6 +207,7 @@ function createRateLimitBundle(config: DynamicRateLimitConfig): RateLimitMiddlew
   const verifyOtpIpLimiter = rateLimit({
     windowMs: verifyOtpWindowMs,
     max: config.verifyOtpMaxAttempts,
+    ...(verifyOtpStore ? { store: verifyOtpStore } : {}),
     standardHeaders: true,
     legacyHeaders: false,
     handler: (_req: Request, _res: Response, next: NextFunction) => {
@@ -136,10 +223,13 @@ function createRateLimitBundle(config: DynamicRateLimitConfig): RateLimitMiddlew
     skipFailedRequests: false,
   });
 
-  const emailCooldownMiddleware = perEmailCooldown(config.emailCooldownSeconds * 1000);
+  const emailCooldownMiddleware = redisClient
+    ? buildRedisEmailCooldownMiddleware(redisClient, config.emailCooldownSeconds)
+    : buildInMemoryEmailCooldownMiddleware(config.emailCooldownSeconds);
 
   return {
-    key: getConfigKey(config),
+    key: `${getConfigKey(config)}:${storeMode}`,
+    storeMode,
     globalApiLimiter,
     sendEmailOtpIpLimiter,
     verifyOtpIpLimiter,
@@ -156,7 +246,7 @@ async function getDynamicRateLimitConfig(): Promise<DynamicRateLimitConfig> {
 
   if (!cachedConfigPromise) {
     const requestVersion = cachedConfigVersion;
-    cachedConfigPromise = rateLimitConfigService
+    const localPromise = rateLimitConfigService
       .getConfig()
       .then((config) => ({
         apiGlobalMaxRequests: config.apiGlobalMaxRequests,
@@ -176,11 +266,20 @@ async function getDynamicRateLimitConfig(): Promise<DynamicRateLimitConfig> {
       })
       .catch((error) => {
         logger.error('Failed to load persisted rate-limit config, using safe defaults', { error });
-        return { ...DEFAULT_RATE_LIMIT_CONFIG };
+        const fallbackConfig = { ...DEFAULT_RATE_LIMIT_CONFIG };
+        if (requestVersion === cachedConfigVersion) {
+          cachedConfig = fallbackConfig;
+          cachedConfigTimestamp = Date.now();
+        }
+        return fallbackConfig;
       })
       .finally(() => {
-        cachedConfigPromise = null;
+        if (cachedConfigPromise === localPromise) {
+          cachedConfigPromise = null;
+        }
       });
+
+    cachedConfigPromise = localPromise;
   }
 
   return await cachedConfigPromise;
@@ -188,10 +287,12 @@ async function getDynamicRateLimitConfig(): Promise<DynamicRateLimitConfig> {
 
 async function getRateLimitBundle(): Promise<RateLimitMiddlewareBundle> {
   const config = await getDynamicRateLimitConfig();
-  const key = getConfigKey(config);
+  const redisClient = await redisClientService.getClient();
+  const storeMode: 'redis' | 'memory' = redisClient ? 'redis' : 'memory';
+  const key = `${getConfigKey(config)}:${storeMode}`;
 
   if (!activeBundle || activeBundle.key !== key) {
-    activeBundle = createRateLimitBundle(config);
+    activeBundle = createRateLimitBundle(config, storeMode, redisClient);
     logger.info('Rate limiter bundle refreshed from configuration', { key });
   }
 

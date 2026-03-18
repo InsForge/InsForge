@@ -300,6 +300,7 @@ paths:
         - Admin
       security:
         - bearerAuth: []
+        - apiKey: []
       responses:
         '200':
           description: Rate-limit configuration
@@ -364,6 +365,7 @@ paths:
         - Admin
       security:
         - bearerAuth: []
+        - apiKey: []
       requestBody:
         required: true
         content:

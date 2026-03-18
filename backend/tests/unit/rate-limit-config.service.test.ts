@@ -116,5 +116,7 @@ describe('RateLimitConfigService', () => {
       4,
       expect.stringContaining('FROM system.rate_limit_configs')
     );
+    expect(mockPool.connect).toHaveBeenCalledTimes(2);
+    expect(mockClient.release).toHaveBeenCalledTimes(2);
   });
 });

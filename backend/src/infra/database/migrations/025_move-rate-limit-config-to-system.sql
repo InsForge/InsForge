@@ -50,3 +50,6 @@ ON CONFLICT DO NOTHING;
 -- Seed defaults once if still missing.
 INSERT INTO system.rate_limit_configs DEFAULT VALUES
 ON CONFLICT DO NOTHING;
+
+-- Remove legacy table after successful copy/seed.
+DROP TABLE IF EXISTS auth.rate_limit_configs CASCADE;
