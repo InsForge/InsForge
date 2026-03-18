@@ -40,7 +40,7 @@ jobs:
 
       - name: Check Prettier formatting on changed files
         if: steps.changed-files-prettier.outputs.any_changed == 'true'
-        run: npx prettier --check ${{ steps.changed-files-prettier.outputs.all_changed_files }}
+        run: npx prettier --check --ignore-unknown ${{ steps.changed-files-prettier.outputs.all_changed_files }}
 
       - name: Run TypeScript type checking
         run: npm run typecheck
