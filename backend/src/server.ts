@@ -260,7 +260,7 @@ export async function createApp() {
   const authAppPath = path.join(__dirname, 'auth');
   if (fs.existsSync(authAppPath)) {
     app.use('/auth', express.static(authAppPath));
-    app.get('/auth*', (_req: Request, res: Response) => {
+    app.get('/auth/*splat', (_req: Request, res: Response) => {
       res.sendFile(path.join(authAppPath, 'index.html'));
     });
   } else {
@@ -280,7 +280,7 @@ export async function createApp() {
   if (fs.existsSync(frontendPath)) {
     app.use(express.static(frontendPath, { index: false }));
     // Catch all handler for SPA routes
-    app.get(['/cloud*', '/dashboard*'], (_req: Request, res: Response) => {
+    app.get(['/cloud/*splat', '/dashboard/*splat'], (_req: Request, res: Response) => {
       res.sendFile(path.join(frontendPath, 'index.html'));
     });
   } else {
