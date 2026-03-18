@@ -227,7 +227,7 @@ router.get(
 
 // PUT /api/storage/buckets/:bucketName/objects/:objectKey - Upload object to bucket (requires auth)
 router.put(
-  '/buckets/:bucketName/objects/*',
+  '/buckets/:bucketName/objects*',
   verifyUser,
   upload.single('file'),
   handleUploadError,
@@ -313,7 +313,7 @@ router.post(
 
 // GET /api/storage/buckets/:bucketName/objects/:objectKey - Download object from bucket (conditional auth)
 router.get(
-  '/buckets/:bucketName/objects/*',
+  '/buckets/:bucketName/objects*',
   conditionalAuth,
   async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
     try {
@@ -406,7 +406,7 @@ router.delete(
 
 // DELETE /api/storage/buckets/:bucketName/objects/:objectKey - Delete object from bucket (requires auth)
 router.delete(
-  '/buckets/:bucketName/objects/*',
+  '/buckets/:bucketName/objects*',
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {

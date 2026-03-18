@@ -260,7 +260,7 @@ export async function createApp() {
   const authAppPath = path.join(__dirname, 'auth');
   if (fs.existsSync(authAppPath)) {
     app.use('/auth', express.static(authAppPath));
-    app.get('/auth*', (_req: Request, res: Response) => {
+    app.get('/auth/*', (_req: Request, res: Response) => {
       res.sendFile(path.join(authAppPath, 'index.html'));
     });
   } else {
