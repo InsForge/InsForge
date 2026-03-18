@@ -145,25 +145,28 @@ export default function FunctionsPage() {
     fileInputRef.current?.click();
   }, []);
 
-  const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    void (async () => {
-      const file = event.target.files?.[0];
-      if (!file) {
-        return;
-      }
-      try {
-        const text = await file.text();
-        setEditedCode(text);
-        setIsEditingCode(true);
-      } catch (error) {
-        console.error('Failed to read function file', error);
-        showToast('Failed to read function file', 'error');
-      } finally {
-        // reset input so same file can be selected again
-        event.target.value = '';
-      }
-    })();
-  }, [showToast]);
+  const handleFileChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      void (async () => {
+        const file = event.target.files?.[0];
+        if (!file) {
+          return;
+        }
+        try {
+          const text = await file.text();
+          setEditedCode(text);
+          setIsEditingCode(true);
+        } catch (error) {
+          console.error('Failed to read function file', error);
+          showToast('Failed to read function file', 'error');
+        } finally {
+          // reset input so same file can be selected again
+          event.target.value = '';
+        }
+      })();
+    },
+    [showToast]
+  );
 
   // Detail view for selected function
   if (selectedFunction) {
