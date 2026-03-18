@@ -56,7 +56,11 @@ export const confirmUploadRequestSchema = z.object({
 });
 
 export const updateStorageConfigRequestSchema = z.object({
-  maxFileSizeMb: z.number().int().min(1, 'Must be at least 1 MB').max(5120, 'Must be at most 5120 MB (5 GB)'),
+  maxFileSizeMb: z
+    .number()
+    .int()
+    .min(1, 'Must be at least 1 MB')
+    .max(5120, 'Must be at most 5120 MB (5 GB)'),
 });
 
 export const getStorageConfigResponseSchema = storageConfigSchema;

@@ -7,6 +7,10 @@ import type { StorageConfigSchema, UpdateStorageConfigRequest } from '@insforge/
 
 const DEFAULT_MAX_FILE_SIZE_MB = 50;
 
+/**
+ * Singleton service responsible for reading and updating the storage
+ * configuration persisted in the `storage.configs` database table.
+ */
 export class StorageConfigService {
   private static instance: StorageConfigService;
   private pool: Pool | null = null;
@@ -15,6 +19,10 @@ export class StorageConfigService {
     logger.info('StorageConfigService initialized');
   }
 
+  /**
+   * Returns the singleton StorageConfigService instance,
+   * creating it on first access.
+   */
   public static getInstance(): StorageConfigService {
     if (!StorageConfigService.instance) {
       StorageConfigService.instance = new StorageConfigService();
@@ -22,6 +30,9 @@ export class StorageConfigService {
     return StorageConfigService.instance;
   }
 
+  /**
+   * Returns the lazily-initialized database connection pool.
+   */
   private getPool(): Pool {
     if (!this.pool) {
       this.pool = DatabaseManager.getInstance().getPool();
@@ -30,8 +41,9 @@ export class StorageConfigService {
   }
 
   /**
-   * Get the storage configuration.
-   * Returns the singleton row or a default if none exists.
+   * Retrieves the storage configuration from the database.
+   * Returns the singleton row, or a fallback using the env-based /
+   * default max file size when the table is empty or the query fails.
    */
   async getStorageConfig(): Promise<StorageConfigSchema> {
     try {
@@ -57,13 +69,23 @@ export class StorageConfigService {
 
       return result.rows[0];
     } catch (error) {
-      logger.error('Failed to get storage config', { error });
-      throw new AppError('Failed to get storage configuration', 500, ERROR_CODES.INTERNAL_ERROR);
+      logger.error('Failed to get storage config, returning fallback values', { error });
+      // Return the effective fallback so the UI still sees the active cap
+      const envValue = parseInt(process.env.MAX_FILE_SIZE || '');
+      const effectiveMb = envValue ? Math.round(envValue / (1024 * 1024)) : DEFAULT_MAX_FILE_SIZE_MB;
+      return {
+        id: '00000000-0000-0000-0000-000000000000',
+        maxFileSizeMb: effectiveMb,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
     }
   }
 
   /**
-   * Returns the configured max file size in bytes (DB config or env fallback).
+   * Returns the configured maximum file size in bytes.
+   * Reads from the database configuration first; falls back to the
+   * `MAX_FILE_SIZE` environment variable or 50 MB default on failure.
    */
   async getMaxFileSizeBytes(): Promise<number> {
     try {
@@ -77,7 +99,9 @@ export class StorageConfigService {
   }
 
   /**
-   * Update the storage configuration.
+   * Updates the storage configuration with the provided values.
+   * If the singleton row does not yet exist (e.g. migrations were not run),
+   * it will be created automatically via an INSERT instead of failing.
    */
   async updateStorageConfig(input: UpdateStorageConfigRequest): Promise<StorageConfigSchema> {
     const client = await this.getPool().connect();
@@ -88,25 +112,32 @@ export class StorageConfigService {
         'SELECT id FROM storage.configs LIMIT 1 FOR UPDATE'
       );
 
+      let result;
+
       if (!existingResult.rows.length) {
-        await client.query('ROLLBACK');
-        throw new AppError(
-          'Storage configuration not found. Please run migrations.',
-          500,
-          ERROR_CODES.INTERNAL_ERROR
+        // Singleton row is missing — create it with the requested value
+        result = await client.query(
+          `INSERT INTO storage.configs (max_file_size_mb)
+           VALUES ($1)
+           RETURNING
+             id,
+             max_file_size_mb as "maxFileSizeMb",
+             created_at as "createdAt",
+             updated_at as "updatedAt"`,
+          [input.maxFileSizeMb]
+        );
+      } else {
+        result = await client.query(
+          `UPDATE storage.configs
+           SET max_file_size_mb = $1, updated_at = NOW()
+           RETURNING
+             id,
+             max_file_size_mb as "maxFileSizeMb",
+             created_at as "createdAt",
+             updated_at as "updatedAt"`,
+          [input.maxFileSizeMb]
         );
       }
-
-      const result = await client.query(
-        `UPDATE storage.configs
-         SET max_file_size_mb = $1, updated_at = NOW()
-         RETURNING
-           id,
-           max_file_size_mb as "maxFileSizeMb",
-           created_at as "createdAt",
-           updated_at as "updatedAt"`,
-        [input.maxFileSizeMb]
-      );
 
       await client.query('COMMIT');
       logger.info('Storage config updated', { maxFileSizeMb: input.maxFileSizeMb });

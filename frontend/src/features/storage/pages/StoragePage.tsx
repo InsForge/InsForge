@@ -466,10 +466,7 @@ export default function StoragePage() {
       />
 
       {/* Storage Settings Dialog */}
-      <StorageSettingsMenuDialog
-        open={storageSettingsOpen}
-        onOpenChange={setStorageSettingsOpen}
-      />
+      <StorageSettingsMenuDialog open={storageSettingsOpen} onOpenChange={setStorageSettingsOpen} />
 
       {/* Confirm Dialog */}
       <ConfirmDialog {...confirmDialogProps} />

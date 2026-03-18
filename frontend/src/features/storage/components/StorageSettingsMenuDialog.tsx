@@ -27,6 +27,7 @@ import {
 } from '@insforge/shared-schemas';
 import { useStorageConfig } from '@/features/storage/hooks/useStorageConfig';
 
+/** Props for the StorageSettingsMenuDialog component. */
 interface StorageSettingsMenuDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -36,17 +37,22 @@ const defaultValues: UpdateStorageConfigRequest = {
   maxFileSizeMb: 50,
 };
 
+/** Maps a StorageConfigSchema to the form's field values, falling back to defaults. */
 const toFormValues = (config?: StorageConfigSchema): UpdateStorageConfigRequest => {
-  if (!config) return defaultValues;
+  if (!config) {
+    return defaultValues;
+  }
   return { maxFileSizeMb: config.maxFileSizeMb };
 };
 
+/** Props for a single row in the settings form. */
 interface SettingRowProps {
   label: string;
   description?: string;
   children: React.ReactNode;
 }
 
+/** Renders a label + description alongside a form control. */
 function SettingRow({ label, description, children }: SettingRowProps) {
   return (
     <div className="flex w-full items-start gap-6">
@@ -65,6 +71,7 @@ function SettingRow({ label, description, children }: SettingRowProps) {
   );
 }
 
+/** Admin dialog for viewing and editing the storage configuration (max upload size). */
 export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSettingsMenuDialogProps) {
   const { config, isLoading, isUpdating, updateConfig } = useStorageConfig();
 
@@ -92,7 +99,11 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
 
   const handleSubmit = () => {
     void form.handleSubmit((data) => {
-      updateConfig(data);
+      updateConfig(data, {
+        onSuccess: () => {
+          form.reset(data);
+        },
+      });
     })();
   };
 

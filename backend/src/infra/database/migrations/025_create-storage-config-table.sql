@@ -5,8 +5,8 @@
 CREATE TABLE IF NOT EXISTS storage.configs (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   max_file_size_mb INTEGER DEFAULT 50 NOT NULL CHECK (max_file_size_mb >= 1 AND max_file_size_mb <= 5120),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
 -- Ensure only one row exists (singleton pattern)

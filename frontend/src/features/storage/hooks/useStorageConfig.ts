@@ -3,6 +3,10 @@ import { StorageConfigSchema, UpdateStorageConfigRequest } from '@insforge/share
 import { storageConfigService } from '@/features/storage/services/storage-config.service';
 import { useToast } from '@/lib/hooks/useToast';
 
+/**
+ * React Query hook for fetching and updating the storage configuration.
+ * Provides config data, loading/updating states, and a mutate function.
+ */
 export function useStorageConfig() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();

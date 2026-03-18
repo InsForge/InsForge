@@ -10,7 +10,10 @@ import logger from '@/utils/logger.js';
 const DEFAULT_MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 const DEFAULT_MAX_FILES = 10;
 
-/** Returns the configured max file size in bytes (env var or 50MB default) */
+/**
+ * Returns the configured max file size in bytes.
+ * Uses the MAX_FILE_SIZE environment variable if set, otherwise defaults to 50 MB.
+ */
 export const getMaxFileSize = (): number =>
   parseInt(process.env.MAX_FILE_SIZE || '') || DEFAULT_MAX_FILE_SIZE;
 
@@ -26,8 +29,10 @@ export const upload = multer({
 /**
  * Creates a per-request multer single-file upload middleware that reads the
  * configured max file size from the storage config table at request time.
+ * Falls back to the env-based limit when the database is unreachable.
  */
-export const dynamicUploadSingle = (fieldName: string) =>
+export const dynamicUploadSingle =
+  (fieldName: string) =>
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     let maxSize: number;
     try {
@@ -51,7 +56,11 @@ export const dynamicUploadSingle = (fieldName: string) =>
     uploader(req, res, next);
   };
 
-// Middleware to handle file upload errors
+/**
+ * Express error-handling middleware for multer upload errors.
+ * Translates multer-specific errors into user-friendly AppError responses,
+ * including the configured size limit when a file exceeds the maximum.
+ */
 export const handleUploadError = (
   err: Error | multer.MulterError,
   req: Request,
@@ -83,8 +92,10 @@ export const handleUploadError = (
   next();
 };
 
-// Helper to process form data
-
+/**
+ * Extracts fields and files from a multipart form-data request
+ * processed by multer and returns them as a structured object.
+ */
 export function processFormData(req: Request): ProcessedFormData {
   const fields = req.body || {};
   const files: Record<string, Express.Multer.File[]> = {};

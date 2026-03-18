@@ -9,6 +9,7 @@ import {
   type SecondaryMenuListItem,
 } from '@/components/layout/SecondaryMenu';
 
+/** Props accepted by the StorageSidebar component. */
 interface StorageSidebarProps {
   buckets: string[];
   selectedBucket?: string;
@@ -20,6 +21,7 @@ interface StorageSidebarProps {
   onSettings?: () => void;
 }
 
+/** Sidebar listing storage buckets with create, edit, delete, and settings actions. */
 export function StorageSidebar({
   buckets,
   selectedBucket,
