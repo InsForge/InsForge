@@ -122,8 +122,22 @@ export class AIGatewayConfigService {
       if (error instanceof AppError) {
         throw error;
       }
+      const isNetworkError =
+        error instanceof TypeError ||
+        (error instanceof DOMException && error.name === 'AbortError') ||
+        (typeof error === 'object' &&
+          error !== null &&
+          'code' in error &&
+          ['ECONNABORTED', 'ENOTFOUND', 'ECONNREFUSED'].includes((error as { code: string }).code));
+      if (isNetworkError) {
+        throw new AppError(
+          'Could not reach OpenRouter to validate the key. Please try again later.',
+          502,
+          ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
+        );
+      }
       throw new AppError(
-        'Could not validate OpenRouter API key. Check your network connection and try again.',
+        'Invalid OpenRouter API key. Please check the key and try again.',
         400,
         ERROR_CODES.AI_INVALID_API_KEY
       );
