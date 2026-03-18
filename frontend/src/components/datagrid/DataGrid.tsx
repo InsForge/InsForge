@@ -39,8 +39,10 @@ export interface DataGridProps<TRow extends DataGridRowType = DataGridRow> {
   currentPage?: number;
   totalPages?: number;
   pageSize?: number;
+  pageSizeOptions?: number[];
   totalRecords?: number;
   onPageChange?: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
   emptyState?: React.ReactNode;
   rowKeyGetter?: (row: TRow) => string;
   className?: string;
@@ -81,8 +83,10 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
   currentPage,
   totalPages,
   pageSize,
+  pageSizeOptions,
   totalRecords,
   onPageChange,
+  onPageSizeChange,
   emptyState,
   rowKeyGetter,
   className,
@@ -351,7 +355,9 @@ export default function DataGrid<TRow extends DataGridRowType = DataGridRow>({
           onPageChange={onPageChange}
           totalRecords={totalRecords}
           pageSize={pageSize}
+          pageSizeOptions={pageSizeOptions}
           recordLabel={paginationRecordLabel}
+          onPageSizeChange={onPageSizeChange}
         />
       )}
     </div>

@@ -207,6 +207,7 @@ export class RealtimeMessageService {
     totalMessages: number;
     whDeliveryRate: number;
     topEvents: { eventName: string; count: number }[];
+    retentionDays: number | null;
   }> {
     const { channelId, since } = options;
 
@@ -244,6 +245,13 @@ export class RealtimeMessageService {
       params
     );
 
+    // Get retention days from realtime.config
+    const configResult = await this.getPool().query(
+      'SELECT retention_days as "retentionDays" FROM realtime.config LIMIT 1'
+    );
+    const retentionDays =
+      configResult.rows.length === 0 ? null : configResult.rows[0].retentionDays;
+
     const stats = statsResult.rows[0];
     const whAudienceTotal = parseInt(stats.wh_audience_total) || 0;
     const whDeliveredTotal = parseInt(stats.wh_delivered_total) || 0;
@@ -255,6 +263,27 @@ export class RealtimeMessageService {
         eventName: row.event_name,
         count: parseInt(row.count),
       })),
+      retentionDays,
     };
+  }
+
+  /**
+   * Get retention days config
+   */
+  async getRetentionDays(): Promise<number | null> {
+    const result = await this.getPool().query(
+      'SELECT retention_days as "retentionDays" FROM realtime.config LIMIT 1'
+    );
+    return result.rows.length === 0 ? null : result.rows[0].retentionDays;
+  }
+
+  /**
+   * Update retention days config
+   */
+  async updateRetentionDays(retentionDays: number | null): Promise<void> {
+    await this.getPool().query(
+      'UPDATE realtime.config SET retention_days = $1, updated_at = NOW()',
+      [retentionDays]
+    );
   }
 }

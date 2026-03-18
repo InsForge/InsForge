@@ -11,6 +11,7 @@ import {
   DialogDivider,
   DialogFooter,
   DialogHeader,
+  DialogDescription,
   DialogTitle,
   Input,
   Switch,
@@ -147,6 +148,9 @@ export function ChannelFormDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{mode === 'create' ? 'Add Channel' : 'Edit Channel'}</DialogTitle>
+          <DialogDescription className="sr-only">
+            {mode === 'create' ? 'Add a new channel' : 'Edit channel settings'}
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={(e) => void handleSubmit(onFormSubmit)(e)}>

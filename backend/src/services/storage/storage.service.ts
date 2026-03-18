@@ -269,7 +269,7 @@ export class StorageService {
       if (prefix) {
         query += ` AND key LIKE $${paramIndex}`;
         countQuery += ` AND key LIKE $${paramIndex}`;
-        params.push(`${prefix}%`);
+        params.push(`${escapeSqlLikePattern(prefix)}%`);
         paramIndex++;
       }
 
@@ -277,7 +277,7 @@ export class StorageService {
       if (searchQuery && searchQuery.trim()) {
         query += ` AND key LIKE $${paramIndex}`;
         countQuery += ` AND key LIKE $${paramIndex}`;
-        const searchPattern = `%${searchQuery.trim()}%`;
+        const searchPattern = `%${escapeSqlLikePattern(searchQuery.trim())}%`;
         params.push(searchPattern);
         paramIndex++;
       }
