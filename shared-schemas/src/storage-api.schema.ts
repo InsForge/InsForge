@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { storageFileSchema } from './storage.schema';
+import { storageConfigSchema, storageFileSchema } from './storage.schema';
 
 export const createBucketRequestSchema = z.object({
   bucketName: z.string().min(1, 'Bucket name cannot be empty'),
@@ -55,6 +55,12 @@ export const confirmUploadRequestSchema = z.object({
   etag: z.string().optional(),
 });
 
+export const updateStorageConfigRequestSchema = z.object({
+  maxFileSizeMb: z.number().int().min(1, 'Must be at least 1 MB').max(5120, 'Must be at most 5120 MB (5 GB)'),
+});
+
+export const getStorageConfigResponseSchema = storageConfigSchema;
+
 export type CreateBucketRequest = z.infer<typeof createBucketRequestSchema>;
 export type UpdateBucketRequest = z.infer<typeof updateBucketRequestSchema>;
 export type ListObjectsResponseSchema = z.infer<typeof listObjectsResponseSchema>;
@@ -63,3 +69,5 @@ export type UploadStrategyResponse = z.infer<typeof uploadStrategyResponseSchema
 export type DownloadStrategyRequest = z.infer<typeof downloadStrategyRequestSchema>;
 export type DownloadStrategyResponse = z.infer<typeof downloadStrategyResponseSchema>;
 export type ConfirmUploadRequest = z.infer<typeof confirmUploadRequestSchema>;
+export type UpdateStorageConfigRequest = z.infer<typeof updateStorageConfigRequestSchema>;
+export type GetStorageConfigResponse = z.infer<typeof getStorageConfigResponseSchema>;

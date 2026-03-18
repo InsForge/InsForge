@@ -15,5 +15,13 @@ export const storageBucketSchema = z.object({
   createdAt: z.string(),
 });
 
+export const storageConfigSchema = z.object({
+  id: z.string().uuid(),
+  maxFileSizeMb: z.number().int().positive(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
 export type StorageFileSchema = z.infer<typeof storageFileSchema>;
 export type StorageBucketSchema = z.infer<typeof storageBucketSchema>;
+export type StorageConfigSchema = z.infer<typeof storageConfigSchema>;
