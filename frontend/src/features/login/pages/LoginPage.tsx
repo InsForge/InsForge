@@ -82,7 +82,9 @@ export default function LoginPage() {
             <form onSubmit={(e) => void form.handleSubmit(onSubmit)(e)}>
               <CardHeader>
                 <CardTitle className="!text-gray-900">Sign In</CardTitle>
-                <CardDescription className="!text-gray-600">Enter your admin credentials to continue</CardDescription>
+                <CardDescription className="!text-gray-600">
+                  Enter your admin credentials to continue
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <FormField
@@ -138,7 +140,11 @@ export default function LoginPage() {
                 )}
               </CardContent>
               <CardFooter className="flex flex-col space-y-4">
-                <Button type="submit" className="w-full !bg-[#059669] !text-white hover:!bg-[#047857]" disabled={isSubmitting}>
+                <Button
+                  type="submit"
+                  className="w-full !bg-[#059669] !text-white hover:!bg-[#047857]"
+                  disabled={isSubmitting}
+                >
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {isSubmitting ? 'Signing in...' : 'Sign in'}
                 </Button>
@@ -152,9 +158,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <div className="mt-8 text-center">
-          <p className="text-xs !text-gray-500">
-            Insforge - Self-hosted Backend as a Service
-          </p>
+          <p className="text-xs !text-gray-500">Insforge - Self-hosted Backend as a Service</p>
         </div>
       </div>
     </div>
