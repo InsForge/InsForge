@@ -234,7 +234,8 @@ router.put(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
-      const objectKey = req.params[0]; // Everything after objects
+      // Extract everything after /objects/ from the URL
+      const objectKey = req.path.replace(/^\/api\/storage\/buckets\/[^/]+\/objects\//, '');
 
       if (!objectKey) {
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
@@ -318,7 +319,8 @@ router.get(
   async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
-      const objectKey = req.params[0]; // Everything after objects
+      // Extract everything after /objects/ from the URL
+      const objectKey = req.path.replace(/^\/api\/storage\/buckets\/[^/]+\/objects\//, '');
 
       if (!objectKey) {
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
@@ -411,7 +413,8 @@ router.delete(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { bucketName } = req.params;
-      const objectKey = req.params[0]; // Everything after objects
+      // Extract everything after /objects/ from the URL
+      const objectKey = req.path.replace(/^\/api\/storage\/buckets\/[^/]+\/objects\//, '');
 
       if (!objectKey) {
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
