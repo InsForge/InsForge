@@ -65,13 +65,8 @@ export function useFunctions() {
   });
 
   const updateFunctionMutation = useMutation({
-    mutationFn: ({
-      slug,
-      updates,
-    }: {
-      slug: string;
-      updates: UpdateFunctionRequest;
-    }) => functionService.updateFunction(slug, updates),
+    mutationFn: ({ slug, updates }: { slug: string; updates: UpdateFunctionRequest }) =>
+      functionService.updateFunction(slug, updates),
     onSuccess: (updated) => {
       void queryClient.invalidateQueries({ queryKey: ['functions'] });
       setSelectedFunction(updated);

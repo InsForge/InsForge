@@ -5,7 +5,14 @@ import { useFunctions } from '../hooks/useFunctions';
 import { useToast } from '@/lib/hooks/useToast';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
-import { Button, ConfirmDialog, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
+import {
+  Button,
+  ConfirmDialog,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@insforge/ui';
 import { CodeEditor, Skeleton, TableHeader } from '@/components';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 
@@ -77,20 +84,17 @@ export default function FunctionsPage() {
     }
   }, [selectedFunction?.id]);
 
-  const handleDownloadCode = useCallback(
-    (code: string, slug: string) => {
-      const blob = new Blob([code], { type: 'text/javascript;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${slug}.ts`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    },
-    []
-  );
+  const handleDownloadCode = useCallback((code: string, slug: string) => {
+    const blob = new Blob([code], { type: 'text/javascript;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${slug}.ts`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, []);
 
   const handleDeleteFunction = useCallback(
     async (slug: string, name: string) => {
@@ -115,13 +119,10 @@ export default function FunctionsPage() {
     [confirm, deleteFunction]
   );
 
-  const handleStartEditCode = useCallback(
-    (initialCode: string | null | undefined) => {
-      setEditedCode(initialCode ?? '');
-      setIsEditingCode(true);
-    },
-    []
-  );
+  const handleStartEditCode = useCallback((initialCode: string | null | undefined) => {
+    setEditedCode(initialCode ?? '');
+    setIsEditingCode(true);
+  }, []);
 
   const handleCancelEditCode = useCallback(() => {
     setIsEditingCode(false);
@@ -144,8 +145,8 @@ export default function FunctionsPage() {
     fileInputRef.current?.click();
   }, []);
 
-  const handleFileChange = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    void (async () => {
       const file = event.target.files?.[0];
       if (!file) {
         return;
@@ -159,12 +160,10 @@ export default function FunctionsPage() {
         showToast('Failed to read function file', 'error');
       } finally {
         // reset input so same file can be selected again
-        // eslint-disable-next-line no-param-reassign
         event.target.value = '';
       }
-    },
-    [showToast]
-  );
+    })();
+  }, [showToast]);
 
   // Detail view for selected function
   if (selectedFunction) {
@@ -225,7 +224,9 @@ export default function FunctionsPage() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => void handleDeleteFunction(selectedFunction.slug, selectedFunction.name)}
+              onClick={() =>
+                void handleDeleteFunction(selectedFunction.slug, selectedFunction.name)
+              }
               className="h-8 w-8 rounded p-1.5 text-destructive hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
               title="Delete function"
               disabled={isDeleting}
