@@ -227,17 +227,18 @@ router.get(
 
 // PUT /api/storage/buckets/:bucketName/objects/:objectKey - Upload object to bucket (requires auth)
 router.put(
-  '/buckets/:bucketName/objects*',
+  '/buckets/:bucketName/objects/*objectKey',
   verifyUser,
   upload.single('file'),
   handleUploadError,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const { bucketName } = req.params;
-      // Extract everything after /objects/ from the URL
-      const objectKey = req.path.replace(/^\/api\/storage\/buckets\/[^/]+\/objects\//, '');
+      const { bucketName, objectKey } = req.params;
 
-      if (!objectKey) {
+      // Convert objectKey from array to string (wildcard captures as array)
+      const objectKeyStr = Array.isArray(objectKey) ? objectKey.join('/') : objectKey;
+
+      if (!objectKeyStr) {
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
@@ -248,7 +249,7 @@ router.put(
       const storageService = StorageService.getInstance();
       const storedFile = await storageService.putObject(
         bucketName,
-        objectKey,
+        objectKeyStr,
         req.file,
         req.user?.id
       );
@@ -314,28 +315,29 @@ router.post(
 
 // GET /api/storage/buckets/:bucketName/objects/:objectKey - Download object from bucket (conditional auth)
 router.get(
-  '/buckets/:bucketName/objects*',
+  '/buckets/:bucketName/objects/*objectKey',
   conditionalAuth,
   async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
     try {
-      const { bucketName } = req.params;
-      // Extract everything after /objects/ from the URL
-      const objectKey = req.path.replace(/^\/api\/storage\/buckets\/[^/]+\/objects\//, '');
+      const { bucketName, objectKey } = req.params;
 
-      if (!objectKey) {
+      // Convert objectKey from array to string (wildcard captures as array)
+      const objectKeyStr = Array.isArray(objectKey) ? objectKey.join('/') : objectKey;
+
+      if (!objectKeyStr) {
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
       const storageService = StorageService.getInstance();
 
       // Get download strategy (service auto-calculates expiry based on bucket visibility)
-      const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
+      const strategy = await storageService.getDownloadStrategy(bucketName, objectKeyStr);
 
       if (strategy.method === 'presigned') {
         return res.redirect(strategy.url);
       }
 
-      const result = await storageService.getObject(bucketName, objectKey);
+      const result = await storageService.getObject(bucketName, objectKeyStr);
       if (!result) {
         throw new AppError('Object not found', 404, ERROR_CODES.NOT_FOUND);
       }
@@ -408,22 +410,23 @@ router.delete(
 
 // DELETE /api/storage/buckets/:bucketName/objects/:objectKey - Delete object from bucket (requires auth)
 router.delete(
-  '/buckets/:bucketName/objects*',
+  '/buckets/:bucketName/objects/*objectKey',
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const { bucketName } = req.params;
-      // Extract everything after /objects/ from the URL
-      const objectKey = req.path.replace(/^\/api\/storage\/buckets\/[^/]+\/objects\//, '');
+      const { bucketName, objectKey } = req.params;
 
-      if (!objectKey) {
+      // Convert objectKey from array to string (wildcard captures as array)
+      const objectKeyStr = Array.isArray(objectKey) ? objectKey.join('/') : objectKey;
+
+      if (!objectKeyStr) {
         throw new AppError('Object key is required', 400, ERROR_CODES.STORAGE_INVALID_PARAMETER);
       }
 
       const storageService = StorageService.getInstance();
       const deleted = await storageService.deleteObject(
         bucketName,
-        objectKey,
+        objectKeyStr,
         req.user?.id || '',
         !!req.apiKey || req.user?.role === 'project_admin'
       );
@@ -476,11 +479,15 @@ router.post(
 
 // POST /api/storage/buckets/:bucketName/objects/:objectKey/confirm-upload - Confirm presigned upload
 router.post(
-  '/buckets/:bucketName/objects/:objectKey/confirm-upload',
+  '/buckets/:bucketName/objects/*objectKey/confirm-upload',
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { bucketName, objectKey } = req.params;
+
+      // Convert objectKey from array to string (wildcard captures as array)
+      const objectKeyStr = Array.isArray(objectKey) ? objectKey.join('/') : objectKey;
+
       const { size, contentType, etag } = req.body;
 
       if (!size) {
@@ -490,7 +497,7 @@ router.post(
       const storageService = StorageService.getInstance();
       const fileInfo = await storageService.confirmUpload(
         bucketName,
-        objectKey,
+        objectKeyStr,
         {
           size,
           contentType,
@@ -512,16 +519,19 @@ router.post(
   }
 );
 
-// POST /api/storage/buckets/:bucketName/objects/:objectKey/download-strategy - Get download URL (presigned or direct)
+// POST /api/storage/buckets/:objectKey/download-strategy - Get download URL (presigned or direct)
 router.post(
-  '/buckets/:bucketName/objects/:objectKey/download-strategy',
+  '/buckets/:bucketName/objects/*objectKey/download-strategy',
   conditionalAuth,
   async (req: AuthRequest | Request, res: Response, next: NextFunction) => {
     try {
       const { bucketName, objectKey } = req.params;
 
+      // Convert objectKey from array to string (wildcard captures as array)
+      const objectKeyStr = Array.isArray(objectKey) ? objectKey.join('/') : objectKey;
+
       const storageService = StorageService.getInstance();
-      const strategy = await storageService.getDownloadStrategy(bucketName, objectKey);
+      const strategy = await storageService.getDownloadStrategy(bucketName, objectKeyStr);
 
       successResponse(res, strategy);
     } catch (error) {
