@@ -58,6 +58,7 @@ export {
   MenuDialogClose,
   MenuDialogOverlay,
   MenuDialogContent,
+  MenuDialogDescription,
   MenuDialogSideNav,
   MenuDialogSideNavHeader,
   MenuDialogSideNavTitle,
