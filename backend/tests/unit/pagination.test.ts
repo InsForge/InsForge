@@ -15,9 +15,11 @@ import { describe, test, expect } from 'vitest';
 // Helper that mirrors the offset clamping pattern used in routes
 const clampOffset = (raw: string): number => Math.max(0, parseInt(raw) || 0);
 
-// Helper that mirrors the limit clamping pattern used in routes
-const clampLimit = (raw: string, defaultLimit: number): number =>
-  Math.max(1, parseInt(raw) || defaultLimit);
+// Helper that mirrors the limit clamping pattern used in routes (with optional upper bound)
+const clampLimit = (raw: string, defaultLimit: number, maxLimit?: number): number => {
+  const parsed = Math.max(1, parseInt(raw) || defaultLimit);
+  return maxLimit !== undefined ? Math.min(parsed, maxLimit) : parsed;
+};
 
 describe('Pagination parameter clamping', () => {
   describe('offset clamping', () => {
@@ -62,6 +64,12 @@ describe('Pagination parameter clamping', () => {
       expect(clampLimit('abc', 50)).toBe(50);
       expect(clampLimit('', 50)).toBe(50);
       expect(clampLimit('abc', 100)).toBe(100);
+    });
+
+    test('limit is capped at maxLimit when provided', () => {
+      expect(clampLimit('200', 50, 100)).toBe(100); // schedules pattern (max 100)
+      expect(clampLimit('2000', 100, 1000)).toBe(1000); // storage pattern (max 1000)
+      expect(clampLimit('50', 50, 100)).toBe(50); // within bounds
     });
   });
 });
