@@ -65,24 +65,24 @@ export default function LoginPage() {
   }, [hasCompletedOnboarding, isAuthenticated, isMcpUsageLoading, navigate]);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-neutral-900 flex items-center justify-center px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md">
         {/* Logo and Title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-black dark:bg-emerald-300 rounded-lg mb-4">
-            <Lock className="h-8 w-8 text-white dark:text-black" />
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-black rounded-lg mb-4">
+            <Lock className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight dark:text-white">Insforge Admin</h1>
-          <p className="text-sm text-muted-foreground mt-2">Sign in to access your dashboard</p>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Insforge Admin</h1>
+          <p className="text-sm text-gray-600 mt-2">Sign in to access your dashboard</p>
         </div>
 
         {/* Login Card */}
-        <Card>
+        <Card className="!bg-white !text-gray-900 !border-gray-200">
           <Form {...form}>
             <form onSubmit={(e) => void form.handleSubmit(onSubmit)(e)}>
               <CardHeader>
-                <CardTitle>Sign In</CardTitle>
-                <CardDescription>Enter your admin credentials to continue</CardDescription>
+                <CardTitle className="!text-gray-900">Sign In</CardTitle>
+                <CardDescription className="!text-gray-600">Enter your admin credentials to continue</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <FormField
@@ -98,7 +98,7 @@ export default function LoginPage() {
                             {...field}
                             type="email"
                             placeholder="admin@example.com"
-                            className="pl-10"
+                            className="pl-10 !bg-black/[0.04] !border-black/[0.12] !text-black"
                             autoComplete="email"
                           />
                         </div>
@@ -121,7 +121,7 @@ export default function LoginPage() {
                             {...field}
                             type="password"
                             placeholder="Enter your password"
-                            className="pl-10"
+                            className="pl-10 !bg-black/[0.04] !border-black/[0.12] !text-black"
                             autoComplete="current-password"
                           />
                         </div>
@@ -138,11 +138,11 @@ export default function LoginPage() {
                 )}
               </CardContent>
               <CardFooter className="flex flex-col space-y-4">
-                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                <Button type="submit" className="w-full !bg-[#059669] !text-white hover:!bg-[#047857]" disabled={isSubmitting}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {isSubmitting ? 'Signing in...' : 'Sign in'}
                 </Button>
-                <p className="text-xs text-center text-muted-foreground">
+                <p className="text-xs text-center !text-gray-500">
                   Use the credentials configured in your .env file
                 </p>
               </CardFooter>
@@ -152,7 +152,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <div className="mt-8 text-center">
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs !text-gray-500">
             Insforge - Self-hosted Backend as a Service
           </p>
         </div>

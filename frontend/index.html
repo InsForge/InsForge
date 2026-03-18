@@ -5,6 +5,24 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>InsForge Dashboard</title>
+    <!-- Force light mode for login pages -->
+    <script>
+      (function() {
+        // Check if we're on a login page
+        const isLoginPage = window.location.pathname.includes('/login') ||
+                           window.location.pathname === '/login' ||
+                           window.location.pathname === '/';
+
+        if (isLoginPage) {
+          // Force light mode for login pages
+          document.documentElement.classList.remove('dark');
+          document.documentElement.classList.add('light');
+          // Also remove it from body if present
+          document.body.classList.remove('dark');
+          document.body.classList.add('light');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
