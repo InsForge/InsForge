@@ -11,7 +11,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-import { Button, Dialog, DialogContent, DialogTitle, Input } from '@insforge/ui';
+import { Button, Dialog, DialogContent, DialogDescription, DialogTitle, Input } from '@insforge/ui';
 import { Skeleton } from '@/components';
 import { useDeployments } from '../hooks/useDeployments';
 import { useDeploymentSlug } from '../hooks/useDeploymentSlug';
