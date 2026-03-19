@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Mail, User } from 'lucide-react';
+import { KeyRound, Mail, User } from 'lucide-react';
 import {
   Avatar,
   AvatarFallback,
@@ -79,6 +79,7 @@ const ProviderBadge = ({
     customLabels?.[normalized] ??
     normalized.charAt(0).toUpperCase() + normalized.slice(1);
   const ProviderLogo = providerLogoMap[normalized as keyof typeof providerLogoMap];
+  const isCustomProvider = Boolean(customLabels?.[normalized]);
 
   return (
     <Badge className="h-5 rounded border border-[var(--alpha-inverse-8)] bg-white px-1.5 py-0 text-xs font-medium leading-4 text-black">
@@ -86,6 +87,8 @@ const ProviderBadge = ({
         <ProviderLogo className="h-4 w-4 shrink-0" />
       ) : normalized === 'email' ? (
         <Mail className="h-4 w-4 shrink-0 text-black" />
+      ) : isCustomProvider ? (
+        <KeyRound className="h-4 w-4 shrink-0 text-black" />
       ) : null}
       {label}
     </Badge>

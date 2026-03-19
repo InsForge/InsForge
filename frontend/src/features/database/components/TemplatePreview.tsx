@@ -63,6 +63,7 @@ export function TemplatePreview({ template, onCancel }: TemplatePreviewProps) {
             metadata={{
               auth: {
                 providers: [],
+                customProviders: [],
               },
               database: {
                 tables: [],

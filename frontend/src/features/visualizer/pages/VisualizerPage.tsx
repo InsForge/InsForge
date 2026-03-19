@@ -93,6 +93,7 @@ const VisualizerPage = () => {
           metadata={{
             auth: {
               providers: metadata.auth.oAuthProviders,
+              customProviders: metadata.auth.customOAuthProviders,
             },
             database: metadata.database,
             storage: metadata.storage,
