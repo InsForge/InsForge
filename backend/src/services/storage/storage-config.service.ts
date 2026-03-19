@@ -9,7 +9,7 @@ const DEFAULT_MAX_FILE_SIZE_MB = 50;
 
 /**
  * Singleton service responsible for reading and updating the storage
- * configuration persisted in the `storage.configs` database table.
+ * configuration persisted in the `storage.config` database table.
  */
 export class StorageConfigService {
   private static instance: StorageConfigService;
@@ -53,7 +53,7 @@ export class StorageConfigService {
           max_file_size_mb as "maxFileSizeMb",
           created_at as "createdAt",
           updated_at as "updatedAt"
-         FROM storage.configs
+         FROM storage.config
          LIMIT 1`
       );
 
@@ -115,7 +115,7 @@ export class StorageConfigService {
       await client.query('BEGIN');
 
       const existingResult = await client.query(
-        'SELECT id FROM storage.configs LIMIT 1 FOR UPDATE'
+        'SELECT id FROM storage.config LIMIT 1 FOR UPDATE'
       );
 
       let result;
@@ -123,7 +123,7 @@ export class StorageConfigService {
       if (!existingResult.rows.length) {
         // Singleton row is missing — create it with the requested value
         result = await client.query(
-          `INSERT INTO storage.configs (max_file_size_mb)
+          `INSERT INTO storage.config (max_file_size_mb)
            VALUES ($1)
            RETURNING
              id,
@@ -134,7 +134,7 @@ export class StorageConfigService {
         );
       } else {
         result = await client.query(
-          `UPDATE storage.configs
+          `UPDATE storage.config
            SET max_file_size_mb = $1, updated_at = NOW()
            RETURNING
              id,
