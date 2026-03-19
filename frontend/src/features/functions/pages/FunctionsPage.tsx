@@ -53,6 +53,7 @@ export default function FunctionsPage() {
     isDeleting,
     isUpdating,
   } = useFunctions();
+  const isMutatingFunction = isUpdating || isDeleting;
 
   const handleScroll = useCallback(() => {
     if (scrollRef.current) {
@@ -110,6 +111,10 @@ export default function FunctionsPage() {
 
   const handleDeleteFunction = useCallback(
     async (slug: string, name: string) => {
+      if (isMutatingFunction) {
+        return;
+      }
+
       try {
         const confirmed = await confirm({
           title: 'Delete Function',
@@ -128,13 +133,17 @@ export default function FunctionsPage() {
         console.error('Failed to delete function', error);
       }
     },
-    [confirm, deleteFunction]
+    [confirm, deleteFunction, isMutatingFunction]
   );
 
   const handleStartEditCode = useCallback((initialCode: string | null | undefined) => {
+    if (isMutatingFunction) {
+      return;
+    }
+
     setEditedCode(initialCode ?? '');
     setIsEditingCode(true);
-  }, []);
+  }, [isMutatingFunction]);
 
   const handleCancelEditCode = useCallback(() => {
     setIsEditingCode(false);
@@ -143,6 +152,10 @@ export default function FunctionsPage() {
 
   const handleSaveCode = useCallback(
     async (slug: string) => {
+      if (isMutatingFunction) {
+        return;
+      }
+
       try {
         await updateFunction(slug, { code: editedCode });
         setIsEditingCode(false);
@@ -150,43 +163,54 @@ export default function FunctionsPage() {
         console.error('Failed to update function code', error);
       }
     },
-    [editedCode, updateFunction]
+    [editedCode, isMutatingFunction, updateFunction]
   );
 
   const handleUploadFile = useCallback(() => {
+    if (isMutatingFunction) {
+      return;
+    }
+
     fileInputRef.current?.click();
-  }, []);
+  }, [isMutatingFunction]);
 
   const handleFileChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       void (async () => {
-        const file = event.target.files?.[0];
-        if (!file) {
-          return;
-        }
-
-        const normalizedFileName = file.name.toLowerCase();
-        const hasAllowedExtension = ALLOWED_FUNCTION_FILE_EXTENSIONS.some((extension) =>
-          normalizedFileName.endsWith(extension)
-        );
-        const hasAllowedMimeType = ALLOWED_FUNCTION_FILE_MIME_TYPES.has(file.type);
-
-        if (!hasAllowedExtension) {
-          showToast('Invalid file type. Please upload a .ts, .js, .tsx, or .jsx file.', 'error');
-          return;
-        }
-
-        if (file.type && !hasAllowedMimeType) {
-          showToast('Invalid file type. Please upload a .ts, .js, .tsx, or .jsx file.', 'error');
-          return;
-        }
-
-        if (file.size > MAX_FUNCTION_FILE_SIZE_BYTES) {
-          showToast('Function file is too large. Please upload a file smaller than 1 MB.', 'error');
-          return;
-        }
-
         try {
+          if (isMutatingFunction) {
+            return;
+          }
+
+          const file = event.target.files?.[0];
+          if (!file) {
+            return;
+          }
+
+          const normalizedFileName = file.name.toLowerCase();
+          const hasAllowedExtension = ALLOWED_FUNCTION_FILE_EXTENSIONS.some((extension) =>
+            normalizedFileName.endsWith(extension)
+          );
+          const hasAllowedMimeType = ALLOWED_FUNCTION_FILE_MIME_TYPES.has(file.type);
+
+          if (!hasAllowedExtension) {
+            showToast('Invalid file type. Please upload a .ts, .js, .tsx, or .jsx file.', 'error');
+            return;
+          }
+
+          if (file.type && !hasAllowedMimeType) {
+            showToast('Invalid file type. Please upload a .ts, .js, .tsx, or .jsx file.', 'error');
+            return;
+          }
+
+          if (file.size > MAX_FUNCTION_FILE_SIZE_BYTES) {
+            showToast(
+              'Function file is too large. Please upload a file smaller than 1 MB.',
+              'error'
+            );
+            return;
+          }
+
           const text = await file.text();
           setEditedCode(text);
           setIsEditingCode(true);
@@ -199,7 +223,7 @@ export default function FunctionsPage() {
         }
       })();
     },
-    [showToast]
+    [isMutatingFunction, showToast]
   );
 
   // Detail view for selected function
@@ -245,6 +269,7 @@ export default function FunctionsPage() {
               size="icon"
               onClick={handleUploadFile}
               aria-label="Upload function file"
+              disabled={isMutatingFunction}
               className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
               title="Upload function file"
             >
@@ -257,7 +282,7 @@ export default function FunctionsPage() {
               aria-label="Edit function code"
               className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
               title="Edit function code"
-              disabled={isUpdating}
+              disabled={isMutatingFunction}
             >
               <Edit3 className="h-4 w-4" />
             </Button>
@@ -270,7 +295,7 @@ export default function FunctionsPage() {
               aria-label="Delete function"
               className="h-8 w-8 rounded p-1.5 text-destructive hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
               title="Delete function"
-              disabled={isDeleting}
+              disabled={isMutatingFunction}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -284,7 +309,7 @@ export default function FunctionsPage() {
                   variant="secondary"
                   size="sm"
                   onClick={handleCancelEditCode}
-                  disabled={isUpdating}
+                  disabled={isMutatingFunction}
                   className="h-8 px-2"
                 >
                   Cancel
@@ -292,7 +317,7 @@ export default function FunctionsPage() {
                 <Button
                   size="sm"
                   onClick={() => void handleSaveCode(selectedFunction.slug)}
-                  disabled={isUpdating}
+                  disabled={isMutatingFunction}
                   className="h-8 px-2"
                 >
                   {isUpdating ? 'Saving…' : 'Save'}
