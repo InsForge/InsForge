@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { logService, type GetBuildLogsResponse, type BuildLogEntry } from '../services/log.service';
 import { LogsDataGrid, type LogsColumnDef } from './LogsDataGrid';
+import { DataGridEmptyState } from '@/components';
 import { cn } from '@/lib/utils/utils';
 
 interface BuildLogsViewProps {
@@ -127,9 +128,7 @@ export function BuildLogsView({ className }: BuildLogsViewProps) {
           loading={isLoading}
           showPagination={false}
           gridContainerClassName="border-t border-[var(--alpha-8)]"
-          emptyState={
-            <div className="text-sm text-zinc-500 dark:text-zinc-400">No build logs found</div>
-          }
+          emptyState={<DataGridEmptyState message="No build logs found" />}
         />
       </div>
     </div>
