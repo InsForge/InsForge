@@ -26,7 +26,6 @@ const ALLOWED_FUNCTION_FILE_MIME_TYPES = new Set([
   'application/x-typescript',
   'text/jsx',
   'text/tsx',
-  'text/plain',
 ]);
 
 export default function FunctionsPage() {
@@ -172,7 +171,12 @@ export default function FunctionsPage() {
         );
         const hasAllowedMimeType = ALLOWED_FUNCTION_FILE_MIME_TYPES.has(file.type);
 
-        if (!hasAllowedExtension && !hasAllowedMimeType) {
+        if (!hasAllowedExtension) {
+          showToast('Invalid file type. Please upload a .ts, .js, .tsx, or .jsx file.', 'error');
+          return;
+        }
+
+        if (file.type && !hasAllowedMimeType) {
           showToast('Invalid file type. Please upload a .ts, .js, .tsx, or .jsx file.', 'error');
           return;
         }
@@ -230,6 +234,7 @@ export default function FunctionsPage() {
                 handleDownloadCode(selectedFunction.code, selectedFunction.slug)
               }
               disabled={!selectedFunction.code}
+              aria-label="Download function code"
               className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
               title="Download function code"
             >
@@ -239,6 +244,7 @@ export default function FunctionsPage() {
               variant="ghost"
               size="icon"
               onClick={handleUploadFile}
+              aria-label="Upload function file"
               className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
               title="Upload function file"
             >
@@ -248,6 +254,7 @@ export default function FunctionsPage() {
               variant="ghost"
               size="icon"
               onClick={() => handleStartEditCode(selectedFunction.code)}
+              aria-label="Edit function code"
               className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
               title="Edit function code"
               disabled={isUpdating}
@@ -260,6 +267,7 @@ export default function FunctionsPage() {
               onClick={() =>
                 void handleDeleteFunction(selectedFunction.slug, selectedFunction.name)
               }
+              aria-label="Delete function"
               className="h-8 w-8 rounded p-1.5 text-destructive hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
               title="Delete function"
               disabled={isDeleting}
