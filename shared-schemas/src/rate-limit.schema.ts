@@ -13,4 +13,17 @@ export const rateLimitConfigSchema = z.object({
   updatedAt: z.string(),
 });
 
+export type TabType = 'info' | 'compute' | 'connect' | 'rate-limits';
+
+export type RateLimitFormField =
+  | 'apiGlobalMaxRequests'
+  | 'apiGlobalWindowMinutes'
+  | 'sendEmailOtpMaxRequests'
+  | 'sendEmailOtpWindowMinutes'
+  | 'verifyOtpMaxAttempts'
+  | 'verifyOtpWindowMinutes'
+  | 'emailCooldownSeconds';
+
+export type RateLimitFormValues = Record<RateLimitFormField, string>;
+
 export type RateLimitConfigSchema = z.infer<typeof rateLimitConfigSchema>;

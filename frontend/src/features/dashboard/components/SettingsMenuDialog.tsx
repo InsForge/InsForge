@@ -25,6 +25,9 @@ import {
 import type {
   GetRateLimitConfigResponse,
   InstanceInfoEvent,
+  RateLimitFormField,
+  RateLimitFormValues,
+  TabType,
   UpdateRateLimitConfigRequest,
 } from '@insforge/shared-schemas';
 import { useApiKey } from '@/lib/hooks/useMetadata';
@@ -42,21 +45,8 @@ import { MCPSection, CLISection, ConnectionStringSection } from '@/features/conn
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 import { useRateLimitConfig } from '@/features/dashboard/hooks/useRateLimitConfig';
 
-type TabType = 'info' | 'compute' | 'connect' | 'rate-limits';
-
 const INFO_FIELD_CLASS =
   'flex h-8 w-full items-center rounded border border-[var(--alpha-12)] bg-[var(--alpha-4)] px-2.5 text-sm leading-5 text-foreground';
-
-type RateLimitFormField =
-  | 'apiGlobalMaxRequests'
-  | 'apiGlobalWindowMinutes'
-  | 'sendEmailOtpMaxRequests'
-  | 'sendEmailOtpWindowMinutes'
-  | 'verifyOtpMaxAttempts'
-  | 'verifyOtpWindowMinutes'
-  | 'emailCooldownSeconds';
-
-type RateLimitFormValues = Record<RateLimitFormField, string>;
 
 const DEFAULT_RATE_LIMIT_FORM_VALUES: RateLimitFormValues = {
   apiGlobalMaxRequests: '3000',
