@@ -60,7 +60,7 @@ export const updateStorageConfigRequestSchema = z.object({
     .number()
     .int()
     .min(1, 'Must be at least 1 MB')
-    .max(5120, 'Must be at most 5120 MB (5 GB)'),
+    .max(200, 'Must be at most 200 MB'),
 });
 
 export const getStorageConfigResponseSchema = storageConfigSchema;
