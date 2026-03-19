@@ -3,12 +3,13 @@ import { Folder } from 'lucide-react';
 import { useStorage } from '@/features/storage/hooks/useStorage';
 import { StorageFileSchema } from '@insforge/shared-schemas';
 import { ConfirmDialog } from '@insforge/ui';
-import { LoadingState, ErrorState, EmptyState, ConnectCTA } from '@/components';
+import { LoadingState, ErrorState, EmptyState, ConnectCTA, DataGridEmptyState } from '@/components';
 import { StorageDataGrid } from './StorageDataGrid';
 import { FilePreviewDialog } from './FilePreviewDialog';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
 import { SortColumn } from 'react-data-grid';
+import { usePageSize } from '@/lib/hooks/usePageSize';
 
 interface StorageManagerProps {
   bucketName: string;
@@ -36,7 +37,11 @@ export function StorageManager({
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(50);
+  const {
+    pageSize,
+    pageSizeOptions,
+    onPageSizeChange: handlePageSizeChange,
+  } = usePageSize('storage');
 
   // Reset page when search query or selected table changes
   useEffect(() => {
@@ -196,16 +201,24 @@ export function StorageManager({
           sortColumns={sortColumns}
           currentPage={currentPage}
           totalPages={totalPages}
+          pageSize={pageSize}
+          pageSizeOptions={pageSizeOptions}
           onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            handlePageSizeChange(newSize);
+            setCurrentPage(1);
+          }}
           onSortColumnsChange={setSortColumns}
           onPreview={handlePreview}
           onDownload={(file) => void handleDownload(file)}
           onDelete={(file) => void handleDelete(file)}
           isDownloading={isDownloading}
           emptyState={
-            <div className="text-sm text-foreground">
-              {searchQuery ? 'No files match your search criteria' : 'No files found'}.{' '}
-              <ConnectCTA />
+            <div className="flex flex-col items-center">
+              <DataGridEmptyState
+                message={searchQuery ? 'No files match your search criteria' : 'No files found'}
+              />
+              {!searchQuery && <ConnectCTA />}
             </div>
           }
         />

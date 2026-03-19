@@ -28,6 +28,7 @@ import {
   Alert,
   AlertDescription,
   TableHeader,
+  DataGridEmptyState,
 } from '@/components';
 
 interface BucketFormState {
@@ -444,8 +445,8 @@ export default function StoragePage() {
           </>
         )}
         {!selectedBucket && (
-          <div className="flex-1">
-            <StoragePageEmptyState />
+          <div className="flex flex-1 items-center justify-center">
+            <DataGridEmptyState message="No bucket selected" />
           </div>
         )}
       </div>

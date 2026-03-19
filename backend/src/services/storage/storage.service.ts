@@ -359,14 +359,15 @@ export class StorageService {
         throw new Error(`Bucket "${bucket}" already exists`);
       }
 
+      // Create bucket using backend first — if this fails, no DB row is written
+      // so there is no orphaned record causing a permanent 409 on retry
+      await this.provider.createBucket(bucket);
+
       // Insert bucket into storage.buckets table
       await client.query('INSERT INTO storage.buckets (name, public) VALUES ($1, $2)', [
         bucket,
         isPublic,
       ]);
-
-      // Create bucket using backend
-      await this.provider.createBucket(bucket);
 
       // Update storage metadata
       // Metadata is now updated on-demand
@@ -389,11 +390,13 @@ export class StorageService {
         return false;
       }
 
+      // Delete from DB first — if DB delete fails, files remain intact and retry is safe.
+      // If provider.deleteBucket fails after this point, all objects are cascade-deleted
+      // from the database but files remain orphaned in storage.
+      await client.query('DELETE FROM storage.buckets WHERE name = $1', [bucket]);
+
       // Delete bucket using backend (handles all files)
       await this.provider.deleteBucket(bucket);
-
-      // Delete from storage table (cascade will handle storage.objects entries)
-      await client.query('DELETE FROM storage.buckets WHERE name = $1', [bucket]);
 
       // Update storage metadata
       // Metadata is now updated on-demand

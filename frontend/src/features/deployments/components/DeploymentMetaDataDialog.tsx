@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Copy, Check } from 'lucide-react';
-import { Button, Dialog, DialogContent } from '@insforge/ui';
+import { Button, Dialog, DialogContent, DialogDescription, DialogTitle } from '@insforge/ui';
 import { ScrollArea } from '@/components';
 import type { DeploymentSchema } from '../services/deployments.service';
 
@@ -38,9 +38,12 @@ export function DeploymentMetaDataDialog({
         {/* Header */}
         <div className="flex flex-col gap-6 p-6 border-b border-neutral-200 dark:border-neutral-700">
           <div className="flex flex-col gap-1">
-            <h2 className="text-2xl font-semibold text-zinc-950 dark:text-white tracking-[-0.6px]">
+            <DialogTitle className="text-2xl font-semibold text-zinc-950 dark:text-white tracking-[-0.6px]">
               Deployment Meta Data
-            </h2>
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              View deployment metadata for debugging and auditing
+            </DialogDescription>
             <p className="text-sm text-neutral-500 dark:text-neutral-300">{deployment?.id}</p>
           </div>
 

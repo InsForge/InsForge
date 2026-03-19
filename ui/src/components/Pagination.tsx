@@ -7,6 +7,7 @@ import {
   MoreHorizontal,
 } from 'lucide-react';
 import { cn } from '../lib';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './Select';
 
 type PaginationItem = number | 'ellipsis-left' | 'ellipsis-right';
 const FIXED_CENTER_SLOT_COUNT = 5;
@@ -16,9 +17,11 @@ export interface PaginationProps extends React.HTMLAttributes<HTMLDivElement> {
   totalPages?: number;
   totalRecords?: number;
   pageSize?: number;
+  pageSizeOptions?: number[];
   recordLabel?: string;
   visiblePageCount?: number;
   onPageChange?: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -63,9 +66,11 @@ export function Pagination({
   totalPages = 1,
   totalRecords = 0,
   pageSize = 100,
+  pageSizeOptions,
   recordLabel = 'users',
   visiblePageCount = FIXED_CENTER_SLOT_COUNT,
   onPageChange,
+  onPageSizeChange,
   ...props
 }: PaginationProps) {
   const normalizedTotalPages = Math.max(1, totalPages);
@@ -104,9 +109,36 @@ export function Pagination({
       )}
       {...props}
     >
-      <p className="min-w-0 flex-1 truncate text-[13px] leading-[18px] text-muted-foreground">
-        Showing {startRecord} to {endRecord} of {totalRecords} {recordLabel}
-      </p>
+      <div className="min-w-0 flex-1 flex items-center gap-3">
+        <p className="truncate text-[13px] leading-[18px] text-muted-foreground">
+          Showing {startRecord} to {endRecord} of {totalRecords} {recordLabel}
+        </p>
+        {pageSizeOptions && pageSizeOptions.length > 0 && onPageSizeChange && (
+          <>
+            <div className="h-4 w-px bg-[var(--alpha-8)]" />
+            <div className="flex items-center gap-1.5">
+              <span className="text-[13px] leading-[18px] text-muted-foreground">
+                {recordLabel.charAt(0).toUpperCase() + recordLabel.slice(1)} per page:
+              </span>
+              <Select
+                value={String(pageSize)}
+                onValueChange={(value) => onPageSizeChange(Number(value))}
+              >
+                <SelectTrigger className="h-7 w-[70px] text-[13px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {pageSizeOptions.map((option) => (
+                    <SelectItem key={option} value={String(option)}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
+      </div>
       <nav className="flex items-center gap-1" aria-label="Pagination">
         <button
           type="button"

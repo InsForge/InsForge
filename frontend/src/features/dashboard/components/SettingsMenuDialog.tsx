@@ -8,6 +8,7 @@ import {
   Input,
   MenuDialog,
   MenuDialogContent,
+  MenuDialogDescription,
   MenuDialogSideNav,
   MenuDialogSideNavHeader,
   MenuDialogSideNavTitle,
@@ -344,6 +345,9 @@ export default function SettingsMenuDialog() {
           <MenuDialogMain>
             <MenuDialogHeader>
               <MenuDialogTitle>{sectionTitle}</MenuDialogTitle>
+              <MenuDialogDescription className="sr-only">
+                Project settings and configuration
+              </MenuDialogDescription>
               <MenuDialogCloseButton className="ml-auto self-start" />
             </MenuDialogHeader>
 
