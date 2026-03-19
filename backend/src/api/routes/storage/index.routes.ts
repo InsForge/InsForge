@@ -546,6 +546,8 @@ router.post(
         next(new AppError(error.message, 404, ERROR_CODES.NOT_FOUND));
       } else if (error instanceof Error && error.message.includes('already confirmed')) {
         next(new AppError(error.message, 409, ERROR_CODES.ALREADY_EXISTS));
+      } else if (error instanceof Error && error.message.includes('exceeds the configured maximum')) {
+        next(new AppError(error.message, 413, ERROR_CODES.STORAGE_INVALID_PARAMETER));
       } else {
         next(error);
       }

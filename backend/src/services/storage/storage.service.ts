@@ -502,7 +502,7 @@ export class StorageService {
     return {
       bucket,
       key,
-      size: metadata.size,
+      size: fileSize,
       mimeType: metadata.contentType,
       uploadedAt: result.rows[0].uploadedAt,
       url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`,
