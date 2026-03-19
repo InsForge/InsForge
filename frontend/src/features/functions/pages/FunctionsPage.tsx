@@ -16,6 +16,19 @@ import {
 import { CodeEditor, Skeleton, TableHeader } from '@/components';
 import { useConfirm } from '@/lib/hooks/useConfirm';
 
+const MAX_FUNCTION_FILE_SIZE_BYTES = 1024 * 1024;
+const ALLOWED_FUNCTION_FILE_EXTENSIONS = ['.ts', '.js', '.tsx', '.jsx'];
+const ALLOWED_FUNCTION_FILE_MIME_TYPES = new Set([
+  'text/javascript',
+  'application/javascript',
+  'text/typescript',
+  'application/typescript',
+  'application/x-typescript',
+  'text/jsx',
+  'text/tsx',
+  'text/plain',
+]);
+
 export default function FunctionsPage() {
   const toastShownRef = useRef(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -152,6 +165,23 @@ export default function FunctionsPage() {
         if (!file) {
           return;
         }
+
+        const normalizedFileName = file.name.toLowerCase();
+        const hasAllowedExtension = ALLOWED_FUNCTION_FILE_EXTENSIONS.some((extension) =>
+          normalizedFileName.endsWith(extension)
+        );
+        const hasAllowedMimeType = ALLOWED_FUNCTION_FILE_MIME_TYPES.has(file.type);
+
+        if (!hasAllowedExtension && !hasAllowedMimeType) {
+          showToast('Invalid file type. Please upload a .ts, .js, .tsx, or .jsx file.', 'error');
+          return;
+        }
+
+        if (file.size > MAX_FUNCTION_FILE_SIZE_BYTES) {
+          showToast('Function file is too large. Please upload a file smaller than 1 MB.', 'error');
+          return;
+        }
+
         try {
           const text = await file.text();
           setEditedCode(text);

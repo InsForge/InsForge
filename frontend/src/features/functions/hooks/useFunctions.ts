@@ -69,7 +69,7 @@ export function useFunctions() {
       functionService.updateFunction(slug, updates),
     onSuccess: (updated) => {
       void queryClient.invalidateQueries({ queryKey: ['functions'] });
-      setSelectedFunction(updated);
+      setSelectedFunction((previous) => (previous?.id === updated.id ? updated : previous));
       showToast('Function updated successfully', 'success');
     },
     onError: (error: Error) => {
