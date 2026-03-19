@@ -136,14 +136,17 @@ export default function FunctionsPage() {
     [confirm, deleteFunction, isMutatingFunction]
   );
 
-  const handleStartEditCode = useCallback((initialCode: string | null | undefined) => {
-    if (isMutatingFunction) {
-      return;
-    }
+  const handleStartEditCode = useCallback(
+    (initialCode: string | null | undefined) => {
+      if (isMutatingFunction) {
+        return;
+      }
 
-    setEditedCode(initialCode ?? '');
-    setIsEditingCode(true);
-  }, [isMutatingFunction]);
+      setEditedCode(initialCode ?? '');
+      setIsEditingCode(true);
+    },
+    [isMutatingFunction]
+  );
 
   const handleCancelEditCode = useCallback(() => {
     setIsEditingCode(false);
