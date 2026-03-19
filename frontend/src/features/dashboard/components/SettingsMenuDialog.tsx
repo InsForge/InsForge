@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Cpu, HardDrive, Plug, Settings } from 'lucide-react';
+import { Cpu, HardDrive, Plug, RefreshCw, Settings } from 'lucide-react';
 import {
   Button,
   CopyButton,
@@ -24,6 +24,7 @@ import {
 } from '@insforge/ui';
 import type { InstanceInfoEvent } from '@insforge/shared-schemas';
 import { useApiKey } from '@/lib/hooks/useMetadata';
+import { metadataService } from '@/lib/services/metadata.service';
 import { useHealth } from '@/lib/hooks/useHealth';
 import {
   CLOUD_PROJECT_INFO_QUERY_KEY,
@@ -54,7 +55,9 @@ export default function SettingsMenuDialog() {
   const [selectedInstanceType, setSelectedInstanceType] = useState<string | null>(null);
   const [isChangingInstanceType, setIsChangingInstanceType] = useState(false);
 
-  const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
+  const [isRotatingApiKey, setIsRotatingApiKey] = useState(false);
+
+  const { apiKey, isLoading: isApiKeyLoading, refetch: refetchApiKey } = useApiKey();
   const { version, isLoading: isVersionLoading } = useHealth();
   const { projectInfo, isLoading: isProjectInfoLoading } = useCloudProjectInfo();
   const { confirm, confirmDialogProps } = useConfirm();
@@ -220,6 +223,36 @@ export default function SettingsMenuDialog() {
     isProjectNameFocused,
     projectInfo.name,
   ]);
+
+  const handleRotateApiKey = useCallback(async () => {
+    const confirmed = await confirm({
+      title: 'Rotate API Key',
+      description:
+        'This will generate a new API key. The current key will remain valid for 24 hours to allow migration. This action cannot be undone.',
+      confirmText: 'Rotate Key',
+      cancelText: 'Cancel',
+      destructive: true,
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsRotatingApiKey(true);
+
+    try {
+      const result = await metadataService.rotateApiKey(24);
+
+      if (result.success) {
+        showToast('API key rotated successfully. Old key expires in 24 hours.', 'success');
+        await refetchApiKey();
+      }
+    } catch {
+      showToast('Failed to rotate API key. Please try again.', 'error');
+    } finally {
+      setIsRotatingApiKey(false);
+    }
+  }, [confirm, showToast, refetchApiKey]);
 
   const handleDeleteProject = async () => {
     const confirmed = await confirm({
@@ -424,6 +457,20 @@ export default function SettingsMenuDialog() {
                           />
                         )}
                       </div>
+                      <Button
+                        variant="secondary"
+                        onClick={() => void handleRotateApiKey()}
+                        disabled={isApiKeyLoading || isRotatingApiKey}
+                        title="Rotate API Key"
+                        className="h-8 shrink-0 rounded border-[var(--alpha-8)] bg-card px-2.5 text-sm font-medium"
+                      >
+                        <RefreshCw
+                          className={cn('size-4', isRotatingApiKey && 'animate-spin')}
+                        />
+                        <span className="ml-1.5">
+                          {isRotatingApiKey ? 'Rotating...' : 'Rotate'}
+                        </span>
+                      </Button>
                     </div>
                   </div>
 
