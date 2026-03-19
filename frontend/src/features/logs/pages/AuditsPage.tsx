@@ -2,8 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { RefreshCw, Trash2, ExternalLink } from 'lucide-react';
 import { LogsDataGrid, type LogsColumnDef } from '@/features/logs/components';
 import { formatTime, cn } from '@/lib/utils/utils';
-import { LOGS_PAGE_SIZE } from '@/features/logs/helpers';
 import { useConfirm } from '@/lib/hooks/useConfirm';
+import { usePageSize } from '@/lib/hooks/usePageSize';
 import { Button, ConfirmDialog } from '@insforge/ui';
 import { TableHeader } from '@/components';
 import { useAuditLogs, useClearAuditLogs } from '@/features/logs/hooks/useAuditLogs';
@@ -22,8 +22,13 @@ export default function AuditsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [filters, setFilters] = useState<Partial<GetAuditLogsRequest>>({});
   const { confirm, confirmDialogProps } = useConfirm();
+  const {
+    pageSize,
+    pageSizeOptions,
+    onPageSizeChange: handlePageSizeChange,
+  } = usePageSize('audit-logs');
 
-  const offset = (currentPage - 1) * LOGS_PAGE_SIZE;
+  const offset = (currentPage - 1) * pageSize;
 
   const {
     data: logsResponse,
@@ -31,7 +36,7 @@ export default function AuditsPage() {
     error,
     refetch,
   } = useAuditLogs({
-    limit: LOGS_PAGE_SIZE,
+    limit: pageSize,
     offset,
     ...filters,
   });
@@ -146,10 +151,16 @@ export default function AuditsPage() {
           data={logsData}
           loading={isLoading}
           currentPage={currentPage}
-          totalPages={Math.ceil(totalRecords / LOGS_PAGE_SIZE)}
-          pageSize={LOGS_PAGE_SIZE}
+          totalPages={Math.ceil(totalRecords / pageSize)}
+          pageSize={pageSize}
+          pageSizeOptions={pageSizeOptions}
           totalRecords={totalRecords}
           onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            handlePageSizeChange(newSize);
+            setCurrentPage(1);
+          }}
+          paginationRecordLabel="logs"
           gridContainerClassName="border-t border-[var(--alpha-8)]"
           emptyState={
             <div className="text-[13px] text-muted-foreground">

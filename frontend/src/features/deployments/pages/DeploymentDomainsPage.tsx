@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ExternalLink, Copy, Check, Plus, Pencil, Globe } from 'lucide-react';
-import { Button, Dialog, DialogContent, DialogTitle, Input } from '@insforge/ui';
+import { Button, Dialog, DialogContent, DialogDescription, DialogTitle, Input } from '@insforge/ui';
 import { Skeleton } from '@/components';
 import DiscordIcon from '@/assets/logos/discord.svg?react';
 import { useDeployments } from '../hooks/useDeployments';
@@ -316,6 +316,9 @@ export default function DeploymentDomainsPage() {
                   Add your own domain
                 </DialogTitle>
               </div>
+              <DialogDescription className="sr-only">
+                Add a custom domain to your deployment
+              </DialogDescription>
 
               {/* Body */}
               <div className="flex flex-col gap-4 p-6">

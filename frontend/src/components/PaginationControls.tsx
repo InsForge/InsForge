@@ -6,7 +6,9 @@ export interface PaginationControlsProps {
   onPageChange?: (page: number) => void;
   totalRecords?: number;
   pageSize?: number;
+  pageSizeOptions?: number[];
   recordLabel?: string;
+  onPageSizeChange?: (pageSize: number) => void;
 }
 
 export function PaginationControls({
@@ -15,7 +17,9 @@ export function PaginationControls({
   onPageChange,
   totalRecords = 0,
   pageSize = 50,
+  pageSizeOptions,
   recordLabel = 'results',
+  onPageSizeChange,
 }: PaginationControlsProps) {
   return (
     <Pagination
@@ -24,7 +28,9 @@ export function PaginationControls({
       onPageChange={onPageChange}
       totalRecords={totalRecords}
       pageSize={pageSize}
+      pageSizeOptions={pageSizeOptions}
       recordLabel={recordLabel}
+      onPageSizeChange={onPageSizeChange}
     />
   );
 }

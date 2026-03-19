@@ -7,7 +7,12 @@ import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
-import { AuthRequest, verifyAdmin, verifyToken } from '@/api/middlewares/auth.js';
+import {
+  AuthRequest,
+  verifyAdmin,
+  verifyToken,
+  extractBearerToken,
+} from '@/api/middlewares/auth.js';
 import oauthRouter from './oauth.routes.js';
 import {
   sendEmailOTPLimiter,
@@ -234,8 +239,62 @@ router.put(
   }
 );
 
-// POST /api/auth/users - Create a new user (registration)
+// GET /api/auth/rate-limits - Get API/auth rate-limit configurations (admin only)
+router.get(
+  '/rate-limits',
+  verifyAdmin,
+  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const config: GetRateLimitConfigResponse = await rateLimitConfigService.getConfig();
+      successResponse(res, config);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// PUT /api/auth/rate-limits - Update API/auth rate-limit configurations (admin only)
+router.put(
+  '/rate-limits',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validationResult = updateRateLimitConfigRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const input = validationResult.data;
+      const config: GetRateLimitConfigResponse = await rateLimitConfigService.updateConfig(input);
+
+      // Ensure new values are picked up immediately by middleware cache.
+      invalidateRateLimitConfigCache();
+
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'UPDATE_RATE_LIMIT_CONFIG',
+        module: 'AUTH',
+        details: {
+          updatedFields: Object.keys(input),
+        },
+        ip_address: req.ip,
+      });
+
+      successResponse(res, config);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /api/auth/users - Create a new user (registration or admin adding user)
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
+// When called with a valid admin token (e.g. dashboard adding a user), we do NOT set session
+// cookie or return csrf/refresh tokens, so the admin's session is not overwritten.
 router.post('/users', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const clientType = parseClientType(req.query.client_type);
@@ -252,8 +311,24 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
     const { email, password, name, options } = validationResult.data;
     const result: CreateUserResponse = await authService.register(email, password, name, options);
 
-    // Set refresh token based on client type
-    if (result.accessToken && result.user) {
+    // If the request is from a project_admin, do not set refresh token cookie or return session
+    // tokens, so the admin's session is not overwritten when adding a user (works with multiple admins).
+    let adminCreatingUser = false;
+    try {
+      const token = extractBearerToken(req.headers.authorization);
+      if (token) {
+        const payload = TokenManager.getInstance().verifyToken(token);
+        adminCreatingUser = payload?.role === 'project_admin';
+      }
+    } catch (error) {
+      // Not a valid token; treat as normal registration.
+      logger.debug('[Auth:CreateUser] Admin detection failed', {
+        error: error instanceof Error ? error.message : 'unknown',
+      });
+    }
+
+    // Set refresh token based on client type (skip when admin is adding a user)
+    if (result.accessToken && result.user && !adminCreatingUser) {
       const tokenManager = TokenManager.getInstance();
       const refreshToken = tokenManager.generateRefreshToken(result.user.id);
 

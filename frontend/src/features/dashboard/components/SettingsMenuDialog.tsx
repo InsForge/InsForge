@@ -8,6 +8,7 @@ import {
   Input,
   MenuDialog,
   MenuDialogContent,
+  MenuDialogDescription,
   MenuDialogSideNav,
   MenuDialogSideNavHeader,
   MenuDialogSideNavTitle,
@@ -157,6 +158,8 @@ export default function SettingsMenuDialog() {
   const {
     config: rateLimitConfig,
     isLoading: isRateLimitConfigLoading,
+    isError: isRateLimitConfigError,
+    error: rateLimitConfigError,
     isUpdating: isUpdatingRateLimits,
     updateConfig: updateRateLimitConfig,
   } = useRateLimitConfig();
@@ -189,12 +192,26 @@ export default function SettingsMenuDialog() {
     () => parseRateLimitFormValues(rateLimitFormValues),
     [rateLimitFormValues]
   );
-  const showRateLimitActions = activeTab === 'rate-limits';
+  const rateLimitConfigErrorMessage = useMemo(() => {
+    if (!isRateLimitConfigError) {
+      return null;
+    }
+
+    if (rateLimitConfigError instanceof Error && rateLimitConfigError.message) {
+      return rateLimitConfigError.message;
+    }
+
+    return 'Failed to load API rate-limit configuration.';
+  }, [isRateLimitConfigError, rateLimitConfigError]);
+  const isRateLimitConfigUnavailable = isRateLimitConfigError || !rateLimitConfig;
+  const showRateLimitActions =
+    activeTab === 'rate-limits' && !isRateLimitConfigLoading && !isRateLimitConfigUnavailable;
   const saveRateLimitsDisabled =
     !isRateLimitDirty ||
     !rateLimitValidation.parsed ||
     isUpdatingRateLimits ||
-    isRateLimitConfigLoading;
+    isRateLimitConfigLoading ||
+    isRateLimitConfigUnavailable;
   const showProjectNameActions =
     isCloud && activeTab === 'info' && (isProjectNameFocused || isProjectNameDirty);
   const showComputeActions =
@@ -446,6 +463,11 @@ export default function SettingsMenuDialog() {
   };
 
   const handleSaveRateLimitChanges = () => {
+    if (isRateLimitConfigUnavailable) {
+      showToast('Rate-limit configuration is unavailable. Please refresh and try again.', 'error');
+      return;
+    }
+
     if (!rateLimitValidation.parsed) {
       showToast('Please fix invalid rate-limit values before saving', 'error');
       return;
@@ -520,6 +542,9 @@ export default function SettingsMenuDialog() {
           <MenuDialogMain>
             <MenuDialogHeader>
               <MenuDialogTitle>{sectionTitle}</MenuDialogTitle>
+              <MenuDialogDescription className="sr-only">
+                Project settings and configuration
+              </MenuDialogDescription>
               <MenuDialogCloseButton className="ml-auto self-start" />
             </MenuDialogHeader>
 
@@ -815,6 +840,16 @@ export default function SettingsMenuDialog() {
                   {isRateLimitConfigLoading ? (
                     <div className="flex min-h-[100px] items-center justify-center text-sm text-muted-foreground">
                       Loading rate-limit configuration...
+                    </div>
+                  ) : isRateLimitConfigUnavailable ? (
+                    <div className="rounded border border-destructive/40 bg-destructive/5 p-3">
+                      <p className="text-sm leading-5 text-destructive">
+                        {rateLimitConfigErrorMessage ||
+                          'Rate-limit configuration is unavailable right now.'}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        Editing is disabled until the configuration can be loaded successfully.
+                      </p>
                     </div>
                   ) : (
                     <div className="flex w-full flex-col gap-4">

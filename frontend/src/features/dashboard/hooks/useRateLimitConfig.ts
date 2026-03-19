@@ -12,6 +12,7 @@ export function useRateLimitConfig() {
   const {
     data: config,
     isLoading,
+    isError,
     error,
     refetch,
   } = useQuery<GetRateLimitConfigResponse>({
@@ -37,9 +38,11 @@ export function useRateLimitConfig() {
   return {
     config,
     isLoading,
+    isError,
     error,
     isUpdating: updateConfigMutation.isPending,
     updateConfig: updateConfigMutation.mutateAsync,
     refetch,
   };
 }
+
