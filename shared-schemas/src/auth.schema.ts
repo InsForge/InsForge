@@ -95,7 +95,7 @@ export const oAuthConfigSchema = z.object({
  * Each entry must be a valid URL or a wildcard subdomain pattern (e.g. https://*.example.com)
  * Uses regex instead of URL constructor since shared-schemas has no DOM types.
  */
-const urlOrWildcardPattern =
+export const urlOrWildcardPattern =
   /^https?:\/\/(\*\.)?[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*(:\d+)?(\/.*)?$/;
 
 export const redirectUrlWhitelistSchema = z.array(
