@@ -44,6 +44,12 @@ interface OpenRouterLimitation {
 
 export const BYOK_SECRET_KEY = 'AI_GATEWAY_OPENROUTER_KEY';
 
+type ApiKeySource = 'byok' | 'cloud' | 'env';
+interface ResolvedApiKey {
+  apiKey: string;
+  source: ApiKeySource;
+}
+
 export class OpenRouterProvider {
   private static instance: OpenRouterProvider;
   private cloudCredentials: CloudCredentials | undefined;
@@ -52,6 +58,7 @@ export class OpenRouterProvider {
   private renewalPromise: Promise<string> | null = null;
   private fetchPromise: Promise<string> | null = null;
   private byokKeyCache: string | null | undefined = undefined; // undefined = not yet fetched
+  private byokCacheGeneration = 0;
 
   private constructor() {}
 
@@ -85,15 +92,21 @@ export class OpenRouterProvider {
     if (this.byokKeyCache !== undefined) {
       return this.byokKeyCache;
     }
+    const generation = this.byokCacheGeneration;
     try {
       const secretService = SecretService.getInstance();
-      this.byokKeyCache = await secretService.getSecretByKey(BYOK_SECRET_KEY);
-      return this.byokKeyCache;
+      const key = await secretService.getSecretByKey(BYOK_SECRET_KEY);
+      if (this.byokCacheGeneration === generation) {
+        this.byokKeyCache = key;
+      }
+      return key;
     } catch (error) {
       logger.warn('Failed to read BYOK secret, falling through to next key source', {
         error: error instanceof Error ? error.message : String(error),
       });
-      this.byokKeyCache = null;
+      if (this.byokCacheGeneration === generation) {
+        this.byokKeyCache = null;
+      }
       return null;
     }
   }
@@ -115,28 +128,27 @@ export class OpenRouterProvider {
     this.currentApiKey = undefined;
     this.cloudCredentials = undefined;
     this.byokKeyCache = undefined;
+    this.byokCacheGeneration++;
   }
 
   /**
-   * Get OpenRouter API key with priority order:
-   * 1. Developer-provided BYOK key (stored in secrets)
-   * 2. InsForge Cloud-managed key (cloud environment only)
-   * 3. OPENROUTER_API_KEY environment variable (self-hosted fallback)
+   * Resolve the API key and its source in one call.
+   * Priority: BYOK > cloud-managed > env variable.
+   * Use this instead of getApiKey() when downstream logic depends on the source.
    */
-  async getApiKey(): Promise<string> {
-    // 1. Check for BYOK key (highest priority for both cloud and self-hosted)
+  async getApiKeyWithSource(): Promise<ResolvedApiKey> {
+    // 1. BYOK key (highest priority for both cloud and self-hosted)
     const byokKey = await this.getBYOKApiKey();
     if (byokKey) {
-      return byokKey;
+      return { apiKey: byokKey, source: 'byok' };
     }
 
     // 2. Cloud environment: fetch from InsForge Cloud
     if (isCloudEnvironment()) {
-      if (this.cloudCredentials) {
-        return this.cloudCredentials.apiKey;
-      } else {
-        return await this.fetchCloudApiKey();
-      }
+      const apiKey = this.cloudCredentials
+        ? this.cloudCredentials.apiKey
+        : await this.fetchCloudApiKey();
+      return { apiKey, source: 'cloud' };
     }
 
     // 3. Self-hosted: env variable fallback
@@ -148,7 +160,17 @@ export class OpenRouterProvider {
         ERROR_CODES.AI_INVALID_API_KEY
       );
     }
-    return apiKey;
+    return { apiKey, source: 'env' };
+  }
+
+  /**
+   * Get OpenRouter API key with priority order:
+   * 1. Developer-provided BYOK key (stored in secrets)
+   * 2. InsForge Cloud-managed key (cloud environment only)
+   * 3. OPENROUTER_API_KEY environment variable (self-hosted fallback)
+   */
+  async getApiKey(): Promise<string> {
+    return (await this.getApiKeyWithSource()).apiKey;
   }
 
   /**
@@ -199,10 +221,10 @@ export class OpenRouterProvider {
     remaining: number | null;
   }> {
     try {
-      const apiKey = await this.getApiKey();
+      const { apiKey, source } = await this.getApiKeyWithSource();
 
-      if (isCloudEnvironment()) {
-        // Use InsForge API for cloud environment
+      if (source === 'cloud') {
+        // Use InsForge API for cloud-managed keys only (never forward BYOK secrets)
         const response = await fetch(
           `https://api.insforge.dev/ai/v1/limitations?credential=${encodeURIComponent(apiKey)}`,
           {
@@ -223,7 +245,7 @@ export class OpenRouterProvider {
           remaining: keyInfo.credit_remaining,
         };
       } else {
-        // Use OpenRouter API for local environment
+        // Use OpenRouter API directly for BYOK and env-var keys
         const response = await fetch('https://openrouter.ai/api/v1/key', {
           method: 'GET',
           headers: {
@@ -408,17 +430,17 @@ export class OpenRouterProvider {
    * @returns The result of the request
    */
   async sendRequest<T>(request: (client: OpenAI) => Promise<T>): Promise<T> {
+    // Snapshot source before the request so retry guard is stable even if admin
+    // changes the BYOK key mid-flight.
+    const { source } = await this.getApiKeyWithSource();
     const client = await this.getClient();
 
     try {
       return await request(client);
     } catch (error) {
-      // Check if error is a 402/403 insufficient credits error in cloud environment
-      // Skip renewal when BYOK key is active — the key is developer-managed
-      const byokActive = await this.isByokActive();
+      // Only renew cloud-managed keys on 402/403 — never touch BYOK or env keys
       if (
-        !byokActive &&
-        isCloudEnvironment() &&
+        source === 'cloud' &&
         error instanceof OpenAI.APIError &&
         (error.status === 402 || error.status === 403)
       ) {
