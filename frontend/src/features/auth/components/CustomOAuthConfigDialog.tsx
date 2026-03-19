@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import {
   Button,
+  CopyButton,
   Dialog,
   DialogContent,
   DialogFooter,
@@ -17,6 +18,7 @@ import {
 } from '@insforge/shared-schemas';
 import { SecretInput } from './SecretInput';
 import { useCustomOAuthConfig } from '@/features/auth/hooks/useCustomOAuthConfig';
+import { getBackendUrl } from '@/lib/utils/utils';
 
 interface CustomOAuthConfigDialogProps {
   isOpen: boolean;
@@ -43,6 +45,12 @@ const isValidUrl = (value: string) => {
   } catch {
     return false;
   }
+};
+
+const getCustomCallbackUrl = (providerKey?: string) => {
+  const normalizedKey = providerKey?.trim().toLowerCase();
+  const callbackKey = normalizedKey || '<provider-key>';
+  return `${getBackendUrl()}/api/auth/oauth/custom/${callbackKey}/callback`;
 };
 
 export function CustomOAuthConfigDialog({
@@ -74,8 +82,15 @@ export function CustomOAuthConfigDialog({
   const isEditing = Boolean(selectedConfig);
   const isPending = isCreating || isUpdating;
   const values = form.watch();
+  const normalizedProviderKey = values.key.trim().toLowerCase();
   const activeConfig = fetchedConfig ?? selectedConfig;
   const [isClientSecretVisible, setIsClientSecretVisible] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsClientSecretVisible(false);
+    }
+  }, [isOpen, selectedConfig?.key]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -213,73 +228,105 @@ export function CustomOAuthConfigDialog({
             </div>
           </div>
         ) : (
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              void form.handleSubmit(onSubmit)();
-            }}
-            className="max-h-[72vh] space-y-5 overflow-y-auto px-6 py-5"
-          >
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">Name</label>
-              <Input placeholder="e.g. Acme" {...form.register('name')} />
-            </div>
+          <>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void form.handleSubmit(onSubmit)();
+              }}
+              className="max-h-[72vh] space-y-5 overflow-y-auto px-6 py-5"
+            >
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground">
+                  Provider Name
+                </label>
+                <Input placeholder="e.g. Acme" {...form.register('name')} />
+              </div>
 
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">Key</label>
-              <Input placeholder="acme_provider" disabled={isEditing} {...form.register('key')} />
-              {form.formState.errors.key?.message && (
-                <p className="mt-1 text-xs text-destructive">{form.formState.errors.key.message}</p>
-              )}
-            </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground">
+                  Provider Key
+                </label>
+                <Input placeholder="acme_provider" disabled={isEditing} {...form.register('key')} />
+                <div className="mt-1 space-y-1 text-xs text-muted-foreground">
+                  <p>
+                    Use lowercase letters, numbers, hyphens, and underscores. Add this callback URL
+                    to your provider:
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <code className="min-w-0 rounded bg-[var(--alpha-8)] px-1.5 py-0.5 font-mono text-[12px] text-foreground break-all">
+                      {getCustomCallbackUrl(values.key)}
+                    </code>
+                    {normalizedProviderKey && (
+                      <CopyButton
+                        text={getCustomCallbackUrl(values.key)}
+                        showText={false}
+                        className="shrink-0"
+                      />
+                    )}
+                  </div>
+                </div>
+                {form.formState.errors.key?.message && (
+                  <p className="mt-1 text-xs text-destructive">
+                    {form.formState.errors.key.message}
+                  </p>
+                )}
+              </div>
 
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">
-                Discovery endpoint
-              </label>
-              <Input
-                placeholder="https://example.com/.well-known/openid-configuration"
-                {...form.register('discoveryEndpoint')}
-              />
-              {form.formState.errors.discoveryEndpoint?.message && (
-                <p className="mt-1 text-xs text-destructive">
-                  {form.formState.errors.discoveryEndpoint.message}
-                </p>
-              )}
-            </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground">
+                  Discovery endpoint
+                </label>
+                <Input
+                  placeholder="https://example.com/.well-known/openid-configuration"
+                  {...form.register('discoveryEndpoint')}
+                />
+                {form.formState.errors.discoveryEndpoint?.message && (
+                  <p className="mt-1 text-xs text-destructive">
+                    {form.formState.errors.discoveryEndpoint.message}
+                  </p>
+                )}
+              </div>
 
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">Client ID</label>
-              <Input {...form.register('clientId')} />
-            </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground">
+                  Client ID
+                </label>
+                <Input {...form.register('clientId')} />
+              </div>
 
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">
-                Client secret
-              </label>
-              <SecretInput
-                {...form.register('clientSecret')}
-                value={values.clientSecret}
-                isVisible={isClientSecretVisible}
-                onToggleVisibility={() => setIsClientSecretVisible((visible) => !visible)}
-                placeholder="Enter client secret"
-              />
-              {form.formState.errors.clientSecret?.message && (
-                <p className="mt-1 text-xs text-destructive">
-                  {form.formState.errors.clientSecret.message}
-                </p>
-              )}
-            </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground">
+                  Client secret
+                </label>
+                <SecretInput
+                  {...form.register('clientSecret')}
+                  value={values.clientSecret}
+                  isVisible={isClientSecretVisible}
+                  onToggleVisibility={() => setIsClientSecretVisible((visible) => !visible)}
+                  placeholder="Enter client secret"
+                />
+                {form.formState.errors.clientSecret?.message && (
+                  <p className="mt-1 text-xs text-destructive">
+                    {form.formState.errors.clientSecret.message}
+                  </p>
+                )}
+              </div>
+            </form>
 
-            <DialogFooter className="border-t border-[var(--alpha-8)] pt-4">
+            <DialogFooter>
               <Button type="button" variant="secondary" onClick={onClose}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSaveDisabled || isPending}>
+              <Button
+                type="button"
+                onClick={() => void form.handleSubmit(onSubmit)()}
+                disabled={isSaveDisabled || isPending}
+              >
                 {isEditing ? 'Save changes' : 'Create provider'}
               </Button>
             </DialogFooter>
-          </form>
+          </>
         )}
       </DialogContent>
     </Dialog>

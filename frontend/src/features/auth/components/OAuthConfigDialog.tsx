@@ -85,6 +85,12 @@ export function OAuthConfigDialog({
     control: form.control,
   });
 
+  useEffect(() => {
+    if (isOpen) {
+      setIsClientSecretVisible(false);
+    }
+  }, [isOpen, provider?.id]);
+
   // Load OAuth configuration after fetching
   useEffect(() => {
     if (isOpen && provider && !isLoadingProvider) {
