@@ -51,6 +51,7 @@ export class OpenRouterProvider {
   private currentApiKey: string | undefined;
   private renewalPromise: Promise<string> | null = null;
   private fetchPromise: Promise<string> | null = null;
+  private byokKeyCache: string | null | undefined = undefined; // undefined = not yet fetched
 
   private constructor() {}
 
@@ -81,15 +82,28 @@ export class OpenRouterProvider {
    * Returns null if no BYOK key is configured
    */
   private async getBYOKApiKey(): Promise<string | null> {
+    if (this.byokKeyCache !== undefined) {
+      return this.byokKeyCache;
+    }
     try {
       const secretService = SecretService.getInstance();
-      return await secretService.getSecretByKey(BYOK_SECRET_KEY);
+      this.byokKeyCache = await secretService.getSecretByKey(BYOK_SECRET_KEY);
+      return this.byokKeyCache;
     } catch (error) {
       logger.warn('Failed to read BYOK secret, falling through to next key source', {
         error: error instanceof Error ? error.message : String(error),
       });
+      this.byokKeyCache = null;
       return null;
     }
+  }
+
+  /**
+   * Returns true if a BYOK key is currently active (uses in-memory cache).
+   * Use this to skip cloud-specific behaviors like usage tracking.
+   */
+  async isByokActive(): Promise<boolean> {
+    return !!(await this.getBYOKApiKey());
   }
 
   /**
@@ -100,6 +114,7 @@ export class OpenRouterProvider {
     this.openRouterClient = null;
     this.currentApiKey = undefined;
     this.cloudCredentials = undefined;
+    this.byokKeyCache = undefined;
   }
 
   /**
@@ -400,7 +415,7 @@ export class OpenRouterProvider {
     } catch (error) {
       // Check if error is a 402/403 insufficient credits error in cloud environment
       // Skip renewal when BYOK key is active — the key is developer-managed
-      const byokActive = !!(await this.getBYOKApiKey());
+      const byokActive = await this.isByokActive();
       if (
         !byokActive &&
         isCloudEnvironment() &&
