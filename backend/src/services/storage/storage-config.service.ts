@@ -114,9 +114,7 @@ export class StorageConfigService {
     try {
       await client.query('BEGIN');
 
-      const existingResult = await client.query(
-        'SELECT id FROM storage.config LIMIT 1 FOR UPDATE'
-      );
+      const existingResult = await client.query('SELECT id FROM storage.config LIMIT 1 FOR UPDATE');
 
       let result;
 
