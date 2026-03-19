@@ -17,8 +17,7 @@ const toastVariants = cva(
 );
 
 export interface ToastProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof toastVariants> {
+  extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof toastVariants> {
   icon?: React.ReactNode;
   action?: React.ReactNode;
 }

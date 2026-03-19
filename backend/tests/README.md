@@ -34,7 +34,9 @@ export APP_KEY="app12345"  # 7-9 character tenant identifier
 Tests are organized into two categories:
 
 ### Local Tests (`./local/`)
+
 Tests for local Docker deployment with local file storage:
+
 - `test-auth-router.sh` - Authentication and JWT tests
 - `test-database-router.sh` - Database CRUD operations
 - `test-e2e.sh` - End-to-end workflows
@@ -44,27 +46,33 @@ Tests for local Docker deployment with local file storage:
 - `comprehensive-curl-tests.sh` - Comprehensive API tests
 
 ### Cloud Tests (`./cloud/`)
+
 Tests for cloud deployment with S3 multi-tenant storage:
+
 - `test-s3-multitenant.sh` - S3 storage with APP_KEY folder structure
 
 ## Running Tests
 
 ### Run all tests
+
 ```bash
 ./run-all-tests.sh
 ```
 
 ### Run local tests only
+
 ```bash
 cd local && for test in test-*.sh; do ./$test; done
 ```
 
 ### Run cloud tests only
+
 ```bash
 cd cloud && for test in test-*.sh; do ./$test; done
 ```
 
 ### Run individual test
+
 ```bash
 ./local/test-auth-router.sh
 ./cloud/test-s3-multitenant.sh
@@ -73,6 +81,7 @@ cd cloud && for test in test-*.sh; do ./$test; done
 ## Test Data Cleanup
 
 All tests automatically clean up after themselves by:
+
 - Deleting test users (email prefix: `testuser_`)
 - Removing test tables
 - Deleting test storage buckets
@@ -86,6 +95,7 @@ To remove ALL test data from the system:
 ```
 
 This will prompt for confirmation and then delete:
+
 - All users with email prefix `testuser_`
 - All tables containing `test_`, `temp_`, `_test`, `_temp`
 - All buckets containing `test`, `temp`, `public-images-`, `private-docs-`
@@ -94,6 +104,7 @@ This will prompt for confirmation and then delete:
 ## Test Configuration
 
 All tests source `test-config.sh` which provides:
+
 - Shared configuration and environment variables
 - Color output utilities
 - Automatic cleanup functions
