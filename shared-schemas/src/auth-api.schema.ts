@@ -10,6 +10,7 @@ import {
   oAuthProvidersSchema,
   authConfigSchema,
   customOAuthConfigSchema,
+  customOAuthKeySchema,
 } from './auth.schema';
 
 // ============================================================================
@@ -366,6 +367,7 @@ export const getAuthConfigResponseSchema = authConfigSchema;
  */
 export const getPublicAuthConfigResponseSchema = z.object({
   oAuthProviders: z.array(oAuthProvidersSchema),
+  customOAuthProviders: z.array(customOAuthKeySchema),
   ...authConfigSchema.omit({
     id: true,
     updatedAt: true,

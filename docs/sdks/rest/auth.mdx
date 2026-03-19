@@ -806,10 +806,8 @@ curl "https://your-app.insforge.app/api/auth/public-config"
 
 ```json
 {
-  "oAuthProviders": [
-    {"provider": "google", "useSharedKey": true},
-    {"provider": "github", "useSharedKey": false}
-  ],
+  "oAuthProviders": ["google", "github"],
+  "customOAuthProviders": ["acme"],
   "requireEmailVerification": true,
   "passwordMinLength": 8,
   "requireNumber": true,

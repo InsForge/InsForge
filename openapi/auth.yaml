@@ -22,13 +22,12 @@ paths:
                   oAuthProviders:
                     type: array
                     items:
-                      type: object
-                      properties:
-                        provider:
-                          type: string
-                          enum: [google, github, discord, linkedin, facebook, instagram, tiktok, apple, x, spotify, microsoft]
-                        useSharedKey:
-                          type: boolean
+                      type: string
+                      enum: [google, github, discord, linkedin, facebook, instagram, tiktok, apple, x, spotify, microsoft]
+                  customOAuthProviders:
+                    type: array
+                    items:
+                      type: string
                   requireEmailVerification:
                     type: boolean
                   passwordMinLength:
@@ -43,14 +42,6 @@ paths:
                     type: boolean
                   requireSpecialChar:
                     type: boolean
-                  verifyEmailRedirectTo:
-                    type: string
-                    nullable: true
-                    description: URL to redirect users after successful email verification (if not set, shows default success page)
-                  resetPasswordRedirectTo:
-                    type: string
-                    nullable: true
-                    description: URL to redirect users after successful password reset (if not set, shows default success page)
                   verifyEmailMethod:
                     type: string
                     enum: [code, link]
@@ -1540,6 +1531,28 @@ components:
           nullable: true
         useSharedKey:
           type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CustomOAuthConfig:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+        name:
+          type: string
+        discoveryEndpoint:
+          type: string
+          format: uri
+        clientId:
+          type: string
         createdAt:
           type: string
           format: date-time
