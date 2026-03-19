@@ -1,13 +1,15 @@
 import type { CSSProperties } from 'react';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Settings, Trash2 } from 'lucide-react';
 import EmptyBoxSvg from '@/assets/images/empty_box.svg?react';
 import {
   SecondaryMenu,
   type SecondaryMenuActionButton,
+  type SecondaryMenuHeaderButton,
   type SecondaryMenuItemAction,
   type SecondaryMenuListItem,
 } from '@/components/layout/SecondaryMenu';
 
+/** Props accepted by the StorageSidebar component. */
 interface StorageSidebarProps {
   buckets: string[];
   selectedBucket?: string;
@@ -16,8 +18,10 @@ interface StorageSidebarProps {
   onNewBucket?: () => void;
   onEditBucket?: (bucketName: string) => void;
   onDeleteBucket?: (bucketName: string) => void;
+  onSettings?: () => void;
 }
 
+/** Sidebar listing storage buckets with create, edit, delete, and settings actions. */
 export function StorageSidebar({
   buckets,
   selectedBucket,
@@ -26,6 +30,7 @@ export function StorageSidebar({
   onNewBucket,
   onEditBucket,
   onDeleteBucket,
+  onSettings,
 }: StorageSidebarProps) {
   const bucketMenuItems: SecondaryMenuListItem[] = buckets.map((bucket) => ({
     id: bucket,
@@ -70,12 +75,17 @@ export function StorageSidebar({
     return actions;
   };
 
+  const headerButtons: SecondaryMenuHeaderButton[] = onSettings
+    ? [{ id: 'storage-settings', label: 'Storage Settings', icon: Settings, onClick: onSettings }]
+    : [];
+
   return (
     <SecondaryMenu
       title="Buckets"
       items={bucketMenuItems}
       activeItemId={selectedBucket}
       loading={loading}
+      headerButtons={headerButtons}
       actionButtons={actionButtons}
       emptyState={
         showEmptyState ? (

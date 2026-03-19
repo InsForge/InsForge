@@ -17,7 +17,8 @@ export interface StorageProvider {
   getUploadStrategy(
     bucket: string,
     key: string,
-    metadata: { contentType?: string; size?: number }
+    metadata: { contentType?: string; size?: number },
+    maxFileSizeBytes: number
   ): Promise<UploadStrategyResponse>;
   getDownloadStrategy(
     bucket: string,
@@ -25,5 +26,5 @@ export interface StorageProvider {
     expiresIn?: number,
     isPublic?: boolean
   ): Promise<DownloadStrategyResponse>;
-  verifyObjectExists(bucket: string, key: string): Promise<boolean>;
+  verifyObjectExists(bucket: string, key: string): Promise<{ exists: boolean; size?: number }>;
 }

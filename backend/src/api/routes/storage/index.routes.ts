@@ -2,16 +2,22 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { verifyAdmin, AuthRequest, verifyUser } from '@/api/middlewares/auth.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { StorageService } from '@/services/storage/storage.service.js';
+import { StorageConfigService } from '@/services/storage/storage-config.service.js';
 import { successResponse } from '@/utils/response.js';
-import { upload, handleUploadError } from '@/api/middlewares/upload.js';
+import { dynamicUploadSingle, handleUploadError } from '@/api/middlewares/upload.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
-import { createBucketRequestSchema, updateBucketRequestSchema } from '@insforge/shared-schemas';
+import {
+  createBucketRequestSchema,
+  updateBucketRequestSchema,
+  updateStorageConfigRequestSchema,
+} from '@insforge/shared-schemas';
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 
 const router = Router();
 const auditService = AuditService.getInstance();
+const storageConfigService = StorageConfigService.getInstance();
 
 // Middleware to conditionally apply authentication based on bucket visibility
 const conditionalAuth = async (req: Request, res: Response, next: NextFunction) => {
@@ -33,6 +39,44 @@ const conditionalAuth = async (req: Request, res: Response, next: NextFunction) 
   // All other cases require authentication
   return verifyUser(req, res, next);
 };
+
+// GET /api/storage/config - Get storage configuration (requires admin)
+router.get('/config', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const config = await storageConfigService.getStorageConfig();
+    successResponse(res, config);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /api/storage/config - Update storage configuration (requires admin)
+router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const validation = updateStorageConfigRequestSchema.safeParse(req.body);
+    if (!validation.success) {
+      throw new AppError(
+        validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const config = await storageConfigService.updateStorageConfig(validation.data);
+
+    await auditService.log({
+      actor: req.user?.email || 'api-key',
+      action: 'UPDATE_STORAGE_CONFIG',
+      module: 'STORAGE',
+      details: { updatedFields: Object.keys(validation.data) },
+      ip_address: req.ip,
+    });
+
+    successResponse(res, config);
+  } catch (error) {
+    next(error);
+  }
+});
 
 // GET /api/storage/buckets - List all buckets (requires admin)
 router.get('/buckets', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -229,7 +273,7 @@ router.get(
 router.put(
   '/buckets/:bucketName/objects/*',
   verifyUser,
-  upload.single('file'),
+  dynamicUploadSingle('file'),
   handleUploadError,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -269,7 +313,7 @@ router.put(
 router.post(
   '/buckets/:bucketName/objects',
   verifyUser,
-  upload.single('file'),
+  dynamicUploadSingle('file'),
   handleUploadError,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -502,6 +546,11 @@ router.post(
         next(new AppError(error.message, 404, ERROR_CODES.NOT_FOUND));
       } else if (error instanceof Error && error.message.includes('already confirmed')) {
         next(new AppError(error.message, 409, ERROR_CODES.ALREADY_EXISTS));
+      } else if (
+        error instanceof Error &&
+        error.message.includes('exceeds the configured maximum')
+      ) {
+        next(new AppError(error.message, 413, ERROR_CODES.STORAGE_INVALID_PARAMETER));
       } else {
         next(error);
       }
