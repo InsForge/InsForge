@@ -29,6 +29,7 @@ import {
 } from '@insforge/ui';
 import {
   updateAuthConfigRequestSchema,
+  urlOrWildcardPattern,
   type AuthConfigSchema,
   type UpdateAuthConfigRequest,
 } from '@insforge/shared-schemas';
@@ -156,10 +157,6 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
   const saveDisabled = !form.formState.isDirty || isUpdating;
 
   // ---- Redirect URL Whitelist helpers ----
-
-  // Mirrors the backend urlOrWildcardPattern from shared-schemas — only http/https is allowed.
-  const urlOrWildcardPattern =
-    /^https?:\/\/(\*\.)?[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*(:\d+)?(\/.*)?$/;
 
   const handleAddUrl = () => {
     const trimmed = newUrlInput.trim();
