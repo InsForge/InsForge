@@ -98,82 +98,89 @@ const ProviderBadge = ({
 const BADGE_WIDTH = 82;
 const OVERFLOW_BADGE_WIDTH = 40;
 
-function createProvidersCellRenderer(customLabels?: Record<string, string>) {
-  return function ProvidersCellRenderer({ row }: RenderCellProps<UserDataGridRow>) {
-    const providers = row.providers;
-    const hasProviders = Array.isArray(providers) && providers.length > 0;
-    const uniqueProviders = hasProviders ? (providers as string[]) : [];
-    const containerRef = useRef<HTMLDivElement | null>(null);
-    const [containerWidth, setContainerWidth] = useState(300);
+function ProvidersCell({
+  row,
+  customLabels,
+}: RenderCellProps<UserDataGridRow> & {
+  customLabels?: Record<string, string>;
+}) {
+  const providers = row.providers;
+  const hasProviders = Array.isArray(providers) && providers.length > 0;
+  const uniqueProviders = hasProviders ? (providers as string[]) : [];
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState(300);
 
-    useEffect(() => {
-      const container = containerRef.current;
-      if (!container) {
-        return;
-      }
-
-      const cell = container.closest('[role="gridcell"]') as HTMLElement | null;
-      const target = cell ?? container;
-
-      let frameId: number;
-      const observer = new ResizeObserver(() => {
-        cancelAnimationFrame(frameId);
-        frameId = requestAnimationFrame(() => {
-          setContainerWidth(target.getBoundingClientRect().width);
-        });
-      });
-
-      observer.observe(target);
-      setContainerWidth(target.getBoundingClientRect().width);
-
-      return () => {
-        cancelAnimationFrame(frameId);
-        observer.disconnect();
-      };
-    }, []);
-
-    const maxBadgesThatFit = Math.max(0, Math.floor(containerWidth / BADGE_WIDTH));
-    const hasOverflow = uniqueProviders.length > maxBadgesThatFit;
-    const visibleProviderCount = hasOverflow
-      ? Math.max(0, Math.floor((containerWidth - OVERFLOW_BADGE_WIDTH) / BADGE_WIDTH))
-      : uniqueProviders.length;
-    const visibleProviders = uniqueProviders.slice(0, visibleProviderCount);
-    const hiddenProviders = uniqueProviders.slice(visibleProviderCount);
-
-    if (!hasProviders) {
-      return (
-        <span className="truncate text-[13px] leading-[18px] text-muted-foreground">null</span>
-      );
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) {
+      return;
     }
 
-    return (
-      <div ref={containerRef} className="flex w-full items-center gap-1 overflow-hidden">
-        {visibleProviders.map((provider) => (
-          <ProviderBadge key={provider} provider={provider} customLabels={customLabels} />
-        ))}
-        {hiddenProviders.length > 0 && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Badge className="h-5 rounded bg-[var(--alpha-8)] px-1.5 py-0 text-xs font-medium leading-4 text-muted-foreground">
-                  +{hiddenProviders.length}
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent side="top" align="center">
-                {hiddenProviders
-                  .map(
-                    (p) =>
-                      providerLabelMap[p.toLowerCase()] ??
-                      customLabels?.[p.toLowerCase()] ??
-                      p.charAt(0).toUpperCase() + p.slice(1)
-                  )
-                  .join(', ')}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
-      </div>
-    );
+    const cell = container.closest('[role="gridcell"]') as HTMLElement | null;
+    const target = cell ?? container;
+
+    let frameId: number;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(() => {
+        setContainerWidth(target.getBoundingClientRect().width);
+      });
+    });
+
+    observer.observe(target);
+    setContainerWidth(target.getBoundingClientRect().width);
+
+    return () => {
+      cancelAnimationFrame(frameId);
+      observer.disconnect();
+    };
+  }, []);
+
+  const maxBadgesThatFit = Math.max(0, Math.floor(containerWidth / BADGE_WIDTH));
+  const hasOverflow = uniqueProviders.length > maxBadgesThatFit;
+  const visibleProviderCount = hasOverflow
+    ? Math.max(0, Math.floor((containerWidth - OVERFLOW_BADGE_WIDTH) / BADGE_WIDTH))
+    : uniqueProviders.length;
+  const visibleProviders = uniqueProviders.slice(0, visibleProviderCount);
+  const hiddenProviders = uniqueProviders.slice(visibleProviderCount);
+
+  if (!hasProviders) {
+    return <span className="truncate text-[13px] leading-[18px] text-muted-foreground">null</span>;
+  }
+
+  return (
+    <div ref={containerRef} className="flex w-full items-center gap-1 overflow-hidden">
+      {visibleProviders.map((provider) => (
+        <ProviderBadge key={provider} provider={provider} customLabels={customLabels} />
+      ))}
+      {hiddenProviders.length > 0 && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge className="h-5 rounded bg-[var(--alpha-8)] px-1.5 py-0 text-xs font-medium leading-4 text-muted-foreground">
+                +{hiddenProviders.length}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent side="top" align="center">
+              {hiddenProviders
+                .map(
+                  (p) =>
+                    providerLabelMap[p.toLowerCase()] ??
+                    customLabels?.[p.toLowerCase()] ??
+                    p.charAt(0).toUpperCase() + p.slice(1)
+                )
+                .join(', ')}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+    </div>
+  );
+}
+
+function createProvidersCellRenderer(customLabels?: Record<string, string>) {
+  return function ProvidersCellRenderer(props: RenderCellProps<UserDataGridRow>) {
+    return <ProvidersCell {...props} customLabels={customLabels} />;
   };
 }
 

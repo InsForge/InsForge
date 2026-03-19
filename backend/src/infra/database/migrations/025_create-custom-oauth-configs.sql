@@ -1,4 +1,4 @@
--- Migration: 024 - Create dedicated custom OAuth configs table
+-- Migration: 025 - Create dedicated custom OAuth configs table
 --
 -- Stores custom (non-built-in) OAuth/OIDC provider configurations.
 -- Uses discovery endpoint for automatic endpoint resolution.

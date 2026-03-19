@@ -151,15 +151,17 @@ export class CustomOAuthConfigService {
   async createConfig(input: CreateCustomOAuthConfigInput): Promise<CustomOAuthConfigSchema> {
     const client = await this.getPool().connect();
     const keyLower = input.key.toLowerCase();
-    let createdSecretId: string | null = null;
     try {
       await client.query('BEGIN');
 
-      const secret = await this.secretService.createSecret({
-        key: this.buildSecretKey(keyLower),
-        value: input.clientSecret,
-      });
-      createdSecretId = secret.id;
+      const secret = await this.secretService.createSecret(
+        {
+          key: this.buildSecretKey(keyLower),
+          value: input.clientSecret,
+        },
+        client
+      );
+      const secretId = secret.id;
 
       const result = await client.query(
         `INSERT INTO auth.custom_oauth_configs (
@@ -174,23 +176,13 @@ export class CustomOAuthConfigService {
           client_id AS "clientId",
           created_at AS "createdAt",
           updated_at AS "updatedAt"`,
-        [keyLower, input.name, input.discoveryEndpoint, input.clientId, secret.id]
+        [keyLower, input.name, input.discoveryEndpoint, input.clientId, secretId]
       );
 
       await client.query('COMMIT');
       return this.mapRow(result.rows[0] as CustomOAuthConfigRow);
     } catch (error) {
       await client.query('ROLLBACK');
-      if (createdSecretId) {
-        try {
-          await this.secretService.deleteSecret(createdSecretId);
-        } catch (cleanupError) {
-          logger.error('Failed to cleanup secret after create rollback', {
-            cleanupError,
-            createdSecretId,
-          });
-        }
-      }
       if (error instanceof AppError) {
         throw error;
       }
@@ -218,8 +210,6 @@ export class CustomOAuthConfigService {
   ): Promise<CustomOAuthConfigSchema> {
     const client = await this.getPool().connect();
     const keyLower = key.toLowerCase();
-    let previousSecretValue: string | null = null;
-    let secretIdToRestore: string | null = null;
     try {
       await client.query('BEGIN');
       const current = await client.query(
@@ -239,11 +229,13 @@ export class CustomOAuthConfigService {
 
       const existing = current.rows[0] as { id: string; secretId: string };
       if (input.clientSecret !== undefined) {
-        previousSecretValue = await this.secretService.getSecretById(existing.secretId);
-        secretIdToRestore = existing.secretId;
-        const updated = await this.secretService.updateSecret(existing.secretId, {
-          value: input.clientSecret,
-        });
+        const updated = await this.secretService.updateSecret(
+          existing.secretId,
+          {
+            value: input.clientSecret,
+          },
+          client
+        );
         if (!updated) {
           throw new AppError(
             `Failed to update secret for ${keyLower}`,
@@ -313,25 +305,6 @@ export class CustomOAuthConfigService {
       return this.mapRow(result.rows[0] as CustomOAuthConfigRow);
     } catch (error) {
       await client.query('ROLLBACK');
-      if (secretIdToRestore && previousSecretValue !== null) {
-        try {
-          const restored = await this.secretService.updateSecret(secretIdToRestore, {
-            value: previousSecretValue,
-          });
-          if (!restored) {
-            logger.error('Failed to restore secret after rollback', {
-              secretIdToRestore,
-              key: keyLower,
-            });
-          }
-        } catch (restoreError) {
-          logger.error('Failed to restore secret after rollback', {
-            restoreError,
-            secretIdToRestore,
-            key: keyLower,
-          });
-        }
-      }
       if (error instanceof AppError) {
         throw error;
       }
@@ -367,17 +340,15 @@ export class CustomOAuthConfigService {
       await client.query('DELETE FROM auth.custom_oauth_configs WHERE id = $1', [
         current.rows[0].id,
       ]);
-      await client.query('COMMIT');
-
-      try {
-        await this.secretService.deleteSecret(secretId);
-      } catch (secretError) {
-        logger.warn('Deleted config but failed to delete secret', {
-          secretError,
-          key: keyLower,
-          secretId,
-        });
+      const deletedSecret = await this.secretService.deleteSecret(secretId, client);
+      if (!deletedSecret) {
+        throw new AppError(
+          `Failed to delete secret for ${keyLower}`,
+          500,
+          ERROR_CODES.INTERNAL_ERROR
+        );
       }
+      await client.query('COMMIT');
 
       return true;
     } catch (error) {

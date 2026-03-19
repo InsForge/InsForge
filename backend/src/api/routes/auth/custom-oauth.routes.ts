@@ -72,8 +72,7 @@ router.get(
           ERROR_CODES.NOT_FOUND
         );
       }
-      const clientSecret = await customOAuthConfigService.getClientSecretByKey(key);
-      successResponse(res, { ...config, clientSecret: clientSecret || undefined });
+      successResponse(res, config);
     } catch (error) {
       logger.error('Failed to get custom OAuth config', { error, key: req.params.key });
       next(error);
@@ -315,10 +314,7 @@ router.get('/:key/callback', async (req: Request, res: Response, next: NextFunct
         };
         if (stateData.redirectUri) {
           const errorUrl = new URL(stateData.redirectUri);
-          errorUrl.searchParams.set(
-            'error',
-            error instanceof Error ? error.message : 'Custom OAuth Authentication Failed'
-          );
+          errorUrl.searchParams.set('error', 'Authentication failed');
           return res.redirect(errorUrl.toString());
         }
       } catch {
