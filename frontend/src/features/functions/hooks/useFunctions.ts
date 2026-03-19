@@ -110,7 +110,10 @@ export function useFunctions() {
     // Actions
     selectFunction,
     clearSelection,
-    deleteFunction: deleteFunctionMutation.mutate,
+    deleteFunction: useCallback(
+      (slug: string) => deleteFunctionMutation.mutateAsync(slug),
+      [deleteFunctionMutation]
+    ),
     updateFunction: useCallback(
       (slug: string, updates: UpdateFunctionRequest) =>
         updateFunctionMutation.mutateAsync({ slug, updates }),
