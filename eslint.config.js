@@ -135,7 +135,7 @@ export default defineConfig(
       curly: ['error', 'all'],
 
       // Prettier integration
-      'prettier/prettier': 'error',
+      'prettier/prettier': ['error', { endOfLine: 'auto' }],
     },
   },
   // Backend configuration
@@ -195,7 +195,7 @@ export default defineConfig(
       curly: ['error', 'all'],
 
       // Prettier integration
-      'prettier/prettier': 'error',
+      'prettier/prettier': ['error', { endOfLine: 'auto' }],
     },
   },
   // Shared schemas configuration - minimal rules for schema definitions
@@ -253,7 +253,7 @@ export default defineConfig(
       'prefer-const': 'error',
 
       // Prettier integration
-      'prettier/prettier': 'error',
+      'prettier/prettier': ['error', { endOfLine: 'auto' }],
     },
   },
   // MCP configuration - minimal linting without TypeScript project
@@ -292,7 +292,7 @@ export default defineConfig(
       curly: ['error', 'all'],
 
       // Prettier integration
-      'prettier/prettier': 'error',
+      'prettier/prettier': ['error', { endOfLine: 'auto' }],
     },
   },
   // Global ignores
