@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Lock, Mail, Settings, Shield, X, Plus } from 'lucide-react';
+import { Lock, Mail, Settings, X, Plus } from 'lucide-react';
 import {
   Button,
   Checkbox,
@@ -41,7 +41,7 @@ interface AuthSettingsMenuDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type AuthSettingsSection = 'general' | 'email-verification' | 'password' | 'security';
+type AuthSettingsSection = 'general' | 'email-verification' | 'password';
 
 const defaultValues: UpdateAuthConfigRequest = {
   requireEmailVerification: false,
@@ -148,9 +148,6 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
     if (activeSection === 'password') {
       return 'Password';
     }
-    if (activeSection === 'security') {
-      return 'Security';
-    }
     return 'General';
   }, [activeSection]);
 
@@ -232,13 +229,6 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
               >
                 Password
               </MenuDialogNavItem>
-              <MenuDialogNavItem
-                icon={<Shield className="h-5 w-5" />}
-                active={activeSection === 'security'}
-                onClick={() => setActiveSection('security')}
-              >
-                Security
-              </MenuDialogNavItem>
             </MenuDialogNavList>
           </MenuDialogNav>
         </MenuDialogSideNav>
@@ -265,14 +255,76 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
             >
               <MenuDialogBody>
                 {activeSection === 'general' && (
-                  <SettingRow
-                    label="Redirect URL"
-                    description="Configure allowed redirect URLs in the Security section. Your app must supply a redirect URL in each auth request, and it will be validated against the whitelist."
-                  >
-                    <p className="text-sm text-muted-foreground">
-                      Redirect URLs are managed via the whitelist in the Security section.
-                    </p>
-                  </SettingRow>
+                  <>
+                    {redirectUrlWhitelist.length === 0 && (
+                      <div className="mb-4 rounded-md border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-200">
+                        <strong>Open redirects enabled</strong> — no whitelist is configured. Auth
+                        flows will accept any redirect URL. This is convenient for development but
+                        is not recommended for production deployments. Add at least one trusted URL
+                        to enforce redirect validation.
+                      </div>
+                    )}
+
+                    <SettingRow
+                      label="Redirect URL Whitelist"
+                      description="Only these URLs may be used as redirect targets in auth flows (OAuth, email verification). Leave empty to allow any URL (not recommended for production)."
+                    >
+                      <div className="flex flex-col gap-2">
+                        {redirectUrlWhitelist.length > 0 && (
+                          <ul className="flex flex-col gap-1.5">
+                            {redirectUrlWhitelist.map((url) => (
+                              <li
+                                key={url}
+                                className="flex items-center justify-between rounded-md border border-border bg-muted/40 px-3 py-1.5"
+                              >
+                                <span className="min-w-0 truncate text-sm text-foreground">
+                                  {url}
+                                </span>
+                                <button
+                                  type="button"
+                                  aria-label={`Remove ${url}`}
+                                  onClick={() => handleRemoveUrl(url)}
+                                  className="ml-2 shrink-0 rounded p-0.5 text-muted-foreground hover:text-destructive focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+
+                        <div className="flex items-start gap-2">
+                          <div className="min-w-0 flex-1">
+                            <Input
+                              type="text"
+                              placeholder="https://yourapp.com/callback"
+                              value={newUrlInput}
+                              onChange={(e) => {
+                                setNewUrlInput(e.target.value);
+                                if (newUrlError) {
+                                  setNewUrlError('');
+                                }
+                              }}
+                              onKeyDown={handleNewUrlKeyDown}
+                              className={newUrlError ? 'border-destructive' : ''}
+                            />
+                            {newUrlError && (
+                              <p className="pt-1 text-xs text-destructive">{newUrlError}</p>
+                            )}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={handleAddUrl}
+                            className="shrink-0"
+                          >
+                            <Plus className="mr-1.5 h-4 w-4" />
+                            Add
+                          </Button>
+                        </div>
+                      </div>
+                    </SettingRow>
+                  </>
                 )}
 
                 {activeSection === 'email-verification' && (
@@ -455,81 +507,6 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                         />
                       </SettingRow>
                     )}
-                  </>
-                )}
-
-                {activeSection === 'security' && (
-                  <>
-                    {redirectUrlWhitelist.length === 0 && (
-                      <div className="mb-4 rounded-md border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-200">
-                        <strong>Open redirects enabled</strong> — no whitelist is configured. Auth
-                        flows will accept any redirect URL. This is convenient for development but
-                        is not recommended for production deployments. Add at least one trusted URL
-                        to enforce redirect validation.
-                      </div>
-                    )}
-
-                    <SettingRow
-                      label="Redirect URL Whitelist"
-                      description="Only these URLs may be used as redirect targets in auth flows (OAuth, email verification). Leave empty to allow any URL (not recommended for production)."
-                    >
-                      <div className="flex flex-col gap-2">
-                        {/* Existing entries */}
-                        {redirectUrlWhitelist.length > 0 && (
-                          <ul className="flex flex-col gap-1.5">
-                            {redirectUrlWhitelist.map((url) => (
-                              <li
-                                key={url}
-                                className="flex items-center justify-between rounded-md border border-border bg-muted/40 px-3 py-1.5"
-                              >
-                                <span className="min-w-0 truncate text-sm text-foreground">
-                                  {url}
-                                </span>
-                                <button
-                                  type="button"
-                                  aria-label={`Remove ${url}`}
-                                  onClick={() => handleRemoveUrl(url)}
-                                  className="ml-2 shrink-0 rounded p-0.5 text-muted-foreground hover:text-destructive focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                >
-                                  <X className="h-3.5 w-3.5" />
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-
-                        {/* Add new URL */}
-                        <div className="flex items-start gap-2">
-                          <div className="min-w-0 flex-1">
-                            <Input
-                              type="text"
-                              placeholder="https://yourapp.com/callback"
-                              value={newUrlInput}
-                              onChange={(e) => {
-                                setNewUrlInput(e.target.value);
-                                if (newUrlError) {
-                                  setNewUrlError('');
-                                }
-                              }}
-                              onKeyDown={handleNewUrlKeyDown}
-                              className={newUrlError ? 'border-destructive' : ''}
-                            />
-                            {newUrlError && (
-                              <p className="pt-1 text-xs text-destructive">{newUrlError}</p>
-                            )}
-                          </div>
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            onClick={handleAddUrl}
-                            className="shrink-0"
-                          >
-                            <Plus className="mr-1.5 h-4 w-4" />
-                            Add
-                          </Button>
-                        </div>
-                      </div>
-                    </SettingRow>
                   </>
                 )}
               </MenuDialogBody>

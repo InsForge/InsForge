@@ -894,7 +894,7 @@ curl "https://your-app.insforge.app/api/auth/config" \
   "resetPasswordMethod": "link",
   "verifyEmailRedirectTo": "https://myapp.com/verify-success",
   "resetPasswordRedirectTo": "https://myapp.com/reset-success",
-  "signInRedirectTo": "https://myapp.com/dashboard",
+  "redirectUrlWhitelist": ["https://myapp.com/dashboard", "https://myapp.com/callback"],
   "createdAt": "2024-01-15T10:30:00Z",
   "updatedAt": "2024-01-15T10:30:00Z"
 }
@@ -922,7 +922,7 @@ PUT /api/auth/config
 | `resetPasswordMethod` | string | No | Password reset method (`code` or `link`) |
 | `verifyEmailRedirectTo` | string | No | Redirect URL after email verification |
 | `resetPasswordRedirectTo` | string | No | Redirect URL after password reset |
-| `signInRedirectTo` | string | No | Redirect URL after sign in |
+| `redirectUrlWhitelist` | string[] | No | List of allowed redirect URLs for auth flows (OAuth, email verification). Empty array allows any URL. |
 
 #### Example
 
