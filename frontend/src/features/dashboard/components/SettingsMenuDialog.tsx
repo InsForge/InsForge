@@ -36,6 +36,7 @@ import { useModal } from '@/lib/contexts/ModalContext';
 import { cn, compareVersions, isIframe, isInsForgeCloudProject } from '@/lib/utils/utils';
 import { MCPSection, CLISection, ConnectionStringSection } from '@/features/connect';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
+import { metadataService } from '@/lib/services/metadata.service';
 
 type TabType = 'info' | 'compute' | 'connect';
 
@@ -53,6 +54,7 @@ export default function SettingsMenuDialog() {
   const [instanceInfo, setInstanceInfo] = useState<Omit<InstanceInfoEvent, 'type'> | null>(null);
   const [selectedInstanceType, setSelectedInstanceType] = useState<string | null>(null);
   const [isChangingInstanceType, setIsChangingInstanceType] = useState(false);
+  const [isRotatingApiKey, setIsRotatingApiKey] = useState(false);
 
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
   const { version, isLoading: isVersionLoading } = useHealth();
@@ -294,6 +296,36 @@ export default function SettingsMenuDialog() {
     );
   };
 
+  const handleRotateApiKey = async () => {
+    const confirmed = await confirm({
+      title: 'Rotate API Key',
+      description: 'Are you sure you want to rotate your API key? The old key will expire in 24 hours. You will need to update all your applications with the new key.',
+      confirmText: 'Rotate Key',
+      cancelText: 'Cancel',
+      destructive: true,
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsRotatingApiKey(true);
+    try {
+      const response = await metadataService.rotateApiKey();
+      
+      if (response.success) {
+        queryClient.setQueryData(['metadata', 'apiKey'], response.apiKey);
+        showToast('API key successfully rotated', 'success');
+      } else {
+        showToast(response.message || 'Failed to rotate API key', 'error');
+      }
+    } catch (error) {
+       showToast(error instanceof Error ? error.message : 'Failed to rotate API key', 'error');
+    } finally {
+      setIsRotatingApiKey(false);
+    }
+  };
+
   return (
     <>
       <ConfirmDialog {...confirmDialogProps} />
@@ -424,6 +456,16 @@ export default function SettingsMenuDialog() {
                           />
                         )}
                       </div>
+                      {!isApiKeyLoading && apiKey && (
+                        <Button
+                          variant="secondary"
+                          onClick={() => void handleRotateApiKey()}
+                          disabled={isRotatingApiKey}
+                          className="h-8 shrink-0 rounded border-[var(--alpha-8)] bg-card px-3 text-sm font-medium"
+                        >
+                          {isRotatingApiKey ? 'Rotating...' : 'Rotate'}
+                        </Button>
+                      )}
                     </div>
                   </div>
 
