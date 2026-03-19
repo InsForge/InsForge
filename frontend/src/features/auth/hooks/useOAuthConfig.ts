@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   OAuthConfigSchema,
@@ -10,10 +10,9 @@ import {
 import { oAuthConfigService } from '../services/oauth-config.service';
 import { useToast } from '@/lib/hooks/useToast';
 
-export function useOAuthConfig() {
+export function useOAuthConfig(selectedProvider?: OAuthProvidersSchema | null) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
-  const [selectedProvider, setSelectedProvider] = useState<OAuthProvidersSchema | null>(null);
 
   // Query to fetch all OAuth configurations
   const {
@@ -75,9 +74,6 @@ export function useOAuthConfig() {
       queryClient.removeQueries({ queryKey: ['oauth-configs'] });
       queryClient.removeQueries({ queryKey: ['oauth-config', provider] });
       showToast(`OAuth configuration for ${provider} deleted successfully`, 'success');
-      if (selectedProvider === provider) {
-        setSelectedProvider(null);
-      }
     },
     onError: (error: Error) => {
       showToast(error.message || 'Failed to delete OAuth configuration', 'error');
@@ -104,8 +100,6 @@ export function useOAuthConfig() {
     // State
     configs: configs?.data ?? [],
     configsCount: configs?.count ?? 0,
-    selectedProvider,
-    setSelectedProvider,
     providerConfig,
 
     // Loading states

@@ -72,7 +72,11 @@ router.get(
           ERROR_CODES.NOT_FOUND
         );
       }
-      successResponse(res, config);
+      const clientSecret = await customOAuthConfigService.getClientSecretByKey(key);
+      successResponse(res, {
+        ...config,
+        clientSecret: clientSecret || undefined,
+      });
     } catch (error) {
       logger.error('Failed to get custom OAuth config', { error, key: req.params.key });
       next(error);

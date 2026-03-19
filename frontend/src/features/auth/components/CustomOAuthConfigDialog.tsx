@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import {
   Button,
@@ -15,6 +15,7 @@ import {
   type CustomOAuthConfigSchema,
   type UpdateCustomOAuthConfigRequest,
 } from '@insforge/shared-schemas';
+import { SecretInput } from './SecretInput';
 import { useCustomOAuthConfig } from '@/features/auth/hooks/useCustomOAuthConfig';
 
 interface CustomOAuthConfigDialogProps {
@@ -50,7 +51,15 @@ export function CustomOAuthConfigDialog({
   selectedConfig,
   onSuccess,
 }: CustomOAuthConfigDialogProps) {
-  const { configs, createConfig, updateConfig, isCreating, isUpdating } = useCustomOAuthConfig();
+  const {
+    configs,
+    createConfig,
+    updateConfig,
+    isCreating,
+    isUpdating,
+    selectedConfig: fetchedConfig,
+    isLoadingSelectedConfig,
+  } = useCustomOAuthConfig(selectedConfig?.key);
 
   const form = useForm<FormValues>({
     defaultValues: {
@@ -65,19 +74,25 @@ export function CustomOAuthConfigDialog({
   const isEditing = Boolean(selectedConfig);
   const isPending = isCreating || isUpdating;
   const values = form.watch();
+  const activeConfig = fetchedConfig ?? selectedConfig;
+  const [isClientSecretVisible, setIsClientSecretVisible] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
       return;
     }
 
-    if (selectedConfig) {
+    if (selectedConfig && isLoadingSelectedConfig) {
+      return;
+    }
+
+    if (activeConfig) {
       form.reset({
-        name: selectedConfig.name,
-        key: selectedConfig.key,
-        discoveryEndpoint: selectedConfig.discoveryEndpoint,
-        clientId: selectedConfig.clientId,
-        clientSecret: '',
+        name: activeConfig.name,
+        key: activeConfig.key,
+        discoveryEndpoint: activeConfig.discoveryEndpoint,
+        clientId: activeConfig.clientId,
+        clientSecret: fetchedConfig?.clientSecret || '',
       });
       return;
     }
@@ -89,17 +104,17 @@ export function CustomOAuthConfigDialog({
       clientId: '',
       clientSecret: '',
     });
-  }, [form, isOpen, selectedConfig]);
+  }, [activeConfig, fetchedConfig?.clientSecret, form, isLoadingSelectedConfig, isOpen, selectedConfig]);
 
   const isSaveDisabled = useMemo(() => {
     if (!values.name.trim() || !values.key.trim() || !values.clientId.trim()) {
       return true;
     }
-    if (!isEditing && !values.clientSecret.trim()) {
+    if (!values.clientSecret.trim()) {
       return true;
     }
     return !values.discoveryEndpoint.trim();
-  }, [isEditing, values]);
+  }, [values]);
 
   const onSubmit = (data: FormValues) => {
     form.clearErrors();
@@ -135,7 +150,7 @@ export function CustomOAuthConfigDialog({
         name: data.name.trim(),
         discoveryEndpoint: data.discoveryEndpoint.trim(),
         clientId: data.clientId.trim(),
-        clientSecret: data.clientSecret.trim() || undefined,
+        clientSecret: data.clientSecret.trim(),
       };
 
       updateConfig(
@@ -181,71 +196,81 @@ export function CustomOAuthConfigDialog({
           </p>
         </DialogHeader>
 
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            void form.handleSubmit(onSubmit)();
-          }}
-          className="max-h-[72vh] space-y-5 overflow-y-auto px-6 py-5"
-        >
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground">Name</label>
-            <Input placeholder="e.g. Acme" {...form.register('name')} />
+        {isEditing && isLoadingSelectedConfig ? (
+          <div className="flex items-center justify-center p-6">
+            <div className="text-sm text-muted-foreground">
+              Loading custom OAuth configuration...
+            </div>
           </div>
+        ) : (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void form.handleSubmit(onSubmit)();
+            }}
+            className="max-h-[72vh] space-y-5 overflow-y-auto px-6 py-5"
+          >
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">Name</label>
+              <Input placeholder="e.g. Acme" {...form.register('name')} />
+            </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground">Key</label>
-            <Input placeholder="acme_provider" disabled={isEditing} {...form.register('key')} />
-            {form.formState.errors.key?.message && (
-              <p className="mt-1 text-xs text-destructive">{form.formState.errors.key.message}</p>
-            )}
-          </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">Key</label>
+              <Input placeholder="acme_provider" disabled={isEditing} {...form.register('key')} />
+              {form.formState.errors.key?.message && (
+                <p className="mt-1 text-xs text-destructive">{form.formState.errors.key.message}</p>
+              )}
+            </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground">
-              Discovery endpoint
-            </label>
-            <Input
-              placeholder="https://example.com/.well-known/openid-configuration"
-              {...form.register('discoveryEndpoint')}
-            />
-            {form.formState.errors.discoveryEndpoint?.message && (
-              <p className="mt-1 text-xs text-destructive">
-                {form.formState.errors.discoveryEndpoint.message}
-              </p>
-            )}
-          </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">
+                Discovery endpoint
+              </label>
+              <Input
+                placeholder="https://example.com/.well-known/openid-configuration"
+                {...form.register('discoveryEndpoint')}
+              />
+              {form.formState.errors.discoveryEndpoint?.message && (
+                <p className="mt-1 text-xs text-destructive">
+                  {form.formState.errors.discoveryEndpoint.message}
+                </p>
+              )}
+            </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground">Client ID</label>
-            <Input {...form.register('clientId')} />
-          </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">Client ID</label>
+              <Input {...form.register('clientId')} />
+            </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground">
-              Client secret
-            </label>
-            <Input
-              type="password"
-              placeholder={isEditing ? 'Leave blank to keep existing' : ''}
-              {...form.register('clientSecret')}
-            />
-            {form.formState.errors.clientSecret?.message && (
-              <p className="mt-1 text-xs text-destructive">
-                {form.formState.errors.clientSecret.message}
-              </p>
-            )}
-          </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">
+                Client secret
+              </label>
+              <SecretInput
+                {...form.register('clientSecret')}
+                value={values.clientSecret}
+                isVisible={isClientSecretVisible}
+                onToggleVisibility={() => setIsClientSecretVisible((visible) => !visible)}
+                placeholder="Enter client secret"
+              />
+              {form.formState.errors.clientSecret?.message && (
+                <p className="mt-1 text-xs text-destructive">
+                  {form.formState.errors.clientSecret.message}
+                </p>
+              )}
+            </div>
 
-          <DialogFooter className="border-t border-[var(--alpha-8)] pt-4">
-            <Button type="button" variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSaveDisabled || isPending}>
-              {isEditing ? 'Save changes' : 'Create provider'}
-            </Button>
-          </DialogFooter>
-        </form>
+            <DialogFooter className="border-t border-[var(--alpha-8)] pt-4">
+              <Button type="button" variant="secondary" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSaveDisabled || isPending}>
+                {isEditing ? 'Save changes' : 'Create provider'}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );

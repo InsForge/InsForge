@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   CustomOAuthConfigSchema,
@@ -9,10 +8,9 @@ import type {
 import { useToast } from '@/lib/hooks/useToast';
 import { customOAuthConfigService } from '../services/custom-oauth-config.service';
 
-export function useCustomOAuthConfig() {
+export function useCustomOAuthConfig(selectedKey?: string | null) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   const {
     data: configs,
@@ -61,9 +59,6 @@ export function useCustomOAuthConfig() {
     onSuccess: (_, key) => {
       void queryClient.invalidateQueries({ queryKey: ['custom-oauth-configs'] });
       void queryClient.removeQueries({ queryKey: ['custom-oauth-config', key] });
-      if (selectedKey === key) {
-        setSelectedKey(null);
-      }
       showToast('Custom OAuth provider deleted successfully', 'success');
     },
     onError: (error: Error) => {
@@ -75,8 +70,6 @@ export function useCustomOAuthConfig() {
     configs: configs?.data ?? [],
     configsCount: configs?.count ?? 0,
     isLoadingConfigs,
-    selectedKey,
-    setSelectedKey,
     selectedConfig,
     isLoadingSelectedConfig,
     createConfig: createConfigMutation.mutate,
