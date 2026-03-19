@@ -26,5 +26,5 @@ export interface StorageProvider {
     expiresIn?: number,
     isPublic?: boolean
   ): Promise<DownloadStrategyResponse>;
-  verifyObjectExists(bucket: string, key: string): Promise<boolean>;
+  verifyObjectExists(bucket: string, key: string): Promise<{ exists: boolean; size?: number }>;
 }

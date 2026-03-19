@@ -461,19 +461,18 @@ export class StorageService {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
-    // Verify the file exists in storage
-    const exists = await this.provider.verifyObjectExists(bucket, key);
+    // Verify the file exists in storage and get its actual size
+    const { exists, size: actualSize } = await this.provider.verifyObjectExists(bucket, key);
     if (!exists) {
       throw new Error(`Upload not found for key "${key}" in bucket "${bucket}"`);
     }
 
-    // Defense-in-depth: reject if the reported size exceeds the configured limit
+    // Defense-in-depth: reject if the actual size exceeds the configured limit
+    const fileSize = actualSize ?? metadata.size;
     const maxBytes = await StorageConfigService.getInstance().getMaxFileSizeBytes();
-    if (metadata.size > maxBytes) {
+    if (fileSize > maxBytes) {
       const limitMb = Math.round(maxBytes / (1024 * 1024));
-      throw new Error(
-        `File size exceeds the configured maximum upload size of ${limitMb} MB`
-      );
+      throw new Error(`File size exceeds the configured maximum upload size of ${limitMb} MB`);
     }
 
     // Check if already confirmed
@@ -493,7 +492,7 @@ export class StorageService {
       VALUES ($1, $2, $3, $4, $5)
       RETURNING uploaded_at as "uploadedAt"
     `,
-      [bucket, key, metadata.size, metadata.contentType || null, userId || null]
+      [bucket, key, fileSize, metadata.contentType || null, userId || null]
     );
 
     if (!result.rows[0]) {

@@ -310,7 +310,10 @@ export class S3StorageProvider implements StorageProvider {
     }
   }
 
-  async verifyObjectExists(bucket: string, key: string): Promise<boolean> {
+  async verifyObjectExists(
+    bucket: string,
+    key: string
+  ): Promise<{ exists: boolean; size?: number }> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
     }
@@ -322,10 +325,10 @@ export class S3StorageProvider implements StorageProvider {
         Bucket: this.s3Bucket,
         Key: s3Key,
       });
-      await this.s3Client.send(command);
-      return true;
+      const response = await this.s3Client.send(command);
+      return { exists: true, size: response.ContentLength };
     } catch {
-      return false;
+      return { exists: false };
     }
   }
 }
