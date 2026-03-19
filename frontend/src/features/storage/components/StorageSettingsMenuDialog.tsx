@@ -155,7 +155,7 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
               <MenuDialogBody>
                 <SettingRow
                   label="Maximum Upload Size"
-                  description="Files exceeding this limit will be rejected. Range: 1–5120 MB."
+                  description="Files exceeding this limit will be rejected. Range: 1–200 MB."
                 >
                   <Controller
                     name="maxFileSizeMb"
@@ -166,9 +166,12 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
                           <Input
                             type="number"
                             min="1"
-                            max="5120"
+                            max="200"
                             {...field}
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                            onChange={(e) => {
+                              const parsed = parseInt(e.target.value);
+                              field.onChange(isNaN(parsed) ? '' : parsed);
+                            }}
                             className={
                               form.formState.errors.maxFileSizeMb ? 'border-destructive' : ''
                             }
@@ -178,7 +181,7 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
                         {form.formState.errors.maxFileSizeMb && (
                           <p className="pt-1 text-xs text-destructive">
                             {form.formState.errors.maxFileSizeMb.message ||
-                              'Must be between 1 and 5120 MB'}
+                              'Must be between 1 and 200 MB'}
                           </p>
                         )}
                         {!form.formState.errors.maxFileSizeMb && config && (

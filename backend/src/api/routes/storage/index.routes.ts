@@ -14,7 +14,6 @@ import {
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import { AuditService } from '@/services/logs/audit.service.js';
-import { isCloudEnvironment } from '@/utils/environment.js';
 
 const router = Router();
 const auditService = AuditService.getInstance();
@@ -58,15 +57,6 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
     if (!validation.success) {
       throw new AppError(
         validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
-
-    const maxAllowedMb = isCloudEnvironment() ? 5120 : 200;
-    if (validation.data.maxFileSizeMb > maxAllowedMb) {
-      throw new AppError(
-        `maxFileSizeMb must be at most ${maxAllowedMb} MB in this environment`,
         400,
         ERROR_CODES.INVALID_INPUT
       );
