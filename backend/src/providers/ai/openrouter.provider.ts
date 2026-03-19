@@ -44,7 +44,7 @@ interface OpenRouterLimitation {
 
 export const BYOK_SECRET_KEY = 'AI_GATEWAY_OPENROUTER_KEY';
 
-type ApiKeySource = 'byok' | 'cloud' | 'env';
+export type ApiKeySource = 'byok' | 'cloud' | 'env';
 interface ResolvedApiKey {
   apiKey: string;
   source: ApiKeySource;
@@ -199,17 +199,6 @@ export class OpenRouterProvider {
       return true;
     }
     return !!process.env.OPENROUTER_API_KEY;
-  }
-
-  /**
-   * Check if AI services are properly configured (async, includes BYOK check)
-   */
-  async isConfiguredAsync(): Promise<boolean> {
-    const byokKey = await this.getBYOKApiKey();
-    if (byokKey) {
-      return true;
-    }
-    return this.isConfigured();
   }
 
   /**
@@ -429,14 +418,16 @@ export class OpenRouterProvider {
    * @param request - Function that takes an OpenAI client and returns a Promise
    * @returns The result of the request
    */
-  async sendRequest<T>(request: (client: OpenAI) => Promise<T>): Promise<T> {
+  async sendRequest<T>(
+    request: (client: OpenAI) => Promise<T>
+  ): Promise<{ result: T; source: ApiKeySource }> {
     // Snapshot source before the request so retry guard is stable even if admin
     // changes the BYOK key mid-flight.
     const { source } = await this.getApiKeyWithSource();
     const client = await this.getClient();
 
     try {
-      return await request(client);
+      return { result: await request(client), source };
     } catch (error) {
       // Only renew cloud-managed keys on 402/403 — never touch BYOK or env keys
       if (
@@ -463,7 +454,7 @@ export class OpenRouterProvider {
 
             const result = await request(renewedClient);
             logger.info('Request succeeded after API key renewal');
-            return result;
+            return { result, source };
           } catch (retryError) {
             if (attempt === maxRetries) {
               logger.error(`All ${maxRetries} retry attempts failed after API key renewal`);
