@@ -85,7 +85,8 @@ export class LocalStorageProvider implements StorageProvider {
   getUploadStrategy(
     bucket: string,
     key: string,
-    _metadata: { contentType?: string; size?: number }
+    _metadata: { contentType?: string; size?: number },
+    _maxFileSizeBytes: number
   ): Promise<UploadStrategyResponse> {
     // For local storage, return direct upload strategy with absolute URL
     const baseUrl = getApiBaseUrl();

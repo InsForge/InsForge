@@ -10,6 +10,7 @@ import {
 import { StorageProvider } from '@/providers/storage/base.provider.js';
 import { LocalStorageProvider } from '@/providers/storage/local.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
+import { StorageConfigService } from '@/services/storage/storage-config.service.js';
 import logger from '@/utils/logger.js';
 import { escapeSqlLikePattern, escapeRegexPattern } from '@/utils/validations.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
@@ -427,7 +428,8 @@ export class StorageService {
 
       // Generate next available key using (1), (2), (3) pattern if duplicates exist
       const key = await this.generateNextAvailableKey(bucket, metadata.filename);
-      return this.provider.getUploadStrategy(bucket, key, metadata);
+      const maxFileSizeBytes = await StorageConfigService.getInstance().getMaxFileSizeBytes();
+      return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes);
     } finally {
       client.release();
     }
@@ -463,6 +465,15 @@ export class StorageService {
     const exists = await this.provider.verifyObjectExists(bucket, key);
     if (!exists) {
       throw new Error(`Upload not found for key "${key}" in bucket "${bucket}"`);
+    }
+
+    // Defense-in-depth: reject if the reported size exceeds the configured limit
+    const maxBytes = await StorageConfigService.getInstance().getMaxFileSizeBytes();
+    if (metadata.size > maxBytes) {
+      const limitMb = Math.round(maxBytes / (1024 * 1024));
+      throw new Error(
+        `File size exceeds the configured maximum upload size of ${limitMb} MB`
+      );
     }
 
     // Check if already confirmed
