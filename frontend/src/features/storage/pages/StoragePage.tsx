@@ -7,7 +7,6 @@ import { useStorage } from '@/features/storage/hooks/useStorage';
 import { StorageSidebar } from '@/features/storage/components/StorageSidebar';
 import { StorageManager } from '@/features/storage/components/StorageManager';
 import { BucketFormDialog } from '@/features/storage/components/BucketFormDialog';
-import { StoragePageEmptyState } from '@/features/storage/components/StoragePageEmptyState';
 
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
@@ -27,6 +26,7 @@ import {
   Alert,
   AlertDescription,
   TableHeader,
+  DataGridEmptyState,
 } from '@/components';
 
 interface BucketFormState {
@@ -441,8 +441,8 @@ export default function StoragePage() {
           </>
         )}
         {!selectedBucket && (
-          <div className="flex-1">
-            <StoragePageEmptyState />
+          <div className="flex flex-1 items-center justify-center">
+            <DataGridEmptyState message="No bucket selected" />
           </div>
         )}
       </div>
