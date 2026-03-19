@@ -112,7 +112,10 @@ export class LocalStorageProvider implements StorageProvider {
     });
   }
 
-  async verifyObjectExists(bucket: string, key: string): Promise<{ exists: boolean; size?: number }> {
+  async verifyObjectExists(
+    bucket: string,
+    key: string
+  ): Promise<{ exists: boolean; size?: number }> {
     // For local storage, check if file exists on disk and get its size
     try {
       const filePath = this.getFilePath(bucket, key);
