@@ -638,10 +638,14 @@ import { usePublicAuthConfig } from '@insforge/react';
 
 function CustomSignIn() {
   const { authConfig } = usePublicAuthConfig();
+  const availableProviders = [
+    ...(authConfig?.oAuthProviders ?? []),
+    ...(authConfig?.customOAuthProviders ?? []),
+  ];
 
   return (
     <div>
-      <p>Available OAuth: {authConfig?.oAuthProviders?.join(', ')}</p>
+      <p>Available OAuth: {availableProviders.join(', ')}</p>
       <p>Password min length: {authConfig?.passwordMinLength}</p>
       <p>Require uppercase: {authConfig?.requireUppercase ? 'Yes' : 'No'}</p>
     </div>
@@ -655,6 +659,7 @@ function CustomSignIn() {
 |----------|------|-------------|
 | `authConfig` | `object \| null` | Auth configuration from dashboard |
 | `authConfig.oAuthProviders` | `["google", "github", "discord", "linkedin", "facebook", "instagram", "tiktok", "apple", "x", "spotify", "microsoft"]` | Enabled OAuth providers |
+| `authConfig.customOAuthProviders` | `string[]` | Enabled custom OAuth provider keys such as `acme` or `okta-company` |
 | `authConfig.passwordMinLength` | `number` | Minimum password length |
 | `authConfig.requireUppercase` | `boolean` | Require uppercase letter |
 | `authConfig.requireLowercase` | `boolean` | Require lowercase letter |
