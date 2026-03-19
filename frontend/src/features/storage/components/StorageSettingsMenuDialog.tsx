@@ -73,7 +73,7 @@ function SettingRow({ label, description, children }: SettingRowProps) {
 
 /** Admin dialog for viewing and editing the storage configuration (max upload size). */
 export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSettingsMenuDialogProps) {
-  const { config, isLoading, isUpdating, updateConfig } = useStorageConfig();
+  const { config, isLoading, error, isUpdating, updateConfig } = useStorageConfig();
 
   const form = useForm<UpdateStorageConfigRequest>({
     resolver: zodResolver(updateStorageConfigRequestSchema),
@@ -139,6 +139,12 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
             <MenuDialogBody>
               <div className="flex h-full min-h-[120px] items-center justify-center text-sm text-muted-foreground">
                 Loading configuration...
+              </div>
+            </MenuDialogBody>
+          ) : error ? (
+            <MenuDialogBody>
+              <div className="flex h-full min-h-[120px] items-center justify-center text-sm text-destructive">
+                Failed to load storage configuration. Close and reopen to retry.
               </div>
             </MenuDialogBody>
           ) : (
