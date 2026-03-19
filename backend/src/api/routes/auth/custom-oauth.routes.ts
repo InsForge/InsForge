@@ -262,7 +262,6 @@ router.get('/:key/callback', async (req: Request, res: Response, next: NextFunct
     const key = keyValidation.data;
     const code = req.query.code as string | undefined;
     const state = req.query.state as string | undefined;
-
     if (!code || !state) {
       throw new AppError('code and state are required', 400, ERROR_CODES.INVALID_INPUT);
     }

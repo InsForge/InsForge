@@ -1440,6 +1440,265 @@ paths:
                 format: uri
                 description: Redirect URL with authentication parameters
 
+  /api/auth/oauth/custom/configs:
+    get:
+      summary: List all custom OAuth configurations
+      description: Get all configured custom OAuth providers (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of custom OAuth configurations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CustomOAuthConfig'
+                  count:
+                    type: integer
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+
+    post:
+      summary: Create custom OAuth configuration
+      description: Create a new custom OAuth provider configuration (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - key
+                - name
+                - discoveryEndpoint
+                - clientId
+                - clientSecret
+              properties:
+                key:
+                  type: string
+                name:
+                  type: string
+                discoveryEndpoint:
+                  type: string
+                  format: uri
+                clientId:
+                  type: string
+                clientSecret:
+                  type: string
+      responses:
+        '200':
+          description: Custom OAuth configuration created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomOAuthConfig'
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+        '409':
+          description: Configuration already exists
+
+  /api/auth/oauth/custom/{key}/config:
+    get:
+      summary: Get custom OAuth configuration
+      description: Get a custom OAuth configuration including client secret (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Custom OAuth configuration
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/CustomOAuthConfig'
+                  - type: object
+                    properties:
+                      clientSecret:
+                        type: string
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+        '404':
+          description: Configuration not found
+
+    put:
+      summary: Update custom OAuth configuration
+      description: Update a custom OAuth provider configuration (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                discoveryEndpoint:
+                  type: string
+                  format: uri
+                clientId:
+                  type: string
+                clientSecret:
+                  type: string
+      responses:
+        '200':
+          description: Custom OAuth configuration updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomOAuthConfig'
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+        '404':
+          description: Configuration not found
+
+    delete:
+      summary: Delete custom OAuth configuration
+      description: Delete a custom OAuth provider configuration (admin only)
+      tags:
+        - Admin
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Configuration deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin only
+        '404':
+          description: Configuration not found
+
+  /api/auth/oauth/custom/{key}:
+    get:
+      summary: Initiate custom OAuth flow (PKCE)
+      description: Generate OAuth authorization URL for a configured custom OAuth provider using PKCE flow
+      tags:
+        - Client
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: redirect_uri
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uri
+          description: URL to redirect after authentication (receives insforge_code parameter)
+        - name: code_challenge
+          in: query
+          required: false
+          schema:
+            type: string
+          description: PKCE code challenge for mobile/desktop/server clients
+      responses:
+        '200':
+          description: OAuth authorization URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authUrl:
+                    type: string
+                    format: uri
+        '400':
+          description: Invalid request
+        '404':
+          description: Custom OAuth provider not found
+
+  /api/auth/oauth/custom/{key}/callback:
+    get:
+      summary: Custom OAuth callback (GET)
+      description: OAuth callback endpoint for custom OAuth providers
+      tags:
+        - Client
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Authorization code from the custom OAuth provider
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Signed OAuth state payload
+      responses:
+        '302':
+          description: Redirect to application after custom OAuth completion
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+                description: Redirect URL with authentication parameters
+
 components:
   securitySchemes:
     bearerAuth:

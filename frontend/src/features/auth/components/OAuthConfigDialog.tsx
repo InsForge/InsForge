@@ -50,14 +50,8 @@ export function OAuthConfigDialog({
   onClose,
   onSuccess,
 }: OAuthConfigDialogProps) {
-  const {
-    providerConfig,
-    createConfig,
-    updateConfig,
-    isCreating,
-    isUpdating,
-    isLoadingProvider,
-  } = useOAuthConfig(provider?.id);
+  const { providerConfig, createConfig, updateConfig, isCreating, isUpdating, isLoadingProvider } =
+    useOAuthConfig(provider?.id);
 
   const form = useForm<OAuthConfigSchema & { clientSecret?: string }>({
     resolver: zodResolver(oAuthConfigSchema.extend({ clientSecret: z.string().optional() })),

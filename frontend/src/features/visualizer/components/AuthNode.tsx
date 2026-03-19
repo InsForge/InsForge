@@ -28,7 +28,7 @@ export function AuthNode({ data }: AuthNodeProps) {
   const enabledCustomProviders = customProviders.map((providerKey) => ({
     id: `custom-${providerKey}`,
     name: formatCustomProviderName(providerKey),
-    icon: <KeyRound />,
+    icon: <KeyRound className="h-4 w-4" />,
   }));
   const authMethods: Array<{ id: string; name: string; icon?: ReactNode }> = [
     { id: 'email', name: 'Email / Password', icon: <Mail /> },

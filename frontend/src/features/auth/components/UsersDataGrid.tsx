@@ -329,7 +329,7 @@ export function UsersDataGrid(props: UsersDataGridProps) {
   const customProviderLabels = useMemo(() => {
     const labels: Record<string, string> = {};
     for (const config of customConfigs) {
-      labels[config.key] = config.name;
+      labels[config.key.toLowerCase()] = config.name;
     }
     return labels;
   }, [customConfigs]);

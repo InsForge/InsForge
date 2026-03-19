@@ -104,7 +104,14 @@ export function CustomOAuthConfigDialog({
       clientId: '',
       clientSecret: '',
     });
-  }, [activeConfig, fetchedConfig?.clientSecret, form, isLoadingSelectedConfig, isOpen, selectedConfig]);
+  }, [
+    activeConfig,
+    fetchedConfig?.clientSecret,
+    form,
+    isLoadingSelectedConfig,
+    isOpen,
+    selectedConfig,
+  ]);
 
   const isSaveDisabled = useMemo(() => {
     if (!values.name.trim() || !values.key.trim() || !values.clientId.trim()) {
