@@ -282,7 +282,10 @@ export async function createApp() {
   if (fs.existsSync(frontendPath)) {
     app.use(express.static(frontendPath, { index: false }));
     // Catch all handler for SPA routes
-    app.get(['/cloud/*path', '/dashboard/*path'], (_req: Request, res: Response) => {
+    app.get('/cloud/*', (_req: Request, res: Response) => {
+      res.sendFile(path.join(frontendPath, 'index.html'));
+    });
+    app.get('/dashboard/*', (_req: Request, res: Response) => {
       res.sendFile(path.join(frontendPath, 'index.html'));
     });
   } else {

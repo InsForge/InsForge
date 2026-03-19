@@ -30,6 +30,9 @@ import DeploymentLogsPage from '@/features/deployments/pages/DeploymentLogsPage'
 import DeploymentOverviewPage from '@/features/deployments/pages/DeploymentOverviewPage';
 import DeploymentEnvVarsPage from '@/features/deployments/pages/DeploymentEnvVarsPage';
 import DeploymentDomainsPage from '@/features/deployments/pages/DeploymentDomainsPage';
+import EmailConfigPage from '@/features/email-config/pages/EmailConfigPage';
+import SMTPPage from '@/features/email-config/pages/SMTPPage';
+import TemplatesConfigPage from '@/features/email-config/pages/TemplatesPage';
 
 export function AppRoutes() {
   return (
@@ -97,6 +100,9 @@ export function AppRoutes() {
                 <Route path="/dashboard/functions/secrets" element={<SecretsPage />} />
                 <Route path="/dashboard/functions/schedules" element={<SchedulesPage />} />
                 <Route path="/dashboard/visualizer" element={<VisualizerPage />} />
+                <Route path="/dashboard/email-config" element={<EmailConfigPage />} />
+                <Route path="/dashboard/email-config/smtp" element={<SMTPPage />} />
+                <Route path="/dashboard/email-config/templates" element={<TemplatesConfigPage />} />
                 <Route path="/dashboard/ai" element={<AIPage />} />
                 <Route
                   path="/dashboard/realtime"

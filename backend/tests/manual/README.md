@@ -9,6 +9,7 @@ These tests are for the Better Auth v2 implementation.
 ### Running Better Auth Tests
 
 Run the Better Auth test:
+
 ```bash
 ./tests/manual/test-better-auth.sh
 ```
@@ -36,6 +37,7 @@ ADMIN_EMAIL=admin@mycompany.com ADMIN_PASSWORD=mysecurepass ./tests/manual/test-
 ### Test Coverage
 
 The test covers:
+
 - Admin authentication (sign-in, wrong password, non-admin email)
 - User registration and sign-in
 - Admin user management (list users with pagination)
@@ -46,6 +48,7 @@ The test covers:
 ### Why These Tests Are Manual
 
 These tests are kept separate because:
+
 1. They use authentication endpoints (`/api/auth/v2/*`) that require specific setup
 2. They test admin-specific functionality that needs manual verification
 3. They verify JWT token structure and claims that may vary between environments

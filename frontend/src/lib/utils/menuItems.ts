@@ -14,6 +14,7 @@ import {
   Settings,
   Rocket,
   SquarePen,
+  Mail,
 } from 'lucide-react';
 import { postMessageToParent } from './cloudMessaging';
 
@@ -219,6 +220,24 @@ export const staticMenuItems: PrimaryMenuItem[] = [
     label: 'Visualizer',
     href: '/dashboard/visualizer',
     icon: GitFork,
+  },
+  {
+    id: 'email-config',
+    label: 'Email Config',
+    href: '/dashboard/email-config',
+    icon: Mail,
+    secondaryMenu: [
+      {
+        id: 'smtp-settings',
+        label: 'SMTP Settings',
+        href: '/dashboard/email-config/smtp',
+      },
+      {
+        id: 'email-templates',
+        label: 'Email Templates',
+        href: '/dashboard/email-config/templates',
+      },
+    ],
   },
 ];
 

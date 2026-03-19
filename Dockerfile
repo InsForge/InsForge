@@ -8,9 +8,9 @@
 ARG DENO_VERSION=2.0.6
 FROM denoland/deno:alpine-${DENO_VERSION} AS deno-bin
 
-FROM node:20-alpine AS package-prep
+FROM node:20-bookworm-slim AS package-prep
 
-RUN apk add --no-cache jq
+RUN apt-get update && apt-get install -y jq && rm -rf /var/lib/apt/lists/*
 
 COPY package.json /tmp/package.json
 
@@ -22,9 +22,12 @@ RUN mkdir -p /out && \
 # ============================================================
 # Stage 2: deps — ALL dependencies (dev + prod) for building
 # ============================================================
-FROM node:20-alpine AS deps
+FROM node:20-bookworm-slim AS deps
 
 WORKDIR /app
+
+# Install jq for JSON manipulation
+RUN apt-get update && apt-get install -y jq && rm -rf /var/lib/apt/lists/*
 
 # Root package.json comes from package-prep (version stripped).
 # COPY --from uses content-based cache: if output is identical,
@@ -41,19 +44,34 @@ COPY ui/package.json          ./ui/package.json
 # Strip prepare/build scripts from shared-schemas to prevent tsc
 # from running during install (source files aren't copied yet).
 # The actual build happens in the build stage with full source.
-RUN apk add --no-cache jq && \
-    jq 'del(.scripts.prepare, .scripts.build)' \
+RUN jq 'del(.scripts.prepare, .scripts.build)' \
       shared-schemas/package.json > shared-schemas/package.json.tmp && \
     mv shared-schemas/package.json.tmp shared-schemas/package.json
 
-RUN npm ci && npm cache clean --force
+RUN npm ci && npm cache clean --force && \
+    npm install --no-save @rollup/rollup-linux-x64-gnu && \
+    npm install --no-save lightningcss-linux-x64-gnu
 
 
 # ============================================================
 # Stage 3: build — compile all packages
 # ============================================================
-FROM deps AS build
+# Use Debian for better native module compatibility
+FROM node:20-bookworm-slim AS build
 
+WORKDIR /app
+
+# Copy package files
+COPY --from=deps /app/package.json ./package.json
+COPY --from=deps /app/package-lock.json ./package-lock.json
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/backend/package.json ./backend/package.json
+COPY --from=deps /app/frontend/package.json ./frontend/package.json
+COPY --from=deps /app/auth/package.json ./auth/package.json
+COPY --from=deps /app/shared-schemas/package.json ./shared-schemas/package.json
+COPY --from=deps /app/ui/package.json ./ui/package.json
+
+# Copy source code
 COPY . .
 
 # Vite bakes these into static bundles at compile time
@@ -61,7 +79,7 @@ ARG VITE_API_BASE_URL
 ARG VITE_PUBLIC_POSTHOG_KEY
 
 # Build order: ui → backend → frontend → auth
-RUN npm run build
+RUN npm install && npm run build
 
 
 # ============================================================
@@ -88,7 +106,7 @@ RUN apk add --no-cache jq && \
       shared-schemas/package.json > shared-schemas/package.json.tmp && \
     mv shared-schemas/package.json.tmp shared-schemas/package.json
 
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm install --omit=dev && npm cache clean --force
 
 
 # ============================================================
