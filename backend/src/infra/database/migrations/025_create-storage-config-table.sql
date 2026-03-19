@@ -4,7 +4,7 @@
 
 CREATE TABLE IF NOT EXISTS storage.config (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  max_file_size_mb INTEGER DEFAULT 50 NOT NULL CHECK (max_file_size_mb >= 1 AND max_file_size_mb <= 5120),
+  max_file_size_mb INTEGER DEFAULT 50 NOT NULL CHECK (max_file_size_mb >= 1 AND max_file_size_mb <= 200),
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
