@@ -222,75 +222,29 @@ router.put(
       // Ensure new values are picked up immediately by middleware cache.
       invalidateRateLimitConfigCache();
 
-      await auditService.log({
-        actor: req.user?.email || 'api-key',
-        action: 'UPDATE_RATE_LIMIT_CONFIG',
-        module: 'AUTH',
-        details: {
-          updatedFields: Object.keys(input),
-        },
-        ip_address: req.ip,
-      });
-
-      successResponse(res, config);
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-// GET /api/auth/rate-limits - Get API/auth rate-limit configurations (admin only)
-router.get(
-  '/rate-limits',
-  verifyAdmin,
-  async (_req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const config: GetRateLimitConfigResponse = await rateLimitConfigService.getConfig();
-      successResponse(res, config);
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-// PUT /api/auth/rate-limits - Update API/auth rate-limit configurations (admin only)
-router.put(
-  '/rate-limits',
-  verifyAdmin,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      const validationResult = updateRateLimitConfigRequestSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        throw new AppError(
-          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-          400,
-          ERROR_CODES.INVALID_INPUT
-        );
+      try {
+        await auditService.log({
+          actor: req.user?.email || 'api-key',
+          action: 'UPDATE_RATE_LIMIT_CONFIG',
+          module: 'AUTH',
+          details: {
+            updatedFields: Object.keys(input),
+          },
+          ip_address: req.ip,
+        });
+      } catch (auditError) {
+        logger.warn('Rate-limit config updated but audit logging failed', {
+          error: auditError instanceof Error ? auditError.message : auditError,
+          actor: req.user?.email || 'api-key',
+        });
       }
 
-      const input = validationResult.data;
-      const config: GetRateLimitConfigResponse = await rateLimitConfigService.updateConfig(input);
-
-      // Ensure new values are picked up immediately by middleware cache.
-      invalidateRateLimitConfigCache();
-
-      await auditService.log({
-        actor: req.user?.email || 'api-key',
-        action: 'UPDATE_RATE_LIMIT_CONFIG',
-        module: 'AUTH',
-        details: {
-          updatedFields: Object.keys(input),
-        },
-        ip_address: req.ip,
-      });
-
       successResponse(res, config);
     } catch (error) {
       next(error);
     }
   }
 );
-
 // POST /api/auth/users - Create a new user (registration or admin adding user)
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
 // When called with a valid admin token (e.g. dashboard adding a user), we do NOT set session
