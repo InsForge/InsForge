@@ -128,7 +128,7 @@ export default function FunctionsPage() {
           return;
         }
 
-        deleteFunction(slug);
+        await deleteFunction(slug);
       } catch (error) {
         console.error('Failed to delete function', error);
       }
