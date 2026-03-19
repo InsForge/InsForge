@@ -34,10 +34,7 @@ export function useOAuthConfig(selectedProvider?: OAuthProvidersSchema | null) {
   } = useQuery<OAuthConfigSchema & { clientSecret?: string }>({
     queryKey: ['oauth-config', selectedProvider],
     queryFn: () => oAuthConfigService.getConfigByProvider(selectedProvider ?? ''),
-    enabled:
-      !!selectedProvider &&
-      !!configs &&
-      configs.data.some((config) => config.provider === selectedProvider),
+    enabled: !!selectedProvider,
   });
 
   // Mutation to create OAuth configuration

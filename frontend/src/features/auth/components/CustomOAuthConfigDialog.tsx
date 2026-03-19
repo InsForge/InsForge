@@ -117,11 +117,11 @@ export function CustomOAuthConfigDialog({
     if (!values.name.trim() || !values.key.trim() || !values.clientId.trim()) {
       return true;
     }
-    if (!values.clientSecret.trim()) {
+    if (!isEditing && !values.clientSecret.trim()) {
       return true;
     }
     return !values.discoveryEndpoint.trim();
-  }, [values]);
+  }, [isEditing, values]);
 
   const onSubmit = (data: FormValues) => {
     form.clearErrors();
@@ -153,12 +153,15 @@ export function CustomOAuthConfigDialog({
     }
 
     if (isEditing && selectedConfig) {
+      const trimmedClientSecret = data.clientSecret.trim();
       const updatePayload: UpdateCustomOAuthConfigRequest = {
         name: data.name.trim(),
         discoveryEndpoint: data.discoveryEndpoint.trim(),
         clientId: data.clientId.trim(),
-        clientSecret: data.clientSecret.trim(),
       };
+      if (trimmedClientSecret) {
+        updatePayload.clientSecret = trimmedClientSecret;
+      }
 
       updateConfig(
         { key: selectedConfig.key, config: updatePayload },
