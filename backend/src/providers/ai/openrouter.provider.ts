@@ -174,31 +174,40 @@ export class OpenRouterProvider {
   }
 
   /**
-   * Get the OpenAI client, creating or updating it as needed
-   * Used internally by sendRequest()
+   * Get the OpenAI client, creating or updating it as needed.
+   * Accepts a pre-resolved apiKey to avoid a redundant getApiKeyWithSource() call.
    */
-  private async getClient(): Promise<OpenAI> {
+  private async getClient(resolvedApiKey?: string): Promise<OpenAI> {
+    const apiKey = resolvedApiKey ?? (await this.getApiKey());
     if (!this.openRouterClient) {
-      this.openRouterClient = this.createClient(await this.getApiKey());
+      this.openRouterClient = this.createClient(apiKey);
       return this.openRouterClient;
     }
-    if (isCloudEnvironment()) {
-      const apiKey = await this.getApiKey();
-      if (this.currentApiKey !== apiKey) {
-        this.openRouterClient = this.createClient(apiKey);
-      }
+    if (isCloudEnvironment() && this.currentApiKey !== apiKey) {
+      this.openRouterClient = this.createClient(apiKey);
     }
     return this.openRouterClient;
   }
 
   /**
-   * Check if AI services are properly configured (sync, env-only check)
+   * Sync check — returns true if a static key source is configured.
+   * Does NOT check BYOK (async). Use isConfiguredAsync() for a full check.
    */
   isConfigured(): boolean {
     if (isCloudEnvironment()) {
       return true;
     }
     return !!process.env.OPENROUTER_API_KEY;
+  }
+
+  /**
+   * Async check — includes BYOK. Use this wherever an async call is acceptable.
+   */
+  async isConfiguredAsync(): Promise<boolean> {
+    if (this.isConfigured()) {
+      return true;
+    }
+    return this.isByokActive();
   }
 
   /**
@@ -421,10 +430,9 @@ export class OpenRouterProvider {
   async sendRequest<T>(
     request: (client: OpenAI) => Promise<T>
   ): Promise<{ result: T; source: ApiKeySource }> {
-    // Snapshot source before the request so retry guard is stable even if admin
-    // changes the BYOK key mid-flight.
-    const { source } = await this.getApiKeyWithSource();
-    const client = await this.getClient();
+    // Resolve once — thread apiKey into getClient() to avoid a second resolution.
+    const { apiKey, source } = await this.getApiKeyWithSource();
+    const client = await this.getClient(apiKey);
 
     try {
       return { result: await request(client), source };
@@ -436,10 +444,10 @@ export class OpenRouterProvider {
         (error.status === 402 || error.status === 403)
       ) {
         logger.info(`Received ${error.status} insufficient credits, renewing API key...`);
-        await this.renewCloudApiKey();
+        const renewedApiKey = await this.renewCloudApiKey();
 
-        // Get fresh client with renewed API key
-        const renewedClient = await this.getClient();
+        // Get fresh client with the renewed key — pass it directly to avoid re-resolution
+        const renewedClient = await this.getClient(renewedApiKey);
 
         // Retry with exponential backoff (3 attempts)
         const maxRetries = 3;
