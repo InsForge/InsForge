@@ -127,8 +127,8 @@ export class ImageGenerationService {
         }
       }
 
-      // Track usage if config is available
-      if (aiConfig?.id) {
+      // Track usage if config is available and BYOK is not active
+      if (aiConfig?.id && !(await ImageGenerationService.openRouterProvider.isByokActive())) {
         // Pass token usage information if available
         const inputTokens = result.metadata?.usage?.promptTokens;
         const outputTokens = result.metadata?.usage?.completionTokens;

@@ -53,8 +53,8 @@ export class EmbeddingService {
           }
         : undefined;
 
-      // Track usage if config is available
-      if (aiConfig?.id && tokenUsage) {
+      // Track usage if config is available and BYOK is not active
+      if (aiConfig?.id && tokenUsage && !(await this.openRouterProvider.isByokActive())) {
         const outputTokens = Math.max(
           0,
           (tokenUsage.totalTokens || 0) - (tokenUsage.promptTokens || 0)
