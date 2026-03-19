@@ -2,7 +2,7 @@ import { useMemo, useState, useCallback, useEffect } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { Tabs, Tab } from '@insforge/ui';
 import { useLogs } from '../hooks/useLogs';
-import { EmptyState, TableHeader } from '@/components';
+import { EmptyState, TableHeader, DataGridEmptyState } from '@/components';
 import {
   LogsDataGrid,
   type LogsColumnDef,
@@ -151,9 +151,7 @@ export default function FunctionLogsPage() {
                 </div>
               )
             }
-            emptyState={
-              <div className="text-[13px] text-muted-foreground">No logs match your filters</div>
-            }
+            emptyState={<DataGridEmptyState message="No logs match your filters" />}
           />
         )}
       </div>
