@@ -479,12 +479,16 @@ import { usePublicAuthConfig } from '@insforge/react-router';
 
 function SignInPage() {
   const { authConfig, isLoaded } = usePublicAuthConfig();
+  const availableProviders = [
+    ...(authConfig?.oAuthProviders ?? []),
+    ...(authConfig?.customOAuthProviders ?? []),
+  ];
 
   if (!isLoaded) return <div>Loading...</div>;
 
   return (
     <div>
-      <p>Available OAuth: {authConfig.oAuthProviders.join(', ')}</p>
+      <p>Available OAuth: {availableProviders.join(', ')}</p>
       <p>Password min length: {authConfig?.passwordMinLength}</p>
     </div>
   );
@@ -494,6 +498,7 @@ function SignInPage() {
 **Returns:**
 
 - `authConfig` - Authentication Configuration you set in InsForge dashboard.
+- `authConfig.customOAuthProviders` - Enabled custom OAuth provider keys.
 - `isLoaded` - Boolean loading state
 
 <Warning>

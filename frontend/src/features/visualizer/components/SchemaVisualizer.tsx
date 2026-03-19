@@ -29,6 +29,7 @@ interface SchemaVisualizerProps {
   metadata: {
     auth: {
       providers: OAuthProvidersSchema[];
+      customProviders: string[];
     };
     database: DatabaseMetadataSchema;
     storage: StorageMetadataSchema;
@@ -53,6 +54,7 @@ type BucketNodeData = {
 
 type AuthNodeData = {
   providers: OAuthProvidersSchema[];
+  customProviders: string[];
   userCount?: number;
   isReferenced?: boolean;
 };
@@ -74,7 +76,8 @@ const getLayoutedElements = (nodes: Node<CustomNodeData>[], edges: BuiltInEdge[]
     if (node.type === 'authNode') {
       // Auth node includes email/password + configured OAuth methods
       const authData = node.data as AuthNodeData;
-      const methodCount = (authData.providers?.length ?? 0) + 1;
+      const methodCount =
+        (authData.providers?.length ?? 0) + (authData.customProviders?.length ?? 0) + 1;
       return 116 + methodCount * 40;
     } else if (node.type === 'tableNode') {
       // Table node height depends on columns
@@ -272,6 +275,7 @@ export function SchemaVisualizer({
       position: { x: 0, y: 0 },
       data: {
         providers: metadata.auth.providers,
+        customProviders: metadata.auth.customProviders,
         userCount,
         isReferenced: isUsersReferenced,
       },

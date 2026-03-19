@@ -1,7 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { AuthService } from '@/services/auth/auth.service.js';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
-import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
@@ -14,6 +13,7 @@ import {
   extractBearerToken,
 } from '@/api/middlewares/auth.js';
 import oauthRouter from './oauth.routes.js';
+import customOAuthRouter from './custom-oauth.routes.js';
 import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-limiters.js';
 import {
   REFRESH_TOKEN_COOKIE_NAME,
@@ -57,25 +57,17 @@ import logger from '@/utils/logger.js';
 const router = Router();
 const authService = AuthService.getInstance();
 const authConfigService = AuthConfigService.getInstance();
-const oAuthConfigService = OAuthConfigService.getInstance();
 const auditService = AuditService.getInstance();
 
 // Mount OAuth routes
+router.use('/oauth/custom', customOAuthRouter);
 router.use('/oauth', oauthRouter);
 
 // Public Authentication Configuration Routes
 // GET /api/auth/public-config - Get all public authentication configuration (public endpoint)
-router.get('/public-config', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/public-config', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const [oAuthProviders, authConfigs] = await Promise.all([
-      oAuthConfigService.getConfiguredProviders(),
-      authConfigService.getPublicAuthConfig(),
-    ]);
-
-    const response: GetPublicAuthConfigResponse = {
-      oAuthProviders,
-      ...authConfigs,
-    };
+    const response: GetPublicAuthConfigResponse = await authService.getMetadata();
 
     successResponse(res, response);
   } catch (error) {

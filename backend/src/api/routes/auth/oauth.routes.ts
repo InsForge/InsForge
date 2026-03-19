@@ -264,7 +264,6 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
     const { redirect_uri, code_challenge } = queryValidation.data;
     const validatedProvider = providerValidation.data;
     const authConfig = await authConfigService.getAuthConfig();
-
     const redirectUri = authConfig.signInRedirectTo || redirect_uri;
 
     if (!redirectUri) {
@@ -284,7 +283,6 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
     });
 
     const authUrl = await authService.generateOAuthUrl(validatedProvider, state);
-
     successResponse(res, { authUrl });
   } catch (error) {
     logger.error(`${req.params.provider} OAuth error`, { error });

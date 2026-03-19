@@ -16,6 +16,7 @@ import type {
   AuthOptions,
 } from '@insforge/shared-schemas';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
+import { CustomOAuthConfigService } from '@/services/auth/custom-oauth-config.service.js';
 import { AuthConfigService } from './auth-config.service.js';
 import { AuthOTPService, OTPPurpose, OTPType } from './auth-otp.service.js';
 import { GoogleOAuthProvider } from '@/providers/oauth/google.provider.js';
@@ -855,12 +856,15 @@ export class AuthService {
   async getMetadata(): Promise<AuthMetadataSchema> {
     const authConfigService = AuthConfigService.getInstance();
     const oAuthConfigService = OAuthConfigService.getInstance();
-    const [oAuthProviders, authConfigs] = await Promise.all([
+    const customOAuthConfigService = CustomOAuthConfigService.getInstance();
+    const [oAuthProviders, customOAuthConfigs, authConfigs] = await Promise.all([
       oAuthConfigService.getConfiguredProviders(),
+      customOAuthConfigService.listConfigs(),
       authConfigService.getPublicAuthConfig(),
     ]);
     return {
       oAuthProviders,
+      customOAuthProviders: customOAuthConfigs.map((config) => config.key),
       ...authConfigs,
     };
   }

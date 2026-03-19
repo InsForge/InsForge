@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Mail, User } from 'lucide-react';
+import { KeyRound, Mail, User } from 'lucide-react';
 import {
   Avatar,
   AvatarFallback,
@@ -31,6 +31,7 @@ import {
 } from '@insforge/ui';
 import { cn, formatTime } from '@/lib/utils/utils';
 import type { UserSchema } from '@insforge/shared-schemas';
+import { useCustomOAuthConfig } from '@/features/auth/hooks/useCustomOAuthConfig';
 
 type UserDataGridRow = UserSchema & {
   [key: string]: string | number | boolean | null | string[] | Record<string, unknown>;
@@ -65,11 +66,20 @@ const providerLogoMap = {
   microsoft: MicrosoftLogo,
 } as const;
 
-const ProviderBadge = ({ provider }: { provider: string }) => {
+const ProviderBadge = ({
+  provider,
+  customLabels,
+}: {
+  provider: string;
+  customLabels?: Record<string, string>;
+}) => {
   const normalized = provider.toLowerCase();
   const label =
-    providerLabelMap[normalized] ?? normalized.charAt(0).toUpperCase() + normalized.slice(1);
+    providerLabelMap[normalized] ??
+    customLabels?.[normalized] ??
+    normalized.charAt(0).toUpperCase() + normalized.slice(1);
   const ProviderLogo = providerLogoMap[normalized as keyof typeof providerLogoMap];
+  const isCustomProvider = Boolean(customLabels?.[normalized]);
 
   return (
     <Badge className="h-5 rounded border border-[var(--alpha-inverse-8)] bg-white px-1.5 py-0 text-xs font-medium leading-4 text-black">
@@ -77,22 +87,27 @@ const ProviderBadge = ({ provider }: { provider: string }) => {
         <ProviderLogo className="h-4 w-4 shrink-0" />
       ) : normalized === 'email' ? (
         <Mail className="h-4 w-4 shrink-0 text-black" />
+      ) : isCustomProvider ? (
+        <KeyRound className="h-4 w-4 shrink-0 text-black" />
       ) : null}
       {label}
     </Badge>
   );
 };
 
-// Width estimates for badge layout calculation
 const BADGE_WIDTH = 82;
 const OVERFLOW_BADGE_WIDTH = 40;
 
-const ProvidersCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
+function ProvidersCell({
+  row,
+  customLabels,
+}: RenderCellProps<UserDataGridRow> & {
+  customLabels?: Record<string, string>;
+}) {
   const providers = row.providers;
   const hasProviders = Array.isArray(providers) && providers.length > 0;
   const uniqueProviders = hasProviders ? (providers as string[]) : [];
   const containerRef = useRef<HTMLDivElement | null>(null);
-  // Reasonable default before ResizeObserver fires
   const [containerWidth, setContainerWidth] = useState(300);
 
   useEffect(() => {
@@ -101,7 +116,6 @@ const ProvidersCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
       return;
     }
 
-    // Walk up the DOM to find the actual grid cell element
     const cell = container.closest('[role="gridcell"]') as HTMLElement | null;
     const target = cell ?? container;
 
@@ -135,9 +149,9 @@ const ProvidersCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
   }
 
   return (
-    <div ref={containerRef} className="flex items-center gap-1 w-full overflow-hidden">
+    <div ref={containerRef} className="flex w-full items-center gap-1 overflow-hidden">
       {visibleProviders.map((provider) => (
-        <ProviderBadge key={provider} provider={provider} />
+        <ProviderBadge key={provider} provider={provider} customLabels={customLabels} />
       ))}
       {hiddenProviders.length > 0 && (
         <TooltipProvider>
@@ -150,7 +164,10 @@ const ProvidersCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
             <TooltipContent side="top" align="center">
               {hiddenProviders
                 .map(
-                  (p) => providerLabelMap[p.toLowerCase()] ?? p.charAt(0).toUpperCase() + p.slice(1)
+                  (p) =>
+                    providerLabelMap[p.toLowerCase()] ??
+                    customLabels?.[p.toLowerCase()] ??
+                    p.charAt(0).toUpperCase() + p.slice(1)
                 )
                 .join(', ')}
             </TooltipContent>
@@ -159,7 +176,13 @@ const ProvidersCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
       )}
     </div>
   );
-};
+}
+
+function createProvidersCellRenderer(customLabels?: Record<string, string>) {
+  return function ProvidersCellRenderer(props: RenderCellProps<UserDataGridRow>) {
+    return <ProvidersCell {...props} customLabels={customLabels} />;
+  };
+}
 
 const EmailVerifiedCellRenderer = ({ row }: RenderCellProps<UserDataGridRow>) => {
   if (typeof row.emailVerified !== 'boolean') {
@@ -198,7 +221,9 @@ const DateTimeCellRenderer = ({
   );
 };
 
-export function createUsersColumns(): DataGridColumn<UserDataGridRow>[] {
+export function createUsersColumns(
+  customProviderLabels?: Record<string, string>
+): DataGridColumn<UserDataGridRow>[] {
   return [
     {
       key: 'id',
@@ -230,7 +255,7 @@ export function createUsersColumns(): DataGridColumn<UserDataGridRow>[] {
       width: '1fr',
       minWidth: 140,
       sortable: true,
-      renderCell: ProvidersCellRenderer,
+      renderCell: createProvidersCellRenderer(customProviderLabels),
     },
     {
       key: 'emailVerified',
@@ -299,7 +324,17 @@ const UserSelectionCell = ({
 };
 
 export function UsersDataGrid(props: UsersDataGridProps) {
-  const columns = useMemo(() => createUsersColumns(), []);
+  const { configs: customConfigs } = useCustomOAuthConfig();
+
+  const customProviderLabels = useMemo(() => {
+    const labels: Record<string, string> = {};
+    for (const config of customConfigs) {
+      labels[config.key.toLowerCase()] = config.name;
+    }
+    return labels;
+  }, [customConfigs]);
+
+  const columns = useMemo(() => createUsersColumns(customProviderLabels), [customProviderLabels]);
 
   return (
     <DataGrid<UserDataGridRow>
