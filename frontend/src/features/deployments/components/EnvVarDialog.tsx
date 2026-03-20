@@ -50,15 +50,31 @@ export function EnvVarDialog({
   }, [open, envVar]);
 
   const manualEntries = useMemo(() => normalizeEnvVarDrafts(manualDrafts), [manualDrafts]);
+  const duplicateManualKeys = useMemo(() => {
+    const seenKeys = new Set<string>();
+    const duplicates = new Set<string>();
+
+    manualEntries.forEach((entry) => {
+      if (seenKeys.has(entry.key)) {
+        duplicates.add(entry.key);
+        return;
+      }
+
+      seenKeys.add(entry.key);
+    });
+
+    return duplicates;
+  }, [manualEntries]);
 
   const hasIncompleteManualRows = manualDrafts.some((draft) => {
     const hasAnyValue = draft.key.trim() || draft.value;
     return hasAnyValue && (!draft.key.trim() || !draft.value);
   });
+  const hasDuplicateManualKeys = duplicateManualKeys.size > 0;
 
   const isValid = isEditMode
     ? Boolean(key.trim() && value)
-    : manualEntries.length > 0 && !hasIncompleteManualRows;
+    : manualEntries.length > 0 && !hasIncompleteManualRows && !hasDuplicateManualKeys;
 
   const handleClose = () => {
     onOpenChange(false);
@@ -67,9 +83,13 @@ export function EnvVarDialog({
   const handleSubmit = async () => {
     const payload = isEditMode ? [{ key: key.trim(), value }] : manualEntries;
 
-    const success = await onSave(payload);
-    if (success) {
-      handleClose();
+    try {
+      const success = await onSave(payload);
+      if (success) {
+        handleClose();
+      }
+    } catch {
+      showToast('Failed to save environment variables. Please try again.', 'error');
     }
   };
 
@@ -135,33 +155,34 @@ export function EnvVarDialog({
     return { applied: true };
   };
 
-  const handleDraftPaste = (draftIndex: number) => (event: ClipboardEvent<HTMLInputElement>) => {
-    const pastedText = event.clipboardData.getData('text');
-    const looksLikeEnvPaste =
-      pastedText.includes('\n') ||
-      pastedText.startsWith('export ') ||
-      /^[A-Za-z_][A-Za-z0-9_]*=/.test(pastedText.trim());
+  const handleDraftPaste =
+    (draftIndex: number, field: 'key' | 'value') => (event: ClipboardEvent<HTMLInputElement>) => {
+      const pastedText = event.clipboardData.getData('text');
+      const looksLikeEnvPaste =
+        pastedText.includes('\n') ||
+        pastedText.startsWith('export ') ||
+        (field === 'key' && /^[A-Za-z_][A-Za-z0-9_]*=/.test(pastedText.trim()));
 
-    if (!looksLikeEnvPaste) {
-      return;
-    }
+      if (!looksLikeEnvPaste) {
+        return;
+      }
 
-    const pasteResult = applyPastedEnvVars(draftIndex, pastedText);
-    if (pasteResult.invalidLineNumbers?.length) {
-      showToast(
-        `Invalid .env lines: ${pasteResult.invalidLineNumbers.join(', ')}. Fix them before pasting again.`,
-        'error'
-      );
+      const pasteResult = applyPastedEnvVars(draftIndex, pastedText);
+      if (pasteResult.invalidLineNumbers?.length) {
+        showToast(
+          `Invalid .env lines: ${pasteResult.invalidLineNumbers.join(', ')}. Fix them before pasting again.`,
+          'error'
+        );
+        event.preventDefault();
+        return;
+      }
+
+      if (!pasteResult.applied) {
+        return;
+      }
+
       event.preventDefault();
-      return;
-    }
-
-    if (!pasteResult.applied) {
-      return;
-    }
-
-    event.preventDefault();
-  };
+    };
 
   const removeManualDraft = (draftId: string) => {
     setManualDrafts((currentDrafts) => {
@@ -240,36 +261,40 @@ export function EnvVarDialog({
 
                 <div className="flex flex-col gap-3">
                   {manualDrafts.map((draft, index) => (
-                    <div
-                      key={draft.id}
-                      className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-3"
-                    >
-                      <Input
-                        id={`deployment-env-var-key-${draft.id}`}
-                        aria-label={`Environment variable key ${index + 1}`}
-                        placeholder={`Key ${index + 1}`}
-                        value={draft.key}
-                        onChange={(e) => updateManualDraft(draft.id, 'key', e.target.value)}
-                        onPaste={handleDraftPaste(index)}
-                      />
-                      <Input
-                        id={`deployment-env-var-value-${draft.id}`}
-                        aria-label={`Environment variable value ${index + 1}`}
-                        placeholder="Value"
-                        value={draft.value}
-                        onChange={(e) => updateManualDraft(draft.id, 'value', e.target.value)}
-                        onPaste={handleDraftPaste(index)}
-                      />
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="icon"
-                        onClick={() => removeManualDraft(draft.id)}
-                        className="h-9 w-9"
-                        aria-label={`Remove environment variable row ${index + 1}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                    <div key={draft.id} className="flex flex-col gap-2">
+                      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-3">
+                        <Input
+                          id={`deployment-env-var-key-${draft.id}`}
+                          aria-label={`Environment variable key ${index + 1}`}
+                          placeholder={`Key ${index + 1}`}
+                          value={draft.key}
+                          onChange={(e) => updateManualDraft(draft.id, 'key', e.target.value)}
+                          onPaste={handleDraftPaste(index, 'key')}
+                        />
+                        <Input
+                          id={`deployment-env-var-value-${draft.id}`}
+                          aria-label={`Environment variable value ${index + 1}`}
+                          placeholder="Value"
+                          value={draft.value}
+                          onChange={(e) => updateManualDraft(draft.id, 'value', e.target.value)}
+                          onPaste={handleDraftPaste(index, 'value')}
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="icon"
+                          onClick={() => removeManualDraft(draft.id)}
+                          className="h-9 w-9"
+                          aria-label={`Remove environment variable row ${index + 1}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {duplicateManualKeys.has(draft.key.trim()) && draft.key.trim() && (
+                        <p className="text-sm text-amber-600 dark:text-amber-400">
+                          Duplicate key: {draft.key.trim()}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -277,6 +302,11 @@ export function EnvVarDialog({
                 {hasIncompleteManualRows && (
                   <p className="text-sm text-amber-600 dark:text-amber-400">
                     Each filled row needs both a key and a value.
+                  </p>
+                )}
+                {hasDuplicateManualKeys && (
+                  <p className="text-sm text-amber-600 dark:text-amber-400">
+                    Each environment variable key must be unique.
                   </p>
                 )}
               </div>
