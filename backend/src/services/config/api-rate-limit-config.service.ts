@@ -1,16 +1,16 @@
-import { Pool } from "pg";
-import { DatabaseManager } from "@/infra/database/database.manager.js";
-import { AppError } from "@/api/middlewares/error.js";
-import { ERROR_CODES } from "@/types/error-constants.js";
-import logger from "@/utils/logger.js";
+import { Pool } from 'pg';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
+import { AppError } from '@/api/middlewares/error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
+import logger from '@/utils/logger.js';
 import type {
   ApiRateLimitConfigSchema,
   UpdateApiRateLimitConfigRequest,
-} from "@insforge/shared-schemas";
+} from '@insforge/shared-schemas';
 
 const DEFAULT_API_RATE_LIMIT_CONFIG: Omit<
   ApiRateLimitConfigSchema,
-  "id" | "createdAt" | "updatedAt"
+  'id' | 'createdAt' | 'updatedAt'
 > = {
   sendEmailOtpMaxRequests: 5,
   sendEmailOtpWindowMinutes: 15,
@@ -24,7 +24,7 @@ export class ApiRateLimitConfigService {
   private pool: Pool | null = null;
 
   private constructor() {
-    logger.info("ApiRateLimitConfigService initialized");
+    logger.info('ApiRateLimitConfigService initialized');
   }
 
   public static getInstance(): ApiRateLimitConfigService {
@@ -54,37 +54,32 @@ export class ApiRateLimitConfigService {
           created_at as "createdAt",
           updated_at as "updatedAt"
          FROM system.api_rate_limit_config
-         LIMIT 1`,
+         LIMIT 1`
       );
 
       if (!result.rows.length) {
-        logger.warn(
-          "No API rate limit config found, returning default fallback values",
-        );
+        logger.warn('No API rate limit config found, returning default fallback values');
         return this.buildFallbackConfig();
       }
 
       return result.rows[0];
     } catch (error) {
-      logger.error(
-        "Failed to get API rate limit config, returning default fallback values",
-        {
-          error,
-        },
-      );
+      logger.error('Failed to get API rate limit config, returning default fallback values', {
+        error,
+      });
       return this.buildFallbackConfig();
     }
   }
 
   async updateApiRateLimitConfig(
-    input: UpdateApiRateLimitConfigRequest,
+    input: UpdateApiRateLimitConfigRequest
   ): Promise<ApiRateLimitConfigSchema> {
     const client = await this.getPool().connect();
     try {
-      await client.query("BEGIN");
+      await client.query('BEGIN');
 
       const existingResult = await client.query(
-        "SELECT id FROM system.api_rate_limit_config LIMIT 1 FOR UPDATE",
+        'SELECT id FROM system.api_rate_limit_config LIMIT 1 FOR UPDATE'
       );
 
       let result;
@@ -113,7 +108,7 @@ export class ApiRateLimitConfigService {
             input.verifyOtpMaxRequests,
             input.verifyOtpWindowMinutes,
             input.emailCooldownSeconds,
-          ],
+          ]
         );
       } else {
         result = await client.query(
@@ -139,28 +134,28 @@ export class ApiRateLimitConfigService {
             input.verifyOtpMaxRequests,
             input.verifyOtpWindowMinutes,
             input.emailCooldownSeconds,
-          ],
+          ]
         );
       }
 
-      await client.query("COMMIT");
-      logger.info("API rate limit config updated", input);
+      await client.query('COMMIT');
+      logger.info('API rate limit config updated', input);
       return result.rows[0];
     } catch (error) {
       try {
-        await client.query("ROLLBACK");
+        await client.query('ROLLBACK');
       } catch (rollbackError) {
-        logger.error("Rollback failed", { rollbackError });
+        logger.error('Rollback failed', { rollbackError });
       }
 
-      logger.error("Failed to update API rate limit config", { error });
+      logger.error('Failed to update API rate limit config', { error });
       if (error instanceof AppError) {
         throw error;
       }
       throw new AppError(
-        "Failed to update API rate limit configuration",
+        'Failed to update API rate limit configuration',
         500,
-        ERROR_CODES.INTERNAL_ERROR,
+        ERROR_CODES.INTERNAL_ERROR
       );
     } finally {
       client.release();
@@ -169,7 +164,7 @@ export class ApiRateLimitConfigService {
 
   private buildFallbackConfig(): ApiRateLimitConfigSchema {
     return {
-      id: "00000000-0000-0000-0000-000000000000",
+      id: '00000000-0000-0000-0000-000000000000',
       ...DEFAULT_API_RATE_LIMIT_CONFIG,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
