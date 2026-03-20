@@ -151,8 +151,10 @@ export default function FunctionsPage() {
       }
 
       try {
-        await updateFunction(slug, { code: editedCode });
-        setIsEditingCode(false);
+        const result = await updateFunction(slug, { code: editedCode });
+        if (result.success && result.deployment?.status !== 'failed') {
+          setIsEditingCode(false);
+        }
       } catch (error) {
         console.error('Failed to update function code', error);
       }

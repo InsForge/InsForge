@@ -67,10 +67,18 @@ export function useFunctions() {
   const updateFunctionMutation = useMutation({
     mutationFn: ({ slug, updates }: { slug: string; updates: UpdateFunctionRequest }) =>
       functionService.updateFunction(slug, updates),
-    onSuccess: (updated) => {
+    onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: ['functions'] });
-      setSelectedFunction((previous) => (previous?.id === updated.id ? updated : previous));
-      showToast('Function updated successfully', 'success');
+      setSelectedFunction((previous) =>
+        previous?.id === result.function.id ? result.function : previous
+      );
+
+      if (result.success && result.deployment?.status !== 'failed') {
+        showToast('Function updated successfully', 'success');
+        return;
+      }
+
+      showToast('Function saved, but deployment failed. Please check the build logs.', 'warn');
     },
     onError: (error: Error) => {
       const errorMessage = error instanceof Error ? error.message : 'Failed to update function';

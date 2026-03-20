@@ -38,7 +38,7 @@ export const deploymentResultSchema = z.object({
 });
 
 export const functionResponseSchema = z.object({
-  success: z.literal(true),
+  success: z.boolean(),
   function: functionSchema,
   deployment: deploymentResultSchema.nullable().optional(),
 });
