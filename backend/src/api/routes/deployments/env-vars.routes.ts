@@ -19,7 +19,7 @@ const auditService = AuditService.getInstance();
  */
 router.get('/', verifyAdmin, async (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!await deploymentService.isConfigured()) {
+    if (!(await deploymentService.isConfigured())) {
       throw new AppError(
         'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
         503,
@@ -40,7 +40,7 @@ router.get('/', verifyAdmin, async (_req: AuthRequest, res: Response, next: Next
  */
 router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!await deploymentService.isConfigured()) {
+    if (!(await deploymentService.isConfigured())) {
       throw new AppError(
         'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
         503,
@@ -89,7 +89,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
  */
 router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!await deploymentService.isConfigured()) {
+    if (!(await deploymentService.isConfigured())) {
       throw new AppError(
         'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
         503,
@@ -113,7 +113,7 @@ router.get('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: Ne
  */
 router.delete('/:id', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    if (!await deploymentService.isConfigured()) {
+    if (!(await deploymentService.isConfigured())) {
       throw new AppError(
         'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
         503,

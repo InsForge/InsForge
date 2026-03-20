@@ -33,7 +33,8 @@ router.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextF
     const teamId = customTeamId || process.env.VERCEL_TEAM_ID;
     const projectId = customProjectId || process.env.VERCEL_PROJECT_ID;
 
-    const mask = (str: string | undefined) => (str ? `${str.substring(0, 4)}...${str.substring(str.length - 4)}` : null);
+    const mask = (str: string | undefined) =>
+      str ? `${str.substring(0, 4)}...${str.substring(str.length - 4)}` : null;
 
     successResponse(res, {
       configured: !!(token && teamId && projectId),
@@ -58,9 +59,7 @@ router.put('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextF
     const validation = credentialsSchema.safeParse(req.body);
     if (!validation.success) {
       throw new AppError(
-        validation.error.issues
-          .map((e) => `${e.path.join('.')}: ${e.message}`)
-          .join(', '),
+        validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
         400,
         ERROR_CODES.INVALID_INPUT
       );

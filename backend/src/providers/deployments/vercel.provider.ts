@@ -98,7 +98,13 @@ export class VercelProvider {
     const customProjectId = await this.secretService.getSecretByKey('VERCEL_CUSTOM_PROJECT_ID');
 
     if (customToken && customTeamId && customProjectId) {
-      return { token: customToken, teamId: customTeamId, projectId: customProjectId, expiresAt: null, slug: null };
+      return {
+        token: customToken,
+        teamId: customTeamId,
+        projectId: customProjectId,
+        expiresAt: null,
+        slug: null,
+      };
     }
 
     // 2. Fallback to Environment Variables
@@ -107,13 +113,25 @@ export class VercelProvider {
     const projectId = process.env.VERCEL_PROJECT_ID;
 
     if (!token) {
-      throw new AppError('VERCEL_TOKEN not found in environment variables or custom settings', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'VERCEL_TOKEN not found in environment variables or custom settings',
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
     }
     if (!teamId) {
-      throw new AppError('VERCEL_TEAM_ID not found in environment variables or custom settings', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'VERCEL_TEAM_ID not found in environment variables or custom settings',
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
     }
     if (!projectId) {
-      throw new AppError('VERCEL_PROJECT_ID not found in environment variables or custom settings', 500, ERROR_CODES.INTERNAL_ERROR);
+      throw new AppError(
+        'VERCEL_PROJECT_ID not found in environment variables or custom settings',
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
     }
 
     return { token, teamId, projectId, expiresAt: null, slug: null };
@@ -165,7 +183,11 @@ export class VercelProvider {
   /**
    * Set custom Vercel credentials
    */
-  async setCustomCredentials(data: { token: string; teamId?: string; projectId?: string }): Promise<void> {
+  async setCustomCredentials(data: {
+    token: string;
+    teamId?: string;
+    projectId?: string;
+  }): Promise<void> {
     const { token, teamId, projectId } = data;
 
     const upsert = async (key: string, value: string) => {
@@ -202,7 +224,11 @@ export class VercelProvider {
   /**
    * Get custom credentials details (masked/partial)
    */
-  async getCustomCredentialsDetails(): Promise<{ token: string; teamId: string | null; projectId: string | null } | null> {
+  async getCustomCredentialsDetails(): Promise<{
+    token: string;
+    teamId: string | null;
+    projectId: string | null;
+  } | null> {
     const customToken = await this.secretService.getSecretByKey('VERCEL_CUSTOM_TOKEN');
     const customTeamId = await this.secretService.getSecretByKey('VERCEL_CUSTOM_TEAM_ID');
     const customProjectId = await this.secretService.getSecretByKey('VERCEL_CUSTOM_PROJECT_ID');

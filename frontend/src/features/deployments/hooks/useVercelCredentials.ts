@@ -16,7 +16,7 @@ export function useVercelCredentials() {
       deploymentsService.setVercelCredentials(credentials),
     onSuccess: (response) => {
       showToast(response.message || 'Credentials saved successfully', 'success');
-      queryClient.invalidateQueries({ queryKey: ['vercel-credentials'] });
+      void queryClient.invalidateQueries({ queryKey: ['vercel-credentials'] });
     },
     onError: (err: Error) => {
       showToast(err.message || 'Failed to save credentials', 'error');
@@ -27,7 +27,7 @@ export function useVercelCredentials() {
     mutationFn: () => deploymentsService.clearVercelCredentials(),
     onSuccess: (response) => {
       showToast(response.message || 'Credentials cleared', 'success');
-      queryClient.invalidateQueries({ queryKey: ['vercel-credentials'] });
+      void queryClient.invalidateQueries({ queryKey: ['vercel-credentials'] });
     },
     onError: (err: Error) => {
       showToast(err.message || 'Failed to clear credentials', 'error');

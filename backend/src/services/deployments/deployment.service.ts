@@ -305,7 +305,11 @@ export class DeploymentService {
   /**
    * Start a deployment directly with file upload (bypasses S3)
    */
-  async startDeploymentDirect(id: string, fileBuffer: Buffer, input: StartDeploymentRequest = {}): Promise<DeploymentRecord> {
+  async startDeploymentDirect(
+    id: string,
+    fileBuffer: Buffer,
+    input: StartDeploymentRequest = {}
+  ): Promise<DeploymentRecord> {
     try {
       const deployment = await this.getDeploymentById(id);
 
@@ -348,7 +352,11 @@ export class DeploymentService {
         meta: input.meta,
       });
 
-      const vercelStatus = (vercelDeployment.readyState || vercelDeployment.state || 'BUILDING').toUpperCase();
+      const vercelStatus = (
+        vercelDeployment.readyState ||
+        vercelDeployment.state ||
+        'BUILDING'
+      ).toUpperCase();
       const envVarKeys = await this.vercelProvider.getEnvironmentVariableKeys();
 
       const updateResult = await this.getPool().query(

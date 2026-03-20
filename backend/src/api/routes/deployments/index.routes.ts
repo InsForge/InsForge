@@ -11,7 +11,6 @@ import { dynamicUploadSingle, handleUploadError } from '@/api/middlewares/upload
 import { vercelCredentialsRouter } from './vercel-credentials.routes.js';
 
 const router = Router();
-console.log('DEBUG: deploymentsRouter index.routes.ts file has loaded!');
 const deploymentService = DeploymentService.getInstance();
 const auditService = AuditService.getInstance();
 
@@ -33,7 +32,7 @@ router.use('/vercel/credentials', (req, res, next) => {
 router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     // Check if deployment service is configured
-    if (!await deploymentService.isConfigured()) {
+    if (!(await deploymentService.isConfigured())) {
       throw new AppError(
         'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
         503,
@@ -68,7 +67,7 @@ router.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       // Check if deployment service is configured
-      if (!await deploymentService.isConfigured()) {
+      if (!(await deploymentService.isConfigured())) {
         throw new AppError(
           'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
           503,
@@ -121,7 +120,7 @@ router.post(
   handleUploadError,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      if (!await deploymentService.isConfigured()) {
+      if (!(await deploymentService.isConfigured())) {
         throw new AppError(
           'Deployment service is not configured.',
           503,
