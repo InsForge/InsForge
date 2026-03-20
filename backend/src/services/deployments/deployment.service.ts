@@ -140,6 +140,47 @@ export class DeploymentService {
   }
 
   /**
+   * Create a new deployment record with WAITING status (no S3 required)
+   * Used for direct deployments in non-cloud and local environments
+   */
+  async createDirectPlaceholder(): Promise<DeploymentRecord> {
+    try {
+      const result = await this.getPool().query(
+        `INSERT INTO system.deployments (provider, status)
+         VALUES ($1, $2)
+         RETURNING
+           id,
+           provider_deployment_id as "providerDeploymentId",
+           provider,
+           status,
+           url,
+           metadata,
+           created_at as "createdAt",
+           updated_at as "updatedAt"`,
+        ['vercel', DeploymentStatus.WAITING]
+      );
+
+      const deployment = result.rows[0] as DeploymentRecord;
+
+      logger.info('Direct deployment placeholder created', {
+        id: deployment.id,
+        status: deployment.status,
+      });
+
+      return deployment;
+    } catch (error) {
+      logger.error('Failed to create direct deployment placeholder', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new AppError(
+        'Failed to create deployment placeholder',
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+  }
+
+  /**
    * Start a deployment - download zip from S3, extract, upload to Vercel, create deployment
    */
   async startDeployment(id: string, input: StartDeploymentRequest = {}): Promise<DeploymentRecord> {

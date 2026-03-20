@@ -129,6 +129,21 @@ router.post(
       }
 
       const { id } = req.params;
+      let deploymentId = id;
+
+      let deploymentExist = null;
+      if (id !== 'new') {
+        try {
+          deploymentExist = await deploymentService.getDeploymentById(id);
+        } catch {
+          // Ignore lookup errors, treat as not found to allocate new
+        }
+      }
+
+      if (id === 'new' || !deploymentExist) {
+        const placeholder = await deploymentService.createDirectPlaceholder();
+        deploymentId = placeholder.id;
+      }
 
       const validationResult = startDeploymentRequestSchema.safeParse(req.body);
       const input = validationResult.success ? validationResult.data : {};
@@ -137,7 +152,11 @@ router.post(
         throw new AppError('File is required', 400, ERROR_CODES.INVALID_INPUT);
       }
 
-      const deployment = await deploymentService.startDeploymentDirect(id, req.file.buffer, input);
+      const deployment = await deploymentService.startDeploymentDirect(
+        deploymentId,
+        req.file.buffer,
+        input
+      );
 
       // Log audit
       await auditService.log({
