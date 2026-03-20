@@ -9,7 +9,7 @@ import {
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
-import { parseSQLStatements, checkAuthSchemaOperations } from '@/utils/sql-parser.js';
+import { parseSQLStatements, checkAuthSchemaOperations, checkSystemSchemaOperations } from '@/utils/sql-parser.js';
 import { validateTableName } from '@/utils/validations.js';
 import pgFormat from 'pg-format';
 import { parse } from 'csv-parse/sync';
@@ -74,6 +74,10 @@ export class DatabaseAdvanceService {
    * - DELETE operations on auth schema (prevents user deletion via raw SQL)
    * - TRUNCATE operations on auth schema (prevents mass user deletion)
    * - DROP operations on auth schema (prevents destruction of tables, indexes, triggers, functions, views, sequences, schemas, policies, types, domains)
+   * - CREATE/ALTER/DROP FUNCTION on system, schedules, extensions, storage, realtime schemas
+   * - CREATE TRIGGER that references a function from those protected schemas
+   * - Any DDL (CREATE TABLE, ALTER TABLE, DROP) on those protected schemas
+   * - DELETE / TRUNCATE on those protected schemas
    *
    * Allows:
    * - SELECT queries on auth schema (for reading user data)
@@ -103,6 +107,15 @@ export class DatabaseAdvanceService {
         query: query.substring(0, 100),
       });
       throw new AppError(authError, 403, ERROR_CODES.FORBIDDEN);
+    }
+
+    // Block DDL on internal system schemas (system, schedules, extensions, etc.)
+    const systemError = checkSystemSchemaOperations(query);
+    if (systemError) {
+      logger.warn('Blocked operation on system schema', {
+        query: query.substring(0, 100),
+      });
+      throw new AppError(systemError, 403, ERROR_CODES.FORBIDDEN);
     }
 
     return query;
