@@ -76,7 +76,14 @@ export default function UsersPage() {
     return () => window.removeEventListener('refreshUsers', handleRefreshEvent);
   }, [refetch]);
 
-  const visibleUserIds = useMemo(() => users.map((user) => user.id).sort().join(','), [users]);
+  const visibleUserIds = useMemo(
+    () =>
+      users
+        .map((user) => user.id)
+        .sort()
+        .join(','),
+    [users]
+  );
 
   // Clear selection when the visible dataset changes
   useEffect(() => {
