@@ -32,7 +32,7 @@ export function EnvVarDialog({
 }: EnvVarDialogProps) {
   const { showToast } = useToast();
   const [key, setKey] = useState('');
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState<string | null>('');
   const [manualDrafts, setManualDrafts] = useState<EnvVarDraft[]>([createEnvVarDraft()]);
 
   const isEditMode = !!envVar;
@@ -45,7 +45,7 @@ export function EnvVarDialog({
     }
 
     setKey(envVar?.key ?? '');
-    setValue('');
+    setValue(envVar ? null : '');
     setManualDrafts([createEnvVarDraft()]);
   }, [open, envVar]);
 
@@ -71,9 +71,10 @@ export function EnvVarDialog({
     return hasAnyValue && draft.key.trim() === '';
   });
   const hasDuplicateManualKeys = duplicateManualKeys.size > 0;
+  const isEditValueDirty = value !== null;
 
   const isValid = isEditMode
-    ? key.trim() !== ''
+    ? key.trim() !== '' && isEditValueDirty
     : manualEntries.length > 0 && !hasIncompleteManualRows && !hasDuplicateManualKeys;
 
   const handleClose = () => {
@@ -81,7 +82,11 @@ export function EnvVarDialog({
   };
 
   const handleSubmit = async () => {
-    const payload = isEditMode ? [{ key: key.trim(), value }] : manualEntries;
+    if (isEditMode && value === null) {
+      return;
+    }
+
+    const payload = isEditMode ? [{ key: key.trim(), value: value ?? '' }] : manualEntries;
 
     try {
       const success = await onSave(payload);
@@ -199,6 +204,21 @@ export function EnvVarDialog({
     });
   };
 
+  const getDraftKeyError = (draft: EnvVarDraft) => {
+    const trimmedKey = draft.key.trim();
+    const hasAnyValue = trimmedKey !== '' || draft.value !== '';
+
+    if (hasAnyValue && trimmedKey === '') {
+      return 'Key is required.';
+    }
+
+    if (duplicateManualKeys.has(trimmedKey) && trimmedKey) {
+      return `Duplicate key: ${trimmedKey}`;
+    }
+
+    return null;
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -225,7 +245,7 @@ export function EnvVarDialog({
                   id="deployment-env-var-key"
                   placeholder="e.g CLIENT_KEY"
                   value={key}
-                  onChange={(e) => setKey(e.target.value)}
+                  readOnly
                   className="flex-1"
                 />
               </div>
@@ -239,8 +259,8 @@ export function EnvVarDialog({
                 </label>
                 <Input
                   id="deployment-env-var-value"
-                  placeholder="Enter value"
-                  value={value}
+                  placeholder="Enter a replacement value"
+                  value={value ?? ''}
                   onChange={(e) => setValue(e.target.value)}
                   className="flex-1"
                 />
@@ -265,80 +285,55 @@ export function EnvVarDialog({
                 </div>
 
                 <div className="flex flex-col gap-3">
-                  {manualDrafts.map((draft, index) => (
-                    <div key={draft.id} className="flex flex-col gap-2">
-                      {(() => {
-                        const trimmedKey = draft.key.trim();
-                        const hasAnyValue = trimmedKey !== '' || draft.value !== '';
-                        const keyError =
-                          hasAnyValue && trimmedKey === ''
-                            ? 'Key is required.'
-                            : duplicateManualKeys.has(trimmedKey) && trimmedKey
-                              ? `Duplicate key: ${trimmedKey}`
-                              : null;
-                        const valueError = keyError;
-                        const keyErrorId = `env-var-${draft.id}-key-error`;
-                        const valueErrorId = `env-var-${draft.id}-value-error`;
+                  {manualDrafts.map((draft, index) => {
+                    const keyError = getDraftKeyError(draft);
+                    const keyErrorId = `env-var-${draft.id}-key-error`;
 
-                        return (
-                          <>
-                            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-3">
-                              <Input
-                                id={`deployment-env-var-key-${draft.id}`}
-                                aria-label={`Environment variable key ${index + 1}`}
-                                aria-invalid={Boolean(keyError)}
-                                aria-describedby={keyError ? keyErrorId : undefined}
-                                placeholder={`Key ${index + 1}`}
-                                value={draft.key}
-                                onChange={(e) => updateManualDraft(draft.id, 'key', e.target.value)}
-                                onPaste={handleDraftPaste(index, 'key')}
-                              />
-                              <Input
-                                id={`deployment-env-var-value-${draft.id}`}
-                                aria-label={`Environment variable value ${index + 1}`}
-                                aria-invalid={Boolean(valueError)}
-                                aria-describedby={valueError ? valueErrorId : undefined}
-                                placeholder="Value"
-                                value={draft.value}
-                                onChange={(e) =>
-                                  updateManualDraft(draft.id, 'value', e.target.value)
-                                }
-                                onPaste={handleDraftPaste(index, 'value')}
-                              />
-                              <Button
-                                type="button"
-                                variant="secondary"
-                                size="icon"
-                                onClick={() => removeManualDraft(draft.id)}
-                                className="h-9 w-9"
-                                aria-label={`Remove environment variable row ${index + 1}`}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                            {keyError && (
-                              <p
-                                id={keyErrorId}
-                                className="text-sm text-amber-600 dark:text-amber-400"
-                              >
-                                {keyError}
-                              </p>
-                            )}
-                            {valueError && (
-                              <span id={valueErrorId} className="sr-only">
-                                {valueError}
-                              </span>
-                            )}
-                          </>
-                        );
-                      })()}
-                    </div>
-                  ))}
+                    return (
+                      <div key={draft.id} className="flex flex-col gap-2">
+                        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-3">
+                          <Input
+                            id={`deployment-env-var-key-${draft.id}`}
+                            aria-label={`Environment variable key ${index + 1}`}
+                            aria-invalid={Boolean(keyError)}
+                            aria-describedby={keyError ? keyErrorId : undefined}
+                            placeholder={`Key ${index + 1}`}
+                            value={draft.key}
+                            onChange={(e) => updateManualDraft(draft.id, 'key', e.target.value)}
+                            onPaste={handleDraftPaste(index, 'key')}
+                          />
+                          <Input
+                            id={`deployment-env-var-value-${draft.id}`}
+                            aria-label={`Environment variable value ${index + 1}`}
+                            placeholder="Value"
+                            value={draft.value}
+                            onChange={(e) => updateManualDraft(draft.id, 'value', e.target.value)}
+                            onPaste={handleDraftPaste(index, 'value')}
+                          />
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="icon"
+                            onClick={() => removeManualDraft(draft.id)}
+                            className="h-9 w-9"
+                            aria-label={`Remove environment variable row ${index + 1}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        {keyError && (
+                          <p id={keyErrorId} className="text-sm text-amber-600 dark:text-amber-400">
+                            {keyError}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {hasIncompleteManualRows && (
                   <p className="text-sm text-amber-600 dark:text-amber-400">
-                    Each filled row needs both a key and a value.
+                    One or more rows are missing a key.
                   </p>
                 )}
                 {hasDuplicateManualKeys && (

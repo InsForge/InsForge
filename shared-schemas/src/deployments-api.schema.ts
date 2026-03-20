@@ -91,7 +91,7 @@ export const getEnvVarResponseSchema = z.object({
  */
 export const upsertEnvVarRequestSchema = z.object({
   key: z.string().trim().min(1, 'key is required'),
-  value: z.string().min(1),
+  value: z.string(),
 });
 
 /**

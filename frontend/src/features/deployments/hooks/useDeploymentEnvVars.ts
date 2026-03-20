@@ -77,9 +77,9 @@ export function useDeploymentEnvVars() {
         return false;
       }
 
-      const incompleteInput = normalizedInputs.find((input) => !input.key || !input.value);
+      const incompleteInput = normalizedInputs.find((input) => !input.key);
       if (incompleteInput) {
-        showToast('Please fill in both key and value for every environment variable', 'error');
+        showToast('One or more rows are missing a key', 'error');
         return false;
       }
 
