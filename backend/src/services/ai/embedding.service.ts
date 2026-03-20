@@ -10,7 +10,7 @@ export class EmbeddingService {
   private aiConfigService = AIConfigService.getInstance();
   private aiUsageService = AIUsageService.getInstance();
 
-  private constructor() {}
+  private constructor() { }
 
   public static getInstance(): EmbeddingService {
     if (!EmbeddingService.instance) {
@@ -29,7 +29,7 @@ export class EmbeddingService {
     try {
       // Send request with automatic renewal and retry logic (same pattern as chat-completion)
       const aiConfig = await this.aiConfigService.findByModelId(options.model);
-      const { result: response } = await this.openRouterProvider.sendRequest((client) =>
+      const { result: response, source } = await this.openRouterProvider.sendRequest((client) =>
         client.embeddings.create({
           model: options.model,
           input: options.input,
@@ -48,22 +48,17 @@ export class EmbeddingService {
       // Extract token usage if available
       const tokenUsage = response.usage
         ? {
-            promptTokens: response.usage.prompt_tokens,
-            totalTokens: response.usage.total_tokens,
-          }
+          promptTokens: response.usage.prompt_tokens,
+          totalTokens: response.usage.total_tokens,
+        }
         : undefined;
 
-      // Track usage if config is available
-      if (aiConfig?.id && tokenUsage) {
-        const outputTokens = Math.max(
-          0,
-          (tokenUsage.totalTokens || 0) - (tokenUsage.promptTokens || 0)
-        );
-        await this.aiUsageService.trackChatUsage(
+      // Track usage if config is available and not BYOK
+      if (aiConfig?.id && tokenUsage && source !== 'byok') {
+        await this.aiUsageService.trackEmbeddingUsage(
           aiConfig.id,
           tokenUsage.promptTokens,
-          outputTokens,
-          options.model // pass the actual model ID used
+          options.model
         );
       }
 
