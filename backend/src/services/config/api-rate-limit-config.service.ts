@@ -77,66 +77,40 @@ export class ApiRateLimitConfigService {
     const client = await this.getPool().connect();
     try {
       await client.query('BEGIN');
-
-      const existingResult = await client.query(
-        'SELECT id FROM system.api_rate_limit_config LIMIT 1 FOR UPDATE'
+      const result = await client.query(
+        `INSERT INTO system.api_rate_limit_config (
+           send_email_otp_max_requests,
+           send_email_otp_window_minutes,
+           verify_otp_max_requests,
+           verify_otp_window_minutes,
+           email_cooldown_seconds
+         )
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT ((1))
+         DO UPDATE SET
+           send_email_otp_max_requests = EXCLUDED.send_email_otp_max_requests,
+           send_email_otp_window_minutes = EXCLUDED.send_email_otp_window_minutes,
+           verify_otp_max_requests = EXCLUDED.verify_otp_max_requests,
+           verify_otp_window_minutes = EXCLUDED.verify_otp_window_minutes,
+           email_cooldown_seconds = EXCLUDED.email_cooldown_seconds,
+           updated_at = NOW()
+         RETURNING
+           id,
+           send_email_otp_max_requests as "sendEmailOtpMaxRequests",
+           send_email_otp_window_minutes as "sendEmailOtpWindowMinutes",
+           verify_otp_max_requests as "verifyOtpMaxRequests",
+           verify_otp_window_minutes as "verifyOtpWindowMinutes",
+           email_cooldown_seconds as "emailCooldownSeconds",
+           created_at as "createdAt",
+           updated_at as "updatedAt"`,
+        [
+          input.sendEmailOtpMaxRequests,
+          input.sendEmailOtpWindowMinutes,
+          input.verifyOtpMaxRequests,
+          input.verifyOtpWindowMinutes,
+          input.emailCooldownSeconds,
+        ]
       );
-
-      let result;
-      if (!existingResult.rows.length) {
-        result = await client.query(
-          `INSERT INTO system.api_rate_limit_config (
-             send_email_otp_max_requests,
-             send_email_otp_window_minutes,
-             verify_otp_max_requests,
-             verify_otp_window_minutes,
-             email_cooldown_seconds
-           )
-           VALUES ($1, $2, $3, $4, $5)
-           RETURNING
-             id,
-             send_email_otp_max_requests as "sendEmailOtpMaxRequests",
-             send_email_otp_window_minutes as "sendEmailOtpWindowMinutes",
-             verify_otp_max_requests as "verifyOtpMaxRequests",
-             verify_otp_window_minutes as "verifyOtpWindowMinutes",
-             email_cooldown_seconds as "emailCooldownSeconds",
-             created_at as "createdAt",
-             updated_at as "updatedAt"`,
-          [
-            input.sendEmailOtpMaxRequests,
-            input.sendEmailOtpWindowMinutes,
-            input.verifyOtpMaxRequests,
-            input.verifyOtpWindowMinutes,
-            input.emailCooldownSeconds,
-          ]
-        );
-      } else {
-        result = await client.query(
-          `UPDATE system.api_rate_limit_config
-           SET send_email_otp_max_requests = $1,
-               send_email_otp_window_minutes = $2,
-               verify_otp_max_requests = $3,
-               verify_otp_window_minutes = $4,
-               email_cooldown_seconds = $5,
-               updated_at = NOW()
-           RETURNING
-             id,
-             send_email_otp_max_requests as "sendEmailOtpMaxRequests",
-             send_email_otp_window_minutes as "sendEmailOtpWindowMinutes",
-             verify_otp_max_requests as "verifyOtpMaxRequests",
-             verify_otp_window_minutes as "verifyOtpWindowMinutes",
-             email_cooldown_seconds as "emailCooldownSeconds",
-             created_at as "createdAt",
-             updated_at as "updatedAt"`,
-          [
-            input.sendEmailOtpMaxRequests,
-            input.sendEmailOtpWindowMinutes,
-            input.verifyOtpMaxRequests,
-            input.verifyOtpWindowMinutes,
-            input.emailCooldownSeconds,
-          ]
-        );
-      }
 
       await client.query('COMMIT');
       logger.info('API rate limit config updated', input);

@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import { EventEmitter } from 'events';
 import {
   applyApiRateLimitConfig,
+  cleanupRateLimitEntries,
   clearRateLimitState,
   perEmailCooldown,
   sendEmailOTPRateLimiter,
@@ -168,6 +169,34 @@ describe('Rate Limit Middleware', () => {
         }
       }
     });
+
+    it('does not clean up email cooldowns before the configured cooldown expires', () => {
+      vi.useFakeTimers();
+      try {
+        const start = new Date('2026-03-21T00:00:00Z');
+        vi.setSystemTime(start);
+        applyApiRateLimitConfig({
+          sendEmailOtpMaxRequests: 5,
+          sendEmailOtpWindowMinutes: 1,
+          verifyOtpMaxRequests: 10,
+          verifyOtpWindowMinutes: 1,
+          emailCooldownSeconds: 600,
+        });
+
+        req.body = { email: 'long-cooldown@example.com' };
+        const middleware = perEmailCooldown();
+
+        middleware(req as Request, res as Response, next);
+        vi.setSystemTime(new Date(start.getTime() + 2 * 60 * 1000));
+        cleanupRateLimitEntries();
+
+        expect(() => {
+          middleware(req as Request, res as Response, next);
+        }).toThrow(/Please wait.*seconds before requesting another code/);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe('IP-based auth limiters', () => {
@@ -208,6 +237,27 @@ describe('Rate Limit Middleware', () => {
       const error = blockingNext.mock.calls[0]?.[0];
       expect(error).toBeInstanceOf(AppError);
       expect((error as AppError).message).toMatch(/Too many send email verification requests/);
+    });
+
+    it('sendEmailOTPRateLimiter reserves capacity before the first request finishes', () => {
+      applyApiRateLimitConfig({
+        sendEmailOtpMaxRequests: 1,
+        sendEmailOtpWindowMinutes: 15,
+        verifyOtpMaxRequests: 10,
+        verifyOtpWindowMinutes: 15,
+        emailCooldownSeconds: 60,
+      });
+
+      const { request: firstRequest } = createRequestResponse();
+      const { request: secondRequest, response: secondResponse } = createRequestResponse();
+      const firstNext = vi.fn();
+      const secondNext = vi.fn();
+
+      sendEmailOTPRateLimiter(firstRequest, firstRequest.res as Response, firstNext);
+      sendEmailOTPRateLimiter(secondRequest, secondResponse, secondNext);
+
+      expect(firstNext).toHaveBeenCalledOnce();
+      expect(secondNext).toHaveBeenCalledWith(expect.any(AppError));
     });
 
     it('verifyOTPRateLimiter only counts failed verification attempts', () => {

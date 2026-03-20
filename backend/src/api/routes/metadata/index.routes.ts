@@ -20,6 +20,7 @@ import { CloudDatabaseProvider } from '@/providers/database/cloud.provider.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { ApiRateLimitConfigService } from '@/services/config/api-rate-limit-config.service.js';
 import { applyApiRateLimitConfig, clearRateLimitState } from '@/api/middlewares/rate-limiters.js';
+import logger from '@/utils/logger.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -203,13 +204,20 @@ router.put('/rate-limits', async (req: AuthRequest, res: Response, next: NextFun
     applyApiRateLimitConfig(config);
     clearRateLimitState();
 
-    await auditService.log({
-      actor: req.user?.email || 'api-key',
-      action: 'UPDATE_API_RATE_LIMIT_CONFIG',
-      module: 'SETTINGS',
-      details: { updatedFields: Object.keys(validation.data) },
-      ip_address: req.ip,
-    });
+    try {
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'UPDATE_API_RATE_LIMIT_CONFIG',
+        module: 'SETTINGS',
+        details: { updatedFields: Object.keys(validation.data) },
+        ip_address: req.ip,
+      });
+    } catch (auditError) {
+      logger.error('Failed to write audit log for API rate limit config update', {
+        auditError,
+        actor: req.user?.email || 'api-key',
+      });
+    }
 
     successResponse(res, config);
   } catch (error) {

@@ -827,65 +827,89 @@ export default function SettingsMenuDialog() {
                       Failed to load API rate-limit configuration. Close and reopen to retry.
                     </div>
                   ) : (
-                    rateLimitFields.map((fieldConfig, index) => (
-                      <div key={fieldConfig.name}>
-                        <div className="flex items-start gap-6">
-                          <div className="w-[200px] shrink-0">
-                            <p className="py-1.5 text-sm leading-5 text-foreground">
-                              {fieldConfig.label}
-                            </p>
-                            <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
-                              {fieldConfig.description}
-                            </p>
-                          </div>
-                          <div className="flex min-w-0 flex-1 items-start gap-1.5">
-                            <Controller
-                              name={fieldConfig.name}
-                              control={rateLimitForm.control}
-                              render={({ field }) => (
-                                <div className="w-full">
-                                  <div className="flex items-center gap-2">
-                                    <Input
-                                      type="number"
-                                      min={fieldConfig.min}
-                                      max={fieldConfig.max}
-                                      {...field}
-                                      onChange={(event) => {
-                                        const parsed = parseInt(event.target.value, 10);
-                                        field.onChange(Number.isNaN(parsed) ? '' : parsed);
-                                      }}
-                                      className={
-                                        rateLimitForm.formState.errors[fieldConfig.name]
-                                          ? 'border-destructive'
-                                          : ''
-                                      }
-                                    />
-                                    <span className="shrink-0 text-sm text-muted-foreground">
-                                      {fieldConfig.unit}
-                                    </span>
+                    rateLimitFields.map((fieldConfig, index) => {
+                      const fieldId = `rate-limit-${fieldConfig.name}`;
+                      const descriptionId = `${fieldId}-description`;
+                      const messageId = `${fieldId}-message`;
+                      const fieldError = rateLimitForm.formState.errors[fieldConfig.name];
+                      const hasError = !!fieldError;
+
+                      return (
+                        <div key={fieldConfig.name}>
+                          <div className="flex items-start gap-6">
+                            <div className="w-[200px] shrink-0">
+                              <label
+                                htmlFor={fieldId}
+                                className="block py-1.5 text-sm leading-5 text-foreground"
+                              >
+                                {fieldConfig.label}
+                              </label>
+                              <p
+                                id={descriptionId}
+                                className="pb-2 text-[13px] leading-[18px] text-muted-foreground"
+                              >
+                                {fieldConfig.description}
+                              </p>
+                            </div>
+                            <div className="flex min-w-0 flex-1 items-start gap-1.5">
+                              <Controller
+                                name={fieldConfig.name}
+                                control={rateLimitForm.control}
+                                render={({ field }) => (
+                                  <div className="w-full">
+                                    <div className="flex items-center gap-2">
+                                      <Input
+                                        id={fieldId}
+                                        type="number"
+                                        min={fieldConfig.min}
+                                        max={fieldConfig.max}
+                                        {...field}
+                                        value={field.value ?? ''}
+                                        disabled={isUpdatingRateLimitConfig}
+                                        aria-invalid={hasError}
+                                        aria-describedby={`${descriptionId} ${messageId}`}
+                                        onChange={(event) => {
+                                          const nextValue = event.target.value.trim();
+                                          if (!nextValue) {
+                                            field.onChange(undefined);
+                                            return;
+                                          }
+
+                                          const parsed = parseInt(nextValue, 10);
+                                          field.onChange(Number.isNaN(parsed) ? undefined : parsed);
+                                        }}
+                                        className={hasError ? 'border-destructive' : ''}
+                                      />
+                                      <span className="shrink-0 text-sm text-muted-foreground">
+                                        {fieldConfig.unit}
+                                      </span>
+                                    </div>
+                                    {hasError ? (
+                                      <p id={messageId} className="pt-1 text-xs text-destructive">
+                                        {fieldError?.message}
+                                      </p>
+                                    ) : (
+                                      <p
+                                        id={messageId}
+                                        className="pt-1 text-xs text-muted-foreground"
+                                      >
+                                        Current: {rateLimitConfig?.[fieldConfig.name]}{' '}
+                                        {fieldConfig.unit}
+                                      </p>
+                                    )}
                                   </div>
-                                  {rateLimitForm.formState.errors[fieldConfig.name] ? (
-                                    <p className="pt-1 text-xs text-destructive">
-                                      {rateLimitForm.formState.errors[fieldConfig.name]?.message}
-                                    </p>
-                                  ) : (
-                                    <p className="pt-1 text-xs text-muted-foreground">
-                                      Current: {rateLimitConfig?.[fieldConfig.name]}{' '}
-                                      {fieldConfig.unit}
-                                    </p>
-                                  )}
-                                </div>
-                              )}
-                            />
+                                )}
+                              />
+                            </div>
                           </div>
+                          {index < rateLimitFields.length - 1 && (
+                            <div className="flex h-5 items-center">
+                              <div className="h-px w-full bg-[var(--alpha-8)]" />
+                            </div>
+                          )}
                         </div>
-                        {index < rateLimitFields.length - 1 && (
-                          <div className="flex h-5 items-center">
-                            <div className="h-px w-full bg-[var(--alpha-8)]" />
-                          </div>
-                        )}
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               )}

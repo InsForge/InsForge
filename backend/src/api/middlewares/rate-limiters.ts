@@ -8,8 +8,10 @@ import type { ApiRateLimitConfigSchema } from '@insforge/shared-schemas';
  * Maps email -> last request timestamp
  */
 const emailCooldowns = new Map<string, number>();
-const sendEmailOtpRequestsByIp = new Map<string, number[]>();
-const verifyOtpRequestsByIp = new Map<string, number[]>();
+type RateLimitHit = { id: number; timestamp: number };
+
+const sendEmailOtpRequestsByIp = new Map<string, RateLimitHit[]>();
+const verifyOtpRequestsByIp = new Map<string, RateLimitHit[]>();
 
 type RuntimeApiRateLimitConfig = Pick<
   ApiRateLimitConfigSchema,
@@ -29,6 +31,7 @@ const DEFAULT_API_RATE_LIMIT_CONFIG: RuntimeApiRateLimitConfig = {
 };
 
 let currentApiRateLimitConfig: RuntimeApiRateLimitConfig = { ...DEFAULT_API_RATE_LIMIT_CONFIG };
+let nextRateLimitHitId = 0;
 
 /**
  * Cleanup interval reference for graceful shutdown
@@ -40,31 +43,42 @@ let cleanupInterval: NodeJS.Timeout | null = null;
  */
 cleanupInterval = setInterval(
   () => {
-    const now = Date.now();
-    const maxWindowMs =
-      Math.max(
-        currentApiRateLimitConfig.sendEmailOtpWindowMinutes,
-        currentApiRateLimitConfig.verifyOtpWindowMinutes,
-        5
-      ) *
-      60 *
-      1000;
-
-    for (const [email, timestamp] of emailCooldowns.entries()) {
-      if (now - timestamp > maxWindowMs) {
-        emailCooldowns.delete(email);
-      }
-    }
-
-    cleanupIpRequests(sendEmailOtpRequestsByIp, maxWindowMs, now);
-    cleanupIpRequests(verifyOtpRequestsByIp, maxWindowMs, now);
+    cleanupRateLimitEntries();
   },
   5 * 60 * 1000
 );
 
-function cleanupIpRequests(store: Map<string, number[]>, maxWindowMs: number, now: number): void {
+export function cleanupRateLimitEntries(now: number = Date.now()): void {
+  const maxIpWindowMs =
+    Math.max(
+      currentApiRateLimitConfig.sendEmailOtpWindowMinutes,
+      currentApiRateLimitConfig.verifyOtpWindowMinutes,
+      5
+    ) *
+    60 *
+    1000;
+  const emailCooldownRetentionMs = Math.max(
+    currentApiRateLimitConfig.emailCooldownSeconds * 1000,
+    5 * 60 * 1000
+  );
+
+  for (const [email, timestamp] of emailCooldowns.entries()) {
+    if (now - timestamp > emailCooldownRetentionMs) {
+      emailCooldowns.delete(email);
+    }
+  }
+
+  cleanupIpRequests(sendEmailOtpRequestsByIp, maxIpWindowMs, now);
+  cleanupIpRequests(verifyOtpRequestsByIp, maxIpWindowMs, now);
+}
+
+function cleanupIpRequests(
+  store: Map<string, RateLimitHit[]>,
+  maxWindowMs: number,
+  now: number
+): void {
   for (const [key, timestamps] of store.entries()) {
-    const recent = timestamps.filter((timestamp) => now - timestamp < maxWindowMs);
+    const recent = timestamps.filter((hit) => now - hit.timestamp < maxWindowMs);
     if (recent.length) {
       store.set(key, recent);
     } else {
@@ -88,7 +102,7 @@ function getClientIp(req: Request): string {
 }
 
 interface IpRateLimiterOptions {
-  store: Map<string, number[]>;
+  store: Map<string, RateLimitHit[]>;
   getWindowMs: () => number;
   getMaxRequests: () => number;
   getMessage: (windowMinutes: number) => string;
@@ -97,16 +111,14 @@ interface IpRateLimiterOptions {
 }
 
 function createIpRateLimiter(options: IpRateLimiterOptions) {
-  return (req: Request, _res: Response, next: NextFunction) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     const now = Date.now();
     const ip = getClientIp(req);
     const windowMs = options.getWindowMs();
     const maxRequests = options.getMaxRequests();
     const recentRequests = (options.store.get(ip) || []).filter(
-      (timestamp) => now - timestamp < windowMs
+      (hit) => now - hit.timestamp < windowMs
     );
-
-    options.store.set(ip, recentRequests);
 
     if (recentRequests.length >= maxRequests) {
       return next(
@@ -118,30 +130,42 @@ function createIpRateLimiter(options: IpRateLimiterOptions) {
       );
     }
 
-    let counted = false;
-    req.res?.on('finish', () => {
-      if (counted) {
+    const reservedHit: RateLimitHit = {
+      id: ++nextRateLimitHitId,
+      timestamp: now,
+    };
+    options.store.set(ip, [...recentRequests, reservedHit]);
+
+    let finalized = false;
+    const finalizeReservation = () => {
+      if (finalized) {
         return;
       }
-      counted = true;
+      finalized = true;
 
-      const statusCode = req.res?.statusCode ?? 500;
+      const statusCode = res.statusCode ?? 500;
       const isSuccess = statusCode < 400;
       const shouldCount =
         (isSuccess && options.countSuccessfulRequests) ||
         (!isSuccess && options.countFailedRequests);
-
-      if (!shouldCount) {
-        return;
-      }
-
       const currentWindowMs = options.getWindowMs();
       const currentTimestamps = (options.store.get(ip) || []).filter(
-        (timestamp) => Date.now() - timestamp < currentWindowMs
+        (hit) => Date.now() - hit.timestamp < currentWindowMs && hit.id !== reservedHit.id
       );
-      currentTimestamps.push(Date.now());
-      options.store.set(ip, currentTimestamps);
-    });
+
+      if (shouldCount) {
+        currentTimestamps.push(reservedHit);
+      }
+
+      if (currentTimestamps.length) {
+        options.store.set(ip, currentTimestamps);
+      } else {
+        options.store.delete(ip);
+      }
+    };
+
+    res.once('finish', finalizeReservation);
+    res.once('close', finalizeReservation);
 
     return next();
   };
@@ -162,6 +186,7 @@ export function clearRateLimitState(): void {
   emailCooldowns.clear();
   sendEmailOtpRequestsByIp.clear();
   verifyOtpRequestsByIp.clear();
+  nextRateLimitHitId = 0;
 }
 
 /**
