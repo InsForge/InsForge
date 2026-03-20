@@ -219,6 +219,143 @@ export function checkAuthSchemaOperations(query: string): string | null {
 }
 
 /**
+ * Protected internal schemas that users must not modify via the SQL editor.
+ * Any CREATE, ALTER, or DROP on objects within these schemas is blocked.
+ */
+const PROTECTED_SCHEMAS = new Set(['system', 'schedules', 'extensions', 'storage', 'realtime']);
+
+/**
+ * Check if a query contains dangerous DDL operations on protected internal schemas
+ * (system, schedules, extensions, storage, realtime).
+ * Returns an error message if blocked, null if allowed.
+ */
+export function checkSystemSchemaOperations(query: string): string | null {
+  try {
+    const { stmts } = parseSync(query);
+
+    for (const stmtWrapper of stmts) {
+      const stmt = stmtWrapper.stmt as Record<string, unknown>;
+      const [stmtType, data] = Object.entries(stmt)[0] as [string, Record<string, unknown>];
+
+      // Block CREATE FUNCTION / CREATE OR REPLACE FUNCTION on protected schemas
+      if (stmtType === 'CreateFunctionStmt') {
+        const funcname = (data.funcname as Array<Record<string, unknown>>) || [];
+        if (funcname.length >= 2) {
+          const schemaItem = funcname[0];
+          const schemaName = (schemaItem.String as Record<string, unknown> | undefined)
+            ?.sval as string | undefined;
+          if (schemaName && PROTECTED_SCHEMAS.has(schemaName.toLowerCase())) {
+            return `CREATE OR REPLACE FUNCTION on schema "${schemaName}" is not allowed. System functions must not be modified.`;
+          }
+        }
+      }
+
+      // Block CREATE TRIGGER that executes a function in a protected schema
+      if (stmtType === 'CreateTrigStmt') {
+        const funcname = (data.funcname as Array<Record<string, unknown>>) || [];
+        if (funcname.length >= 2) {
+          const schemaItem = funcname[0];
+          const schemaName = (schemaItem.String as Record<string, unknown> | undefined)
+            ?.sval as string | undefined;
+          if (schemaName && PROTECTED_SCHEMAS.has(schemaName.toLowerCase())) {
+            return `CREATE TRIGGER using a function from schema "${schemaName}" is not allowed. System trigger functions must not be attached to user tables.`;
+          }
+        }
+      }
+
+      // Block ALTER FUNCTION on protected schemas
+      if (stmtType === 'AlterFunctionStmt') {
+        const func = data.func as Record<string, unknown> | undefined;
+        const objname = (func?.objname as Array<Record<string, unknown>>) || [];
+        if (objname.length >= 2) {
+          const schemaItem = objname[0];
+          const schemaName = (schemaItem.String as Record<string, unknown> | undefined)
+            ?.sval as string | undefined;
+          if (schemaName && PROTECTED_SCHEMAS.has(schemaName.toLowerCase())) {
+            return `ALTER FUNCTION on schema "${schemaName}" is not allowed. System functions must not be modified.`;
+          }
+        }
+      }
+
+      // Block DROP on protected schemas (functions, tables, etc.)
+      if (stmtType === 'DropStmt') {
+        const objects = (data.objects as Array<unknown>) || [];
+        for (const obj of objects) {
+          if (typeof obj !== 'object' || obj === null) continue;
+          const objRecord = obj as Record<string, unknown>;
+          let schemaName: string | null = null;
+
+          // DROP SCHEMA: direct String object
+          if (objRecord.String) {
+            const stringObj = objRecord.String as Record<string, unknown>;
+            schemaName = (stringObj.sval as string) ?? null;
+          }
+          // DROP TABLE/INDEX/VIEW/etc: List with [schema, name] items
+          else if (objRecord.List) {
+            const list = objRecord.List as Record<string, unknown>;
+            const items = (list.items as Array<Record<string, unknown>>) || [];
+            if (items.length > 0) {
+              const firstItem = items[0];
+              if (firstItem.String) {
+                schemaName = (firstItem.String as Record<string, unknown>).sval as string;
+              }
+            }
+          }
+          // DROP FUNCTION/PROCEDURE: ObjectWithArgs
+          else if (objRecord.ObjectWithArgs) {
+            const objectWithArgs = objRecord.ObjectWithArgs as Record<string, unknown>;
+            const objname = (objectWithArgs.objname as Array<Record<string, unknown>>) || [];
+            if (objname.length > 0) {
+              const firstItem = objname[0];
+              if (firstItem.String) {
+                schemaName = (firstItem.String as Record<string, unknown>).sval as string;
+              }
+            }
+          }
+
+          if (schemaName && PROTECTED_SCHEMAS.has(schemaName.toLowerCase())) {
+            return `DROP operations on schema "${schemaName}" are not allowed. System schemas must not be modified.`;
+          }
+        }
+      }
+
+      // Block CREATE TABLE / ALTER TABLE on protected schemas
+      if (stmtType === 'CreateStmt' || stmtType === 'AlterTableStmt') {
+        const relation = data.relation as Record<string, unknown> | undefined;
+        const schemaName = getSchemaName(relation);
+        if (schemaName && PROTECTED_SCHEMAS.has(schemaName.toLowerCase())) {
+          return `DDL operations on schema "${schemaName}" are not allowed. System schemas must not be modified.`;
+        }
+      }
+
+      // Block DELETE / TRUNCATE on protected schemas
+      if (stmtType === 'DeleteStmt') {
+        const relation = data.relation as Record<string, unknown> | undefined;
+        const schemaName = getSchemaName(relation);
+        if (schemaName && PROTECTED_SCHEMAS.has(schemaName.toLowerCase())) {
+          return `DELETE operations on schema "${schemaName}" are not allowed.`;
+        }
+      }
+
+      if (stmtType === 'TruncateStmt') {
+        const relations = (data.relations as Array<Record<string, unknown>>) || [];
+        for (const relation of relations) {
+          const schemaName = getSchemaName(relation);
+          if (schemaName && PROTECTED_SCHEMAS.has(schemaName.toLowerCase())) {
+            return `TRUNCATE operations on schema "${schemaName}" are not allowed.`;
+          }
+        }
+      }
+    }
+
+    return null;
+  } catch (parseError) {
+    logger.warn('SQL parse error in checkSystemSchemaOperations, letting query through:', parseError);
+    return null;
+  }
+}
+
+/**
  * Parse a SQL string into individual statements, properly handling:
  * - String literals with embedded semicolons
  * - Escaped quotes
