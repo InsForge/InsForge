@@ -66,6 +66,22 @@ All deployment methods require:
 - PostgreSQL 15+ compatible
 - Internet connectivity for external services
 
+## 🚀 Vercel Deployments
+
+InsForge supports deploying application builds into Vercel. The trigger methodology expands depending on the host environment:
+
+### 1. InsForge Cloud (Managed)
+- **Flow**: Source ZIP buffers stage on standard S3 backend layers first (`_deployments` index bucket) before triggering Vercel build locks.
+- **Credentials**: Backend configurations handle auth transparently.
+
+### 2. Self-Hosted / Local Environment
+- **Flow**: Custom deployments operate using a **DIRECT** buffer pipe straight into Vercel APIs. **No AWS S3 Setup is required** for staging execution buffers.
+- **Credentials**: Fully configurable in product. Access the **Deployments Tab** to bind:
+    - `Vercel Token` (Account access token)
+    - `Team ID` (Optional - for team organizations)
+    - `Project ID` (Target app profile index)
+- **Defaults**: Local variables (`VERCEL_TOKEN`, etc.) serve as static fallback anchors until overridden by safely-persisted secret allocation structures on the backend.
+
 ## 🔧 Architecture Overview
 
 InsForge consists of 6 main services:
