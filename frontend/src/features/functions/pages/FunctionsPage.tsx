@@ -18,14 +18,41 @@ import { useConfirm } from '@/lib/hooks/useConfirm';
 
 const MAX_FUNCTION_FILE_SIZE_BYTES = 1024 * 1024;
 const ALLOWED_FUNCTION_FILE_EXTENSIONS = ['.ts', '.js', '.tsx', '.jsx'];
-const ALLOWED_FUNCTION_FILE_MIME_TYPES = new Set([
-  'text/javascript',
-  'application/javascript',
-  'text/typescript',
-  'application/typescript',
-  'application/x-typescript',
-  'text/jsx',
-  'text/tsx',
+const ALLOWED_FUNCTION_FILE_MIME_TYPES_BY_EXTENSION = new Map([
+  [
+    '.js',
+    new Set([
+      'text/javascript',
+      'application/javascript',
+    ]),
+  ],
+  [
+    '.ts',
+    new Set([
+      'text/typescript',
+      'application/typescript',
+      'application/x-typescript',
+      // Windows commonly reports .ts files as MPEG transport streams.
+      'video/mp2t',
+    ]),
+  ],
+  [
+    '.jsx',
+    new Set([
+      'text/jsx',
+      'text/javascript',
+      'application/javascript',
+    ]),
+  ],
+  [
+    '.tsx',
+    new Set([
+      'text/tsx',
+      'text/typescript',
+      'application/typescript',
+      'application/x-typescript',
+    ]),
+  ],
 ]);
 
 export default function FunctionsPage() {
@@ -191,17 +218,21 @@ export default function FunctionsPage() {
           }
 
           const normalizedFileName = file.name.toLowerCase();
-          const hasAllowedExtension = ALLOWED_FUNCTION_FILE_EXTENSIONS.some((extension) =>
+          const matchedExtension = ALLOWED_FUNCTION_FILE_EXTENSIONS.find((extension) =>
             normalizedFileName.endsWith(extension)
           );
-          const hasAllowedMimeType = ALLOWED_FUNCTION_FILE_MIME_TYPES.has(file.type);
 
-          if (!hasAllowedExtension) {
+          if (!matchedExtension) {
             showToast('Invalid file type. Please upload a .ts, .js, .tsx, or .jsx file.', 'error');
             return;
           }
 
-          if (file.type && !hasAllowedMimeType) {
+          const allowedMimeTypesForExtension =
+            ALLOWED_FUNCTION_FILE_MIME_TYPES_BY_EXTENSION.get(matchedExtension);
+          const hasAllowedMimeType =
+            !file.type || allowedMimeTypesForExtension?.has(file.type) === true;
+
+          if (!hasAllowedMimeType) {
             showToast('Invalid file type. Please upload a .ts, .js, .tsx, or .jsx file.', 'error');
             return;
           }
