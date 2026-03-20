@@ -149,7 +149,6 @@ export type TokenPayloadSchema = z.infer<typeof tokenPayloadSchema>;
 export type OAuthConfigSchema = z.infer<typeof oAuthConfigSchema>;
 export type OAuthProvidersSchema = z.infer<typeof oAuthProvidersSchema>;
 export type AuthConfigSchema = z.infer<typeof authConfigSchema>;
-<<<<<<< HEAD
 
 // ============================================================================
 // Custom OAuth provider schemas
@@ -176,6 +175,4 @@ export const customOAuthConfigSchema = z.object({
 
 export type CustomOAuthKeySchema = z.infer<typeof customOAuthKeySchema>;
 export type CustomOAuthConfigSchema = z.infer<typeof customOAuthConfigSchema>;
-=======
 export type RedirectUrlWhitelistSchema = z.infer<typeof redirectUrlWhitelistSchema>;
->>>>>>> 3b8d143a (feat(auth): add redirect URL whitelist to Auth Settings and enforce across auth flows)
