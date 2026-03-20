@@ -4,6 +4,20 @@ import { functionService } from '../services/function.service';
 import { FunctionSchema, type UpdateFunctionRequest } from '@insforge/shared-schemas';
 import { useToast } from '@/lib/hooks/useToast';
 
+function getDeploymentFailureMessage(buildLogs?: string[]): string {
+  const logs = buildLogs?.map((log) => log.trim()).filter(Boolean) ?? [];
+
+  const explicitError =
+    logs.find((log) => log.toLowerCase().includes('[error]')) ?? logs.at(-1) ?? null;
+
+  if (!explicitError) {
+    return 'Function saved, but deployment failed.';
+  }
+
+  const normalizedError = explicitError.replace(/^\[error\]\s*/i, '');
+  return `Function saved, but deployment failed: ${normalizedError}`;
+}
+
 export function useFunctions() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
@@ -78,7 +92,7 @@ export function useFunctions() {
         return;
       }
 
-      showToast('Function saved, but deployment failed. Please check the build logs.', 'warn');
+      showToast(getDeploymentFailureMessage(result.deployment?.buildLogs), 'warn', undefined, 6000);
     },
     onError: (error: Error) => {
       const errorMessage = error instanceof Error ? error.message : 'Failed to update function';
