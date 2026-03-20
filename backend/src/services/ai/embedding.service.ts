@@ -1,3 +1,4 @@
+import OpenAI from 'openai';
 import { OpenRouterProvider } from '@/providers/ai/openrouter.provider.js';
 import type { EmbeddingsRequest, EmbeddingsResponse } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
@@ -29,14 +30,14 @@ export class EmbeddingService {
     try {
       // Send request with automatic renewal and retry logic (same pattern as chat-completion)
       const aiConfig = await this.aiConfigService.findByModelId(options.model);
-      const { result: response, source } = await this.openRouterProvider.sendRequest((client) =>
+      const { result: response, source } = (await this.openRouterProvider.sendRequest((client) =>
         client.embeddings.create({
           model: options.model,
           input: options.input,
           encoding_format: options.encoding_format || 'float',
           dimensions: options.dimensions,
         })
-      );
+      )) as { result: OpenAI.CreateEmbeddingResponse; source: 'byok' | 'cloud' | 'env' };
 
       logger.debug('Embeddings generated successfully', {
         model: response.model,
@@ -65,7 +66,7 @@ export class EmbeddingService {
       // Transform to our response format with metadata
       return {
         object: 'list',
-        data: response.data.map((item) => ({
+        data: response.data.map((item: OpenAI.Embedding) => ({
           object: 'embedding' as const,
           embedding: item.embedding as number[] | string,
           index: item.index,
