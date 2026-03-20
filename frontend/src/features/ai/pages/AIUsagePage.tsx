@@ -7,8 +7,12 @@ import type { AIUsageRecordSchema } from '@insforge/shared-schemas';
 type DateRange = 'week' | 'month' | 'all';
 
 function formatTokenCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  if (n >= 1_000_000) {
+    return `${(n / 1_000_000).toFixed(1)}M`;
+  }
+  if (n >= 1_000) {
+    return `${(n / 1_000).toFixed(1)}K`;
+  }
   return String(n);
 }
 
@@ -22,11 +26,17 @@ function formatDate(date: Date | string): string {
 }
 
 function getDateRange(range: DateRange): { startDate?: string; endDate?: string } {
-  if (range === 'all') return {};
+  if (range === 'all') {
+    return {};
+  }
   const now = new Date();
   const start = new Date(now);
-  if (range === 'week') start.setDate(now.getDate() - 7);
-  if (range === 'month') start.setMonth(now.getMonth() - 1);
+  if (range === 'week') {
+    start.setDate(now.getDate() - 7);
+  }
+  if (range === 'month') {
+    start.setMonth(now.getMonth() - 1);
+  }
   return { startDate: start.toISOString(), endDate: now.toISOString() };
 }
 
@@ -206,10 +216,14 @@ function UsageRow({ record }: { record: AIUsageRecordSchema }) {
         <TypeBadge type={usageType} />
       </div>
       <div className="text-foreground tabular-nums">
-        {record.inputTokens != null ? formatTokenCount(record.inputTokens) : '—'}
+        {record.inputTokens !== null && record.inputTokens !== undefined
+          ? formatTokenCount(record.inputTokens)
+          : '—'}
       </div>
       <div className="text-foreground tabular-nums">
-        {record.outputTokens != null ? formatTokenCount(record.outputTokens) : '—'}
+        {record.outputTokens !== null && record.outputTokens !== undefined
+          ? formatTokenCount(record.outputTokens)
+          : '—'}
       </div>
     </div>
   );
