@@ -54,7 +54,9 @@ export function EnvVarDialog({
     return hasAnyValue && (!draft.key.trim() || !draft.value.trim());
   });
 
-  const isValid = isEditMode ? Boolean(key.trim() && value.trim()) : manualEntries.length > 0 && !hasIncompleteManualRows;
+  const isValid = isEditMode
+    ? Boolean(key.trim() && value.trim())
+    : manualEntries.length > 0 && !hasIncompleteManualRows;
 
   const handleClose = () => {
     onOpenChange(false);
@@ -97,7 +99,8 @@ export function EnvVarDialog({
     setManualDrafts((currentDrafts) => {
       const nextDrafts = [...currentDrafts];
       const targetDraft = nextDrafts[draftIndex];
-      const shouldReplaceTarget = targetDraft && !targetDraft.key.trim() && !targetDraft.value.trim();
+      const shouldReplaceTarget =
+        targetDraft && !targetDraft.key.trim() && !targetDraft.value.trim();
 
       if (shouldReplaceTarget) {
         nextDrafts[draftIndex] = createEnvVarDraft(normalizedEntries[0]);
@@ -120,25 +123,24 @@ export function EnvVarDialog({
     return true;
   };
 
-  const handleDraftPaste =
-    (draftIndex: number) => (event: ClipboardEvent<HTMLInputElement>) => {
-      const pastedText = event.clipboardData.getData('text');
-      const looksLikeEnvPaste =
-        pastedText.includes('\n') ||
-        pastedText.startsWith('export ') ||
-        /^[A-Za-z_][A-Za-z0-9_]*=/.test(pastedText.trim());
+  const handleDraftPaste = (draftIndex: number) => (event: ClipboardEvent<HTMLInputElement>) => {
+    const pastedText = event.clipboardData.getData('text');
+    const looksLikeEnvPaste =
+      pastedText.includes('\n') ||
+      pastedText.startsWith('export ') ||
+      /^[A-Za-z_][A-Za-z0-9_]*=/.test(pastedText.trim());
 
-      if (!looksLikeEnvPaste) {
-        return;
-      }
+    if (!looksLikeEnvPaste) {
+      return;
+    }
 
-      const wasApplied = applyPastedEnvVars(draftIndex, pastedText);
-      if (!wasApplied) {
-        return;
-      }
+    const wasApplied = applyPastedEnvVars(draftIndex, pastedText);
+    if (!wasApplied) {
+      return;
+    }
 
-      event.preventDefault();
-    };
+    event.preventDefault();
+  };
 
   const removeManualDraft = (draftId: string) => {
     setManualDrafts((currentDrafts) => {
@@ -200,9 +202,7 @@ export function EnvVarDialog({
 
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-zinc-950 dark:text-white">
-                    Variables
-                  </p>
+                  <p className="text-sm font-medium text-zinc-950 dark:text-white">Variables</p>
                   <Button variant="secondary" size="sm" onClick={addManualDraft}>
                     <Plus className="mr-2 h-4 w-4" />
                     Add row
