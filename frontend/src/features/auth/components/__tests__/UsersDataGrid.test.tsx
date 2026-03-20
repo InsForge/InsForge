@@ -1,6 +1,9 @@
-import { render, screen } from '@testing-library/react';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createUsersColumns } from '../UsersDataGrid';
+
+const originalResizeObserver = globalThis.ResizeObserver;
+const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
 
 beforeAll(() => {
   class ResizeObserverMock {
@@ -28,6 +31,20 @@ beforeAll(() => {
       y: 0,
       toJSON: () => ({}),
     }),
+  });
+});
+
+afterAll(() => {
+  Object.defineProperty(globalThis, 'ResizeObserver', {
+    writable: true,
+    configurable: true,
+    value: originalResizeObserver,
+  });
+
+  Object.defineProperty(HTMLElement.prototype, 'getBoundingClientRect', {
+    writable: true,
+    configurable: true,
+    value: originalGetBoundingClientRect,
   });
 });
 
@@ -74,6 +91,27 @@ describe('createUsersColumns', () => {
     render(<>{actionsColumn?.renderCell?.({ row: baseUser } as never)}</>);
 
     expect(screen.getByLabelText('Actions for member@example.com')).toBeInTheDocument();
+  });
+
+  it('renders bootstrap admin actions with disabled affordances', () => {
+    const columns = createUsersColumns({ onToggleAdminStatus: () => undefined });
+    const actionsColumn = columns.find((column) => column.key === 'actions');
+
+    render(
+      <>
+        {actionsColumn?.renderCell?.({
+          row: { ...baseUser, isProjectAdmin: true, adminSource: 'bootstrap' },
+        } as never)}
+      </>
+    );
+
+    const trigger = screen.getByLabelText('Actions for member@example.com');
+    fireEvent.click(trigger);
+
+    expect(trigger).toHaveAttribute('aria-disabled', 'true');
+    expect(trigger).toHaveClass('opacity-50');
+    expect(trigger).toHaveClass('cursor-not-allowed');
+    expect(screen.queryByText('Remove admin')).not.toBeInTheDocument();
   });
 
   it('renders custom provider labels while admin toggles are enabled', () => {

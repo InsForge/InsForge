@@ -1374,6 +1374,14 @@ export class AuthService {
       );
     }
 
+    if (isProjectAdmin && !existingUser.password) {
+      throw new AppError(
+        'Users without a password cannot be promoted to admin',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
     const pool = this.getPool();
     const result = await pool.query(
       `UPDATE auth.users

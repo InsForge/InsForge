@@ -76,10 +76,12 @@ export default function UsersPage() {
     return () => window.removeEventListener('refreshUsers', handleRefreshEvent);
   }, [refetch]);
 
+  const visibleUserIds = useMemo(() => users.map((user) => user.id).sort().join(','), [users]);
+
   // Clear selection when the visible dataset changes
   useEffect(() => {
     setSelectedRows(new Set());
-  }, [currentPage, roleFilter, searchQuery, users]);
+  }, [currentPage, roleFilter, searchQuery, visibleUserIds]);
 
   // Apply sorting to users data
   const sortedUsers = useMemo(() => {

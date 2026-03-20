@@ -321,4 +321,33 @@ describe('AuthService project admin support', () => {
     expect(result.isProjectAdmin).toBe(false);
     expect(result.providers).toEqual(['anonymous']);
   });
+
+  it('rejects promoting passwordless users to admin', async () => {
+    const { AuthService } = await import('../../src/services/auth/auth.service');
+
+    mockPool.query.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'a4cad96f-0e90-4dbb-aa63-4ca5a17bdcf1',
+          email: 'oauth-user@example.com',
+          password: null,
+          email_verified: true,
+          is_project_admin: false,
+          is_anonymous: false,
+          profile: { name: 'OAuth User' },
+          metadata: {},
+          created_at: '2026-03-01T00:00:00.000Z',
+          updated_at: '2026-03-01T00:00:00.000Z',
+          providers: 'google',
+        },
+      ],
+    });
+
+    await expect(
+      AuthService.getInstance().setProjectAdminStatus(
+        'a4cad96f-0e90-4dbb-aa63-4ca5a17bdcf1',
+        true
+      )
+    ).rejects.toThrow(AppError);
+  });
 });

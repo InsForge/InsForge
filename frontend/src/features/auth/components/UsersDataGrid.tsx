@@ -337,8 +337,10 @@ export function createUsersColumns({
           <Button
             variant="ghost"
             size="icon-sm"
-            className="h-7 w-7"
+            className={cn('h-7 w-7', actionDisabled && 'cursor-not-allowed opacity-50')}
             aria-label={`Actions for ${row.email}`}
+            aria-disabled={actionDisabled || undefined}
+            tabIndex={actionDisabled ? -1 : undefined}
           >
             <MoreHorizontal className="h-4 w-4" />
           </Button>
