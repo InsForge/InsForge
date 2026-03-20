@@ -69,11 +69,12 @@ export class DeploymentService {
    * Check if deployment service is configured
    * Only available in cloud environment
    */
-  isConfigured(): boolean {
-    if (!isCloudEnvironment()) {
-      return false;
+  async isConfigured(): Promise<boolean> {
+    const isVercelConfigured = await this.vercelProvider.isConfigured();
+    if (isCloudEnvironment()) {
+      return isVercelConfigured && this.s3Provider !== null;
     }
-    return this.vercelProvider.isConfigured() && this.s3Provider !== null;
+    return isVercelConfigured;
   }
 
   /**
@@ -81,14 +82,6 @@ export class DeploymentService {
    * Returns presigned URL for uploading source zip file
    */
   async createDeployment(): Promise<CreateDeploymentResponse> {
-    if (!isCloudEnvironment()) {
-      throw new AppError(
-        'Deployments are only available in cloud environment.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
-
     if (!this.s3Provider) {
       throw new AppError(
         'S3 storage is required for deployments. Please configure AWS_S3_BUCKET.',
@@ -150,14 +143,6 @@ export class DeploymentService {
    * Start a deployment - download zip from S3, extract, upload to Vercel, create deployment
    */
   async startDeployment(id: string, input: StartDeploymentRequest = {}): Promise<DeploymentRecord> {
-    if (!isCloudEnvironment()) {
-      throw new AppError(
-        'Deployments are only available in cloud environment.',
-        503,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
-
     if (!this.s3Provider) {
       throw new AppError(
         'S3 storage is required for deployments. Please configure AWS_S3_BUCKET.',
@@ -314,6 +299,107 @@ export class DeploymentService {
         error: error instanceof Error ? error.message : 'Unknown error',
       }).catch(() => {});
       throw new AppError('Failed to start deployment', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+  }
+
+  /**
+   * Start a deployment directly with file upload (bypasses S3)
+   */
+  async startDeploymentDirect(id: string, fileBuffer: Buffer, input: StartDeploymentRequest = {}): Promise<DeploymentRecord> {
+    try {
+      const deployment = await this.getDeploymentById(id);
+
+      if (!deployment) {
+        throw new AppError(`Deployment not found: ${id}`, 404, ERROR_CODES.NOT_FOUND);
+      }
+
+      if (deployment.status !== DeploymentStatus.WAITING) {
+        throw new AppError(
+          `Deployment is not in WAITING status. Current status: ${deployment.status}`,
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      await this.updateDeploymentStatus(id, DeploymentStatus.UPLOADING);
+
+      const files = this.extractFilesFromZip(fileBuffer);
+
+      if (files.length === 0) {
+        await this.updateDeploymentStatus(id, DeploymentStatus.ERROR, {
+          error: 'No files found in source zip.',
+        });
+        throw new AppError('No files found in source zip.', 400, ERROR_CODES.INVALID_INPUT);
+      }
+
+      logger.info('Extracted files from zip (direct)', {
+        deploymentId: id,
+        fileCount: files.length,
+      });
+
+      if (input.envVars && input.envVars.length > 0) {
+        await this.vercelProvider.upsertEnvironmentVariables(input.envVars);
+      }
+
+      const uploadedFiles = await this.vercelProvider.uploadFiles(files);
+
+      const vercelDeployment = await this.vercelProvider.createDeploymentWithFiles(uploadedFiles, {
+        projectSettings: input.projectSettings,
+        meta: input.meta,
+      });
+
+      const vercelStatus = (vercelDeployment.readyState || vercelDeployment.state || 'BUILDING').toUpperCase();
+      const envVarKeys = await this.vercelProvider.getEnvironmentVariableKeys();
+
+      const updateResult = await this.getPool().query(
+        `UPDATE system.deployments
+         SET provider_deployment_id = $1,
+             status = $2,
+             url = $3,
+             metadata = COALESCE(metadata, '{}'::jsonb) || $4::jsonb
+         WHERE id = $5
+         RETURNING
+           id,
+           provider_deployment_id as "providerDeploymentId",
+           provider,
+           status,
+           url,
+           metadata,
+           created_at as "createdAt",
+           updated_at as "updatedAt"`,
+        [
+          vercelDeployment.id,
+          vercelStatus,
+          this.getDeploymentUrl(vercelDeployment.url),
+          JSON.stringify({
+            vercelName: vercelDeployment.name,
+            fileCount: uploadedFiles.length,
+            envVarKeys,
+            startedAt: new Date().toISOString(),
+          }),
+          id,
+        ]
+      );
+
+      logger.info('Direct deployment started', {
+        id,
+        providerDeploymentId: vercelDeployment.id,
+        status: vercelStatus,
+      });
+
+      return updateResult.rows[0] as DeploymentRecord;
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      logger.error('Failed to start direct deployment', {
+        error: error instanceof Error ? error.message : String(error),
+        id,
+      });
+      await this.updateDeploymentStatus(id, DeploymentStatus.ERROR, {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }).catch(() => {});
+      throw new AppError('Failed to start direct deployment', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 

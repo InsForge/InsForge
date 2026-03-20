@@ -9,7 +9,6 @@ import {
   type PrimaryMenuItem,
 } from '@/lib/utils/menuItems';
 import { useLocation, matchPath } from 'react-router-dom';
-import { isInsForgeCloudProject } from '@/lib/utils/utils';
 import { useModal } from '@/lib/contexts/ModalContext';
 
 interface AppSidebarProps extends React.HTMLAttributes<HTMLElement> {
@@ -22,27 +21,22 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   const { menuItems: logsMenuItems, isLoading: logsLoading } = useLogSources();
   const { openSettingsDialog } = useModal();
 
-  const isCloud = isInsForgeCloudProject();
-
   // Build main menu items - insert deployments at the end of section 2 for cloud projects
   const mainMenuItems = useMemo(() => {
     const items = staticMenuItems.map((item) => ({ ...item }));
 
-    if (isCloud) {
-      const aiItemIndex = items.findIndex((item) => item.id === 'ai');
-      const deploymentsItem: PrimaryMenuItem = { ...deploymentsMenuItem, sectionEnd: true };
+    const aiItemIndex = items.findIndex((item) => item.id === 'ai');
+    const deploymentsItem: PrimaryMenuItem = { ...deploymentsMenuItem, sectionEnd: true };
 
-      if (aiItemIndex >= 0) {
-        items[aiItemIndex] = { ...items[aiItemIndex], sectionEnd: false };
-        items.splice(aiItemIndex + 1, 0, deploymentsItem);
-        return items;
-      }
-
-      return [...items, deploymentsItem];
+    if (aiItemIndex >= 0) {
+      items[aiItemIndex] = { ...items[aiItemIndex], sectionEnd: false };
+      items.splice(aiItemIndex + 1, 0, deploymentsItem);
+    } else {
+      items.push(deploymentsItem);
     }
 
     return items;
-  }, [isCloud]);
+  }, []);
 
   // Build bottom menu items based on deployment environment
   const bottomMenuItems = useMemo(() => {

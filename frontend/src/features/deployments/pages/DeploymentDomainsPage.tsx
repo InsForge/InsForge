@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ExternalLink, Copy, Check, Plus, Pencil, Globe } from 'lucide-react';
+import { ExternalLink, Copy, Check, Plus, Pencil, Globe, Trash2 } from 'lucide-react';
 import { Button, Dialog, DialogContent, DialogDescription, DialogTitle, Input } from '@insforge/ui';
 import { Skeleton } from '@/components';
 import DiscordIcon from '@/assets/logos/discord.svg?react';
@@ -7,6 +7,8 @@ import { useDeployments } from '../hooks/useDeployments';
 import { useDeploymentSlug } from '../hooks/useDeploymentSlug';
 import { useDeploymentMetadata } from '../hooks/useDeploymentMetadata';
 import { useToast } from '@/lib/hooks/useToast';
+import { isInsForgeCloudProject } from '@/lib/utils/utils';
+import { useVercelCredentials } from '../hooks/useVercelCredentials';
 
 // Extract slug from custom domain URL (e.g., "https://my-slug.insforge.site" -> "my-slug")
 function extractSlugFromUrl(url: string | null): string {
@@ -28,6 +30,21 @@ export default function DeploymentDomainsPage() {
   const { updateSlug, isUpdating } = useDeploymentSlug();
   const { customDomainUrl, isLoading: isLoadingMetadata, invalidate } = useDeploymentMetadata();
   const { showToast } = useToast();
+
+  const isCloud = isInsForgeCloudProject();
+  const { credentials, setCredentials, clearCredentials, isSaving, isClearing } = useVercelCredentials();
+  const [credentialsForm, setCredentialsForm] = useState({ token: '', teamId: '', projectId: '' });
+
+  const handleSaveCredentials = async () => {
+    if (!credentialsForm.token.trim() || !credentialsForm.teamId.trim() || !credentialsForm.projectId.trim()) {
+      showToast('All fields are required', 'error');
+      return;
+    }
+    try {
+      await setCredentials(credentialsForm);
+      setCredentialsForm({ token: '', teamId: '', projectId: '' });
+    } catch {}
+  };
 
   // Get the latest READY deployment (the current production deployment)
   const latestReadyDeployment = deployments.find((d) => d.status === 'READY') ?? null;
@@ -158,6 +175,84 @@ export default function DeploymentDomainsPage() {
 
           {/* Domain Rows */}
           <div className="flex flex-col gap-4">
+            {/* Vercel Credentials Section (Non-Cloud only) */}
+            {!isCloud && (
+              <div className="bg-[#1c1c1c] dark:bg-[#181818] rounded-lg p-5 flex flex-col gap-4 border border-zinc-200 dark:border-zinc-800">
+                <div className="flex flex-col gap-1">
+                  <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">Vercel credentials</h2>
+                  <span className="text-xs text-zinc-500">
+                    Source: {credentials?.source || 'none'} ({credentials?.configured ? 'configured' : 'not configured'})
+                  </span>
+                </div>
+
+                {credentials?.source !== 'none' && (
+                  <div className="flex items-center gap-2 bg-zinc-100 dark:bg-[#222] border border-zinc-200 dark:border-zinc-800 p-2 rounded-lg">
+                    <div className="flex-1 grid grid-cols-3 gap-2">
+                      <Input 
+                        readOnly 
+                        value={credentials?.details.teamId ?? ''} 
+                        className="h-9 bg-white dark:bg-[#1a1a1a] border-zinc-300 dark:border-zinc-800 text-xs text-zinc-500 truncate cursor-text"
+                      />
+                      <Input 
+                        readOnly 
+                        value={credentials?.details.projectId ?? ''} 
+                        className="h-9 bg-white dark:bg-[#1a1a1a] border-zinc-300 dark:border-zinc-800 text-xs text-zinc-500 truncate cursor-text"
+                      />
+                      <Input 
+                        readOnly 
+                        value="••••••••••••" 
+                        className="h-9 bg-white dark:bg-[#1a1a1a] border-zinc-300 dark:border-zinc-800 text-xs text-zinc-500 truncate cursor-text"
+                      />
+                    </div>
+                    {credentials?.source === 'custom' && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-9 w-9 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-500"
+                        onClick={() => void clearCredentials()}
+                        disabled={isClearing}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-3 gap-2">
+                  <Input 
+                    placeholder="Vercel Team ID" 
+                    value={credentialsForm.teamId} 
+                    onChange={(e) => setCredentialsForm({...credentialsForm, teamId: e.target.value})} 
+                    className="h-9 bg-white dark:bg-[#1c1c1c] border-zinc-300 dark:border-zinc-800 text-xs" 
+                  />
+                  <Input 
+                    placeholder="Vercel Project ID" 
+                    value={credentialsForm.projectId} 
+                    onChange={(e) => setCredentialsForm({...credentialsForm, projectId: e.target.value})} 
+                    className="h-9 bg-white dark:bg-[#1c1c1c] border-zinc-300 dark:border-zinc-800 text-xs" 
+                  />
+                  <Input 
+                    placeholder="Vercel Token" 
+                    type="password" 
+                    value={credentialsForm.token} 
+                    onChange={(e) => setCredentialsForm({...credentialsForm, token: e.target.value})} 
+                    className="h-9 bg-white dark:bg-[#1c1c1c] border-zinc-300 dark:border-zinc-800 text-xs" 
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-zinc-500 text-[11px] leading-relaxed">
+                  <span>In InsForge Cloud, deployments use cloud-managed credentials. Self-hosted/local can deploy with custom credentials stored here.</span>
+                  <Button 
+                    onClick={() => void handleSaveCredentials()} 
+                    disabled={isSaving}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white h-8 px-4 rounded text-xs ml-4 font-medium"
+                  >
+                    {isSaving ? 'Saving...' : 'Save'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Default Domain Row */}
             <div className="bg-white dark:bg-[#333] rounded-lg h-12 flex items-center px-3">
               <div className="flex items-center gap-6">
@@ -295,6 +390,8 @@ export default function DeploymentDomainsPage() {
               )}
             </div>
           </div>
+
+
 
           {/* Add Your Own Domain */}
           <Button

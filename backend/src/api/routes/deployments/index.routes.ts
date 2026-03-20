@@ -7,13 +7,23 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse, paginatedResponse } from '@/utils/response.js';
 import { startDeploymentRequestSchema, updateSlugRequestSchema } from '@insforge/shared-schemas';
 import { envVarsRouter } from './env-vars.routes.js';
+import { dynamicUploadSingle, handleUploadError } from '@/api/middlewares/upload.js';
+import { vercelCredentialsRouter } from './vercel-credentials.routes.js';
 
 const router = Router();
+console.log('DEBUG: deploymentsRouter index.routes.ts file has loaded!');
 const deploymentService = DeploymentService.getInstance();
 const auditService = AuditService.getInstance();
 
 // Mount sub-routers first to avoid conflicts with parameterized routes
 router.use('/env-vars', envVarsRouter);
+
+router.use('/vercel/credentials', (req, res, next) => {
+  if (!req.url || req.url === '' || req.url === '/') {
+    req.url = '/';
+  }
+  return vercelCredentialsRouter(req, res, next);
+});
 
 /**
  * Create a new deployment record with WAITING status
@@ -23,7 +33,7 @@ router.use('/env-vars', envVarsRouter);
 router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     // Check if deployment service is configured
-    if (!deploymentService.isConfigured()) {
+    if (!await deploymentService.isConfigured()) {
       throw new AppError(
         'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
         503,
@@ -58,7 +68,7 @@ router.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       // Check if deployment service is configured
-      if (!deploymentService.isConfigured()) {
+      if (!await deploymentService.isConfigured()) {
         throw new AppError(
           'Deployment service is not configured. Please set VERCEL_TOKEN, VERCEL_TEAM_ID, and VERCEL_PROJECT_ID environment variables.',
           503,
@@ -90,6 +100,52 @@ router.post(
           provider: deployment.provider,
           status: deployment.status,
         },
+        ip_address: req.ip,
+      });
+
+      successResponse(res, deployment);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * Start a deployment directly with file upload (bypasses S3)
+ * POST /api/deployments/:id/start-direct
+ */
+router.post(
+  '/:id/start-direct',
+  verifyAdmin,
+  dynamicUploadSingle('file'),
+  handleUploadError,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!await deploymentService.isConfigured()) {
+        throw new AppError(
+          'Deployment service is not configured.',
+          503,
+          ERROR_CODES.INTERNAL_ERROR
+        );
+      }
+
+      const { id } = req.params;
+
+      const validationResult = startDeploymentRequestSchema.safeParse(req.body);
+      const input = validationResult.success ? validationResult.data : {};
+
+      if (!req.file) {
+        throw new AppError('File is required', 400, ERROR_CODES.INVALID_INPUT);
+      }
+
+      const deployment = await deploymentService.startDeploymentDirect(id, req.file.buffer, input);
+
+      // Log audit
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'START_DEPLOYMENT_DIRECT',
+        module: 'DEPLOYMENTS',
+        details: { id: deployment.id },
         ip_address: req.ip,
       });
 

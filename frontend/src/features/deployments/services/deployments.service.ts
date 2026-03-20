@@ -162,6 +162,53 @@ export class DeploymentsService {
       headers: apiClient.withAccessToken(),
     });
   }
+  // ============================================================================
+  // Vercel Credentials
+  // ============================================================================
+
+  async getVercelCredentials(): Promise<{
+    configured: boolean;
+    source: 'custom' | 'env' | 'none';
+    details: { token: string | null; teamId: string | null; projectId: string | null };
+  }> {
+    return apiClient.request('/deployments/vercel/credentials', {
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  async setVercelCredentials(data: {
+    token: string;
+    teamId: string;
+    projectId: string;
+  }): Promise<{ success: boolean; message: string }> {
+    return apiClient.request('/deployments/vercel/credentials', {
+      method: 'PUT',
+      headers: apiClient.withAccessToken(),
+      body: JSON.stringify(data),
+    });
+  }
+
+  async clearVercelCredentials(): Promise<{ success: boolean; message: string }> {
+    return apiClient.request('/deployments/vercel/credentials', {
+      method: 'DELETE',
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  // ============================================================================
+  // Direct Deployment
+  // ============================================================================
+
+  async startDeploymentDirect(id: string, file: File): Promise<DeploymentSchema> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    return apiClient.request(`/deployments/${id}/start-direct`, {
+      method: 'POST',
+      headers: apiClient.withAccessToken(),
+      body: formData,
+    });
+  }
 }
 
 export const deploymentsService = new DeploymentsService();

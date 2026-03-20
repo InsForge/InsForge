@@ -92,30 +92,28 @@ export class VercelProvider {
       return await this.fetchCloudCredentials();
     }
 
+    // 1. Try custom credentials from SecretService
+    const customToken = await this.secretService.getSecretByKey('VERCEL_CUSTOM_TOKEN');
+    const customTeamId = await this.secretService.getSecretByKey('VERCEL_CUSTOM_TEAM_ID');
+    const customProjectId = await this.secretService.getSecretByKey('VERCEL_CUSTOM_PROJECT_ID');
+
+    if (customToken && customTeamId && customProjectId) {
+      return { token: customToken, teamId: customTeamId, projectId: customProjectId, expiresAt: null, slug: null };
+    }
+
+    // 2. Fallback to Environment Variables
     const token = process.env.VERCEL_TOKEN;
     const teamId = process.env.VERCEL_TEAM_ID;
     const projectId = process.env.VERCEL_PROJECT_ID;
 
     if (!token) {
-      throw new AppError(
-        'VERCEL_TOKEN not found in environment variables',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
+      throw new AppError('VERCEL_TOKEN not found in environment variables or custom settings', 500, ERROR_CODES.INTERNAL_ERROR);
     }
     if (!teamId) {
-      throw new AppError(
-        'VERCEL_TEAM_ID not found in environment variables',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
+      throw new AppError('VERCEL_TEAM_ID not found in environment variables or custom settings', 500, ERROR_CODES.INTERNAL_ERROR);
     }
     if (!projectId) {
-      throw new AppError(
-        'VERCEL_PROJECT_ID not found in environment variables',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
+      throw new AppError('VERCEL_PROJECT_ID not found in environment variables or custom settings', 500, ERROR_CODES.INTERNAL_ERROR);
     }
 
     return { token, teamId, projectId, expiresAt: null, slug: null };
@@ -124,15 +122,100 @@ export class VercelProvider {
   /**
    * Check if Vercel is properly configured
    */
-  isConfigured(): boolean {
+  async isConfigured(): Promise<boolean> {
     if (isCloudEnvironment()) {
       return true;
     }
+
+    const customToken = await this.secretService.getSecretByKey('VERCEL_CUSTOM_TOKEN');
+    const customTeamId = await this.secretService.getSecretByKey('VERCEL_CUSTOM_TEAM_ID');
+    const customProjectId = await this.secretService.getSecretByKey('VERCEL_CUSTOM_PROJECT_ID');
+
+    if (customToken && customTeamId && customProjectId) {
+      return true;
+    }
+
     return !!(
       process.env.VERCEL_TOKEN &&
       process.env.VERCEL_TEAM_ID &&
       process.env.VERCEL_PROJECT_ID
     );
+  }
+
+  /**
+   * Get the source of current Vercel credentials
+   */
+  async getCredentialsSource(): Promise<'cloud' | 'custom' | 'env' | 'none'> {
+    if (isCloudEnvironment()) {
+      return 'cloud';
+    }
+
+    const customToken = await this.secretService.getSecretByKey('VERCEL_CUSTOM_TOKEN');
+    if (customToken) {
+      return 'custom';
+    }
+
+    if (process.env.VERCEL_TOKEN && process.env.VERCEL_TEAM_ID && process.env.VERCEL_PROJECT_ID) {
+      return 'env';
+    }
+
+    return 'none';
+  }
+
+  /**
+   * Set custom Vercel credentials
+   */
+  async setCustomCredentials(data: { token: string; teamId?: string; projectId?: string }): Promise<void> {
+    const { token, teamId, projectId } = data;
+
+    const upsert = async (key: string, value: string) => {
+      const existing = await this.secretService.getSecretByKey(key);
+      if (existing !== null) {
+        await this.secretService.updateSecretByKey(key, { value });
+      } else {
+        await this.secretService.createSecret({ key, value, isReserved: false });
+      }
+    };
+
+    await upsert('VERCEL_CUSTOM_TOKEN', token);
+    if (teamId) {
+      await upsert('VERCEL_CUSTOM_TEAM_ID', teamId);
+    }
+    if (projectId) {
+      await upsert('VERCEL_CUSTOM_PROJECT_ID', projectId);
+    }
+
+    logger.info('Custom Vercel credentials updated');
+  }
+
+  /**
+   * Clear custom Vercel credentials
+   */
+  async clearCustomCredentials(): Promise<void> {
+    await this.secretService.deleteSecretByKey('VERCEL_CUSTOM_TOKEN');
+    await this.secretService.deleteSecretByKey('VERCEL_CUSTOM_TEAM_ID');
+    await this.secretService.deleteSecretByKey('VERCEL_CUSTOM_PROJECT_ID');
+
+    logger.info('Custom Vercel credentials cleared');
+  }
+
+  /**
+   * Get custom credentials details (masked/partial)
+   */
+  async getCustomCredentialsDetails(): Promise<{ token: string; teamId: string | null; projectId: string | null } | null> {
+    const customToken = await this.secretService.getSecretByKey('VERCEL_CUSTOM_TOKEN');
+    const customTeamId = await this.secretService.getSecretByKey('VERCEL_CUSTOM_TEAM_ID');
+    const customProjectId = await this.secretService.getSecretByKey('VERCEL_CUSTOM_PROJECT_ID');
+
+    if (!customToken) {
+      return null;
+    }
+
+    return {
+      token: '••••••••', // Masked for security
+      teamId: customTeamId || null,
+      projectId: customProjectId || null,
+    };
   }
 
   /**
