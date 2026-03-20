@@ -1,8 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { Controller, useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Cpu, HardDrive, Plug, RefreshCw, Settings, Shield } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Controller, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  Cpu,
+  HardDrive,
+  Plug,
+  RefreshCw,
+  Settings,
+  Shield,
+} from "lucide-react";
 import {
   Button,
   CopyButton,
@@ -23,33 +30,42 @@ import {
   MenuDialogBody,
   MenuDialogFooter,
   MenuDialogCloseButton,
-} from '@insforge/ui';
+} from "@insforge/ui";
 import {
   type ApiRateLimitConfigSchema,
   type InstanceInfoEvent,
   type UpdateApiRateLimitConfigRequest,
   updateApiRateLimitConfigRequestSchema,
-} from '@insforge/shared-schemas';
-import { useApiKey } from '@/lib/hooks/useMetadata';
-import { useHealth } from '@/lib/hooks/useHealth';
+} from "@insforge/shared-schemas";
+import { useApiKey } from "@/lib/hooks/useMetadata";
+import { useHealth } from "@/lib/hooks/useHealth";
 import {
   CLOUD_PROJECT_INFO_QUERY_KEY,
   useCloudProjectInfo,
   type CloudProjectInfo,
-} from '@/lib/hooks/useCloudProjectInfo';
-import { useConfirm } from '@/lib/hooks/useConfirm';
-import { useToast } from '@/lib/hooks/useToast';
-import { useModal } from '@/lib/contexts/ModalContext';
-import { cn, compareVersions, isIframe, isInsForgeCloudProject } from '@/lib/utils/utils';
-import { MCPSection, CLISection, ConnectionStringSection } from '@/features/connect';
-import { postMessageToParent } from '@/lib/utils/cloudMessaging';
-import { metadataService } from '@/lib/services/metadata.service';
-import { useApiRateLimitConfig } from '@/features/dashboard/hooks/useApiRateLimitConfig';
+} from "@/lib/hooks/useCloudProjectInfo";
+import { useConfirm } from "@/lib/hooks/useConfirm";
+import { useToast } from "@/lib/hooks/useToast";
+import { useModal } from "@/lib/contexts/ModalContext";
+import {
+  cn,
+  compareVersions,
+  isIframe,
+  isInsForgeCloudProject,
+} from "@/lib/utils/utils";
+import {
+  MCPSection,
+  CLISection,
+  ConnectionStringSection,
+} from "@/features/connect";
+import { postMessageToParent } from "@/lib/utils/cloudMessaging";
+import { metadataService } from "@/lib/services/metadata.service";
+import { useApiRateLimitConfig } from "@/features/dashboard/hooks/useApiRateLimitConfig";
 
-type TabType = 'info' | 'compute' | 'connect' | 'rate-limits';
+type TabType = "info" | "compute" | "connect" | "rate-limits";
 
 const INFO_FIELD_CLASS =
-  'flex h-8 w-full items-center rounded border border-[var(--alpha-12)] bg-[var(--alpha-4)] px-2.5 text-sm leading-5 text-foreground';
+  "flex h-8 w-full items-center rounded border border-[var(--alpha-12)] bg-[var(--alpha-4)] px-2.5 text-sm leading-5 text-foreground";
 
 const defaultRateLimitValues: UpdateApiRateLimitConfigRequest = {
   sendEmailOtpMaxRequests: 5,
@@ -60,7 +76,7 @@ const defaultRateLimitValues: UpdateApiRateLimitConfigRequest = {
 };
 
 const toRateLimitFormValues = (
-  config?: ApiRateLimitConfigSchema
+  config?: ApiRateLimitConfigSchema,
 ): UpdateApiRateLimitConfigRequest => {
   if (!config) {
     return defaultRateLimitValues;
@@ -84,63 +100,73 @@ const rateLimitFields: Array<{
   max: number;
 }> = [
   {
-    name: 'sendEmailOtpMaxRequests',
-    label: 'Send OTP Requests',
-    description: 'Maximum email OTP send requests allowed from the same IP within the configured window.',
-    unit: 'requests',
+    name: "sendEmailOtpMaxRequests",
+    label: "Send OTP Requests",
+    description:
+      "Maximum email OTP send requests allowed from the same IP within the configured window.",
+    unit: "requests",
     min: 1,
     max: 100,
   },
   {
-    name: 'sendEmailOtpWindowMinutes',
-    label: 'Send OTP Window',
-    description: 'Time window used for the send OTP per-IP limit.',
-    unit: 'minutes',
+    name: "sendEmailOtpWindowMinutes",
+    label: "Send OTP Window",
+    description: "Time window used for the send OTP per-IP limit.",
+    unit: "minutes",
     min: 1,
     max: 1440,
   },
   {
-    name: 'verifyOtpMaxRequests',
-    label: 'Verify OTP Attempts',
-    description: 'Maximum failed OTP verification attempts allowed from the same IP within the configured window.',
-    unit: 'attempts',
+    name: "verifyOtpMaxRequests",
+    label: "Verify OTP Attempts",
+    description:
+      "Maximum failed OTP verification attempts allowed from the same IP within the configured window.",
+    unit: "attempts",
     min: 1,
     max: 100,
   },
   {
-    name: 'verifyOtpWindowMinutes',
-    label: 'Verify OTP Window',
-    description: 'Time window used for the verify OTP per-IP limit.',
-    unit: 'minutes',
+    name: "verifyOtpWindowMinutes",
+    label: "Verify OTP Window",
+    description: "Time window used for the verify OTP per-IP limit.",
+    unit: "minutes",
     min: 1,
     max: 1440,
   },
   {
-    name: 'emailCooldownSeconds',
-    label: 'Per-email Cooldown',
-    description: 'Minimum delay between requesting a new OTP for the same email address.',
-    unit: 'seconds',
+    name: "emailCooldownSeconds",
+    label: "Per-email Cooldown",
+    description:
+      "Minimum delay between requesting a new OTP for the same email address.",
+    unit: "seconds",
     min: 0,
     max: 3600,
   },
 ];
 
 export default function SettingsMenuDialog() {
-  const { isSettingsDialogOpen, settingsDefaultTab, closeSettingsDialog } = useModal();
-  const [activeTab, setActiveTab] = useState<TabType>('info');
+  const { isSettingsDialogOpen, settingsDefaultTab, closeSettingsDialog } =
+    useModal();
+  const [activeTab, setActiveTab] = useState<TabType>("info");
   const [isVersionOutdated, setIsVersionOutdated] = useState(false);
   const [isUpdatingVersion, setIsUpdatingVersion] = useState(false);
-  const [projectName, setProjectName] = useState('');
-  const [projectNameInitialValue, setProjectNameInitialValue] = useState('');
+  const [projectName, setProjectName] = useState("");
+  const [projectNameInitialValue, setProjectNameInitialValue] = useState("");
   const [isProjectNameFocused, setIsProjectNameFocused] = useState(false);
-  const [instanceInfo, setInstanceInfo] = useState<Omit<InstanceInfoEvent, 'type'> | null>(null);
-  const [selectedInstanceType, setSelectedInstanceType] = useState<string | null>(null);
+  const [instanceInfo, setInstanceInfo] = useState<Omit<
+    InstanceInfoEvent,
+    "type"
+  > | null>(null);
+  const [selectedInstanceType, setSelectedInstanceType] = useState<
+    string | null
+  >(null);
   const [isChangingInstanceType, setIsChangingInstanceType] = useState(false);
   const [isRotatingApiKey, setIsRotatingApiKey] = useState(false);
 
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
   const { version, isLoading: isVersionLoading } = useHealth();
-  const { projectInfo, isLoading: isProjectInfoLoading } = useCloudProjectInfo();
+  const { projectInfo, isLoading: isProjectInfoLoading } =
+    useCloudProjectInfo();
   const {
     config: rateLimitConfig,
     isLoading: isRateLimitConfigLoading,
@@ -158,28 +184,36 @@ export default function SettingsMenuDialog() {
 
   const isCloud = isInsForgeCloudProject();
   const isInIframe = isIframe();
-  const projectUrl = useMemo(() => `${window.location.origin.replace(/\/$/, '')}/`, []);
+  const projectUrl = useMemo(
+    () => `${window.location.origin.replace(/\/$/, "")}/`,
+    [],
+  );
 
-  const maskedApiKey = apiKey ? `ik_${'*'.repeat(22)}` : 'ik_**********************';
+  const maskedApiKey = apiKey
+    ? `ik_${"*".repeat(22)}`
+    : "ik_**********************";
   const latestVersion = projectInfo.latestVersion ?? null;
 
   const sectionTitle =
-    activeTab === 'connect'
-      ? 'Connect Project'
-      : activeTab === 'compute'
-        ? 'Compute & Disk'
-        : activeTab === 'rate-limits'
-          ? 'API Rate Limits'
-        : 'Project Information';
+    activeTab === "connect"
+      ? "Connect Project"
+      : activeTab === "compute"
+        ? "Compute & Disk"
+        : activeTab === "rate-limits"
+          ? "API Rate Limits"
+          : "Project Information";
   const isProjectNameDirty = projectName !== projectNameInitialValue;
   const showProjectNameActions =
-    isCloud && activeTab === 'info' && (isProjectNameFocused || isProjectNameDirty);
+    isCloud &&
+    activeTab === "info" &&
+    (isProjectNameFocused || isProjectNameDirty);
   const showComputeActions =
-    activeTab === 'compute' &&
+    activeTab === "compute" &&
     !!instanceInfo &&
     !!selectedInstanceType &&
     selectedInstanceType !== instanceInfo.currentInstanceType;
-  const showRateLimitActions = activeTab === 'rate-limits' && rateLimitForm.formState.isDirty;
+  const showRateLimitActions =
+    activeTab === "rate-limits" && rateLimitForm.formState.isDirty;
 
   const resetRateLimitForm = useCallback(() => {
     rateLimitForm.reset(toRateLimitFormValues(rateLimitConfig));
@@ -191,10 +225,10 @@ export default function SettingsMenuDialog() {
     }
 
     const currentInstance = instanceInfo.instanceTypes.find(
-      (type) => type.id === instanceInfo.currentInstanceType
+      (type) => type.id === instanceInfo.currentInstanceType,
     );
     const nextInstance = instanceInfo.instanceTypes.find(
-      (type) => type.id === selectedInstanceType
+      (type) => type.id === selectedInstanceType,
     );
 
     if (!currentInstance || !nextInstance) {
@@ -206,9 +240,14 @@ export default function SettingsMenuDialog() {
       currentInstance.pricePerMonth +
       nextInstance.pricePerMonth;
 
-    const credits = instanceInfo.computeCredits === -1 ? Infinity : instanceInfo.computeCredits;
+    const credits =
+      instanceInfo.computeCredits === -1
+        ? Infinity
+        : instanceInfo.computeCredits;
     const creditDeduction =
-      credits === Infinity ? rawProjectedCost : Math.min(Math.max(rawProjectedCost, 0), credits);
+      credits === Infinity
+        ? rawProjectedCost
+        : Math.min(Math.max(rawProjectedCost, 0), credits);
     const afterCredits = Math.max(0, rawProjectedCost - creditDeduction);
 
     return {
@@ -218,15 +257,15 @@ export default function SettingsMenuDialog() {
 
   useEffect(() => {
     if (isSettingsDialogOpen) {
-      const cloudProjectName = projectInfo.name ?? '';
+      const cloudProjectName = projectInfo.name ?? "";
       const nextTab: TabType =
-        settingsDefaultTab === 'connect'
-          ? 'connect'
-          : settingsDefaultTab === 'rate-limits'
-            ? 'rate-limits'
-          : settingsDefaultTab === 'compute' && isCloud && isInIframe
-            ? 'compute'
-            : 'info';
+        settingsDefaultTab === "connect"
+          ? "connect"
+          : settingsDefaultTab === "rate-limits"
+            ? "rate-limits"
+            : settingsDefaultTab === "compute" && isCloud && isInIframe
+              ? "compute"
+              : "info";
 
       setActiveTab(nextTab);
       setProjectName(cloudProjectName);
@@ -235,7 +274,7 @@ export default function SettingsMenuDialog() {
       resetRateLimitForm();
 
       if (isCloud && isInIframe) {
-        postMessageToParent({ type: 'REQUEST_INSTANCE_INFO' }, '*');
+        postMessageToParent({ type: "REQUEST_INSTANCE_INFO" }, "*");
       }
       return;
     }
@@ -259,11 +298,11 @@ export default function SettingsMenuDialog() {
     }
 
     const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'VERSION_UPDATE_STARTED') {
+      if (event.data?.type === "VERSION_UPDATE_STARTED") {
         setIsUpdatingVersion(true);
       }
 
-      if (event.data?.type === 'INSTANCE_INFO') {
+      if (event.data?.type === "INSTANCE_INFO") {
         setInstanceInfo({
           currentInstanceType: event.data.currentInstanceType,
           planName: event.data.planName,
@@ -275,7 +314,7 @@ export default function SettingsMenuDialog() {
         setSelectedInstanceType(null);
       }
 
-      if (event.data?.type === 'INSTANCE_TYPE_CHANGE_RESULT') {
+      if (event.data?.type === "INSTANCE_TYPE_CHANGE_RESULT") {
         setIsChangingInstanceType(false);
 
         if (event.data.success) {
@@ -287,21 +326,21 @@ export default function SettingsMenuDialog() {
                     ...prev,
                     currentInstanceType: nextInstanceType,
                   }
-                : prev
+                : prev,
             );
             setSelectedInstanceType(null);
           }
-          postMessageToParent({ type: 'REQUEST_INSTANCE_INFO' }, '*');
+          postMessageToParent({ type: "REQUEST_INSTANCE_INFO" }, "*");
           return;
         }
 
-        showToast(event.data.error || 'Failed to update compute size', 'error');
+        showToast(event.data.error || "Failed to update compute size", "error");
       }
     };
 
-    window.addEventListener('message', handleMessage);
+    window.addEventListener("message", handleMessage);
 
-    return () => window.removeEventListener('message', handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
   }, [isCloud, isInIframe, showToast]);
 
   useEffect(() => {
@@ -312,7 +351,12 @@ export default function SettingsMenuDialog() {
   }, [version, latestVersion]);
 
   useEffect(() => {
-    if (!isSettingsDialogOpen || !isCloud || !isInIframe || isProjectInfoLoading) {
+    if (
+      !isSettingsDialogOpen ||
+      !isCloud ||
+      !isInIframe ||
+      isProjectInfoLoading
+    ) {
       return;
     }
 
@@ -320,7 +364,7 @@ export default function SettingsMenuDialog() {
       return;
     }
 
-    const cloudProjectName = projectInfo.name ?? '';
+    const cloudProjectName = projectInfo.name ?? "";
     setProjectName(cloudProjectName);
     setProjectNameInitialValue(cloudProjectName);
   }, [
@@ -334,7 +378,11 @@ export default function SettingsMenuDialog() {
   ]);
 
   useEffect(() => {
-    if (!isSettingsDialogOpen || activeTab !== 'rate-limits' || rateLimitForm.formState.isDirty) {
+    if (
+      !isSettingsDialogOpen ||
+      activeTab !== "rate-limits" ||
+      rateLimitForm.formState.isDirty
+    ) {
       return;
     }
 
@@ -349,10 +397,11 @@ export default function SettingsMenuDialog() {
 
   const handleDeleteProject = async () => {
     const confirmed = await confirm({
-      title: 'Delete Project',
-      description: 'Are you certain you wish to remove this project? This action is irreversible.',
-      confirmText: 'Delete Project',
-      cancelText: 'Cancel',
+      title: "Delete Project",
+      description:
+        "Are you certain you wish to remove this project? This action is irreversible.",
+      confirmText: "Delete Project",
+      cancelText: "Cancel",
       destructive: true,
     });
 
@@ -360,11 +409,11 @@ export default function SettingsMenuDialog() {
       return;
     }
 
-    postMessageToParent({ type: 'DELETE_PROJECT' }, '*');
+    postMessageToParent({ type: "DELETE_PROJECT" }, "*");
   };
 
   const handleUpdateVersion = () => {
-    postMessageToParent({ type: 'UPDATE_PROJECT_VERSION' }, '*');
+    postMessageToParent({ type: "UPDATE_PROJECT_VERSION" }, "*");
   };
 
   const handleCancelProjectNameEdit = () => {
@@ -381,16 +430,19 @@ export default function SettingsMenuDialog() {
 
     postMessageToParent(
       {
-        type: 'UPDATE_PROJECT_NAME',
+        type: "UPDATE_PROJECT_NAME",
         name: nextProjectName,
       },
-      '*'
+      "*",
     );
 
-    queryClient.setQueryData<CloudProjectInfo>(CLOUD_PROJECT_INFO_QUERY_KEY, (previous = {}) => ({
-      ...previous,
-      name: nextProjectName,
-    }));
+    queryClient.setQueryData<CloudProjectInfo>(
+      CLOUD_PROJECT_INFO_QUERY_KEY,
+      (previous = {}) => ({
+        ...previous,
+        name: nextProjectName,
+      }),
+    );
 
     setProjectName(nextProjectName);
     setProjectNameInitialValue(nextProjectName);
@@ -399,11 +451,11 @@ export default function SettingsMenuDialog() {
 
   const handleRotateApiKey = async () => {
     const confirmed = await confirm({
-      title: 'Rotate API Key',
+      title: "Rotate API Key",
       description:
-        'This will generate a new API key. The current key will remain valid for 24 hours to allow for a smooth transition. This action cannot be undone.',
-      confirmText: 'Rotate Key',
-      cancelText: 'Cancel',
+        "This will generate a new API key. The current key will remain valid for 24 hours to allow for a smooth transition. This action cannot be undone.",
+      confirmText: "Rotate Key",
+      cancelText: "Cancel",
       destructive: true,
     });
 
@@ -414,13 +466,13 @@ export default function SettingsMenuDialog() {
     setIsRotatingApiKey(true);
     try {
       const result = await metadataService.rotateApiKey(24);
-      queryClient.setQueryData(['metadata', 'apiKey'], result.apiKey);
+      queryClient.setQueryData(["metadata", "apiKey"], result.apiKey);
       showToast(
-        'API key rotated successfully. The old key will remain valid for 24 hours.',
-        'success'
+        "API key rotated successfully. The old key will remain valid for 24 hours.",
+        "success",
       );
     } catch {
-      showToast('Failed to rotate API key. Please try again.', 'error');
+      showToast("Failed to rotate API key. Please try again.", "error");
     } finally {
       setIsRotatingApiKey(false);
     }
@@ -437,15 +489,15 @@ export default function SettingsMenuDialog() {
 
     setIsChangingInstanceType(true);
     showToast(
-      'Project is updating compute size, please wait a few seconds and refresh the page.',
-      'success'
+      "Project is updating compute size, please wait a few seconds and refresh the page.",
+      "success",
     );
     postMessageToParent(
       {
-        type: 'REQUEST_INSTANCE_TYPE_CHANGE',
+        type: "REQUEST_INSTANCE_TYPE_CHANGE",
         instanceType: selectedInstanceType,
       },
-      '*'
+      "*",
     );
   };
 
@@ -479,32 +531,35 @@ export default function SettingsMenuDialog() {
               <MenuDialogNavList className="gap-1">
                 <MenuDialogNavItem
                   icon={<Settings className="size-5" />}
-                  active={activeTab === 'info'}
-                  onClick={() => setActiveTab('info')}
+                  active={activeTab === "info"}
+                  onClick={() => setActiveTab("info")}
                 >
                   General
                 </MenuDialogNavItem>
                 <MenuDialogNavItem
                   icon={<Plug className="size-5" />}
-                  active={activeTab === 'connect'}
-                  onClick={() => setActiveTab('connect')}
+                  active={activeTab === "connect"}
+                  onClick={() => setActiveTab("connect")}
                 >
                   Connect
                 </MenuDialogNavItem>
                 <MenuDialogNavItem
                   icon={<Shield className="size-5" />}
-                  active={activeTab === 'rate-limits'}
-                  onClick={() => setActiveTab('rate-limits')}
+                  active={activeTab === "rate-limits"}
+                  onClick={() => setActiveTab("rate-limits")}
                 >
                   Rate Limits
                 </MenuDialogNavItem>
                 {isCloud && isInIframe && (
                   <MenuDialogNavItem
                     icon={<HardDrive className="size-5" />}
-                    active={activeTab === 'compute'}
+                    active={activeTab === "compute"}
                     onClick={() => {
-                      setActiveTab('compute');
-                      postMessageToParent({ type: 'REQUEST_INSTANCE_INFO' }, '*');
+                      setActiveTab("compute");
+                      postMessageToParent(
+                        { type: "REQUEST_INSTANCE_INFO" },
+                        "*",
+                      );
                     }}
                   >
                     Compute & Disk
@@ -524,26 +579,39 @@ export default function SettingsMenuDialog() {
             </MenuDialogHeader>
 
             <MenuDialogBody
-              className={cn('border-b-0 p-4', activeTab === 'info' ? 'gap-0' : 'gap-8')}
+              className={cn(
+                "border-b-0 p-4",
+                activeTab === "info" ? "gap-0" : "gap-8",
+              )}
             >
-              {activeTab === 'info' && (
+              {activeTab === "info" && (
                 <div className="flex w-full flex-col">
                   {isCloud && (
                     <>
                       <div className="flex items-start gap-6">
                         <div className="w-[200px] shrink-0">
-                          <p className="py-1.5 text-sm leading-5 text-foreground">Project Name</p>
+                          <p className="py-1.5 text-sm leading-5 text-foreground">
+                            Project Name
+                          </p>
                         </div>
                         <div className="flex min-w-0 flex-1 items-start gap-1.5">
                           <Input
-                            value={isInIframe && isProjectInfoLoading ? 'Loading...' : projectName}
-                            onChange={(event) => setProjectName(event.target.value)}
+                            value={
+                              isInIframe && isProjectInfoLoading
+                                ? "Loading..."
+                                : projectName
+                            }
+                            onChange={(event) =>
+                              setProjectName(event.target.value)
+                            }
                             onFocus={() => setIsProjectNameFocused(true)}
                             onBlur={() => setIsProjectNameFocused(false)}
                             disabled={isInIframe && isProjectInfoLoading}
                             className={cn(
-                              'h-8',
-                              isInIframe && isProjectInfoLoading && 'animate-pulse cursor-wait'
+                              "h-8",
+                              isInIframe &&
+                                isProjectInfoLoading &&
+                                "animate-pulse cursor-wait",
                             )}
                           />
                         </div>
@@ -557,11 +625,15 @@ export default function SettingsMenuDialog() {
 
                   <div className="flex items-start gap-6">
                     <div className="w-[200px] shrink-0">
-                      <p className="py-1.5 text-sm leading-5 text-foreground">Project URL</p>
+                      <p className="py-1.5 text-sm leading-5 text-foreground">
+                        Project URL
+                      </p>
                     </div>
                     <div className="flex min-w-0 flex-1 items-start gap-1.5">
                       <div className={INFO_FIELD_CLASS}>
-                        <span className="min-w-0 flex-1 truncate">{projectUrl}</span>
+                        <span className="min-w-0 flex-1 truncate">
+                          {projectUrl}
+                        </span>
                         <CopyButton
                           text={projectUrl}
                           showText={false}
@@ -577,16 +649,24 @@ export default function SettingsMenuDialog() {
 
                   <div className="flex items-start gap-6">
                     <div className="w-[200px] shrink-0">
-                      <p className="py-1.5 text-sm leading-5 text-foreground">API Key</p>
+                      <p className="py-1.5 text-sm leading-5 text-foreground">
+                        API Key
+                      </p>
                       <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
-                        This key has full access control to your project and should be kept secure.
-                        Do not expose this key in your frontend code.
+                        This key has full access control to your project and
+                        should be kept secure. Do not expose this key in your
+                        frontend code.
                       </p>
                     </div>
                     <div className="flex min-w-0 flex-1 items-start gap-1.5">
-                      <div className={cn(INFO_FIELD_CLASS, isApiKeyLoading && 'animate-pulse')}>
+                      <div
+                        className={cn(
+                          INFO_FIELD_CLASS,
+                          isApiKeyLoading && "animate-pulse",
+                        )}
+                      >
                         <span className="min-w-0 flex-1 truncate">
-                          {isApiKeyLoading ? 'Loading...' : maskedApiKey}
+                          {isApiKeyLoading ? "Loading..." : maskedApiKey}
                         </span>
                         {!isApiKeyLoading && apiKey && (
                           <CopyButton
@@ -603,9 +683,12 @@ export default function SettingsMenuDialog() {
                         className="h-8 shrink-0 rounded border-[var(--alpha-8)] bg-card px-3 text-sm font-medium"
                       >
                         <RefreshCw
-                          className={cn('mr-1.5 size-3.5', isRotatingApiKey && 'animate-spin')}
+                          className={cn(
+                            "mr-1.5 size-3.5",
+                            isRotatingApiKey && "animate-spin",
+                          )}
                         />
-                        {isRotatingApiKey ? 'Rotating...' : 'Rotate'}
+                        {isRotatingApiKey ? "Rotating..." : "Rotate"}
                       </Button>
                     </div>
                   </div>
@@ -616,13 +699,22 @@ export default function SettingsMenuDialog() {
 
                   <div className="flex items-start gap-6">
                     <div className="w-[200px] shrink-0">
-                      <p className="py-1.5 text-sm leading-5 text-foreground">Version</p>
+                      <p className="py-1.5 text-sm leading-5 text-foreground">
+                        Version
+                      </p>
                     </div>
                     <div className="flex min-w-0 flex-1 items-start gap-1.5">
                       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                        <div className={cn(INFO_FIELD_CLASS, isVersionLoading && 'animate-pulse')}>
+                        <div
+                          className={cn(
+                            INFO_FIELD_CLASS,
+                            isVersionLoading && "animate-pulse",
+                          )}
+                        >
                           <span className="truncate">
-                            {isVersionLoading ? 'Loading...' : version || 'Unknown'}
+                            {isVersionLoading
+                              ? "Loading..."
+                              : version || "Unknown"}
                           </span>
                         </div>
                         {latestVersion && isVersionOutdated && (
@@ -637,7 +729,7 @@ export default function SettingsMenuDialog() {
                           disabled={isUpdatingVersion}
                           className="h-8 rounded px-3 text-sm font-medium"
                         >
-                          {isUpdatingVersion ? 'Upgrading...' : 'Upgrade'}
+                          {isUpdatingVersion ? "Upgrading..." : "Upgrade"}
                         </Button>
                       )}
                     </div>
@@ -650,7 +742,9 @@ export default function SettingsMenuDialog() {
                   {isCloud && isInIframe && (
                     <div className="flex items-start gap-6">
                       <div className="w-[200px] shrink-0">
-                        <p className="py-1.5 text-sm leading-5 text-foreground">Delete Project</p>
+                        <p className="py-1.5 text-sm leading-5 text-foreground">
+                          Delete Project
+                        </p>
                       </div>
                       <div className="flex min-w-0 flex-1 items-start justify-end gap-1.5">
                         <Button
@@ -666,15 +760,18 @@ export default function SettingsMenuDialog() {
                 </div>
               )}
 
-              {activeTab === 'connect' && (
+              {activeTab === "connect" && (
                 <div className="flex w-full flex-col">
                   {isCloud && isInIframe && (
                     <>
                       <div className="flex items-start gap-6">
                         <div className="w-[200px] shrink-0">
-                          <p className="py-1.5 text-sm leading-5 text-foreground">CLI</p>
+                          <p className="py-1.5 text-sm leading-5 text-foreground">
+                            CLI
+                          </p>
                           <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
-                            Link this cloud project with InsForge CLI and verify the connection.
+                            Link this cloud project with InsForge CLI and verify
+                            the connection.
                           </p>
                         </div>
                         <div className="flex min-w-0 flex-1 items-start gap-1.5">
@@ -690,15 +787,17 @@ export default function SettingsMenuDialog() {
 
                   <div className="flex items-start gap-6">
                     <div className="w-[200px] shrink-0">
-                      <p className="py-1.5 text-sm leading-5 text-foreground">MCP</p>
+                      <p className="py-1.5 text-sm leading-5 text-foreground">
+                        MCP
+                      </p>
                       <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
-                        Install the MCP server so your coding agent can access and build the
-                        backend.
+                        Install the MCP server so your coding agent can access
+                        and build the backend.
                       </p>
                     </div>
                     <div className="flex min-w-0 flex-1 items-start gap-1.5">
                       <MCPSection
-                        apiKey={apiKey || ''}
+                        apiKey={apiKey || ""}
                         appUrl={projectUrl}
                         isLoading={isApiKeyLoading}
                         className="w-full gap-3"
@@ -718,8 +817,9 @@ export default function SettingsMenuDialog() {
                             Connection String
                           </p>
                           <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
-                            Ideal for applications with persistent and long-lived connections, such
-                            as those running on virtual machines or long-standing containers.
+                            Ideal for applications with persistent and
+                            long-lived connections, such as those running on
+                            virtual machines or long-standing containers.
                           </p>
                         </div>
                         <div className="flex min-w-0 flex-1 items-start gap-1.5">
@@ -731,24 +831,32 @@ export default function SettingsMenuDialog() {
                 </div>
               )}
 
-              {activeTab === 'compute' && isCloud && isInIframe && (
+              {activeTab === "compute" && isCloud && isInIframe && (
                 <div className="flex w-full flex-col gap-4">
                   {!instanceInfo ? (
-                    <div className={cn(INFO_FIELD_CLASS, 'justify-between')}>
-                      <span className="text-muted-foreground">Loading compute options...</span>
+                    <div className={cn(INFO_FIELD_CLASS, "justify-between")}>
+                      <span className="text-muted-foreground">
+                        Loading compute options...
+                      </span>
                     </div>
                   ) : (
                     <>
-                      {instanceInfo.planName === 'free' && (
+                      {instanceInfo.planName === "free" && (
                         <div className="flex flex-col gap-2 rounded border border-[var(--alpha-12)] bg-[var(--alpha-4)] p-3">
                           <p className="text-sm leading-5 text-foreground">
-                            Compute upgrades are available on Start plan and above.
+                            Compute upgrades are available on Start plan and
+                            above.
                           </p>
                           <div className="flex justify-end">
                             <Button
                               type="button"
                               className="h-8 rounded px-3 text-sm font-medium"
-                              onClick={() => postMessageToParent({ type: 'SHOW_PLAN_MODAL' }, '*')}
+                              onClick={() =>
+                                postMessageToParent(
+                                  { type: "SHOW_PLAN_MODAL" },
+                                  "*",
+                                )
+                              }
                             >
                               Upgrade Plan
                             </Button>
@@ -758,10 +866,15 @@ export default function SettingsMenuDialog() {
 
                       <div className="grid gap-3 md:grid-cols-2">
                         {instanceInfo.instanceTypes.map((instanceType) => {
-                          const isCurrent = instanceType.id === instanceInfo.currentInstanceType;
-                          const isSelected = instanceType.id === selectedInstanceType;
-                          const isFreePlan = instanceInfo.planName === 'free';
-                          const isDisabled = isChangingInstanceType || (isFreePlan && !isCurrent);
+                          const isCurrent =
+                            instanceType.id ===
+                            instanceInfo.currentInstanceType;
+                          const isSelected =
+                            instanceType.id === selectedInstanceType;
+                          const isFreePlan = instanceInfo.planName === "free";
+                          const isDisabled =
+                            isChangingInstanceType ||
+                            (isFreePlan && !isCurrent);
 
                           return (
                             <button
@@ -774,13 +887,15 @@ export default function SettingsMenuDialog() {
                                 }
                               }}
                               className={cn(
-                                'flex flex-col gap-3 rounded border p-3 text-left transition-colors',
-                                isDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
+                                "flex flex-col gap-3 rounded border p-3 text-left transition-colors",
+                                isDisabled
+                                  ? "cursor-not-allowed opacity-50"
+                                  : "cursor-pointer",
                                 isCurrent
-                                  ? 'border-foreground bg-[var(--alpha-4)]'
+                                  ? "border-foreground bg-[var(--alpha-4)]"
                                   : isSelected
-                                    ? 'border-primary bg-[var(--alpha-4)]'
-                                    : 'border-[var(--alpha-12)] hover:border-[var(--alpha-16)]'
+                                    ? "border-primary bg-[var(--alpha-4)]"
+                                    : "border-[var(--alpha-12)] hover:border-[var(--alpha-16)]",
                               )}
                             >
                               <div className="flex items-center justify-between gap-2">
@@ -788,10 +903,13 @@ export default function SettingsMenuDialog() {
                                   {instanceType.id}
                                 </span>
                                 {isCurrent ? (
-                                  <span className="text-xs text-muted-foreground">Current</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    Current
+                                  </span>
                                 ) : (
                                   <span className="text-xs text-muted-foreground">
-                                    ${instanceType.pricePerHour.toFixed(4)} / hour
+                                    ${instanceType.pricePerHour.toFixed(4)} /
+                                    hour
                                   </span>
                                 )}
                               </div>
@@ -814,7 +932,7 @@ export default function SettingsMenuDialog() {
                 </div>
               )}
 
-              {activeTab === 'rate-limits' && (
+              {activeTab === "rate-limits" && (
                 <div className="flex w-full flex-col">
                   {isRateLimitConfigLoading ? (
                     <div className="flex h-full min-h-[120px] items-center justify-center text-sm text-muted-foreground">
@@ -822,7 +940,8 @@ export default function SettingsMenuDialog() {
                     </div>
                   ) : rateLimitConfigError ? (
                     <div className="flex h-full min-h-[120px] items-center justify-center text-sm text-destructive">
-                      Failed to load API rate-limit configuration. Close and reopen to retry.
+                      Failed to load API rate-limit configuration. Close and
+                      reopen to retry.
                     </div>
                   ) : (
                     rateLimitFields.map((fieldConfig, index) => (
@@ -849,26 +968,41 @@ export default function SettingsMenuDialog() {
                                       max={fieldConfig.max}
                                       {...field}
                                       onChange={(event) => {
-                                        const parsed = parseInt(event.target.value, 10);
-                                        field.onChange(Number.isNaN(parsed) ? '' : parsed);
+                                        const parsed = parseInt(
+                                          event.target.value,
+                                          10,
+                                        );
+                                        field.onChange(
+                                          Number.isNaN(parsed) ? "" : parsed,
+                                        );
                                       }}
                                       className={
-                                        rateLimitForm.formState.errors[fieldConfig.name]
-                                          ? 'border-destructive'
-                                          : ''
+                                        rateLimitForm.formState.errors[
+                                          fieldConfig.name
+                                        ]
+                                          ? "border-destructive"
+                                          : ""
                                       }
                                     />
                                     <span className="shrink-0 text-sm text-muted-foreground">
                                       {fieldConfig.unit}
                                     </span>
                                   </div>
-                                  {rateLimitForm.formState.errors[fieldConfig.name] ? (
+                                  {rateLimitForm.formState.errors[
+                                    fieldConfig.name
+                                  ] ? (
                                     <p className="pt-1 text-xs text-destructive">
-                                      {rateLimitForm.formState.errors[fieldConfig.name]?.message}
+                                      {
+                                        rateLimitForm.formState.errors[
+                                          fieldConfig.name
+                                        ]?.message
+                                      }
                                     </p>
                                   ) : (
                                     <p className="pt-1 text-xs text-muted-foreground">
-                                      Current: {rateLimitConfig?.[fieldConfig.name]} {fieldConfig.unit}
+                                      Current:{" "}
+                                      {rateLimitConfig?.[fieldConfig.name]}{" "}
+                                      {fieldConfig.unit}
                                     </p>
                                   )}
                                 </div>
@@ -912,7 +1046,7 @@ export default function SettingsMenuDialog() {
                 <div className="mr-auto text-sm text-muted-foreground">
                   {projectedComputeCost && (
                     <span>
-                      Projected monthly compute after credits:{' '}
+                      Projected monthly compute after credits:{" "}
                       <span className="text-foreground">
                         ${projectedComputeCost.afterCredits.toFixed(2)}
                       </span>
@@ -934,7 +1068,7 @@ export default function SettingsMenuDialog() {
                   disabled={isChangingInstanceType}
                   className="h-8 rounded px-3 text-sm font-medium"
                 >
-                  {isChangingInstanceType ? 'Applying...' : 'Apply Changes'}
+                  {isChangingInstanceType ? "Applying..." : "Apply Changes"}
                 </Button>
               </MenuDialogFooter>
             )}
@@ -955,7 +1089,7 @@ export default function SettingsMenuDialog() {
                   disabled={isUpdatingRateLimitConfig}
                   className="h-8 rounded px-3 text-sm font-medium"
                 >
-                  {isUpdatingRateLimitConfig ? 'Saving...' : 'Save'}
+                  {isUpdatingRateLimitConfig ? "Saving..." : "Save"}
                 </Button>
               </MenuDialogFooter>
             )}

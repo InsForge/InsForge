@@ -1,7 +1,7 @@
-import { Request, Response, NextFunction } from 'express';
-import { AppError } from './error.js';
-import { ERROR_CODES } from '@/types/error-constants.js';
-import type { ApiRateLimitConfigSchema } from '@insforge/shared-schemas';
+import { Request, Response, NextFunction } from "express";
+import { AppError } from "./error.js";
+import { ERROR_CODES } from "@/types/error-constants.js";
+import type { ApiRateLimitConfigSchema } from "@insforge/shared-schemas";
 
 /**
  * Store for tracking per-email cooldowns
@@ -13,11 +13,11 @@ const verifyOtpRequestsByIp = new Map<string, number[]>();
 
 type RuntimeApiRateLimitConfig = Pick<
   ApiRateLimitConfigSchema,
-  | 'sendEmailOtpMaxRequests'
-  | 'sendEmailOtpWindowMinutes'
-  | 'verifyOtpMaxRequests'
-  | 'verifyOtpWindowMinutes'
-  | 'emailCooldownSeconds'
+  | "sendEmailOtpMaxRequests"
+  | "sendEmailOtpWindowMinutes"
+  | "verifyOtpMaxRequests"
+  | "verifyOtpWindowMinutes"
+  | "emailCooldownSeconds"
 >;
 
 const DEFAULT_API_RATE_LIMIT_CONFIG: RuntimeApiRateLimitConfig = {
@@ -28,7 +28,9 @@ const DEFAULT_API_RATE_LIMIT_CONFIG: RuntimeApiRateLimitConfig = {
   emailCooldownSeconds: 60,
 };
 
-let currentApiRateLimitConfig: RuntimeApiRateLimitConfig = { ...DEFAULT_API_RATE_LIMIT_CONFIG };
+let currentApiRateLimitConfig: RuntimeApiRateLimitConfig = {
+  ...DEFAULT_API_RATE_LIMIT_CONFIG,
+};
 
 /**
  * Cleanup interval reference for graceful shutdown
@@ -45,7 +47,7 @@ cleanupInterval = setInterval(
       Math.max(
         currentApiRateLimitConfig.sendEmailOtpWindowMinutes,
         currentApiRateLimitConfig.verifyOtpWindowMinutes,
-        5
+        5,
       ) *
       60 *
       1000;
@@ -59,12 +61,18 @@ cleanupInterval = setInterval(
     cleanupIpRequests(sendEmailOtpRequestsByIp, maxWindowMs, now);
     cleanupIpRequests(verifyOtpRequestsByIp, maxWindowMs, now);
   },
-  5 * 60 * 1000
+  5 * 60 * 1000,
 );
 
-function cleanupIpRequests(store: Map<string, number[]>, maxWindowMs: number, now: number): void {
+function cleanupIpRequests(
+  store: Map<string, number[]>,
+  maxWindowMs: number,
+  now: number,
+): void {
   for (const [key, timestamps] of store.entries()) {
-    const recent = timestamps.filter((timestamp) => now - timestamp < maxWindowMs);
+    const recent = timestamps.filter(
+      (timestamp) => now - timestamp < maxWindowMs,
+    );
     if (recent.length) {
       store.set(key, recent);
     } else {
@@ -73,7 +81,9 @@ function cleanupIpRequests(store: Map<string, number[]>, maxWindowMs: number, no
   }
 }
 
-export function applyApiRateLimitConfig(config: RuntimeApiRateLimitConfig): void {
+export function applyApiRateLimitConfig(
+  config: RuntimeApiRateLimitConfig,
+): void {
   currentApiRateLimitConfig = {
     sendEmailOtpMaxRequests: config.sendEmailOtpMaxRequests,
     sendEmailOtpWindowMinutes: config.sendEmailOtpWindowMinutes,
@@ -84,7 +94,7 @@ export function applyApiRateLimitConfig(config: RuntimeApiRateLimitConfig): void
 }
 
 function getClientIp(req: Request): string {
-  return req.ip || req.socket.remoteAddress || 'unknown';
+  return req.ip || req.socket.remoteAddress || "unknown";
 }
 
 interface IpRateLimiterOptions {
@@ -102,7 +112,9 @@ function createIpRateLimiter(options: IpRateLimiterOptions) {
     const ip = getClientIp(req);
     const windowMs = options.getWindowMs();
     const maxRequests = options.getMaxRequests();
-    const recentRequests = (options.store.get(ip) || []).filter((timestamp) => now - timestamp < windowMs);
+    const recentRequests = (options.store.get(ip) || []).filter(
+      (timestamp) => now - timestamp < windowMs,
+    );
 
     options.store.set(ip, recentRequests);
 
@@ -111,13 +123,13 @@ function createIpRateLimiter(options: IpRateLimiterOptions) {
         new AppError(
           options.getMessage(Math.ceil(windowMs / (60 * 1000))),
           429,
-          ERROR_CODES.TOO_MANY_REQUESTS
-        )
+          ERROR_CODES.TOO_MANY_REQUESTS,
+        ),
       );
     }
 
     let counted = false;
-    req.res?.on('finish', () => {
+    req.res?.on("finish", () => {
       if (counted) {
         return;
       }
@@ -126,7 +138,8 @@ function createIpRateLimiter(options: IpRateLimiterOptions) {
       const statusCode = req.res?.statusCode ?? 500;
       const isSuccess = statusCode < 400;
       const shouldCount =
-        (isSuccess && options.countSuccessfulRequests) || (!isSuccess && options.countFailedRequests);
+        (isSuccess && options.countSuccessfulRequests) ||
+        (!isSuccess && options.countFailedRequests);
 
       if (!shouldCount) {
         return;
@@ -134,7 +147,7 @@ function createIpRateLimiter(options: IpRateLimiterOptions) {
 
       const currentWindowMs = options.getWindowMs();
       const currentTimestamps = (options.store.get(ip) || []).filter(
-        (timestamp) => Date.now() - timestamp < currentWindowMs
+        (timestamp) => Date.now() - timestamp < currentWindowMs,
       );
       currentTimestamps.push(Date.now());
       options.store.set(ip, currentTimestamps);
@@ -170,7 +183,8 @@ export function clearRateLimitState(): void {
  */
 export const sendEmailOTPRateLimiter = createIpRateLimiter({
   store: sendEmailOtpRequestsByIp,
-  getWindowMs: () => currentApiRateLimitConfig.sendEmailOtpWindowMinutes * 60 * 1000,
+  getWindowMs: () =>
+    currentApiRateLimitConfig.sendEmailOtpWindowMinutes * 60 * 1000,
   getMaxRequests: () => currentApiRateLimitConfig.sendEmailOtpMaxRequests,
   getMessage: (windowMinutes) =>
     `Too many send email verification requests from this IP. Please try again in ${windowMinutes} minutes.`,
@@ -186,7 +200,8 @@ export const sendEmailOTPRateLimiter = createIpRateLimiter({
  */
 export const verifyOTPRateLimiter = createIpRateLimiter({
   store: verifyOtpRequestsByIp,
-  getWindowMs: () => currentApiRateLimitConfig.verifyOtpWindowMinutes * 60 * 1000,
+  getWindowMs: () =>
+    currentApiRateLimitConfig.verifyOtpWindowMinutes * 60 * 1000,
   getMaxRequests: () => currentApiRateLimitConfig.verifyOtpMaxRequests,
   getMessage: (windowMinutes) =>
     `Too many verification attempts from this IP. Please try again in ${windowMinutes} minutes.`,
@@ -210,7 +225,8 @@ export const perEmailCooldown = (cooldownMs?: number) => {
     }
 
     const effectiveCooldownMs =
-      cooldownMs ?? Math.max(0, currentApiRateLimitConfig.emailCooldownSeconds) * 1000;
+      cooldownMs ??
+      Math.max(0, currentApiRateLimitConfig.emailCooldownSeconds) * 1000;
     const now = Date.now();
     const lastRequest = emailCooldowns.get(email);
 
@@ -221,7 +237,7 @@ export const perEmailCooldown = (cooldownMs?: number) => {
       throw new AppError(
         `Please wait ${remainingSec} seconds before requesting another code for this email`,
         429,
-        ERROR_CODES.TOO_MANY_REQUESTS
+        ERROR_CODES.TOO_MANY_REQUESTS,
       );
     }
 
