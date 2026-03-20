@@ -18,24 +18,6 @@ import { useConfirm } from '@/lib/hooks/useConfirm';
 
 const MAX_FUNCTION_FILE_SIZE_BYTES = 1024 * 1024;
 const ALLOWED_FUNCTION_FILE_EXTENSIONS = ['.ts', '.js', '.tsx', '.jsx'];
-const ALLOWED_FUNCTION_FILE_MIME_TYPES_BY_EXTENSION = new Map([
-  ['.js', new Set(['text/javascript', 'application/javascript'])],
-  [
-    '.ts',
-    new Set([
-      'text/typescript',
-      'application/typescript',
-      'application/x-typescript',
-      // Windows commonly reports .ts files as MPEG transport streams.
-      'video/mp2t',
-    ]),
-  ],
-  ['.jsx', new Set(['text/jsx', 'text/javascript', 'application/javascript'])],
-  [
-    '.tsx',
-    new Set(['text/tsx', 'text/typescript', 'application/typescript', 'application/x-typescript']),
-  ],
-]);
 
 export default function FunctionsPage() {
   const toastShownRef = useRef(false);
@@ -205,16 +187,6 @@ export default function FunctionsPage() {
           );
 
           if (!matchedExtension) {
-            showToast('Invalid file type. Please upload a .ts, .js, .tsx, or .jsx file.', 'error');
-            return;
-          }
-
-          const allowedMimeTypesForExtension =
-            ALLOWED_FUNCTION_FILE_MIME_TYPES_BY_EXTENSION.get(matchedExtension);
-          const hasAllowedMimeType =
-            !file.type || allowedMimeTypesForExtension?.has(file.type) === true;
-
-          if (!hasAllowedMimeType) {
             showToast('Invalid file type. Please upload a .ts, .js, .tsx, or .jsx file.', 'error');
             return;
           }
