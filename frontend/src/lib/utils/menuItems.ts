@@ -22,6 +22,7 @@ export interface SecondaryMenuItem {
   label: string;
   href: string;
   sectionEnd?: boolean; // Add support for separator after the item
+  exact?: boolean; // Use exact path matching for active state
 }
 
 export interface PrimaryMenuItem {
@@ -206,6 +207,19 @@ export const staticMenuItems: PrimaryMenuItem[] = [
     href: '/dashboard/ai',
     icon: Sparkles,
     sectionEnd: true,
+    secondaryMenu: [
+      {
+        id: 'ai-models',
+        label: 'Models',
+        href: '/dashboard/ai',
+        exact: true,
+      },
+      {
+        id: 'ai-usage',
+        label: 'Usage',
+        href: '/dashboard/ai/usage',
+      },
+    ],
   },
   {
     id: 'logs',
