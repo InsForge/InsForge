@@ -22,7 +22,7 @@ export function useUsers(options: UseUsersOptions = {}) {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['users', currentPage, searchQuery, roleFilter],
+    queryKey: ['users', currentPage, searchQuery, roleFilter, pageSize],
     queryFn: () => {
       const params = new URLSearchParams({
         limit: pageSize.toString(),

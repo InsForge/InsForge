@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm, Controller, useFormState } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -8,6 +8,7 @@ import {
   CopyButton,
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -21,6 +22,7 @@ import {
   OAuthProvidersSchema,
 } from '@insforge/shared-schemas';
 import { type OAuthProviderInfo } from '../helpers';
+import { SecretInput } from './SecretInput';
 import { useOAuthConfig } from '@/features/auth/hooks/useOAuthConfig';
 import { getBackendUrl, isInsForgeCloudProject } from '@/lib/utils/utils';
 
@@ -48,16 +50,8 @@ export function OAuthConfigDialog({
   onClose,
   onSuccess,
 }: OAuthConfigDialogProps) {
-  const {
-    configs,
-    providerConfig,
-    createConfig,
-    updateConfig,
-    isCreating,
-    isUpdating,
-    setSelectedProvider,
-    isLoadingProvider,
-  } = useOAuthConfig();
+  const { providerConfig, createConfig, updateConfig, isCreating, isUpdating, isLoadingProvider } =
+    useOAuthConfig(provider?.id);
 
   const form = useForm<OAuthConfigSchema & { clientSecret?: string }>({
     resolver: zodResolver(oAuthConfigSchema.extend({ clientSecret: z.string().optional() })),
@@ -72,6 +66,7 @@ export function OAuthConfigDialog({
   const useSharedKey = form.watch('useSharedKey');
   const clientId = form.watch('clientId');
   const clientSecret = form.watch('clientSecret');
+  const [isClientSecretVisible, setIsClientSecretVisible] = useState(false);
 
   // Our Cloud only support shared keys of these OAuth Providers for now
   const sharedKeyProviders: readonly OAuthProvidersSchema[] = [
@@ -90,12 +85,11 @@ export function OAuthConfigDialog({
     control: form.control,
   });
 
-  // Set selected provider and refetch when dialog opens
   useEffect(() => {
-    if (isOpen && provider) {
-      setSelectedProvider(provider.id);
+    if (isOpen) {
+      setIsClientSecretVisible(false);
     }
-  }, [configs, isOpen, provider, setSelectedProvider]);
+  }, [isOpen, provider?.id]);
 
   // Load OAuth configuration after fetching
   useEffect(() => {
@@ -188,6 +182,9 @@ export function OAuthConfigDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{provider?.name}</DialogTitle>
+          <DialogDescription className="sr-only">
+            Configure OAuth settings for {provider?.name}
+          </DialogDescription>
         </DialogHeader>
         {isLoadingProvider ? (
           <div className="p-6 flex items-center justify-center">
@@ -283,9 +280,11 @@ export function OAuthConfigDialog({
 
                   <div className="flex flex-row items-center justify-between gap-10">
                     <label className="text-sm text-zinc-950 dark:text-white">Client Secret</label>
-                    <Input
-                      type="password"
+                    <SecretInput
                       {...form.register('clientSecret')}
+                      value={clientSecret ?? ''}
+                      isVisible={isClientSecretVisible}
+                      onToggleVisibility={() => setIsClientSecretVisible((visible) => !visible)}
                       placeholder={`Enter ${provider?.name.split(' ')[0]} OAuth App Secret`}
                       className="w-[340px]"
                     />

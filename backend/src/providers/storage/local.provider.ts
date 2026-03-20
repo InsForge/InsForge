@@ -41,7 +41,7 @@ export class LocalStorageProvider implements StorageProvider {
       const filePath = this.getFilePath(bucket, key);
       return await fs.readFile(filePath);
     } catch (error) {
-      if ((error as any).code === 'ENOENT') {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return null;
       }
       throw error;
@@ -54,7 +54,7 @@ export class LocalStorageProvider implements StorageProvider {
       await fs.unlink(filePath);
     } catch (error) {
       // Re-throw if it's not a "file not found" error (e.g., validation or permission error)
-      if ((error as any).code !== 'ENOENT') {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         throw error;
       }
     }
@@ -71,7 +71,7 @@ export class LocalStorageProvider implements StorageProvider {
       await fs.rm(bucketPath, { recursive: true, force: true });
     } catch (error) {
       // Re-throw if it's not a "not found" error
-      if ((error as any).code !== 'ENOENT') {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         throw error;
       }
     }
@@ -85,7 +85,8 @@ export class LocalStorageProvider implements StorageProvider {
   getUploadStrategy(
     bucket: string,
     key: string,
-    _metadata: { contentType?: string; size?: number }
+    _metadata: { contentType?: string; size?: number },
+    _maxFileSizeBytes: number
   ): Promise<UploadStrategyResponse> {
     // For local storage, return direct upload strategy with absolute URL
     const baseUrl = getApiBaseUrl();
@@ -111,15 +112,18 @@ export class LocalStorageProvider implements StorageProvider {
     });
   }
 
-  async verifyObjectExists(bucket: string, key: string): Promise<boolean> {
-    // For local storage, check if file exists on disk
+  async verifyObjectExists(
+    bucket: string,
+    key: string
+  ): Promise<{ exists: boolean; size?: number }> {
+    // For local storage, check if file exists on disk and get its size
     try {
       const filePath = this.getFilePath(bucket, key);
-      await fs.access(filePath);
-      return true;
+      const stat = await fs.stat(filePath);
+      return { exists: true, size: stat.size };
     } catch (error) {
-      if ((error as any).code === 'ENOENT') {
-        return false;
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return { exists: false };
       }
       throw error;
     }

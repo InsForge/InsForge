@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Cpu, HardDrive, Plug, Settings } from 'lucide-react';
+import { Cpu, HardDrive, Plug, RefreshCw, Settings } from 'lucide-react';
 import {
   Button,
   CopyButton,
@@ -8,6 +8,7 @@ import {
   Input,
   MenuDialog,
   MenuDialogContent,
+  MenuDialogDescription,
   MenuDialogSideNav,
   MenuDialogSideNavHeader,
   MenuDialogSideNavTitle,
@@ -35,6 +36,7 @@ import { useModal } from '@/lib/contexts/ModalContext';
 import { cn, compareVersions, isIframe, isInsForgeCloudProject } from '@/lib/utils/utils';
 import { MCPSection, CLISection, ConnectionStringSection } from '@/features/connect';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
+import { metadataService } from '@/lib/services/metadata.service';
 
 type TabType = 'info' | 'compute' | 'connect';
 
@@ -52,6 +54,7 @@ export default function SettingsMenuDialog() {
   const [instanceInfo, setInstanceInfo] = useState<Omit<InstanceInfoEvent, 'type'> | null>(null);
   const [selectedInstanceType, setSelectedInstanceType] = useState<string | null>(null);
   const [isChangingInstanceType, setIsChangingInstanceType] = useState(false);
+  const [isRotatingApiKey, setIsRotatingApiKey] = useState(false);
 
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
   const { version, isLoading: isVersionLoading } = useHealth();
@@ -270,6 +273,35 @@ export default function SettingsMenuDialog() {
     setIsProjectNameFocused(false);
   };
 
+  const handleRotateApiKey = async () => {
+    const confirmed = await confirm({
+      title: 'Rotate API Key',
+      description:
+        'This will generate a new API key. The current key will remain valid for 24 hours to allow for a smooth transition. This action cannot be undone.',
+      confirmText: 'Rotate Key',
+      cancelText: 'Cancel',
+      destructive: true,
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsRotatingApiKey(true);
+    try {
+      const result = await metadataService.rotateApiKey(24);
+      queryClient.setQueryData(['metadata', 'apiKey'], result.apiKey);
+      showToast(
+        'API key rotated successfully. The old key will remain valid for 24 hours.',
+        'success'
+      );
+    } catch {
+      showToast('Failed to rotate API key. Please try again.', 'error');
+    } finally {
+      setIsRotatingApiKey(false);
+    }
+  };
+
   const handleChangeInstanceType = () => {
     if (
       !instanceInfo ||
@@ -344,6 +376,9 @@ export default function SettingsMenuDialog() {
           <MenuDialogMain>
             <MenuDialogHeader>
               <MenuDialogTitle>{sectionTitle}</MenuDialogTitle>
+              <MenuDialogDescription className="sr-only">
+                Project settings and configuration
+              </MenuDialogDescription>
               <MenuDialogCloseButton className="ml-auto self-start" />
             </MenuDialogHeader>
 
@@ -420,6 +455,17 @@ export default function SettingsMenuDialog() {
                           />
                         )}
                       </div>
+                      <Button
+                        variant="secondary"
+                        onClick={() => void handleRotateApiKey()}
+                        disabled={isApiKeyLoading || isRotatingApiKey}
+                        className="h-8 shrink-0 rounded border-[var(--alpha-8)] bg-card px-3 text-sm font-medium"
+                      >
+                        <RefreshCw
+                          className={cn('mr-1.5 size-3.5', isRotatingApiKey && 'animate-spin')}
+                        />
+                        {isRotatingApiKey ? 'Rotating...' : 'Rotate'}
+                      </Button>
                     </div>
                   </div>
 

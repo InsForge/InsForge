@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import logger from '@/utils/logger.js';
 
 /**
  * EncryptionManager - Handles encryption/decryption operations
@@ -12,6 +13,13 @@ export class EncryptionManager {
       const key = process.env.ENCRYPTION_KEY || process.env.JWT_SECRET;
       if (!key) {
         throw new Error('ENCRYPTION_KEY or JWT_SECRET must be set for secrets encryption');
+      }
+      if (!process.env.ENCRYPTION_KEY) {
+        logger.warn(
+          'ENCRYPTION_KEY is not set — falling back to JWT_SECRET for secrets encryption. ' +
+            'WARNING: rotating JWT_SECRET without setting a dedicated ENCRYPTION_KEY will corrupt all stored secrets. ' +
+            'Set ENCRYPTION_KEY to a separate 32+ character secret in your environment.'
+        );
       }
       this.encryptionKey = crypto.createHash('sha256').update(key).digest();
     }

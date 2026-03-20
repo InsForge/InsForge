@@ -1,5 +1,5 @@
 import type { MouseEvent, ReactNode } from 'react';
-import { LockKeyhole, Mail, Users, Circle, ExternalLink } from 'lucide-react';
+import { LockKeyhole, Mail, Users, Circle, ExternalLink, KeyRound } from 'lucide-react';
 import { Handle, Position } from '@xyflow/react';
 import { useNavigate } from 'react-router-dom';
 import { OAuthProvidersSchema } from '@insforge/shared-schemas';
@@ -8,18 +8,32 @@ import { oauthProviders } from '@/features/auth/helpers';
 interface AuthNodeProps {
   data: {
     providers: OAuthProvidersSchema[];
+    customProviders: string[];
     userCount?: number;
     isReferenced?: boolean; // Whether any tables have foreign keys to users.id
   };
 }
 
+const formatCustomProviderName = (key: string) =>
+  key
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
 export function AuthNode({ data }: AuthNodeProps) {
   const navigate = useNavigate();
-  const { providers, isReferenced = false } = data;
+  const { providers, customProviders, isReferenced = false } = data;
   const enabledProviders = oauthProviders.filter((provider) => providers.includes(provider.id));
+  const enabledCustomProviders = customProviders.map((providerKey) => ({
+    id: `custom-${providerKey}`,
+    name: formatCustomProviderName(providerKey),
+    icon: <KeyRound className="h-4 w-4" />,
+  }));
   const authMethods: Array<{ id: string; name: string; icon?: ReactNode }> = [
     { id: 'email', name: 'Email / Password', icon: <Mail /> },
     ...enabledProviders,
+    ...enabledCustomProviders,
   ];
   const enabledCount = authMethods.length;
 

@@ -139,3 +139,29 @@ export type TokenPayloadSchema = z.infer<typeof tokenPayloadSchema>;
 export type OAuthConfigSchema = z.infer<typeof oAuthConfigSchema>;
 export type OAuthProvidersSchema = z.infer<typeof oAuthProvidersSchema>;
 export type AuthConfigSchema = z.infer<typeof authConfigSchema>;
+
+// ============================================================================
+// Custom OAuth provider schemas
+// ============================================================================
+
+export const customOAuthKeySchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(
+    /^[a-z0-9_-]+$/,
+    'Key must contain only lowercase letters, numbers, hyphens, and underscores'
+  );
+
+export const customOAuthConfigSchema = z.object({
+  id: z.string().uuid(),
+  key: customOAuthKeySchema,
+  name: z.string().min(1),
+  discoveryEndpoint: z.string().url(),
+  clientId: z.string().min(1),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export type CustomOAuthKeySchema = z.infer<typeof customOAuthKeySchema>;
+export type CustomOAuthConfigSchema = z.infer<typeof customOAuthConfigSchema>;

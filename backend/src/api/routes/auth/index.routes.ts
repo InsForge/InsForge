@@ -1,14 +1,19 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { AuthService } from '@/services/auth/auth.service.js';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
-import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
-import { AuthRequest, verifyAdmin, verifyToken } from '@/api/middlewares/auth.js';
+import {
+  AuthRequest,
+  verifyAdmin,
+  verifyToken,
+  extractBearerToken,
+} from '@/api/middlewares/auth.js';
 import oauthRouter from './oauth.routes.js';
+import customOAuthRouter from './custom-oauth.routes.js';
 import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-limiters.js';
 import {
   REFRESH_TOKEN_COOKIE_NAME,
@@ -54,25 +59,17 @@ import logger from '@/utils/logger.js';
 const router = Router();
 const authService = AuthService.getInstance();
 const authConfigService = AuthConfigService.getInstance();
-const oAuthConfigService = OAuthConfigService.getInstance();
 const auditService = AuditService.getInstance();
 
 // Mount OAuth routes
+router.use('/oauth/custom', customOAuthRouter);
 router.use('/oauth', oauthRouter);
 
 // Public Authentication Configuration Routes
 // GET /api/auth/public-config - Get all public authentication configuration (public endpoint)
-router.get('/public-config', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/public-config', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const [oAuthProviders, authConfigs] = await Promise.all([
-      oAuthConfigService.getConfiguredProviders(),
-      authConfigService.getPublicAuthConfig(),
-    ]);
-
-    const response: GetPublicAuthConfigResponse = {
-      oAuthProviders,
-      ...authConfigs,
-    };
+    const response: GetPublicAuthConfigResponse = await authService.getMetadata();
 
     successResponse(res, response);
   } catch (error) {
@@ -176,8 +173,10 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
   }
 });
 
-// POST /api/auth/users - Create a new user (registration)
+// POST /api/auth/users - Create a new user (registration or admin adding user)
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
+// When called with a valid admin token (e.g. dashboard adding a user), we do NOT set session
+// cookie or return csrf/refresh tokens, so the admin's session is not overwritten.
 router.post('/users', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const clientType = parseClientType(req.query.client_type);
@@ -194,8 +193,24 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
     const { email, password, name, options } = validationResult.data;
     const result: CreateUserResponse = await authService.register(email, password, name, options);
 
-    // Set refresh token based on client type
-    if (result.accessToken && result.user) {
+    // If the request is from a project_admin, do not set refresh token cookie or return session
+    // tokens, so the admin's session is not overwritten when adding a user (works with multiple admins).
+    let adminCreatingUser = false;
+    try {
+      const token = extractBearerToken(req.headers.authorization);
+      if (token) {
+        const payload = TokenManager.getInstance().verifyToken(token);
+        adminCreatingUser = payload?.role === 'project_admin';
+      }
+    } catch (error) {
+      // Not a valid token; treat as normal registration.
+      logger.debug('[Auth:CreateUser] Admin detection failed', {
+        error: error instanceof Error ? error.message : 'unknown',
+      });
+    }
+
+    // Set refresh token based on client type (skip when admin is adding a user)
+    if (result.accessToken && result.user && !adminCreatingUser) {
       const tokenManager = TokenManager.getInstance();
       const refreshToken = tokenManager.generateRefreshToken(result.user.id);
 
@@ -533,8 +548,8 @@ router.get('/users', verifyAdmin, async (req: Request, res: Response, next: Next
 
     const parsedLimit = Number.parseInt(String(limit), 10);
     const parsedOffset = Number.parseInt(String(offset), 10);
-    const validatedLimit = Number.isNaN(parsedLimit) ? 10 : parsedLimit;
-    const validatedOffset = Number.isNaN(parsedOffset) ? 0 : parsedOffset;
+    const validatedLimit = Number.isNaN(parsedLimit) ? 10 : Math.max(1, parsedLimit);
+    const validatedOffset = Number.isNaN(parsedOffset) ? 0 : Math.max(0, parsedOffset);
     const validatedRoleFilter =
       roleFilter === 'admins' || roleFilter === 'all' || roleFilter === 'users'
         ? roleFilter

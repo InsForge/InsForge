@@ -1,6 +1,35 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { createUsersColumns } from '../UsersDataGrid';
+
+beforeAll(() => {
+  class ResizeObserverMock {
+    observe() {}
+    disconnect() {}
+  }
+
+  Object.defineProperty(globalThis, 'ResizeObserver', {
+    writable: true,
+    configurable: true,
+    value: ResizeObserverMock,
+  });
+
+  Object.defineProperty(HTMLElement.prototype, 'getBoundingClientRect', {
+    writable: true,
+    configurable: true,
+    value: () => ({
+      width: 240,
+      height: 40,
+      top: 0,
+      left: 0,
+      bottom: 40,
+      right: 240,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    }),
+  });
+});
 
 const baseUser = {
   id: '8b0a99a2-2787-4e2a-9ef9-19e0d7ce7f67',
@@ -45,5 +74,25 @@ describe('createUsersColumns', () => {
     render(<>{actionsColumn?.renderCell?.({ row: baseUser } as never)}</>);
 
     expect(screen.getByLabelText('Actions for member@example.com')).toBeInTheDocument();
+  });
+
+  it('renders custom provider labels while admin toggles are enabled', () => {
+    const columns = createUsersColumns({
+      customProviderLabels: { saml: 'Company SSO' },
+      onToggleAdminStatus: () => undefined,
+    });
+    const providersColumn = columns.find((column) => column.key === 'providers');
+
+    expect(providersColumn).toBeDefined();
+
+    render(
+      <>
+        {providersColumn?.renderCell?.({
+          row: { ...baseUser, providers: ['saml'] },
+        } as never)}
+      </>
+    );
+
+    expect(screen.getByText('Company SSO')).toBeInTheDocument();
   });
 });

@@ -79,7 +79,7 @@ export class LocalFileProvider extends BaseLogProvider {
     try {
       await fs.access(filePath);
     } catch (error) {
-      if ((error as any).code === 'ENOENT') {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return [];
       }
       throw error;
@@ -147,7 +147,7 @@ export class LocalFileProvider extends BaseLogProvider {
           lastActivity: fileStats.mtime.toISOString(),
         });
       } catch (error) {
-        if ((error as any).code !== 'ENOENT') {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
           throw error;
         }
         // File doesn't exist, skip
