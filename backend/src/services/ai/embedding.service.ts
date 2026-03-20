@@ -31,14 +31,14 @@ export class EmbeddingService {
       // Send request with automatic renewal and retry logic (same pattern as chat-completion)
       const aiConfig = await this.aiConfigService.findByModelId(options.model);
       const isByok = await this.openRouterProvider.isByokActive();
-      const response = await this.openRouterProvider.sendRequest((client) =>
+      const response = (await this.openRouterProvider.sendRequest((client) =>
         client.embeddings.create({
           model: options.model,
           input: options.input,
           encoding_format: options.encoding_format || 'float',
           dimensions: options.dimensions,
         })
-      ) as OpenAI.CreateEmbeddingResponse;
+      )) as OpenAI.CreateEmbeddingResponse;
 
       logger.debug('Embeddings generated successfully', {
         model: response.model,
