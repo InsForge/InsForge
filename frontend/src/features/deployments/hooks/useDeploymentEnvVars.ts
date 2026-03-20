@@ -68,7 +68,7 @@ export function useDeploymentEnvVars() {
       const normalizedInputs = inputs
         .map((input) => ({
           key: input.key.trim(),
-          value: input.value.trim(),
+          value: input.value,
         }))
         .filter((input) => input.key || input.value);
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ClipboardEvent } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button, Dialog, DialogContent, DialogDescription, DialogTitle, Input } from '@insforge/ui';
 import type { DeploymentEnvVar } from '@insforge/shared-schemas';
+import { useToast } from '@/lib/hooks/useToast';
 import {
   createEnvVarDraft,
   normalizeEnvVarDrafts,
@@ -29,6 +30,7 @@ export function EnvVarDialog({
   onSave,
   isSaving = false,
 }: EnvVarDialogProps) {
+  const { showToast } = useToast();
   const [key, setKey] = useState('');
   const [value, setValue] = useState('');
   const [manualDrafts, setManualDrafts] = useState<EnvVarDraft[]>([createEnvVarDraft()]);
@@ -50,12 +52,12 @@ export function EnvVarDialog({
   const manualEntries = useMemo(() => normalizeEnvVarDrafts(manualDrafts), [manualDrafts]);
 
   const hasIncompleteManualRows = manualDrafts.some((draft) => {
-    const hasAnyValue = draft.key.trim() || draft.value.trim();
-    return hasAnyValue && (!draft.key.trim() || !draft.value.trim());
+    const hasAnyValue = draft.key.trim() || draft.value;
+    return hasAnyValue && (!draft.key.trim() || !draft.value);
   });
 
   const isValid = isEditMode
-    ? Boolean(key.trim() && value.trim())
+    ? Boolean(key.trim() && value)
     : manualEntries.length > 0 && !hasIncompleteManualRows;
 
   const handleClose = () => {
@@ -63,7 +65,7 @@ export function EnvVarDialog({
   };
 
   const handleSubmit = async () => {
-    const payload = isEditMode ? [{ key: key.trim(), value: value.trim() }] : manualEntries;
+    const payload = isEditMode ? [{ key: key.trim(), value }] : manualEntries;
 
     const success = await onSave(payload);
     if (success) {
@@ -88,12 +90,22 @@ export function EnvVarDialog({
     setManualDrafts((currentDrafts) => [...currentDrafts, createEnvVarDraft()]);
   };
 
-  const applyPastedEnvVars = (draftIndex: number, pastedText: string) => {
+  const applyPastedEnvVars = (
+    draftIndex: number,
+    pastedText: string
+  ): { applied: boolean; invalidLineNumbers?: number[] } => {
     const parsed = parseDotEnvInput(pastedText);
+    if (parsed.invalidLineNumbers.length > 0) {
+      return {
+        applied: false,
+        invalidLineNumbers: parsed.invalidLineNumbers,
+      };
+    }
+
     const normalizedEntries = normalizeEnvVarDrafts(parsed.drafts);
 
     if (normalizedEntries.length === 0) {
-      return false;
+      return { applied: false };
     }
 
     setManualDrafts((currentDrafts) => {
@@ -120,7 +132,7 @@ export function EnvVarDialog({
       return nextDrafts;
     });
 
-    return true;
+    return { applied: true };
   };
 
   const handleDraftPaste = (draftIndex: number) => (event: ClipboardEvent<HTMLInputElement>) => {
@@ -134,8 +146,17 @@ export function EnvVarDialog({
       return;
     }
 
-    const wasApplied = applyPastedEnvVars(draftIndex, pastedText);
-    if (!wasApplied) {
+    const pasteResult = applyPastedEnvVars(draftIndex, pastedText);
+    if (pasteResult.invalidLineNumbers?.length) {
+      showToast(
+        `Invalid .env lines: ${pasteResult.invalidLineNumbers.join(', ')}. Fix them before pasting again.`,
+        'error'
+      );
+      event.preventDefault();
+      return;
+    }
+
+    if (!pasteResult.applied) {
       return;
     }
 
@@ -168,10 +189,14 @@ export function EnvVarDialog({
           {isEditMode ? (
             <>
               <div className="flex items-center gap-2">
-                <label className="w-30 shrink-0 text-sm text-zinc-950 dark:text-neutral-50">
+                <label
+                  htmlFor="deployment-env-var-key"
+                  className="w-30 shrink-0 text-sm text-zinc-950 dark:text-neutral-50"
+                >
                   Key
                 </label>
                 <Input
+                  id="deployment-env-var-key"
                   placeholder="e.g CLIENT_KEY"
                   value={key}
                   onChange={(e) => setKey(e.target.value)}
@@ -180,10 +205,14 @@ export function EnvVarDialog({
               </div>
 
               <div className="flex items-center gap-2">
-                <label className="w-30 shrink-0 text-sm text-zinc-950 dark:text-neutral-50">
+                <label
+                  htmlFor="deployment-env-var-value"
+                  className="w-30 shrink-0 text-sm text-zinc-950 dark:text-neutral-50"
+                >
                   Value
                 </label>
                 <Input
+                  id="deployment-env-var-value"
                   placeholder="Enter value"
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
@@ -216,12 +245,16 @@ export function EnvVarDialog({
                       className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-3"
                     >
                       <Input
+                        id={`deployment-env-var-key-${draft.id}`}
+                        aria-label={`Environment variable key ${index + 1}`}
                         placeholder={`Key ${index + 1}`}
                         value={draft.key}
                         onChange={(e) => updateManualDraft(draft.id, 'key', e.target.value)}
                         onPaste={handleDraftPaste(index)}
                       />
                       <Input
+                        id={`deployment-env-var-value-${draft.id}`}
+                        aria-label={`Environment variable value ${index + 1}`}
                         placeholder="Value"
                         value={draft.value}
                         onChange={(e) => updateManualDraft(draft.id, 'value', e.target.value)}

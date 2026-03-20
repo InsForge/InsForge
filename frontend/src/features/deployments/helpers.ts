@@ -22,7 +22,7 @@ export const normalizeEnvVarDrafts = (drafts: EnvVarDraft[]) => {
   return drafts
     .map((draft) => ({
       key: draft.key.trim(),
-      value: draft.value.trim(),
+      value: draft.value,
     }))
     .filter((draft) => draft.key || draft.value);
 };
