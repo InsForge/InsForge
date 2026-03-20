@@ -95,11 +95,27 @@ export const upsertEnvVarRequestSchema = z.object({
 });
 
 /**
+ * Request to create or update multiple environment variables
+ */
+export const upsertEnvVarsRequestSchema = z.object({
+  envVars: z.array(upsertEnvVarRequestSchema).min(1),
+});
+
+/**
  * Response from upserting an environment variable
  */
 export const upsertEnvVarResponseSchema = z.object({
   success: z.literal(true),
   message: z.string(),
+});
+
+/**
+ * Response from upserting multiple environment variables
+ */
+export const upsertEnvVarsResponseSchema = z.object({
+  success: z.literal(true),
+  message: z.string(),
+  count: z.number().int().positive(),
 });
 
 /**
@@ -160,6 +176,8 @@ export type ListEnvVarsResponse = z.infer<typeof listEnvVarsResponseSchema>;
 export type GetEnvVarResponse = z.infer<typeof getEnvVarResponseSchema>;
 export type UpsertEnvVarRequest = z.infer<typeof upsertEnvVarRequestSchema>;
 export type UpsertEnvVarResponse = z.infer<typeof upsertEnvVarResponseSchema>;
+export type UpsertEnvVarsRequest = z.infer<typeof upsertEnvVarsRequestSchema>;
+export type UpsertEnvVarsResponse = z.infer<typeof upsertEnvVarsResponseSchema>;
 export type DeleteEnvVarResponse = z.infer<typeof deleteEnvVarResponseSchema>;
 export type UpdateSlugRequest = z.infer<typeof updateSlugRequestSchema>;
 export type UpdateSlugResponse = z.infer<typeof updateSlugResponseSchema>;
