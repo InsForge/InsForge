@@ -297,7 +297,7 @@ export class ChatCompletionService {
       };
 
       // Send request with automatic renewal and retry logic
-      const response = await this.openRouterProvider.sendRequest((client) =>
+      const { result: response, source } = await this.openRouterProvider.sendRequest((client) =>
         client.chat.completions.create(
           request as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming
         )
@@ -312,8 +312,8 @@ export class ChatCompletionService {
           }
         : undefined;
 
-      // Track usage if config is available
-      if (aiConfig?.id && tokenUsage) {
+      // Track usage if config is available and BYOK is not active
+      if (aiConfig?.id && tokenUsage && source !== 'byok') {
         await this.aiUsageService.trackChatUsage(
           aiConfig.id,
           tokenUsage.promptTokens,
@@ -402,7 +402,7 @@ export class ChatCompletionService {
       };
 
       // Send request with automatic renewal and retry logic
-      const stream = await this.openRouterProvider.sendRequest((client) =>
+      const { result: stream, source } = await this.openRouterProvider.sendRequest((client) =>
         client.chat.completions.create(request as OpenAI.Chat.ChatCompletionCreateParamsStreaming)
       );
 
@@ -486,8 +486,8 @@ export class ChatCompletionService {
         yield { annotations: collectedAnnotations };
       }
 
-      // Track usage after streaming completes
-      if (aiConfig?.id && tokenUsage.totalTokens > 0) {
+      // Track usage after streaming completes (skip when BYOK is active)
+      if (aiConfig?.id && tokenUsage.totalTokens > 0 && source !== 'byok') {
         await this.aiUsageService.trackChatUsage(
           aiConfig.id,
           tokenUsage.promptTokens,

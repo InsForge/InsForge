@@ -75,11 +75,11 @@ export class ImageGenerationService {
       };
 
       // Send request with automatic renewal and retry logic
-      const response = (await this.openRouterProvider.sendRequest((client) =>
+      const { result: response, source } = await this.openRouterProvider.sendRequest((client) =>
         client.chat.completions.create(
           request as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming
         )
-      )) as OpenAI.Chat.ChatCompletion;
+      );
 
       // Initialize the result
       const result: ImageGenerationResponse = {
@@ -127,8 +127,8 @@ export class ImageGenerationService {
         }
       }
 
-      // Track usage if config is available
-      if (aiConfig?.id) {
+      // Track usage if config is available and BYOK is not active
+      if (aiConfig?.id && source !== 'byok') {
         // Pass token usage information if available
         const inputTokens = result.metadata?.usage?.promptTokens;
         const outputTokens = result.metadata?.usage?.completionTokens;
