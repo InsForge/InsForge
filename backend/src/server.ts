@@ -21,7 +21,10 @@ import { emailRouter } from '@/api/routes/email/index.routes.js';
 import { deploymentsRouter } from '@/api/routes/deployments/index.routes.js';
 import { webhooksRouter } from '@/api/routes/webhooks/index.routes.js';
 import { errorMiddleware } from '@/api/middlewares/error.js';
-import { destroyEmailCooldownInterval } from '@/api/middlewares/rate-limiters.js';
+import {
+  applyApiRateLimitConfig,
+  destroyEmailCooldownInterval,
+} from '@/api/middlewares/rate-limiters.js';
 import { isCloudEnvironment } from '@/utils/environment.js';
 import { RealtimeManager } from '@/infra/realtime/realtime.manager.js';
 import fetch from 'node-fetch';
@@ -34,6 +37,7 @@ import { seedBackend } from '@/utils/seed.js';
 import logger from '@/utils/logger.js';
 import { initSqlParser } from '@/utils/sql-parser.js';
 import { FunctionService } from '@/services/functions/function.service.js';
+import { ApiRateLimitConfigService } from '@/services/config/api-rate-limit-config.service.js';
 import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
 const __filename = fileURLToPath(import.meta.url);
@@ -63,6 +67,9 @@ export async function createApp() {
 
   // Initialize SQL parser WASM module
   await initSqlParser();
+
+  const apiRateLimitConfigService = ApiRateLimitConfigService.getInstance();
+  applyApiRateLimitConfig(await apiRateLimitConfigService.getApiRateLimitConfig());
 
   const app = express();
 

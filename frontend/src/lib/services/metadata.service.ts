@@ -1,10 +1,12 @@
 import { apiClient } from '@/lib/api/client';
 import {
+  ApiRateLimitConfigSchema,
   ApiKeyResponse,
   AppMetadataSchema,
   DatabaseConnectionInfo,
   DatabasePasswordInfo,
   ProjectIdResponse,
+  UpdateApiRateLimitConfigRequest,
 } from '@insforge/shared-schemas';
 
 export interface RotateApiKeyResponse {
@@ -42,6 +44,22 @@ export class MetadataService {
   async getDatabasePassword(): Promise<DatabasePasswordInfo> {
     return apiClient.request('/metadata/database-password', {
       headers: apiClient.withAccessToken(),
+    });
+  }
+
+  async getApiRateLimitConfig(): Promise<ApiRateLimitConfigSchema> {
+    return apiClient.request('/metadata/rate-limits', {
+      headers: apiClient.withAccessToken(),
+    });
+  }
+
+  async updateApiRateLimitConfig(
+    input: UpdateApiRateLimitConfigRequest
+  ): Promise<ApiRateLimitConfigSchema> {
+    return apiClient.request('/metadata/rate-limits', {
+      method: 'PUT',
+      headers: apiClient.withAccessToken(),
+      body: JSON.stringify(input),
     });
   }
 

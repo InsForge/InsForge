@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Cpu, HardDrive, Plug, RefreshCw, Settings } from 'lucide-react';
+import { Controller, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Cpu, HardDrive, Plug, RefreshCw, Settings, Shield } from 'lucide-react';
 import {
   Button,
   CopyButton,
@@ -22,7 +24,12 @@ import {
   MenuDialogFooter,
   MenuDialogCloseButton,
 } from '@insforge/ui';
-import type { InstanceInfoEvent } from '@insforge/shared-schemas';
+import {
+  type ApiRateLimitConfigSchema,
+  type InstanceInfoEvent,
+  type UpdateApiRateLimitConfigRequest,
+  updateApiRateLimitConfigRequestSchema,
+} from '@insforge/shared-schemas';
 import { useApiKey } from '@/lib/hooks/useMetadata';
 import { useHealth } from '@/lib/hooks/useHealth';
 import {
@@ -37,11 +44,86 @@ import { cn, compareVersions, isIframe, isInsForgeCloudProject } from '@/lib/uti
 import { MCPSection, CLISection, ConnectionStringSection } from '@/features/connect';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 import { metadataService } from '@/lib/services/metadata.service';
+import { useApiRateLimitConfig } from '@/features/dashboard/hooks/useApiRateLimitConfig';
 
-type TabType = 'info' | 'compute' | 'connect';
+type TabType = 'info' | 'compute' | 'connect' | 'rate-limits';
 
 const INFO_FIELD_CLASS =
   'flex h-8 w-full items-center rounded border border-[var(--alpha-12)] bg-[var(--alpha-4)] px-2.5 text-sm leading-5 text-foreground';
+
+const defaultRateLimitValues: UpdateApiRateLimitConfigRequest = {
+  sendEmailOtpMaxRequests: 5,
+  sendEmailOtpWindowMinutes: 15,
+  verifyOtpMaxRequests: 10,
+  verifyOtpWindowMinutes: 15,
+  emailCooldownSeconds: 60,
+};
+
+const toRateLimitFormValues = (
+  config?: ApiRateLimitConfigSchema
+): UpdateApiRateLimitConfigRequest => {
+  if (!config) {
+    return defaultRateLimitValues;
+  }
+
+  return {
+    sendEmailOtpMaxRequests: config.sendEmailOtpMaxRequests,
+    sendEmailOtpWindowMinutes: config.sendEmailOtpWindowMinutes,
+    verifyOtpMaxRequests: config.verifyOtpMaxRequests,
+    verifyOtpWindowMinutes: config.verifyOtpWindowMinutes,
+    emailCooldownSeconds: config.emailCooldownSeconds,
+  };
+};
+
+const rateLimitFields: Array<{
+  name: keyof UpdateApiRateLimitConfigRequest;
+  label: string;
+  description: string;
+  unit: string;
+  min: number;
+  max: number;
+}> = [
+  {
+    name: 'sendEmailOtpMaxRequests',
+    label: 'Send OTP Requests',
+    description: 'Maximum email OTP send requests allowed from the same IP within the configured window.',
+    unit: 'requests',
+    min: 1,
+    max: 100,
+  },
+  {
+    name: 'sendEmailOtpWindowMinutes',
+    label: 'Send OTP Window',
+    description: 'Time window used for the send OTP per-IP limit.',
+    unit: 'minutes',
+    min: 1,
+    max: 1440,
+  },
+  {
+    name: 'verifyOtpMaxRequests',
+    label: 'Verify OTP Attempts',
+    description: 'Maximum failed OTP verification attempts allowed from the same IP within the configured window.',
+    unit: 'attempts',
+    min: 1,
+    max: 100,
+  },
+  {
+    name: 'verifyOtpWindowMinutes',
+    label: 'Verify OTP Window',
+    description: 'Time window used for the verify OTP per-IP limit.',
+    unit: 'minutes',
+    min: 1,
+    max: 1440,
+  },
+  {
+    name: 'emailCooldownSeconds',
+    label: 'Per-email Cooldown',
+    description: 'Minimum delay between requesting a new OTP for the same email address.',
+    unit: 'seconds',
+    min: 0,
+    max: 3600,
+  },
+];
 
 export default function SettingsMenuDialog() {
   const { isSettingsDialogOpen, settingsDefaultTab, closeSettingsDialog } = useModal();
@@ -59,9 +141,20 @@ export default function SettingsMenuDialog() {
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
   const { version, isLoading: isVersionLoading } = useHealth();
   const { projectInfo, isLoading: isProjectInfoLoading } = useCloudProjectInfo();
+  const {
+    config: rateLimitConfig,
+    isLoading: isRateLimitConfigLoading,
+    error: rateLimitConfigError,
+    isUpdating: isUpdatingRateLimitConfig,
+    updateConfig: updateRateLimitConfig,
+  } = useApiRateLimitConfig();
   const { confirm, confirmDialogProps } = useConfirm();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
+  const rateLimitForm = useForm<UpdateApiRateLimitConfigRequest>({
+    resolver: zodResolver(updateApiRateLimitConfigRequestSchema),
+    defaultValues: defaultRateLimitValues,
+  });
 
   const isCloud = isInsForgeCloudProject();
   const isInIframe = isIframe();
@@ -75,6 +168,8 @@ export default function SettingsMenuDialog() {
       ? 'Connect Project'
       : activeTab === 'compute'
         ? 'Compute & Disk'
+        : activeTab === 'rate-limits'
+          ? 'API Rate Limits'
         : 'Project Information';
   const isProjectNameDirty = projectName !== projectNameInitialValue;
   const showProjectNameActions =
@@ -84,6 +179,11 @@ export default function SettingsMenuDialog() {
     !!instanceInfo &&
     !!selectedInstanceType &&
     selectedInstanceType !== instanceInfo.currentInstanceType;
+  const showRateLimitActions = activeTab === 'rate-limits' && rateLimitForm.formState.isDirty;
+
+  const resetRateLimitForm = useCallback(() => {
+    rateLimitForm.reset(toRateLimitFormValues(rateLimitConfig));
+  }, [rateLimitConfig, rateLimitForm]);
 
   const projectedComputeCost = useMemo(() => {
     if (!instanceInfo || !selectedInstanceType) {
@@ -122,6 +222,8 @@ export default function SettingsMenuDialog() {
       const nextTab: TabType =
         settingsDefaultTab === 'connect'
           ? 'connect'
+          : settingsDefaultTab === 'rate-limits'
+            ? 'rate-limits'
           : settingsDefaultTab === 'compute' && isCloud && isInIframe
             ? 'compute'
             : 'info';
@@ -130,6 +232,7 @@ export default function SettingsMenuDialog() {
       setProjectName(cloudProjectName);
       setProjectNameInitialValue(cloudProjectName);
       setIsProjectNameFocused(false);
+      resetRateLimitForm();
 
       if (isCloud && isInIframe) {
         postMessageToParent({ type: 'REQUEST_INSTANCE_INFO' }, '*');
@@ -141,7 +244,14 @@ export default function SettingsMenuDialog() {
     setIsChangingInstanceType(false);
     setIsProjectNameFocused(false);
     setSelectedInstanceType(null);
-  }, [isSettingsDialogOpen, settingsDefaultTab, projectInfo.name, isCloud, isInIframe]);
+  }, [
+    isSettingsDialogOpen,
+    settingsDefaultTab,
+    projectInfo.name,
+    isCloud,
+    isInIframe,
+    resetRateLimitForm,
+  ]);
 
   useEffect(() => {
     if (!isCloud || !isInIframe) {
@@ -221,6 +331,20 @@ export default function SettingsMenuDialog() {
     isProjectNameDirty,
     isProjectNameFocused,
     projectInfo.name,
+  ]);
+
+  useEffect(() => {
+    if (!isSettingsDialogOpen || activeTab !== 'rate-limits' || rateLimitForm.formState.isDirty) {
+      return;
+    }
+
+    resetRateLimitForm();
+  }, [
+    activeTab,
+    isSettingsDialogOpen,
+    rateLimitConfig,
+    rateLimitForm.formState.isDirty,
+    resetRateLimitForm,
   ]);
 
   const handleDeleteProject = async () => {
@@ -325,6 +449,16 @@ export default function SettingsMenuDialog() {
     );
   };
 
+  const handleSaveRateLimitConfig = () => {
+    void rateLimitForm.handleSubmit((data) => {
+      updateRateLimitConfig(data, {
+        onSuccess: () => {
+          rateLimitForm.reset(data);
+        },
+      });
+    })();
+  };
+
   return (
     <>
       <ConfirmDialog {...confirmDialogProps} />
@@ -356,6 +490,13 @@ export default function SettingsMenuDialog() {
                   onClick={() => setActiveTab('connect')}
                 >
                   Connect
+                </MenuDialogNavItem>
+                <MenuDialogNavItem
+                  icon={<Shield className="size-5" />}
+                  active={activeTab === 'rate-limits'}
+                  onClick={() => setActiveTab('rate-limits')}
+                >
+                  Rate Limits
                 </MenuDialogNavItem>
                 {isCloud && isInIframe && (
                   <MenuDialogNavItem
@@ -672,6 +813,79 @@ export default function SettingsMenuDialog() {
                   )}
                 </div>
               )}
+
+              {activeTab === 'rate-limits' && (
+                <div className="flex w-full flex-col">
+                  {isRateLimitConfigLoading ? (
+                    <div className="flex h-full min-h-[120px] items-center justify-center text-sm text-muted-foreground">
+                      Loading rate-limit configuration...
+                    </div>
+                  ) : rateLimitConfigError ? (
+                    <div className="flex h-full min-h-[120px] items-center justify-center text-sm text-destructive">
+                      Failed to load API rate-limit configuration. Close and reopen to retry.
+                    </div>
+                  ) : (
+                    rateLimitFields.map((fieldConfig, index) => (
+                      <div key={fieldConfig.name}>
+                        <div className="flex items-start gap-6">
+                          <div className="w-[200px] shrink-0">
+                            <p className="py-1.5 text-sm leading-5 text-foreground">
+                              {fieldConfig.label}
+                            </p>
+                            <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
+                              {fieldConfig.description}
+                            </p>
+                          </div>
+                          <div className="flex min-w-0 flex-1 items-start gap-1.5">
+                            <Controller
+                              name={fieldConfig.name}
+                              control={rateLimitForm.control}
+                              render={({ field }) => (
+                                <div className="w-full">
+                                  <div className="flex items-center gap-2">
+                                    <Input
+                                      type="number"
+                                      min={fieldConfig.min}
+                                      max={fieldConfig.max}
+                                      {...field}
+                                      onChange={(event) => {
+                                        const parsed = parseInt(event.target.value, 10);
+                                        field.onChange(Number.isNaN(parsed) ? '' : parsed);
+                                      }}
+                                      className={
+                                        rateLimitForm.formState.errors[fieldConfig.name]
+                                          ? 'border-destructive'
+                                          : ''
+                                      }
+                                    />
+                                    <span className="shrink-0 text-sm text-muted-foreground">
+                                      {fieldConfig.unit}
+                                    </span>
+                                  </div>
+                                  {rateLimitForm.formState.errors[fieldConfig.name] ? (
+                                    <p className="pt-1 text-xs text-destructive">
+                                      {rateLimitForm.formState.errors[fieldConfig.name]?.message}
+                                    </p>
+                                  ) : (
+                                    <p className="pt-1 text-xs text-muted-foreground">
+                                      Current: {rateLimitConfig?.[fieldConfig.name]} {fieldConfig.unit}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            />
+                          </div>
+                        </div>
+                        {index < rateLimitFields.length - 1 && (
+                          <div className="flex h-5 items-center">
+                            <div className="h-px w-full bg-[var(--alpha-8)]" />
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
             </MenuDialogBody>
             {showProjectNameActions && (
               <MenuDialogFooter className="border-t border-[var(--alpha-8)]">
@@ -721,6 +935,27 @@ export default function SettingsMenuDialog() {
                   className="h-8 rounded px-3 text-sm font-medium"
                 >
                   {isChangingInstanceType ? 'Applying...' : 'Apply Changes'}
+                </Button>
+              </MenuDialogFooter>
+            )}
+            {showRateLimitActions && (
+              <MenuDialogFooter className="border-t border-[var(--alpha-8)]">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={resetRateLimitForm}
+                  className="h-8 rounded border-[var(--alpha-8)] bg-card px-3 text-sm font-medium"
+                  disabled={isUpdatingRateLimitConfig}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleSaveRateLimitConfig}
+                  disabled={isUpdatingRateLimitConfig}
+                  className="h-8 rounded px-3 text-sm font-medium"
+                >
+                  {isUpdatingRateLimitConfig ? 'Saving...' : 'Save'}
                 </Button>
               </MenuDialogFooter>
             )}
