@@ -344,10 +344,7 @@ describe('AuthService project admin support', () => {
     });
 
     await expect(
-      AuthService.getInstance().setProjectAdminStatus(
-        'a4cad96f-0e90-4dbb-aa63-4ca5a17bdcf1',
-        true
-      )
+      AuthService.getInstance().setProjectAdminStatus('a4cad96f-0e90-4dbb-aa63-4ca5a17bdcf1', true)
     ).rejects.toThrow(AppError);
   });
 });
