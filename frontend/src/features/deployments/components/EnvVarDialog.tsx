@@ -67,13 +67,13 @@ export function EnvVarDialog({
   }, [manualEntries]);
 
   const hasIncompleteManualRows = manualDrafts.some((draft) => {
-    const hasAnyValue = draft.key.trim() || draft.value;
-    return hasAnyValue && (!draft.key.trim() || !draft.value);
+    const hasAnyValue = draft.key.trim() !== '' || draft.value !== '';
+    return hasAnyValue && draft.key.trim() === '';
   });
   const hasDuplicateManualKeys = duplicateManualKeys.size > 0;
 
   const isValid = isEditMode
-    ? Boolean(key.trim() && value)
+    ? key.trim() !== ''
     : manualEntries.length > 0 && !hasIncompleteManualRows && !hasDuplicateManualKeys;
 
   const handleClose = () => {
@@ -158,10 +158,15 @@ export function EnvVarDialog({
   const handleDraftPaste =
     (draftIndex: number, field: 'key' | 'value') => (event: ClipboardEvent<HTMLInputElement>) => {
       const pastedText = event.clipboardData.getData('text');
+      const trimmedPastedText = pastedText.trim();
+      const looksLikeMultilineEnvPaste =
+        pastedText.includes('\n') &&
+        /(?:^|\n)\s*(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=/.test(pastedText);
       const looksLikeEnvPaste =
-        pastedText.includes('\n') ||
-        pastedText.startsWith('export ') ||
-        (field === 'key' && /^[A-Za-z_][A-Za-z0-9_]*=/.test(pastedText.trim()));
+        looksLikeMultilineEnvPaste ||
+        (field === 'key' &&
+          (/^[A-Za-z_][A-Za-z0-9_]*=/.test(trimmedPastedText) ||
+            /^export\s+[A-Za-z_][A-Za-z0-9_]*=/.test(trimmedPastedText)));
 
       if (!looksLikeEnvPaste) {
         return;
@@ -262,39 +267,71 @@ export function EnvVarDialog({
                 <div className="flex flex-col gap-3">
                   {manualDrafts.map((draft, index) => (
                     <div key={draft.id} className="flex flex-col gap-2">
-                      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-3">
-                        <Input
-                          id={`deployment-env-var-key-${draft.id}`}
-                          aria-label={`Environment variable key ${index + 1}`}
-                          placeholder={`Key ${index + 1}`}
-                          value={draft.key}
-                          onChange={(e) => updateManualDraft(draft.id, 'key', e.target.value)}
-                          onPaste={handleDraftPaste(index, 'key')}
-                        />
-                        <Input
-                          id={`deployment-env-var-value-${draft.id}`}
-                          aria-label={`Environment variable value ${index + 1}`}
-                          placeholder="Value"
-                          value={draft.value}
-                          onChange={(e) => updateManualDraft(draft.id, 'value', e.target.value)}
-                          onPaste={handleDraftPaste(index, 'value')}
-                        />
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="icon"
-                          onClick={() => removeManualDraft(draft.id)}
-                          className="h-9 w-9"
-                          aria-label={`Remove environment variable row ${index + 1}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      {duplicateManualKeys.has(draft.key.trim()) && draft.key.trim() && (
-                        <p className="text-sm text-amber-600 dark:text-amber-400">
-                          Duplicate key: {draft.key.trim()}
-                        </p>
-                      )}
+                      {(() => {
+                        const trimmedKey = draft.key.trim();
+                        const hasAnyValue = trimmedKey !== '' || draft.value !== '';
+                        const keyError =
+                          hasAnyValue && trimmedKey === ''
+                            ? 'Key is required.'
+                            : duplicateManualKeys.has(trimmedKey) && trimmedKey
+                              ? `Duplicate key: ${trimmedKey}`
+                              : null;
+                        const valueError = keyError;
+                        const keyErrorId = `env-var-${draft.id}-key-error`;
+                        const valueErrorId = `env-var-${draft.id}-value-error`;
+
+                        return (
+                          <>
+                            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-3">
+                              <Input
+                                id={`deployment-env-var-key-${draft.id}`}
+                                aria-label={`Environment variable key ${index + 1}`}
+                                aria-invalid={Boolean(keyError)}
+                                aria-describedby={keyError ? keyErrorId : undefined}
+                                placeholder={`Key ${index + 1}`}
+                                value={draft.key}
+                                onChange={(e) => updateManualDraft(draft.id, 'key', e.target.value)}
+                                onPaste={handleDraftPaste(index, 'key')}
+                              />
+                              <Input
+                                id={`deployment-env-var-value-${draft.id}`}
+                                aria-label={`Environment variable value ${index + 1}`}
+                                aria-invalid={Boolean(valueError)}
+                                aria-describedby={valueError ? valueErrorId : undefined}
+                                placeholder="Value"
+                                value={draft.value}
+                                onChange={(e) =>
+                                  updateManualDraft(draft.id, 'value', e.target.value)
+                                }
+                                onPaste={handleDraftPaste(index, 'value')}
+                              />
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="icon"
+                                onClick={() => removeManualDraft(draft.id)}
+                                className="h-9 w-9"
+                                aria-label={`Remove environment variable row ${index + 1}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            {keyError && (
+                              <p
+                                id={keyErrorId}
+                                className="text-sm text-amber-600 dark:text-amber-400"
+                              >
+                                {keyError}
+                              </p>
+                            )}
+                            {valueError && (
+                              <span id={valueErrorId} className="sr-only">
+                                {valueError}
+                              </span>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   ))}
                 </div>
