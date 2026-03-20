@@ -19,13 +19,7 @@ import { useConfirm } from '@/lib/hooks/useConfirm';
 const MAX_FUNCTION_FILE_SIZE_BYTES = 1024 * 1024;
 const ALLOWED_FUNCTION_FILE_EXTENSIONS = ['.ts', '.js', '.tsx', '.jsx'];
 const ALLOWED_FUNCTION_FILE_MIME_TYPES_BY_EXTENSION = new Map([
-  [
-    '.js',
-    new Set([
-      'text/javascript',
-      'application/javascript',
-    ]),
-  ],
+  ['.js', new Set(['text/javascript', 'application/javascript'])],
   [
     '.ts',
     new Set([
@@ -36,22 +30,10 @@ const ALLOWED_FUNCTION_FILE_MIME_TYPES_BY_EXTENSION = new Map([
       'video/mp2t',
     ]),
   ],
-  [
-    '.jsx',
-    new Set([
-      'text/jsx',
-      'text/javascript',
-      'application/javascript',
-    ]),
-  ],
+  ['.jsx', new Set(['text/jsx', 'text/javascript', 'application/javascript'])],
   [
     '.tsx',
-    new Set([
-      'text/tsx',
-      'text/typescript',
-      'application/typescript',
-      'application/x-typescript',
-    ]),
+    new Set(['text/tsx', 'text/typescript', 'application/typescript', 'application/x-typescript']),
   ],
 ]);
 
