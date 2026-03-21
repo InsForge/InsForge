@@ -161,7 +161,7 @@ paths:
                     type: array
                     items:
                       type: string
-                    description: List of allowed redirect URLs for auth flows (OAuth, email verification). Leave empty to allow any URL (not recommended for production).
+                    description: List of allowed redirect targets for registration, OAuth, and email verification flows. Each entry may be an exact URL or a wildcard subdomain pattern such as `https://*.example.com`. If a path, query, or fragment is present, it must match exactly; a bare wildcard host allows any path. Leave the list empty to allow any redirect target (not recommended for production).
                   createdAt:
                     type: string
                     format: date-time
@@ -249,7 +249,7 @@ paths:
                     type: array
                     items:
                       type: string
-                    description: List of allowed redirect URLs for auth flows (OAuth, email verification). Leave empty to allow any URL (not recommended for production).
+                    description: List of allowed redirect targets for registration, OAuth, and email verification flows. Each entry may be an exact URL or a wildcard subdomain pattern such as `https://*.example.com`. If a path, query, or fragment is present, it must match exactly; a bare wildcard host allows any path. Leave the list empty to allow any redirect target (not recommended for production).
                   createdAt:
                     type: string
                     format: date-time
@@ -777,8 +777,8 @@ paths:
         Successfully verified users will receive a session token.
 
         The email verification link sent to users always points to the backend API endpoint.
-        After successful verification, the backend redirects to the URL specified in the verification request if it matches an entry in `redirectUrlWhitelist`.
-        If the whitelist is empty (not recommended for production), any redirect URL is allowed. Otherwise, a default success page is displayed.
+        For link-based verification, the backend redirects after success only when the original flow supplied a redirect target and that target is allowed by `redirectUrlWhitelist`.
+        If no redirect target is available after validation, the default success page is displayed. An empty whitelist allows any redirect target (not recommended for production).
       tags:
         - Client
       parameters:
