@@ -80,7 +80,11 @@ export class AIGatewayConfigService {
   async removeBYOKKey(): Promise<boolean> {
     const pool = DatabaseManager.getInstance().getPool();
 
-    const result = await pool.query(`DELETE FROM system.secrets WHERE key = $1`, [BYOK_SECRET_KEY]);
+    // Soft delete (mark inactive), consistent with other secrets
+    const result = await pool.query(
+      `UPDATE system.secrets SET is_active = false, updated_at = NOW() WHERE key = $1 AND is_active = true`,
+      [BYOK_SECRET_KEY]
+    );
 
     const removed = (result.rowCount ?? 0) > 0;
 
