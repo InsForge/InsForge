@@ -129,6 +129,12 @@ export class AuthService {
       );
     }
 
+    if (options?.emailRedirectTo) {
+      if (!(await authConfigService.validateRedirectUrl(options.emailRedirectTo))) {
+        throw new AppError('Redirect URI is not whitelisted', 400, ERROR_CODES.INVALID_INPUT);
+      }
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
     const userId = crypto.randomUUID();
 

@@ -225,35 +225,52 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                       }
                     >
                       <div className="flex flex-col gap-2">
-                        {(form.watch('redirectUrlWhitelist') || []).map((url, index) => (
-                          <div key={index} className="flex gap-2">
-                            <Input
-                              value={url}
-                              onChange={(e) => {
-                                const newList = [...(form.getValues('redirectUrlWhitelist') || [])];
-                                newList[index] = e.target.value;
-                                form.setValue('redirectUrlWhitelist', newList, {
-                                  shouldDirty: true,
-                                });
-                              }}
-                              placeholder="https://example.com"
-                            />
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              onClick={() => {
-                                const newList = [...(form.getValues('redirectUrlWhitelist') || [])];
-                                newList.splice(index, 1);
-                                form.setValue('redirectUrlWhitelist', newList, {
-                                  shouldDirty: true,
-                                });
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
+                        {(form.watch('redirectUrlWhitelist') || []).map((url, index) => {
+                          const urlErrors = form.formState.errors.redirectUrlWhitelist;
+                          const itemError = Array.isArray(urlErrors) ? urlErrors[index] : undefined;
+
+                          return (
+                            <div key={index} className="flex flex-col gap-1">
+                              <div className="flex gap-2">
+                                <Input
+                                  value={url}
+                                  onChange={(e) => {
+                                    const newList = [
+                                      ...(form.getValues('redirectUrlWhitelist') || []),
+                                    ];
+                                    newList[index] = e.target.value;
+                                    form.setValue('redirectUrlWhitelist', newList, {
+                                      shouldDirty: true,
+                                    });
+                                  }}
+                                  placeholder="https://example.com"
+                                  className={itemError ? 'border-destructive' : ''}
+                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => {
+                                    const newList = [
+                                      ...(form.getValues('redirectUrlWhitelist') || []),
+                                    ];
+                                    newList.splice(index, 1);
+                                    form.setValue('redirectUrlWhitelist', newList, {
+                                      shouldDirty: true,
+                                    });
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                              {itemError && (
+                                <p className="pt-1 text-xs text-destructive">
+                                  {itemError.message || 'Invalid URL'}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
                         <Button
                           type="button"
                           variant="outline"

@@ -298,7 +298,11 @@ export class AuthConfigService {
       // Wildcard match
       try {
         const dummyPrefix = '__wildcard__.';
-        const parsedItem = new URL(item.replace('*.', dummyPrefix));
+        const normalizedItem = this.normalizeUrl(item.replace('*.', dummyPrefix));
+        if (!normalizedItem) {
+          return false;
+        }
+        const parsedItem = new URL(normalizedItem);
 
         if (parsedItem.protocol !== targetUrlObj.protocol) {
           return false;
