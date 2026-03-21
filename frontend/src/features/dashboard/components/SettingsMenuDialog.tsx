@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -157,6 +157,7 @@ export default function SettingsMenuDialog() {
     resolver: zodResolver(updateApiRateLimitConfigRequestSchema),
     defaultValues: defaultRateLimitValues,
   });
+  const wasSettingsDialogOpenRef = useRef(false);
 
   const isCloud = isInsForgeCloudProject();
   const isInIframe = isIframe();
@@ -219,7 +220,10 @@ export default function SettingsMenuDialog() {
   }, [instanceInfo, selectedInstanceType]);
 
   useEffect(() => {
-    if (isSettingsDialogOpen) {
+    const justOpened = isSettingsDialogOpen && !wasSettingsDialogOpenRef.current;
+    wasSettingsDialogOpenRef.current = isSettingsDialogOpen;
+
+    if (justOpened) {
       const cloudProjectName = projectInfo.name ?? '';
       const nextTab: TabType =
         settingsDefaultTab === 'connect'
@@ -234,7 +238,7 @@ export default function SettingsMenuDialog() {
       setProjectName(cloudProjectName);
       setProjectNameInitialValue(cloudProjectName);
       setIsProjectNameFocused(false);
-      resetRateLimitForm();
+      rateLimitForm.reset(toRateLimitFormValues(rateLimitConfig));
 
       if (isCloud && isInIframe) {
         postMessageToParent({ type: 'REQUEST_INSTANCE_INFO' }, '*');
@@ -252,7 +256,8 @@ export default function SettingsMenuDialog() {
     projectInfo.name,
     isCloud,
     isInIframe,
-    resetRateLimitForm,
+    rateLimitConfig,
+    rateLimitForm,
   ]);
 
   useEffect(() => {
@@ -866,6 +871,7 @@ export default function SettingsMenuDialog() {
                                         type="number"
                                         min={fieldConfig.min}
                                         max={fieldConfig.max}
+                                        step={1}
                                         {...field}
                                         value={field.value ?? ''}
                                         disabled={isUpdatingRateLimitConfig}
@@ -878,7 +884,7 @@ export default function SettingsMenuDialog() {
                                             return;
                                           }
 
-                                          const parsed = parseInt(nextValue, 10);
+                                          const parsed = Number(nextValue);
                                           field.onChange(Number.isNaN(parsed) ? undefined : parsed);
                                         }}
                                         className={hasError ? 'border-destructive' : ''}
