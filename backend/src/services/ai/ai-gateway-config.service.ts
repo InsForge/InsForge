@@ -116,10 +116,18 @@ export class AIGatewayConfigService {
       }
 
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          throw new AppError(
+            'Invalid OpenRouter API key. Please check the key and try again.',
+            400,
+            ERROR_CODES.AI_INVALID_API_KEY
+          );
+        }
+
         throw new AppError(
-          'Invalid OpenRouter API key. Please check the key and try again.',
-          400,
-          ERROR_CODES.AI_INVALID_API_KEY
+          'Could not reach OpenRouter to validate the key. Please try again later.',
+          502,
+          ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
         );
       }
     } catch (error) {
@@ -141,9 +149,9 @@ export class AIGatewayConfigService {
         );
       }
       throw new AppError(
-        'Invalid OpenRouter API key. Please check the key and try again.',
-        400,
-        ERROR_CODES.AI_INVALID_API_KEY
+        'Could not reach OpenRouter to validate the key. Please try again later.',
+        502,
+        ERROR_CODES.AI_UPSTREAM_UNAVAILABLE
       );
     }
   }
