@@ -249,6 +249,7 @@ paths:
                     type: array
                     items:
                       type: string
+                    description: List of allowed redirect URLs for auth flows (OAuth, email verification). Leave empty to allow any URL (not recommended for production).
                   createdAt:
                     type: string
                     format: date-time
@@ -776,8 +777,8 @@ paths:
         Successfully verified users will receive a session token.
 
         The email verification link sent to users always points to the backend API endpoint.
-        If `verifyEmailRedirectTo` is configured, the backend will redirect to that URL after successful verification.
-        Otherwise, a default success page is displayed.
+        After successful verification, the backend redirects to the URL specified in the verification request if it matches an entry in `redirectUrlWhitelist`.
+        If the whitelist is empty (not recommended for production), any redirect URL is allowed. Otherwise, a default success page is displayed.
       tags:
         - Client
       parameters:
