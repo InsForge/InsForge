@@ -117,10 +117,12 @@ export class DeploymentService {
       const deployment = result.rows[0] as DeploymentRecord;
 
       // Generate presigned URL for uploading zip file (reuse existing storage method)
+      const deploymentMaxBytes = 100 * 1024 * 1024; // 100MB — fixed limit for deployment zips
       const uploadInfo = await this.s3Provider.getUploadStrategy(
         DEPLOYMENT_BUCKET,
         getDeploymentKey(deployment.id),
-        { size: 100 * 1024 * 1024 } // 100MB max
+        { size: deploymentMaxBytes },
+        deploymentMaxBytes
       );
 
       logger.info('Deployment record created', {
@@ -185,7 +187,7 @@ export class DeploymentService {
       await this.updateDeploymentStatus(id, DeploymentStatus.UPLOADING);
 
       // Check if zip file exists
-      const zipExists = await this.s3Provider.verifyObjectExists(
+      const { exists: zipExists } = await this.s3Provider.verifyObjectExists(
         DEPLOYMENT_BUCKET,
         getDeploymentKey(id)
       );

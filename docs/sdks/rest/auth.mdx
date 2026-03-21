@@ -609,6 +609,12 @@ OAuth authentication now uses the PKCE (Proof Key for Code Exchange) flow for en
 GET /api/auth/oauth/{provider}
 ```
 
+For custom providers configured in the dashboard, use:
+
+```
+GET /api/auth/oauth/custom/{key}
+```
+
 ### Query Parameters
 
 | Parameter | Type | Required | Description |
@@ -627,6 +633,7 @@ GET /api/auth/oauth/{provider}
 - `microsoft`
 - `x`
 - `spotify`
+- Any custom provider key returned by `GET /api/auth/public-config` in `customOAuthProviders`
 
 ### Example
 
@@ -638,6 +645,11 @@ CODE_VERIFIER=$(openssl rand -base64 32 | tr -d '=' | tr '/+' '_-')
 CODE_CHALLENGE=$(echo -n $CODE_VERIFIER | openssl dgst -sha256 -binary | base64 | tr -d '=' | tr '/+' '_-')
 
 curl "https://your-app.insforge.app/api/auth/oauth/google?redirect_uri=https://myapp.com/callback&code_challenge=$CODE_CHALLENGE"
+```
+
+```bash
+# Custom provider example
+curl "https://your-app.insforge.app/api/auth/oauth/custom/acme?redirect_uri=https://myapp.com/callback&code_challenge=$CODE_CHALLENGE"
 ```
 
 ### Response
@@ -806,10 +818,8 @@ curl "https://your-app.insforge.app/api/auth/public-config"
 
 ```json
 {
-  "oAuthProviders": [
-    {"provider": "google", "useSharedKey": true},
-    {"provider": "github", "useSharedKey": false}
-  ],
+  "oAuthProviders": ["google", "github"],
+  "customOAuthProviders": ["acme"],
   "requireEmailVerification": true,
   "passwordMinLength": 8,
   "requireNumber": true,

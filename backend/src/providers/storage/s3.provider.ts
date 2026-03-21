@@ -13,7 +13,6 @@ import { getSignedUrl as getCloudFrontSignedUrl } from '@aws-sdk/cloudfront-sign
 import { UploadStrategyResponse, DownloadStrategyResponse } from '@insforge/shared-schemas';
 import { StorageProvider } from './base.provider.js';
 import logger from '@/utils/logger.js';
-import { getMaxFileSize } from '@/api/middlewares/upload.js';
 
 const ONE_HOUR_IN_SECONDS = 3600;
 const SEVEN_DAYS_IN_SECONDS = 604800;
@@ -170,7 +169,8 @@ export class S3StorageProvider implements StorageProvider {
   async getUploadStrategy(
     bucket: string,
     key: string,
-    metadata: { contentType?: string; size?: number }
+    metadata: { contentType?: string; size?: number },
+    maxFileSizeBytes: number
   ): Promise<UploadStrategyResponse> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
@@ -188,7 +188,7 @@ export class S3StorageProvider implements StorageProvider {
           [
             'content-length-range',
             0,
-            Math.min(metadata.size || getMaxFileSize(), getMaxFileSize()),
+            Math.min(metadata.size || maxFileSizeBytes, maxFileSizeBytes),
           ],
         ],
         Expires: expiresIn,
@@ -310,7 +310,10 @@ export class S3StorageProvider implements StorageProvider {
     }
   }
 
-  async verifyObjectExists(bucket: string, key: string): Promise<boolean> {
+  async verifyObjectExists(
+    bucket: string,
+    key: string
+  ): Promise<{ exists: boolean; size?: number }> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
     }
@@ -322,10 +325,10 @@ export class S3StorageProvider implements StorageProvider {
         Bucket: this.s3Bucket,
         Key: s3Key,
       });
-      await this.s3Client.send(command);
-      return true;
+      const response = await this.s3Client.send(command);
+      return { exists: true, size: response.ContentLength };
     } catch {
-      return false;
+      return { exists: false };
     }
   }
 }

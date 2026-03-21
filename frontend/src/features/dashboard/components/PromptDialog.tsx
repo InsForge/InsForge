@@ -1,4 +1,11 @@
-import { Button, CopyButton, Dialog, DialogContent } from '@insforge/ui';
+import {
+  Button,
+  CopyButton,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@insforge/ui';
 import { CheckCircle, Lock, Database, HardDrive, Code2, Box } from 'lucide-react';
 import type { PromptTemplate } from '../prompts';
 
@@ -24,6 +31,8 @@ export function PromptDialog({ open, onOpenChange, promptTemplate }: PromptDialo
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
+        <DialogTitle className="sr-only">{promptTemplate.title}</DialogTitle>
+        <DialogDescription className="sr-only">{promptTemplate.description}</DialogDescription>
         {/* Content area with border bottom */}
         <div className="flex flex-col gap-10 p-6 border-b border-gray-200 dark:border-neutral-700">
           {/* Header and Prompt Section */}
@@ -37,7 +46,10 @@ export function PromptDialog({ open, onOpenChange, promptTemplate }: PromptDialo
 
             {/* Prompt Box */}
             <div className="flex flex-col gap-3">
-              <p className="text-sm text-gray-500 dark:text-neutral-400 leading-6">
+              <p
+                aria-hidden="true"
+                className="text-sm text-gray-500 dark:text-neutral-400 leading-6"
+              >
                 {promptTemplate.description}
               </p>
               <div className="bg-gray-50 dark:bg-neutral-900 rounded p-3 h-60 overflow-y-auto relative">

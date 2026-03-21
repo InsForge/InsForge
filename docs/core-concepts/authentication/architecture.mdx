@@ -169,8 +169,10 @@ sequenceDiagram
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/api/auth/oauth/:provider` | Initiate OAuth flow for any supported provider |
-| GET | `/api/auth/oauth/:provider/callback` | OAuth callback handler |
+| GET | `/api/auth/oauth/:provider` | Initiate OAuth flow for built-in providers |
+| GET | `/api/auth/oauth/:provider/callback` | Built-in OAuth callback handler |
+| GET | `/api/auth/oauth/custom/:key` | Initiate OAuth flow for custom providers |
+| GET | `/api/auth/oauth/custom/:key/callback` | Custom OAuth callback handler |
 
 ### Admin Endpoints
 
@@ -182,6 +184,20 @@ sequenceDiagram
 ## OAuth Provider Configuration
 
 InsForge supports multiple OAuth providers including Google, GitHub, Microsoft, Discord, LinkedIn, Facebook and more coming soon.
+
+### Custom OAuth Providers
+
+Admins can add custom OIDC-compatible OAuth providers from the dashboard at `Auth Methods` without writing backend code.
+
+Required for custom provider setup:
+
+- `name` (display label)
+- `key` (unique lowercase key, e.g. `okta-company`)
+- `discovery endpoint` (`.well-known/openid-configuration` URL)
+- `client ID`
+- `client secret` (stored through the existing secret-management flow)
+
+PKCE is always enabled for custom provider flows. Custom providers are stored in `auth.custom_oauth_configs` and handled by dedicated routes under `/api/auth/oauth/custom/*`, keeping built-in provider behavior isolated. Users authenticated through custom providers are linked into the same `auth.users` and `auth.user_providers` model.
 
 ### Example: Google OAuth 2.0
 

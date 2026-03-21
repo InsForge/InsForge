@@ -19,6 +19,7 @@ import { SortColumn } from 'react-data-grid';
 import { UserSchema } from '@insforge/shared-schemas';
 import { useToast } from '@/lib/hooks/useToast';
 import { useUsers } from '@/features/auth/hooks/useUsers';
+import { usePageSize } from '@/lib/hooks/usePageSize';
 
 export default function UsersPage() {
   const [searchValue, setSearchValue] = useState('');
@@ -30,9 +31,12 @@ export default function UsersPage() {
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
 
   const { showToast } = useToast();
+  const {
+    pageSize,
+    pageSizeOptions,
+    onPageSizeChange: handlePageSizeChange,
+  } = usePageSize('users');
 
-  // Default page size of 50 records per page
-  const pageSize = 50;
   const {
     users,
     totalUsers,
@@ -227,8 +231,13 @@ export default function UsersPage() {
           currentPage={currentPage}
           totalPages={totalPages}
           pageSize={pageSize}
+          pageSizeOptions={pageSizeOptions}
           totalRecords={totalUsers}
-          onPageChange={setCurrentPage}
+          onPageChange={(page) => setCurrentPage(page)}
+          onPageSizeChange={(newSize) => {
+            handlePageSizeChange(newSize);
+            setCurrentPage(1);
+          }}
           emptyState={emptyState}
         />
       </div>

@@ -1,5 +1,10 @@
 import { apiClient } from '@/lib/api/client';
-import { FunctionSchema, ListFunctionsResponse } from '@insforge/shared-schemas';
+import {
+  FunctionSchema,
+  ListFunctionsResponse,
+  UpdateFunctionRequest,
+  FunctionResponse,
+} from '@insforge/shared-schemas';
 
 export class FunctionService {
   async listFunctions(): Promise<ListFunctionsResponse> {
@@ -17,6 +22,15 @@ export class FunctionService {
   async getFunctionBySlug(slug: string): Promise<FunctionSchema> {
     const response: FunctionSchema = await apiClient.request(`/functions/${slug}`, {
       headers: apiClient.withAccessToken(),
+    });
+    return response;
+  }
+
+  async updateFunction(slug: string, updates: UpdateFunctionRequest): Promise<FunctionResponse> {
+    const response: FunctionResponse = await apiClient.request(`/functions/${slug}`, {
+      method: 'PUT',
+      headers: apiClient.withAccessToken(),
+      body: JSON.stringify(updates),
     });
     return response;
   }

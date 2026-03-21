@@ -67,6 +67,7 @@ export function CopyButton({
 
   return (
     <Button
+      type="button"
       onClick={(e) => void handleCopy(e)}
       disabled={disabled}
       aria-label={!showText ? (copied ? copiedText : copyText) : undefined}

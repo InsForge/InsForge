@@ -184,10 +184,13 @@ export class OAuthConfigService {
       // Only create secret if clientSecret is provided and not using shared key
       if (input.clientSecret && !input.useSharedKey) {
         // Create new secret
-        const secret = await this.secretService.createSecret({
-          key: `${input.provider.toUpperCase()}_CLIENT_SECRET`,
-          value: input.clientSecret,
-        });
+        const secret = await this.secretService.createSecret(
+          {
+            key: `${input.provider.toUpperCase()}_CLIENT_SECRET`,
+            value: input.clientSecret,
+          },
+          client
+        );
         secretId = secret.id;
       }
 
@@ -296,15 +299,22 @@ export class OAuthConfigService {
       if (input.clientSecret !== undefined) {
         if (existingConfig.secretId) {
           // Update existing secret
-          await this.secretService.updateSecret(existingConfig.secretId, {
-            value: input.clientSecret,
-          });
+          await this.secretService.updateSecret(
+            existingConfig.secretId,
+            {
+              value: input.clientSecret,
+            },
+            client
+          );
         } else {
           // Create new secret if it doesn't exist
-          const secret = await this.secretService.createSecret({
-            key: `${provider.toUpperCase()}_CLIENT_SECRET`,
-            value: input.clientSecret,
-          });
+          const secret = await this.secretService.createSecret(
+            {
+              key: `${provider.toUpperCase()}_CLIENT_SECRET`,
+              value: input.clientSecret,
+            },
+            client
+          );
           // Add secret_id to the update query
           await client.query(`UPDATE auth.oauth_configs SET secret_id = $1 WHERE id = $2`, [
             secret.id,
@@ -425,8 +435,18 @@ export class OAuthConfigService {
 
       // Try to delete the associated secret (will fail if still referenced)
       try {
-        await client.query('DELETE FROM system.secrets WHERE id = $1', [existingConfig.secretId]);
-        logger.info('Associated secret deleted', { secretId: existingConfig.secretId });
+        const deletedSecret = await this.secretService.deleteSecret(
+          existingConfig.secretId,
+          client
+        );
+        if (deletedSecret) {
+          logger.info('Associated secret deleted', { secretId: existingConfig.secretId });
+        } else {
+          logger.warn('Could not delete associated secret, it may be in use elsewhere', {
+            provider,
+            secretId: existingConfig.secretId,
+          });
+        }
       } catch {
         logger.warn('Could not delete associated secret, it may be in use elsewhere', {
           provider,

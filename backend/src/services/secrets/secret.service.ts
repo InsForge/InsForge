@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { Pool, PoolClient } from 'pg';
 import crypto from 'crypto';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import logger from '@/utils/logger.js';
@@ -42,11 +42,12 @@ export class SecretService {
   /**
    * Create a new secret
    */
-  async createSecret(input: CreateSecretInput): Promise<{ id: string }> {
+  async createSecret(input: CreateSecretInput, client?: PoolClient): Promise<{ id: string }> {
     try {
       const encryptedValue = EncryptionManager.encrypt(input.value);
+      const executor = client ?? this.getPool();
 
-      const result = await this.getPool().query(
+      const result = await executor.query(
         `INSERT INTO system.secrets (key, value_ciphertext, is_reserved, expires_at)
          VALUES ($1, $2, $3, $4)
          RETURNING id`,
@@ -144,11 +145,12 @@ export class SecretService {
   /**
    * Update a secret
    */
-  async updateSecret(id: string, input: UpdateSecretInput): Promise<boolean> {
+  async updateSecret(id: string, input: UpdateSecretInput, client?: PoolClient): Promise<boolean> {
     try {
       const updates: string[] = [];
       const values: (string | boolean | Date | null)[] = [];
       let paramCount = 1;
+      const executor = client ?? this.getPool();
 
       if (input.value !== undefined) {
         const encryptedValue = EncryptionManager.encrypt(input.value);
@@ -177,7 +179,7 @@ export class SecretService {
 
       values.push(id);
 
-      const result = await this.getPool().query(
+      const result = await executor.query(
         `UPDATE system.secrets
          SET ${updates.join(', ')}
          WHERE id = $${paramCount}`,
@@ -198,11 +200,16 @@ export class SecretService {
   /**
    * Update a secret by key
    */
-  async updateSecretByKey(key: string, input: UpdateSecretInput): Promise<boolean> {
+  async updateSecretByKey(
+    key: string,
+    input: UpdateSecretInput,
+    client?: PoolClient
+  ): Promise<boolean> {
     try {
       const updates: string[] = [];
       const values: (string | boolean | Date | null)[] = [];
       let paramCount = 1;
+      const executor = client ?? this.getPool();
 
       if (input.value !== undefined) {
         const encryptedValue = EncryptionManager.encrypt(input.value);
@@ -231,7 +238,7 @@ export class SecretService {
 
       values.push(key);
 
-      const result = await this.getPool().query(
+      const result = await executor.query(
         `UPDATE system.secrets
          SET ${updates.join(', ')}
          WHERE key = $${paramCount}`,
@@ -252,9 +259,10 @@ export class SecretService {
   /**
    * Delete a secret by key
    */
-  async deleteSecretByKey(key: string): Promise<boolean> {
+  async deleteSecretByKey(key: string, client?: PoolClient): Promise<boolean> {
     try {
-      const result = await this.getPool().query(
+      const executor = client ?? this.getPool();
+      const result = await executor.query(
         'DELETE FROM system.secrets WHERE key = $1 AND is_reserved = false',
         [key]
       );
@@ -315,10 +323,11 @@ export class SecretService {
   /**
    * Delete a secret
    */
-  async deleteSecret(id: string): Promise<boolean> {
+  async deleteSecret(id: string, client?: PoolClient): Promise<boolean> {
     try {
       // Optimized: Single query with WHERE clause to prevent deleting reserved secrets
-      const result = await this.getPool().query(
+      const executor = client ?? this.getPool();
+      const result = await executor.query(
         'DELETE FROM system.secrets WHERE id = $1 AND is_reserved = false',
         [id]
       );
@@ -328,7 +337,7 @@ export class SecretService {
         logger.info('Secret deleted', { id });
       } else {
         // Check if it exists but is reserved
-        const checkResult = await this.getPool().query(
+        const checkResult = await executor.query(
           'SELECT is_reserved FROM system.secrets WHERE id = $1',
           [id]
         );

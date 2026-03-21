@@ -9,6 +9,8 @@ import {
   oAuthConfigSchema,
   oAuthProvidersSchema,
   authConfigSchema,
+  customOAuthConfigSchema,
+  customOAuthKeySchema,
 } from './auth.schema';
 
 // ============================================================================
@@ -365,6 +367,7 @@ export const getAuthConfigResponseSchema = authConfigSchema;
  */
 export const getPublicAuthConfigResponseSchema = z.object({
   oAuthProviders: z.array(oAuthProvidersSchema),
+  customOAuthProviders: z.array(customOAuthKeySchema),
   ...authConfigSchema.omit({
     id: true,
     updatedAt: true,
@@ -435,3 +438,29 @@ export type GetAuthConfigResponse = z.infer<typeof getAuthConfigResponseSchema>;
 export type GetPublicAuthConfigResponse = z.infer<typeof getPublicAuthConfigResponseSchema>;
 
 export type AuthErrorResponse = z.infer<typeof authErrorResponseSchema>;
+
+// ============================================================================
+// Custom OAuth Configuration Management schemas
+// ============================================================================
+
+export const createCustomOAuthConfigRequestSchema = customOAuthConfigSchema
+  .omit({ id: true, createdAt: true, updatedAt: true })
+  .extend({
+    clientSecret: z.string().min(1, 'Client secret is required'),
+  });
+
+export const updateCustomOAuthConfigRequestSchema = customOAuthConfigSchema
+  .omit({ id: true, key: true, createdAt: true, updatedAt: true })
+  .extend({
+    clientSecret: z.string().min(1).optional(),
+  })
+  .partial();
+
+export const listCustomOAuthConfigsResponseSchema = z.object({
+  data: z.array(customOAuthConfigSchema),
+  count: z.number(),
+});
+
+export type CreateCustomOAuthConfigRequest = z.infer<typeof createCustomOAuthConfigRequestSchema>;
+export type UpdateCustomOAuthConfigRequest = z.infer<typeof updateCustomOAuthConfigRequestSchema>;
+export type ListCustomOAuthConfigsResponse = z.infer<typeof listCustomOAuthConfigsResponseSchema>;

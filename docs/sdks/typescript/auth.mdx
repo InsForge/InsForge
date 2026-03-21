@@ -158,11 +158,11 @@ if (data) {
 
 ## signInWithOAuth()
 
-Start OAuth authentication flow with supported providers (Google, GitHub, Microsoft, Discord, and more).
+Start OAuth authentication flow with configured providers (built-in providers like Google/GitHub, plus any custom provider key configured from the dashboard).
 
 ### Parameters
 
-- `provider` (string, required) - OAuth provider name (e.g., 'google', 'github', 'microsoft', 'discord')
+- `provider` (string, required) - OAuth provider key (e.g., `google`, `github`, or custom provider key like `okta-company`)
 - `redirectTo` (string, optional) - URL to redirect after authentication
 - `skipBrowserRedirect` (boolean, optional) - If true, returns OAuth URL without auto-redirecting (for mobile apps)
 
@@ -198,6 +198,10 @@ const { data } = await insforge.auth.signInWithOAuth({
 
 window.location.href = data.url; // Redirect when ready
 ```
+
+<Note>
+  Custom providers must be configured first in the InsForge dashboard under `Auth Methods` with client credentials and an OIDC discovery URL.
+</Note>
 
 ### Output
 

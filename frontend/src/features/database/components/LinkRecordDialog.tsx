@@ -3,6 +3,7 @@ import {
   Button,
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   SearchInput,
@@ -246,6 +247,9 @@ export function LinkRecordDialog({
         <DialogContent className="flex h-[min(90dvh,760px)] flex-col overflow-hidden">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>Link Record</DialogTitle>
+            <DialogDescription className="sr-only">
+              Select a record to link as a reference
+            </DialogDescription>
             <div className="flex items-center gap-1.5">
               <span className="text-sm text-zinc-500 dark:text-neutral-400">
                 Select a record to reference from

@@ -10,6 +10,7 @@ import {
 import { StorageProvider } from '@/providers/storage/base.provider.js';
 import { LocalStorageProvider } from '@/providers/storage/local.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
+import { StorageConfigService } from '@/services/storage/storage-config.service.js';
 import logger from '@/utils/logger.js';
 import { escapeSqlLikePattern, escapeRegexPattern } from '@/utils/validations.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
@@ -269,7 +270,7 @@ export class StorageService {
       if (prefix) {
         query += ` AND key LIKE $${paramIndex}`;
         countQuery += ` AND key LIKE $${paramIndex}`;
-        params.push(`${prefix}%`);
+        params.push(`${escapeSqlLikePattern(prefix)}%`);
         paramIndex++;
       }
 
@@ -277,7 +278,7 @@ export class StorageService {
       if (searchQuery && searchQuery.trim()) {
         query += ` AND key LIKE $${paramIndex}`;
         countQuery += ` AND key LIKE $${paramIndex}`;
-        const searchPattern = `%${searchQuery.trim()}%`;
+        const searchPattern = `%${escapeSqlLikePattern(searchQuery.trim())}%`;
         params.push(searchPattern);
         paramIndex++;
       }
@@ -358,14 +359,15 @@ export class StorageService {
         throw new Error(`Bucket "${bucket}" already exists`);
       }
 
+      // Create bucket using backend first — if this fails, no DB row is written
+      // so there is no orphaned record causing a permanent 409 on retry
+      await this.provider.createBucket(bucket);
+
       // Insert bucket into storage.buckets table
       await client.query('INSERT INTO storage.buckets (name, public) VALUES ($1, $2)', [
         bucket,
         isPublic,
       ]);
-
-      // Create bucket using backend
-      await this.provider.createBucket(bucket);
 
       // Update storage metadata
       // Metadata is now updated on-demand
@@ -388,11 +390,13 @@ export class StorageService {
         return false;
       }
 
+      // Delete from DB first — if DB delete fails, files remain intact and retry is safe.
+      // If provider.deleteBucket fails after this point, all objects are cascade-deleted
+      // from the database but files remain orphaned in storage.
+      await client.query('DELETE FROM storage.buckets WHERE name = $1', [bucket]);
+
       // Delete bucket using backend (handles all files)
       await this.provider.deleteBucket(bucket);
-
-      // Delete from storage table (cascade will handle storage.objects entries)
-      await client.query('DELETE FROM storage.buckets WHERE name = $1', [bucket]);
 
       // Update storage metadata
       // Metadata is now updated on-demand
@@ -427,7 +431,8 @@ export class StorageService {
 
       // Generate next available key using (1), (2), (3) pattern if duplicates exist
       const key = await this.generateNextAvailableKey(bucket, metadata.filename);
-      return this.provider.getUploadStrategy(bucket, key, metadata);
+      const maxFileSizeBytes = await StorageConfigService.getInstance().getMaxFileSizeBytes();
+      return this.provider.getUploadStrategy(bucket, key, metadata, maxFileSizeBytes);
     } finally {
       client.release();
     }
@@ -459,10 +464,18 @@ export class StorageService {
     this.validateBucketName(bucket);
     this.validateKey(key);
 
-    // Verify the file exists in storage
-    const exists = await this.provider.verifyObjectExists(bucket, key);
+    // Verify the file exists in storage and get its actual size
+    const { exists, size: actualSize } = await this.provider.verifyObjectExists(bucket, key);
     if (!exists) {
       throw new Error(`Upload not found for key "${key}" in bucket "${bucket}"`);
+    }
+
+    // Defense-in-depth: reject if the actual size exceeds the configured limit
+    const fileSize = actualSize ?? metadata.size;
+    const maxBytes = await StorageConfigService.getInstance().getMaxFileSizeBytes();
+    if (fileSize > maxBytes) {
+      const limitMb = Math.round(maxBytes / (1024 * 1024));
+      throw new Error(`File size exceeds the configured maximum upload size of ${limitMb} MB`);
     }
 
     // Check if already confirmed
@@ -482,7 +495,7 @@ export class StorageService {
       VALUES ($1, $2, $3, $4, $5)
       RETURNING uploaded_at as "uploadedAt"
     `,
-      [bucket, key, metadata.size, metadata.contentType || null, userId || null]
+      [bucket, key, fileSize, metadata.contentType || null, userId || null]
     );
 
     if (!result.rows[0]) {
@@ -492,7 +505,7 @@ export class StorageService {
     return {
       bucket,
       key,
-      size: metadata.size,
+      size: fileSize,
       mimeType: metadata.contentType,
       uploadedAt: result.rows[0].uploadedAt,
       url: `${getApiBaseUrl()}/api/storage/buckets/${bucket}/objects/${encodeURIComponent(key)}`,
