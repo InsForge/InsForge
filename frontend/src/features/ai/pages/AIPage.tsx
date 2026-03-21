@@ -165,13 +165,12 @@ export default function AIPage() {
                 )}
               </div>
               <Button
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 onClick={() => setGatewayConfigOpen(true)}
-                className="flex items-center gap-1.5 shrink-0"
+                className="h-9 rounded px-2 text-foreground"
               >
-                <Settings className="w-3.5 h-3.5" />
-                Gateway credentials
+                <Settings className="h-5 w-5 stroke-[1.7]" />
+                <span className="px-1">Gateway credentials</span>
               </Button>
             </div>
             <p className="text-sm leading-5 text-muted-foreground">

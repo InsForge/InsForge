@@ -15,7 +15,7 @@ import type { GatewayConfigResponse } from '@insforge/shared-schemas';
 function KeySourceBadge({ config }: { config: GatewayConfigResponse }) {
   if (config.keySource === 'byok') {
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success bg-success/10 border border-success/20 px-2 py-0.5 rounded-full">
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-primary bg-primary/20 px-2 py-0.5 rounded-full">
         <Key className="w-3 h-3" />
         Your key (BYOK)
       </span>
@@ -23,7 +23,7 @@ function KeySourceBadge({ config }: { config: GatewayConfigResponse }) {
   }
   if (config.keySource === 'cloud') {
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full">
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-primary bg-primary/20 px-2 py-0.5 rounded-full">
         <Cloud className="w-3 h-3" />
         InsForge-managed
       </span>
@@ -62,6 +62,7 @@ export function GatewayConfigDialog({ open, onOpenChange }: GatewayConfigDialogP
       setApiKeyInput('');
       setShowKey(false);
       setErrorMsg('');
+      setBYOKKey.reset();
     }
     onOpenChange(nextOpen);
   };
@@ -161,7 +162,7 @@ export function GatewayConfigDialog({ open, onOpenChange }: GatewayConfigDialogP
             {errorMsg && <p className="text-xs text-destructive">{errorMsg}</p>}
 
             {setBYOKKey.isSuccess && (
-              <p className="text-xs text-success flex items-center gap-1">
+              <p className="text-xs text-primary flex items-center gap-1">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 Key saved successfully.
               </p>
