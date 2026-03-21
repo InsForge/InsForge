@@ -101,12 +101,10 @@ export class OpenRouterProvider {
       }
       return key;
     } catch (error) {
-      logger.warn('Failed to read BYOK secret, falling through to next key source', {
+      logger.error('Failed to read BYOK secret, cannot determine BYOK state', {
         error: error instanceof Error ? error.message : String(error),
       });
-      if (this.byokCacheGeneration === generation) {
-        this.byokKeyCache = null;
-      }
+      // Don't cache null on transient errors — next request will retry
       return null;
     }
   }
