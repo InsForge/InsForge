@@ -156,7 +156,12 @@ export default function AIUsagePage() {
               <StatsCard
                 icon={Activity}
                 title="Embedding Requests"
-                value={isLoadingSummary ? 0 : ((summary as (typeof summary & { embeddingRequests?: number }))?.embeddingRequests ?? 0)}
+                value={
+                  isLoadingSummary
+                    ? 0
+                    : ((summary as typeof summary & { embeddingRequests?: number })
+                        ?.embeddingRequests ?? 0)
+                }
                 unit="requests"
                 description="Embedding requests"
                 isLoading={isLoadingSummary}
@@ -164,7 +169,14 @@ export default function AIUsagePage() {
               <StatsCard
                 icon={Zap}
                 title="Embedding Tokens"
-                value={isLoadingSummary ? 0 : formatTokenCount(((summary as (typeof summary & { embeddingTokens?: number }))?.embeddingTokens) ?? 0)}
+                value={
+                  isLoadingSummary
+                    ? 0
+                    : formatTokenCount(
+                        (summary as typeof summary & { embeddingTokens?: number })
+                          ?.embeddingTokens ?? 0
+                      )
+                }
                 unit="tokens"
                 description="Embedding tokens consumed"
                 isLoading={isLoadingSummary}
