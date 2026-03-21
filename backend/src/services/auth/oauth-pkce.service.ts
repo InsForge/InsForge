@@ -160,7 +160,7 @@ export class OAuthPKCEService {
     return {
       user,
       accessToken,
-      redirectTo: authConfig.signInRedirectTo || undefined,
+      redirectTo: authConfig.redirectUrlWhitelist?.[0] || undefined,
     };
   }
 

@@ -13,7 +13,7 @@ import { setRefreshTokenCookie } from '@/utils/cookies.js';
 import { parseClientType } from '@/utils/utils.js';
 import logger from '@/utils/logger.js';
 import jwt from 'jsonwebtoken';
-import { validateRedirectUrl } from '@/utils/auth-redirect.js';
+
 import {
   createOAuthConfigRequestSchema,
   updateOAuthConfigRequestSchema,
@@ -264,14 +264,13 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
 
     const { redirect_uri, code_challenge } = queryValidation.data;
     const validatedProvider = providerValidation.data;
-    const authConfig = await authConfigService.getAuthConfig();
-    const redirectUri = authConfig.signInRedirectTo || redirect_uri;
+    const redirectUri = redirect_uri || (await authConfigService.getAuthConfig()).redirectUrlWhitelist?.[0];
 
     if (!redirectUri) {
       throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    if (!validateRedirectUrl(redirectUri, authConfig.redirectUrlWhitelist)) {
+    if (!(await authConfigService.validateRedirectUrl(redirectUri))) {
       throw new AppError('Redirect URI is not whitelisted', 400, ERROR_CODES.INVALID_INPUT);
     }
 
@@ -353,8 +352,7 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       throw new AppError('redirectUri is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    const authConfig = await authConfigService.getAuthConfig();
-    if (redirectUri && !validateRedirectUrl(redirectUri, authConfig.redirectUrlWhitelist)) {
+    if (redirectUri && !(await authConfigService.validateRedirectUrl(redirectUri))) {
       logger.warn('Redirect URI is not whitelisted in shared callback', { redirectUri });
       throw new AppError('Redirect URI is not whitelisted', 400, ERROR_CODES.INVALID_INPUT);
     }
@@ -442,8 +440,7 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
       throw new AppError('redirectUri is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    const authConfig = await authConfigService.getAuthConfig();
-    if (!validateRedirectUrl(redirectUri, authConfig.redirectUrlWhitelist)) {
+    if (!(await authConfigService.validateRedirectUrl(redirectUri))) {
       logger.warn('Redirect URI is not whitelisted in callback', { redirectUri });
       throw new AppError('Redirect URI is not whitelisted', 400, ERROR_CODES.INVALID_INPUT);
     }

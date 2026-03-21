@@ -101,10 +101,6 @@ export const authConfigSchema = z.object({
   requireSpecialChar: z.boolean(),
   verifyEmailMethod: verificationMethodSchema,
   resetPasswordMethod: verificationMethodSchema,
-  signInRedirectTo: z
-    .union([z.string().url(), z.literal(''), z.null()])
-    .optional()
-    .transform((val) => (val === '' ? null : val)),
   redirectUrlWhitelist: z.array(z.string().url()).optional().nullable(),
   createdAt: z.string(), // PostgreSQL timestamp
   updatedAt: z.string(), // PostgreSQL timestamp

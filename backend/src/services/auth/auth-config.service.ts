@@ -4,6 +4,7 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import logger from '@/utils/logger.js';
 import type { AuthConfigSchema, UpdateAuthConfigRequest } from '@insforge/shared-schemas';
+import { URL } from 'url';
 
 export class AuthConfigService {
   private static instance: AuthConfigService;
@@ -90,7 +91,6 @@ export class AuthConfigService {
           require_special_char as "requireSpecialChar",
           verify_email_method as "verifyEmailMethod",
           reset_password_method as "resetPasswordMethod",
-          sign_in_redirect_to as "signInRedirectTo",
           redirect_url_whitelist as "redirectUrlWhitelist",
           created_at as "createdAt",
           updated_at as "updatedAt"
@@ -112,7 +112,6 @@ export class AuthConfigService {
           requireSpecialChar: false,
           verifyEmailMethod: 'code' as const,
           resetPasswordMethod: 'code' as const,
-          signInRedirectTo: null,
           redirectUrlWhitelist: [],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -198,11 +197,6 @@ export class AuthConfigService {
         values.push(input.resetPasswordMethod);
       }
 
-      if (input.signInRedirectTo !== undefined) {
-        updates.push(`sign_in_redirect_to = $${paramCount++}`);
-        values.push(input.signInRedirectTo);
-      }
-
       if (input.redirectUrlWhitelist !== undefined) {
         updates.push(`redirect_url_whitelist = $${paramCount++}::TEXT[]`);
         values.push(input.redirectUrlWhitelist);
@@ -230,7 +224,6 @@ export class AuthConfigService {
            require_special_char as "requireSpecialChar",
            verify_email_method as "verifyEmailMethod",
            reset_password_method as "resetPasswordMethod",
-           sign_in_redirect_to as "signInRedirectTo",
            redirect_url_whitelist as "redirectUrlWhitelist",
            created_at as "createdAt",
            updated_at as "updatedAt"`,
@@ -254,5 +247,77 @@ export class AuthConfigService {
     } finally {
       client.release();
     }
+  }
+
+  /**
+   * Normalizes a URL for comparison.
+   * - Converts hostname to lowercase
+   * - Removes default ports (handled by URL class)
+   * - Removes trailing slash
+   * Returns null if the URL is malformed.
+   */
+  private normalizeUrl(urlStr: string): string | null {
+    try {
+      const url = new URL(urlStr);
+      return url.href.replace(/\/$/, '');
+    } catch {
+      // Reject malformed URL instead of returning lowercased string
+      return null;
+    }
+  }
+
+  /**
+   * Validates a redirect URL against the server's configured whitelist
+   */
+  async validateRedirectUrl(urlStr: string): Promise<boolean> {
+    const config = await this.getAuthConfig();
+    const whitelist = config.redirectUrlWhitelist;
+
+    if (!whitelist || whitelist.length === 0) {
+      return true;
+    }
+
+    const targetUrl = this.normalizeUrl(urlStr);
+    if (!targetUrl) {
+      return false;
+    }
+
+    let targetUrlObj: URL;
+    try {
+      targetUrlObj = new URL(targetUrl);
+    } catch {
+      return false;
+    }
+
+    return whitelist.some((item) => {
+      // Exact match
+      if (!item.includes('*.')) {
+        return this.normalizeUrl(item) === targetUrl;
+      }
+
+      // Wildcard match
+      try {
+        const dummyPrefix = '__wildcard__.';
+        const parsedItem = new URL(item.replace('*.', dummyPrefix));
+
+        if (parsedItem.protocol !== targetUrlObj.protocol) {
+          return false;
+        }
+        if (parsedItem.port !== targetUrlObj.port) {
+          return false;
+        }
+        if (parsedItem.pathname !== targetUrlObj.pathname) {
+          return false;
+        }
+
+        const baseDomain = parsedItem.hostname.replace(dummyPrefix, '');
+
+        return (
+          targetUrlObj.hostname === baseDomain || targetUrlObj.hostname.endsWith('.' + baseDomain)
+        );
+      } catch {
+        return false;
+      }
+    });
   }
 }

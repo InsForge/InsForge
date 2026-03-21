@@ -165,10 +165,6 @@ paths:
                     type: string
                     enum: [code, link]
                     description: Method for password reset (code = 6-digit OTP + exchange flow, link = magic link)
-                  signInRedirectTo:
-                    type: string
-                    nullable: true
-                    description: URL to redirect users after successful sign in
                   redirectUrlWhitelist:
                     type: array
                     items:
@@ -229,10 +225,6 @@ paths:
                   type: string
                   enum: [code, link]
                   description: Method for password reset (code = 6-digit OTP + exchange flow, link = magic link)
-                signInRedirectTo:
-                  type: string
-                  nullable: true
-                  description: URL to redirect users after successful sign in
                 redirectUrlWhitelist:
                   type: array
                   items:
@@ -277,9 +269,6 @@ paths:
                   resetPasswordMethod:
                     type: string
                     enum: [code, link]
-                  signInRedirectTo:
-                    type: string
-                    nullable: true
                   redirectUrlWhitelist:
                     type: array
                     items:

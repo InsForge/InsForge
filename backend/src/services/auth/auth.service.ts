@@ -165,7 +165,7 @@ export class AuthService {
     if (emailAuthConfig.requireEmailVerification) {
       try {
         if (emailAuthConfig.verifyEmailMethod === 'link') {
-          const redirectTo = emailAuthConfig.signInRedirectTo || options?.emailRedirectTo;
+          const redirectTo = options?.emailRedirectTo || emailAuthConfig.redirectUrlWhitelist?.[0];
           await this.sendVerificationEmailWithLink(email, redirectTo);
         } else {
           await this.sendVerificationEmailWithCode(email);
@@ -190,7 +190,7 @@ export class AuthService {
       user,
       accessToken,
       requireEmailVerification: false,
-      redirectTo: emailAuthConfig.signInRedirectTo || undefined,
+      redirectTo: emailAuthConfig.redirectUrlWhitelist?.[0] || undefined,
     };
   }
 
@@ -233,7 +233,7 @@ export class AuthService {
     const response: CreateSessionResponse = {
       user,
       accessToken,
-      redirectTo: emailAuthConfig.signInRedirectTo || undefined,
+      redirectTo: emailAuthConfig.redirectUrlWhitelist?.[0] || undefined,
     };
 
     return response;
@@ -362,7 +362,7 @@ export class AuthService {
       return {
         user,
         accessToken,
-        redirectTo: emailAuthConfig.signInRedirectTo || undefined,
+        redirectTo: emailAuthConfig.redirectUrlWhitelist?.[0] || undefined,
       };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -428,7 +428,7 @@ export class AuthService {
       return {
         user,
         accessToken,
-        redirectTo: emailAuthConfig.signInRedirectTo || undefined,
+        redirectTo: emailAuthConfig.redirectUrlWhitelist?.[0] || undefined,
       };
     } catch (error) {
       await client.query('ROLLBACK');
