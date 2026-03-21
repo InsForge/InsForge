@@ -149,14 +149,6 @@ paths:
                     type: boolean
                   requireSpecialChar:
                     type: boolean
-                  verifyEmailRedirectTo:
-                    type: string
-                    nullable: true
-                    description: URL to redirect users after successful email verification (if not set, shows default success page)
-                  resetPasswordRedirectTo:
-                    type: string
-                    nullable: true
-                    description: URL to redirect users after successful password reset (if not set, shows default success page)
                   verifyEmailMethod:
                     type: string
                     enum: [code, link]
@@ -209,14 +201,6 @@ paths:
                   type: boolean
                 requireSpecialChar:
                   type: boolean
-                verifyEmailRedirectTo:
-                  type: string
-                  nullable: true
-                  description: URL to redirect users after successful email verification (if not set, shows default success page)
-                resetPasswordRedirectTo:
-                  type: string
-                  nullable: true
-                  description: URL to redirect users after successful password reset (if not set, shows default success page)
                 verifyEmailMethod:
                   type: string
                   enum: [code, link]
@@ -255,14 +239,6 @@ paths:
                     type: boolean
                   requireSpecialChar:
                     type: boolean
-                  verifyEmailRedirectTo:
-                    type: string
-                    nullable: true
-                    description: URL to redirect users after successful email verification (if not set, shows default success page)
-                  resetPasswordRedirectTo:
-                    type: string
-                    nullable: true
-                    description: URL to redirect users after successful password reset (if not set, shows default success page)
                   verifyEmailMethod:
                     type: string
                     enum: [code, link]

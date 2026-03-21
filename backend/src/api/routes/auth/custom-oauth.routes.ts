@@ -322,12 +322,13 @@ router.get('/:key/callback', async (req: Request, res: Response, next: NextFunct
           redirectUri?: string;
         };
         if (stateData.redirectUri) {
+          await authConfigService.validateRedirectUrl(stateData.redirectUri);
           const errorUrl = new URL(stateData.redirectUri);
           errorUrl.searchParams.set('error', 'Authentication failed');
           return res.redirect(errorUrl.toString());
         }
       } catch {
-        // Ignore redirect fallback failures
+        // Ignore redirect fallback failures — fall through to next(error)
       }
     }
     next(error);

@@ -7,6 +7,15 @@ import type { AuthConfigSchema, UpdateAuthConfigRequest } from '@insforge/shared
 
 type ConfigParamValue = string | number | boolean | null | string[];
 
+const redactUrl = (url: string): string => {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return '[invalid url]';
+  }
+};
+
 export class AuthConfigService {
   private static instance: AuthConfigService;
   private pool: Pool | null = null;
@@ -48,22 +57,26 @@ export class AuthConfigService {
       logger.warn(
         '[Auth] Redirect URL whitelist is empty — redirect accepted without validation. ' +
           'Configure a whitelist in Auth Settings for production deployments.',
-        { redirectUrl }
+        { redirectUrl: redactUrl(redirectUrl) }
       );
       return;
     }
 
     const allowed = whitelist.some((entry) => this.matchesEntry(redirectUrl, entry));
     if (!allowed) {
-      logger.warn('[Auth] Redirect URL rejected — not on whitelist', { redirectUrl });
+      logger.warn('[Auth] Redirect URL rejected — not on whitelist', {
+        redirectUrl: redactUrl(redirectUrl),
+      });
       throw new AppError(
-        `Redirect URL '${redirectUrl}' is not allowed. Add it to the redirect URL whitelist in Auth Settings.`,
+        `Redirect URL '${redactUrl(redirectUrl)}' is not allowed. Add it to the redirect URL whitelist in Auth Settings.`,
         400,
         ERROR_CODES.INVALID_INPUT
       );
     }
 
-    logger.debug('[Auth] Redirect URL validated against whitelist', { redirectUrl });
+    logger.debug('[Auth] Redirect URL validated against whitelist', {
+      redirectUrl: redactUrl(redirectUrl),
+    });
   }
 
   /**
@@ -114,7 +127,12 @@ export class AuthConfigService {
       try {
         const entryScheme = wildcardMatch[1] || 'https://';
         const entrySuffix = wildcardMatch[2];
-        const hasExplicitPath = /[/?#]/.test(entrySuffix);
+        const firstDelimiterIndex = entrySuffix.search(/[/?#]/);
+        const entryRemainder =
+          firstDelimiterIndex === -1 ? '' : entrySuffix.slice(firstDelimiterIndex);
+        const hasExplicitPath = entryRemainder.startsWith('/');
+        const hasExplicitQuery = entryRemainder.includes('?');
+        const hasExplicitHash = entryRemainder.includes('#');
         const entryUrl = new URL(entryScheme + 'placeholder.' + entrySuffix);
         const parsedCandidate = new URL(candidate);
 
@@ -137,18 +155,16 @@ export class AuthConfigService {
         if (!extraPart || extraPart.includes('.')) {
           return false;
         }
-        // If entry includes explicit path/query/hash, enforce exact match for those parts.
-        // Otherwise '*.example.com' matches any path on matching subdomains.
-        if (hasExplicitPath) {
-          if (parsedCandidate.pathname !== entryUrl.pathname) {
-            return false;
-          }
-          if (entryUrl.search && parsedCandidate.search !== entryUrl.search) {
-            return false;
-          }
-          if (entryUrl.hash && parsedCandidate.hash !== entryUrl.hash) {
-            return false;
-          }
+        // Enforce exact match for each component independently when present in the entry.
+        // Otherwise '*.example.com' matches any path/query/hash on matching subdomains.
+        if (hasExplicitPath && parsedCandidate.pathname !== entryUrl.pathname) {
+          return false;
+        }
+        if (hasExplicitQuery && parsedCandidate.search !== entryUrl.search) {
+          return false;
+        }
+        if (hasExplicitHash && parsedCandidate.hash !== entryUrl.hash) {
+          return false;
         }
         return true;
       } catch {

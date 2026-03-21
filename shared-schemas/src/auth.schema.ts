@@ -92,19 +92,32 @@ export const oAuthConfigSchema = z.object({
 
 /**
  * Redirect URL whitelist entry schema
- * Each entry must be a valid URL or a wildcard subdomain pattern (e.g. https://*.example.com)
+ * Each entry must be either:
+ *   A) A valid http(s) URL or wildcard subdomain pattern (e.g. https://*.example.com)
+ *   B) An absolute URL with any scheme for exact matches (e.g. myapp://callback)
  * Uses regex instead of URL constructor since shared-schemas has no DOM types.
  */
 export const urlOrWildcardPattern =
   /^https?:\/\/(\*\.)?[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*(:\d+)?(\/[^?#]*)?(\?[^#]*)?(#.*)?$/;
 
+// Exact match: any scheme (for native app callbacks like myapp://callback)
+const absoluteUrlPattern = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^\s]+$/;
+
 export const redirectUrlWhitelistSchema = z.array(
-  z
-    .string()
-    .regex(
-      urlOrWildcardPattern,
-      'Each entry must be a valid URL or wildcard pattern (e.g. https://*.example.com)'
-    )
+  z.union([
+    z
+      .string()
+      .regex(
+        urlOrWildcardPattern,
+        'Each entry must be a valid http(s) URL or wildcard pattern (e.g. https://*.example.com)'
+      ),
+    z
+      .string()
+      .regex(
+        absoluteUrlPattern,
+        'Each entry must be an absolute URL (e.g. myapp://callback) or a valid https wildcard pattern'
+      ),
+  ])
 );
 
 // Email authentication configuration schema
