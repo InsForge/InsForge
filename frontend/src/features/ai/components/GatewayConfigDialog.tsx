@@ -63,6 +63,7 @@ export function GatewayConfigDialog({ open, onOpenChange }: GatewayConfigDialogP
       setShowKey(false);
       setErrorMsg('');
       setBYOKKey.reset();
+      removeBYOKKey.reset();
     }
     onOpenChange(nextOpen);
   };
