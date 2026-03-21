@@ -118,7 +118,9 @@ export class ApiRateLimitConfigService {
       return result.rows[0];
     } catch (error) {
       try {
-        await client.query('ROLLBACK');
+        if (client) {
+          await client.query('ROLLBACK');
+        }
       } catch (rollbackError) {
         logger.error('Rollback failed', { rollbackError });
       }
