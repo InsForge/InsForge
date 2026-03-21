@@ -169,6 +169,11 @@ paths:
                     type: string
                     nullable: true
                     description: URL to redirect users after successful sign in
+                  redirectUrlWhitelist:
+                    type: array
+                    items:
+                      type: string
+                    description: List of allowed URLs for authentication redirects
                   createdAt:
                     type: string
                     format: date-time
@@ -228,6 +233,11 @@ paths:
                   type: string
                   nullable: true
                   description: URL to redirect users after successful sign in
+                redirectUrlWhitelist:
+                  type: array
+                  items:
+                    type: string
+                  description: List of allowed URLs for authentication redirects
       responses:
         '200':
           description: Configuration updated successfully
@@ -270,6 +280,11 @@ paths:
                   signInRedirectTo:
                     type: string
                     nullable: true
+                  redirectUrlWhitelist:
+                    type: array
+                    items:
+                      type: string
+                    description: List of allowed URLs for authentication redirects
                   createdAt:
                     type: string
                     format: date-time

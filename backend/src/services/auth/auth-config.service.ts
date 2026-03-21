@@ -91,6 +91,7 @@ export class AuthConfigService {
           verify_email_method as "verifyEmailMethod",
           reset_password_method as "resetPasswordMethod",
           sign_in_redirect_to as "signInRedirectTo",
+          redirect_url_whitelist as "redirectUrlWhitelist",
           created_at as "createdAt",
           updated_at as "updatedAt"
          FROM auth.configs
@@ -112,6 +113,7 @@ export class AuthConfigService {
           verifyEmailMethod: 'code' as const,
           resetPasswordMethod: 'code' as const,
           signInRedirectTo: null,
+          redirectUrlWhitelist: [],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -153,7 +155,7 @@ export class AuthConfigService {
 
       // Build update query
       const updates: string[] = [];
-      const values: (string | number | boolean | null)[] = [];
+      const values: (string | number | boolean | null | string[])[] = [];
       let paramCount = 1;
 
       if (input.requireEmailVerification !== undefined) {
@@ -201,6 +203,11 @@ export class AuthConfigService {
         values.push(input.signInRedirectTo);
       }
 
+      if (input.redirectUrlWhitelist !== undefined) {
+        updates.push(`redirect_url_whitelist = $${paramCount++}::TEXT[]`);
+        values.push(input.redirectUrlWhitelist);
+      }
+
       if (!updates.length) {
         await client.query('COMMIT');
         // Return current config if no updates
@@ -224,6 +231,7 @@ export class AuthConfigService {
            verify_email_method as "verifyEmailMethod",
            reset_password_method as "resetPasswordMethod",
            sign_in_redirect_to as "signInRedirectTo",
+           redirect_url_whitelist as "redirectUrlWhitelist",
            created_at as "createdAt",
            updated_at as "updatedAt"`,
         values

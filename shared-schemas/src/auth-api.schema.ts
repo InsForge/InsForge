@@ -373,6 +373,7 @@ export const getPublicAuthConfigResponseSchema = z.object({
     updatedAt: true,
     createdAt: true,
     signInRedirectTo: true,
+    redirectUrlWhitelist: true,
   }).shape,
 });
 
