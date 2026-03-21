@@ -32,10 +32,10 @@ function getDateRange(range: DateRange): { startDate?: string; endDate?: string 
   const now = new Date();
   const start = new Date(now);
   if (range === 'week') {
-    start.setDate(now.getDate() - 7);
+    start.setDate(start.getDate() - 7);
   }
   if (range === 'month') {
-    start.setMonth(now.getMonth() - 1);
+    start.setMonth(start.getMonth() - 1);
   }
   return { startDate: start.toISOString(), endDate: now.toISOString() };
 }
