@@ -48,12 +48,19 @@ export default function AIUsagePage() {
 
   const { startDate, endDate } = useMemo(() => getDateRange(dateRange), [dateRange]);
 
-  const { data: summary, isLoading: isLoadingSummary } = useAIUsageSummary({
-    startDate,
-    endDate,
-  });
+  const {
+    data: summary,
+    isLoading: isLoadingSummary,
+    isError: isSummaryError,
+    refetch: refetchSummary,
+  } = useAIUsageSummary({ startDate, endDate });
 
-  const { data: recordsData, isLoading: isLoadingRecords } = useAIUsageRecords({
+  const {
+    data: recordsData,
+    isLoading: isLoadingRecords,
+    isError: isRecordsError,
+    refetch: refetchRecords,
+  } = useAIUsageRecords({
     startDate,
     endDate,
     limit: String(PAGE_SIZE),
@@ -88,6 +95,7 @@ export default function AIUsagePage() {
                 <button
                   key={r}
                   onClick={() => handleRangeChange(r)}
+                  aria-pressed={dateRange === r}
                   className={`px-3 py-1 rounded text-sm font-normal transition-colors ${
                     dateRange === r
                       ? 'bg-[var(--alpha-8)] text-foreground'
@@ -101,40 +109,68 @@ export default function AIUsagePage() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-            <StatsCard
-              icon={Activity}
-              title="Total Requests"
-              value={isLoadingSummary ? 0 : (summary?.totalRequests ?? 0)}
-              unit="requests"
-              description="All AI requests"
-              isLoading={isLoadingSummary}
-            />
-            <StatsCard
-              icon={Zap}
-              title="Input Tokens"
-              value={isLoadingSummary ? 0 : formatTokenCount(summary?.totalInputTokens ?? 0)}
-              unit="tokens"
-              description="Prompt tokens consumed"
-              isLoading={isLoadingSummary}
-            />
-            <StatsCard
-              icon={MessageSquare}
-              title="Output Tokens"
-              value={isLoadingSummary ? 0 : formatTokenCount(summary?.totalOutputTokens ?? 0)}
-              unit="tokens"
-              description="Completion tokens generated"
-              isLoading={isLoadingSummary}
-            />
-            <StatsCard
-              icon={Image}
-              title="Images Generated"
-              value={isLoadingSummary ? 0 : (summary?.totalImageCount ?? 0)}
-              unit="images"
-              description="Total images created"
-              isLoading={isLoadingSummary}
-            />
-          </div>
+          {isSummaryError ? (
+            <div className="flex items-center justify-between rounded border border-[var(--alpha-8)] bg-card px-4 py-3">
+              <p className="text-sm text-muted-foreground">Failed to load usage summary.</p>
+              <button
+                onClick={() => void refetchSummary()}
+                className="text-sm text-foreground underline hover:no-underline"
+              >
+                Retry
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
+              <StatsCard
+                icon={Activity}
+                title="Total Requests"
+                value={isLoadingSummary ? 0 : (summary?.totalRequests ?? 0)}
+                unit="requests"
+                description="All AI requests"
+                isLoading={isLoadingSummary}
+              />
+              <StatsCard
+                icon={Zap}
+                title="Input Tokens"
+                value={isLoadingSummary ? 0 : formatTokenCount(summary?.totalInputTokens ?? 0)}
+                unit="tokens"
+                description="Prompt tokens consumed"
+                isLoading={isLoadingSummary}
+              />
+              <StatsCard
+                icon={MessageSquare}
+                title="Output Tokens"
+                value={isLoadingSummary ? 0 : formatTokenCount(summary?.totalOutputTokens ?? 0)}
+                unit="tokens"
+                description="Completion tokens generated"
+                isLoading={isLoadingSummary}
+              />
+              <StatsCard
+                icon={Image}
+                title="Images Generated"
+                value={isLoadingSummary ? 0 : (summary?.totalImageCount ?? 0)}
+                unit="images"
+                description="Total images created"
+                isLoading={isLoadingSummary}
+              />
+              <StatsCard
+                icon={Activity}
+                title="Embedding Requests"
+                value={isLoadingSummary ? 0 : ((summary as (typeof summary & { embeddingRequests?: number }))?.embeddingRequests ?? 0)}
+                unit="requests"
+                description="Embedding requests"
+                isLoading={isLoadingSummary}
+              />
+              <StatsCard
+                icon={Zap}
+                title="Embedding Tokens"
+                value={isLoadingSummary ? 0 : formatTokenCount(((summary as (typeof summary & { embeddingTokens?: number }))?.embeddingTokens) ?? 0)}
+                unit="tokens"
+                description="Embedding tokens consumed"
+                isLoading={isLoadingSummary}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -155,6 +191,16 @@ export default function AIUsagePage() {
             {isLoadingRecords && records.length === 0 ? (
               <div className="flex items-center justify-center h-40">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : isRecordsError ? (
+              <div className="flex items-center justify-between h-40 px-4">
+                <p className="text-sm text-muted-foreground">Failed to load usage records.</p>
+                <button
+                  onClick={() => void refetchRecords()}
+                  className="text-sm text-foreground underline hover:no-underline"
+                >
+                  Retry
+                </button>
               </div>
             ) : records.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 gap-2">
