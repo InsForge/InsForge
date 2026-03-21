@@ -1,284 +1,13 @@
 import { useState, useMemo } from 'react';
-import { Loader2, Activity, Zap, Image, MessageSquare } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 import { useAIUsageSummary, useAIUsageRecords } from '../hooks/useAIUsage';
-import { StatsCard } from '@/features/dashboard/components/StatsCard';
+import { Button } from '@insforge/ui';
 import type { AIUsageRecordSchema } from '@insforge/shared-schemas';
+import { useQueryClient } from '@tanstack/react-query';
 
 type DateRange = 'week' | 'month' | 'all';
 
-function formatTokenCount(n: number): string {
-  if (n >= 1_000_000) {
-    return `${(n / 1_000_000).toFixed(1)}M`;
-  }
-  if (n >= 1_000) {
-    return `${(n / 1_000).toFixed(1)}K`;
-  }
-  return String(n);
-}
-
-function formatDate(date: Date | string): string {
-  return new Date(date).toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function getDateRange(range: DateRange): { startDate?: string; endDate?: string } {
-  if (range === 'all') {
-    return {};
-  }
-  const now = new Date();
-  const start = new Date(now);
-  if (range === 'week') {
-    const day = start.getDay(); // 0 = Sunday
-    start.setDate(start.getDate() - day);
-    start.setHours(0, 0, 0, 0);
-  }
-  if (range === 'month') {
-    start.setDate(1);
-    start.setHours(0, 0, 0, 0);
-  }
-  return { startDate: start.toISOString(), endDate: now.toISOString() };
-}
-
-const PAGE_SIZE = 50;
-
-export default function AIUsagePage() {
-  const [dateRange, setDateRange] = useState<DateRange>('month');
-  const [page, setPage] = useState(0);
-
-  const { startDate, endDate } = useMemo(() => getDateRange(dateRange), [dateRange]);
-
-  const {
-    data: summary,
-    isLoading: isLoadingSummary,
-    isError: isSummaryError,
-    refetch: refetchSummary,
-  } = useAIUsageSummary({ startDate, endDate });
-
-  const {
-    data: recordsData,
-    isLoading: isLoadingRecords,
-    isError: isRecordsError,
-    refetch: refetchRecords,
-  } = useAIUsageRecords({
-    startDate,
-    endDate,
-    limit: String(PAGE_SIZE),
-    offset: String(page * PAGE_SIZE),
-  });
-
-  const records = recordsData?.records ?? [];
-  const total = recordsData?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
-  const handleRangeChange = (range: DateRange) => {
-    setDateRange(range);
-    setPage(0);
-  };
-
-  return (
-    <div className="h-full flex flex-col bg-[rgb(var(--semantic-0))]">
-      {/* Header */}
-      <div className="flex flex-col items-center px-10 flex-shrink-0">
-        <div className="max-w-[1024px] w-full flex flex-col gap-6 pt-10 pb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col gap-2">
-              <h1 className="text-2xl font-medium text-foreground leading-8">AI Usage</h1>
-              <p className="text-sm leading-5 text-muted-foreground">
-                Track token consumption and request activity across all AI models.
-              </p>
-            </div>
-
-            {/* Date range filter */}
-            <div className="flex items-center gap-1 bg-card border border-[var(--alpha-8)] rounded p-1">
-              {(['week', 'month', 'all'] as DateRange[]).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => handleRangeChange(r)}
-                  aria-pressed={dateRange === r}
-                  className={`px-3 py-1 rounded text-sm font-normal transition-colors ${
-                    dateRange === r
-                      ? 'bg-[var(--alpha-8)] text-foreground'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {r === 'week' ? 'This week' : r === 'month' ? 'This month' : 'All time'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Stats Cards */}
-          {isSummaryError ? (
-            <div className="flex items-center justify-between rounded border border-[var(--alpha-8)] bg-card px-4 py-3">
-              <p className="text-sm text-muted-foreground">Failed to load usage summary.</p>
-              <button
-                onClick={() => void refetchSummary()}
-                className="text-sm text-foreground underline hover:no-underline"
-              >
-                Retry
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
-              <StatsCard
-                icon={Activity}
-                title="Total Requests"
-                value={isLoadingSummary ? 0 : (summary?.totalRequests ?? 0)}
-                unit="requests"
-                description="All AI requests"
-                isLoading={isLoadingSummary}
-              />
-              <StatsCard
-                icon={Zap}
-                title="Input Tokens"
-                value={isLoadingSummary ? 0 : formatTokenCount(summary?.totalInputTokens ?? 0)}
-                unit="tokens"
-                description="Prompt tokens consumed"
-                isLoading={isLoadingSummary}
-              />
-              <StatsCard
-                icon={MessageSquare}
-                title="Output Tokens"
-                value={isLoadingSummary ? 0 : formatTokenCount(summary?.totalOutputTokens ?? 0)}
-                unit="tokens"
-                description="Completion tokens generated"
-                isLoading={isLoadingSummary}
-              />
-              <StatsCard
-                icon={Image}
-                title="Images Generated"
-                value={isLoadingSummary ? 0 : (summary?.totalImageCount ?? 0)}
-                unit="images"
-                description="Total images created"
-                isLoading={isLoadingSummary}
-              />
-              <StatsCard
-                icon={Activity}
-                title="Embedding Requests"
-                value={isLoadingSummary ? 0 : (summary?.embeddingRequests ?? 0)}
-                unit="requests"
-                description="Embedding requests"
-                isLoading={isLoadingSummary}
-              />
-              <StatsCard
-                icon={Zap}
-                title="Embedding Tokens"
-                value={isLoadingSummary ? 0 : formatTokenCount(summary?.embeddingTokens ?? 0)}
-                unit="tokens"
-                description="Embedding tokens consumed"
-                isLoading={isLoadingSummary}
-              />
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Records Table */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-10 pb-6">
-        <div className="max-w-[1024px] w-full mx-auto">
-          <div className="bg-card border border-[var(--alpha-8)] rounded py-2 flex flex-col">
-            {/* Table Header */}
-            <div className="grid grid-cols-5 gap-x-2.5 h-8 items-center text-sm leading-5 text-muted-foreground px-4 border-b border-[var(--alpha-8)] shrink-0">
-              <div>Time</div>
-              <div>Model</div>
-              <div>Type</div>
-              <div>Input tokens</div>
-              <div>Output tokens</div>
-            </div>
-
-            {/* Table Body */}
-            {isLoadingRecords && records.length === 0 ? (
-              <div className="flex items-center justify-center h-40">
-                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : isRecordsError ? (
-              <div className="flex items-center justify-between h-40 px-4">
-                <p className="text-sm text-muted-foreground">Failed to load usage records.</p>
-                <button
-                  onClick={() => void refetchRecords()}
-                  className="text-sm text-foreground underline hover:no-underline"
-                >
-                  Retry
-                </button>
-              </div>
-            ) : records.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-40 gap-2">
-                <p className="text-sm text-muted-foreground">No usage records found</p>
-                <p className="text-xs text-muted-foreground">
-                  Records will appear here after AI requests are made.
-                </p>
-              </div>
-            ) : (
-              records.map((record: AIUsageRecordSchema) => (
-                <UsageRow key={record.id} record={record} />
-              ))
-            )}
-          </div>
-
-          {/* Pagination */}
-          {total > PAGE_SIZE && (
-            <div className="flex items-center justify-between mt-3 px-1">
-              <p className="text-sm text-muted-foreground">
-                {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                  className="px-3 py-1 text-sm rounded border border-[var(--alpha-8)] text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Previous
-                </button>
-                <span className="text-sm text-muted-foreground">
-                  {page + 1} / {totalPages}
-                </span>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                  disabled={page >= totalPages - 1}
-                  className="px-3 py-1 text-sm rounded border border-[var(--alpha-8)] text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function UsageRow({ record }: { record: AIUsageRecordSchema }) {
-  const usageType = record.usageType;
-
-  return (
-    <div className="grid grid-cols-5 gap-x-2.5 h-10 items-center text-sm px-4 border-b border-[var(--alpha-8)] last:border-b-0 hover:bg-[var(--alpha-4)] transition-colors">
-      <div className="text-muted-foreground truncate">{formatDate(record.createdAt)}</div>
-      <div className="truncate text-foreground" title={record.model ?? record.modelId ?? '—'}>
-        {record.model ?? record.modelId ?? '—'}
-      </div>
-      <div>
-        <TypeBadge type={usageType} />
-      </div>
-      <div className="text-foreground tabular-nums">
-        {record.inputTokens !== null && record.inputTokens !== undefined
-          ? formatTokenCount(record.inputTokens)
-          : '—'}
-      </div>
-      <div className="text-foreground tabular-nums">
-        {record.outputTokens !== null && record.outputTokens !== undefined
-          ? formatTokenCount(record.outputTokens)
-          : '—'}
-      </div>
-    </div>
-  );
-}
-
-function TypeBadge({ type }: { type?: string }) {
+function UsageTypeBadge({ type }: { type?: string }) {
   const label = type ?? 'chat';
   const styles: Record<string, string> = {
     chat: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
@@ -291,5 +20,194 @@ function TypeBadge({ type }: { type?: string }) {
     >
       {label === 'image_generation' ? 'image' : label}
     </span>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="bg-card border border-[var(--alpha-8)] rounded p-4 flex flex-col gap-1">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-xl font-semibold text-foreground tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+export default function AIUsagePage() {
+  const [dateRange, setDateRange] = useState<DateRange>('all');
+  const [page, setPage] = useState(0);
+  const pageSize = 20;
+  const queryClient = useQueryClient();
+
+  const dateParams = useMemo(() => {
+    const now = new Date();
+    if (dateRange === 'week') {
+      const start = new Date(now);
+      start.setDate(start.getDate() - 7);
+      return { startDate: start.toISOString() };
+    }
+    if (dateRange === 'month') {
+      const start = new Date(now);
+      start.setMonth(start.getMonth() - 1);
+      return { startDate: start.toISOString() };
+    }
+    return {};
+  }, [dateRange]);
+
+  const { data: summary, isLoading: isLoadingSummary } = useAIUsageSummary(dateParams);
+  const { data: usageData, isLoading: isLoadingRecords } = useAIUsageRecords({
+    ...dateParams,
+    limit: String(pageSize),
+    offset: String(page * pageSize),
+  });
+
+  const records = usageData?.records ?? [];
+  const total = usageData?.total ?? 0;
+  const totalPages = Math.ceil(total / pageSize);
+
+  const handleRefresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ['ai-usage-summary'] });
+    void queryClient.invalidateQueries({ queryKey: ['ai-usage-records'] });
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-[rgb(var(--semantic-0))]">
+      {/* Header */}
+      <div className="flex flex-col items-center px-10 flex-shrink-0">
+        <div className="max-w-[1024px] w-full flex flex-col gap-4 pt-10 pb-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-medium text-foreground leading-8">Usage</h1>
+              <p className="text-sm leading-5 text-muted-foreground mt-1">
+                Track AI token consumption across chat, embedding, and image generation requests.
+              </p>
+            </div>
+            <Button variant="secondary" onClick={handleRefresh} className="h-9 rounded px-3">
+              <RefreshCw className="h-4 w-4 mr-1.5" />
+              Refresh
+            </Button>
+          </div>
+
+          {/* Date Range Filter */}
+          <div className="flex gap-2">
+            {(
+              [
+                ['week', 'This week'],
+                ['month', 'This month'],
+                ['all', 'All time'],
+              ] as const
+            ).map(([key, label]) => (
+              <Button
+                key={key}
+                variant={dateRange === key ? 'primary' : 'secondary'}
+                onClick={() => {
+                  setDateRange(key);
+                  setPage(0);
+                }}
+                className="h-8 rounded px-3 text-sm"
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-10">
+        <div className="max-w-[1024px] w-full mx-auto pb-6">
+          {/* Summary Cards */}
+          {isLoadingSummary ? (
+            <div className="flex items-center justify-center h-24">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : summary ? (
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-6">
+              <StatCard label="Total Requests" value={summary.totalRequests} />
+              <StatCard label="Input Tokens" value={summary.totalInputTokens.toLocaleString()} />
+              <StatCard label="Output Tokens" value={summary.totalOutputTokens.toLocaleString()} />
+              <StatCard label="Images Generated" value={summary.totalImageCount} />
+              <StatCard label="Embedding Requests" value={summary.embeddingRequests ?? 0} />
+              <StatCard
+                label="Embedding Tokens"
+                value={(summary.embeddingTokens ?? 0).toLocaleString()}
+              />
+            </div>
+          ) : null}
+
+          {/* Usage Records Table */}
+          <div className="bg-card border border-[var(--alpha-8)] rounded py-2 flex flex-col">
+            <div className="px-4 py-2 text-sm font-medium text-foreground border-b border-[var(--alpha-8)] flex items-center justify-between">
+              <span>Usage Records</span>
+              <span className="text-xs text-muted-foreground">{total} total</span>
+            </div>
+            <div className="grid grid-cols-5 gap-x-2.5 h-8 items-center text-sm leading-5 text-muted-foreground px-4 border-b border-[var(--alpha-8)]">
+              <div>Time</div>
+              <div>Model</div>
+              <div>Type</div>
+              <div>Input tokens</div>
+              <div>Output tokens</div>
+            </div>
+            {isLoadingRecords ? (
+              <div className="flex items-center justify-center h-32">
+                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : records.length === 0 ? (
+              <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
+                No usage records found.
+              </div>
+            ) : (
+              records.map((record: AIUsageRecordSchema) => (
+                <div
+                  key={record.id}
+                  className="grid grid-cols-5 gap-x-2.5 h-10 items-center text-sm px-4 border-b border-[var(--alpha-8)] last:border-b-0 hover:bg-[var(--alpha-4)] transition-colors"
+                >
+                  <div className="text-muted-foreground text-xs">
+                    {new Date(record.createdAt).toLocaleString()}
+                  </div>
+                  <div
+                    className="truncate text-foreground"
+                    title={record.model ?? record.modelId ?? '—'}
+                  >
+                    {record.model ?? record.modelId ?? '—'}
+                  </div>
+                  <div>
+                    <UsageTypeBadge type={record.usageType} />
+                  </div>
+                  <div className="text-foreground tabular-nums">{record.inputTokens ?? '—'}</div>
+                  <div className="text-foreground tabular-nums">{record.outputTokens ?? '—'}</div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4">
+              <span className="text-sm text-muted-foreground">
+                Page {page + 1} of {totalPages}
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="h-8 rounded px-3 text-sm"
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1}
+                  className="h-8 rounded px-3 text-sm"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
