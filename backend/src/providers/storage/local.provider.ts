@@ -49,7 +49,7 @@ export class LocalStorageProvider implements StorageProvider {
       const filePath = this.getFilePath(bucket, key);
       return await fs.readFile(filePath);
     } catch (error) {
-      if ((error as any).code === 'ENOENT') {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return null;
       }
       throw error;
@@ -62,7 +62,7 @@ export class LocalStorageProvider implements StorageProvider {
       await fs.unlink(filePath);
     } catch (error) {
       // Re-throw if it's not a "file not found" error (e.g., validation or permission error)
-      if ((error as any).code !== 'ENOENT') {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         throw error;
       }
     }
@@ -79,7 +79,7 @@ export class LocalStorageProvider implements StorageProvider {
       await fs.rm(bucketPath, { recursive: true, force: true });
     } catch (error) {
       // Re-throw if it's not a "not found" error
-      if ((error as any).code !== 'ENOENT') {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         throw error;
       }
     }
@@ -126,7 +126,7 @@ export class LocalStorageProvider implements StorageProvider {
       await fs.access(filePath);
       return true;
     } catch (error) {
-      if ((error as any).code === 'ENOENT') {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return false;
       }
       throw error;
