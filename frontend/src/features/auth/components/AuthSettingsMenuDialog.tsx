@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Lock, Mail, Settings } from 'lucide-react';
+import { Lock, Mail, Settings, Plus, Trash2, AlertTriangle } from 'lucide-react';
 import {
   Button,
   Checkbox,
@@ -52,6 +52,7 @@ const defaultValues: UpdateAuthConfigRequest = {
   verifyEmailMethod: 'code',
   resetPasswordMethod: 'code',
   signInRedirectTo: null,
+  redirectUrlWhitelist: [],
 };
 
 const toFormValues = (config?: AuthConfigSchema): UpdateAuthConfigRequest => {
@@ -69,12 +70,13 @@ const toFormValues = (config?: AuthConfigSchema): UpdateAuthConfigRequest => {
     verifyEmailMethod: config.verifyEmailMethod,
     resetPasswordMethod: config.resetPasswordMethod,
     signInRedirectTo: config.signInRedirectTo ?? null,
+    redirectUrlWhitelist: config.redirectUrlWhitelist ?? [],
   };
 };
 
 interface SettingRowProps {
   label: string;
-  description?: string;
+  description?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -203,23 +205,93 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
             >
               <MenuDialogBody>
                 {activeSection === 'general' && (
-                  <SettingRow
-                    label="Redirect URL After Sign In"
-                    description="Your app url after successful authentication"
-                  >
-                    <Input
-                      type="url"
-                      placeholder="https://yourapp.com/dashboard"
-                      {...form.register('signInRedirectTo')}
-                      className={form.formState.errors.signInRedirectTo ? 'border-destructive' : ''}
-                    />
-                    {form.formState.errors.signInRedirectTo && (
-                      <p className="pt-1 text-xs text-destructive">
-                        {form.formState.errors.signInRedirectTo.message ||
-                          'Please enter a valid URL'}
-                      </p>
-                    )}
-                  </SettingRow>
+                  <>
+                    <SettingRow
+                      label="Redirect URL After Sign In"
+                      description="Your app url after successful authentication"
+                    >
+                      <Input
+                        type="url"
+                        placeholder="https://yourapp.com/dashboard"
+                        {...form.register('signInRedirectTo')}
+                        className={
+                          form.formState.errors.signInRedirectTo ? 'border-destructive' : ''
+                        }
+                      />
+                      {form.formState.errors.signInRedirectTo && (
+                        <p className="pt-1 text-xs text-destructive">
+                          {form.formState.errors.signInRedirectTo.message ||
+                            'Please enter a valid URL'}
+                        </p>
+                      )}
+                    </SettingRow>
+
+                    <SettingRow
+                      label="Redirect URL Whitelist"
+                      description={
+                        <div>
+                          <p>
+                            Allowed URLs for authentication redirects. If empty, all URLs are
+                            allowed.
+                          </p>
+                          {((form.watch('redirectUrlWhitelist') || []) as string[]).length ===
+                            0 && (
+                            <div className="mt-1.5 flex items-center gap-1.5 text-destructive">
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                              <span className="text-[12px] font-medium leading-[16px]">
+                                Insecure and discouraged for production.
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      }
+                    >
+                      <div className="flex flex-col gap-2">
+                        {(form.watch('redirectUrlWhitelist') || []).map((url, index) => (
+                          <div key={index} className="flex gap-2">
+                            <Input
+                              value={url}
+                              onChange={(e) => {
+                                const newList = [...(form.getValues('redirectUrlWhitelist') || [])];
+                                newList[index] = e.target.value;
+                                form.setValue('redirectUrlWhitelist', newList, {
+                                  shouldDirty: true,
+                                });
+                              }}
+                              placeholder="https://example.com"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={() => {
+                                const newList = [...(form.getValues('redirectUrlWhitelist') || [])];
+                                newList.splice(index, 1);
+                                form.setValue('redirectUrlWhitelist', newList, {
+                                  shouldDirty: true,
+                                });
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="self-start"
+                          onClick={() => {
+                            const newList = [...(form.getValues('redirectUrlWhitelist') || [])];
+                            newList.push('');
+                            form.setValue('redirectUrlWhitelist', newList, { shouldDirty: true });
+                          }}
+                        >
+                          <Plus className="mr-2 h-4 w-4" /> Add URL
+                        </Button>
+                      </div>
+                    </SettingRow>
+                  </>
                 )}
 
                 {activeSection === 'email-verification' && (

@@ -13,6 +13,7 @@ import { setRefreshTokenCookie } from '@/utils/cookies.js';
 import { parseClientType } from '@/utils/utils.js';
 import logger from '@/utils/logger.js';
 import jwt from 'jsonwebtoken';
+import { validateRedirectUrl } from '@/utils/auth-redirect.js';
 import {
   createOAuthConfigRequestSchema,
   updateOAuthConfigRequestSchema,
@@ -270,6 +271,10 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
       throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
+    if (!validateRedirectUrl(redirectUri, authConfig.redirectUrlWhitelist)) {
+      throw new AppError('Redirect URI is not whitelisted', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
     const jwtPayload = {
       provider: validatedProvider,
       redirectUri,
@@ -346,6 +351,12 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     const validatedProvider = providerValidation.data;
     if (!redirectUri) {
       throw new AppError('redirectUri is required', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
+    const authConfig = await authConfigService.getAuthConfig();
+    if (redirectUri && !validateRedirectUrl(redirectUri, authConfig.redirectUrlWhitelist)) {
+      logger.warn('Redirect URI is not whitelisted in shared callback', { redirectUri });
+      throw new AppError('Redirect URI is not whitelisted', 400, ERROR_CODES.INVALID_INPUT);
     }
 
     if (!codeChallenge) {
@@ -429,6 +440,12 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
 
     if (!redirectUri) {
       throw new AppError('redirectUri is required', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
+    const authConfig = await authConfigService.getAuthConfig();
+    if (!validateRedirectUrl(redirectUri, authConfig.redirectUrlWhitelist)) {
+      logger.warn('Redirect URI is not whitelisted in callback', { redirectUri });
+      throw new AppError('Redirect URI is not whitelisted', 400, ERROR_CODES.INVALID_INPUT);
     }
 
     if (!codeChallenge) {
