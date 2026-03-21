@@ -51,7 +51,6 @@ const defaultValues: UpdateAuthConfigRequest = {
   requireSpecialChar: false,
   verifyEmailMethod: 'code',
   resetPasswordMethod: 'code',
-  signInRedirectTo: null,
   redirectUrlWhitelist: [],
 };
 
@@ -69,7 +68,6 @@ const toFormValues = (config?: AuthConfigSchema): UpdateAuthConfigRequest => {
     requireSpecialChar: config.requireSpecialChar,
     verifyEmailMethod: config.verifyEmailMethod,
     resetPasswordMethod: config.resetPasswordMethod,
-    signInRedirectTo: config.signInRedirectTo ?? null,
     redirectUrlWhitelist: config.redirectUrlWhitelist ?? [],
   };
 };
@@ -206,26 +204,6 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
               <MenuDialogBody>
                 {activeSection === 'general' && (
                   <>
-                    <SettingRow
-                      label="Redirect URL After Sign In"
-                      description="Your app url after successful authentication"
-                    >
-                      <Input
-                        type="url"
-                        placeholder="https://yourapp.com/dashboard"
-                        {...form.register('signInRedirectTo')}
-                        className={
-                          form.formState.errors.signInRedirectTo ? 'border-destructive' : ''
-                        }
-                      />
-                      {form.formState.errors.signInRedirectTo && (
-                        <p className="pt-1 text-xs text-destructive">
-                          {form.formState.errors.signInRedirectTo.message ||
-                            'Please enter a valid URL'}
-                        </p>
-                      )}
-                    </SettingRow>
-
                     <SettingRow
                       label="Redirect URL Whitelist"
                       description={

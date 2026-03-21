@@ -53,7 +53,6 @@ import {
 import { SocketManager } from '@/infra/socket/socket.manager.js';
 import { DataUpdateResourceType, ServerEvents } from '@/types/socket.js';
 import logger from '@/utils/logger.js';
-import { validateRedirectUrl } from '@/utils/auth-redirect.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -677,9 +676,9 @@ router.post(
       // Note: User enumeration is prevented at service layer
       // Service returns gracefully (no error) if user not found
       if (method === 'link') {
-        const redirectTo = authConfig.signInRedirectTo || options?.emailRedirectTo;
+        const redirectTo = options?.emailRedirectTo || authConfig.redirectUrlWhitelist?.[0];
 
-        if (redirectTo && !validateRedirectUrl(redirectTo, authConfig.redirectUrlWhitelist)) {
+        if (redirectTo && !(await authConfigService.validateRedirectUrl(redirectTo))) {
           logger.warn('Redirect URL is not whitelisted for verification email', { redirectTo });
           throw new AppError('Redirect URL is not whitelisted', 400, ERROR_CODES.INVALID_INPUT);
         }
