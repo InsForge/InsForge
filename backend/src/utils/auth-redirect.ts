@@ -10,7 +10,7 @@ export function normalizeUrl(urlStr: string): string {
   try {
     const url = new URL(urlStr);
     return url.href.replace(/\/$/, '');
-  } catch (error) {
+  } catch {
     // If invalid URL, return as is after trimming and lowercasing
     return urlStr.trim().toLowerCase().replace(/\/$/, '');
   }
