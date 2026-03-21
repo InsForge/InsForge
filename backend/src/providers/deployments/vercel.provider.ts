@@ -336,8 +336,14 @@ export class VercelProvider {
     const credentials = await this.getCredentials();
 
     try {
+      const queryString = new URLSearchParams();
+      if (credentials.teamId) {
+        queryString.append('teamId', credentials.teamId);
+      }
+      queryString.append('skipAutoDetectionConfirmation', '1');
+
       const response = await axios.post(
-        `https://api.vercel.com/v13/deployments${credentials.teamId ? `?teamId=${credentials.teamId}` : ''}&skipAutoDetectionConfirmation=1`,
+        `https://api.vercel.com/v13/deployments?${queryString.toString()}`,
         {
           name: options.name || 'deployment',
           target: 'production',

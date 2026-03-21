@@ -92,6 +92,11 @@ With custom environment variables:
 node backend/scripts/deploy-direct-agent.cjs ./frontend '[{"key":"VITE_API","value":"http://api.local"}]'
 ```
 
+> [!WARNING]
+> **Do not pass sensitive secrets (like API keys or passwords) directly on the command line.** 
+> Arguments passed via shell are visible in shell history files (e.g., `.bash_history`) and system process lists (e.g., `ps aux`). 
+> For sensitive variables, consider fetching them inside your application code from a secure configuration service/backend or passing them via a configuration file lookup during builds instead.
+
 ---
 
 ## SPA Routing (React, Vue, etc.)

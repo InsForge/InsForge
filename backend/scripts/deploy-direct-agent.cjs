@@ -28,7 +28,7 @@ const jwt = require(jwtPath);
 
 // Configuration from .env
 const envPath = path.join(backendDir, '.env');
-let jwtSecret = 'local_secret'; // fallback
+let jwtSecret = process.env.JWT_SECRET || '';
 let backendPort = 7130;
 
 if (fs.existsSync(envPath)) {
@@ -39,11 +39,18 @@ if (fs.existsSync(envPath)) {
   if (portMatch && portMatch[1]) backendPort = parseInt(portMatch[1].trim(), 10);
 }
 
+if (!jwtSecret) {
+  console.error('Error: JWT_SECRET is required (set backend/.env or process env).');
+  process.exit(1);
+}
+
 const args = process.argv.slice(2);
 const sourceDir = args[0];
 
 if (!sourceDir) {
-  console.error('Usage: node deploy-direct-agent.cjs <source_directory_path> [envVars_json_string]');
+  console.error(
+    'Usage: node deploy-direct-agent.cjs <source_directory_path> [envVars_json_string]'
+  );
   console.error('Example: node deploy-direct-agent.cjs ../frontend');
   process.exit(1);
 }
@@ -55,7 +62,11 @@ if (!fs.existsSync(absoluteSource)) {
 }
 
 // 1. Generate Admin JWT Token
-const token = jwt.sign({ sub: 'admin', email: 'admin@insforge.local', role: 'project_admin' }, jwtSecret, { expiresIn: '10m' });
+const token = jwt.sign(
+  { sub: 'admin', email: 'admin@insforge.local', role: 'project_admin' },
+  jwtSecret,
+  { expiresIn: '10m' }
+);
 
 // 2. Create ZIP
 console.log(`Zipping source directory: ${absoluteSource}...`);
@@ -71,13 +82,17 @@ const boundary = '----InsForgeAgentBoundary' + Math.random().toString(16).substr
 let bodyParts = [];
 
 if (envVars.length > 0) {
-    bodyParts.push(
-        Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="envVars"\r\n\r\n${JSON.stringify(envVars)}\r\n`)
-    );
+  bodyParts.push(
+    Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="envVars"\r\n\r\n${JSON.stringify(envVars)}\r\n`
+    )
+  );
 }
 
 bodyParts.push(
-    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="source.zip"\r\nContent-Type: application/zip\r\n\r\n`)
+  Buffer.from(
+    `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="source.zip"\r\nContent-Type: application/zip\r\n\r\n`
+  )
 );
 bodyParts.push(buffer);
 bodyParts.push(Buffer.from(`\r\n--${boundary}--`));
@@ -91,17 +106,19 @@ const options = {
   path: '/api/deployments/new/start-direct',
   method: 'POST',
   headers: {
-    'Authorization': `Bearer ${token}`,
+    Authorization: `Bearer ${token}`,
     'Content-Type': `multipart/form-data; boundary=${boundary}`,
-    'Content-Length': fullBody.length
-  }
+    'Content-Length': fullBody.length,
+  },
 };
 
 console.log(`Uploading to http://localhost:${backendPort}${options.path}...`);
 
 const req = http.request(options, (res) => {
   let responseData = '';
-  res.on('data', (chunk) => { responseData += chunk; });
+  res.on('data', (chunk) => {
+    responseData += chunk;
+  });
   res.on('end', () => {
     try {
       const result = JSON.parse(responseData);
@@ -120,6 +137,10 @@ const req = http.request(options, (res) => {
       console.error(`\n❌ Error parsing response (${res.statusCode}):`, responseData);
     }
   });
+});
+
+req.setTimeout(30000, () => {
+  req.destroy(new Error('Request timed out after 30 seconds'));
 });
 
 req.on('error', (e) => {
