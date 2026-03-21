@@ -29,7 +29,7 @@ export class EmbeddingService {
     try {
       // Send request with automatic renewal and retry logic (same pattern as chat-completion)
       const aiConfig = await this.aiConfigService.findByModelId(options.model);
-      const { result: response, source } = await this.openRouterProvider.sendRequest((client) =>
+      const { result: response } = await this.openRouterProvider.sendRequest((client) =>
         client.embeddings.create({
           model: options.model,
           input: options.input,
@@ -53,8 +53,8 @@ export class EmbeddingService {
           }
         : undefined;
 
-      // Track usage if config is available and BYOK is not active
-      if (aiConfig?.id && tokenUsage && source !== 'byok') {
+      // Track usage if config is available
+      if (aiConfig?.id && tokenUsage) {
         const outputTokens = Math.max(
           0,
           (tokenUsage.totalTokens || 0) - (tokenUsage.promptTokens || 0)
