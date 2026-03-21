@@ -14,18 +14,18 @@ export class LocalStorageProvider implements StorageProvider {
     await fs.mkdir(this.baseDir, { recursive: true });
   }
 
-  private validateBucketName(bucket: string) {
+  private getValidatedPath(...parts: string[]): string {
+    const [bucket, ...rest] = parts;
+
     if (!bucket || bucket.trim() === '') {
       throw new Error('Invalid bucket name');
     }
     if (!/^[a-zA-Z0-9-_]+$/.test(bucket)) {
       throw new Error('Bucket name contains invalid characters');
     }
-  }
 
-  private getValidatedPath(...parts: string[]): string {
     const resolvedBaseDir = path.resolve(this.baseDir);
-    const resolvedPath = path.resolve(this.baseDir, ...parts);
+    const resolvedPath = path.resolve(this.baseDir, bucket, ...rest);
     const relativePath = path.relative(resolvedBaseDir, resolvedPath);
 
     if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
@@ -76,7 +76,6 @@ export class LocalStorageProvider implements StorageProvider {
 
   async deleteBucket(bucket: string): Promise<void> {
     try {
-      this.validateBucketName(bucket);
       const bucketPath = this.getValidatedPath(bucket);
       await fs.rm(bucketPath, { recursive: true, force: true });
     } catch (error) {

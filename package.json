@@ -84,7 +84,8 @@
     "release-it": "^19.0.4",
     "rimraf": "^5.0.5",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.38.0"
+    "typescript-eslint": "^8.38.0",
+    "vitest": "^4.1.0"
   },
   "repository": {
     "type": "git",
