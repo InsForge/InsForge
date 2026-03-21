@@ -18,8 +18,8 @@ interface CloudCredentialsResponse {
 
 interface VercelCredentials {
   token: string;
-  teamId: string;
-  projectId: string;
+  teamId: string | null;
+  projectId: string | null;
   expiresAt: Date | null;
   slug: string | null;
 }
@@ -97,11 +97,11 @@ export class VercelProvider {
     const customTeamId = await this.secretService.getSecretByKey('VERCEL_CUSTOM_TEAM_ID');
     const customProjectId = await this.secretService.getSecretByKey('VERCEL_CUSTOM_PROJECT_ID');
 
-    if (customToken && customTeamId && customProjectId) {
+    if (customToken) {
       return {
         token: customToken,
-        teamId: customTeamId,
-        projectId: customProjectId,
+        teamId: customTeamId || null,
+        projectId: customProjectId || null,
         expiresAt: null,
         slug: null,
       };
@@ -119,22 +119,14 @@ export class VercelProvider {
         ERROR_CODES.INTERNAL_ERROR
       );
     }
-    if (!teamId) {
-      throw new AppError(
-        'VERCEL_TEAM_ID not found in environment variables or custom settings',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
-    if (!projectId) {
-      throw new AppError(
-        'VERCEL_PROJECT_ID not found in environment variables or custom settings',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
 
-    return { token, teamId, projectId, expiresAt: null, slug: null };
+    return {
+      token,
+      teamId: teamId || null,
+      projectId: projectId || null,
+      expiresAt: null,
+      slug: null,
+    };
   }
 
   /**
@@ -146,18 +138,12 @@ export class VercelProvider {
     }
 
     const customToken = await this.secretService.getSecretByKey('VERCEL_CUSTOM_TOKEN');
-    const customTeamId = await this.secretService.getSecretByKey('VERCEL_CUSTOM_TEAM_ID');
-    const customProjectId = await this.secretService.getSecretByKey('VERCEL_CUSTOM_PROJECT_ID');
 
-    if (customToken && customTeamId && customProjectId) {
+    if (customToken) {
       return true;
     }
 
-    return !!(
-      process.env.VERCEL_TOKEN &&
-      process.env.VERCEL_TEAM_ID &&
-      process.env.VERCEL_PROJECT_ID
-    );
+    return !!process.env.VERCEL_TOKEN;
   }
 
   /**
@@ -351,11 +337,11 @@ export class VercelProvider {
 
     try {
       const response = await axios.post(
-        `https://api.vercel.com/v13/deployments?teamId=${credentials.teamId}&skipAutoDetectionConfirmation=1`,
+        `https://api.vercel.com/v13/deployments${credentials.teamId ? `?teamId=${credentials.teamId}` : ''}&skipAutoDetectionConfirmation=1`,
         {
           name: options.name || 'deployment',
           target: 'production',
-          project: credentials.projectId,
+          project: credentials.projectId || undefined,
           files: options.files,
           projectSettings: options.projectSettings,
           meta: options.meta,

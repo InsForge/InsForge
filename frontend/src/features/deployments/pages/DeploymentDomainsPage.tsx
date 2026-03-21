@@ -37,12 +37,8 @@ export default function DeploymentDomainsPage() {
   const [credentialsForm, setCredentialsForm] = useState({ token: '', teamId: '', projectId: '' });
 
   const handleSaveCredentials = async () => {
-    if (
-      !credentialsForm.token.trim() ||
-      !credentialsForm.teamId.trim() ||
-      !credentialsForm.projectId.trim()
-    ) {
-      showToast('All fields are required', 'error');
+    if (!credentialsForm.token.trim()) {
+      showToast('Vercel Token is required', 'error');
       return;
     }
     try {
@@ -257,10 +253,16 @@ export default function DeploymentDomainsPage() {
                 </div>
 
                 <div className="flex items-center justify-between text-zinc-500 text-[11px] leading-relaxed">
-                  <span>
-                    In InsForge Cloud, deployments use cloud-managed credentials. Self-hosted/local
-                    can deploy with custom credentials stored here.
-                  </span>
+                  <div className="flex flex-col gap-0.5 max-w-[70%]">
+                    <span>
+                      In InsForge Cloud, deployments use cloud-managed credentials.
+                      Self-hosted/local can deploy with custom credentials stored here.
+                    </span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1 mt-0.5">
+                      💡 Project ID and Team ID are optional for new projects (Vercel will create
+                      them automatically).
+                    </span>
+                  </div>
                   <Button
                     onClick={() => void handleSaveCredentials()}
                     disabled={isSaving}

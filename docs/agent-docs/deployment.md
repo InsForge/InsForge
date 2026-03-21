@@ -70,6 +70,30 @@ Once status is `READY`, the `url` column contains the live deployment URL.
 SELECT url FROM system.deployments WHERE id = '<deployment-id>';
 ```
 
+## Deploy with Agent Script (Self-Hosted / Local)
+
+In self-hosted or local environments without AWS S3 configured, you can trigger a direct deployment using the built-in deployment script. This bundles your source folder and sends a buffered upload directly to the InsForge backend API.
+
+### Usage
+
+Run the script using Node.js:
+
+```bash
+node backend/scripts/deploy-direct-agent.cjs <source_directory_path> [envVars_array_json]
+```
+
+**Example:**
+```bash
+node backend/scripts/deploy-direct-agent.cjs ./frontend
+```
+
+With custom environment variables:
+```bash
+node backend/scripts/deploy-direct-agent.cjs ./frontend '[{"key":"VITE_API","value":"http://api.local"}]'
+```
+
+---
+
 ## SPA Routing (React, Vue, etc.)
 
 Add `vercel.json` to your project root:
@@ -89,6 +113,7 @@ Add `vercel.json` to your project root:
 
 | Task | Tool | Command |
 |------|------|---------|
-| Deploy app | `create-deployment` | Provide `sourceDirectory` and `envVars` |
+| Deploy app (Cloud) | `create-deployment` | Provide `sourceDirectory` and `envVars` |
+| Deploy app (Self-Hosted) | Script | `node backend/scripts/deploy-direct-agent.cjs <source_dir>` |
 | Check status | `run-raw-sql` | `SELECT status FROM system.deployments WHERE id = '...'` |
 | List deployments | `run-raw-sql` | `SELECT * FROM system.deployments ORDER BY created_at DESC` |
