@@ -50,7 +50,8 @@ interface GatewayConfigDialogProps {
 }
 
 export function GatewayConfigDialog({ open, onOpenChange }: GatewayConfigDialogProps) {
-  const { gatewayConfig, isLoadingGatewayConfig, setBYOKKey, removeBYOKKey } = useAIGatewayConfig();
+  const { gatewayConfig, isLoadingGatewayConfig, gatewayConfigError, setBYOKKey, removeBYOKKey } =
+    useAIGatewayConfig();
 
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [showKey, setShowKey] = useState(false);
@@ -105,6 +106,10 @@ export function GatewayConfigDialog({ open, onOpenChange }: GatewayConfigDialogP
             <p className="text-sm font-medium text-foreground">Active credential source</p>
             {isLoadingGatewayConfig ? (
               <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            ) : gatewayConfigError ? (
+              <p className="text-xs text-destructive">
+                Failed to load gateway configuration. Please close and try again.
+              </p>
             ) : gatewayConfig ? (
               <div className="flex items-center gap-3">
                 <KeySourceBadge config={gatewayConfig} />

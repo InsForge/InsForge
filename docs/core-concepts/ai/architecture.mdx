@@ -358,14 +358,43 @@ async function retryableRequest(fn, maxRetries = 3) {
 | GET | `/api/ai/usage/summary` | Admin | Get usage summary statistics |
 | GET | `/api/ai/usage/config/:configId` | Admin | Get usage by configuration |
 
+## Gateway Credentials & BYOK
+
+InsForge resolves the OpenRouter API key using the following priority order:
+
+| Priority | Source | Description |
+|----------|--------|-------------|
+| 1 | **BYOK (Bring Your Own Key)** | Developer-provided key, configured from the dashboard. Stored encrypted in the database. |
+| 2 | **Cloud-managed** | Automatically fetched from InsForge Cloud (cloud projects only). |
+| 3 | **Environment variable** | `OPENROUTER_API_KEY` from the server environment (self-hosted fallback). |
+
+The first available source wins. For example, if a BYOK key is configured, it is always used regardless of whether a cloud-managed or environment key is also available.
+
+### Managing BYOK Keys
+
+Admins can set, replace, or remove a BYOK key from the **AI** page in the dashboard under **Gateway Credentials**. The key is validated against OpenRouter before being saved. Removing a BYOK key reverts to the next available source (cloud-managed or environment variable).
+
+### Usage Tracking
+
+When a BYOK key is active, usage is not tracked by InsForge — billing goes directly to the developer's OpenRouter account. Usage tracking only applies to cloud-managed and environment variable sources.
+
+### API Endpoints
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/api/ai/gateway/config` | Admin | Get current credential source and masked key status |
+| POST | `/api/ai/gateway/config` | Admin | Set or replace the BYOK OpenRouter key |
+| DELETE | `/api/ai/gateway/config` | Admin | Remove the BYOK key, reverting to the default source |
+
 ## Environment Variables
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `OPENROUTER_API_KEY` | OpenRouter API key (local dev only) | Yes (local) |
+| `OPENROUTER_API_KEY` | OpenRouter API key (self-hosted fallback) | Only if no BYOK or cloud-managed key |
 
-**Note**: 
-- In cloud environments, the API key is fetched dynamically from the cloud API
+**Note**:
+- In cloud environments, the API key is fetched dynamically from the cloud API unless a BYOK key is configured
+- A BYOK key configured from the dashboard always takes precedence over other sources
 - Model configuration is stored in the database (`_ai_configs` table)
 - No other AI-related environment variables are used
 
