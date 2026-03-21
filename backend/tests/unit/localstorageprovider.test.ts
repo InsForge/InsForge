@@ -37,17 +37,13 @@ describe('LocalStorageProvider - deleteBucket', () => {
   });
 
   it('does not throw if bucket does not exist (ENOENT)', async () => {
-    await expect(
-      provider.deleteBucket('nonExistentBucket')
-    ).resolves.toBeUndefined();
+    await expect(provider.deleteBucket('nonExistentBucket')).resolves.toBeUndefined();
   });
 
   it('rethrows unexpected fs errors', async () => {
     const bucket = 'testBucket';
 
-    const spy = vi
-      .spyOn(fs, 'rm')
-      .mockRejectedValue({ code: 'EACCES' } as NodeJS.ErrnoException);
+    const spy = vi.spyOn(fs, 'rm').mockRejectedValue({ code: 'EACCES' } as NodeJS.ErrnoException);
 
     await expect(provider.deleteBucket(bucket)).rejects.toEqual({
       code: 'EACCES',
