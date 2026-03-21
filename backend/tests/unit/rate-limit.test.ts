@@ -260,6 +260,36 @@ describe('Rate Limit Middleware', () => {
       expect(secondNext).toHaveBeenCalledWith(expect.any(AppError));
     });
 
+    it('stale reservations do not repopulate state after the limiter is cleared', () => {
+      applyApiRateLimitConfig({
+        sendEmailOtpMaxRequests: 1,
+        sendEmailOtpWindowMinutes: 15,
+        verifyOtpMaxRequests: 10,
+        verifyOtpWindowMinutes: 15,
+        emailCooldownSeconds: 60,
+      });
+
+      const { request: firstRequest, response: firstResponse } = createRequestResponse();
+      const { request: secondRequest, response: secondResponse } = createRequestResponse();
+      const firstNext = vi.fn();
+      const secondNext = vi.fn();
+
+      sendEmailOTPRateLimiter(firstRequest, firstResponse, firstNext);
+      clearRateLimitState();
+      sendEmailOTPRateLimiter(secondRequest, secondResponse, secondNext);
+
+      expect(firstNext).toHaveBeenCalledOnce();
+      expect(secondNext).toHaveBeenCalledOnce();
+
+      firstResponse.emit('finish');
+
+      const { request: thirdRequest, response: thirdResponse } = createRequestResponse();
+      const thirdNext = vi.fn();
+      sendEmailOTPRateLimiter(thirdRequest, thirdResponse, thirdNext);
+
+      expect(thirdNext).toHaveBeenCalledWith(expect.any(AppError));
+    });
+
     it('verifyOTPRateLimiter only counts failed verification attempts', () => {
       applyApiRateLimitConfig({
         sendEmailOtpMaxRequests: 5,
@@ -293,6 +323,28 @@ describe('Rate Limit Middleware', () => {
       const error = blockingNext.mock.calls[0]?.[0];
       expect(error).toBeInstanceOf(AppError);
       expect((error as AppError).message).toMatch(/Too many verification attempts/);
+    });
+
+    it('verifyOTPRateLimiter counts early client disconnects as failed attempts', () => {
+      applyApiRateLimitConfig({
+        sendEmailOtpMaxRequests: 5,
+        sendEmailOtpWindowMinutes: 15,
+        verifyOtpMaxRequests: 1,
+        verifyOtpWindowMinutes: 15,
+        emailCooldownSeconds: 60,
+      });
+
+      const { request, response } = createRequestResponse();
+      const firstNext = vi.fn();
+      verifyOTPRateLimiter(request, response, firstNext);
+      expect(firstNext).toHaveBeenCalledOnce();
+
+      response.emit('close');
+
+      const blockingNext = vi.fn();
+      verifyOTPRateLimiter(request, response, blockingNext);
+
+      expect(blockingNext).toHaveBeenCalledWith(expect.any(AppError));
     });
   });
 });

@@ -32,6 +32,7 @@ const DEFAULT_API_RATE_LIMIT_CONFIG: RuntimeApiRateLimitConfig = {
 
 let currentApiRateLimitConfig: RuntimeApiRateLimitConfig = { ...DEFAULT_API_RATE_LIMIT_CONFIG };
 let nextRateLimitHitId = 0;
+let currentRateLimitGeneration = 0;
 
 /**
  * Cleanup interval reference for graceful shutdown
@@ -134,17 +135,22 @@ function createIpRateLimiter(options: IpRateLimiterOptions) {
       id: ++nextRateLimitHitId,
       timestamp: now,
     };
+    const reservationGeneration = currentRateLimitGeneration;
     options.store.set(ip, [...recentRequests, reservedHit]);
 
     let finalized = false;
-    const finalizeReservation = () => {
+    const finalizeReservation = (endedEarly: boolean) => {
       if (finalized) {
         return;
       }
       finalized = true;
 
+      if (reservationGeneration !== currentRateLimitGeneration) {
+        return;
+      }
+
       const statusCode = res.statusCode ?? 500;
-      const isSuccess = statusCode < 400;
+      const isSuccess = !endedEarly && statusCode < 400;
       const shouldCount =
         (isSuccess && options.countSuccessfulRequests) ||
         (!isSuccess && options.countFailedRequests);
@@ -164,8 +170,12 @@ function createIpRateLimiter(options: IpRateLimiterOptions) {
       }
     };
 
-    res.once('finish', finalizeReservation);
-    res.once('close', finalizeReservation);
+    let didFinish = false;
+    res.once('finish', () => {
+      didFinish = true;
+      finalizeReservation(false);
+    });
+    res.once('close', () => finalizeReservation(!didFinish));
 
     return next();
   };
@@ -183,10 +193,10 @@ export function destroyEmailCooldownInterval(): void {
 }
 
 export function clearRateLimitState(): void {
+  currentRateLimitGeneration += 1;
   emailCooldowns.clear();
   sendEmailOtpRequestsByIp.clear();
   verifyOtpRequestsByIp.clear();
-  nextRateLimitHitId = 0;
 }
 
 /**

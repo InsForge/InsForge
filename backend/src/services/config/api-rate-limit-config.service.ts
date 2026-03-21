@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { Pool, PoolClient } from 'pg';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -74,8 +74,9 @@ export class ApiRateLimitConfigService {
   async updateApiRateLimitConfig(
     input: UpdateApiRateLimitConfigRequest
   ): Promise<ApiRateLimitConfigSchema> {
-    const client = await this.getPool().connect();
+    let client: PoolClient | null = null;
     try {
+      client = await this.getPool().connect();
       await client.query('BEGIN');
       const result = await client.query(
         `INSERT INTO system.api_rate_limit_config (
@@ -132,7 +133,7 @@ export class ApiRateLimitConfigService {
         ERROR_CODES.INTERNAL_ERROR
       );
     } finally {
-      client.release();
+      client?.release();
     }
   }
 

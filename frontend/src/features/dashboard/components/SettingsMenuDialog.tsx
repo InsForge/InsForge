@@ -833,6 +833,9 @@ export default function SettingsMenuDialog() {
                       const messageId = `${fieldId}-message`;
                       const fieldError = rateLimitForm.formState.errors[fieldConfig.name];
                       const hasError = !!fieldError;
+                      const currentValue =
+                        rateLimitConfig?.[fieldConfig.name] ??
+                        defaultRateLimitValues[fieldConfig.name];
 
                       return (
                         <div key={fieldConfig.name}>
@@ -893,8 +896,7 @@ export default function SettingsMenuDialog() {
                                         id={messageId}
                                         className="pt-1 text-xs text-muted-foreground"
                                       >
-                                        Current: {rateLimitConfig?.[fieldConfig.name]}{' '}
-                                        {fieldConfig.unit}
+                                        Current: {currentValue} {fieldConfig.unit}
                                       </p>
                                     )}
                                   </div>
