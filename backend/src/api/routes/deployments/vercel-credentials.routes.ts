@@ -13,8 +13,8 @@ const auditService = AuditService.getInstance();
 
 const credentialsSchema = z.object({
   token: z.string().min(1, 'Token is required'),
-  teamId: z.string().min(1, 'Team ID is required'),
-  projectId: z.string().min(1, 'Project ID is required'),
+  teamId: z.string().optional(),
+  projectId: z.string().optional(),
 });
 
 /**
@@ -75,8 +75,8 @@ router.put('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextF
     };
 
     await upsert('VERCEL_CUSTOM_TOKEN', token);
-    await upsert('VERCEL_CUSTOM_TEAM_ID', teamId);
-    await upsert('VERCEL_CUSTOM_PROJECT_ID', projectId);
+    await upsert('VERCEL_CUSTOM_TEAM_ID', teamId || '');
+    await upsert('VERCEL_CUSTOM_PROJECT_ID', projectId || '');
 
     // Log audit
     await auditService.log({
