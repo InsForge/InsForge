@@ -156,12 +156,7 @@ export default function AIUsagePage() {
               <StatsCard
                 icon={Activity}
                 title="Embedding Requests"
-                value={
-                  isLoadingSummary
-                    ? 0
-                    : ((summary as typeof summary & { embeddingRequests?: number })
-                        ?.embeddingRequests ?? 0)
-                }
+                value={isLoadingSummary ? 0 : (summary?.embeddingRequests ?? 0)}
                 unit="requests"
                 description="Embedding requests"
                 isLoading={isLoadingSummary}
@@ -169,14 +164,7 @@ export default function AIUsagePage() {
               <StatsCard
                 icon={Zap}
                 title="Embedding Tokens"
-                value={
-                  isLoadingSummary
-                    ? 0
-                    : formatTokenCount(
-                        (summary as typeof summary & { embeddingTokens?: number })
-                          ?.embeddingTokens ?? 0
-                      )
-                }
+                value={isLoadingSummary ? 0 : formatTokenCount(summary?.embeddingTokens ?? 0)}
                 unit="tokens"
                 description="Embedding tokens consumed"
                 isLoading={isLoadingSummary}
@@ -262,7 +250,7 @@ export default function AIUsagePage() {
 }
 
 function UsageRow({ record }: { record: AIUsageRecordSchema }) {
-  const usageType = (record as AIUsageRecordSchema & { usageType?: string }).usageType;
+  const usageType = record.usageType;
 
   return (
     <div className="grid grid-cols-5 gap-x-2.5 h-10 items-center text-sm px-4 border-b border-[var(--alpha-8)] last:border-b-0 hover:bg-[var(--alpha-4)] transition-colors">
