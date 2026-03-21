@@ -6,7 +6,6 @@ import logger from '@/utils/logger.js';
 import { generateSecureToken } from '@/utils/utils.js';
 import type { CreateSessionResponse } from '@insforge/shared-schemas';
 import { AuthService } from './auth.service.js';
-import { AuthConfigService } from './auth-config.service.js';
 
 /**
  * Minimal data stored for each PKCE code
@@ -139,7 +138,6 @@ export class OAuthPKCEService {
 
     // Fetch user and generate fresh token
     const authService = AuthService.getInstance();
-    const authConfigService = AuthConfigService.getInstance();
     const tokenManager = TokenManager.getInstance();
 
     const user = await authService.getUserSchemaById(data.userId);
@@ -153,14 +151,12 @@ export class OAuthPKCEService {
       email: user.email,
       role: 'authenticated',
     });
-    const authConfig = await authConfigService.getAuthConfig();
 
     logger.info('OAuth PKCE code successfully exchanged', { provider: data.provider });
 
     return {
       user,
       accessToken,
-      redirectTo: authConfig.signInRedirectTo || undefined,
     };
   }
 

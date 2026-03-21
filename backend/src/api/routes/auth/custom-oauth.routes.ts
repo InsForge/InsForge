@@ -228,11 +228,14 @@ router.get('/:key', async (req: Request, res: Response, next: NextFunction) => {
     }
 
     const { redirect_uri, code_challenge } = queryValidation.data;
-    const authConfig = await authConfigService.getAuthConfig();
-    const redirectUri = authConfig.signInRedirectTo || redirect_uri;
+    const redirectUri = redirect_uri;
     if (!redirectUri) {
       throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
     }
+
+    // Validate redirect URI against the whitelist before storing it in the signed state.
+    // If the whitelist is empty, validation is skipped (permissive dev mode).
+    await authConfigService.validateRedirectUrl(redirectUri);
 
     const state = jwt.sign(
       {
@@ -284,6 +287,9 @@ router.get('/:key/callback', async (req: Request, res: Response, next: NextFunct
     if (!stateData.codeChallenge) {
       throw new AppError('code_challenge is required in state', 400, ERROR_CODES.INVALID_INPUT);
     }
+
+    // Re-validate redirect URI against current whitelist before using it.
+    await authConfigService.validateRedirectUrl(stateData.redirectUri);
 
     const oauthUser = await customOAuthProvider.handleCallback(key, code, state);
     const session = await authService.findOrCreateThirdPartyUser(

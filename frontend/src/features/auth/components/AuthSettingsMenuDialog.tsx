@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Lock, Mail, Settings } from 'lucide-react';
+import { Lock, Mail, Settings, X, Plus } from 'lucide-react';
 import {
   Button,
   Checkbox,
@@ -29,6 +29,7 @@ import {
 } from '@insforge/ui';
 import {
   updateAuthConfigRequestSchema,
+  urlOrWildcardPattern,
   type AuthConfigSchema,
   type UpdateAuthConfigRequest,
 } from '@insforge/shared-schemas';
@@ -51,7 +52,7 @@ const defaultValues: UpdateAuthConfigRequest = {
   requireSpecialChar: false,
   verifyEmailMethod: 'code',
   resetPasswordMethod: 'code',
-  signInRedirectTo: null,
+  redirectUrlWhitelist: [],
 };
 
 const toFormValues = (config?: AuthConfigSchema): UpdateAuthConfigRequest => {
@@ -68,7 +69,7 @@ const toFormValues = (config?: AuthConfigSchema): UpdateAuthConfigRequest => {
     requireSpecialChar: config.requireSpecialChar,
     verifyEmailMethod: config.verifyEmailMethod,
     resetPasswordMethod: config.resetPasswordMethod,
-    signInRedirectTo: config.signInRedirectTo ?? null,
+    redirectUrlWhitelist: config.redirectUrlWhitelist ?? [],
   };
 };
 
@@ -101,15 +102,22 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
   const [activeSection, setActiveSection] = useState<AuthSettingsSection>('general');
   const { config, isLoading, isUpdating, updateConfig } = useAuthConfig();
 
+  // Local state for the new-URL input in the General section
+  const [newUrlInput, setNewUrlInput] = useState('');
+  const [newUrlError, setNewUrlError] = useState('');
+
   const form = useForm<UpdateAuthConfigRequest>({
     resolver: zodResolver(updateAuthConfigRequestSchema),
     defaultValues,
   });
 
   const requireEmailVerification = form.watch('requireEmailVerification');
+  const redirectUrlWhitelist = form.watch('redirectUrlWhitelist') ?? [];
 
   const resetForm = useCallback(() => {
     form.reset(toFormValues(config));
+    setNewUrlInput('');
+    setNewUrlError('');
   }, [config, form]);
 
   useEffect(() => {
@@ -144,6 +152,50 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
   }, [activeSection]);
 
   const saveDisabled = !form.formState.isDirty || isUpdating;
+
+  // ---- Redirect URL Whitelist helpers ----
+
+  const handleAddUrl = () => {
+    const trimmed = newUrlInput.trim();
+    if (!trimmed) {
+      setNewUrlError('Please enter a URL');
+      return;
+    }
+
+    // Validate against the same regex used by the backend — rejects ftp://, javascript:, etc.
+    if (!urlOrWildcardPattern.test(trimmed)) {
+      setNewUrlError(
+        'Please enter a valid http/https URL (e.g. https://yourapp.com/callback) or wildcard pattern (e.g. https://*.example.com)'
+      );
+      return;
+    }
+
+    if (redirectUrlWhitelist.includes(trimmed)) {
+      setNewUrlError('This URL is already in the list');
+      return;
+    }
+
+    form.setValue('redirectUrlWhitelist', [...redirectUrlWhitelist, trimmed], {
+      shouldDirty: true,
+    });
+    setNewUrlInput('');
+    setNewUrlError('');
+  };
+
+  const handleRemoveUrl = (urlToRemove: string) => {
+    form.setValue(
+      'redirectUrlWhitelist',
+      redirectUrlWhitelist.filter((u) => u !== urlToRemove),
+      { shouldDirty: true }
+    );
+  };
+
+  const handleNewUrlKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddUrl();
+    }
+  };
 
   return (
     <MenuDialog open={open} onOpenChange={handleOpenChange}>
@@ -203,23 +255,76 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
             >
               <MenuDialogBody>
                 {activeSection === 'general' && (
-                  <SettingRow
-                    label="Redirect URL After Sign In"
-                    description="Your app url after successful authentication"
-                  >
-                    <Input
-                      type="url"
-                      placeholder="https://yourapp.com/dashboard"
-                      {...form.register('signInRedirectTo')}
-                      className={form.formState.errors.signInRedirectTo ? 'border-destructive' : ''}
-                    />
-                    {form.formState.errors.signInRedirectTo && (
-                      <p className="pt-1 text-xs text-destructive">
-                        {form.formState.errors.signInRedirectTo.message ||
-                          'Please enter a valid URL'}
-                      </p>
+                  <>
+                    {redirectUrlWhitelist.length === 0 && (
+                      <div className="mb-4 rounded-md border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-200">
+                        <strong>Open redirects enabled</strong> — no whitelist is configured. Auth
+                        flows will accept any redirect URL. This is convenient for development but
+                        is not recommended for production deployments. Add at least one trusted URL
+                        to enforce redirect validation.
+                      </div>
                     )}
-                  </SettingRow>
+
+                    <SettingRow
+                      label="Redirect URL Whitelist"
+                      description="Only these URLs may be used as redirect targets in auth flows (OAuth, email verification). Leave empty to allow any URL (not recommended for production)."
+                    >
+                      <div className="flex flex-col gap-2">
+                        {redirectUrlWhitelist.length > 0 && (
+                          <ul className="flex flex-col gap-1.5">
+                            {redirectUrlWhitelist.map((url) => (
+                              <li
+                                key={url}
+                                className="flex items-center justify-between rounded-md border border-border bg-muted/40 px-3 py-1.5"
+                              >
+                                <span className="min-w-0 truncate text-sm text-foreground">
+                                  {url}
+                                </span>
+                                <button
+                                  type="button"
+                                  aria-label={`Remove ${url}`}
+                                  onClick={() => handleRemoveUrl(url)}
+                                  className="ml-2 shrink-0 rounded p-0.5 text-muted-foreground hover:text-destructive focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+
+                        <div className="flex items-start gap-2">
+                          <div className="min-w-0 flex-1">
+                            <Input
+                              type="text"
+                              placeholder="https://yourapp.com/callback"
+                              value={newUrlInput}
+                              onChange={(e) => {
+                                setNewUrlInput(e.target.value);
+                                if (newUrlError) {
+                                  setNewUrlError('');
+                                }
+                              }}
+                              onKeyDown={handleNewUrlKeyDown}
+                              className={newUrlError ? 'border-destructive' : ''}
+                            />
+                            {newUrlError && (
+                              <p className="pt-1 text-xs text-destructive">{newUrlError}</p>
+                            )}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={handleAddUrl}
+                            className="shrink-0"
+                          >
+                            <Plus className="mr-1.5 h-4 w-4" />
+                            Add
+                          </Button>
+                        </div>
+                      </div>
+                    </SettingRow>
+                  </>
                 )}
 
                 {activeSection === 'email-verification' && (

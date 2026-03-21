@@ -165,10 +165,11 @@ paths:
                     type: string
                     enum: [code, link]
                     description: Method for password reset (code = 6-digit OTP + exchange flow, link = magic link)
-                  signInRedirectTo:
-                    type: string
-                    nullable: true
-                    description: URL to redirect users after successful sign in
+                  redirectUrlWhitelist:
+                    type: array
+                    items:
+                      type: string
+                    description: List of allowed redirect URLs for auth flows (OAuth, email verification). Leave empty to allow any URL (not recommended for production).
                   createdAt:
                     type: string
                     format: date-time
@@ -224,10 +225,11 @@ paths:
                   type: string
                   enum: [code, link]
                   description: Method for password reset (code = 6-digit OTP + exchange flow, link = magic link)
-                signInRedirectTo:
-                  type: string
-                  nullable: true
-                  description: URL to redirect users after successful sign in
+                redirectUrlWhitelist:
+                  type: array
+                  items:
+                    type: string
+                  description: List of allowed redirect URLs for auth flows (OAuth, email verification). Leave empty to allow any URL (not recommended for production).
       responses:
         '200':
           description: Configuration updated successfully
@@ -267,9 +269,10 @@ paths:
                   resetPasswordMethod:
                     type: string
                     enum: [code, link]
-                  signInRedirectTo:
-                    type: string
-                    nullable: true
+                  redirectUrlWhitelist:
+                    type: array
+                    items:
+                      type: string
                   createdAt:
                     type: string
                     format: date-time

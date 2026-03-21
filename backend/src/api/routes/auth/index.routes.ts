@@ -189,6 +189,12 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
     }
 
     const { email, password, name, options } = validationResult.data;
+
+    // Validate redirect URL against whitelist before registration
+    if (options?.emailRedirectTo) {
+      await authConfigService.validateRedirectUrl(options.emailRedirectTo);
+    }
+
     const result: CreateUserResponse = await authService.register(email, password, name, options);
 
     // If the request is from a project_admin, do not set refresh token cookie or return session
@@ -676,7 +682,11 @@ router.post(
       // Note: User enumeration is prevented at service layer
       // Service returns gracefully (no error) if user not found
       if (method === 'link') {
-        const redirectTo = authConfig.signInRedirectTo || options?.emailRedirectTo;
+        const redirectTo = options?.emailRedirectTo;
+        // Validate the redirect target against the whitelist when one is provided
+        if (redirectTo) {
+          await authConfigService.validateRedirectUrl(redirectTo);
+        }
         await authService.sendVerificationEmailWithLink(email, redirectTo);
       } else {
         await authService.sendVerificationEmailWithCode(email);
