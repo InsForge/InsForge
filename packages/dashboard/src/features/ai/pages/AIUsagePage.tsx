@@ -32,10 +32,13 @@ function getDateRange(range: DateRange): { startDate?: string; endDate?: string 
   const now = new Date();
   const start = new Date(now);
   if (range === 'week') {
-    start.setDate(start.getDate() - 7);
+    const day = start.getDay(); // 0 = Sunday
+    start.setDate(start.getDate() - day);
+    start.setHours(0, 0, 0, 0);
   }
   if (range === 'month') {
-    start.setMonth(start.getMonth() - 1);
+    start.setDate(1);
+    start.setHours(0, 0, 0, 0);
   }
   return { startDate: start.toISOString(), endDate: now.toISOString() };
 }

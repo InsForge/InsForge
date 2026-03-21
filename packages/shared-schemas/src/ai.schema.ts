@@ -27,12 +27,15 @@ export const aiConfigurationWithUsageSchema = aiConfigurationSchema.extend({
     .optional(),
 });
 
+export const usageTypeSchema = z.enum(['chat', 'embedding', 'image_generation']);
+
 export const aiUsageDataSchema = z.object({
   configId: z.string().uuid(),
   inputTokens: z.number().int().optional(),
   outputTokens: z.number().int().optional(),
   imageCount: z.number().int().optional(),
   imageResolution: z.string().optional(),
+  usageType: usageTypeSchema.optional(),
 });
 
 export const aiUsageRecordSchema = aiUsageDataSchema.extend({
@@ -43,7 +46,7 @@ export const aiUsageRecordSchema = aiUsageDataSchema.extend({
   provider: z.string().nullable(),
   inputModality: z.array(modalitySchema).nullable(),
   outputModality: z.array(modalitySchema).nullable(),
-  usageType: z.string().optional(),
+  usageType: usageTypeSchema.default('chat'),
 });
 
 export const aiUsageSummarySchema = z.object({
@@ -61,6 +64,7 @@ export type ModalitySchema = z.infer<typeof modalitySchema>;
 export type AIConfigurationInputSchema = z.infer<typeof aiConfigurationInputSchema>;
 export type AIConfigurationSchema = z.infer<typeof aiConfigurationSchema>;
 export type AIConfigurationWithUsageSchema = z.infer<typeof aiConfigurationWithUsageSchema>;
+export type UsageTypeSchema = z.infer<typeof usageTypeSchema>;
 export type AIUsageDataSchema = z.infer<typeof aiUsageDataSchema>;
 export type AIUsageRecordSchema = z.infer<typeof aiUsageRecordSchema>;
 export type AIUsageSummarySchema = z.infer<typeof aiUsageSummarySchema>;
