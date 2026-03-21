@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Settings } from 'lucide-react';
+import { Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Settings, BarChart3 } from 'lucide-react';
 import { useAIConfigs } from '../hooks/useAIConfigs';
 import { useAIRemainingCredits } from '../hooks/useAIUsage';
 import { useConfirm } from '@/lib/hooks/useConfirm';
@@ -14,6 +14,7 @@ import {
   type SortDirection,
 } from '../helpers';
 import { GatewayConfigDialog, ModelRow } from '../components';
+import { UsageDialog } from '../components/UsageDialog';
 import type { AIModelSchema } from '@insforge/shared-schemas';
 
 export default function AIPage() {
@@ -39,6 +40,7 @@ export default function AIPage() {
   const [sortField, setSortField] = useState<SortField>('inputPrice');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [aiSettingsOpen, setAISettingsOpen] = useState(false);
+  const [usageOpen, setUsageOpen] = useState(false);
 
   // Set default active tab when providers are loaded
   useEffect(() => {
@@ -164,14 +166,24 @@ export default function AIPage() {
                   </span>
                 )}
               </div>
-              <Button
-                variant="secondary"
-                onClick={() => setAISettingsOpen(true)}
-                className="h-9 rounded px-2 text-foreground"
-              >
-                <Settings className="h-5 w-5 stroke-[1.7]" />
-                <span className="px-1">Gateway credentials</span>
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => setUsageOpen(true)}
+                  className="h-9 rounded px-2 text-foreground"
+                >
+                  <BarChart3 className="h-5 w-5 stroke-[1.7]" />
+                  <span className="px-1">Usage</span>
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setAISettingsOpen(true)}
+                  className="h-9 rounded px-2 text-foreground"
+                >
+                  <Settings className="h-5 w-5 stroke-[1.7]" />
+                  <span className="px-1">Gateway credentials</span>
+                </Button>
+              </div>
             </div>
             <p className="text-sm leading-5 text-muted-foreground">
               Your models are ready — build LLM-powered features or add more integrations.
@@ -282,6 +294,9 @@ export default function AIPage() {
 
       {/* Gateway Credentials Dialog */}
       <GatewayConfigDialog open={aiSettingsOpen} onOpenChange={setAISettingsOpen} />
+
+      {/* Usage Dialog */}
+      <UsageDialog open={usageOpen} onOpenChange={setUsageOpen} />
     </div>
   );
 }

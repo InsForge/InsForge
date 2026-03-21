@@ -76,7 +76,7 @@ function FeatureSidebarItemRow({
   itemActions,
 }: FeatureSidebarItemProps) {
   // Each item determines its own active state using React Router's useMatch
-  const match = useMatch({ path: item.href ?? '/__secondary_menu_no_match__', end: !!item.exact });
+  const match = useMatch({ path: item.href ?? '/__secondary_menu_no_match__', end: false });
   const hasExternalActiveItem = activeItemId !== null && activeItemId !== undefined;
   const isSelected = hasExternalActiveItem ? item.id === activeItemId : !!match;
   const menuActions = itemActions?.(item) ?? [];

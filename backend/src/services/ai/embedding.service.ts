@@ -11,7 +11,7 @@ export class EmbeddingService {
   private aiConfigService = AIConfigService.getInstance();
   private aiUsageService = AIUsageService.getInstance();
 
-  private constructor() { }
+  private constructor() {}
 
   public static getInstance(): EmbeddingService {
     if (!EmbeddingService.instance) {
@@ -30,14 +30,14 @@ export class EmbeddingService {
     try {
       // Send request with automatic renewal and retry logic (same pattern as chat-completion)
       const aiConfig = await this.aiConfigService.findByModelId(options.model);
-      const response = (await this.openRouterProvider.sendRequest((client) =>
+      const { result: response } = await this.openRouterProvider.sendRequest((client) =>
         client.embeddings.create({
           model: options.model,
           input: options.input,
           encoding_format: options.encoding_format || 'float',
           dimensions: options.dimensions,
         })
-      )) as OpenAI.CreateEmbeddingResponse;
+      );
 
       logger.debug('Embeddings generated successfully', {
         model: response.model,
@@ -49,9 +49,9 @@ export class EmbeddingService {
       // Extract token usage if available
       const tokenUsage = response.usage
         ? {
-          promptTokens: response.usage.prompt_tokens,
-          totalTokens: response.usage.total_tokens,
-        }
+            promptTokens: response.usage.prompt_tokens,
+            totalTokens: response.usage.total_tokens,
+          }
         : undefined;
 
       // Track usage if config is available
