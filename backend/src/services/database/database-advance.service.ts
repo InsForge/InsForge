@@ -74,10 +74,9 @@ export class DatabaseAdvanceService {
    * - DELETE operations on auth schema (prevents user deletion via raw SQL)
    * - TRUNCATE operations on auth schema (prevents mass user deletion)
    * - DROP operations on auth schema (prevents destruction of tables, indexes, triggers, functions, views, sequences, schemas, policies, types, domains)
-   * - CREATE/ALTER/DROP FUNCTION on system, schedules, extensions, storage, realtime schemas
-   * - CREATE TRIGGER that references a function from those protected schemas
-   * - Any DDL (CREATE TABLE, ALTER TABLE, DROP) on those protected schemas
-   * - DELETE / TRUNCATE on those protected schemas
+   * - CREATE/ALTER/DROP FUNCTION on system schema
+   * - CREATE TRIGGER that references a function from the system schema
+   * - Any DDL (CREATE TABLE, ALTER TABLE, DROP) on the system schema
    *
    * Allows:
    * - SELECT queries on auth schema (for reading user data)

@@ -219,17 +219,24 @@ export function checkAuthSchemaOperations(query: string): string | null {
 }
 
 /**
- * Protected internal schemas that users must not modify via the SQL editor.
- * Any CREATE, ALTER, or DROP on objects within these schemas is blocked.
+ * Extract the schema name from a libpg-query name list (array of String nodes).
+ * Returns the first element if it looks like a schema (i.e. list has >= 2 items).
  */
-const PROTECTED_SCHEMAS = new Set(['system', 'schedules', 'extensions', 'storage', 'realtime']);
+function getSchemaFromNameList(items: Array<Record<string, unknown>>): string | null {
+  if (items.length < 2) return null;
+  const first = items[0];
+  return ((first.String as Record<string, unknown> | undefined)?.sval as string) ?? null;
+}
 
 /**
- * Check if a query contains dangerous DDL operations on protected internal schemas
- * (system, schedules, extensions, storage, realtime).
+ * Check if a query tries to CREATE, ALTER, or DROP objects inside the `system` schema,
+ * or CREATE a TRIGGER that calls a `system` schema function.
  * Returns an error message if blocked, null if allowed.
  */
 export function checkSystemSchemaOperations(query: string): string | null {
+  const BLOCKED = 'system';
+  const isSystem = (s: string | null) => s?.toLowerCase() === BLOCKED;
+
   try {
     const { stmts } = parseSync(query);
 
@@ -237,113 +244,60 @@ export function checkSystemSchemaOperations(query: string): string | null {
       const stmt = stmtWrapper.stmt as Record<string, unknown>;
       const [stmtType, data] = Object.entries(stmt)[0] as [string, Record<string, unknown>];
 
-      // Block CREATE FUNCTION / CREATE OR REPLACE FUNCTION on protected schemas
+      // CREATE [OR REPLACE] FUNCTION system.*
       if (stmtType === 'CreateFunctionStmt') {
-        const funcname = (data.funcname as Array<Record<string, unknown>>) || [];
-        if (funcname.length >= 2) {
-          const schemaItem = funcname[0];
-          const schemaName = (schemaItem.String as Record<string, unknown> | undefined)
-            ?.sval as string | undefined;
-          if (schemaName && PROTECTED_SCHEMAS.has(schemaName.toLowerCase())) {
-            return `CREATE OR REPLACE FUNCTION on schema "${schemaName}" is not allowed. System functions must not be modified.`;
-          }
+        const funcname = (data.funcname as Array<Record<string, unknown>>) ?? [];
+        if (isSystem(getSchemaFromNameList(funcname))) {
+          return 'Modifying functions in the "system" schema is not allowed.';
         }
       }
 
-      // Block CREATE TRIGGER that executes a function in a protected schema
-      if (stmtType === 'CreateTrigStmt') {
-        const funcname = (data.funcname as Array<Record<string, unknown>>) || [];
-        if (funcname.length >= 2) {
-          const schemaItem = funcname[0];
-          const schemaName = (schemaItem.String as Record<string, unknown> | undefined)
-            ?.sval as string | undefined;
-          if (schemaName && PROTECTED_SCHEMAS.has(schemaName.toLowerCase())) {
-            return `CREATE TRIGGER using a function from schema "${schemaName}" is not allowed. System trigger functions must not be attached to user tables.`;
-          }
-        }
-      }
-
-      // Block ALTER FUNCTION on protected schemas
+      // ALTER FUNCTION system.*
       if (stmtType === 'AlterFunctionStmt') {
-        const func = data.func as Record<string, unknown> | undefined;
-        const objname = (func?.objname as Array<Record<string, unknown>>) || [];
-        if (objname.length >= 2) {
-          const schemaItem = objname[0];
-          const schemaName = (schemaItem.String as Record<string, unknown> | undefined)
-            ?.sval as string | undefined;
-          if (schemaName && PROTECTED_SCHEMAS.has(schemaName.toLowerCase())) {
-            return `ALTER FUNCTION on schema "${schemaName}" is not allowed. System functions must not be modified.`;
-          }
+        const objname = ((data.func as Record<string, unknown>)?.objname as Array<Record<string, unknown>>) ?? [];
+        if (isSystem(getSchemaFromNameList(objname))) {
+          return 'Altering functions in the "system" schema is not allowed.';
         }
       }
 
-      // Block DROP on protected schemas (functions, tables, etc.)
+      // CREATE TRIGGER ... EXECUTE FUNCTION system.*
+      if (stmtType === 'CreateTrigStmt') {
+        const funcname = (data.funcname as Array<Record<string, unknown>>) ?? [];
+        if (isSystem(getSchemaFromNameList(funcname))) {
+          return 'Creating triggers that reference "system" schema functions is not allowed.';
+        }
+      }
+
+      // DROP FUNCTION/TABLE/SCHEMA/etc on system
       if (stmtType === 'DropStmt') {
-        const objects = (data.objects as Array<unknown>) || [];
+        const objects = (data.objects as Array<unknown>) ?? [];
         for (const obj of objects) {
           if (typeof obj !== 'object' || obj === null) continue;
-          const objRecord = obj as Record<string, unknown>;
-          let schemaName: string | null = null;
+          const o = obj as Record<string, unknown>;
+          let schema: string | null = null;
 
-          // DROP SCHEMA: direct String object
-          if (objRecord.String) {
-            const stringObj = objRecord.String as Record<string, unknown>;
-            schemaName = (stringObj.sval as string) ?? null;
-          }
-          // DROP TABLE/INDEX/VIEW/etc: List with [schema, name] items
-          else if (objRecord.List) {
-            const list = objRecord.List as Record<string, unknown>;
-            const items = (list.items as Array<Record<string, unknown>>) || [];
-            if (items.length > 0) {
-              const firstItem = items[0];
-              if (firstItem.String) {
-                schemaName = (firstItem.String as Record<string, unknown>).sval as string;
-              }
-            }
-          }
-          // DROP FUNCTION/PROCEDURE: ObjectWithArgs
-          else if (objRecord.ObjectWithArgs) {
-            const objectWithArgs = objRecord.ObjectWithArgs as Record<string, unknown>;
-            const objname = (objectWithArgs.objname as Array<Record<string, unknown>>) || [];
-            if (objname.length > 0) {
-              const firstItem = objname[0];
-              if (firstItem.String) {
-                schemaName = (firstItem.String as Record<string, unknown>).sval as string;
-              }
-            }
+          if (o.String) {
+            // DROP SCHEMA system
+            schema = ((o.String as Record<string, unknown>).sval as string) ?? null;
+          } else if (o.List) {
+            // DROP TABLE system.foo
+            schema = getSchemaFromNameList((o.List as Record<string, unknown>).items as Array<Record<string, unknown>> ?? []);
+          } else if (o.ObjectWithArgs) {
+            // DROP FUNCTION system.foo(...)
+            schema = getSchemaFromNameList((o.ObjectWithArgs as Record<string, unknown>).objname as Array<Record<string, unknown>> ?? []);
           }
 
-          if (schemaName && PROTECTED_SCHEMAS.has(schemaName.toLowerCase())) {
-            return `DROP operations on schema "${schemaName}" are not allowed. System schemas must not be modified.`;
+          if (isSystem(schema)) {
+            return 'DROP operations on the "system" schema are not allowed.';
           }
         }
       }
 
-      // Block CREATE TABLE / ALTER TABLE on protected schemas
+      // CREATE TABLE / ALTER TABLE system.*
       if (stmtType === 'CreateStmt' || stmtType === 'AlterTableStmt') {
         const relation = data.relation as Record<string, unknown> | undefined;
-        const schemaName = getSchemaName(relation);
-        if (schemaName && PROTECTED_SCHEMAS.has(schemaName.toLowerCase())) {
-          return `DDL operations on schema "${schemaName}" are not allowed. System schemas must not be modified.`;
-        }
-      }
-
-      // Block DELETE / TRUNCATE on protected schemas
-      if (stmtType === 'DeleteStmt') {
-        const relation = data.relation as Record<string, unknown> | undefined;
-        const schemaName = getSchemaName(relation);
-        if (schemaName && PROTECTED_SCHEMAS.has(schemaName.toLowerCase())) {
-          return `DELETE operations on schema "${schemaName}" are not allowed.`;
-        }
-      }
-
-      if (stmtType === 'TruncateStmt') {
-        const relations = (data.relations as Array<Record<string, unknown>>) || [];
-        for (const relation of relations) {
-          const schemaName = getSchemaName(relation);
-          if (schemaName && PROTECTED_SCHEMAS.has(schemaName.toLowerCase())) {
-            return `TRUNCATE operations on schema "${schemaName}" are not allowed.`;
-          }
+        if (isSystem(getSchemaName(relation))) {
+          return 'DDL operations on the "system" schema are not allowed.';
         }
       }
     }
