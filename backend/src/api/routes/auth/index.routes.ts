@@ -676,7 +676,11 @@ router.post(
       // Note: User enumeration is prevented at service layer
       // Service returns gracefully (no error) if user not found
       if (method === 'link') {
-        const redirectTo = options?.emailRedirectTo || authConfig.redirectUrlWhitelist?.[0];
+        const redirectTo = options?.emailRedirectTo;
+
+        if (!redirectTo) {
+          throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
+        }
 
         if (redirectTo && !(await authConfigService.validateRedirectUrl(redirectTo))) {
           logger.warn('Redirect URL is not whitelisted for verification email', { redirectTo });
