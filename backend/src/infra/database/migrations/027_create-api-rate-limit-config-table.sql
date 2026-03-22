@@ -4,6 +4,10 @@
 
 CREATE TABLE IF NOT EXISTS system.api_rate_limit_config (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  overall_api_max_requests INTEGER DEFAULT 3000 NOT NULL
+    CHECK (overall_api_max_requests >= 100 AND overall_api_max_requests <= 100000),
+  overall_api_window_minutes INTEGER DEFAULT 15 NOT NULL
+    CHECK (overall_api_window_minutes >= 1 AND overall_api_window_minutes <= 1440),
   send_email_otp_max_requests INTEGER DEFAULT 5 NOT NULL
     CHECK (send_email_otp_max_requests >= 1 AND send_email_otp_max_requests <= 100),
   send_email_otp_window_minutes INTEGER DEFAULT 15 NOT NULL
@@ -27,11 +31,13 @@ CREATE TRIGGER update_api_rate_limit_config_updated_at
   FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
 
 INSERT INTO system.api_rate_limit_config (
+  overall_api_max_requests,
+  overall_api_window_minutes,
   send_email_otp_max_requests,
   send_email_otp_window_minutes,
   verify_otp_max_requests,
   verify_otp_window_minutes,
   email_cooldown_seconds
 )
-VALUES (5, 15, 10, 15, 60)
+VALUES (3000, 15, 5, 15, 10, 15, 60)
 ON CONFLICT DO NOTHING;

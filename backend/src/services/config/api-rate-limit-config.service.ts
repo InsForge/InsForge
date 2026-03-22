@@ -12,6 +12,8 @@ const DEFAULT_API_RATE_LIMIT_CONFIG: Omit<
   ApiRateLimitConfigSchema,
   'id' | 'createdAt' | 'updatedAt'
 > = {
+  overallApiMaxRequests: 3000,
+  overallApiWindowMinutes: 15,
   sendEmailOtpMaxRequests: 5,
   sendEmailOtpWindowMinutes: 15,
   verifyOtpMaxRequests: 10,
@@ -46,6 +48,8 @@ export class ApiRateLimitConfigService {
       const result = await this.getPool().query(
         `SELECT
           id,
+          overall_api_max_requests as "overallApiMaxRequests",
+          overall_api_window_minutes as "overallApiWindowMinutes",
           send_email_otp_max_requests as "sendEmailOtpMaxRequests",
           send_email_otp_window_minutes as "sendEmailOtpWindowMinutes",
           verify_otp_max_requests as "verifyOtpMaxRequests",
@@ -80,15 +84,19 @@ export class ApiRateLimitConfigService {
       await client.query('BEGIN');
       const result = await client.query(
         `INSERT INTO system.api_rate_limit_config (
+           overall_api_max_requests,
+           overall_api_window_minutes,
            send_email_otp_max_requests,
            send_email_otp_window_minutes,
            verify_otp_max_requests,
            verify_otp_window_minutes,
            email_cooldown_seconds
          )
-         VALUES ($1, $2, $3, $4, $5)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT ((1))
          DO UPDATE SET
+           overall_api_max_requests = EXCLUDED.overall_api_max_requests,
+           overall_api_window_minutes = EXCLUDED.overall_api_window_minutes,
            send_email_otp_max_requests = EXCLUDED.send_email_otp_max_requests,
            send_email_otp_window_minutes = EXCLUDED.send_email_otp_window_minutes,
            verify_otp_max_requests = EXCLUDED.verify_otp_max_requests,
@@ -97,6 +105,8 @@ export class ApiRateLimitConfigService {
            updated_at = NOW()
          RETURNING
            id,
+           overall_api_max_requests as "overallApiMaxRequests",
+           overall_api_window_minutes as "overallApiWindowMinutes",
            send_email_otp_max_requests as "sendEmailOtpMaxRequests",
            send_email_otp_window_minutes as "sendEmailOtpWindowMinutes",
            verify_otp_max_requests as "verifyOtpMaxRequests",
@@ -105,6 +115,8 @@ export class ApiRateLimitConfigService {
            created_at as "createdAt",
            updated_at as "updatedAt"`,
         [
+          input.overallApiMaxRequests,
+          input.overallApiWindowMinutes,
           input.sendEmailOtpMaxRequests,
           input.sendEmailOtpWindowMinutes,
           input.verifyOtpMaxRequests,

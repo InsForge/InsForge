@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 export const apiRateLimitConfigSchema = z.object({
   id: z.string().uuid(),
+  overallApiMaxRequests: z.number().int().positive(),
+  overallApiWindowMinutes: z.number().int().positive(),
   sendEmailOtpMaxRequests: z.number().int().positive(),
   sendEmailOtpWindowMinutes: z.number().int().positive(),
   verifyOtpMaxRequests: z.number().int().positive(),

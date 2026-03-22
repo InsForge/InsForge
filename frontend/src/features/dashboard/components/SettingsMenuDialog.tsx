@@ -52,6 +52,8 @@ const INFO_FIELD_CLASS =
   'flex h-8 w-full items-center rounded border border-[var(--alpha-12)] bg-[var(--alpha-4)] px-2.5 text-sm leading-5 text-foreground';
 
 const defaultRateLimitValues: UpdateApiRateLimitConfigRequest = {
+  overallApiMaxRequests: 3000,
+  overallApiWindowMinutes: 15,
   sendEmailOtpMaxRequests: 5,
   sendEmailOtpWindowMinutes: 15,
   verifyOtpMaxRequests: 10,
@@ -67,6 +69,8 @@ const toRateLimitFormValues = (
   }
 
   return {
+    overallApiMaxRequests: config.overallApiMaxRequests,
+    overallApiWindowMinutes: config.overallApiWindowMinutes,
     sendEmailOtpMaxRequests: config.sendEmailOtpMaxRequests,
     sendEmailOtpWindowMinutes: config.sendEmailOtpWindowMinutes,
     verifyOtpMaxRequests: config.verifyOtpMaxRequests,
@@ -83,6 +87,23 @@ const rateLimitFields: Array<{
   min: number;
   max: number;
 }> = [
+  {
+    name: 'overallApiMaxRequests',
+    label: 'Overall API Requests',
+    description:
+      'Maximum total API requests allowed from the same IP within the configured window.',
+    unit: 'requests',
+    min: 100,
+    max: 100000,
+  },
+  {
+    name: 'overallApiWindowMinutes',
+    label: 'Overall API Window',
+    description: 'Time window used for the overall per-IP API limiter.',
+    unit: 'minutes',
+    min: 1,
+    max: 1440,
+  },
   {
     name: 'sendEmailOtpMaxRequests',
     label: 'Send OTP Requests',

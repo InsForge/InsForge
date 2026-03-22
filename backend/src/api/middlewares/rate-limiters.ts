@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import rateLimit from 'express-rate-limit';
 import { AppError } from './error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import type { ApiRateLimitConfigSchema } from '@insforge/shared-schemas';
@@ -15,6 +16,8 @@ const verifyOtpRequestsByIp = new Map<string, RateLimitHit[]>();
 
 type RuntimeApiRateLimitConfig = Pick<
   ApiRateLimitConfigSchema,
+  | 'overallApiMaxRequests'
+  | 'overallApiWindowMinutes'
   | 'sendEmailOtpMaxRequests'
   | 'sendEmailOtpWindowMinutes'
   | 'verifyOtpMaxRequests'
@@ -23,6 +26,8 @@ type RuntimeApiRateLimitConfig = Pick<
 >;
 
 const DEFAULT_API_RATE_LIMIT_CONFIG: RuntimeApiRateLimitConfig = {
+  overallApiMaxRequests: 3000,
+  overallApiWindowMinutes: 15,
   sendEmailOtpMaxRequests: 5,
   sendEmailOtpWindowMinutes: 15,
   verifyOtpMaxRequests: 10,
@@ -33,6 +38,7 @@ const DEFAULT_API_RATE_LIMIT_CONFIG: RuntimeApiRateLimitConfig = {
 let currentApiRateLimitConfig: RuntimeApiRateLimitConfig = { ...DEFAULT_API_RATE_LIMIT_CONFIG };
 let nextRateLimitHitId = 0;
 let currentRateLimitGeneration = 0;
+let currentOverallApiRateLimiter = buildOverallApiRateLimiter(currentApiRateLimitConfig);
 
 /**
  * Cleanup interval reference for graceful shutdown
@@ -90,13 +96,29 @@ function cleanupIpRequests(
 
 export function applyApiRateLimitConfig(config: RuntimeApiRateLimitConfig): void {
   currentApiRateLimitConfig = {
+    overallApiMaxRequests: config.overallApiMaxRequests,
+    overallApiWindowMinutes: config.overallApiWindowMinutes,
     sendEmailOtpMaxRequests: config.sendEmailOtpMaxRequests,
     sendEmailOtpWindowMinutes: config.sendEmailOtpWindowMinutes,
     verifyOtpMaxRequests: config.verifyOtpMaxRequests,
     verifyOtpWindowMinutes: config.verifyOtpWindowMinutes,
     emailCooldownSeconds: config.emailCooldownSeconds,
   };
+  currentOverallApiRateLimiter = buildOverallApiRateLimiter(currentApiRateLimitConfig);
 }
+
+function buildOverallApiRateLimiter(config: RuntimeApiRateLimitConfig) {
+  return rateLimit({
+    windowMs: config.overallApiWindowMinutes * 60 * 1000,
+    max: config.overallApiMaxRequests,
+    message: 'Too many requests from this IP',
+    skip: (req) => req.path === '/api/health',
+  });
+}
+
+export const overallApiRateLimiter = (req: Request, res: Response, next: NextFunction) => {
+  return currentOverallApiRateLimiter(req, res, next);
+};
 
 function getClientIp(req: Request): string {
   return req.ip || req.socket.remoteAddress || 'unknown';

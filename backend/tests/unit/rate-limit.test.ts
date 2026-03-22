@@ -15,6 +15,8 @@ describe('Rate Limit Middleware', () => {
   beforeEach(() => {
     clearRateLimitState();
     applyApiRateLimitConfig({
+      overallApiMaxRequests: 3000,
+      overallApiWindowMinutes: 15,
       sendEmailOtpMaxRequests: 5,
       sendEmailOtpWindowMinutes: 15,
       verifyOtpMaxRequests: 10,
@@ -176,6 +178,8 @@ describe('Rate Limit Middleware', () => {
         const start = new Date('2026-03-21T00:00:00Z');
         vi.setSystemTime(start);
         applyApiRateLimitConfig({
+          overallApiMaxRequests: 3000,
+          overallApiWindowMinutes: 15,
           sendEmailOtpMaxRequests: 5,
           sendEmailOtpWindowMinutes: 1,
           verifyOtpMaxRequests: 10,
@@ -215,6 +219,8 @@ describe('Rate Limit Middleware', () => {
 
     it('sendEmailOTPRateLimiter blocks after the configured number of requests', () => {
       applyApiRateLimitConfig({
+        overallApiMaxRequests: 3000,
+        overallApiWindowMinutes: 15,
         sendEmailOtpMaxRequests: 1,
         sendEmailOtpWindowMinutes: 15,
         verifyOtpMaxRequests: 10,
@@ -241,6 +247,8 @@ describe('Rate Limit Middleware', () => {
 
     it('sendEmailOTPRateLimiter reserves capacity before the first request finishes', () => {
       applyApiRateLimitConfig({
+        overallApiMaxRequests: 3000,
+        overallApiWindowMinutes: 15,
         sendEmailOtpMaxRequests: 1,
         sendEmailOtpWindowMinutes: 15,
         verifyOtpMaxRequests: 10,
@@ -262,6 +270,8 @@ describe('Rate Limit Middleware', () => {
 
     it('stale reservations do not repopulate state after the limiter is cleared', () => {
       applyApiRateLimitConfig({
+        overallApiMaxRequests: 3000,
+        overallApiWindowMinutes: 15,
         sendEmailOtpMaxRequests: 1,
         sendEmailOtpWindowMinutes: 15,
         verifyOtpMaxRequests: 10,
@@ -292,6 +302,8 @@ describe('Rate Limit Middleware', () => {
 
     it('verifyOTPRateLimiter only counts failed verification attempts', () => {
       applyApiRateLimitConfig({
+        overallApiMaxRequests: 3000,
+        overallApiWindowMinutes: 15,
         sendEmailOtpMaxRequests: 5,
         sendEmailOtpWindowMinutes: 15,
         verifyOtpMaxRequests: 1,
@@ -327,6 +339,8 @@ describe('Rate Limit Middleware', () => {
 
     it('verifyOTPRateLimiter counts early client disconnects as failed attempts', () => {
       applyApiRateLimitConfig({
+        overallApiMaxRequests: 3000,
+        overallApiWindowMinutes: 15,
         sendEmailOtpMaxRequests: 5,
         sendEmailOtpWindowMinutes: 15,
         verifyOtpMaxRequests: 1,
