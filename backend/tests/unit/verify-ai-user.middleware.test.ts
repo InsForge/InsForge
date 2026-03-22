@@ -13,15 +13,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // ---------------------------------------------------------------------------
 
 // Hoisted mock objects — must be declared before any imports.
-const { mockAIAccessService, mockVerifyApiKey } = vi.hoisted(() => ({
+const { mockAIAccessService } = vi.hoisted(() => ({
   mockAIAccessService: {
     isAnonAiAccessAllowed: vi.fn(),
   },
-  // Spy that stands in for verifyApiKey; calls next() with no argument to
-  // simulate successful API-key authentication.
-  mockVerifyApiKey: vi.fn((_req: unknown, _res: unknown, next: (err?: unknown) => void) => {
-    next();
-  }),
 }));
 
 vi.mock('../../src/services/ai/ai-access-config.service', () => ({

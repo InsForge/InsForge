@@ -162,10 +162,7 @@ export function AISettingsMenuDialog({ open, onOpenChange }: AISettingsMenuDialo
                     control={form.control}
                     render={({ field }) => (
                       <div className="py-1.5">
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
                       </div>
                     )}
                   />

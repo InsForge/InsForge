@@ -70,7 +70,12 @@ export class AIAccessConfigService {
         };
       }
 
-      return result.rows[0];
+      const row = result.rows[0];
+      return {
+        ...row,
+        createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+        updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+      };
     } catch (error) {
       logger.error('Failed to get AI access config, returning fallback values', { error });
       return {
@@ -106,9 +111,7 @@ export class AIAccessConfigService {
     try {
       await client.query('BEGIN');
 
-      const existingResult = await client.query(
-        'SELECT id FROM ai.config LIMIT 1 FOR UPDATE'
-      );
+      const existingResult = await client.query('SELECT id FROM ai.config LIMIT 1 FOR UPDATE');
 
       let result;
 
@@ -141,7 +144,12 @@ export class AIAccessConfigService {
 
       await client.query('COMMIT');
       logger.info('AI access config updated', { allowAnonAiAccess: input.allowAnonAiAccess });
-      return result.rows[0];
+      const row = result.rows[0];
+      return {
+        ...row,
+        createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+        updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+      };
     } catch (error) {
       try {
         await client.query('ROLLBACK');

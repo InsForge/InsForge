@@ -3,6 +3,7 @@ import { Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Settings } from 'lucid
 import { useAIConfigs } from '../hooks/useAIConfigs';
 import { useAIRemainingCredits } from '../hooks/useAIUsage';
 import { useConfirm } from '@/lib/hooks/useConfirm';
+import { useAuth } from '@/lib/contexts/AuthContext';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
 import { Tabs, Tab, ConfirmDialog, Button } from '@insforge/ui';
 import {
@@ -28,6 +29,8 @@ export default function AIPage() {
   } = useAIConfigs();
 
   const isCloud = isInsForgeCloudProject();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'project_admin';
 
   // Dynamically generate provider tabs from available models
   const providers = useMemo(() => generateProviderTabs(allAvailableModels), [allAvailableModels]);
@@ -166,14 +169,16 @@ export default function AIPage() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSettingsOpen(true)}
-                  aria-label="AI settings"
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSettingsOpen(true)}
+                    aria-label="AI settings"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button
                   variant="secondary"
                   onClick={() => setAISettingsOpen(true)}
