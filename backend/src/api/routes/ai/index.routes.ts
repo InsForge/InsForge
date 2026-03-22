@@ -34,9 +34,6 @@ const aiAccessConfigService = AIAccessConfigService.getInstance();
 const auditService = AuditService.getInstance();
 const aiGatewayConfigService = AIGatewayConfigService.getInstance();
 
-// Block anon API key requests when the per-project toggle is off
-router.use(checkAnonAccess);
-
 /**
  * GET /api/ai/models
  * Get all available AI models in ListModelsResponse format
@@ -110,6 +107,7 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
  */
 router.post(
   '/chat/completion',
+  checkAnonAccess,
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -192,6 +190,7 @@ router.post(
  */
 router.post(
   '/image/generation',
+  checkAnonAccess,
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -546,6 +545,7 @@ router.get('/credits', verifyAdmin, async (req: AuthRequest, res: Response, next
  */
 router.post(
   '/embeddings',
+  checkAnonAccess,
   verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {

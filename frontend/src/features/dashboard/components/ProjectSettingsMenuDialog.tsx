@@ -6,6 +6,7 @@ import {
   CopyButton,
   ConfirmDialog,
   Input,
+  Switch,
   MenuDialog,
   MenuDialogContent,
   MenuDialogDescription,
@@ -37,6 +38,7 @@ import { cn, compareVersions, isIframe, isInsForgeCloudProject } from '@/lib/uti
 import { MCPSection, CLISection, ConnectionStringSection } from './connect';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 import { metadataService } from '@/lib/services/metadata.service';
+import { useAIAccessConfig } from '@/features/ai/hooks/useAIAccessConfig';
 
 type TabType = 'info' | 'compute' | 'connect';
 
@@ -57,6 +59,11 @@ export default function ProjectSettingsMenuDialog() {
   const [isRotatingApiKey, setIsRotatingApiKey] = useState(false);
 
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();
+  const {
+    config: aiAccessConfig,
+    isLoading: isAiConfigLoading,
+    updateConfig: updateAiConfig,
+  } = useAIAccessConfig();
   const { version, isLoading: isVersionLoading } = useHealth();
   const { projectInfo, isLoading: isProjectInfoLoading } = useCloudProjectInfo();
   const { confirm, confirmDialogProps } = useConfirm();
@@ -504,6 +511,27 @@ export default function ProjectSettingsMenuDialog() {
 
                   <div className="flex h-5 items-center">
                     <div className="h-px w-full bg-[var(--alpha-8)]" />
+                  </div>
+
+                  <div className="flex items-start gap-6">
+                    <div className="w-[200px] shrink-0">
+                      <p className="py-1.5 text-sm leading-5 text-foreground">
+                        Anonymous AI Access
+                      </p>
+                      <p className="pb-2 text-[13px] leading-[18px] text-muted-foreground">
+                        Allow requests authenticated with the anon API key to call AI endpoints.
+                      </p>
+                    </div>
+                    <div className="flex min-w-0 flex-1 items-start gap-1.5 py-1.5">
+                      <Switch
+                        checked={aiAccessConfig?.allowAnonAiAccess ?? true}
+                        onCheckedChange={(checked) =>
+                          updateAiConfig({ allowAnonAiAccess: checked })
+                        }
+                        disabled={isAiConfigLoading}
+                        aria-label="Allow anonymous AI access"
+                      />
+                    </div>
                   </div>
 
                   {isCloud && isInIframe && (

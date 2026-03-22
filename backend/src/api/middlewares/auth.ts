@@ -251,7 +251,9 @@ export async function verifyCloudBackend(req: AuthRequest, _res: Response, next:
  */
 export async function checkAnonAccess(req: AuthRequest, _res: Response, next: NextFunction) {
   const apiKey = extractApiKey(req);
-  if (!apiKey) return next(); // JWT request — skip check
+  if (!apiKey) {
+    return next(); // JWT request — skip check
+  }
 
   try {
     const aiAccessConfigService = AIAccessConfigService.getInstance();
