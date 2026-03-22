@@ -244,32 +244,30 @@ export async function verifyCloudBackend(req: AuthRequest, _res: Response, next:
 }
 
 /**
- * Verifies user authentication for AI endpoints.
- * Behaves like verifyUser but additionally enforces the per-project
- * `allow_anon_ai_access` flag: when the flag is `false`, requests
- * authenticated via an API key (anon token) are rejected with 403.
- * Requests authenticated via a JWT user token are always allowed.
+ * Checks the per-project `allow_anon_ai_access` flag.
+ * When the flag is `false`, requests using an API key (anon token)
+ * are rejected with 403. JWT requests pass through unchanged.
+ * Apply as router-level middleware before verifyUser on AI routes.
  */
-export async function verifyAiUser(req: AuthRequest, res: Response, next: NextFunction) {
+export async function checkAnonAccess(req: AuthRequest, _res: Response, next: NextFunction) {
   const apiKey = extractApiKey(req);
-  if (apiKey) {
-    try {
-      const aiAccessConfigService = AIAccessConfigService.getInstance();
-      const allowed = await aiAccessConfigService.isAnonAiAccessAllowed();
-      if (!allowed) {
-        return next(
-          new AppError(
-            'Anonymous access to AI endpoints is disabled for this project',
-            403,
-            ERROR_CODES.AUTH_UNAUTHORIZED,
-            NEXT_ACTION.CHECK_TOKEN
-          )
-        );
-      }
-    } catch (error) {
-      return next(error);
+  if (!apiKey) return next(); // JWT request — skip check
+
+  try {
+    const aiAccessConfigService = AIAccessConfigService.getInstance();
+    const allowed = await aiAccessConfigService.isAnonAiAccessAllowed();
+    if (!allowed) {
+      return next(
+        new AppError(
+          'Anonymous access to AI endpoints is disabled for this project',
+          403,
+          ERROR_CODES.AUTH_UNAUTHORIZED,
+          NEXT_ACTION.CHECK_TOKEN
+        )
+      );
     }
-    return verifyApiKey(req, res, next);
+  } catch (error) {
+    return next(error);
   }
-  return verifyToken(req, res, next);
+  next();
 }

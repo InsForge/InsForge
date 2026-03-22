@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { ChatCompletionService } from '@/services/ai/chat-completion.service.js';
-import { AuthRequest, verifyAdmin, verifyAiUser } from '../../middlewares/auth.js';
+import { AuthRequest, verifyAdmin, verifyUser, checkAnonAccess } from '../../middlewares/auth.js';
 import { ImageGenerationService } from '@/services/ai/image-generation.service.js';
 import { EmbeddingService } from '@/services/ai/embedding.service.js';
 import { AIModelService } from '@/services/ai/ai-model.service.js';
@@ -33,6 +33,9 @@ const aiUsageService = AIUsageService.getInstance();
 const aiAccessConfigService = AIAccessConfigService.getInstance();
 const auditService = AuditService.getInstance();
 const aiGatewayConfigService = AIGatewayConfigService.getInstance();
+
+// Block anon API key requests when the per-project toggle is off
+router.use(checkAnonAccess);
 
 /**
  * GET /api/ai/models
@@ -107,7 +110,7 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
  */
 router.post(
   '/chat/completion',
-  verifyAiUser,
+  verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const validationResult = chatCompletionRequestSchema.safeParse(req.body);
@@ -189,7 +192,7 @@ router.post(
  */
 router.post(
   '/image/generation',
-  verifyAiUser,
+  verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const validationResult = imageGenerationRequestSchema.safeParse(req.body);
@@ -543,7 +546,7 @@ router.get('/credits', verifyAdmin, async (req: AuthRequest, res: Response, next
  */
 router.post(
   '/embeddings',
-  verifyAiUser,
+  verifyUser,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const validationResult = embeddingsRequestSchema.safeParse(req.body);
