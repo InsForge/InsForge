@@ -211,6 +211,7 @@ function CustomDomainRow({
 }) {
   const isReady = domain.verified && !domain.misconfigured;
   const [showVerification, setShowVerification] = useState(!isReady);
+  const customDomainUrl = `https://${domain.domain}`;
 
   return (
     <div className="bg-white dark:bg-[#333] rounded-lg px-3 py-3">
@@ -218,16 +219,16 @@ function CustomDomainRow({
         <div className="flex items-center gap-3 flex-wrap">
           {isReady ? (
             <a
-              href={`https://${domain.domain}`}
+              href={customDomainUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="text-[13px] font-medium text-zinc-950 dark:text-white underline hover:text-blue-600 dark:hover:text-blue-400"
             >
-              {domain.domain}
+              {customDomainUrl}
             </a>
           ) : (
             <span className="text-[13px] font-medium text-zinc-950 dark:text-white">
-              {domain.domain}
+              {customDomainUrl}
             </span>
           )}
           <StatusBadge verified={domain.verified} misconfigured={domain.misconfigured} />
@@ -265,9 +266,7 @@ function CustomDomainRow({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() =>
-                window.open(`https://${domain.domain}`, '_blank', 'noopener,noreferrer')
-              }
+              onClick={() => window.open(customDomainUrl, '_blank', 'noopener,noreferrer')}
               className="h-8 px-2 gap-1 text-zinc-950 dark:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700"
             >
               <ExternalLink className="w-3.5 h-3.5" />

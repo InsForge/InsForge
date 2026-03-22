@@ -47,7 +47,7 @@ export default function DeploymentOverviewPage() {
   const visibleDomains = [
     ...readyCustomDomains.map((domain) => ({
       href: `https://${domain.domain}`,
-      label: domain.domain,
+      label: `https://${domain.domain}`,
     })),
     ...(customDomainUrl
       ? [
