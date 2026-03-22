@@ -172,9 +172,6 @@ export class AuthService {
       try {
         if (emailAuthConfig.verifyEmailMethod === 'link') {
           const redirectTo = options?.emailRedirectTo;
-          if (!redirectTo) {
-            throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
-          }
           await this.sendVerificationEmailWithLink(email, redirectTo);
         } else {
           await this.sendVerificationEmailWithCode(email);
