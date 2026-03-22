@@ -30,6 +30,9 @@
   <a href="https://vercel.com/oss">
     <img alt="Vercel OSS Program" src="https://vercel.com/oss/program-badge-2026.svg" />
   </a>
+  <a href="https://gitcgr.com/InsForge/InsForge">
+    <img src="https://gitcgr.com/badge/InsForge/InsForge.svg" alt="gitcgr" />
+  </a>
 </div>
 
 ## InsForge
