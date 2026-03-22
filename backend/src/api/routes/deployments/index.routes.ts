@@ -5,12 +5,17 @@ import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse, paginatedResponse } from '@/utils/response.js';
-import { startDeploymentRequestSchema, updateSlugRequestSchema } from '@insforge/shared-schemas';
+import {
+  startDeploymentRequestSchema,
+  updateSlugRequestSchema,
+  addCustomDomainRequestSchema,
+} from '@insforge/shared-schemas';
 import { envVarsRouter } from './env-vars.routes.js';
 
 const router = Router();
 const deploymentService = DeploymentService.getInstance();
 const auditService = AuditService.getInstance();
+const domainParamSchema = addCustomDomainRequestSchema.shape.domain;
 
 // Mount sub-routers first to avoid conflicts with parameterized routes
 router.use('/env-vars', envVarsRouter);
@@ -165,6 +170,124 @@ router.put('/slug', verifyAdmin, async (req: AuthRequest, res: Response, next: N
     next(error);
   }
 });
+
+// ============================================================================
+// Custom Domain Routes (user-owned domains)
+// ============================================================================
+
+/**
+ * List all custom domains
+ * GET /api/deployments/domains
+ */
+router.get(
+  '/domains',
+  verifyAdmin,
+  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const result = await deploymentService.listCustomDomains();
+      successResponse(res, result);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * Add a custom domain
+ * POST /api/deployments/domains
+ */
+router.post(
+  '/domains',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validationResult = addCustomDomainRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const domain = await deploymentService.addCustomDomain(validationResult.data.domain);
+
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'ADD_CUSTOM_DOMAIN',
+        module: 'DEPLOYMENTS',
+        details: { domain: domain.domain },
+        ip_address: req.ip,
+      });
+
+      successResponse(res, domain, 201);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * Verify a custom domain's DNS configuration
+ * POST /api/deployments/domains/:domain/verify
+ */
+router.post(
+  '/domains/:domain/verify',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validationResult = domainParamSchema.safeParse(req.params.domain);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((issue) => issue.message).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const result = await deploymentService.verifyCustomDomain(validationResult.data);
+      successResponse(res, result);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * Remove a custom domain
+ * DELETE /api/deployments/domains/:domain
+ */
+router.delete(
+  '/domains/:domain',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const validationResult = domainParamSchema.safeParse(req.params.domain);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((issue) => issue.message).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const domain = validationResult.data;
+      await deploymentService.removeCustomDomain(domain);
+
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'REMOVE_CUSTOM_DOMAIN',
+        module: 'DEPLOYMENTS',
+        details: { domain },
+        ip_address: req.ip,
+      });
+
+      successResponse(res, { success: true, message: `Domain ${domain} removed` });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 /**
  * Get deployment by database ID

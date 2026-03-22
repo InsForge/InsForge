@@ -2,7 +2,10 @@ import { Pool } from 'pg';
 import AdmZip from 'adm-zip';
 import jwt from 'jsonwebtoken';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { VercelProvider } from '@/providers/deployments/vercel.provider.js';
+import {
+  VercelProvider,
+  type VercelDomainConfig,
+} from '@/providers/deployments/vercel.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -18,9 +21,21 @@ import type {
   StartDeploymentRequest,
   UpdateSlugResponse,
   DeploymentMetadataResponse,
+  CustomDomain,
+  ListCustomDomainsResponse,
+  AddCustomDomainResponse,
+  VerifyCustomDomainResponse,
 } from '@insforge/shared-schemas';
 
-export type { DeploymentRecord, UpdateSlugResponse, DeploymentMetadataResponse };
+export type {
+  DeploymentRecord,
+  UpdateSlugResponse,
+  DeploymentMetadataResponse,
+  CustomDomain,
+  ListCustomDomainsResponse,
+  AddCustomDomainResponse,
+  VerifyCustomDomainResponse,
+};
 
 // Deployment files are stored in a special "_deployments" bucket
 const DEPLOYMENT_BUCKET = '_deployments';
@@ -63,6 +78,62 @@ export class DeploymentService {
       this.pool = DatabaseManager.getInstance().getPool();
     }
     return this.pool;
+  }
+
+  private isReservedHostedDomain(domain: string): boolean {
+    return domain.endsWith('.vercel.app') || domain.endsWith('.insforge.site');
+  }
+
+  private pickPreferredARecord(config: VercelDomainConfig): string | null {
+    const rankOneValues = (config.recommendedIPv4 ?? [])
+      .filter((record) => record.rank === 1)
+      .flatMap((record) => record.value ?? []);
+
+    if (rankOneValues.length === 0) {
+      return null;
+    }
+
+    return rankOneValues.find((value) => value === '216.150.16.1') ?? rankOneValues[0];
+  }
+
+  private toCustomDomainResponse(
+    domain: {
+      name: string;
+      apexName: string;
+      verified: boolean;
+      verification?: Array<{ type: string; domain: string; value: string; reason: string }>;
+    },
+    config: VercelDomainConfig
+  ): CustomDomain {
+    return {
+      domain: domain.name,
+      apexDomain: domain.apexName,
+      verified: domain.verified,
+      misconfigured: config.misconfigured ?? false,
+      verification: (domain.verification ?? []).map((record) => ({
+        type: record.type,
+        domain: record.domain,
+        value: record.value,
+      })),
+      cnameTarget: config.recommendedCNAME?.find((record) => record.rank === 1)?.value ?? null,
+      aRecordValue: this.pickPreferredARecord(config),
+    };
+  }
+
+  private async getCustomDomainConfigOrEmpty(
+    configDomain: string,
+    requestedDomain: string
+  ): Promise<VercelDomainConfig> {
+    try {
+      return await this.vercelProvider.getCustomDomainConfig(configDomain);
+    } catch (error) {
+      logger.warn('Vercel domain config lookup failed; continuing without DNS hints', {
+        requestedDomain,
+        configDomain,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return {};
+    }
   }
 
   /**
@@ -783,6 +854,130 @@ export class DeploymentService {
         error: error instanceof Error ? error.message : String(error),
       });
       throw new AppError('Failed to update slug', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+  }
+
+  // ============================================================================
+  // Custom Domain Management (user-owned domains)
+  // ============================================================================
+
+  /**
+   * Add a user-owned custom domain on Vercel and return DNS instructions
+   */
+  async addCustomDomain(domain: string): Promise<AddCustomDomainResponse> {
+    if (!isCloudEnvironment()) {
+      throw new AppError(
+        'Custom domains are only available in cloud environment.',
+        503,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+
+    const vercelData = await this.vercelProvider.addCustomDomain(domain);
+    const config = await this.getCustomDomainConfigOrEmpty(vercelData.name, domain);
+
+    logger.info('Custom domain added', { domain, verified: vercelData.verified });
+    return this.toCustomDomainResponse(vercelData, config);
+  }
+
+  /**
+   * List all custom domains
+   */
+  async listCustomDomains(): Promise<ListCustomDomainsResponse> {
+    if (!isCloudEnvironment()) {
+      throw new AppError(
+        'Custom domains are only available in cloud environment.',
+        503,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+
+    try {
+      const domains = (await this.vercelProvider.listCustomDomains()).filter(
+        (domain) => !this.isReservedHostedDomain(domain.name)
+      );
+      const configs = new Map(
+        await Promise.all(
+          domains.map(
+            async (domain) =>
+              [
+                domain.name,
+                await this.getCustomDomainConfigOrEmpty(domain.name, domain.name),
+              ] as const
+          )
+        )
+      );
+
+      return {
+        domains: domains.map((domain) =>
+          this.toCustomDomainResponse(domain, configs.get(domain.name) ?? {})
+        ),
+      };
+    } catch (error) {
+      logger.error('Failed to list custom domains', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new AppError('Failed to list custom domains', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+  }
+
+  /**
+   * Remove a custom domain directly from Vercel
+   */
+  async removeCustomDomain(domain: string): Promise<void> {
+    if (!isCloudEnvironment()) {
+      throw new AppError(
+        'Custom domains are only available in cloud environment.',
+        503,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+
+    await this.vercelProvider.removeCustomDomain(domain);
+
+    logger.info('Custom domain removed', { domain });
+  }
+
+  /**
+   * Re-verify a custom domain's DNS configuration via Vercel
+   */
+  async verifyCustomDomain(domain: string): Promise<VerifyCustomDomainResponse> {
+    if (!isCloudEnvironment()) {
+      throw new AppError(
+        'Custom domains are only available in cloud environment.',
+        503,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+
+    try {
+      const [vercelResult, projectDomain] = await Promise.all([
+        this.vercelProvider.verifyCustomDomain(domain),
+        this.vercelProvider.getCustomDomain(domain),
+      ]);
+
+      logger.info('Custom domain verification result', { domain, verified: vercelResult.verified });
+
+      const config = await this.getCustomDomainConfigOrEmpty(domain, domain);
+
+      return this.toCustomDomainResponse(
+        {
+          name: domain,
+          apexName: projectDomain.apexName,
+          verified: vercelResult.verified,
+          verification: vercelResult.verification,
+        },
+        config
+      );
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      logger.error('Failed to verify custom domain', {
+        error: error instanceof Error ? error.message : String(error),
+        domain,
+      });
+      throw new AppError('Failed to verify custom domain', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 
