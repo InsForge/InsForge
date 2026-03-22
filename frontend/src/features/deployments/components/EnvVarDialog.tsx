@@ -137,7 +137,7 @@ export function EnvVarDialog({
       const nextDrafts = [...currentDrafts];
       const targetDraft = nextDrafts[draftIndex];
       const shouldReplaceTarget =
-        targetDraft && !targetDraft.key.trim() && !targetDraft.value.trim();
+        targetDraft && !targetDraft.key.trim() && targetDraft.value === '';
 
       if (shouldReplaceTarget) {
         nextDrafts[draftIndex] = createEnvVarDraft(normalizedEntries[0]);

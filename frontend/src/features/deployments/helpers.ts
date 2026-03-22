@@ -27,6 +27,57 @@ export const normalizeEnvVarDrafts = (drafts: EnvVarDraft[]) => {
     .filter((draft) => draft.key || draft.value);
 };
 
+const stripInlineComment = (value: string) => {
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] === '#' && (index === 0 || /\s/.test(value[index - 1] ?? ''))) {
+      return value.slice(0, index).replace(/\s+$/, '');
+    }
+  }
+
+  return value;
+};
+
+const parseDotEnvValue = (value: string) => {
+  const trimmedStart = value.trimStart();
+
+  if (!trimmedStart) {
+    return '';
+  }
+
+  const quote = trimmedStart[0];
+  if (quote !== '"' && quote !== "'") {
+    return stripInlineComment(value);
+  }
+
+  let isEscaped = false;
+  for (let index = 1; index < trimmedStart.length; index += 1) {
+    const character = trimmedStart[index];
+
+    if (isEscaped) {
+      isEscaped = false;
+      continue;
+    }
+
+    if (character === '\\') {
+      isEscaped = true;
+      continue;
+    }
+
+    if (character !== quote) {
+      continue;
+    }
+
+    const remainder = trimmedStart.slice(index + 1).trim();
+    if (remainder && !remainder.startsWith('#')) {
+      return trimmedStart;
+    }
+
+    return trimmedStart.slice(1, index);
+  }
+
+  return trimmedStart;
+};
+
 export const parseDotEnvInput = (input: string) => {
   const lines = input.split(/\r?\n/);
   const drafts: EnvVarDraft[] = [];
@@ -39,7 +90,7 @@ export const parseDotEnvInput = (input: string) => {
       return;
     }
 
-    const withoutExport = trimmed.startsWith('export ') ? trimmed.slice(7).trim() : trimmed;
+    const withoutExport = line.trimStart().startsWith('export ') ? line.trimStart().slice(7) : line;
     const separatorIndex = withoutExport.indexOf('=');
 
     if (separatorIndex <= 0) {
@@ -48,19 +99,14 @@ export const parseDotEnvInput = (input: string) => {
     }
 
     const key = withoutExport.slice(0, separatorIndex).trim();
-    const rawValue = withoutExport.slice(separatorIndex + 1).trim();
+    const rawValue = withoutExport.slice(separatorIndex + 1);
 
     if (!key) {
       invalidLineNumbers.push(index + 1);
       return;
     }
 
-    const value =
-      rawValue.length >= 2 &&
-      ((rawValue.startsWith('"') && rawValue.endsWith('"')) ||
-        (rawValue.startsWith("'") && rawValue.endsWith("'")))
-        ? rawValue.slice(1, -1)
-        : rawValue;
+    const value = parseDotEnvValue(rawValue);
 
     drafts.push(createEnvVarDraft({ key, value }));
   });
