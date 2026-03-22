@@ -85,12 +85,16 @@ export function AISettingsMenuDialog({ open, onOpenChange }: AISettingsMenuDialo
   }, [config, form]);
 
   const prevOpenRef = useRef(false);
+  const prevLoadingRef = useRef(isLoading);
   useEffect(() => {
-    if (open && !prevOpenRef.current) {
+    const openedNow = open && !prevOpenRef.current;
+    const loadedWhileOpen = open && prevLoadingRef.current && !isLoading;
+    if (openedNow || loadedWhileOpen) {
       resetForm();
     }
     prevOpenRef.current = open;
-  }, [open, resetForm]);
+    prevLoadingRef.current = isLoading;
+  }, [open, isLoading, resetForm]);
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
