@@ -213,17 +213,18 @@ export function checkAuthSchemaOperations(query: string): string | null {
 
     return null; // No dangerous operations found
   } catch (parseError) {
-    logger.warn('SQL parse error in checkAuthSchemaOperations, letting query through:', parseError);
-    return null;
+    logger.warn('SQL parse error in checkAuthSchemaOperations, rejecting query:', parseError);
+    return 'Query could not be parsed and was rejected for security reasons.';
   }
 }
 
 /**
  * Extract the schema name from a libpg-query name list (array of String nodes).
- * Returns the first element if it looks like a schema (i.e. list has >= 2 items).
+ * For qualified names (schema.object), returns the first element (the schema).
+ * For single-part names, also returns the identifier so isSystem() can match it.
  */
 function getSchemaFromNameList(items: Array<Record<string, unknown>>): string | null {
-  if (items.length < 2) return null;
+  if (items.length < 1) return null;
   const first = items[0];
   return ((first.String as Record<string, unknown> | undefined)?.sval as string) ?? null;
 }
@@ -300,12 +301,30 @@ export function checkSystemSchemaOperations(query: string): string | null {
           return 'DDL operations on the "system" schema are not allowed.';
         }
       }
+
+      // DELETE FROM system.*
+      if (stmtType === 'DeleteStmt') {
+        const relation = data.relation as Record<string, unknown> | undefined;
+        if (isSystem(getSchemaName(relation))) {
+          return 'DELETE operations on the "system" schema are not allowed.';
+        }
+      }
+
+      // TRUNCATE system.*
+      if (stmtType === 'TruncateStmt') {
+        const relations = (data.relations as Array<Record<string, unknown>>) ?? [];
+        for (const relation of relations) {
+          if (isSystem(getSchemaName(relation))) {
+            return 'TRUNCATE operations on the "system" schema are not allowed.';
+          }
+        }
+      }
     }
 
     return null;
   } catch (parseError) {
-    logger.warn('SQL parse error in checkSystemSchemaOperations, letting query through:', parseError);
-    return null;
+    logger.warn('SQL parse error in checkSystemSchemaOperations, rejecting query:', parseError);
+    return 'Query could not be parsed and was rejected for security reasons.';
   }
 }
 
