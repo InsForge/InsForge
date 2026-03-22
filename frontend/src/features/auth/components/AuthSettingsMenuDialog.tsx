@@ -104,6 +104,7 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
   const form = useForm<UpdateAuthConfigRequest>({
     resolver: zodResolver(updateAuthConfigRequestSchema),
     defaultValues,
+    mode: 'onChange',
   });
 
   const requireEmailVerification = form.watch('requireEmailVerification');

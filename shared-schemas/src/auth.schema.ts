@@ -90,6 +90,9 @@ export const oAuthConfigSchema = z.object({
   updatedAt: z.string(), // PostgreSQL timestamp
 });
 
+export const redirectUrlWhitelistRegex =
+  /^(https?:\/\/)(?:\*\.)?(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?::\d+)?(?:\/.*)?$/;
+
 // Email authentication configuration schema
 export const authConfigSchema = z.object({
   id: z.string().uuid(),
@@ -102,21 +105,7 @@ export const authConfigSchema = z.object({
   verifyEmailMethod: verificationMethodSchema,
   resetPasswordMethod: verificationMethodSchema,
   redirectUrlWhitelist: z
-    .array(
-      z.string().refine(
-        (val) => {
-          try {
-            const dummyPrefix = '__wildcard__.';
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            new (globalThis as any).URL(val.replace('*.', dummyPrefix));
-            return true;
-          } catch {
-            return false;
-          }
-        },
-        { message: 'Invalid URL or wildcard URL' }
-      )
-    )
+    .array(z.string().regex(redirectUrlWhitelistRegex, { message: 'Invalid URL or wildcard URL' }))
     .optional()
     .nullable(),
   createdAt: z.string(), // PostgreSQL timestamp
