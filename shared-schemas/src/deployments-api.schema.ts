@@ -90,9 +90,35 @@ export const getEnvVarResponseSchema = z.object({
  * Request to create or update an environment variable
  */
 export const upsertEnvVarRequestSchema = z.object({
-  key: z.string().min(1),
-  value: z.string().min(1),
+  key: z.string().trim().min(1, 'key is required'),
+  value: z.string(),
 });
+
+/**
+ * Request to create or update multiple environment variables
+ */
+export const upsertEnvVarsRequestSchema = z
+  .object({
+    envVars: z.array(upsertEnvVarRequestSchema).min(1),
+  })
+  .superRefine(({ envVars }, ctx) => {
+    const firstSeenByKey = new Map<string, number>();
+
+    envVars.forEach((envVar, index) => {
+      const existingIndex = firstSeenByKey.get(envVar.key);
+
+      if (existingIndex !== undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'duplicate environment variable key',
+          path: ['envVars', index, 'key'],
+        });
+        return;
+      }
+
+      firstSeenByKey.set(envVar.key, index);
+    });
+  });
 
 /**
  * Response from upserting an environment variable
@@ -100,6 +126,15 @@ export const upsertEnvVarRequestSchema = z.object({
 export const upsertEnvVarResponseSchema = z.object({
   success: z.literal(true),
   message: z.string(),
+});
+
+/**
+ * Response from upserting multiple environment variables
+ */
+export const upsertEnvVarsResponseSchema = z.object({
+  success: z.literal(true),
+  message: z.string(),
+  count: z.number().int().positive(),
 });
 
 /**
@@ -160,6 +195,8 @@ export type ListEnvVarsResponse = z.infer<typeof listEnvVarsResponseSchema>;
 export type GetEnvVarResponse = z.infer<typeof getEnvVarResponseSchema>;
 export type UpsertEnvVarRequest = z.infer<typeof upsertEnvVarRequestSchema>;
 export type UpsertEnvVarResponse = z.infer<typeof upsertEnvVarResponseSchema>;
+export type UpsertEnvVarsRequest = z.infer<typeof upsertEnvVarsRequestSchema>;
+export type UpsertEnvVarsResponse = z.infer<typeof upsertEnvVarsResponseSchema>;
 export type DeleteEnvVarResponse = z.infer<typeof deleteEnvVarResponseSchema>;
 export type UpdateSlugRequest = z.infer<typeof updateSlugRequestSchema>;
 export type UpdateSlugResponse = z.infer<typeof updateSlugResponseSchema>;

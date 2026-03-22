@@ -25,15 +25,24 @@ export function useDeploymentEnvVars() {
 
   // Upsert env var mutation
   const upsertEnvVarMutation = useMutation({
-    mutationFn: (input: UpsertEnvVarRequest) => deploymentsService.upsertEnvVar(input),
-    onSuccess: () => {
+    mutationFn: async (inputs: UpsertEnvVarRequest[]) => {
+      const result = await deploymentsService.upsertEnvVars({ envVars: inputs });
+      return result.count;
+    },
+    onSuccess: (count) => {
       void queryClient.invalidateQueries({ queryKey: ['deployment-env-vars'] });
-      showToast('Environment variable saved successfully', 'success');
+      showToast(
+        count === 1
+          ? 'Environment variable saved successfully'
+          : `${count} environment variables saved successfully`,
+        'success'
+      );
     },
     onError: (error: Error) => {
+      void queryClient.invalidateQueries({ queryKey: ['deployment-env-vars'] });
       console.error('Failed to save environment variable:', error);
       const errorMessage =
-        error instanceof Error ? error.message : 'Failed to save environment variable';
+        error instanceof Error ? error.message : 'Failed to save environment variables';
       showToast(errorMessage, 'error');
     },
   });
@@ -54,18 +63,48 @@ export function useDeploymentEnvVars() {
   });
 
   // Create/Update env var with validation
-  const upsertEnvVar = useCallback(
-    async (key: string, value: string) => {
-      if (!key.trim() || !value.trim()) {
-        showToast('Please fill in both key and value', 'error');
+  const upsertEnvVars = useCallback(
+    async (inputs: UpsertEnvVarRequest[]) => {
+      const normalizedInputs = inputs
+        .map((input) => ({
+          key: input.key.trim(),
+          value: input.value,
+        }))
+        .filter((input) => input.key || input.value);
+
+      if (normalizedInputs.length === 0) {
+        showToast('Add at least one environment variable', 'error');
+        return false;
+      }
+
+      const incompleteInput = normalizedInputs.find((input) => !input.key);
+      if (incompleteInput) {
+        showToast('One or more rows are missing a key', 'error');
+        return false;
+      }
+
+      const seenKeys = new Set<string>();
+      const duplicateKeys = normalizedInputs
+        .map((input) => input.key)
+        .filter((key) => {
+          if (seenKeys.has(key)) {
+            return true;
+          }
+
+          seenKeys.add(key);
+          return false;
+        });
+
+      if (duplicateKeys.length > 0) {
+        showToast(
+          `Duplicate keys found: ${Array.from(new Set(duplicateKeys)).join(', ')}`,
+          'error'
+        );
         return false;
       }
 
       try {
-        await upsertEnvVarMutation.mutateAsync({
-          key: key.trim(),
-          value: value.trim(),
-        });
+        await upsertEnvVarMutation.mutateAsync(normalizedInputs);
         return true;
       } catch {
         return false;
@@ -112,7 +151,7 @@ export function useDeploymentEnvVars() {
     error,
 
     // Actions
-    upsertEnvVar,
+    upsertEnvVars,
     deleteEnvVar,
     refetch,
 
