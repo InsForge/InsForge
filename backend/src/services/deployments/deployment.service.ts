@@ -853,7 +853,17 @@ export class DeploymentService {
     }
 
     const vercelData = await this.vercelProvider.addCustomDomain(domain);
-    const config = await this.vercelProvider.getCustomDomainConfig(vercelData.apexName);
+    let config: VercelDomainConfig = {};
+
+    try {
+      config = await this.vercelProvider.getCustomDomainConfig(vercelData.apexName);
+    } catch (error) {
+      logger.warn('Custom domain added but Vercel config lookup failed', {
+        domain,
+        apexDomain: vercelData.apexName,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     logger.info('Custom domain added', { domain, verified: vercelData.verified });
     return this.toCustomDomainResponse(vercelData, config);

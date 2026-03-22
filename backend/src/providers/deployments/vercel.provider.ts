@@ -609,7 +609,6 @@ export class VercelProvider {
 
     try {
       const params = new URLSearchParams({
-        limit: '100',
         teamId: credentials.teamId,
       });
 
