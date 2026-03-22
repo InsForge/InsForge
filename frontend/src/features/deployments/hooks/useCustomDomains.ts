@@ -28,7 +28,7 @@ export function useCustomDomains() {
     mutationFn: (domain: string) => deploymentsService.addCustomDomain(domain),
     onSuccess: (domain) => {
       showToast(
-        `Domain ${domain.domain} added. Complete the verification challenge to activate it.`,
+        `Domain ${domain.domain} added. Add the required DNS records to activate it.`,
         'success'
       );
       void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
@@ -41,11 +41,13 @@ export function useCustomDomains() {
   const verifyMutation = useMutation({
     mutationFn: (domain: string) => deploymentsService.verifyCustomDomain(domain),
     onSuccess: (result) => {
-      if (result.verified) {
+      if (result.verified && !result.misconfigured) {
         showToast('Domain verified successfully!', 'success');
+      } else if (result.misconfigured) {
+        showToast('Domain ownership is verified, but DNS is not pointing to Vercel yet.', 'error');
       } else {
         showToast(
-          'Verification is still pending. Check the returned challenge and try again.',
+          'Verification is still pending. Check the required DNS records and try again.',
           'error'
         );
       }

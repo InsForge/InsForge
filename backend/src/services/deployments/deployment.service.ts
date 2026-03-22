@@ -80,6 +80,10 @@ export class DeploymentService {
     return this.pool;
   }
 
+  private isReservedHostedDomain(domain: string): boolean {
+    return domain.endsWith('.vercel.app') || domain.endsWith('.insforge.site');
+  }
+
   private pickPreferredARecord(config: VercelDomainConfig): string | null {
     const rankOneValues = (config.recommendedIPv4 ?? [])
       .filter((record) => record.rank === 1)
@@ -105,6 +109,7 @@ export class DeploymentService {
       domain: domain.name,
       apexDomain: domain.apexName,
       verified: domain.verified,
+      misconfigured: config.misconfigured ?? false,
       verification: (domain.verification ?? []).map((record) => ({
         type: record.type,
         domain: record.domain,
@@ -113,6 +118,22 @@ export class DeploymentService {
       cnameTarget: config.recommendedCNAME?.find((record) => record.rank === 1)?.value ?? null,
       aRecordValue: this.pickPreferredARecord(config),
     };
+  }
+
+  private async getCustomDomainConfigOrEmpty(
+    configDomain: string,
+    requestedDomain: string
+  ): Promise<VercelDomainConfig> {
+    try {
+      return await this.vercelProvider.getCustomDomainConfig(configDomain);
+    } catch (error) {
+      logger.warn('Vercel domain config lookup failed; continuing without DNS hints', {
+        requestedDomain,
+        configDomain,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return {};
+    }
   }
 
   /**
@@ -853,17 +874,7 @@ export class DeploymentService {
     }
 
     const vercelData = await this.vercelProvider.addCustomDomain(domain);
-    let config: VercelDomainConfig = {};
-
-    try {
-      config = await this.vercelProvider.getCustomDomainConfig(vercelData.apexName);
-    } catch (error) {
-      logger.warn('Custom domain added but Vercel config lookup failed', {
-        domain,
-        apexDomain: vercelData.apexName,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
+    const config = await this.getCustomDomainConfigOrEmpty(vercelData.apexName, domain);
 
     logger.info('Custom domain added', { domain, verified: vercelData.verified });
     return this.toCustomDomainResponse(vercelData, config);
@@ -883,14 +894,14 @@ export class DeploymentService {
 
     try {
       const domains = (await this.vercelProvider.listCustomDomains()).filter(
-        (domain) => !domain.name.endsWith('.vercel.app')
+        (domain) => !this.isReservedHostedDomain(domain.name)
       );
       const apexDomains = [...new Set(domains.map((domain) => domain.apexName))];
       const configs = new Map(
         await Promise.all(
           apexDomains.map(
             async (apexDomain) =>
-              [apexDomain, await this.vercelProvider.getCustomDomainConfig(apexDomain)] as const
+              [apexDomain, await this.getCustomDomainConfigOrEmpty(apexDomain, apexDomain)] as const
           )
         )
       );
@@ -920,7 +931,6 @@ export class DeploymentService {
       );
     }
 
-    await this.vercelProvider.getCustomDomain(domain);
     await this.vercelProvider.removeCustomDomain(domain);
 
     logger.info('Custom domain removed', { domain });
@@ -946,7 +956,7 @@ export class DeploymentService {
 
       logger.info('Custom domain verification result', { domain, verified: vercelResult.verified });
 
-      const config = await this.vercelProvider.getCustomDomainConfig(projectDomain.apexName);
+      const config = await this.getCustomDomainConfigOrEmpty(projectDomain.apexName, domain);
 
       return this.toCustomDomainResponse(
         {

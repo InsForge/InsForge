@@ -185,6 +185,7 @@ export const customDomainSchema = z.object({
   domain: z.string(),
   apexDomain: z.string(),
   verified: z.boolean(),
+  misconfigured: z.boolean(),
   verification: z.array(domainVerificationRecordSchema),
   cnameTarget: z.string().nullable(),
   aRecordValue: z.string().nullable(),
@@ -201,7 +202,10 @@ export const addCustomDomainRequestSchema = z.object({
     .regex(
       /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i,
       'Invalid domain format (e.g. myapp.com or www.myapp.com)'
-    ),
+    )
+    .refine((domain) => !domain.toLowerCase().endsWith('.insforge.site'), {
+      message: 'Domains ending with .insforge.site are reserved by InsForge',
+    }),
 });
 
 /**

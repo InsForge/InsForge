@@ -15,6 +15,7 @@ import { envVarsRouter } from './env-vars.routes.js';
 const router = Router();
 const deploymentService = DeploymentService.getInstance();
 const auditService = AuditService.getInstance();
+const domainParamSchema = addCustomDomainRequestSchema.shape.domain;
 
 // Mount sub-routers first to avoid conflicts with parameterized routes
 router.use('/env-vars', envVarsRouter);
@@ -235,8 +236,16 @@ router.post(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const { domain } = req.params;
-      const result = await deploymentService.verifyCustomDomain(domain);
+      const validationResult = domainParamSchema.safeParse(req.params.domain);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((issue) => issue.message).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const result = await deploymentService.verifyCustomDomain(validationResult.data);
       successResponse(res, result);
     } catch (error) {
       next(error);
@@ -253,7 +262,16 @@ router.delete(
   verifyAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const { domain } = req.params;
+      const validationResult = domainParamSchema.safeParse(req.params.domain);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((issue) => issue.message).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const domain = validationResult.data;
       await deploymentService.removeCustomDomain(domain);
 
       await auditService.log({

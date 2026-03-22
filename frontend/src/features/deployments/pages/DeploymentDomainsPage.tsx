@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ExternalLink,
   Copy,
@@ -35,15 +35,20 @@ function extractSlugFromUrl(url: string | null): string {
 /**
  * Displays a colored badge indicating the verification status of a custom domain.
  */
-function StatusBadge({ verified }: { verified: boolean }) {
-  const tone = verified
-    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-    : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
-  return (
-    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${tone}`}>
-      {verified ? 'Verified' : 'Pending verification'}
-    </span>
-  );
+function StatusBadge({ verified, misconfigured }: { verified: boolean; misconfigured: boolean }) {
+  const tone = misconfigured
+    ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+    : verified
+      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+      : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
+
+  const label = misconfigured
+    ? 'Invalid configuration'
+    : verified
+      ? 'Verified'
+      : 'Pending verification';
+
+  return <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${tone}`}>{label}</span>;
 }
 
 /**
@@ -165,7 +170,9 @@ function VerificationChallenges({ domain }: { domain: CustomDomain }) {
   return (
     <div className="mt-3 text-xs space-y-3">
       <p className="text-muted-foreground dark:text-neutral-400 font-medium">
-        Add the following DNS records with your domain provider, then click{' '}
+        {domain.misconfigured
+          ? 'Update the following DNS records with your domain provider, then click '
+          : 'Add the following DNS records with your domain provider, then click '}
         <span className="font-semibold">Verify</span>.
       </p>
 
@@ -202,13 +209,14 @@ function CustomDomainRow({
   isVerifying: boolean;
   isRemoving: boolean;
 }) {
-  const [showVerification, setShowVerification] = useState(!domain.verified);
+  const isReady = domain.verified && !domain.misconfigured;
+  const [showVerification, setShowVerification] = useState(!isReady);
 
   return (
     <div className="bg-white dark:bg-[#333] rounded-lg px-3 py-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 flex-wrap">
-          {domain.verified ? (
+          {isReady ? (
             <a
               href={`https://${domain.domain}`}
               target="_blank"
@@ -222,11 +230,11 @@ function CustomDomainRow({
               {domain.domain}
             </span>
           )}
-          <StatusBadge verified={domain.verified} />
+          <StatusBadge verified={domain.verified} misconfigured={domain.misconfigured} />
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {!domain.verified && (
+          {!isReady && (
             <Button
               variant="ghost"
               size="sm"
@@ -241,7 +249,7 @@ function CustomDomainRow({
               <span className="text-xs">Records</span>
             </Button>
           )}
-          {!domain.verified && (
+          {!isReady && (
             <Button
               variant="secondary"
               size="sm"
@@ -253,7 +261,7 @@ function CustomDomainRow({
               {isVerifying ? 'Verifying...' : 'Verify'}
             </Button>
           )}
-          {domain.verified && (
+          {isReady && (
             <Button
               variant="ghost"
               size="sm"
@@ -279,7 +287,7 @@ function CustomDomainRow({
         </div>
       </div>
 
-      {showVerification && !domain.verified && <VerificationChallenges domain={domain} />}
+      {showVerification && !isReady && <VerificationChallenges domain={domain} />}
     </div>
   );
 }
@@ -297,6 +305,7 @@ export default function DeploymentDomainsPage() {
   const [isAddDomainOpen, setIsAddDomainOpen] = useState(false);
   const [newDomain, setNewDomain] = useState('');
   const [domainError, setDomainError] = useState('');
+  const isSubmittingAddDomainRef = useRef(false);
 
   const { deployments, isLoadingDeployments } = useDeployments();
   const { updateSlug, isUpdating } = useDeploymentSlug();
@@ -317,6 +326,7 @@ export default function DeploymentDomainsPage() {
     removingDomain,
   } = useCustomDomains();
   const { showToast } = useToast();
+  const RESERVED_HOSTED_DOMAIN_SUFFIX = '.insforge.site';
 
   const latestReadyDeployment = deployments.find((d) => d.status === 'READY') ?? null;
   const defaultDomain = latestReadyDeployment?.url ?? null;
@@ -395,6 +405,10 @@ export default function DeploymentDomainsPage() {
   const DOMAIN_REGEX = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
 
   const handleAddDomain = async () => {
+    if (isAdding || isSubmittingAddDomainRef.current) {
+      return;
+    }
+
     const trimmed = newDomain.trim().toLowerCase();
     if (!trimmed) {
       return;
@@ -403,13 +417,20 @@ export default function DeploymentDomainsPage() {
       setDomainError('Invalid domain format (e.g. myapp.com or www.myapp.com)');
       return;
     }
+    if (trimmed.endsWith(RESERVED_HOSTED_DOMAIN_SUFFIX)) {
+      setDomainError('Domains ending with .insforge.site are reserved by InsForge');
+      return;
+    }
     setDomainError('');
     try {
+      isSubmittingAddDomainRef.current = true;
       await addDomain(trimmed);
       setNewDomain('');
       setIsAddDomainOpen(false);
     } catch {
       // Error handling is done in the hook
+    } finally {
+      isSubmittingAddDomainRef.current = false;
     }
   };
 
@@ -680,7 +701,11 @@ export default function DeploymentDomainsPage() {
                   }}
                   placeholder="myapp.com"
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && newDomain.trim()) {
+                    if (
+                      e.key === 'Enter' &&
+                      newDomain.trim() &&
+                      !isSubmittingAddDomainRef.current
+                    ) {
                       void handleAddDomain();
                     }
                   }}

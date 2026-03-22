@@ -77,6 +77,7 @@ export interface VercelCustomDomain {
 }
 
 export interface VercelDomainConfig {
+  misconfigured?: boolean;
   recommendedCNAME?: Array<{
     rank: number;
     value: string;
