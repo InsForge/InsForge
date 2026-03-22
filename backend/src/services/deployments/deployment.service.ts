@@ -2,7 +2,10 @@ import { Pool } from 'pg';
 import AdmZip from 'adm-zip';
 import jwt from 'jsonwebtoken';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
-import { VercelProvider } from '@/providers/deployments/vercel.provider.js';
+import {
+  VercelProvider,
+  type VercelDomainConfig,
+} from '@/providers/deployments/vercel.provider.js';
 import { S3StorageProvider } from '@/providers/storage/s3.provider.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
@@ -75,6 +78,41 @@ export class DeploymentService {
       this.pool = DatabaseManager.getInstance().getPool();
     }
     return this.pool;
+  }
+
+  private pickPreferredARecord(config: VercelDomainConfig): string | null {
+    const rankOneValues = (config.recommendedIPv4 ?? [])
+      .filter((record) => record.rank === 1)
+      .flatMap((record) => record.value ?? []);
+
+    if (rankOneValues.length === 0) {
+      return null;
+    }
+
+    return rankOneValues.find((value) => value === '216.150.16.1') ?? rankOneValues[0];
+  }
+
+  private toCustomDomainResponse(
+    domain: {
+      name: string;
+      apexName: string;
+      verified: boolean;
+      verification?: Array<{ type: string; domain: string; value: string; reason: string }>;
+    },
+    config: VercelDomainConfig
+  ): CustomDomain {
+    return {
+      domain: domain.name,
+      apexDomain: domain.apexName,
+      verified: domain.verified,
+      verification: (domain.verification ?? []).map((record) => ({
+        type: record.type,
+        domain: record.domain,
+        value: record.value,
+      })),
+      cnameTarget: config.recommendedCNAME?.find((record) => record.rank === 1)?.value ?? null,
+      aRecordValue: this.pickPreferredARecord(config),
+    };
   }
 
   /**
@@ -803,7 +841,7 @@ export class DeploymentService {
   // ============================================================================
 
   /**
-   * Add a user-owned custom domain, register it on Vercel, and persist to DB
+   * Add a user-owned custom domain on Vercel and return DNS instructions
    */
   async addCustomDomain(domain: string): Promise<AddCustomDomainResponse> {
     if (!isCloudEnvironment()) {
@@ -814,78 +852,11 @@ export class DeploymentService {
       );
     }
 
-    // Register the domain on Vercel and get the required DNS records
     const vercelData = await this.vercelProvider.addCustomDomain(domain);
+    const config = await this.vercelProvider.getCustomDomainConfig(vercelData.apexName);
 
-    // Parse DNS hints from Vercel's response
-    // Vercel always returns a CNAME target for subdomains (e.g. www) and an A record for apex.
-    // We store both so the UI can show whichever applies.
-    const cnameValue = 'cname.vercel-dns.com';
-    const aRecordValue = '76.76.21.21';
-
-    // If Vercel requires additional TXT/CNAME verification (domain is already in use elsewhere),
-    // store the first verification record.
-    const verificationRecord = vercelData.verification?.[0];
-
-    try {
-      const result = await this.getPool().query(
-        `INSERT INTO system.custom_domains
-           (domain, status, cname_value, a_record_value,
-            verification_type, verification_domain, verification_value)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (domain) DO UPDATE
-           SET status = EXCLUDED.status,
-               cname_value = EXCLUDED.cname_value,
-               a_record_value = EXCLUDED.a_record_value,
-               verification_type = EXCLUDED.verification_type,
-               verification_domain = EXCLUDED.verification_domain,
-               verification_value = EXCLUDED.verification_value,
-               error = NULL,
-               updated_at = NOW()
-         RETURNING
-           id,
-           domain,
-           status,
-           cname_value       as "cnameValue",
-           a_record_value    as "aRecordValue",
-           verification_type  as "verificationType",
-           verification_domain as "verificationDomain",
-           verification_value  as "verificationValue",
-           error,
-           created_at as "createdAt",
-           updated_at as "updatedAt"`,
-        [
-          domain,
-          vercelData.verified ? 'VERIFIED' : 'PENDING',
-          cnameValue,
-          aRecordValue,
-          verificationRecord?.type ?? null,
-          verificationRecord?.domain ?? null,
-          verificationRecord?.value ?? null,
-        ]
-      );
-
-      logger.info('Custom domain added', { domain, verified: vercelData.verified });
-      return result.rows[0] as AddCustomDomainResponse;
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      // DB insert failed — remove domain from Vercel to avoid stranding it
-      try {
-        await this.vercelProvider.removeCustomDomain(domain);
-      } catch (rollbackErr) {
-        logger.warn('Failed to rollback Vercel domain after DB error', {
-          error: rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr),
-          domain,
-        });
-      }
-      logger.error('Failed to persist custom domain', {
-        error: error instanceof Error ? error.message : String(error),
-        domain,
-      });
-      throw new AppError('Failed to add custom domain', 500, ERROR_CODES.INTERNAL_ERROR);
-    }
+    logger.info('Custom domain added', { domain, verified: vercelData.verified });
+    return this.toCustomDomainResponse(vercelData, config);
   }
 
   /**
@@ -901,24 +872,24 @@ export class DeploymentService {
     }
 
     try {
-      const result = await this.getPool().query(
-        `SELECT
-           id,
-           domain,
-           status,
-           cname_value        as "cnameValue",
-           a_record_value     as "aRecordValue",
-           verification_type  as "verificationType",
-           verification_domain as "verificationDomain",
-           verification_value  as "verificationValue",
-           error,
-           created_at as "createdAt",
-           updated_at as "updatedAt"
-         FROM system.custom_domains
-         ORDER BY created_at DESC`
+      const domains = (await this.vercelProvider.listCustomDomains()).filter(
+        (domain) => !domain.name.endsWith('.vercel.app')
+      );
+      const apexDomains = [...new Set(domains.map((domain) => domain.apexName))];
+      const configs = new Map(
+        await Promise.all(
+          apexDomains.map(
+            async (apexDomain) =>
+              [apexDomain, await this.vercelProvider.getCustomDomainConfig(apexDomain)] as const
+          )
+        )
       );
 
-      return { domains: result.rows as CustomDomain[] };
+      return {
+        domains: domains.map((domain) =>
+          this.toCustomDomainResponse(domain, configs.get(domain.apexName) ?? {})
+        ),
+      };
     } catch (error) {
       logger.error('Failed to list custom domains', {
         error: error instanceof Error ? error.message : String(error),
@@ -928,7 +899,7 @@ export class DeploymentService {
   }
 
   /**
-   * Remove a custom domain from Vercel and the database
+   * Remove a custom domain directly from Vercel
    */
   async removeCustomDomain(domain: string): Promise<void> {
     if (!isCloudEnvironment()) {
@@ -939,28 +910,8 @@ export class DeploymentService {
       );
     }
 
-    // Verify it exists in our DB first
-    const existing = await this.getPool().query(
-      `SELECT id FROM system.custom_domains WHERE domain = $1`,
-      [domain]
-    );
-
-    if (!existing.rows.length) {
-      throw new AppError(`Custom domain not found: ${domain}`, 404, ERROR_CODES.NOT_FOUND);
-    }
-
-    // Remove from Vercel (best-effort – don't fail if already gone)
+    await this.vercelProvider.getCustomDomain(domain);
     await this.vercelProvider.removeCustomDomain(domain);
-
-    try {
-      await this.getPool().query(`DELETE FROM system.custom_domains WHERE domain = $1`, [domain]);
-    } catch (error) {
-      logger.error('Failed to delete custom domain from DB after Vercel removal', {
-        error: error instanceof Error ? error.message : String(error),
-        domain,
-      });
-      throw new AppError('Failed to remove custom domain', 500, ERROR_CODES.INTERNAL_ERROR);
-    }
 
     logger.info('Custom domain removed', { domain });
   }
@@ -978,57 +929,24 @@ export class DeploymentService {
     }
 
     try {
-      const existing = await this.getPool().query(
-        `SELECT id FROM system.custom_domains WHERE domain = $1`,
-        [domain]
-      );
-
-      if (!existing.rows.length) {
-        throw new AppError(`Custom domain not found: ${domain}`, 404, ERROR_CODES.NOT_FOUND);
-      }
-
-      const vercelResult = await this.vercelProvider.verifyCustomDomain(domain);
-
-      const newStatus = vercelResult.verified ? 'VERIFIED' : 'PENDING';
-
-      const verificationRecord = vercelResult.verification?.[0];
-
-      const result = await this.getPool().query(
-        `UPDATE system.custom_domains
-         SET status = $1,
-             error = NULL,
-             verification_type = $3,
-             verification_domain = $4,
-             verification_value = $5,
-             updated_at = NOW()
-         WHERE domain = $2
-         RETURNING
-           id,
-           domain,
-           status,
-           cname_value        as "cnameValue",
-           a_record_value     as "aRecordValue",
-           verification_type  as "verificationType",
-           verification_domain as "verificationDomain",
-           verification_value  as "verificationValue",
-           error,
-           created_at as "createdAt",
-           updated_at as "updatedAt"`,
-        [
-          newStatus,
-          domain,
-          verificationRecord?.type ?? null,
-          verificationRecord?.domain ?? null,
-          verificationRecord?.value ?? null,
-        ]
-      );
+      const [vercelResult, projectDomain] = await Promise.all([
+        this.vercelProvider.verifyCustomDomain(domain),
+        this.vercelProvider.getCustomDomain(domain),
+      ]);
 
       logger.info('Custom domain verification result', { domain, verified: vercelResult.verified });
 
-      return {
-        verified: vercelResult.verified,
-        domain: result.rows[0] as CustomDomain,
-      };
+      const config = await this.vercelProvider.getCustomDomainConfig(projectDomain.apexName);
+
+      return this.toCustomDomainResponse(
+        {
+          name: domain,
+          apexName: projectDomain.apexName,
+          verified: vercelResult.verified,
+          verification: vercelResult.verification,
+        },
+        config
+      );
     } catch (error) {
       if (error instanceof AppError) {
         throw error;

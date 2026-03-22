@@ -35,82 +35,150 @@ function extractSlugFromUrl(url: string | null): string {
 /**
  * Displays a colored badge indicating the verification status of a custom domain.
  */
-function StatusBadge({ status }: { status: CustomDomain['status'] }) {
-  const styles: Record<CustomDomain['status'], string> = {
-    VERIFIED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-    PENDING: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-    FAILED: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  };
-  const labels: Record<CustomDomain['status'], string> = {
-    VERIFIED: 'Verified',
-    PENDING: 'Pending DNS',
-    FAILED: 'Failed',
-  };
+function StatusBadge({ verified }: { verified: boolean }) {
+  const tone = verified
+    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+    : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
   return (
-    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${styles[status]}`}>
-      {labels[status]}
+    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${tone}`}>
+      {verified ? 'Verified' : 'Pending verification'}
     </span>
   );
 }
 
 /**
- * Renders the DNS configuration instructions for a pending custom domain,
- * showing the required CNAME and/or A record values the user must set with their registrar.
+ * Small inline copy button used in DNS record tables.
  */
-function DnsInstructions({ domain }: { domain: CustomDomain }) {
-  const isApex = !domain.domain.split('.').slice(0, -2).join('.'); // no subdomain
+function CopyIconButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Keep this non-blocking inside the table UI.
+    }
+  };
+
   return (
-    <div className="mt-3 p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg text-xs space-y-3">
+    <button
+      type="button"
+      onClick={() => void handleCopy()}
+      aria-label={`Copy ${label}`}
+      title={`Copy ${label}`}
+      className="inline-flex items-center justify-center rounded p-1 text-neutral-500 transition hover:bg-neutral-200 hover:text-zinc-950 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-white"
+    >
+      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+    </button>
+  );
+}
+
+type DnsRecordRow = {
+  type: string;
+  name: string;
+  value: string;
+};
+
+function getSubdomainLabel(domain: string, apexDomain: string): string {
+  if (domain === apexDomain) {
+    return '@';
+  }
+
+  const suffix = `.${apexDomain}`;
+  return domain.endsWith(suffix) ? domain.slice(0, -suffix.length) : domain;
+}
+
+/**
+ * Vercel-style table layout for DNS records.
+ */
+function RecordsTable({ rows }: { rows: DnsRecordRow[] }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-700">
+      <table className="w-full border-collapse text-left text-xs">
+        <thead className="bg-neutral-50 dark:bg-neutral-800/80">
+          <tr className="text-muted-foreground dark:text-neutral-400">
+            <th className="px-4 py-3 font-medium">Type</th>
+            <th className="px-4 py-3 font-medium">Name</th>
+            <th className="px-4 py-3 font-medium">Value</th>
+          </tr>
+        </thead>
+        <tbody className="bg-white dark:bg-[#2f2f2f]">
+          {rows.map((row) => (
+            <tr
+              key={`${row.type}:${row.name}:${row.value}`}
+              className="border-t border-neutral-200 text-zinc-950 dark:border-neutral-700 dark:text-white"
+            >
+              <td className="px-4 py-3 align-top font-medium">{row.type}</td>
+              <td className="px-4 py-3 align-top">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono">{row.name}</span>
+                  <CopyIconButton value={row.name} label={`${row.type} record name`} />
+                </div>
+              </td>
+              <td className="px-4 py-3 align-top">
+                <div className="flex items-start gap-2">
+                  <span className="font-mono break-all">{row.value}</span>
+                  <CopyIconButton value={row.value} label={`${row.type} record value`} />
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/**
+ * Renders the DNS records returned by Vercel for a domain that is not yet verified.
+ */
+function VerificationChallenges({ domain }: { domain: CustomDomain }) {
+  const isApexDomain = domain.domain === domain.apexDomain;
+  const rows: DnsRecordRow[] = [];
+
+  if (!isApexDomain && domain.cnameTarget) {
+    rows.push({
+      type: 'CNAME',
+      name: getSubdomainLabel(domain.domain, domain.apexDomain),
+      value: domain.cnameTarget,
+    });
+  }
+
+  if (isApexDomain && domain.aRecordValue) {
+    rows.push({
+      type: 'A',
+      name: '@',
+      value: domain.aRecordValue,
+    });
+  }
+
+  rows.push(
+    ...domain.verification.map((record) => ({
+      type: record.type,
+      name: record.domain,
+      value: record.value,
+    }))
+  );
+
+  return (
+    <div className="mt-3 text-xs space-y-3">
       <p className="text-muted-foreground dark:text-neutral-400 font-medium">
-        Configure one of the following DNS records with your domain registrar:
+        Add the following DNS records with your domain provider, then click{' '}
+        <span className="font-semibold">Verify</span>.
       </p>
 
-      {/* CNAME — for subdomains (www.myapp.com) */}
-      <div>
-        <p className="font-semibold text-zinc-950 dark:text-white mb-1">
-          CNAME record {isApex ? '(for subdomains, e.g. www)' : ''}
+      {rows.length > 0 ? (
+        <RecordsTable rows={rows} />
+      ) : (
+        <p className="text-muted-foreground dark:text-neutral-400">
+          Vercel has not returned any DNS records for this domain yet.
         </p>
-        <div className="font-mono grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-zinc-950 dark:text-white">
-          <span className="text-muted-foreground dark:text-neutral-500">Name</span>
-          <span>{isApex ? 'www' : domain.domain.split('.').slice(0, -2).join('.')}</span>
-          <span className="text-muted-foreground dark:text-neutral-500">Value</span>
-          <span>{domain.cnameValue ?? 'cname.vercel-dns.com'}</span>
-        </div>
-      </div>
-
-      {/* A record — for apex domains */}
-      {isApex && (
-        <div>
-          <p className="font-semibold text-zinc-950 dark:text-white mb-1">
-            A record (for apex domain)
-          </p>
-          <div className="font-mono grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-zinc-950 dark:text-white">
-            <span className="text-muted-foreground dark:text-neutral-500">Name</span>
-            <span>@</span>
-            <span className="text-muted-foreground dark:text-neutral-500">Value</span>
-            <span>{domain.aRecordValue ?? '76.76.21.21'}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Additional verification record if Vercel requires it */}
-      {domain.verificationDomain && domain.verificationValue && (
-        <div>
-          <p className="font-semibold text-zinc-950 dark:text-white mb-1">
-            Additional verification record ({domain.verificationType})
-          </p>
-          <div className="font-mono grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-zinc-950 dark:text-white">
-            <span className="text-muted-foreground dark:text-neutral-500">Name</span>
-            <span>{domain.verificationDomain}</span>
-            <span className="text-muted-foreground dark:text-neutral-500">Value</span>
-            <span className="break-all">{domain.verificationValue}</span>
-          </div>
-        </div>
       )}
 
       <p className="text-muted-foreground dark:text-neutral-400">
-        DNS changes can take up to 48 hours to propagate. Click{' '}
-        <span className="font-semibold">Verify</span> once your DNS is configured.
+        DNS changes can take time to propagate before verification succeeds.
       </p>
     </div>
   );
@@ -134,13 +202,13 @@ function CustomDomainRow({
   isVerifying: boolean;
   isRemoving: boolean;
 }) {
-  const [showDns, setShowDns] = useState(domain.status !== 'VERIFIED');
+  const [showVerification, setShowVerification] = useState(!domain.verified);
 
   return (
     <div className="bg-white dark:bg-[#333] rounded-lg px-3 py-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 flex-wrap">
-          {domain.status === 'VERIFIED' ? (
+          {domain.verified ? (
             <a
               href={`https://${domain.domain}`}
               target="_blank"
@@ -154,26 +222,26 @@ function CustomDomainRow({
               {domain.domain}
             </span>
           )}
-          <StatusBadge status={domain.status} />
+          <StatusBadge verified={domain.verified} />
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {domain.status !== 'VERIFIED' && (
+          {!domain.verified && (
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setShowDns((v) => !v)}
+              onClick={() => setShowVerification((v) => !v)}
               className="h-8 px-2 gap-1 text-zinc-950 dark:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700"
             >
-              {showDns ? (
+              {showVerification ? (
                 <ChevronUp className="w-3.5 h-3.5" />
               ) : (
                 <ChevronDown className="w-3.5 h-3.5" />
               )}
-              <span className="text-xs">DNS</span>
+              <span className="text-xs">Records</span>
             </Button>
           )}
-          {domain.status !== 'VERIFIED' && (
+          {!domain.verified && (
             <Button
               variant="secondary"
               size="sm"
@@ -185,7 +253,7 @@ function CustomDomainRow({
               {isVerifying ? 'Verifying...' : 'Verify'}
             </Button>
           )}
-          {domain.status === 'VERIFIED' && (
+          {domain.verified && (
             <Button
               variant="ghost"
               size="sm"
@@ -211,7 +279,7 @@ function CustomDomainRow({
         </div>
       </div>
 
-      {showDns && domain.status !== 'VERIFIED' && <DnsInstructions domain={domain} />}
+      {showVerification && !domain.verified && <VerificationChallenges domain={domain} />}
     </div>
   );
 }
@@ -563,7 +631,7 @@ export default function DeploymentDomainsPage() {
               <div className="flex flex-col gap-2">
                 {domains.map((d) => (
                   <CustomDomainRow
-                    key={d.id}
+                    key={d.domain}
                     domain={d}
                     onVerify={(name) => void verifyDomain(name)}
                     onRemove={(name) => void removeDomain(name)}

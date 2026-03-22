@@ -28,7 +28,7 @@ export function useCustomDomains() {
     mutationFn: (domain: string) => deploymentsService.addCustomDomain(domain),
     onSuccess: (domain) => {
       showToast(
-        `Domain ${domain.domain} added. Configure your DNS records to verify it.`,
+        `Domain ${domain.domain} added. Complete the verification challenge to activate it.`,
         'success'
       );
       void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
@@ -44,7 +44,10 @@ export function useCustomDomains() {
       if (result.verified) {
         showToast('Domain verified successfully!', 'success');
       } else {
-        showToast('DNS not propagated yet. Please check your DNS settings and try again.', 'error');
+        showToast(
+          'Verification is still pending. Check the returned challenge and try again.',
+          'error'
+        );
       }
       void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
     },

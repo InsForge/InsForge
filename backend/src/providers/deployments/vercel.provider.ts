@@ -61,6 +61,39 @@ export interface DeploymentFile {
   size: number;
 }
 
+export interface VercelCustomDomain {
+  id: string;
+  name: string;
+  apexName: string;
+  projectId: string;
+  verified: boolean;
+  redirect: string | null;
+  redirectStatusCode: number | null;
+  gitBranch: string | null;
+  customEnvironmentId?: string | null;
+  createdAt: number;
+  updatedAt: number;
+  verification?: Array<{ type: string; domain: string; value: string; reason: string }>;
+}
+
+export interface VercelDomainConfig {
+  recommendedCNAME?: Array<{
+    rank: number;
+    value: string;
+  }>;
+  recommendedIPv4?: Array<{
+    rank: number;
+    value: string[];
+  }>;
+}
+
+export interface VercelProjectDomain {
+  name: string;
+  apexName: string;
+  verified: boolean;
+  verification?: Array<{ type: string; domain: string; value: string; reason: string }>;
+}
+
 export class VercelProvider {
   private static instance: VercelProvider;
   private cloudCredentials: VercelCredentials | undefined;
@@ -566,6 +599,106 @@ export class VercelProvider {
   // ============================================================================
   // Custom Domain Management
   // ============================================================================
+
+  /**
+   * List domains associated with the configured Vercel project
+   * GET /v9/projects/:id/domains
+   */
+  async listCustomDomains(): Promise<VercelCustomDomain[]> {
+    const credentials = await this.getCredentials();
+
+    try {
+      const params = new URLSearchParams({
+        limit: '100',
+        teamId: credentials.teamId,
+      });
+
+      const response = await axios.get(
+        `https://api.vercel.com/v9/projects/${credentials.projectId}/domains?${params.toString()}`,
+        {
+          headers: { Authorization: `Bearer ${credentials.token}` },
+        }
+      );
+
+      const data = response.data as {
+        domains?: VercelCustomDomain[];
+      };
+
+      const domains = data.domains ?? [];
+
+      logger.info('Custom domains fetched from Vercel', {
+        count: domains.length,
+      });
+
+      return domains;
+    } catch (error) {
+      logger.error('Failed to list custom domains from Vercel', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new AppError('Failed to list custom domains', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+  }
+
+  /**
+   * Get DNS configuration hints for a domain on Vercel
+   * GET /v6/domains/:domain/config
+   */
+  async getCustomDomainConfig(domain: string): Promise<VercelDomainConfig> {
+    const credentials = await this.getCredentials();
+
+    try {
+      const params = new URLSearchParams({
+        teamId: credentials.teamId,
+      });
+
+      const response = await axios.get(
+        `https://api.vercel.com/v6/domains/${domain}/config?${params.toString()}`,
+        {
+          headers: { Authorization: `Bearer ${credentials.token}` },
+        }
+      );
+
+      return response.data as VercelDomainConfig;
+    } catch (error) {
+      logger.error('Failed to fetch custom domain config from Vercel', {
+        error: error instanceof Error ? error.message : String(error),
+        domain,
+      });
+      throw new AppError('Failed to get custom domain config', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+  }
+
+  /**
+   * Get a single domain associated with the configured Vercel project
+   * GET /v9/projects/:id/domains/:domain
+   */
+  async getCustomDomain(domain: string): Promise<VercelProjectDomain> {
+    const credentials = await this.getCredentials();
+
+    try {
+      const params = new URLSearchParams({
+        teamId: credentials.teamId,
+      });
+
+      const response = await axios.get(
+        `https://api.vercel.com/v9/projects/${credentials.projectId}/domains/${domain}?${params.toString()}`,
+        {
+          headers: { Authorization: `Bearer ${credentials.token}` },
+        }
+      );
+
+      return response.data as VercelProjectDomain;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        throw new AppError(`Domain not found on Vercel: ${domain}`, 404, ERROR_CODES.NOT_FOUND);
+      }
+      logger.error('Failed to fetch custom domain from Vercel', {
+        error: error instanceof Error ? error.message : String(error),
+        domain,
+      });
+      throw new AppError('Failed to get custom domain', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+  }
 
   /**
    * Add a custom domain to the Vercel project

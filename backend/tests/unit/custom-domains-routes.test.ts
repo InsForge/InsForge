@@ -22,6 +22,11 @@ const vercelSource = readFileSync(
   'utf-8'
 );
 
+const listCustomDomainsSource =
+  serviceSource.match(
+    /async listCustomDomains\(\): Promise<ListCustomDomainsResponse> \{[\s\S]*?\n {2}}\n\n {2}\/\*\*\n {3}\* Remove a custom domain/
+  )?.[0] ?? '';
+
 describe('Custom Domain Routes', () => {
   test('imports addCustomDomainRequestSchema', () => {
     expect(routesSource).toContain('addCustomDomainRequestSchema');
@@ -76,12 +81,20 @@ describe('Custom Domain Service Methods', () => {
     expect(serviceSource).toMatch(/addCustomDomain[\s\S]{0,200}isCloudEnvironment/);
   });
 
-  test('custom_domains table is queried', () => {
-    expect(serviceSource).toContain('system.custom_domains');
+  test('listCustomDomains uses the Vercel provider', () => {
+    expect(listCustomDomainsSource).toContain('this.vercelProvider.listCustomDomains()');
+  });
+
+  test('custom domain service does not query the custom_domains table', () => {
+    expect(serviceSource).not.toContain('system.custom_domains');
   });
 });
 
 describe('Vercel Provider Custom Domain Methods', () => {
+  test('listCustomDomains method exists', () => {
+    expect(vercelSource).toContain('async listCustomDomains(');
+  });
+
   test('addCustomDomain method exists', () => {
     expect(vercelSource).toContain('async addCustomDomain(');
   });
@@ -90,12 +103,32 @@ describe('Vercel Provider Custom Domain Methods', () => {
     expect(vercelSource).toContain('async removeCustomDomain(');
   });
 
+  test('getCustomDomainConfig method exists', () => {
+    expect(vercelSource).toContain('async getCustomDomainConfig(');
+  });
+
+  test('getCustomDomain method exists', () => {
+    expect(vercelSource).toContain('async getCustomDomain(');
+  });
+
   test('verifyCustomDomain method exists', () => {
     expect(vercelSource).toContain('async verifyCustomDomain(');
   });
 
   test('uses correct Vercel add domain endpoint', () => {
     expect(vercelSource).toContain('/v10/projects/${credentials.projectId}/domains');
+  });
+
+  test('uses correct Vercel list domains endpoint', () => {
+    expect(vercelSource).toContain('/v9/projects/${credentials.projectId}/domains');
+  });
+
+  test('uses correct Vercel domain config endpoint', () => {
+    expect(vercelSource).toContain('https://api.vercel.com/v6/domains/${domain}/config');
+  });
+
+  test('uses correct Vercel single project domain endpoint', () => {
+    expect(vercelSource).toContain('/v9/projects/${credentials.projectId}/domains/${domain}');
   });
 
   test('uses correct Vercel verify endpoint', () => {

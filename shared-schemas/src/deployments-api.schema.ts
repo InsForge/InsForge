@@ -176,24 +176,18 @@ export const domainVerificationRecordSchema = z.object({
   type: z.string(),
   domain: z.string(),
   value: z.string(),
-  reason: z.string(),
 });
 
 /**
- * A custom domain entry stored in the database
+ * A custom domain entry returned by Vercel project domain endpoints
  */
 export const customDomainSchema = z.object({
-  id: z.string().uuid(),
   domain: z.string(),
-  status: z.enum(['PENDING', 'VERIFIED', 'FAILED']),
-  cnameValue: z.string().nullable(),
+  apexDomain: z.string(),
+  verified: z.boolean(),
+  verification: z.array(domainVerificationRecordSchema),
+  cnameTarget: z.string().nullable(),
   aRecordValue: z.string().nullable(),
-  verificationType: z.string().nullable(),
-  verificationDomain: z.string().nullable(),
-  verificationValue: z.string().nullable(),
-  error: z.string().nullable(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
 });
 
 /**
@@ -225,10 +219,7 @@ export const listCustomDomainsResponseSchema = z.object({
 /**
  * Response from verifying a custom domain
  */
-export const verifyCustomDomainResponseSchema = z.object({
-  verified: z.boolean(),
-  domain: customDomainSchema,
-});
+export const verifyCustomDomainResponseSchema = customDomainSchema;
 
 export type DomainVerificationRecord = z.infer<typeof domainVerificationRecordSchema>;
 export type CustomDomain = z.infer<typeof customDomainSchema>;
