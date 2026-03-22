@@ -12,7 +12,7 @@ export default function DeploymentEnvVarsPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingEnvVar, setEditingEnvVar] = useState<DeploymentEnvVar | null>(null);
 
-  const { envVars, isLoading, isUpserting, upsertEnvVar, deleteEnvVar, confirmDialogProps } =
+  const { envVars, isLoading, isUpserting, upsertEnvVars, deleteEnvVar, confirmDialogProps } =
     useDeploymentEnvVars();
 
   const handleEdit = (envVar: DeploymentEnvVar) => {
@@ -83,7 +83,7 @@ export default function DeploymentEnvVarsPage() {
       <EnvVarDialog
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
-        onSave={upsertEnvVar}
+        onSave={upsertEnvVars}
         isSaving={isUpserting}
       />
 
@@ -92,7 +92,7 @@ export default function DeploymentEnvVarsPage() {
         open={!!editingEnvVar}
         onOpenChange={(open) => !open && setEditingEnvVar(null)}
         envVar={editingEnvVar}
-        onSave={upsertEnvVar}
+        onSave={upsertEnvVars}
         isSaving={isUpserting}
       />
 

@@ -9,7 +9,8 @@ import type {
   ListEnvVarsResponse,
   GetEnvVarResponse,
   UpsertEnvVarRequest,
-  UpsertEnvVarResponse,
+  UpsertEnvVarsRequest,
+  UpsertEnvVarsResponse,
   DeleteEnvVarResponse,
   UpdateSlugRequest,
   UpdateSlugResponse,
@@ -25,7 +26,8 @@ export type {
   ListEnvVarsResponse,
   GetEnvVarResponse,
   UpsertEnvVarRequest,
-  UpsertEnvVarResponse,
+  UpsertEnvVarsRequest,
+  UpsertEnvVarsResponse,
   DeleteEnvVarResponse,
   UpdateSlugRequest,
   UpdateSlugResponse,
@@ -101,7 +103,7 @@ export class DeploymentsService {
     return data.envVar;
   }
 
-  async upsertEnvVar(input: UpsertEnvVarRequest): Promise<UpsertEnvVarResponse> {
+  async upsertEnvVars(input: UpsertEnvVarsRequest): Promise<UpsertEnvVarsResponse> {
     return apiClient.request('/deployments/env-vars', {
       method: 'POST',
       headers: apiClient.withAccessToken(),
