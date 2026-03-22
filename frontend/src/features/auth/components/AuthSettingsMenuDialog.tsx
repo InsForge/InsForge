@@ -29,10 +29,12 @@ import {
 } from '@insforge/ui';
 import {
   updateAuthConfigRequestSchema,
+  redirectUrlWhitelistRegex,
   type AuthConfigSchema,
   type UpdateAuthConfigRequest,
 } from '@insforge/shared-schemas';
 import { useAuthConfig } from '@/features/auth/hooks/useAuthConfig';
+import { useToast } from '@/lib/hooks/useToast';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
 
 interface AuthSettingsMenuDialogProps {
@@ -100,6 +102,7 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
   const isCloudProject = isInsForgeCloudProject();
   const [activeSection, setActiveSection] = useState<AuthSettingsSection>('general');
   const { config, isLoading, isUpdating, updateConfig } = useAuthConfig();
+  const { showToast } = useToast();
 
   const form = useForm<UpdateAuthConfigRequest>({
     resolver: zodResolver(updateAuthConfigRequestSchema),
@@ -279,6 +282,16 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                           className="self-start"
                           onClick={() => {
                             const newList = [...(form.getValues('redirectUrlWhitelist') || [])];
+                            const hasInvalid = newList.some(
+                              (val) => !redirectUrlWhitelistRegex.test(val)
+                            );
+                            if (hasInvalid) {
+                              showToast(
+                                'Please fix or fill existing invalid URLs before adding a new one.',
+                                'error'
+                              );
+                              return;
+                            }
                             newList.push('');
                             form.setValue('redirectUrlWhitelist', newList, { shouldDirty: true });
                           }}

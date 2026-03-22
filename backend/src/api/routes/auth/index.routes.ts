@@ -678,10 +678,6 @@ router.post(
       if (method === 'link') {
         const redirectTo = options?.emailRedirectTo;
 
-        if (!redirectTo) {
-          throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
-        }
-
         if (redirectTo && !(await authConfigService.validateRedirectUrl(redirectTo))) {
           logger.warn('Redirect URL is not whitelisted for verification email', { redirectTo });
           throw new AppError('Redirect URL is not whitelisted', 400, ERROR_CODES.INVALID_INPUT);
