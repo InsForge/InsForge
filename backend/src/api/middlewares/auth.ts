@@ -3,6 +3,7 @@ import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from './error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
+import { AIAccessConfigService } from '@/services/ai/ai-access-config.service.js';
 import { RoleSchema } from '@insforge/shared-schemas';
 
 export interface AuthRequest extends Request {
@@ -240,4 +241,35 @@ export async function verifyCloudBackend(req: AuthRequest, _res: Response, next:
       );
     }
   }
+}
+
+/**
+ * Verifies user authentication for AI endpoints.
+ * Behaves like verifyUser but additionally enforces the per-project
+ * `allow_anon_ai_access` flag: when the flag is `false`, requests
+ * authenticated via an API key (anon token) are rejected with 403.
+ * Requests authenticated via a JWT user token are always allowed.
+ */
+export async function verifyAiUser(req: AuthRequest, res: Response, next: NextFunction) {
+  const apiKey = extractApiKey(req);
+  if (apiKey) {
+    try {
+      const aiAccessConfigService = AIAccessConfigService.getInstance();
+      const allowed = await aiAccessConfigService.isAnonAiAccessAllowed();
+      if (!allowed) {
+        return next(
+          new AppError(
+            'Anonymous access to AI endpoints is disabled for this project',
+            403,
+            ERROR_CODES.AUTH_UNAUTHORIZED,
+            NEXT_ACTION.CHECK_TOKEN
+          )
+        );
+      }
+    } catch (error) {
+      return next(error);
+    }
+    return verifyApiKey(req, res, next);
+  }
+  return verifyToken(req, res, next);
 }
