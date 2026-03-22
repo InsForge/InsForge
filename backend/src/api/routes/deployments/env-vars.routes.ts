@@ -6,7 +6,7 @@ import { AuditService } from '@/services/logs/audit.service.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { successResponse } from '@/utils/response.js';
-import { upsertEnvVarRequestSchema } from '@insforge/shared-schemas';
+import { upsertEnvVarsRequestSchema } from '@insforge/shared-schemas';
 
 const router = Router();
 const deploymentService = DeploymentService.getInstance();
@@ -35,7 +35,7 @@ router.get('/', verifyAdmin, async (_req: AuthRequest, res: Response, next: Next
 });
 
 /**
- * Create or update an environment variable
+ * Create or update environment variables
  * POST /api/deployments/env-vars
  */
 router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -48,7 +48,7 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
       );
     }
 
-    const validationResult = upsertEnvVarRequestSchema.safeParse(req.body);
+    const validationResult = upsertEnvVarsRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
       throw new AppError(
         validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
@@ -57,16 +57,15 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
       );
     }
 
-    const { key, value } = validationResult.data;
+    const { envVars } = validationResult.data;
 
-    await vercelProvider.upsertEnvironmentVariables([{ key, value }]);
+    await vercelProvider.upsertEnvironmentVariables(envVars);
 
-    // Log audit
     await auditService.log({
       actor: req.user?.email || 'api-key',
-      action: 'UPSERT_ENV_VAR',
+      action: 'UPSERT_ENV_VARS',
       module: 'DEPLOYMENTS',
-      details: { key },
+      details: { count: envVars.length, keys: envVars.map((envVar) => envVar.key) },
       ip_address: req.ip,
     });
 
@@ -74,7 +73,8 @@ router.post('/', verifyAdmin, async (req: AuthRequest, res: Response, next: Next
       res,
       {
         success: true,
-        message: `Environment variable ${key} has been saved successfully`,
+        message: `${envVars.length} environment variables have been saved successfully`,
+        count: envVars.length,
       },
       201
     );
