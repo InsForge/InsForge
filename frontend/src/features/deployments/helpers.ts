@@ -46,7 +46,7 @@ const parseDotEnvValue = (value: string) => {
 
   const quote = trimmedStart[0];
   if (quote !== '"' && quote !== "'") {
-    return stripInlineComment(value);
+    return stripInlineComment(trimmedStart);
   }
 
   let isEscaped = false;
