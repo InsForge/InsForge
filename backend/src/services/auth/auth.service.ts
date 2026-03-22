@@ -199,7 +199,6 @@ export class AuthService {
       user,
       accessToken,
       requireEmailVerification: false,
-      redirectTo: options?.emailRedirectTo || undefined,
     };
   }
 

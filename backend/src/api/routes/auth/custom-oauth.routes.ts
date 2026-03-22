@@ -284,6 +284,10 @@ router.get('/:key/callback', async (req: Request, res: Response, next: NextFunct
     if (!stateData.redirectUri) {
       throw new AppError('redirectUri is required in state', 400, ERROR_CODES.INVALID_INPUT);
     }
+
+    if (!(await authConfigService.validateRedirectUrl(stateData.redirectUri))) {
+      throw new AppError('Redirect URL is not whitelisted', 400, ERROR_CODES.INVALID_INPUT);
+    }
     if (!stateData.codeChallenge) {
       throw new AppError('code_challenge is required in state', 400, ERROR_CODES.INVALID_INPUT);
     }
