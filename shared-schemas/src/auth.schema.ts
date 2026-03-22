@@ -101,7 +101,24 @@ export const authConfigSchema = z.object({
   requireSpecialChar: z.boolean(),
   verifyEmailMethod: verificationMethodSchema,
   resetPasswordMethod: verificationMethodSchema,
-  redirectUrlWhitelist: z.array(z.string().url()).optional().nullable(),
+  redirectUrlWhitelist: z
+    .array(
+      z.string().refine(
+        (val) => {
+          try {
+            const dummyPrefix = '__wildcard__.';
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            new (globalThis as any).URL(val.replace('*.', dummyPrefix));
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        { message: 'Invalid URL or wildcard URL' }
+      )
+    )
+    .optional()
+    .nullable(),
   createdAt: z.string(), // PostgreSQL timestamp
   updatedAt: z.string(), // PostgreSQL timestamp
 });

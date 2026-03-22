@@ -290,12 +290,10 @@ export class AuthConfigService {
     }
 
     return whitelist.some((item) => {
-      // Exact match
       if (!item.includes('*.')) {
         return this.normalizeUrl(item) === targetUrl;
       }
 
-      // Wildcard match
       try {
         const dummyPrefix = '__wildcard__.';
         const normalizedItem = this.normalizeUrl(item.replace('*.', dummyPrefix));
@@ -310,7 +308,7 @@ export class AuthConfigService {
         if (parsedItem.port !== targetUrlObj.port) {
           return false;
         }
-        if (parsedItem.pathname !== targetUrlObj.pathname) {
+        if (parsedItem.pathname !== '/' && parsedItem.pathname !== targetUrlObj.pathname) {
           return false;
         }
 

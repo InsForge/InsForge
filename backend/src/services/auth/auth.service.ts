@@ -171,7 +171,10 @@ export class AuthService {
     if (emailAuthConfig.requireEmailVerification) {
       try {
         if (emailAuthConfig.verifyEmailMethod === 'link') {
-          const redirectTo = options?.emailRedirectTo || emailAuthConfig.redirectUrlWhitelist?.[0];
+          const redirectTo = options?.emailRedirectTo;
+          if (!redirectTo) {
+            throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
+          }
           await this.sendVerificationEmailWithLink(email, redirectTo);
         } else {
           await this.sendVerificationEmailWithCode(email);
@@ -196,7 +199,7 @@ export class AuthService {
       user,
       accessToken,
       requireEmailVerification: false,
-      redirectTo: emailAuthConfig.redirectUrlWhitelist?.[0] || undefined,
+      redirectTo: options?.emailRedirectTo || undefined,
     };
   }
 
@@ -235,11 +238,9 @@ export class AuthService {
       role: 'authenticated',
     });
 
-    // Include redirect URL if configured
     const response: CreateSessionResponse = {
       user,
       accessToken,
-      redirectTo: emailAuthConfig.redirectUrlWhitelist?.[0] || undefined,
     };
 
     return response;
@@ -361,14 +362,9 @@ export class AuthService {
         role: 'authenticated',
       });
 
-      // Get redirect URL from auth config if configured
-      const authConfigService = AuthConfigService.getInstance();
-      const emailAuthConfig = await authConfigService.getAuthConfig();
-
       return {
         user,
         accessToken,
-        redirectTo: emailAuthConfig.redirectUrlWhitelist?.[0] || undefined,
       };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -427,14 +423,9 @@ export class AuthService {
         role: 'authenticated',
       });
 
-      // Get redirect URL from auth config if configured
-      const authConfigService = AuthConfigService.getInstance();
-      const emailAuthConfig = await authConfigService.getAuthConfig();
-
       return {
         user,
         accessToken,
-        redirectTo: emailAuthConfig.redirectUrlWhitelist?.[0] || undefined,
       };
     } catch (error) {
       await client.query('ROLLBACK');
