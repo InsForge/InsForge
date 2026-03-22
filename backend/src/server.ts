@@ -73,7 +73,7 @@ export async function createApp() {
     windowMs: 15 * 60 * 1000,
     max: 3000,
     message: 'Too many requests from this IP',
-    skip: (req) => req.path === '/api/health' || req.path.startsWith('/api/ai/'),
+    skip: (req) => req.path === '/api/health' || req.path.startsWith('/api/ai'),
   });
 
   const aiLimiter = rateLimit({
