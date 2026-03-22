@@ -4,6 +4,7 @@ import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from
 import { Skeleton } from '@/components';
 import { useDeployments } from '../hooks/useDeployments';
 import { useDeploymentMetadata } from '../hooks/useDeploymentMetadata';
+import { useCustomDomains } from '../hooks/useCustomDomains';
 import { useToast } from '@/lib/hooks/useToast';
 import { cn, formatTime } from '@/lib/utils/utils';
 
@@ -26,6 +27,7 @@ export default function DeploymentOverviewPage() {
   const [iframeKey, setIframeKey] = useState(0);
   const { deployments, isLoadingDeployments, refetchDeployments } = useDeployments();
   const { customDomainUrl } = useDeploymentMetadata();
+  const { domains: customDomains } = useCustomDomains();
 
   const latestReadyDeployment = deployments.find((d) => d.status === 'READY') ?? null;
 
@@ -38,6 +40,35 @@ export default function DeploymentOverviewPage() {
       ? latestReadyDeployment.url
       : `https://${latestReadyDeployment.url}`
     : null;
+  const readyCustomDomains = customDomains
+    .filter((domain) => domain.verified && !domain.misconfigured)
+    .sort((left, right) => left.domain.localeCompare(right.domain));
+  const preferredCustomDomain = readyCustomDomains[0] ?? null;
+  const visibleDomains = [
+    ...readyCustomDomains.map((domain) => ({
+      href: `https://${domain.domain}`,
+      label: domain.domain,
+    })),
+    ...(customDomainUrl
+      ? [
+          {
+            href: customDomainUrl,
+            label: customDomainUrl,
+          },
+        ]
+      : []),
+    ...(deploymentUrl && latestReadyDeployment?.url
+      ? [
+          {
+            href: deploymentUrl,
+            label: latestReadyDeployment.url,
+          },
+        ]
+      : []),
+  ];
+  const primaryVisitUrl = preferredCustomDomain
+    ? `https://${preferredCustomDomain.domain}`
+    : (customDomainUrl ?? deploymentUrl);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -188,28 +219,21 @@ export default function DeploymentOverviewPage() {
                 Domains
               </p>
               <div className="flex flex-col gap-1">
-                {customDomainUrl && (
-                  <a
-                    href={customDomainUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-zinc-950 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1"
-                  >
-                    {customDomainUrl}
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                )}
-                {deploymentUrl ? (
-                  <a
-                    href={deploymentUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-zinc-950 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1"
-                  >
-                    {latestReadyDeployment.url}
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                ) : (
+                {visibleDomains.length > 0
+                  ? visibleDomains.map((domain) => (
+                      <a
+                        key={domain.href}
+                        href={domain.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-zinc-950 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1"
+                      >
+                        {domain.label}
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    ))
+                  : null}
+                {visibleDomains.length === 0 && (
                   <p className="text-sm text-zinc-950 dark:text-white">—</p>
                 )}
               </div>
@@ -252,12 +276,12 @@ export default function DeploymentOverviewPage() {
                 </Tooltip>
               </TooltipProvider>
             </div>
-            {deploymentUrl && (
+            {primaryVisitUrl && (
               <Button
                 asChild
                 className="h-9 px-8 bg-zinc-950 text-white hover:bg-zinc-800 dark:bg-emerald-300 dark:text-zinc-950 dark:hover:bg-emerald-400"
               >
-                <a href={deploymentUrl} target="_blank" rel="noopener noreferrer">
+                <a href={primaryVisitUrl} target="_blank" rel="noopener noreferrer">
                   Visit
                 </a>
               </Button>
