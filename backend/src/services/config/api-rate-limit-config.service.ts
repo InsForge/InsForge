@@ -55,8 +55,8 @@ export class ApiRateLimitConfigService {
           verify_otp_max_requests as "verifyOtpMaxRequests",
           verify_otp_window_minutes as "verifyOtpWindowMinutes",
           email_cooldown_seconds as "emailCooldownSeconds",
-          created_at as "createdAt",
-          updated_at as "updatedAt"
+          created_at::text as "createdAt",
+          updated_at::text as "updatedAt"
          FROM system.api_rate_limit_config
          LIMIT 1`
       );
@@ -112,8 +112,8 @@ export class ApiRateLimitConfigService {
            verify_otp_max_requests as "verifyOtpMaxRequests",
            verify_otp_window_minutes as "verifyOtpWindowMinutes",
            email_cooldown_seconds as "emailCooldownSeconds",
-           created_at as "createdAt",
-           updated_at as "updatedAt"`,
+           created_at::text as "createdAt",
+           updated_at::text as "updatedAt"`,
         [
           input.overallApiMaxRequests,
           input.overallApiWindowMinutes,
