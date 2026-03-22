@@ -129,10 +129,10 @@ describe('AIAccessConfigService', () => {
       const updatedRow = makeConfigRow(false);
       // connect → BEGIN → SELECT FOR UPDATE (row exists) → UPDATE → COMMIT
       mockConnect.query
-        .mockResolvedValueOnce(undefined)                        // BEGIN
+        .mockResolvedValueOnce(undefined) // BEGIN
         .mockResolvedValueOnce({ rows: [{ id: updatedRow.id }] }) // SELECT FOR UPDATE
-        .mockResolvedValueOnce({ rows: [updatedRow] })           // UPDATE … RETURNING
-        .mockResolvedValueOnce(undefined);                        // COMMIT
+        .mockResolvedValueOnce({ rows: [updatedRow] }) // UPDATE … RETURNING
+        .mockResolvedValueOnce(undefined); // COMMIT
 
       const service = AIAccessConfigService.getInstance();
       const result = await service.updateAIAccessConfig({ allowAnonAiAccess: false });
@@ -152,10 +152,10 @@ describe('AIAccessConfigService', () => {
       const newRow = makeConfigRow(true);
       // connect → BEGIN → SELECT FOR UPDATE (empty) → INSERT → COMMIT
       mockConnect.query
-        .mockResolvedValueOnce(undefined)           // BEGIN
-        .mockResolvedValueOnce({ rows: [] })        // SELECT FOR UPDATE — no row
-        .mockResolvedValueOnce({ rows: [newRow] })  // INSERT … RETURNING
-        .mockResolvedValueOnce(undefined);           // COMMIT
+        .mockResolvedValueOnce(undefined) // BEGIN
+        .mockResolvedValueOnce({ rows: [] }) // SELECT FOR UPDATE — no row
+        .mockResolvedValueOnce({ rows: [newRow] }) // INSERT … RETURNING
+        .mockResolvedValueOnce(undefined); // COMMIT
 
       const service = AIAccessConfigService.getInstance();
       const result = await service.updateAIAccessConfig({ allowAnonAiAccess: true });
@@ -169,14 +169,14 @@ describe('AIAccessConfigService', () => {
 
     it('rolls back and throws AppError on database failure', async () => {
       mockConnect.query
-        .mockResolvedValueOnce(undefined)                         // BEGIN
+        .mockResolvedValueOnce(undefined) // BEGIN
         .mockRejectedValueOnce(new Error('constraint violation')); // SELECT FOR UPDATE fails
 
       const service = AIAccessConfigService.getInstance();
 
-      await expect(
-        service.updateAIAccessConfig({ allowAnonAiAccess: false })
-      ).rejects.toThrow('Failed to update AI access configuration');
+      await expect(service.updateAIAccessConfig({ allowAnonAiAccess: false })).rejects.toThrow(
+        'Failed to update AI access configuration'
+      );
 
       // release() must be called even after an error
       expect(mockConnect.release).toHaveBeenCalledOnce();

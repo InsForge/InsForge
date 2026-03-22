@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Settings } from 'lucide-react';
@@ -84,10 +84,12 @@ export function AISettingsMenuDialog({ open, onOpenChange }: AISettingsMenuDialo
     form.reset(toFormValues(config));
   }, [config, form]);
 
+  const prevOpenRef = useRef(false);
   useEffect(() => {
-    if (open) {
+    if (open && !prevOpenRef.current) {
       resetForm();
     }
+    prevOpenRef.current = open;
   }, [open, resetForm]);
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -162,7 +164,11 @@ export function AISettingsMenuDialog({ open, onOpenChange }: AISettingsMenuDialo
                     control={form.control}
                     render={({ field }) => (
                       <div className="py-1.5">
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          aria-label="Allow anonymous AI access"
+                        />
                       </div>
                     )}
                   />
