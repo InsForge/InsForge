@@ -91,7 +91,7 @@ export const oAuthConfigSchema = z.object({
 });
 
 export const redirectUrlWhitelistRegex =
-  /^(https?:\/\/)(?:(?:\*\.)?(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}|localhost)(?::\d+)?(?:\/.*)?$/;
+  /^(?:(https?:\/\/)(?:(?:\*\.)?(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}|localhost)(?::\d+)?(?:\/.*)?|[a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^\s/]+(?:\/.*)?)$/;
 
 // Email authentication configuration schema
 export const authConfigSchema = z.object({
