@@ -56,7 +56,7 @@ export function DeploymentsTab({
     <div className="flex flex-col gap-1 pt-2">
       {deployments.map((dep, idx) => {
         const statusColor = STATUS_COLORS[dep.status] ?? 'bg-gray-400';
-        const canRollback = !dep.is_active && dep.status !== 'failed';
+        const canRollback = !dep.isActive && dep.status !== 'failed';
         const deployNumber = deployments.length - idx;
 
         return (
@@ -73,7 +73,7 @@ export function DeploymentsTab({
             </span>
 
             {/* Active badge */}
-            {dep.is_active && (
+            {dep.isActive && (
               <span className="ml-2 px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 shrink-0">
                 active
               </span>
@@ -81,23 +81,23 @@ export function DeploymentsTab({
 
             {/* Commit SHA */}
             <span className="ml-3 text-sm font-mono text-foreground truncate flex-1">
-              {dep.commit_sha ? dep.commit_sha.slice(0, 8) : (dep.image_tag ?? '—')}
+              {dep.commitSha ? dep.commitSha.slice(0, 8) : (dep.imageTag ?? '—')}
             </span>
 
             {/* Trigger */}
             <span className="text-xs text-muted-foreground px-2 shrink-0 hidden sm:block">
-              {dep.triggered_by.replace('_', ' ')}
+              {dep.triggeredBy.replace('_', ' ')}
             </span>
 
             {/* Timestamp */}
             <span className="text-xs text-muted-foreground px-2 shrink-0 hidden md:block">
-              {formatDate(dep.started_at)}
+              {formatDate(dep.startedAt)}
             </span>
 
             {/* Log link */}
-            {dep.build_log_url && (
+            {dep.buildLogUrl && (
               <a
-                href={dep.build_log_url}
+                href={dep.buildLogUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 shrink-0"

@@ -36,25 +36,25 @@ export function DeployModal({ open, onOpenChange, onSubmit, isSubmitting }: Depl
 
     const base = {
       name: name.trim(),
-      source_type: sourceType,
+      sourceType: sourceType,
       port: parseInt(port, 10),
-      health_check_path: healthCheckPath,
-      dockerfile_path: dockerfilePath,
+      healthCheckPath: healthCheckPath,
+      dockerfilePath: dockerfilePath,
       cpu: 256,
       memory: 512,
-      auto_deploy: true,
+      autoDeploy: true,
     };
 
     if (sourceType === 'github') {
       onSubmit({
         ...base,
-        github_repo: githubRepo,
-        github_branch: githubBranch,
+        githubRepo: githubRepo,
+        githubBranch: githubBranch,
       });
     } else {
       onSubmit({
         ...base,
-        image_url: imageUrl,
+        imageUrl: imageUrl,
       });
     }
   };

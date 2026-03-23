@@ -52,9 +52,9 @@ export function ContainerDetail({
   const statusColor = STATUS_COLORS[container.status] ?? 'bg-gray-400';
 
   const source =
-    container.source_type === 'github'
-      ? `${container.github_repo ?? ''}@${container.github_branch ?? 'main'}`
-      : (container.image_url ?? '—');
+    container.sourceType === 'github'
+      ? `${container.githubRepo ?? ''}@${container.githubBranch ?? 'main'}`
+      : (container.imageUrl ?? '—');
 
   const handleSaveEnvVars = (vars: { key: string; value: string }[]) => {
     const envVars = Object.fromEntries(vars.map((v) => [v.key, v.value]));
@@ -81,14 +81,14 @@ export function ContainerDetail({
         </div>
         <div className="flex flex-col gap-0.5">
           <p className="text-sm text-muted-foreground font-mono">{source}</p>
-          {container.endpoint_url && (
+          {container.endpointUrl && (
             <a
-              href={container.endpoint_url}
+              href={container.endpointUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
             >
-              {container.endpoint_url}
+              {container.endpointUrl}
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
           )}
@@ -121,27 +121,25 @@ export function ContainerDetail({
               <h3 className="text-sm font-medium text-foreground">Source</h3>
               <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
                 <span className="text-muted-foreground">Type</span>
-                <span className="text-foreground capitalize">{container.source_type}</span>
-                {container.source_type === 'github' ? (
+                <span className="text-foreground capitalize">{container.sourceType}</span>
+                {container.sourceType === 'github' ? (
                   <>
                     <span className="text-muted-foreground">Repository</span>
-                    <span className="text-foreground font-mono">
-                      {container.github_repo ?? '—'}
-                    </span>
+                    <span className="text-foreground font-mono">{container.githubRepo ?? '—'}</span>
                     <span className="text-muted-foreground">Branch</span>
                     <span className="text-foreground font-mono">
-                      {container.github_branch ?? '—'}
+                      {container.githubBranch ?? '—'}
                     </span>
                     <span className="text-muted-foreground">Dockerfile</span>
                     <span className="text-foreground font-mono">
-                      {container.dockerfile_path ?? '—'}
+                      {container.dockerfilePath ?? '—'}
                     </span>
                   </>
                 ) : (
                   <>
                     <span className="text-muted-foreground">Image</span>
                     <span className="text-foreground font-mono truncate">
-                      {container.image_url ?? '—'}
+                      {container.imageUrl ?? '—'}
                     </span>
                   </>
                 )}
@@ -160,10 +158,10 @@ export function ContainerDetail({
                 <span className="text-foreground">{container.replicas}</span>
                 <span className="text-muted-foreground">Port</span>
                 <span className="text-foreground">{container.port}</span>
-                {container.health_check_path && (
+                {container.healthCheckPath && (
                   <>
                     <span className="text-muted-foreground">Health Check</span>
-                    <span className="text-foreground font-mono">{container.health_check_path}</span>
+                    <span className="text-foreground font-mono">{container.healthCheckPath}</span>
                   </>
                 )}
                 <span className="text-muted-foreground">Region</span>

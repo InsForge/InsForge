@@ -19,11 +19,11 @@ export function ContainerCard({ container, onClick }: ContainerCardProps) {
   const statusColor = STATUS_COLORS[container.status] ?? 'bg-gray-400';
 
   const source =
-    container.source_type === 'github'
-      ? container.github_repo
-        ? `${container.github_repo}@${container.github_branch ?? 'main'}`
+    container.sourceType === 'github'
+      ? container.githubRepo
+        ? `${container.githubRepo}@${container.githubBranch ?? 'main'}`
         : 'GitHub (unconfigured)'
-      : (container.image_url ?? 'Image (unconfigured)');
+      : (container.imageUrl ?? 'Image (unconfigured)');
 
   return (
     <button
@@ -47,10 +47,10 @@ export function ContainerCard({ container, onClick }: ContainerCardProps) {
 
       {/* Endpoint */}
       <div className="flex-[2] py-1.5 px-2.5 truncate hidden lg:flex items-center gap-1">
-        {container.endpoint_url ? (
+        {container.endpointUrl ? (
           <>
             <span className="text-sm text-muted-foreground font-mono truncate">
-              {container.endpoint_url}
+              {container.endpointUrl}
             </span>
             <ExternalLink className="shrink-0 w-3.5 h-3.5 text-muted-foreground" />
           </>
