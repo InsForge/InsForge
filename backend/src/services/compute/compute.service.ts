@@ -833,8 +833,17 @@ export class ComputeService {
       const envVars = await this.getDecryptedEnvVars(container.id);
       envVars['PORT'] = String(container.port);
 
-      // Build imageUri from the stored image_tag
-      const imageUri = `${config.compute.ecrRegistry}/${container.id}:${deployment.imageTag}`;
+      // Build imageUri from the stored image_tag.
+      // For image-source containers the imageTag may be a full URI (contains '/' or ':'),
+      // or the container's imageUrl should be used directly — avoid reconstructing an ECR
+      // path for images that were never pushed to ECR.
+      const storedTag = deployment.imageTag ?? '';
+      const imageUri =
+        container.sourceType === 'image' && container.imageUrl
+          ? container.imageUrl
+          : storedTag.includes('/') || storedTag.includes(':')
+            ? storedTag
+            : `${config.compute.ecrRegistry}/${container.id}:${storedTag}`;
 
       const deployResult = await provider.deploy({
         containerId: container.id,

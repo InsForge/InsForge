@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS compute.containers (
   -- Auto-deploy
   auto_deploy           BOOLEAN DEFAULT true,
   github_webhook_id     TEXT,
-  github_webhook_secret TEXT,
+  github_webhook_secret TEXT, -- TODO(production): encrypt at rest; stored as plaintext for POC only
 
   -- Custom domains (future)
   custom_domain         TEXT,

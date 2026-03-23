@@ -51,10 +51,16 @@ export class AwsFargateProvider implements ComputeProvider {
   private logsClient!: CloudWatchLogsClient;
 
   initialize(): Promise<void> {
-    const credentials = {
-      accessKeyId: config.compute.awsAccessKeyId,
-      secretAccessKey: config.compute.awsSecretAccessKey,
-    };
+    // Only pass explicit credentials when both values are present.
+    // Otherwise pass undefined so the AWS SDK falls back to the default credential chain
+    // (e.g. instance profile, ECS task role, environment variables).
+    const credentials =
+      config.compute.awsAccessKeyId && config.compute.awsSecretAccessKey
+        ? {
+            accessKeyId: config.compute.awsAccessKeyId,
+            secretAccessKey: config.compute.awsSecretAccessKey,
+          }
+        : undefined;
     const region = config.compute.awsRegion;
 
     this.ecsClient = new ECSClient({ region, credentials });

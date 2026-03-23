@@ -27,7 +27,11 @@ computeRouter.post(
     try {
       const validation = createContainerSchema.safeParse(req.body);
       if (!validation.success) {
-        throw new AppError(JSON.stringify(validation.error.issues), 400, ERROR_CODES.INVALID_INPUT);
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
       }
 
       const projectId = req.query.project_id as string | undefined;
@@ -101,7 +105,11 @@ computeRouter.patch(
       const { id } = req.params;
       const validation = updateContainerSchema.safeParse(req.body);
       if (!validation.success) {
-        throw new AppError(JSON.stringify(validation.error.issues), 400, ERROR_CODES.INVALID_INPUT);
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
       }
 
       const container = await computeService.updateContainer(id, validation.data);
@@ -156,7 +164,11 @@ computeRouter.post(
       const { id } = req.params;
       const validation = deployContainerSchema.safeParse(req.body);
       if (!validation.success) {
-        throw new AppError(JSON.stringify(validation.error.issues), 400, ERROR_CODES.INVALID_INPUT);
+        throw new AppError(
+          validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
       }
 
       const deployment = await computeService.deploy({
