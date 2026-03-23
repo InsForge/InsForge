@@ -7,13 +7,15 @@ const {
   deviceAuthorizationServiceMock,
   tokenManagerMock,
   oauthProviderStub,
+  approvedUserId,
 } = vi.hoisted(() => {
+  const approvedUserId = '22222222-2222-2222-2222-222222222222';
   const deviceAuthorizationServiceMock = {
     exchangeApproved: vi.fn(
       async (
         _deviceCode: string,
         mintSession: (userId: string) => Promise<unknown>
-      ) => mintSession('11111111-1111-1111-1111-111111111111')
+      ) => mintSession(approvedUserId)
     ),
   };
 
@@ -29,6 +31,7 @@ const {
     deviceAuthorizationServiceMock,
     tokenManagerMock,
     oauthProviderStub,
+    approvedUserId,
   };
 });
 
@@ -100,19 +103,24 @@ describe('device auth session exchange', () => {
   it('returns a standard non-web session payload for an approved device authorization', async () => {
     const authService = AuthService.getInstance();
 
-    vi.spyOn(authService as any, 'getUserById').mockResolvedValue({
-      id: '11111111-1111-1111-1111-111111111111',
-      email: 'device-user@example.com',
-      profile: { name: 'Device User' },
-      metadata: { source: 'device' },
-      email_verified: true,
-      is_project_admin: false,
-      is_anonymous: false,
-      created_at: '2026-03-24T00:00:00.000Z',
-      updated_at: '2026-03-24T00:00:00.000Z',
-      password: 'hashed-password',
-      providers: 'email',
-    });
+    const getUserByIdSpy = vi.spyOn(authService as any, 'getUserById').mockImplementation(
+      async (userId: string) => {
+        expect(userId).toBe(approvedUserId);
+        return {
+          id: approvedUserId,
+          email: 'device-user@example.com',
+          profile: { name: 'Device User' },
+          metadata: { source: 'device' },
+          email_verified: true,
+          is_project_admin: false,
+          is_anonymous: false,
+          created_at: '2026-03-24T00:00:00.000Z',
+          updated_at: '2026-03-24T00:00:00.000Z',
+          password: 'hashed-password',
+          providers: 'email',
+        };
+      }
+    );
 
     const session = await authService.exchangeApprovedDeviceAuthorization('device-code-123');
 
@@ -120,6 +128,8 @@ describe('device auth session exchange', () => {
       'device-code-123',
       expect.any(Function)
     );
+    expect(getUserByIdSpy).toHaveBeenCalledWith(approvedUserId);
+    expect(getUserByIdSpy).toHaveBeenCalledTimes(1);
     expect(session).toMatchObject({
       accessToken: 'access-token-123',
       user: {
@@ -128,7 +138,7 @@ describe('device auth session exchange', () => {
     });
     expect(session).not.toHaveProperty('refreshToken');
     expect(tokenManagerMock.generateAccessToken).toHaveBeenCalledWith({
-      sub: '11111111-1111-1111-1111-111111111111',
+      sub: approvedUserId,
       email: 'device-user@example.com',
       role: 'authenticated',
     });

@@ -14,6 +14,48 @@ echo "🧪 Testing auth router..."
 API_BASE="$TEST_API_BASE"
 AUTH_TOKEN=""
 
+http_json_request() {
+    local method=$1
+    local endpoint=$2
+    local data=${3:-}
+    local auth_token=${4:-}
+    local tmp_file
+    tmp_file="$(mktemp)"
+
+    local -a curl_args=(-sS -o "$tmp_file" -w "%{http_code}" -X "$method" "$endpoint" -H "Content-Type: application/json")
+    if [ -n "$auth_token" ]; then
+        curl_args+=(-H "Authorization: Bearer $auth_token")
+    fi
+    if [ -n "$data" ]; then
+        curl_args+=(-d "$data")
+    fi
+
+    local status
+    status="$(curl "${curl_args[@]}")"
+    local body
+    body="$(cat "$tmp_file")"
+    rm -f "$tmp_file"
+
+    printf '%s\n%s' "$status" "$body"
+}
+
+assert_http_status() {
+    local actual_status=$1
+    local expected_status=$2
+    local description=$3
+
+    if [ "$actual_status" -ne "$expected_status" ]; then
+        print_fail "$description returned status $actual_status (expected $expected_status)"
+        return 1
+    fi
+}
+
+json_get() {
+    local json=$1
+    local query=$2
+    printf '%s' "$json" | jq -er "$query"
+}
+
 # Test function
 # $1: method, $2: endpoint, $3: data, $4: description, $5: extra header
 # If $5 is not empty, it will be added as header
@@ -95,54 +137,106 @@ echo ""
 
 # 3. exchange an approved device authorization and verify the returned access token
 echo "🪪 Exchanging an approved device authorization..."
-device_create_response=$(curl -s -X POST "$API_BASE/auth/device/authorizations" \
-    -H "Content-Type: application/json" \
-    -d '{"deviceName":"router-smoke","hostname":"router-smoke","platform":"linux-x64"}')
+device_create_response="$(http_json_request POST "$API_BASE/auth/device/authorizations" '{"deviceName":"router-smoke","hostname":"router-smoke","platform":"linux-x64"}')"
+device_create_status="${device_create_response%%$'\n'*}"
+device_create_body="${device_create_response#*$'\n'}"
 
-device_code=$(echo "$device_create_response" | grep -o '"deviceCode":"[^"]*"' | cut -d'"' -f4)
-user_code=$(echo "$device_create_response" | grep -o '"userCode":"[^"]*"' | cut -d'"' -f4)
-
-if [ -z "$device_code" ] || [ -z "$user_code" ]; then
-    print_fail "Device authorization creation failed"
-    echo "Response: $device_create_response"
+if ! assert_http_status "$device_create_status" 200 "Device authorization creation"; then
+    echo "Response: $device_create_body"
     track_test_failure
 else
-    approve_response=$(curl -s -X POST "$API_BASE/auth/device/authorizations/approve" \
-        -H "Authorization: Bearer $AUTH_TOKEN" \
-        -H "Content-Type: application/json" \
-        -d '{"userCode":"'$user_code'"}')
-
-    if ! echo "$approve_response" | grep -q '"status":"approved"'; then
-        print_fail "Device authorization approval failed"
-        echo "Response: $approve_response"
+    if ! device_code="$(json_get "$device_create_body" '.deviceCode')"; then
+        print_fail "Device authorization creation response missing deviceCode"
+        echo "Response: $device_create_body"
         track_test_failure
     else
-        device_token_response=$(curl -s -X POST "$API_BASE/auth/device/token" \
-            -H "Content-Type: application/json" \
-            -d '{"deviceCode":"'$device_code'","grantType":"urn:insforge:params:oauth:grant-type:device_code"}')
-
-        device_access_token=$(echo "$device_token_response" | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4)
-        device_refresh_token=$(echo "$device_token_response" | grep -o '"refreshToken":"[^"]*"' | cut -d'"' -f4)
-
-        if [ -z "$device_access_token" ] || [ -z "$device_refresh_token" ]; then
-            print_fail "Device authorization exchange did not return both access and refresh tokens"
-            echo "Response: $device_token_response"
+        if ! user_code="$(json_get "$device_create_body" '.userCode')"; then
+            print_fail "Device authorization creation response missing userCode"
+            echo "Response: $device_create_body"
             track_test_failure
         else
-            print_success "Device authorization exchange returned access and refresh tokens"
+            approve_response="$(http_json_request POST "$API_BASE/auth/device/authorizations/approve" '{"userCode":"'$user_code'"}' "$AUTH_TOKEN")"
+            approve_status="${approve_response%%$'\n'*}"
+            approve_body="${approve_response#*$'\n'}"
 
-            device_me_response=$(curl -s -X GET "$API_BASE/auth/sessions/current" \
-                -H "Authorization: Bearer $device_access_token" \
-                -H "Content-Type: application/json")
-
-            if echo "$device_me_response" | grep -q "\"email\":\"$USER_EMAIL\""; then
-                print_success "Device access token can read the current session"
-                echo "Response: $device_me_response" | head -c 200
-                echo ""
-            else
-                print_fail "Device access token could not read the current session"
-                echo "Response: $device_me_response"
+            if ! assert_http_status "$approve_status" 200 "Device authorization approval"; then
+                echo "Response: $approve_body"
                 track_test_failure
+            else
+                if ! approve_status_text="$(json_get "$approve_body" '.status')"; then
+                    print_fail "Device authorization approval response missing status"
+                    echo "Response: $approve_body"
+                    track_test_failure
+                elif [ "$approve_status_text" != "approved" ]; then
+                    print_fail "Device authorization approval returned unexpected status: $approve_status_text"
+                    echo "Response: $approve_body"
+                    track_test_failure
+                else
+                    device_token_response="$(http_json_request POST "$API_BASE/auth/device/token" '{"deviceCode":"'$device_code'","grantType":"urn:insforge:params:oauth:grant-type:device_code"}')"
+                    device_token_status="${device_token_response%%$'\n'*}"
+                    device_token_body="${device_token_response#*$'\n'}"
+
+                    if ! assert_http_status "$device_token_status" 200 "Device authorization exchange"; then
+                        echo "Response: $device_token_body"
+                        track_test_failure
+                    else
+                        if ! device_access_token="$(json_get "$device_token_body" '.accessToken')"; then
+                            print_fail "Device authorization exchange response missing accessToken"
+                            echo "Response: $device_token_body"
+                            track_test_failure
+                        elif ! device_refresh_token="$(json_get "$device_token_body" '.refreshToken')"; then
+                            print_fail "Device authorization exchange response missing refreshToken"
+                            echo "Response: $device_token_body"
+                            track_test_failure
+                        else
+                            print_success "Device authorization exchange returned access and refresh tokens"
+
+                            repeat_token_response="$(http_json_request POST "$API_BASE/auth/device/token" '{"deviceCode":"'$device_code'","grantType":"urn:insforge:params:oauth:grant-type:device_code"}')"
+                            repeat_token_status="${repeat_token_response%%$'\n'*}"
+                            repeat_token_body="${repeat_token_response#*$'\n'}"
+
+                            if ! assert_http_status "$repeat_token_status" 400 "Repeated device authorization exchange"; then
+                                echo "Response: $repeat_token_body"
+                                track_test_failure
+                            else
+                                if ! repeat_token_error="$(json_get "$repeat_token_body" '.error')"; then
+                                    print_fail "Repeated device authorization response missing error"
+                                    echo "Response: $repeat_token_body"
+                                    track_test_failure
+                                elif [ "$repeat_token_error" != "already_used" ]; then
+                                    print_fail "Repeated device authorization returned unexpected error: $repeat_token_error"
+                                    echo "Response: $repeat_token_body"
+                                    track_test_failure
+                                else
+                                    print_success "Repeated device authorization exchange failed as expected"
+                                fi
+                            fi
+
+                            device_me_response="$(http_json_request GET "$API_BASE/auth/sessions/current" "" "$device_access_token")"
+                            device_me_status="${device_me_response%%$'\n'*}"
+                            device_me_body="${device_me_response#*$'\n'}"
+
+                            if ! assert_http_status "$device_me_status" 200 "Device access token session lookup"; then
+                                echo "Response: $device_me_body"
+                                track_test_failure
+                            else
+                                if ! device_me_email="$(printf '%s' "$device_me_body" | jq -er --arg email "$USER_EMAIL" '.user.email == $email')"; then
+                                    print_fail "Device access token session response missing user.email"
+                                    echo "Response: $device_me_body"
+                                    track_test_failure
+                                elif [ "$device_me_email" != "true" ]; then
+                                    print_fail "Device access token session returned the wrong user email"
+                                    echo "Response: $device_me_body"
+                                    track_test_failure
+                                else
+                                    print_success "Device access token can read the current session"
+                                    echo "Response: $device_me_body" | head -c 200
+                                    echo ""
+                                fi
+                            fi
+                        fi
+                    fi
+                fi
             fi
         fi
     fi
