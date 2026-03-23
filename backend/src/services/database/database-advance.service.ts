@@ -74,9 +74,6 @@ export class DatabaseAdvanceService {
    * - DELETE operations on auth schema (prevents user deletion via raw SQL)
    * - TRUNCATE operations on auth schema (prevents mass user deletion)
    * - DROP operations on auth schema (prevents destruction of tables, indexes, triggers, functions, views, sequences, schemas, policies, types, domains)
-   * - CREATE/ALTER/DROP FUNCTION on system schema
-   * - CREATE TRIGGER that references a function from the system schema
-   * - Any DDL (CREATE TABLE, ALTER TABLE, DROP) on the system schema
    *
    * Allows:
    * - SELECT queries on auth schema (for reading user data)
@@ -108,7 +105,7 @@ export class DatabaseAdvanceService {
       throw new AppError(authError, 403, ERROR_CODES.FORBIDDEN);
     }
 
-    // Block DDL on internal system schemas (system, schedules, extensions, etc.)
+    // Block DDL/DML on internal system schema
     const systemError = checkSystemSchemaOperations(query);
     if (systemError) {
       logger.warn('Blocked operation on system schema', {
