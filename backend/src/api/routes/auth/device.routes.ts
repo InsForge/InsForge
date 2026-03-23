@@ -190,6 +190,32 @@ router.post(
 );
 
 router.post(
+  '/authorizations/lookup',
+  deviceAuthorizationUserCodeLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const validationResult = approveDeviceAuthorizationRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const session = await deviceAuthorizationService.findByUserCode(validationResult.data.userCode);
+      if (!session) {
+        throw new AppError('Device authorization not found', 404, ERROR_CODES.NOT_FOUND);
+      }
+
+      successResponse(res, session);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post(
   '/authorizations/deny',
   verifyToken,
   deviceAuthorizationUserCodeLimiter,

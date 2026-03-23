@@ -15,6 +15,7 @@ const {
 
   const deviceAuthorizationServiceMock = {
     create: vi.fn(),
+    findByUserCode: vi.fn(),
     approve: vi.fn(),
     deny: vi.fn(),
   };
@@ -226,6 +227,21 @@ describe('device auth routes', () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
+    deviceAuthorizationServiceMock.findByUserCode.mockResolvedValue({
+      id: '11111111-1111-1111-1111-111111111111',
+      status: 'pending_authorization',
+      deviceCode: 'device-code-123',
+      userCode: 'ABCD-EFGH',
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      pollIntervalSeconds: 5,
+      approvedByUserId: null,
+      consumedAt: null,
+      clientContext: {
+        deviceName: 'my-vps',
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
     authServiceMock.exchangeApprovedDeviceAuthorization.mockResolvedValue({
       user: {
         id: '11111111-1111-1111-1111-111111111111',
@@ -257,6 +273,27 @@ describe('device auth routes', () => {
       expect(result.status).toBe(200);
       expect(result.body.userCode).toBe('ABCD-EFGH');
       expect(result.body.verificationUri).toBe('http://localhost:7130/auth/device');
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('looks up device authorization metadata by user code', async () => {
+    const server = await createServer();
+
+    try {
+      const result = await postJson(`${server.baseUrl}/api/auth/device/authorizations/lookup`, {
+        userCode: 'ABCD-EFGH',
+      });
+
+      expect(result.status).toBe(200);
+      expect(deviceAuthorizationServiceMock.findByUserCode).toHaveBeenCalledWith('ABCD-EFGH');
+      expect(result.body).toMatchObject({
+        status: 'pending_authorization',
+        clientContext: {
+          deviceName: 'my-vps',
+        },
+      });
     } finally {
       await server.close();
     }
