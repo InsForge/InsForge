@@ -99,7 +99,7 @@ sequenceDiagram
 
 ### Device Authorization Flow
 
-Headless clients use an instance-scoped device authorization session and complete login through the existing browser sign-in and consent pages exposed by the current built-in auth app at `/auth/device` and `/auth/device/consent`. This first release does not add `client_id`, `scope`, a registration flow, or multi-instance SSO.
+Headless clients use an instance-scoped device authorization session and complete login through the current built-in auth app's device-code entry and consent pages at `/auth/device` and `/auth/device/consent`. If the browser is not already signed in, the flow continues through the existing `/auth/sign-in` route before returning to consent. This first release does not add `client_id`, `scope`, a registration flow, or multi-instance SSO.
 
 ```mermaid
 sequenceDiagram

@@ -259,7 +259,7 @@ router.post(
         req.user.id
       );
 
-      successResponse(res, session);
+      successResponse(res, buildPublicDeviceAuthorizationLookupResponse(session));
     } catch (error) {
       next(error);
     }

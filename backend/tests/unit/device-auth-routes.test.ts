@@ -421,7 +421,16 @@ describe('device auth routes', () => {
         'ABCD-EFGH',
         '11111111-1111-1111-1111-111111111111'
       );
-      expect(result.body.status).toBe('denied');
+      expect(result.body).toEqual({
+        status: 'denied',
+        expiresAt: expect.any(String),
+        clientContext: {
+          deviceName: 'my-vps',
+        },
+      });
+      expect(result.body).not.toHaveProperty('id');
+      expect(result.body).not.toHaveProperty('deviceCode');
+      expect(result.body).not.toHaveProperty('userCode');
     } finally {
       await server.close();
     }

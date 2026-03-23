@@ -802,7 +802,7 @@ refreshToken = response.refreshToken  // Persist securely
 
 ## Device Authorization
 
-Headless clients can start a short-lived device authorization session and complete it through the current built-in auth app's browser sign-in and consent pages at `/auth/device` and `/auth/device/consent`. This release is instance-scoped only: it does not support `client_id`, `scope`, a registration flow, or multi-instance SSO.
+Headless clients can start a short-lived device authorization session and complete it through the current built-in auth app's device-code entry and consent pages at `/auth/device` and `/auth/device/consent`. If the browser is not already signed in, the flow continues through the existing `/auth/sign-in` route before returning to consent. This release is instance-scoped only: it does not support `client_id`, `scope`, a registration flow, or multi-instance SSO.
 
 ### Create Device Authorization
 
