@@ -1,0 +1,481 @@
+import crypto from 'crypto';
+import { Pool } from 'pg';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
+import { AppError } from '@/api/middlewares/error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
+import logger from '@/utils/logger.js';
+import { generateSecureToken } from '@/utils/utils.js';
+import type {
+  CreateDeviceAuthorizationRequest,
+  DeviceAuthorizationSessionSchema,
+} from '@insforge/shared-schemas';
+
+interface DeviceAuthorizationRow {
+  id: string;
+  device_code_hash: string;
+  user_code_hash: string;
+  status:
+    | 'pending_authorization'
+    | 'authenticated'
+    | 'approved'
+    | 'denied'
+    | 'expired'
+    | 'consumed';
+  expires_at: string;
+  poll_interval_seconds: number;
+  approved_by_user_id: string | null;
+  consumed_at: string | null;
+  client_context: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type DeviceAuthorizationSessionView = Omit<
+  DeviceAuthorizationSessionSchema,
+  'deviceCode' | 'userCode'
+>;
+
+export type DeviceAuthorizationCreatedSession = DeviceAuthorizationSessionView & {
+  deviceCode: string;
+  userCode: string;
+};
+
+const DEFAULT_EXPIRES_IN_MS = 15 * 60 * 1000;
+const DEFAULT_POLL_INTERVAL_SECONDS = 5;
+
+export class DeviceAuthorizationService {
+  private static instance: DeviceAuthorizationService;
+  private pool: Pool | null = null;
+
+  private constructor() {
+    logger.info('DeviceAuthorizationService initialized');
+  }
+
+  public static getInstance(): DeviceAuthorizationService {
+    if (!DeviceAuthorizationService.instance) {
+      DeviceAuthorizationService.instance = new DeviceAuthorizationService();
+    }
+    return DeviceAuthorizationService.instance;
+  }
+
+  private getPool(): Pool {
+    if (!this.pool) {
+      this.pool = DatabaseManager.getInstance().getPool();
+    }
+    return this.pool;
+  }
+
+  private hashCode(value: string): string {
+    return crypto.createHash('sha256').update(value).digest('hex');
+  }
+
+  private generateUserCode(): string {
+    const raw = generateSecureToken(4).toUpperCase();
+    return `${raw.slice(0, 4)}-${raw.slice(4, 8)}`;
+  }
+
+  private normalizeClientContext(
+    input: CreateDeviceAuthorizationRequest
+  ): Record<string, unknown> | null {
+    const clientContext = {
+      ...(input.deviceName ? { deviceName: input.deviceName } : {}),
+      ...(input.hostname ? { hostname: input.hostname } : {}),
+      ...(input.platform ? { platform: input.platform } : {}),
+    };
+
+    return Object.keys(clientContext).length > 0 ? clientContext : null;
+  }
+
+  private toPublicSession(row: DeviceAuthorizationRow): DeviceAuthorizationSessionView {
+    return {
+      id: row.id,
+      status: row.status,
+      expiresAt: row.expires_at,
+      pollIntervalSeconds: row.poll_interval_seconds,
+      approvedByUserId: row.approved_by_user_id,
+      consumedAt: row.consumed_at,
+      clientContext: row.client_context,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  private cloneRow(row: DeviceAuthorizationRow): DeviceAuthorizationRow {
+    return {
+      ...row,
+      client_context: row.client_context ? { ...row.client_context } : null,
+    };
+  }
+
+  private async expireRow(id: string): Promise<DeviceAuthorizationSessionView | null> {
+    const result = await this.getPool().query(
+      `UPDATE auth.device_authorizations
+       SET status = 'expired', updated_at = NOW()
+       WHERE id = $1 AND status NOT IN ('expired', 'consumed', 'denied')
+       RETURNING
+         id,
+         device_code_hash,
+         user_code_hash,
+         status,
+         expires_at,
+         poll_interval_seconds,
+         approved_by_user_id,
+         consumed_at,
+         client_context,
+         created_at,
+         updated_at`,
+      [id]
+    );
+
+    const row = result.rows[0] as DeviceAuthorizationRow | undefined;
+    return row ? this.toPublicSession(row) : null;
+  }
+
+  private async loadByUserCodeHash(userCodeHash: string): Promise<DeviceAuthorizationRow | null> {
+    const result = await this.getPool().query(
+      `SELECT
+         id,
+         device_code_hash,
+         user_code_hash,
+         status,
+         expires_at,
+         poll_interval_seconds,
+         approved_by_user_id,
+         consumed_at,
+         client_context,
+         created_at,
+         updated_at
+       FROM auth.device_authorizations
+       WHERE user_code_hash = $1
+       LIMIT 1`,
+      [userCodeHash]
+    );
+
+    const row = result.rows[0] as DeviceAuthorizationRow | undefined;
+    return row ? this.cloneRow(row) : null;
+  }
+
+  private async loadByDeviceCodeHash(
+    deviceCodeHash: string
+  ): Promise<DeviceAuthorizationRow | null> {
+    const result = await this.getPool().query(
+      `SELECT
+         id,
+         device_code_hash,
+         user_code_hash,
+         status,
+         expires_at,
+         poll_interval_seconds,
+         approved_by_user_id,
+         consumed_at,
+         client_context,
+         created_at,
+         updated_at
+       FROM auth.device_authorizations
+       WHERE device_code_hash = $1
+       LIMIT 1`,
+      [deviceCodeHash]
+    );
+
+    const row = result.rows[0] as DeviceAuthorizationRow | undefined;
+    return row ? this.cloneRow(row) : null;
+  }
+
+  private async throwForCurrentState(row: DeviceAuthorizationRow | null): Promise<never> {
+    if (!row) {
+      throw new AppError('Device authorization not found', 404, ERROR_CODES.NOT_FOUND);
+    }
+
+    if (row.status === 'denied') {
+      throw new AppError(
+        'Device authorization denied',
+        403,
+        ERROR_CODES.AUTH_DEVICE_AUTHORIZATION_DENIED
+      );
+    }
+
+    if (row.status === 'consumed') {
+      throw new AppError(
+        'Device authorization already consumed',
+        409,
+        ERROR_CODES.AUTH_DEVICE_AUTHORIZATION_CONSUMED
+      );
+    }
+
+    if (new Date(row.expires_at).getTime() <= Date.now()) {
+      await this.expireRow(row.id);
+      throw new AppError(
+        'Device authorization expired',
+        410,
+        ERROR_CODES.AUTH_DEVICE_AUTHORIZATION_EXPIRED
+      );
+    }
+
+    throw new AppError(
+      'Device authorization pending',
+      428,
+      ERROR_CODES.AUTH_DEVICE_AUTHORIZATION_PENDING
+    );
+  }
+
+  async create(
+    input: CreateDeviceAuthorizationRequest
+  ): Promise<DeviceAuthorizationCreatedSession> {
+    try {
+      const deviceCode = generateSecureToken(32);
+      const userCode = this.generateUserCode();
+      const expiresAt = new Date(Date.now() + DEFAULT_EXPIRES_IN_MS).toISOString();
+      const clientContext = this.normalizeClientContext(input);
+
+      const result = await this.getPool().query(
+        `INSERT INTO auth.device_authorizations (
+           device_code_hash,
+           user_code_hash,
+           status,
+           expires_at,
+           poll_interval_seconds,
+           client_context
+         )
+         VALUES ($1, $2, 'pending_authorization', $3, $4, $5::jsonb)
+         RETURNING
+           id,
+           device_code_hash,
+           user_code_hash,
+           status,
+           expires_at,
+           poll_interval_seconds,
+           approved_by_user_id,
+           consumed_at,
+           client_context,
+           created_at,
+           updated_at`,
+        [
+          this.hashCode(deviceCode),
+          this.hashCode(userCode),
+          expiresAt,
+          DEFAULT_POLL_INTERVAL_SECONDS,
+          clientContext ? JSON.stringify(clientContext) : null,
+        ]
+      );
+
+      const row = result.rows[0] as DeviceAuthorizationRow | undefined;
+      if (!row) {
+        throw new AppError(
+          'Failed to create device authorization',
+          500,
+          ERROR_CODES.INTERNAL_ERROR
+        );
+      }
+
+      return { ...this.toPublicSession(this.cloneRow(row)), deviceCode, userCode };
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      logger.error('Failed to create device authorization', { error });
+      throw new AppError('Failed to create device authorization', 500, ERROR_CODES.INTERNAL_ERROR);
+    }
+  }
+
+  async findByUserCode(userCode: string): Promise<DeviceAuthorizationSessionView | null> {
+    const userCodeHash = this.hashCode(userCode);
+    const row = await this.loadByUserCodeHash(userCodeHash);
+
+    if (!row) {
+      return null;
+    }
+
+    if (row.status === 'denied' || row.status === 'consumed') {
+      return this.toPublicSession(row);
+    }
+
+    if (
+      new Date(row.expires_at).getTime() <= Date.now() &&
+      row.status !== 'expired'
+    ) {
+      return this.expireRow(row.id);
+    }
+
+    return this.toPublicSession(row);
+  }
+
+  async markAuthenticated(
+    userCode: string,
+    userId: string
+  ): Promise<DeviceAuthorizationSessionView> {
+    const userCodeHash = this.hashCode(userCode);
+
+    const result = await this.getPool().query(
+      `UPDATE auth.device_authorizations
+       SET status = 'authenticated',
+           approved_by_user_id = COALESCE(approved_by_user_id, $2),
+           updated_at = NOW()
+       WHERE user_code_hash = $1
+         AND status IN ('pending_authorization', 'authenticated')
+         AND consumed_at IS NULL
+         AND expires_at > NOW()
+       RETURNING
+         id,
+         device_code_hash,
+         user_code_hash,
+         status,
+         expires_at,
+         poll_interval_seconds,
+         approved_by_user_id,
+         consumed_at,
+         client_context,
+         created_at,
+         updated_at`,
+      [userCodeHash, userId]
+    );
+
+    const row = result.rows[0] as DeviceAuthorizationRow | undefined;
+    if (row) {
+      return this.toPublicSession(row);
+    }
+
+    const current = await this.loadByUserCodeHash(userCodeHash);
+    return await this.throwForCurrentState(current);
+  }
+
+  async approve(userCode: string, userId: string): Promise<DeviceAuthorizationSessionView> {
+    const userCodeHash = this.hashCode(userCode);
+
+    const result = await this.getPool().query(
+      `UPDATE auth.device_authorizations
+       SET status = 'approved',
+           approved_by_user_id = COALESCE(approved_by_user_id, $2),
+           updated_at = NOW()
+       WHERE user_code_hash = $1
+         AND status IN ('pending_authorization', 'authenticated', 'approved')
+         AND consumed_at IS NULL
+         AND expires_at > NOW()
+       RETURNING
+         id,
+         device_code_hash,
+         user_code_hash,
+         status,
+         expires_at,
+         poll_interval_seconds,
+         approved_by_user_id,
+         consumed_at,
+         client_context,
+         created_at,
+         updated_at`,
+      [userCodeHash, userId]
+    );
+
+    const row = result.rows[0] as DeviceAuthorizationRow | undefined;
+    if (row) {
+      return this.toPublicSession(row);
+    }
+
+    const current = await this.loadByUserCodeHash(userCodeHash);
+    return await this.throwForCurrentState(current);
+  }
+
+  async deny(userCode: string): Promise<DeviceAuthorizationSessionView> {
+    const userCodeHash = this.hashCode(userCode);
+
+    const result = await this.getPool().query(
+      `UPDATE auth.device_authorizations
+       SET status = 'denied',
+           updated_at = NOW()
+       WHERE user_code_hash = $1
+         AND status IN ('pending_authorization', 'authenticated', 'approved', 'denied')
+         AND consumed_at IS NULL
+         AND expires_at > NOW()
+       RETURNING
+         id,
+         device_code_hash,
+         user_code_hash,
+         status,
+         expires_at,
+         poll_interval_seconds,
+         approved_by_user_id,
+         consumed_at,
+         client_context,
+         created_at,
+         updated_at`,
+      [userCodeHash]
+    );
+
+    const row = result.rows[0] as DeviceAuthorizationRow | undefined;
+    if (row) {
+      return this.toPublicSession(row);
+    }
+
+    const current = await this.loadByUserCodeHash(userCodeHash);
+    return await this.throwForCurrentState(current);
+  }
+
+  async consumeApproved(deviceCode: string): Promise<DeviceAuthorizationSessionView> {
+    const deviceCodeHash = this.hashCode(deviceCode);
+
+    const result = await this.getPool().query(
+      `UPDATE auth.device_authorizations
+       SET status = 'consumed',
+           consumed_at = NOW(),
+           updated_at = NOW()
+       WHERE device_code_hash = $1
+         AND status = 'approved'
+         AND consumed_at IS NULL
+         AND expires_at > NOW()
+       RETURNING
+         id,
+         device_code_hash,
+         user_code_hash,
+         status,
+         expires_at,
+         poll_interval_seconds,
+         approved_by_user_id,
+         consumed_at,
+         client_context,
+         created_at,
+         updated_at`,
+      [deviceCodeHash]
+    );
+
+    const row = result.rows[0] as DeviceAuthorizationRow | undefined;
+    if (row) {
+      return this.toPublicSession(row);
+    }
+
+    const current = await this.loadByDeviceCodeHash(deviceCodeHash);
+    if (!current) {
+      throw new AppError('Device authorization not found', 404, ERROR_CODES.NOT_FOUND);
+    }
+
+    if (current.status === 'denied') {
+      throw new AppError(
+        'Device authorization denied',
+        403,
+        ERROR_CODES.AUTH_DEVICE_AUTHORIZATION_DENIED
+      );
+    }
+
+    if (current.status === 'consumed') {
+      throw new AppError(
+        'Device authorization already consumed',
+        409,
+        ERROR_CODES.AUTH_DEVICE_AUTHORIZATION_CONSUMED
+      );
+    }
+
+    if (new Date(current.expires_at).getTime() <= Date.now()) {
+      await this.expireRow(current.id);
+      throw new AppError(
+        'Device authorization expired',
+        410,
+        ERROR_CODES.AUTH_DEVICE_AUTHORIZATION_EXPIRED
+      );
+    }
+
+    throw new AppError(
+      'Device authorization pending',
+      428,
+      ERROR_CODES.AUTH_DEVICE_AUTHORIZATION_PENDING
+    );
+  }
+}
