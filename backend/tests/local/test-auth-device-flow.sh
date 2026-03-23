@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "$SCRIPT_DIR/../test-config.sh"
 
-API_BASE="$TEST_API_BASE/api"
+API_BASE="$TEST_API_BASE"
 DEVICE_GRANT_TYPE="urn:insforge:params:oauth:grant-type:device_code"
 POLL_INTERVAL_SECONDS=5
 MAX_WAIT_SECONDS=900
