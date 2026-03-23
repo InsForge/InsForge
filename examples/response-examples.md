@@ -41,6 +41,8 @@ All API responses now follow a consistent format with `success` field and proper
 
 ### Authentication Endpoints
 
+Device authorization endpoints return direct JSON payloads instead of the `success/data/meta` envelope.
+
 #### POST /auth/register
 **Success Response (201):**
 ```json
@@ -146,6 +148,42 @@ All API responses now follow a consistent format with `success` field and proper
   "meta": {
     "timestamp": "2024-01-01T00:00:00.000Z"
   }
+}
+```
+
+#### POST /api/auth/device/authorizations
+**Success Response (200):**
+```json
+{
+  "deviceCode": "device-code-123",
+  "userCode": "ABCD-EFGH",
+  "verificationUri": "https://your-app.insforge.app/auth/device",
+  "verificationUriComplete": "https://your-app.insforge.app/auth/device?user_code=ABCD-EFGH",
+  "expiresIn": 900,
+  "interval": 5
+}
+```
+
+#### POST /api/auth/device/token
+**Success Response (200):**
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "device-user@example.com",
+    "emailVerified": true
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+**Error Response (428):**
+```json
+{
+  "error": "authorization_pending",
+  "message": "Device authorization is still pending approval.",
+  "statusCode": 428
 }
 ```
 
