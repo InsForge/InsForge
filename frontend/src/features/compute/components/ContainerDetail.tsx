@@ -1,5 +1,9 @@
 import { useState } from 'react';
-import { ContainerSchema, ContainerDeploymentSchema, UpdateContainerRequest } from '@insforge/shared-schemas';
+import {
+  ContainerSchema,
+  ContainerDeploymentSchema,
+  UpdateContainerRequest,
+} from '@insforge/shared-schemas';
 import { Button } from '@insforge/ui';
 import { Trash2, RefreshCw, ExternalLink } from 'lucide-react';
 import { EnvVarsTab } from './EnvVarsTab';
@@ -50,16 +54,16 @@ export function ContainerDetail({
   const source =
     container.source_type === 'github'
       ? `${container.github_repo ?? ''}@${container.github_branch ?? 'main'}`
-      : container.image_url ?? '—';
+      : (container.image_url ?? '—');
 
   const handleSaveEnvVars = (vars: { key: string; value: string }[]) => {
-    const env_vars = Object.fromEntries(vars.map((v) => [v.key, v.value]));
-    onUpdate({ id: container.id, data: { env_vars } });
+    const envVars = Object.fromEntries(vars.map((v) => [v.key, v.value]));
+    onUpdate({ id: container.id, data: { envVars } });
   };
 
   const handleSaveAndRedeploy = (vars: { key: string; value: string }[]) => {
-    const env_vars = Object.fromEntries(vars.map((v) => [v.key, v.value]));
-    onUpdate({ id: container.id, data: { env_vars } });
+    const envVars = Object.fromEntries(vars.map((v) => [v.key, v.value]));
+    onUpdate({ id: container.id, data: { envVars } });
     onDeploy(container.id);
   };
 
@@ -121,16 +125,24 @@ export function ContainerDetail({
                 {container.source_type === 'github' ? (
                   <>
                     <span className="text-muted-foreground">Repository</span>
-                    <span className="text-foreground font-mono">{container.github_repo ?? '—'}</span>
+                    <span className="text-foreground font-mono">
+                      {container.github_repo ?? '—'}
+                    </span>
                     <span className="text-muted-foreground">Branch</span>
-                    <span className="text-foreground font-mono">{container.github_branch ?? '—'}</span>
+                    <span className="text-foreground font-mono">
+                      {container.github_branch ?? '—'}
+                    </span>
                     <span className="text-muted-foreground">Dockerfile</span>
-                    <span className="text-foreground font-mono">{container.dockerfile_path ?? '—'}</span>
+                    <span className="text-foreground font-mono">
+                      {container.dockerfile_path ?? '—'}
+                    </span>
                   </>
                 ) : (
                   <>
                     <span className="text-muted-foreground">Image</span>
-                    <span className="text-foreground font-mono truncate">{container.image_url ?? '—'}</span>
+                    <span className="text-foreground font-mono truncate">
+                      {container.image_url ?? '—'}
+                    </span>
                   </>
                 )}
               </div>

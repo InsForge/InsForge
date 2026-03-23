@@ -1,7 +1,11 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { computeService } from '../services/compute.service';
-import { ContainerSchema, CreateContainerRequest, UpdateContainerRequest } from '@insforge/shared-schemas';
+import {
+  ContainerSchema,
+  CreateContainerRequest,
+  UpdateContainerRequest,
+} from '@insforge/shared-schemas';
 import { useToast } from '@/lib/hooks/useToast';
 
 export function useCompute() {
@@ -30,7 +34,7 @@ export function useCompute() {
     refetch: refetchDeployments,
   } = useQuery({
     queryKey: ['compute', 'deployments', selectedContainer?.id],
-    queryFn: () => computeService.listDeployments(selectedContainer!.id),
+    queryFn: () => computeService.listDeployments(selectedContainer?.id ?? ''),
     enabled: !!selectedContainer,
     staleTime: 15 * 1000,
   });

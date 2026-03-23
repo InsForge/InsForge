@@ -23,7 +23,7 @@ export function ContainerCard({ container, onClick }: ContainerCardProps) {
       ? container.github_repo
         ? `${container.github_repo}@${container.github_branch ?? 'main'}`
         : 'GitHub (unconfigured)'
-      : container.image_url ?? 'Image (unconfigured)';
+      : (container.image_url ?? 'Image (unconfigured)');
 
   return (
     <button
