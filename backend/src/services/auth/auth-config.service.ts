@@ -314,9 +314,7 @@ export class AuthConfigService {
 
         const baseDomain = parsedItem.hostname.replace(dummyPrefix, '');
 
-        return (
-          targetUrlObj.hostname === baseDomain || targetUrlObj.hostname.endsWith('.' + baseDomain)
-        );
+        return targetUrlObj.hostname.endsWith('.' + baseDomain);
       } catch {
         return false;
       }
