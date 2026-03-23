@@ -14,3 +14,4 @@ deno.lock
 better-auth/
 .mcp.json
 backend/logs/*
+.worktrees/
