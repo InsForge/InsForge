@@ -81,7 +81,7 @@ export function DeploymentsTab({
 
             {/* Commit SHA */}
             <span className="ml-3 text-sm font-mono text-foreground truncate flex-1">
-              {dep.commit_sha ? dep.commit_sha.slice(0, 8) : dep.image_tag ?? '—'}
+              {dep.commit_sha ? dep.commit_sha.slice(0, 8) : (dep.image_tag ?? '—')}
             </span>
 
             {/* Trigger */}
