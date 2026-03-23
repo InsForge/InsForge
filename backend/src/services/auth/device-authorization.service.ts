@@ -181,9 +181,52 @@ export class DeviceAuthorizationService {
     return row ? this.cloneRow(row) : null;
   }
 
-  private async throwForCurrentState(row: DeviceAuthorizationRow | null): Promise<never> {
+  private async loadByDeviceCodeHashForUpdate(
+    client: Pick<Pool, 'query'>,
+    deviceCodeHash: string
+  ): Promise<DeviceAuthorizationRow | null> {
+    const result = await client.query(
+      `SELECT
+         id,
+         device_code_hash,
+         user_code_hash,
+         status,
+         expires_at,
+         poll_interval_seconds,
+         approved_by_user_id,
+         consumed_at,
+         client_context,
+         created_at,
+         updated_at
+       FROM auth.device_authorizations
+       WHERE device_code_hash = $1
+       LIMIT 1
+       FOR UPDATE`,
+      [deviceCodeHash]
+    );
+
+    const row = result.rows[0] as DeviceAuthorizationRow | undefined;
+    return row ? this.cloneRow(row) : null;
+  }
+
+  private hasForeignBoundUser(row: DeviceAuthorizationRow, userId?: string): boolean {
+    return !!userId && !!row.approved_by_user_id && row.approved_by_user_id !== userId;
+  }
+
+  private async throwForCurrentState(
+    row: DeviceAuthorizationRow | null,
+    userId?: string
+  ): Promise<never> {
     if (!row) {
       throw new AppError('Device authorization not found', 404, ERROR_CODES.NOT_FOUND);
+    }
+
+    if (this.hasForeignBoundUser(row, userId)) {
+      throw new AppError(
+        'Device authorization bound to another user',
+        403,
+        ERROR_CODES.FORBIDDEN
+      );
     }
 
     if (row.status === 'denied') {
@@ -336,7 +379,7 @@ export class DeviceAuthorizationService {
     }
 
     const current = await this.loadByUserCodeHash(userCodeHash);
-    return await this.throwForCurrentState(current);
+    return await this.throwForCurrentState(current, userId);
   }
 
   async approve(userCode: string, userId: string): Promise<DeviceAuthorizationSessionView> {
@@ -351,6 +394,7 @@ export class DeviceAuthorizationService {
          AND status IN ('pending_authorization', 'authenticated', 'approved')
          AND consumed_at IS NULL
          AND expires_at > NOW()
+         AND (approved_by_user_id IS NULL OR approved_by_user_id = $2)
        RETURNING
          id,
          device_code_hash,
@@ -372,10 +416,10 @@ export class DeviceAuthorizationService {
     }
 
     const current = await this.loadByUserCodeHash(userCodeHash);
-    return await this.throwForCurrentState(current);
+    return await this.throwForCurrentState(current, userId);
   }
 
-  async deny(userCode: string): Promise<DeviceAuthorizationSessionView> {
+  async deny(userCode: string, userId: string): Promise<DeviceAuthorizationSessionView> {
     const userCodeHash = this.hashCode(userCode);
 
     const result = await this.getPool().query(
@@ -386,6 +430,7 @@ export class DeviceAuthorizationService {
          AND status IN ('pending_authorization', 'authenticated', 'approved', 'denied')
          AND consumed_at IS NULL
          AND expires_at > NOW()
+         AND (approved_by_user_id IS NULL OR approved_by_user_id = $2)
        RETURNING
          id,
          device_code_hash,
@@ -398,7 +443,7 @@ export class DeviceAuthorizationService {
          client_context,
          created_at,
          updated_at`,
-      [userCodeHash]
+      [userCodeHash, userId]
     );
 
     const row = result.rows[0] as DeviceAuthorizationRow | undefined;
@@ -407,7 +452,7 @@ export class DeviceAuthorizationService {
     }
 
     const current = await this.loadByUserCodeHash(userCodeHash);
-    return await this.throwForCurrentState(current);
+    return await this.throwForCurrentState(current, userId);
   }
 
   async consumeApproved(deviceCode: string): Promise<DeviceAuthorizationSessionView> {
@@ -477,5 +522,87 @@ export class DeviceAuthorizationService {
       428,
       ERROR_CODES.AUTH_DEVICE_AUTHORIZATION_PENDING
     );
+  }
+
+  async exchangeApproved<T>(
+    deviceCode: string,
+    mintSession: (userId: string) => Promise<T>
+  ): Promise<T> {
+    const deviceCodeHash = this.hashCode(deviceCode);
+    const pool = this.getPool();
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const current = await this.loadByDeviceCodeHashForUpdate(client, deviceCodeHash);
+      if (!current) {
+        throw new AppError('Device authorization not found', 404, ERROR_CODES.NOT_FOUND);
+      }
+
+      if (current.status === 'denied') {
+        throw new AppError(
+          'Device authorization denied',
+          403,
+          ERROR_CODES.AUTH_DEVICE_AUTHORIZATION_DENIED
+        );
+      }
+
+      if (current.status === 'consumed') {
+        throw new AppError(
+          'Device authorization already consumed',
+          409,
+          ERROR_CODES.AUTH_DEVICE_AUTHORIZATION_CONSUMED
+        );
+      }
+
+      if (new Date(current.expires_at).getTime() <= Date.now()) {
+        throw new AppError(
+          'Device authorization expired',
+          410,
+          ERROR_CODES.AUTH_DEVICE_AUTHORIZATION_EXPIRED
+        );
+      }
+
+      if (current.status !== 'approved' || !current.approved_by_user_id) {
+        throw new AppError(
+          'Device authorization pending',
+          428,
+          ERROR_CODES.AUTH_DEVICE_AUTHORIZATION_PENDING
+        );
+      }
+
+      const session = await mintSession(current.approved_by_user_id);
+
+      const consumedResult = await client.query(
+        `UPDATE auth.device_authorizations
+         SET status = 'consumed',
+             consumed_at = NOW(),
+             updated_at = NOW()
+         WHERE device_code_hash = $1
+           AND status = 'approved'
+           AND consumed_at IS NULL
+           AND expires_at > NOW()
+         RETURNING id`,
+        [deviceCodeHash]
+      );
+
+      if (!consumedResult.rows[0]) {
+        const latest = await this.loadByDeviceCodeHashForUpdate(client, deviceCodeHash);
+        await this.throwForCurrentState(latest);
+      }
+
+      await client.query('COMMIT');
+      return session;
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // Ignore rollback errors and rethrow the original failure.
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }

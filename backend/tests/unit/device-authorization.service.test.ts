@@ -27,6 +27,7 @@ type DeviceAuthorizationRow = {
 const { mockPool } = vi.hoisted(() => ({
   mockPool: {
     query: vi.fn(),
+    connect: vi.fn(),
   },
 }));
 
@@ -67,8 +68,8 @@ function createRow(overrides: Partial<DeviceAuthorizationRow> = {}): DeviceAutho
   };
 }
 
-function installQueryMock(rows: Map<string, DeviceAuthorizationRow>) {
-  mockPool.query.mockImplementation(async (sql: string, params: unknown[]) => {
+function createQueryHandler(rows: Map<string, DeviceAuthorizationRow>) {
+  return async (sql: string, params: unknown[]) => {
     if (sql.startsWith('INSERT INTO auth.device_authorizations')) {
       const row = createRow({
         device_code_hash: String(params[0]),
@@ -105,6 +106,10 @@ function installQueryMock(rows: Map<string, DeviceAuthorizationRow>) {
         return { rows: [], rowCount: 0 };
       }
 
+      if (row.approved_by_user_id && row.approved_by_user_id !== String(params[1])) {
+        return { rows: [], rowCount: 0 };
+      }
+
       row.status = 'approved';
       row.approved_by_user_id = row.approved_by_user_id ?? String(params[1]);
       row.updated_at = new Date().toISOString();
@@ -118,6 +123,10 @@ function installQueryMock(rows: Map<string, DeviceAuthorizationRow>) {
         !['pending_authorization', 'authenticated', 'approved', 'denied'].includes(row.status) ||
         new Date(row.expires_at).getTime() <= Date.now()
       ) {
+        return { rows: [], rowCount: 0 };
+      }
+
+      if (row.approved_by_user_id && row.approved_by_user_id !== String(params[1])) {
         return { rows: [], rowCount: 0 };
       }
 
@@ -160,6 +169,77 @@ function installQueryMock(rows: Map<string, DeviceAuthorizationRow>) {
     }
 
     throw new Error(`Unexpected SQL: ${sql}`);
+  };
+}
+
+function installQueryMock(rows: Map<string, DeviceAuthorizationRow>) {
+  const handler = createQueryHandler(rows);
+  mockPool.query.mockImplementation(handler);
+}
+
+function cloneRows(
+  rows: Map<string, DeviceAuthorizationRow>
+): Map<string, DeviceAuthorizationRow> {
+  const clonedRows = new Map<string, DeviceAuthorizationRow>();
+  const seen = new WeakMap<DeviceAuthorizationRow, DeviceAuthorizationRow>();
+
+  for (const [key, row] of rows.entries()) {
+    let cloned = seen.get(row);
+    if (!cloned) {
+      cloned = { ...row, client_context: row.client_context ? { ...row.client_context } : null };
+      seen.set(row, cloned);
+    }
+    clonedRows.set(key, cloned);
+  }
+
+  return clonedRows;
+}
+
+function restoreRows(
+  target: Map<string, DeviceAuthorizationRow>,
+  snapshot: Map<string, DeviceAuthorizationRow>
+) {
+  target.clear();
+  for (const [key, row] of snapshot.entries()) {
+    target.set(key, row);
+  }
+}
+
+function installTransactionalQueryMock(rows: Map<string, DeviceAuthorizationRow>) {
+  let snapshot: Map<string, DeviceAuthorizationRow> | null = null;
+  const baseHandler = createQueryHandler(rows);
+
+  const handler = async (sql: string, params: unknown[]) => {
+    if (sql === 'BEGIN') {
+      snapshot = cloneRows(rows);
+      return { rows: [], rowCount: 0 };
+    }
+
+    if (sql === 'COMMIT') {
+      snapshot = null;
+      return { rows: [], rowCount: 0 };
+    }
+
+    if (sql === 'ROLLBACK') {
+      if (snapshot) {
+        restoreRows(rows, snapshot);
+      }
+      snapshot = null;
+      return { rows: [], rowCount: 0 };
+    }
+
+    if (sql.includes('FOR UPDATE') && sql.includes('WHERE device_code_hash = $1')) {
+      const row = rows.get(String(params[0]));
+      return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
+    }
+
+    return baseHandler(sql, params);
+  };
+
+  mockPool.query.mockImplementation(handler);
+  mockPool.connect.mockResolvedValue({
+    query: handler,
+    release: vi.fn(),
   });
 }
 
@@ -244,7 +324,7 @@ describe('DeviceAuthorizationService', () => {
     );
     const secondApproved = await service.approve(
       created.userCode,
-      '33333333-3333-3333-3333-333333333333'
+      '22222222-2222-2222-2222-222222222222'
     );
 
     expect(firstApproved.status).toBe('approved');
@@ -260,7 +340,7 @@ describe('DeviceAuthorizationService', () => {
     storedRow.expires_at = new Date(Date.now() - 60_000).toISOString();
 
     await expect(
-      service.approve(created.userCode, '44444444-4444-4444-4444-444444444444')
+      service.approve(created.userCode, '22222222-2222-2222-2222-222222222222')
     ).rejects.toMatchObject({
       name: 'AppError',
       code: ERROR_CODES.AUTH_DEVICE_AUTHORIZATION_EXPIRED,
@@ -297,5 +377,66 @@ describe('DeviceAuthorizationService', () => {
       statusCode: 403,
     });
     expect(storedRow.status).toBe('denied');
+  });
+
+  it('does not consume an approved authorization when minting fails before consumption', async () => {
+    const rows = new Map<string, DeviceAuthorizationRow>();
+    installTransactionalQueryMock(rows);
+
+    const service = DeviceAuthorizationService.getInstance();
+    const created = await service.create({});
+    await service.markAuthenticated(created.userCode, '22222222-2222-2222-2222-222222222222');
+    await service.approve(created.userCode, '22222222-2222-2222-2222-222222222222');
+
+    await expect(
+      service.exchangeApproved(created.deviceCode, async () => {
+        throw new Error('mint failed');
+      })
+    ).rejects.toThrow('mint failed');
+
+    const storedRow = Array.from(rows.values())[0];
+    expect(storedRow).toBeDefined();
+    if (!storedRow) {
+      throw new Error('Expected stored authorization row');
+    }
+
+    expect(storedRow.status).toBe('approved');
+    expect(storedRow.consumed_at).toBeNull();
+  });
+
+  it('rejects approve from a different authenticated user when already bound', async () => {
+    const rows = new Map<string, DeviceAuthorizationRow>();
+    installQueryMock(rows);
+
+    const service = DeviceAuthorizationService.getInstance();
+    const created = await service.create({});
+    await service.markAuthenticated(created.userCode, '22222222-2222-2222-2222-222222222222');
+    await service.approve(created.userCode, '22222222-2222-2222-2222-222222222222');
+
+    await expect(
+      service.approve(created.userCode, '33333333-3333-3333-3333-333333333333')
+    ).rejects.toMatchObject({
+      name: 'AppError',
+      code: ERROR_CODES.FORBIDDEN,
+      statusCode: 403,
+    });
+  });
+
+  it('rejects deny from a different authenticated user when already bound', async () => {
+    const rows = new Map<string, DeviceAuthorizationRow>();
+    installQueryMock(rows);
+
+    const service = DeviceAuthorizationService.getInstance();
+    const created = await service.create({});
+    await service.markAuthenticated(created.userCode, '22222222-2222-2222-2222-222222222222');
+    await service.approve(created.userCode, '22222222-2222-2222-2222-222222222222');
+
+    await expect(
+      service.deny(created.userCode, '33333333-3333-3333-3333-333333333333')
+    ).rejects.toMatchObject({
+      name: 'AppError',
+      code: ERROR_CODES.FORBIDDEN,
+      statusCode: 403,
+    });
   });
 });

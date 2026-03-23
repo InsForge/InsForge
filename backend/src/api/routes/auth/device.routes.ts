@@ -208,7 +208,10 @@ router.post(
         );
       }
 
-      const session = await deviceAuthorizationService.deny(validationResult.data.userCode);
+      const session = await deviceAuthorizationService.deny(
+        validationResult.data.userCode,
+        req.user.id
+      );
 
       successResponse(res, session);
     } catch (error) {

@@ -50,6 +50,12 @@ vi.mock('../../src/infra/security/token.manager.js', () => ({
 
 vi.mock('../../src/api/middlewares/auth.js', () => ({
   verifyToken: (req: { user?: unknown }, _res: unknown, next: () => void) => {
+    const authorization = (req as { headers?: { authorization?: string } }).headers?.authorization;
+    if (!authorization) {
+      next(new AppError('No token provided', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS));
+      return;
+    }
+
     req.user = {
       id: '11111111-1111-1111-1111-111111111111',
       email: 'user@example.com',
@@ -143,11 +149,16 @@ async function createServer(): Promise<ServerHandle> {
   };
 }
 
-async function postJson(url: string, body: unknown) {
+async function postJsonWithHeaders(
+  url: string,
+  body: unknown,
+  headers: HeadersInit = {}
+) {
   const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...headers,
     },
     body: JSON.stringify(body),
   });
@@ -161,6 +172,10 @@ async function postJson(url: string, body: unknown) {
     status: response.status,
     body: responseBody,
   };
+}
+
+async function postJson(url: string, body: unknown, headers: HeadersInit = {}) {
+  return postJsonWithHeaders(url, body, headers);
 }
 
 describe('device auth routes', () => {
@@ -294,6 +309,36 @@ describe('device auth routes', () => {
     }
   });
 
+  it.each([
+    ['access_denied', 403, ERROR_CODES.AUTH_DEVICE_AUTHORIZATION_DENIED],
+    ['expired_token', 400, ERROR_CODES.AUTH_DEVICE_AUTHORIZATION_EXPIRED],
+    ['already_used', 400, ERROR_CODES.AUTH_DEVICE_AUTHORIZATION_CONSUMED],
+  ])(
+    'maps %s to the protocol error shape',
+    async (error, statusCode, code) => {
+      authServiceMock.exchangeApprovedDeviceAuthorization.mockRejectedValue(
+        new AppError(`Device authorization ${error}`, statusCode, code)
+      );
+
+      const server = await createServer();
+
+      try {
+        const result = await postJson(`${server.baseUrl}/api/auth/device/token`, {
+          deviceCode: 'device-code-123',
+          grantType: 'urn:insforge:params:oauth:grant-type:device_code',
+        });
+
+        expect(result.status).toBe(statusCode);
+        expect(result.body).toMatchObject({
+          error,
+          statusCode,
+        });
+      } finally {
+        await server.close();
+      }
+    }
+  );
+
   it('approves a device authorization with the authenticated user', async () => {
     const server = await createServer();
 
@@ -302,6 +347,9 @@ describe('device auth routes', () => {
         `${server.baseUrl}/api/auth/device/authorizations/approve`,
         {
           userCode: 'ABCD-EFGH',
+        },
+        {
+          Authorization: 'Bearer test-token',
         }
       );
 
@@ -320,13 +368,40 @@ describe('device auth routes', () => {
     const server = await createServer();
 
     try {
-      const result = await postJson(`${server.baseUrl}/api/auth/device/authorizations/deny`, {
+      const result = await postJson(
+        `${server.baseUrl}/api/auth/device/authorizations/deny`,
+        {
+          userCode: 'ABCD-EFGH',
+        },
+        {
+          Authorization: 'Bearer test-token',
+        }
+      );
+
+      expect(result.status).toBe(200);
+      expect(deviceAuthorizationServiceMock.deny).toHaveBeenCalledWith(
+        'ABCD-EFGH',
+        '11111111-1111-1111-1111-111111111111'
+      );
+      expect(result.body.status).toBe('denied');
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('returns 401 when approve is called without authorization', async () => {
+    const server = await createServer();
+
+    try {
+      const result = await postJson(`${server.baseUrl}/api/auth/device/authorizations/approve`, {
         userCode: 'ABCD-EFGH',
       });
 
-      expect(result.status).toBe(200);
-      expect(deviceAuthorizationServiceMock.deny).toHaveBeenCalledWith('ABCD-EFGH');
-      expect(result.body.status).toBe('denied');
+      expect(result.status).toBe(401);
+      expect(result.body).toMatchObject({
+        error: ERROR_CODES.AUTH_UNAUTHORIZED,
+        statusCode: 401,
+      });
     } finally {
       await server.close();
     }

@@ -624,17 +624,9 @@ export class AuthService {
    */
   async exchangeApprovedDeviceAuthorization(deviceCode: string): Promise<CreateSessionResponse> {
     const deviceAuthorizationService = DeviceAuthorizationService.getInstance();
-    const session = await deviceAuthorizationService.consumeApproved(deviceCode);
-
-    if (!session.approvedByUserId) {
-      throw new AppError(
-        'Device authorization is missing an approved user',
-        500,
-        ERROR_CODES.INTERNAL_ERROR
-      );
-    }
-
-    return this.mintSessionForUserId(session.approvedByUserId);
+    return deviceAuthorizationService.exchangeApproved(deviceCode, (userId) =>
+      this.mintSessionForUserId(userId)
+    );
   }
 
   /**
