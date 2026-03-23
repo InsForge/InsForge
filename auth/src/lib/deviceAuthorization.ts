@@ -64,7 +64,10 @@ async function postDeviceAuthorizationSession(
 
   if (!response.ok) {
     const message =
-      payload && typeof payload === 'object' && 'message' in payload && typeof payload.message === 'string'
+      payload &&
+      typeof payload === 'object' &&
+      'message' in payload &&
+      typeof payload.message === 'string'
         ? payload.message
         : 'Device authorization request failed';
     throw new Error(message);
@@ -73,7 +76,9 @@ async function postDeviceAuthorizationSession(
   return deviceAuthorizationSessionViewSchema.parse(payload);
 }
 
-export function lookupDeviceAuthorization(userCode: string): Promise<DeviceAuthorizationSessionView> {
+export function lookupDeviceAuthorization(
+  userCode: string
+): Promise<DeviceAuthorizationSessionView> {
   return postDeviceAuthorizationSession(DEVICE_AUTHORIZATION_LOOKUP_PATH, userCode);
 }
 

@@ -71,12 +71,11 @@ export const exchangeAdminSessionRequestSchema = z.object({
   code: z.string(),
 });
 
-export const createDeviceAuthorizationRequestSchema = z
-  .object({
-    deviceName: z.string().min(1).optional(),
-    hostname: z.string().min(1).optional(),
-    platform: z.string().min(1).optional(),
-  });
+export const createDeviceAuthorizationRequestSchema = z.object({
+  deviceName: z.string().min(1).optional(),
+  hostname: z.string().min(1).optional(),
+  platform: z.string().min(1).optional(),
+});
 
 export const createDeviceAuthorizationResponseSchema = z.object({
   deviceCode: deviceAuthorizationDeviceCodeSchema,

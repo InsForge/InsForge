@@ -66,7 +66,7 @@ export function DeviceConsentPage() {
         return;
       }
 
-      navigate(buildDeviceSignInPath(userCode), { replace: true });
+      void navigate(buildDeviceSignInPath(userCode), { replace: true });
     }
 
     void resolveSessionToken();
@@ -99,7 +99,9 @@ export function DeviceConsentPage() {
       } catch (error) {
         if (!cancelled) {
           setAuthorization(null);
-          setErrorMessage(error instanceof Error ? error.message : 'Failed to load device authorization.');
+          setErrorMessage(
+            error instanceof Error ? error.message : 'Failed to load device authorization.'
+          );
         }
       } finally {
         if (!cancelled) {
@@ -141,7 +143,9 @@ export function DeviceConsentPage() {
       setAuthorization(session);
       setResultMessage(action === 'approve' ? 'Device approved.' : 'Device denied.');
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to update device authorization.');
+      setErrorMessage(
+        error instanceof Error ? error.message : 'Unable to update device authorization.'
+      );
     } finally {
       setActionState('idle');
     }
@@ -151,7 +155,9 @@ export function DeviceConsentPage() {
     return (
       <div className="w-full max-w-2xl px-6 py-10">
         <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-900/5 dark:border-neutral-800 dark:bg-neutral-900">
-          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Loading device consent…</p>
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+            Loading device consent…
+          </p>
         </div>
       </div>
     );

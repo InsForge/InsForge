@@ -66,14 +66,16 @@ export function DeviceAuthorizePage() {
         Boolean(isSignedIn) ||
         Boolean(browserSession && typeof browserSession === 'object' && browserSession.accessToken);
 
-      navigate(
+      void navigate(
         hasBrowserSession
           ? buildDeviceConsentPath(validatedUserCode)
           : buildDeviceSignInPath(validatedUserCode),
         { replace: true }
       );
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to resolve the device code.');
+      setErrorMessage(
+        error instanceof Error ? error.message : 'Failed to resolve the device code.'
+      );
     } finally {
       setLoading(false);
     }
@@ -94,10 +96,15 @@ export function DeviceAuthorizePage() {
       </div>
 
       <form
-        onSubmit={handleSubmit}
+        onSubmit={(event) => {
+          void handleSubmit(event);
+        }}
         className="rounded-3xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-900/5 dark:border-neutral-800 dark:bg-neutral-900"
       >
-        <label htmlFor="device-code" className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+        <label
+          htmlFor="device-code"
+          className="block text-sm font-medium text-slate-700 dark:text-slate-200"
+        >
           Device code
         </label>
         <input

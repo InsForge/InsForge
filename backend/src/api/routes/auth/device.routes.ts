@@ -27,10 +27,9 @@ const deviceAuthorizationService = DeviceAuthorizationService.getInstance();
 const authService = AuthService.getInstance();
 const tokenManager = TokenManager.getInstance();
 
-function buildVerificationUrls(userCode: string): Pick<
-  CreateDeviceAuthorizationResponse,
-  'verificationUri' | 'verificationUriComplete'
-> {
+function buildVerificationUrls(
+  userCode: string
+): Pick<CreateDeviceAuthorizationResponse, 'verificationUri' | 'verificationUriComplete'> {
   const verificationUri = new URL('/auth/device', getApiBaseUrl()).toString();
   const verificationUriComplete = new URL(verificationUri);
   verificationUriComplete.searchParams.set('user_code', userCode);
@@ -76,9 +75,9 @@ function buildPublicDeviceAuthorizationLookupResponse(
   };
 }
 
-function mapDeviceTokenError(error: unknown):
-  | { error: string; message: string; statusCode: number }
-  | undefined {
+function mapDeviceTokenError(
+  error: unknown
+): { error: string; message: string; statusCode: number } | undefined {
   if (!error || typeof error !== 'object' || !('code' in error)) {
     return undefined;
   }
@@ -129,7 +128,9 @@ router.post(
       const validationResult = createDeviceAuthorizationRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
         throw new AppError(
-          validationResult.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', '),
+          validationResult.error.issues
+            .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+            .join(', '),
           400,
           ERROR_CODES.INVALID_INPUT
         );
@@ -151,7 +152,9 @@ router.post(
       const validationResult = exchangeDeviceAuthorizationRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
         throw new AppError(
-          validationResult.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', '),
+          validationResult.error.issues
+            .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+            .join(', '),
           400,
           ERROR_CODES.INVALID_INPUT
         );
@@ -191,7 +194,9 @@ router.post(
       const validationResult = approveDeviceAuthorizationRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
         throw new AppError(
-          validationResult.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', '),
+          validationResult.error.issues
+            .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+            .join(', '),
           400,
           ERROR_CODES.INVALID_INPUT
         );
@@ -217,13 +222,17 @@ router.post(
       const validationResult = approveDeviceAuthorizationRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
         throw new AppError(
-          validationResult.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', '),
+          validationResult.error.issues
+            .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+            .join(', '),
           400,
           ERROR_CODES.INVALID_INPUT
         );
       }
 
-      const session = await deviceAuthorizationService.findByUserCode(validationResult.data.userCode);
+      const session = await deviceAuthorizationService.findByUserCode(
+        validationResult.data.userCode
+      );
       if (!session) {
         throw new AppError('Device authorization not found', 404, ERROR_CODES.NOT_FOUND);
       }
@@ -248,7 +257,9 @@ router.post(
       const validationResult = denyDeviceAuthorizationRequestSchema.safeParse(req.body);
       if (!validationResult.success) {
         throw new AppError(
-          validationResult.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', '),
+          validationResult.error.issues
+            .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+            .join(', '),
           400,
           ERROR_CODES.INVALID_INPUT
         );

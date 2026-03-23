@@ -3,37 +3,31 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 process.env.ADMIN_EMAIL = 'admin@example.com';
 process.env.ADMIN_PASSWORD = 'change-this-password';
 
-const {
-  deviceAuthorizationServiceMock,
-  tokenManagerMock,
-  oauthProviderStub,
-  approvedUserId,
-} = vi.hoisted(() => {
-  const approvedUserId = '22222222-2222-2222-2222-222222222222';
-  const deviceAuthorizationServiceMock = {
-    exchangeApproved: vi.fn(
-      async (
-        _deviceCode: string,
-        mintSession: (userId: string) => Promise<unknown>
-      ) => mintSession(approvedUserId)
-    ),
-  };
+const { deviceAuthorizationServiceMock, tokenManagerMock, oauthProviderStub, approvedUserId } =
+  vi.hoisted(() => {
+    const approvedUserId = '22222222-2222-2222-2222-222222222222';
+    const deviceAuthorizationServiceMock = {
+      exchangeApproved: vi.fn(
+        async (_deviceCode: string, mintSession: (userId: string) => Promise<unknown>) =>
+          mintSession(approvedUserId)
+      ),
+    };
 
-  const tokenManagerMock = {
-    generateAccessToken: vi.fn(() => 'access-token-123'),
-  };
+    const tokenManagerMock = {
+      generateAccessToken: vi.fn(() => 'access-token-123'),
+    };
 
-  const oauthProviderStub = {
-    getInstance: () => ({}),
-  };
+    const oauthProviderStub = {
+      getInstance: () => ({}),
+    };
 
-  return {
-    deviceAuthorizationServiceMock,
-    tokenManagerMock,
-    oauthProviderStub,
-    approvedUserId,
-  };
-});
+    return {
+      deviceAuthorizationServiceMock,
+      tokenManagerMock,
+      oauthProviderStub,
+      approvedUserId,
+    };
+  });
 
 vi.mock('../../src/infra/security/token.manager.js', () => ({
   TokenManager: {
@@ -103,8 +97,9 @@ describe('device auth session exchange', () => {
   it('returns a standard non-web session payload for an approved device authorization', async () => {
     const authService = AuthService.getInstance();
 
-    const getUserByIdSpy = vi.spyOn(authService as any, 'getUserById').mockImplementation(
-      async (userId: string) => {
+    const getUserByIdSpy = vi
+      .spyOn(authService, 'getUserById')
+      .mockImplementation(async (userId) => {
         expect(userId).toBe(approvedUserId);
         return {
           id: approvedUserId,
@@ -119,8 +114,7 @@ describe('device auth session exchange', () => {
           password: 'hashed-password',
           providers: 'email',
         };
-      }
-    );
+      });
 
     const session = await authService.exchangeApprovedDeviceAuthorization('device-code-123');
 

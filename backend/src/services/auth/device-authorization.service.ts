@@ -222,11 +222,7 @@ export class DeviceAuthorizationService {
     }
 
     if (this.hasForeignBoundUser(row, userId)) {
-      throw new AppError(
-        'Device authorization bound to another user',
-        403,
-        ERROR_CODES.FORBIDDEN
-      );
+      throw new AppError('Device authorization bound to another user', 403, ERROR_CODES.FORBIDDEN);
     }
 
     if (row.status === 'denied') {
@@ -333,10 +329,7 @@ export class DeviceAuthorizationService {
       return this.toPublicSession(row);
     }
 
-    if (
-      new Date(row.expires_at).getTime() <= Date.now() &&
-      row.status !== 'expired'
-    ) {
+    if (new Date(row.expires_at).getTime() <= Date.now() && row.status !== 'expired') {
       return this.expireRow(row.id);
     }
 
