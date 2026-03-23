@@ -243,6 +243,48 @@ function installTransactionalQueryMock(rows: Map<string, DeviceAuthorizationRow>
   });
 }
 
+function installLockSensitiveTransactionalQueryMock(rows: Map<string, DeviceAuthorizationRow>) {
+  let snapshot: Map<string, DeviceAuthorizationRow> | null = null;
+  const baseHandler = createQueryHandler(rows);
+
+  const handler = async (sql: string, params: unknown[]) => {
+    if (sql === 'BEGIN') {
+      snapshot = cloneRows(rows);
+      return { rows: [], rowCount: 0 };
+    }
+
+    if (sql === 'COMMIT') {
+      snapshot = null;
+      return { rows: [], rowCount: 0 };
+    }
+
+    if (sql === 'ROLLBACK') {
+      if (snapshot) {
+        restoreRows(rows, snapshot);
+      }
+      snapshot = null;
+      return { rows: [], rowCount: 0 };
+    }
+
+    if (sql.includes("SET status = 'expired'")) {
+      throw new Error('self-lock');
+    }
+
+    if (sql.includes('FOR UPDATE') && sql.includes('WHERE device_code_hash = $1')) {
+      const row = rows.get(String(params[0]));
+      return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
+    }
+
+    return baseHandler(sql, params);
+  };
+
+  mockPool.query.mockImplementation(handler);
+  mockPool.connect.mockResolvedValue({
+    query: handler,
+    release: vi.fn(),
+  });
+}
+
 describe('DeviceAuthorizationService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -402,6 +444,34 @@ describe('DeviceAuthorizationService', () => {
 
     expect(storedRow.status).toBe('approved');
     expect(storedRow.consumed_at).toBeNull();
+  });
+
+  it('returns expired_token instead of self-locking when the authorization expires during exchange', async () => {
+    const rows = new Map<string, DeviceAuthorizationRow>();
+    installLockSensitiveTransactionalQueryMock(rows);
+
+    const service = DeviceAuthorizationService.getInstance();
+    const created = await service.create({});
+    await service.markAuthenticated(created.userCode, '22222222-2222-2222-2222-222222222222');
+    await service.approve(created.userCode, '22222222-2222-2222-2222-222222222222');
+
+    await expect(
+      service.exchangeApproved(created.deviceCode, async () => {
+        const storedRow = Array.from(rows.values())[0];
+        if (!storedRow) {
+          throw new Error('Expected stored authorization row');
+        }
+
+        storedRow.expires_at = new Date(Date.now() - 60_000).toISOString();
+        return {
+          accessToken: 'unused',
+        };
+      })
+    ).rejects.toMatchObject({
+      name: 'AppError',
+      code: ERROR_CODES.AUTH_DEVICE_AUTHORIZATION_EXPIRED,
+      statusCode: 410,
+    });
   });
 
   it('rejects approve from a different authenticated user when already bound', async () => {

@@ -589,6 +589,13 @@ export class DeviceAuthorizationService {
 
       if (!consumedResult.rows[0]) {
         const latest = await this.loadByDeviceCodeHashForUpdate(client, deviceCodeHash);
+        if (latest && new Date(latest.expires_at).getTime() <= Date.now()) {
+          throw new AppError(
+            'Device authorization expired',
+            410,
+            ERROR_CODES.AUTH_DEVICE_AUTHORIZATION_EXPIRED
+          );
+        }
         await this.throwForCurrentState(latest);
       }
 
