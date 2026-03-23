@@ -553,8 +553,15 @@ export class ComputeService {
         if (!container.githubRepo || !container.githubBranch) {
           throw new Error('githubRepo and githubBranch are required for github source');
         }
-        if (!githubToken) {
-          throw new Error('githubToken is required to build from GitHub source');
+
+        // Resolve GitHub token: prefer token passed by caller, fall back to env var.
+        // TODO: In production this should come from a stored GitHub OAuth token
+        // associated with the user's account (e.g. encrypted in the DB).
+        const resolvedToken = githubToken ?? process.env['GITHUB_TOKEN'];
+        if (!resolvedToken) {
+          throw new Error(
+            'GitHub token required for building from source. Set GITHUB_TOKEN env var or connect GitHub account.'
+          );
         }
 
         await this.setDeploymentStatus(deployment.id, 'building');
@@ -565,7 +572,7 @@ export class ComputeService {
           githubRepo: container.githubRepo,
           githubBranch: container.githubBranch,
           dockerfilePath: container.dockerfilePath ?? 'Dockerfile',
-          githubToken,
+          githubToken: resolvedToken,
           imageTag: deployment.imageTag ?? `deploy-${Date.now()}`,
         });
 
@@ -619,8 +626,9 @@ export class ComputeService {
         rule_arn: string | null;
         service_arn: string | null;
         task_def_arn: string | null;
+        endpoint_url: string | null;
       }>(
-        `SELECT target_group_arn, rule_arn, service_arn, task_def_arn
+        `SELECT target_group_arn, rule_arn, service_arn, task_def_arn, endpoint_url
          FROM compute.container_routes
          WHERE container_id = $1
          LIMIT 1`,
@@ -630,7 +638,7 @@ export class ComputeService {
       const existingRoute = routeResult.rows[0];
       const isFirstDeploy = !existingRoute?.target_group_arn;
 
-      const deployResult = await provider.deploy({
+      const deployParams = {
         containerId: container.id,
         imageUri,
         cpu: container.cpu,
@@ -639,10 +647,19 @@ export class ComputeService {
         healthCheckPath: container.healthCheckPath ?? '/health',
         envVars,
         projectSlug,
-      });
+      };
 
-      // On first deploy, store route info
+      let endpointUrl: string;
+      let serviceArn: string;
+      let taskDefArn: string;
+
       if (isFirstDeploy) {
+        // First deploy: create ALB route + ECS service from scratch
+        const deployResult = await provider.deploy(deployParams);
+        endpointUrl = deployResult.endpointUrl;
+        serviceArn = deployResult.serviceArn;
+        taskDefArn = deployResult.taskDefArn;
+
         await pool.query(
           `INSERT INTO compute.container_routes
              (container_id, target_group_arn, rule_arn, service_arn, task_def_arn, endpoint_url)
@@ -663,12 +680,20 @@ export class ComputeService {
           ]
         );
       } else {
-        // Update existing route with new task def
+        // Redeploy: register a new task definition and update the existing service.
+        // The ALB route (target group + listener rule) already exists — do NOT recreate it.
+        taskDefArn = await provider.registerTaskDefinition(deployParams);
+        serviceArn = existingRoute.service_arn ?? '';
+        endpointUrl =
+          existingRoute.endpoint_url ?? `https://${projectSlug}.${container.region}.insforge.app`;
+
+        await provider.updateService(serviceArn, taskDefArn);
+
         await pool.query(
           `UPDATE compute.container_routes
-           SET task_def_arn = $2, service_arn = $3, endpoint_url = $4
+           SET task_def_arn = $2, updated_at = NOW()
            WHERE container_id = $1`,
-          [container.id, deployResult.taskDefArn, deployResult.serviceArn, deployResult.endpointUrl]
+          [container.id, taskDefArn]
         );
       }
 
@@ -683,13 +708,13 @@ export class ComputeService {
       ]);
 
       await this.setContainerStatus(container.id, 'running', {
-        endpointUrl: deployResult.endpointUrl,
+        endpointUrl,
       });
 
       logger.info('Deployment succeeded', {
         deploymentId: deployment.id,
         containerId: container.id,
-        endpointUrl: deployResult.endpointUrl,
+        endpointUrl,
       });
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);
@@ -845,7 +870,28 @@ export class ComputeService {
             ? storedTag
             : `${config.compute.ecrRegistry}/${container.id}:${storedTag}`;
 
-      const deployResult = await provider.deploy({
+      // Fetch existing route — rollback always targets an already-running service
+      const existingRouteResult = await pool.query<{
+        service_arn: string | null;
+        endpoint_url: string | null;
+      }>(
+        `SELECT service_arn, endpoint_url
+         FROM compute.container_routes
+         WHERE container_id = $1
+         LIMIT 1`,
+        [container.id]
+      );
+
+      const existingRoute = existingRouteResult.rows[0];
+      if (!existingRoute?.service_arn) {
+        throw new Error(
+          'No existing service found for rollback — container has never been deployed'
+        );
+      }
+
+      // Register a new task definition for the rollback image, then update the existing service.
+      // Never recreate the ALB route on rollback — the service is already live.
+      const taskDefArn = await provider.registerTaskDefinition({
         containerId: container.id,
         imageUri,
         cpu: container.cpu,
@@ -856,12 +902,17 @@ export class ComputeService {
         projectSlug,
       });
 
-      // Update route record
+      await provider.updateService(existingRoute.service_arn, taskDefArn);
+
+      const endpointUrl =
+        existingRoute.endpoint_url ?? `https://${projectSlug}.${container.region}.insforge.app`;
+
+      // Update route record with new task def ARN
       await pool.query(
         `UPDATE compute.container_routes
-         SET task_def_arn = $2, service_arn = $3, endpoint_url = $4
+         SET task_def_arn = $2, updated_at = NOW()
          WHERE container_id = $1`,
-        [container.id, deployResult.taskDefArn, deployResult.serviceArn, deployResult.endpointUrl]
+        [container.id, taskDefArn]
       );
 
       await this.setDeploymentStatus(deployment.id, 'live');
@@ -874,12 +925,13 @@ export class ComputeService {
       ]);
 
       await this.setContainerStatus(container.id, 'running', {
-        endpointUrl: deployResult.endpointUrl,
+        endpointUrl,
       });
 
       logger.info('Rollback deployment succeeded', {
         deploymentId: deployment.id,
         containerId: container.id,
+        endpointUrl,
       });
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);

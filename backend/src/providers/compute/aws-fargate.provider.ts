@@ -112,13 +112,16 @@ export class AwsFargateProvider implements ComputeProvider {
     };
   }
 
-  async deploy(params: DeployParams): Promise<DeployResult> {
-    const { containerId, imageUri, cpu, memory, port, healthCheckPath, envVars, projectSlug } =
-      params;
+  /**
+   * Register a new ECS task definition and return its ARN.
+   * Also ensures the CloudWatch log group exists.
+   * Used by both first-deploy (via deploy()) and redeployments.
+   */
+  async registerTaskDefinition(params: DeployParams): Promise<string> {
+    const { containerId, imageUri, cpu, memory, port, healthCheckPath, envVars } = params;
 
     const logGroup = `/insforge/compute/${containerId}`;
     const taskFamily = `insforge-compute-${containerId}`;
-    const serviceName = `insforge-compute-${containerId}`;
 
     // C2: Create CloudWatch log group before registering the task definition
     try {
@@ -132,7 +135,6 @@ export class AwsFargateProvider implements ComputeProvider {
       }
     }
 
-    // Register task definition
     // C10: Use wget-based health check instead of curl (container may not have curl)
     const registerCommand = new RegisterTaskDefinitionCommand({
       family: taskFamily,
@@ -175,7 +177,15 @@ export class AwsFargateProvider implements ComputeProvider {
     });
 
     const taskDefResult = await this.ecsClient.send(registerCommand);
-    const taskDefArn = taskDefResult.taskDefinition?.taskDefinitionArn ?? '';
+    return taskDefResult.taskDefinition?.taskDefinitionArn ?? '';
+  }
+
+  async deploy(params: DeployParams): Promise<DeployResult> {
+    const { containerId, port, healthCheckPath, projectSlug } = params;
+    const serviceName = `insforge-compute-${containerId}`;
+
+    // Register task definition (also creates log group)
+    const taskDefArn = await this.registerTaskDefinition(params);
 
     // Create route first to get target group
     const routeResult = await this.createRoute({

@@ -75,6 +75,7 @@ export interface ComputeProvider {
   buildImage(params: BuildParams): Promise<BuildResult>;
   getBuildStatus(buildId: string): Promise<{ status: string; logUrl: string }>;
   deploy(params: DeployParams): Promise<DeployResult>;
+  registerTaskDefinition(params: DeployParams): Promise<string>;
   updateService(serviceArn: string, taskDefArn: string): Promise<void>;
   stop(serviceArn: string): Promise<void>;
   destroy(serviceArn: string): Promise<void>;
