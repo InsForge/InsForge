@@ -3,60 +3,77 @@ import { z } from 'zod';
 export const containerSourceType = z.enum(['github', 'image']);
 
 export const containerStatus = z.enum([
-  'pending', 'building', 'deploying', 'running', 'stopped', 'failed',
+  'pending',
+  'building',
+  'deploying',
+  'running',
+  'stopped',
+  'failed',
 ]);
 
 export const deploymentStatus = z.enum([
-  'pending', 'building', 'pushing', 'deploying', 'live', 'failed',
+  'pending',
+  'building',
+  'pushing',
+  'deploying',
+  'live',
+  'failed',
 ]);
 
 export const deploymentTrigger = z.enum([
-  'manual', 'git_push', 'rollback', 'config_change', 'cron',
+  'manual',
+  'git_push',
+  'rollback',
+  'config_change',
+  'cron',
 ]);
 
 // Valid Fargate CPU/memory combinations
-export const FARGATE_CPU_MEMORY_MAP: Record<number, number[]> = {
+export const fargateMemoryMap: Record<number, number[]> = {
+  // eslint-disable-next-line @typescript-eslint/naming-convention
   256: [512, 1024, 2048],
+  // eslint-disable-next-line @typescript-eslint/naming-convention
   512: [1024, 2048, 3072, 4096],
+  // eslint-disable-next-line @typescript-eslint/naming-convention
   1024: [2048, 3072, 4096, 5120, 6144, 7168, 8192],
 };
 
 export const containerSchema = z.object({
   id: z.string().uuid(),
-  project_id: z.string().uuid(),
+  projectId: z.string().uuid(),
   name: z.string(),
-  source_type: containerSourceType,
-  github_repo: z.string().nullable(),
-  github_branch: z.string().nullable(),
-  image_url: z.string().nullable(),
-  dockerfile_path: z.string().nullable(),
+  sourceType: containerSourceType,
+  githubRepo: z.string().nullable(),
+  githubBranch: z.string().nullable(),
+  imageUrl: z.string().nullable(),
+  dockerfilePath: z.string().nullable(),
   cpu: z.number(),
   memory: z.number(),
   port: z.number(),
-  health_check_path: z.string().nullable(),
+  healthCheckPath: z.string().nullable(),
   status: containerStatus,
-  endpoint_url: z.string().nullable(),
-  auto_deploy: z.boolean(),
+  endpointUrl: z.string().nullable(),
+  autoDeploy: z.boolean(),
   replicas: z.number(),
-  custom_domain: z.string().nullable(),
+  customDomain: z.string().nullable(),
   region: z.string(),
-  last_deployed_at: z.string().nullable(),
-  created_at: z.string(),
-  updated_at: z.string(),
+  lastDeployedAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
 
 export const containerDeploymentSchema = z.object({
   id: z.string().uuid(),
-  container_id: z.string().uuid(),
-  commit_sha: z.string().nullable(),
-  image_tag: z.string().nullable(),
-  build_log_url: z.string().nullable(),
+  containerId: z.string().uuid(),
+  commitSha: z.string().nullable(),
+  imageTag: z.string().nullable(),
+  buildLogUrl: z.string().nullable(),
   status: deploymentStatus,
-  error_message: z.string().nullable(),
-  triggered_by: deploymentTrigger,
-  is_active: z.boolean(),
-  started_at: z.string(),
-  finished_at: z.string().nullable(),
+  errorMessage: z.string().nullable(),
+  triggeredBy: deploymentTrigger,
+  isActive: z.boolean(),
+  startedAt: z.string(),
+  finishedAt: z.string().nullable(),
 });
 
 export type ContainerSchema = z.infer<typeof containerSchema>;

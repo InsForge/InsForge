@@ -28,44 +28,128 @@ const ALLOWED_UPDATE_COLUMNS = new Set([
 // ─── Input types ─────────────────────────────────────────────────────────────
 
 export interface CreateContainerInput {
-  project_id: string;
+  projectId: string;
   name: string;
-  source_type: 'github' | 'image';
-  github_repo?: string | null;
-  github_branch?: string | null;
-  image_url?: string | null;
-  dockerfile_path?: string | null;
+  sourceType: 'github' | 'image';
+  githubRepo?: string | null;
+  githubBranch?: string | null;
+  imageUrl?: string | null;
+  dockerfilePath?: string | null;
   cpu: number;
   memory: number;
   port: number;
-  health_check_path?: string | null;
-  auto_deploy?: boolean;
+  healthCheckPath?: string | null;
+  autoDeploy?: boolean;
   replicas?: number;
   region?: string;
-  env_vars?: Record<string, string>;
+  envVars?: Record<string, string>;
 }
 
 export interface UpdateContainerInput {
   name?: string;
-  github_repo?: string | null;
-  github_branch?: string | null;
-  image_url?: string | null;
-  dockerfile_path?: string | null;
+  githubRepo?: string | null;
+  githubBranch?: string | null;
+  imageUrl?: string | null;
+  dockerfilePath?: string | null;
   cpu?: number;
   memory?: number;
   port?: number;
-  health_check_path?: string | null;
-  auto_deploy?: boolean;
+  healthCheckPath?: string | null;
+  autoDeploy?: boolean;
   replicas?: number;
-  custom_domain?: string | null;
-  env_vars?: Record<string, string>;
+  customDomain?: string | null;
+  envVars?: Record<string, string>;
 }
 
 export interface DeployInput {
+  containerId: string;
+  triggeredBy?: 'manual' | 'git_push' | 'rollback' | 'config_change' | 'cron';
+  commitSha?: string | null;
+  githubToken?: string;
+}
+
+// ─── Row type returned by SQL queries (snake_case DB columns) ────────────────
+
+interface ContainerRow {
+  id: string;
+  project_id: string;
+  name: string;
+  source_type: string;
+  github_repo: string | null;
+  github_branch: string | null;
+  image_url: string | null;
+  dockerfile_path: string | null;
+  cpu: number;
+  memory: number;
+  port: number;
+  health_check_path: string | null;
+  status: string;
+  endpoint_url: string | null;
+  auto_deploy: boolean;
+  replicas: number;
+  custom_domain: string | null;
+  region: string;
+  last_deployed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface DeploymentRow {
+  id: string;
   container_id: string;
-  triggered_by?: 'manual' | 'git_push' | 'rollback' | 'config_change' | 'cron';
-  commit_sha?: string | null;
-  github_token?: string;
+  commit_sha: string | null;
+  image_tag: string | null;
+  build_log_url: string | null;
+  status: string;
+  error_message: string | null;
+  triggered_by: string;
+  is_active: boolean;
+  started_at: string;
+  finished_at: string | null;
+}
+
+// ─── Mappers ─────────────────────────────────────────────────────────────────
+
+function mapContainerRow(row: ContainerRow): ContainerSchema {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    name: row.name,
+    sourceType: row.source_type as ContainerSchema['sourceType'],
+    githubRepo: row.github_repo,
+    githubBranch: row.github_branch,
+    imageUrl: row.image_url,
+    dockerfilePath: row.dockerfile_path,
+    cpu: row.cpu,
+    memory: row.memory,
+    port: row.port,
+    healthCheckPath: row.health_check_path,
+    status: row.status as ContainerSchema['status'],
+    endpointUrl: row.endpoint_url,
+    autoDeploy: row.auto_deploy,
+    replicas: row.replicas,
+    customDomain: row.custom_domain,
+    region: row.region,
+    lastDeployedAt: row.last_deployed_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapDeploymentRow(row: DeploymentRow): ContainerDeploymentSchema {
+  return {
+    id: row.id,
+    containerId: row.container_id,
+    commitSha: row.commit_sha,
+    imageTag: row.image_tag,
+    buildLogUrl: row.build_log_url,
+    status: row.status as ContainerDeploymentSchema['status'],
+    errorMessage: row.error_message,
+    triggeredBy: row.triggered_by as ContainerDeploymentSchema['triggeredBy'],
+    isActive: row.is_active,
+    startedAt: row.started_at,
+    finishedAt: row.finished_at,
+  };
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────
@@ -115,11 +199,11 @@ export class ComputeService {
     const pool = this.getPool();
 
     let envVarsEncrypted: string | null = null;
-    if (input.env_vars && Object.keys(input.env_vars).length > 0) {
-      envVarsEncrypted = EncryptionManager.encrypt(JSON.stringify(input.env_vars));
+    if (input.envVars && Object.keys(input.envVars).length > 0) {
+      envVarsEncrypted = EncryptionManager.encrypt(JSON.stringify(input.envVars));
     }
 
-    const result = await pool.query<ContainerSchema>(
+    const result = await pool.query<ContainerRow>(
       `INSERT INTO compute.containers (
         project_id, name, source_type,
         github_repo, github_branch, image_url, dockerfile_path,
@@ -134,18 +218,18 @@ export class ComputeService {
         custom_domain, region,
         last_deployed_at, created_at, updated_at`,
       [
-        input.project_id,
+        input.projectId,
         input.name,
-        input.source_type,
-        input.github_repo ?? null,
-        input.github_branch ?? null,
-        input.image_url ?? null,
-        input.dockerfile_path ?? null,
+        input.sourceType,
+        input.githubRepo ?? null,
+        input.githubBranch ?? null,
+        input.imageUrl ?? null,
+        input.dockerfilePath ?? null,
         input.cpu,
         input.memory,
         input.port,
-        input.health_check_path ?? null,
-        input.auto_deploy ?? false,
+        input.healthCheckPath ?? null,
+        input.autoDeploy ?? false,
         input.replicas ?? 1,
         input.region ?? 'us-east-1',
         envVarsEncrypted,
@@ -153,11 +237,11 @@ export class ComputeService {
     );
 
     logger.info('Container created', { id: result.rows[0].id });
-    return result.rows[0];
+    return mapContainerRow(result.rows[0]);
   }
 
   async getContainers(projectId: string): Promise<ContainerSchema[]> {
-    const result = await this.getPool().query<ContainerSchema>(
+    const result = await this.getPool().query<ContainerRow>(
       `SELECT
         id, project_id, name, source_type,
         github_repo, github_branch, image_url, dockerfile_path,
@@ -170,11 +254,11 @@ export class ComputeService {
        ORDER BY created_at DESC`,
       [projectId]
     );
-    return result.rows;
+    return result.rows.map(mapContainerRow);
   }
 
   async getContainer(id: string): Promise<ContainerSchema | null> {
-    const result = await this.getPool().query<ContainerSchema>(
+    const result = await this.getPool().query<ContainerRow>(
       `SELECT
         id, project_id, name, source_type,
         github_repo, github_branch, image_url, dockerfile_path,
@@ -186,7 +270,8 @@ export class ComputeService {
        WHERE id = $1`,
       [id]
     );
-    return result.rows[0] ?? null;
+    const row = result.rows[0];
+    return row ? mapContainerRow(row) : null;
   }
 
   async updateContainer(id: string, input: UpdateContainerInput): Promise<ContainerSchema | null> {
@@ -195,9 +280,24 @@ export class ComputeService {
     const values: unknown[] = [];
     let paramCount = 1;
 
+    // Map camelCase input keys to snake_case DB column names
+    const camelToSnake: Record<string, string> = {
+      name: 'name',
+      githubRepo: 'github_repo',
+      githubBranch: 'github_branch',
+      imageUrl: 'image_url',
+      dockerfilePath: 'dockerfile_path',
+      cpu: 'cpu',
+      memory: 'memory',
+      port: 'port',
+      healthCheckPath: 'health_check_path',
+      autoDeploy: 'auto_deploy',
+      replicas: 'replicas',
+      customDomain: 'custom_domain',
+    };
+
     for (const [key, value] of Object.entries(input)) {
-      if (key === 'env_vars') {
-        // Handle env_vars separately — encrypt and store in env_vars_encrypted
+      if (key === 'envVars') {
         if (ALLOWED_UPDATE_COLUMNS.has('env_vars_encrypted')) {
           const encrypted =
             value && typeof value === 'object' && Object.keys(value as object).length > 0
@@ -206,9 +306,12 @@ export class ComputeService {
           setClauses.push(`env_vars_encrypted = $${paramCount++}`);
           values.push(encrypted);
         }
-      } else if (ALLOWED_UPDATE_COLUMNS.has(key)) {
-        setClauses.push(`${key} = $${paramCount++}`);
-        values.push(value);
+      } else {
+        const dbColumn = camelToSnake[key];
+        if (dbColumn && ALLOWED_UPDATE_COLUMNS.has(dbColumn)) {
+          setClauses.push(`${dbColumn} = $${paramCount++}`);
+          values.push(value);
+        }
       }
     }
 
@@ -218,7 +321,7 @@ export class ComputeService {
 
     values.push(id);
 
-    const result = await pool.query<ContainerSchema>(
+    const result = await pool.query<ContainerRow>(
       `UPDATE compute.containers
        SET ${setClauses.join(', ')}, updated_at = NOW()
        WHERE id = $${paramCount}
@@ -233,14 +336,44 @@ export class ComputeService {
     );
 
     logger.info('Container updated', { id });
-    return result.rows[0] ?? null;
+    const row = result.rows[0];
+    return row ? mapContainerRow(row) : null;
   }
 
   async deleteContainer(id: string): Promise<boolean> {
-    const result = await this.getPool().query(
-      'DELETE FROM compute.containers WHERE id = $1',
+    const pool = this.getPool();
+
+    // Fetch route info before deleting
+    const routeResult = await pool.query<{
+      target_group_arn: string | null;
+      rule_arn: string | null;
+      service_arn: string | null;
+    }>(
+      `SELECT target_group_arn, rule_arn, service_arn
+       FROM compute.container_routes
+       WHERE container_id = $1
+       LIMIT 1`,
       [id]
     );
+
+    const route = routeResult.rows[0];
+
+    // Clean up AWS resources before deleting DB row
+    if (route && this.provider) {
+      try {
+        if (route.service_arn) {
+          await this.provider.destroy(route.service_arn);
+        }
+        if (route.target_group_arn && route.rule_arn) {
+          await this.provider.deleteRoute(route.target_group_arn, route.rule_arn);
+        }
+      } catch (err: unknown) {
+        logger.warn('Failed to clean up AWS resources during container delete', { id, err });
+        // Continue with DB deletion even if AWS cleanup fails
+      }
+    }
+
+    const result = await pool.query('DELETE FROM compute.containers WHERE id = $1', [id]);
     const success = (result.rowCount ?? 0) > 0;
     if (success) {
       logger.info('Container deleted', { id });
@@ -260,7 +393,10 @@ export class ComputeService {
       return {};
     }
     try {
-      return JSON.parse(EncryptionManager.decrypt(row.env_vars_encrypted)) as Record<string, string>;
+      return JSON.parse(EncryptionManager.decrypt(row.env_vars_encrypted)) as Record<
+        string,
+        string
+      >;
     } catch {
       logger.error('Failed to decrypt env vars', { containerId });
       return {};
@@ -278,7 +414,7 @@ export class ComputeService {
        WHERE container_id = $1
        AND status IN ('pending','building','pushing','deploying')
        LIMIT 1`,
-      [input.container_id]
+      [input.containerId]
     );
     if (inFlight.rows.length > 0) {
       throw new Error('A deployment is already in progress for this container');
@@ -286,7 +422,7 @@ export class ComputeService {
 
     const imageTag = `deploy-${Date.now()}`;
 
-    const result = await pool.query<ContainerDeploymentSchema>(
+    const result = await pool.query<DeploymentRow>(
       `INSERT INTO compute.deployments
          (container_id, status, triggered_by, commit_sha, image_tag, started_at)
        VALUES ($1, 'pending', $2, $3, $4, NOW())
@@ -294,18 +430,13 @@ export class ComputeService {
          id, container_id, commit_sha, image_tag,
          build_log_url, status, error_message,
          triggered_by, is_active, started_at, finished_at`,
-      [
-        input.container_id,
-        input.triggered_by ?? 'manual',
-        input.commit_sha ?? null,
-        imageTag,
-      ]
+      [input.containerId, input.triggeredBy ?? 'manual', input.commitSha ?? null, imageTag]
     );
 
-    const deployment = result.rows[0];
+    const deployment = mapDeploymentRow(result.rows[0]);
 
     // Fire-and-forget
-    this.executeDeploy(deployment, input.github_token).catch((err: unknown) => {
+    this.executeDeploy(deployment, input.githubToken).catch((err: unknown) => {
       logger.error('executeDeploy uncaught error', { deploymentId: deployment.id, err });
     });
 
@@ -316,26 +447,26 @@ export class ComputeService {
     deploymentId: string,
     status: ContainerDeploymentSchema['status'],
     extra: {
-      error_message?: string;
-      build_log_url?: string;
-      image_tag?: string;
+      errorMessage?: string;
+      buildLogUrl?: string;
+      imageTag?: string;
     } = {}
   ): Promise<void> {
     const setClauses = ['status = $2'];
     const values: unknown[] = [deploymentId, status];
     let paramCount = 3;
 
-    if (extra.error_message !== undefined) {
+    if (extra.errorMessage !== undefined) {
       setClauses.push(`error_message = $${paramCount++}`);
-      values.push(extra.error_message);
+      values.push(extra.errorMessage);
     }
-    if (extra.build_log_url !== undefined) {
+    if (extra.buildLogUrl !== undefined) {
       setClauses.push(`build_log_url = $${paramCount++}`);
-      values.push(extra.build_log_url);
+      values.push(extra.buildLogUrl);
     }
-    if (extra.image_tag !== undefined) {
+    if (extra.imageTag !== undefined) {
       setClauses.push(`image_tag = $${paramCount++}`);
-      values.push(extra.image_tag);
+      values.push(extra.imageTag);
     }
 
     const isTerminal = status === 'live' || status === 'failed';
@@ -352,15 +483,15 @@ export class ComputeService {
   private async setContainerStatus(
     containerId: string,
     status: ContainerSchema['status'],
-    extra: { endpoint_url?: string } = {}
+    extra: { endpointUrl?: string } = {}
   ): Promise<void> {
     const setClauses = ['status = $2', 'updated_at = NOW()'];
     const values: unknown[] = [containerId, status];
     let paramCount = 3;
 
-    if (extra.endpoint_url !== undefined) {
+    if (extra.endpointUrl !== undefined) {
       setClauses.push(`endpoint_url = $${paramCount++}`);
-      values.push(extra.endpoint_url);
+      values.push(extra.endpointUrl);
     }
     if (status === 'running') {
       setClauses.push(`last_deployed_at = NOW()`);
@@ -378,7 +509,7 @@ export class ComputeService {
   ): Promise<void> {
     const pool = this.getPool();
 
-    const containerResult = await pool.query(
+    const containerResult = await pool.query<ContainerRow>(
       `SELECT
          id, project_id, name, source_type,
          github_repo, github_branch, image_url, dockerfile_path,
@@ -386,22 +517,22 @@ export class ComputeService {
          status, endpoint_url, auto_deploy, replicas,
          custom_domain, region, last_deployed_at, created_at, updated_at
        FROM compute.containers WHERE id = $1`,
-      [deployment.container_id]
+      [deployment.containerId]
     );
 
     if (!containerResult.rows.length) {
       await this.setDeploymentStatus(deployment.id, 'failed', {
-        error_message: 'Container not found',
+        errorMessage: 'Container not found',
       });
       return;
     }
 
-    const container = containerResult.rows[0] as ContainerSchema;
+    const container = mapContainerRow(containerResult.rows[0]);
     const provider = this.provider;
 
     if (!provider) {
       await this.setDeploymentStatus(deployment.id, 'failed', {
-        error_message: 'Compute provider not configured',
+        errorMessage: 'Compute provider not configured',
       });
       await this.setContainerStatus(container.id, 'failed');
       return;
@@ -410,20 +541,20 @@ export class ComputeService {
     // Fetch project slug for routing
     const projectResult = await pool.query<{ slug: string }>(
       `SELECT slug FROM projects WHERE id = $1`,
-      [container.project_id]
+      [container.projectId]
     );
-    const projectSlug = projectResult.rows[0]?.slug ?? container.project_id;
+    const projectSlug = projectResult.rows[0]?.slug ?? container.projectId;
 
     let imageUri: string;
 
     try {
-      if (container.source_type === 'github') {
+      if (container.sourceType === 'github') {
         // ── BUILD phase ────────────────────────────────────────────────────
-        if (!container.github_repo || !container.github_branch) {
-          throw new Error('github_repo and github_branch are required for github source');
+        if (!container.githubRepo || !container.githubBranch) {
+          throw new Error('githubRepo and githubBranch are required for github source');
         }
         if (!githubToken) {
-          throw new Error('github_token is required to build from GitHub source');
+          throw new Error('githubToken is required to build from GitHub source');
         }
 
         await this.setDeploymentStatus(deployment.id, 'building');
@@ -431,11 +562,11 @@ export class ComputeService {
 
         const buildResult = await provider.buildImage({
           containerId: container.id,
-          githubRepo: container.github_repo,
-          githubBranch: container.github_branch,
-          dockerfilePath: container.dockerfile_path ?? 'Dockerfile',
+          githubRepo: container.githubRepo,
+          githubBranch: container.githubBranch,
+          dockerfilePath: container.dockerfilePath ?? 'Dockerfile',
           githubToken,
-          imageTag: deployment.image_tag ?? `deploy-${Date.now()}`,
+          imageTag: deployment.imageTag ?? `deploy-${Date.now()}`,
         });
 
         // Poll build status — 10s intervals, 15min timeout
@@ -450,7 +581,7 @@ export class ComputeService {
           buildStatus = statusResult.status;
           if (statusResult.logUrl) {
             await this.setDeploymentStatus(deployment.id, 'building', {
-              build_log_url: statusResult.logUrl,
+              buildLogUrl: statusResult.logUrl,
             });
           }
         }
@@ -463,14 +594,14 @@ export class ComputeService {
 
         // ── PUSH phase (image is already in ECR, just update status) ──────
         await this.setDeploymentStatus(deployment.id, 'pushing', {
-          image_tag: deployment.image_tag ?? undefined,
+          imageTag: deployment.imageTag ?? undefined,
         });
       } else {
-        // image source — use provided image_url directly
-        if (!container.image_url) {
-          throw new Error('image_url is required for image source type');
+        // image source — use provided imageUrl directly
+        if (!container.imageUrl) {
+          throw new Error('imageUrl is required for image source type');
         }
-        imageUri = container.image_url;
+        imageUri = container.imageUrl;
       }
 
       // ── DEPLOY phase ───────────────────────────────────────────────────
@@ -505,7 +636,7 @@ export class ComputeService {
         cpu: container.cpu,
         memory: container.memory,
         port: container.port,
-        healthCheckPath: container.health_check_path ?? '/health',
+        healthCheckPath: container.healthCheckPath ?? '/health',
         envVars,
         projectSlug,
       });
@@ -524,8 +655,8 @@ export class ComputeService {
              endpoint_url = EXCLUDED.endpoint_url`,
           [
             container.id,
-            deployResult.serviceArn, // We'll store serviceArn here; target_group_arn handled by provider
-            null,
+            deployResult.targetGroupArn,
+            deployResult.ruleArn,
             deployResult.serviceArn,
             deployResult.taskDefArn,
             deployResult.endpointUrl,
@@ -547,13 +678,12 @@ export class ComputeService {
         `UPDATE compute.deployments SET is_active = false WHERE container_id = $1 AND id != $2`,
         [container.id, deployment.id]
       );
-      await pool.query(
-        `UPDATE compute.deployments SET is_active = true WHERE id = $1`,
-        [deployment.id]
-      );
+      await pool.query(`UPDATE compute.deployments SET is_active = true WHERE id = $1`, [
+        deployment.id,
+      ]);
 
       await this.setContainerStatus(container.id, 'running', {
-        endpoint_url: deployResult.endpointUrl,
+        endpointUrl: deployResult.endpointUrl,
       });
 
       logger.info('Deployment succeeded', {
@@ -568,13 +698,13 @@ export class ComputeService {
         containerId: container.id,
         error: errorMessage,
       });
-      await this.setDeploymentStatus(deployment.id, 'failed', { error_message: errorMessage });
+      await this.setDeploymentStatus(deployment.id, 'failed', { errorMessage });
       await this.setContainerStatus(container.id, 'failed');
     }
   }
 
   async getDeployments(containerId: string): Promise<ContainerDeploymentSchema[]> {
-    const result = await this.getPool().query<ContainerDeploymentSchema>(
+    const result = await this.getPool().query<DeploymentRow>(
       `SELECT
          id, container_id, commit_sha, image_tag,
          build_log_url, status, error_message,
@@ -584,11 +714,11 @@ export class ComputeService {
        ORDER BY started_at DESC`,
       [containerId]
     );
-    return result.rows;
+    return result.rows.map(mapDeploymentRow);
   }
 
   async getDeployment(id: string): Promise<ContainerDeploymentSchema | null> {
-    const result = await this.getPool().query<ContainerDeploymentSchema>(
+    const result = await this.getPool().query<DeploymentRow>(
       `SELECT
          id, container_id, commit_sha, image_tag,
          build_log_url, status, error_message,
@@ -597,14 +727,18 @@ export class ComputeService {
        WHERE id = $1`,
       [id]
     );
-    return result.rows[0] ?? null;
+    const row = result.rows[0];
+    return row ? mapDeploymentRow(row) : null;
   }
 
   /**
    * Rollback — creates a new deployment using a previous deployment's image_tag.
    * Skips the build phase and goes straight to deploy.
    */
-  async rollback(containerId: string, targetDeploymentId: string): Promise<ContainerDeploymentSchema> {
+  async rollback(
+    containerId: string,
+    targetDeploymentId: string
+  ): Promise<ContainerDeploymentSchema> {
     const pool = this.getPool();
 
     // Guard: reject if another deploy is in-flight
@@ -620,7 +754,7 @@ export class ComputeService {
     }
 
     // Fetch target deployment to get its image_tag
-    const targetResult = await pool.query<ContainerDeploymentSchema>(
+    const targetResult = await pool.query<DeploymentRow>(
       `SELECT id, image_tag FROM compute.deployments WHERE id = $1 AND container_id = $2`,
       [targetDeploymentId, containerId]
     );
@@ -633,7 +767,7 @@ export class ComputeService {
       throw new Error('Target deployment has no image_tag — cannot rollback');
     }
 
-    const result = await pool.query<ContainerDeploymentSchema>(
+    const result = await pool.query<DeploymentRow>(
       `INSERT INTO compute.deployments
          (container_id, status, triggered_by, image_tag, started_at)
        VALUES ($1, 'pending', 'rollback', $2, NOW())
@@ -644,7 +778,7 @@ export class ComputeService {
       [containerId, targetImageTag]
     );
 
-    const deployment = result.rows[0];
+    const deployment = mapDeploymentRow(result.rows[0]);
 
     // Fire-and-forget rollback deploy
     this.executeRollbackDeploy(deployment).catch((err: unknown) => {
@@ -657,7 +791,7 @@ export class ComputeService {
   private async executeRollbackDeploy(deployment: ContainerDeploymentSchema): Promise<void> {
     const pool = this.getPool();
 
-    const containerResult = await pool.query(
+    const containerResult = await pool.query<ContainerRow>(
       `SELECT
          id, project_id, name, source_type,
          github_repo, github_branch, image_url, dockerfile_path,
@@ -665,22 +799,22 @@ export class ComputeService {
          status, endpoint_url, auto_deploy, replicas,
          custom_domain, region, last_deployed_at, created_at, updated_at
        FROM compute.containers WHERE id = $1`,
-      [deployment.container_id]
+      [deployment.containerId]
     );
 
     if (!containerResult.rows.length) {
       await this.setDeploymentStatus(deployment.id, 'failed', {
-        error_message: 'Container not found',
+        errorMessage: 'Container not found',
       });
       return;
     }
 
-    const container = containerResult.rows[0] as ContainerSchema;
+    const container = mapContainerRow(containerResult.rows[0]);
     const provider = this.provider;
 
     if (!provider) {
       await this.setDeploymentStatus(deployment.id, 'failed', {
-        error_message: 'Compute provider not configured',
+        errorMessage: 'Compute provider not configured',
       });
       await this.setContainerStatus(container.id, 'failed');
       return;
@@ -688,9 +822,9 @@ export class ComputeService {
 
     const projectResult = await pool.query<{ slug: string }>(
       `SELECT slug FROM projects WHERE id = $1`,
-      [container.project_id]
+      [container.projectId]
     );
-    const projectSlug = projectResult.rows[0]?.slug ?? container.project_id;
+    const projectSlug = projectResult.rows[0]?.slug ?? container.projectId;
 
     try {
       await this.setDeploymentStatus(deployment.id, 'deploying');
@@ -700,7 +834,7 @@ export class ComputeService {
       envVars['PORT'] = String(container.port);
 
       // Build imageUri from the stored image_tag
-      const imageUri = `${config.compute.ecrRegistry}/${container.id}:${deployment.image_tag}`;
+      const imageUri = `${config.compute.ecrRegistry}/${container.id}:${deployment.imageTag}`;
 
       const deployResult = await provider.deploy({
         containerId: container.id,
@@ -708,7 +842,7 @@ export class ComputeService {
         cpu: container.cpu,
         memory: container.memory,
         port: container.port,
-        healthCheckPath: container.health_check_path ?? '/health',
+        healthCheckPath: container.healthCheckPath ?? '/health',
         envVars,
         projectSlug,
       });
@@ -726,13 +860,12 @@ export class ComputeService {
         `UPDATE compute.deployments SET is_active = false WHERE container_id = $1 AND id != $2`,
         [container.id, deployment.id]
       );
-      await pool.query(
-        `UPDATE compute.deployments SET is_active = true WHERE id = $1`,
-        [deployment.id]
-      );
+      await pool.query(`UPDATE compute.deployments SET is_active = true WHERE id = $1`, [
+        deployment.id,
+      ]);
 
       await this.setContainerStatus(container.id, 'running', {
-        endpoint_url: deployResult.endpointUrl,
+        endpointUrl: deployResult.endpointUrl,
       });
 
       logger.info('Rollback deployment succeeded', {
@@ -746,15 +879,12 @@ export class ComputeService {
         containerId: container.id,
         error: errorMessage,
       });
-      await this.setDeploymentStatus(deployment.id, 'failed', { error_message: errorMessage });
+      await this.setDeploymentStatus(deployment.id, 'failed', { errorMessage });
       await this.setContainerStatus(container.id, 'failed');
     }
   }
 
-  async getContainerLogs(
-    containerId: string,
-    opts: LogOpts = {}
-  ): Promise<LogStream> {
+  async getContainerLogs(containerId: string, opts: LogOpts = {}): Promise<LogStream> {
     const provider = this.provider;
     if (!provider) {
       throw new Error('Compute provider not configured');

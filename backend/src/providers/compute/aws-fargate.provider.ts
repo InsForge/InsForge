@@ -27,7 +27,8 @@ import {
 } from '@aws-sdk/client-codebuild';
 import {
   CloudWatchLogsClient,
-  GetLogEventsCommand,
+  CreateLogGroupCommand,
+  FilterLogEventsCommand,
 } from '@aws-sdk/client-cloudwatch-logs';
 import { config } from '@/infra/config/app.config.js';
 import type {
@@ -49,7 +50,7 @@ export class AwsFargateProvider implements ComputeProvider {
   private codebuildClient!: CodeBuildClient;
   private logsClient!: CloudWatchLogsClient;
 
-  async initialize(): Promise<void> {
+  initialize(): Promise<void> {
     const credentials = {
       accessKeyId: config.compute.awsAccessKeyId,
       secretAccessKey: config.compute.awsSecretAccessKey,
@@ -60,21 +61,29 @@ export class AwsFargateProvider implements ComputeProvider {
     this.elbClient = new ElasticLoadBalancingV2Client({ region, credentials });
     this.codebuildClient = new CodeBuildClient({ region, credentials });
     this.logsClient = new CloudWatchLogsClient({ region, credentials });
+
+    return Promise.resolve();
   }
 
   async buildImage(params: BuildParams): Promise<BuildResult> {
     const { containerId, githubRepo, githubBranch, dockerfilePath, githubToken, imageTag } = params;
     const imageUri = `${config.compute.ecrRegistry}/${containerId}:${imageTag}`;
 
+    // C5: Store GitHub token reference in Secrets Manager; use SECRETS_MANAGER type
     const command = new StartBuildCommand({
       projectName: config.compute.codebuildProject,
       environmentVariablesOverride: [
         { name: 'REPO_URL', value: githubRepo, type: 'PLAINTEXT' },
         { name: 'BRANCH', value: githubBranch, type: 'PLAINTEXT' },
         { name: 'DOCKERFILE_PATH', value: dockerfilePath, type: 'PLAINTEXT' },
-        { name: 'ECR_REPO', value: `${config.compute.ecrRegistry}/${containerId}`, type: 'PLAINTEXT' },
+        {
+          name: 'ECR_REPO',
+          value: `${config.compute.ecrRegistry}/${containerId}`,
+          type: 'PLAINTEXT',
+        },
         { name: 'IMAGE_TAG', value: imageTag, type: 'PLAINTEXT' },
-        { name: 'GITHUB_TOKEN', value: githubToken, type: 'PLAINTEXT' },
+        // githubToken is the Secrets Manager secret ARN or name
+        { name: 'GITHUB_TOKEN', value: githubToken, type: 'SECRETS_MANAGER' },
       ],
     });
 
@@ -98,22 +107,27 @@ export class AwsFargateProvider implements ComputeProvider {
   }
 
   async deploy(params: DeployParams): Promise<DeployResult> {
-    const {
-      containerId,
-      imageUri,
-      cpu,
-      memory,
-      port,
-      healthCheckPath,
-      envVars,
-      projectSlug,
-    } = params;
+    const { containerId, imageUri, cpu, memory, port, healthCheckPath, envVars, projectSlug } =
+      params;
 
     const logGroup = `/insforge/compute/${containerId}`;
     const taskFamily = `insforge-compute-${containerId}`;
     const serviceName = `insforge-compute-${containerId}`;
 
+    // C2: Create CloudWatch log group before registering the task definition
+    try {
+      const createLogGroupCommand = new CreateLogGroupCommand({ logGroupName: logGroup });
+      await this.logsClient.send(createLogGroupCommand);
+    } catch (err: unknown) {
+      // Ignore ResourceAlreadyExistsException — log group may already exist
+      const errName = (err as { name?: string }).name;
+      if (errName !== 'ResourceAlreadyExistsException') {
+        throw err;
+      }
+    }
+
     // Register task definition
+    // C10: Use wget-based health check instead of curl (container may not have curl)
     const registerCommand = new RegisterTaskDefinitionCommand({
       family: taskFamily,
       networkMode: NetworkMode.AWSVPC,
@@ -133,7 +147,10 @@ export class AwsFargateProvider implements ComputeProvider {
           ],
           environment: Object.entries(envVars).map(([name, value]) => ({ name, value })),
           healthCheck: {
-            command: ['CMD', 'curl', '-f', `http://localhost:${port}${healthCheckPath}`],
+            command: [
+              'CMD-SHELL',
+              `wget -q --spider http://localhost:${port}${healthCheckPath} || exit 1`,
+            ],
             interval: 30,
             timeout: 5,
             retries: 3,
@@ -195,10 +212,13 @@ export class AwsFargateProvider implements ComputeProvider {
     const serviceResult = await this.ecsClient.send(createServiceCommand);
     const serviceArn = serviceResult.service?.serviceArn ?? '';
 
+    // C6: Include targetGroupArn and ruleArn in DeployResult
     return {
       serviceArn,
       taskDefArn,
       endpointUrl: routeResult.endpointUrl,
+      targetGroupArn: routeResult.targetGroupArn,
+      ruleArn: routeResult.ruleArn,
     };
   }
 
@@ -277,16 +297,15 @@ export class AwsFargateProvider implements ComputeProvider {
     const arnParts = serviceArn.split('/');
     const containerId = arnParts[arnParts.length - 1].replace(/^insforge-compute-/, '');
     const logGroup = `/insforge/compute/${containerId}`;
-    const logStreamPrefix = containerId;
 
-    const command = new GetLogEventsCommand({
+    // C9: Use FilterLogEvents instead of GetLogEvents on a specific stream,
+    // so we get all log streams (task IDs) without needing to know the exact stream name.
+    const command = new FilterLogEventsCommand({
       logGroupName: logGroup,
-      logStreamName: `${logStreamPrefix}/${containerId}/latest`,
       startTime: opts.startTime,
       endTime: opts.endTime,
       limit: opts.limit,
       nextToken: opts.nextToken,
-      startFromHead: false,
     });
 
     const result = await this.logsClient.send(command);
@@ -296,7 +315,7 @@ export class AwsFargateProvider implements ComputeProvider {
         timestamp: new Date(e.timestamp ?? 0).toISOString(),
         message: e.message ?? '',
       })),
-      nextToken: result.nextForwardToken ?? undefined,
+      nextToken: result.nextToken ?? undefined,
     };
   }
 
@@ -304,12 +323,13 @@ export class AwsFargateProvider implements ComputeProvider {
     const { containerId, projectSlug, port, healthCheckPath } = params;
     const hostHeader = `${projectSlug}.${config.compute.domain}`;
 
-    // Create target group
+    // C3: VpcId is required for IP target groups
+    // C4: Use "cmp-" prefix + 28 chars to stay within the 32-char limit
     const createTgCommand = new CreateTargetGroupCommand({
-      Name: `insforge-${containerId.substring(0, 24)}`,
+      Name: `cmp-${containerId.substring(0, 28)}`,
       Protocol: ProtocolEnum.HTTP,
       Port: port,
-      VpcId: undefined, // will be derived from ALB VPC — passed via env if needed
+      VpcId: config.compute.vpcId,
       TargetType: TargetTypeEnum.IP,
       HealthCheckPath: healthCheckPath,
       HealthCheckProtocol: ProtocolEnum.HTTP,
@@ -369,7 +389,9 @@ export class AwsFargateProvider implements ComputeProvider {
       .map((r) => parseInt(r.Priority ?? '0', 10))
       .filter((p) => !isNaN(p) && p > 0);
 
-    if (priorities.length === 0) return 1;
+    if (priorities.length === 0) {
+      return 1;
+    }
     return Math.max(...priorities) + 1;
   }
 }

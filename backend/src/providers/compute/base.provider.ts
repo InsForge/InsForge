@@ -28,6 +28,8 @@ export interface DeployResult {
   serviceArn: string;
   taskDefArn: string;
   endpointUrl: string;
+  targetGroupArn: string;
+  ruleArn: string;
 }
 
 export interface RouteParams {

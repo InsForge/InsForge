@@ -82,6 +82,18 @@ CREATE TABLE IF NOT EXISTS compute.deployments (
   finished_at       TIMESTAMPTZ
 );
 
+-- Container routes (ALB routing info per container)
+CREATE TABLE IF NOT EXISTS compute.container_routes (
+  container_id      UUID PRIMARY KEY REFERENCES compute.containers(id) ON DELETE CASCADE,
+  target_group_arn  TEXT,
+  rule_arn          TEXT,
+  service_arn       TEXT,
+  task_def_arn      TEXT,
+  endpoint_url      TEXT,
+  created_at        TIMESTAMPTZ DEFAULT now(),
+  updated_at        TIMESTAMPTZ DEFAULT now()
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_compute_containers_project
   ON compute.containers(project_id);
@@ -92,9 +104,14 @@ CREATE INDEX IF NOT EXISTS idx_compute_deployments_container
 CREATE INDEX IF NOT EXISTS idx_compute_deployments_active
   ON compute.deployments(container_id, is_active) WHERE is_active = true;
 
--- Updated_at trigger (uses function from 000_create-base-tables.sql)
+-- Updated_at trigger (uses function from 018_schema-rework.sql)
 DROP TRIGGER IF EXISTS set_compute_containers_updated_at ON compute.containers;
 CREATE TRIGGER set_compute_containers_updated_at
   BEFORE UPDATE ON compute.containers
   FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+  EXECUTE FUNCTION system.update_updated_at();
+
+-- Concurrent deploy guard: prevent multiple in-progress deployments for the same container
+CREATE UNIQUE INDEX IF NOT EXISTS idx_compute_deployments_in_progress
+  ON compute.deployments (container_id)
+  WHERE status IN ('pending', 'building', 'pushing', 'deploying');

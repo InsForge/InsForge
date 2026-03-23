@@ -39,6 +39,7 @@ export interface AppConfig {
     codebuildProject: string;
     subnetIds: string[];
     securityGroupId: string;
+    vpcId: string;
     domain: string;
     executionRoleArn: string;
   };
@@ -85,6 +86,7 @@ export const config: AppConfig = {
     codebuildProject: process.env.COMPUTE_CODEBUILD_PROJECT || '',
     subnetIds: (process.env.COMPUTE_SUBNET_IDS || '').split(',').filter(Boolean),
     securityGroupId: process.env.COMPUTE_SECURITY_GROUP_ID || '',
+    vpcId: process.env.COMPUTE_VPC_ID || '',
     domain: process.env.COMPUTE_DOMAIN || 'compute.insforge.app',
     executionRoleArn: process.env.COMPUTE_EXECUTION_ROLE_ARN || '',
   },
