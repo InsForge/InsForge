@@ -212,7 +212,7 @@ export default function AIPage() {
           ) : (
             <div className="bg-card border border-[var(--alpha-8)] rounded py-2 flex flex-col">
               {/* Table Header - Fixed */}
-              <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr] gap-x-2.5 h-8 items-center text-sm leading-5 text-muted-foreground px-4 border-b border-[var(--alpha-8)] shrink-0">
+              <div className="grid grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_1fr_1fr] gap-x-2.5 h-8 items-center text-sm leading-5 text-muted-foreground px-4 border-b border-[var(--alpha-8)] shrink-0">
                 <div>Model</div>
                 <div>Input</div>
                 <button
