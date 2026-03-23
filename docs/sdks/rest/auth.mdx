@@ -802,7 +802,7 @@ refreshToken = response.refreshToken  // Persist securely
 
 ## Device Authorization
 
-Headless clients can start a short-lived device authorization session and complete it through the existing browser sign-in and consent pages at `/auth/device` and `/auth/device/consent`. This release is instance-scoped only: it does not support `client_id`, `scope`, a registration flow, or multi-instance SSO.
+Headless clients can start a short-lived device authorization session and complete it through the current built-in auth app's browser sign-in and consent pages at `/auth/device` and `/auth/device/consent`. This release is instance-scoped only: it does not support `client_id`, `scope`, a registration flow, or multi-instance SSO.
 
 ### Create Device Authorization
 
@@ -958,6 +958,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/device/token" \
 |----------|-------|------|---------|
 | `POST /api/auth/device/authorizations/lookup` | `NOT_FOUND` | 404 | The `userCode` does not match an active authorization session |
 | `POST /api/auth/device/token` | `authorization_pending` | 428 | The authorization has not been approved yet |
+| `POST /api/auth/device/token` | `slow_down` | 429 | The client is polling too quickly |
 | `POST /api/auth/device/token` | `access_denied` | 403 | The user denied the request |
 | `POST /api/auth/device/token` | `expired_token` | 400 | The authorization expired before exchange |
 | `POST /api/auth/device/token` | `already_used` | 400 | The authorization was already exchanged |
