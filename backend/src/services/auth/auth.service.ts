@@ -46,6 +46,7 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { EmailService } from '@/services/email/email.service.js';
 import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
 import { AppleOAuthProvider } from '@/providers/oauth/apple.provider.js';
+import { DeviceAuthorizationService } from './device-authorization.service.js';
 
 /**
  * Simplified JWT-based auth service
@@ -596,6 +597,44 @@ export class AuthService {
     } finally {
       client.release();
     }
+  }
+
+  private async mintSessionForUserId(userId: string): Promise<CreateSessionResponse> {
+    const dbUser = await this.getUserById(userId);
+    if (!dbUser) {
+      throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
+    }
+
+    const user = this.transformUserRecordToSchema(dbUser);
+    const role = dbUser.is_project_admin ? 'project_admin' : 'authenticated';
+    const accessToken = this.tokenManager.generateAccessToken({
+      sub: user.id,
+      email: user.email,
+      role,
+    });
+
+    return {
+      user,
+      accessToken,
+    };
+  }
+
+  /**
+   * Exchange an approved device authorization for the standard session payload
+   */
+  async exchangeApprovedDeviceAuthorization(deviceCode: string): Promise<CreateSessionResponse> {
+    const deviceAuthorizationService = DeviceAuthorizationService.getInstance();
+    const session = await deviceAuthorizationService.consumeApproved(deviceCode);
+
+    if (!session.approvedByUserId) {
+      throw new AppError(
+        'Device authorization is missing an approved user',
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    }
+
+    return this.mintSessionForUserId(session.approvedByUserId);
   }
 
   /**
