@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>InsForge Presence Demo</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #09090b; color: #fafafa; padding: 32px;
+    }
+    h1 { font-size: 22px; margin-bottom: 20px; color: #fafafa; font-weight: 600; }
+    .container { display: flex; gap: 20px; }
+    .client {
+      flex: 1; background: #18181b; border: 1px solid #27272a; border-radius: 10px;
+      padding: 20px; min-height: 440px; display: flex; flex-direction: column;
+    }
+    .client h2 { font-size: 15px; margin-bottom: 12px; font-weight: 600; color: #fafafa; }
+    .controls { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    button {
+      padding: 7px 16px; border: 1px solid #27272a; border-radius: 6px;
+      background: #27272a; color: #fafafa; cursor: pointer; font-size: 13px;
+      font-weight: 500; transition: background 0.15s;
+    }
+    button:hover { background: #3f3f46; }
+    button:disabled { opacity: 0.35; cursor: not-allowed; }
+    button.connect { background: #166534; border-color: #166534; color: #bbf7d0; }
+    button.connect:hover { background: #15803d; }
+    button.disconnect { background: #7f1d1d; border-color: #7f1d1d; color: #fecaca; }
+    button.disconnect:hover { background: #991b1b; }
+    .status { font-size: 12px; margin-bottom: 10px; color: #a1a1aa; }
+    .status .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+    .dot.green { background: #22c55e; }
+    .dot.red { background: #ef4444; }
+    .dot.yellow { background: #eab308; }
+    .members { margin-bottom: 14px; }
+    .members h3 { font-size: 12px; color: #71717a; margin-bottom: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+    .member {
+      padding: 6px 10px; background: #09090b; border: 1px solid #27272a; border-radius: 6px; margin-bottom: 4px;
+      font-size: 12px; display: flex; justify-content: space-between; font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+    }
+    .member .role { color: #71717a; }
+    .log-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .log-header h3 { font-size: 12px; color: #71717a; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+    .clear-btn { font-size: 11px; padding: 3px 10px; background: transparent; border-color: #3f3f46; color: #a1a1aa; }
+    .clear-btn:hover { background: #27272a; }
+    .log {
+      flex: 1; overflow-y: auto; background: #09090b; border: 1px solid #27272a; border-radius: 8px;
+      padding: 10px; font-size: 12px; font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+    }
+    .log-entry { margin-bottom: 5px; line-height: 1.5; }
+    .log-entry .time { color: #52525b; margin-right: 10px; }
+    .log-entry.join { color: #4ade80; }
+    .log-entry.leave { color: #f87171; }
+    .log-entry.sync { color: #60a5fa; }
+    .log-entry.info { color: #a1a1aa; }
+    input, textarea {
+      padding: 8px 12px; border: 1px solid #27272a; border-radius: 6px;
+      background: #09090b; color: #fafafa; font-size: 13px; width: 140px;
+      font-family: inherit; resize: none; transition: border-color 0.15s;
+    }
+    input:focus, textarea:focus { outline: none; border-color: #3f3f46; }
+    .setup {
+      margin-bottom: 20px; background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 20px;
+    }
+    .setup label { font-size: 13px; color: #a1a1aa; margin-right: 8px; white-space: nowrap; min-width: 180px; }
+    .setup .row { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+    .setup .hint { font-size: 11px; color: #52525b; }
+  </style>
+</head>
+<body>
+  <h1>InsForge Realtime Presence Demo</h1>
+
+  <div class="setup">
+    <div class="row">
+      <label>API URL:</label>
+      <input id="apiUrl" value="http://localhost:7130" style="width: 220px;">
+      <label>Channel:</label>
+      <input id="channelName" value="demo-room">
+      <span class="hint">(both clients subscribe to the same channel)</span>
+    </div>
+    <div class="row">
+      <label>Token / API Key (Client A):</label>
+      <textarea id="tokenA" rows="2" placeholder="paste JWT token or API key" style="width: 100%; max-width: 600px; font-family: 'SF Mono', 'Cascadia Code', monospace; font-size: 12px;"></textarea>
+    </div>
+    <div class="row">
+      <label>Token / API Key (Client B):</label>
+      <textarea id="tokenB" rows="2" placeholder="paste JWT token or API key" style="width: 100%; max-width: 600px; font-family: 'SF Mono', 'Cascadia Code', monospace; font-size: 12px;"></textarea>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="client" id="clientA">
+      <h2>Client A</h2>
+      <div class="status" id="statusA"><span class="dot red"></span>Disconnected</div>
+      <div class="controls">
+        <button class="connect" onclick="connect('A')">Connect</button>
+        <button onclick="subscribe('A')" id="subA">Subscribe</button>
+        <button onclick="unsubscribe('A')" id="unsubA" disabled>Unsubscribe</button>
+        <button class="disconnect" onclick="disconnect('A')">Disconnect</button>
+      </div>
+      <div class="members" id="membersA">
+        <h3>Online Members (0)</h3>
+      </div>
+      <div class="log-header"><h3>Log</h3><button class="clear-btn" onclick="clearLog('A')">Clear</button></div>
+      <div class="log" id="logA"></div>
+    </div>
+
+    <div class="client" id="clientB">
+      <h2>Client B</h2>
+      <div class="status" id="statusB"><span class="dot red"></span>Disconnected</div>
+      <div class="controls">
+        <button class="connect" onclick="connect('B')">Connect</button>
+        <button onclick="subscribe('B')" id="subB">Subscribe</button>
+        <button onclick="unsubscribe('B')" id="unsubB" disabled>Unsubscribe</button>
+        <button class="disconnect" onclick="disconnect('B')">Disconnect</button>
+      </div>
+      <div class="members" id="membersB">
+        <h3>Online Members (0)</h3>
+      </div>
+      <div class="log-header"><h3>Log</h3><button class="clear-btn" onclick="clearLog('B')">Clear</button></div>
+      <div class="log" id="logB"></div>
+    </div>
+  </div>
+
+  <script>
+    const sockets = { A: null, B: null };
+    const memberLists = { A: [], B: [] };
+    const subscribed = { A: false, B: false };
+
+    // XSS-safe text escaping
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function log(client, message, type = 'info') {
+      const el = document.getElementById('log' + client);
+      const time = new Date().toLocaleTimeString();
+      el.innerHTML += '<div class="log-entry ' + esc(type) + '"><span class="time">' + esc(time) + '</span>' + esc(message) + '</div>';
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function clearLog(client) {
+      document.getElementById('log' + client).innerHTML = '';
+    }
+
+    function updateStatus(client, state) {
+      const el = document.getElementById('status' + client);
+      const colors = { connected: 'green', disconnected: 'red', connecting: 'yellow' };
+      el.innerHTML = '<span class="dot ' + (colors[state] || 'red') + '"></span>' + esc(state.charAt(0).toUpperCase() + state.slice(1));
+    }
+
+    function updateButtons(client) {
+      const sub = document.getElementById('sub' + client);
+      const unsub = document.getElementById('unsub' + client);
+      sub.disabled = subscribed[client];
+      unsub.disabled = !subscribed[client];
+    }
+
+    function renderMembers(client) {
+      const el = document.getElementById('members' + client);
+      const members = memberLists[client];
+      let html = '<h3>Online Members (' + members.length + ')</h3>';
+      for (const m of members) {
+        const id = m.userId || m.presenceId.slice(0, 8);
+        html += '<div class="member"><span>' + esc(id) + '</span><span class="role">' + esc(m.role || 'unknown') + '</span></div>';
+      }
+      el.innerHTML = html;
+    }
+
+    function connect(client) {
+      const url = document.getElementById('apiUrl').value;
+      const credential = document.getElementById('token' + client).value.trim();
+      if (!credential) { log(client, 'Please enter a JWT token or API key', 'leave'); return; }
+
+      updateStatus(client, 'connecting');
+      log(client, 'Connecting...');
+
+      // Detect if credential looks like a JWT (has dots) or an API key
+      const isJwt = credential.split('.').length === 3;
+      const auth = isJwt ? { token: credential } : { apiKey: credential };
+
+      const socket = io(url, {
+        auth: auth,
+        transports: ['websocket'],
+      });
+
+      socket.on('connect', function() {
+        updateStatus(client, 'connected');
+        log(client, 'Connected (socket: ' + socket.id + ')', 'sync');
+        // Re-subscribe after reconnect if previously subscribed
+        if (subscribed[client]) {
+          subscribe(client);
+        }
+      });
+
+      socket.on('disconnect', function(reason) {
+        updateStatus(client, 'disconnected');
+        memberLists[client] = [];
+        renderMembers(client);
+        log(client, 'Disconnected: ' + reason, 'leave');
+      });
+
+      socket.on('connect_error', function(err) {
+        updateStatus(client, 'disconnected');
+        log(client, 'Connection error: ' + err.message, 'leave');
+      });
+
+      // Presence events
+      socket.on('presence:sync', function(data) {
+        memberLists[client] = data.members;
+        renderMembers(client);
+        log(client, 'Presence sync: ' + data.members.length + ' member(s) in ' + data.channel, 'sync');
+      });
+
+      socket.on('presence:join', function(data) {
+        // Deduplicate: skip if already in list
+        if (!memberLists[client].some(function(m) { return m.presenceId === data.member.presenceId; })) {
+          memberLists[client].push(data.member);
+        }
+        renderMembers(client);
+        var id = data.member.userId || data.member.presenceId.slice(0, 8);
+        log(client, id + ' joined ' + data.channel, 'join');
+      });
+
+      socket.on('presence:leave', function(data) {
+        memberLists[client] = memberLists[client].filter(function(m) { return m.presenceId !== data.member.presenceId; });
+        renderMembers(client);
+        var id = data.member.userId || data.member.presenceId.slice(0, 8);
+        log(client, id + ' left ' + data.channel, 'leave');
+      });
+
+      socket.on('realtime:error', function(data) {
+        log(client, 'Error: ' + data.message, 'leave');
+      });
+
+      sockets[client] = socket;
+    }
+
+    function subscribe(client) {
+      var socket = sockets[client];
+      if (!socket || !socket.connected) { log(client, 'Not connected', 'leave'); return; }
+      var channel = document.getElementById('channelName').value;
+      log(client, 'Subscribing to ' + channel + '...');
+      socket.emit('realtime:subscribe', { channel: channel }, function(res) {
+        if (res.ok) {
+          subscribed[client] = true;
+          updateButtons(client);
+          log(client, 'Subscribed to ' + channel, 'sync');
+        } else {
+          log(client, 'Subscribe failed: ' + (res.error && res.error.message || 'Unknown error'), 'leave');
+        }
+      });
+    }
+
+    function unsubscribe(client) {
+      var socket = sockets[client];
+      if (!socket || !socket.connected) { log(client, 'Not connected', 'leave'); return; }
+      var channel = document.getElementById('channelName').value;
+      socket.emit('realtime:unsubscribe', { channel: channel });
+      subscribed[client] = false;
+      updateButtons(client);
+      memberLists[client] = [];
+      renderMembers(client);
+      log(client, 'Unsubscribed from ' + channel, 'info');
+    }
+
+    function disconnect(client) {
+      if (sockets[client]) {
+        sockets[client].disconnect();
+      }
+      sockets[client] = null;
+      subscribed[client] = false;
+      updateButtons(client);
+      memberLists[client] = [];
+      renderMembers(client);
+    }
+  </script>
+</body>
+</html>
