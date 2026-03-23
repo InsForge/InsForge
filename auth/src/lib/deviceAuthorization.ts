@@ -1,4 +1,7 @@
-import { deviceAuthorizationSessionSchema } from '@insforge/shared-schemas';
+import {
+  deviceAuthorizationClientContextSchema,
+  deviceAuthorizationStatusSchema,
+} from '@insforge/shared-schemas';
 import { z } from 'zod';
 import { getBackendUrl } from './utils';
 
@@ -15,9 +18,10 @@ const DEVICE_AUTHORIZATION_LOOKUP_PATH = `${DEVICE_AUTHORIZATION_BASE_PATH}/auth
 const DEVICE_AUTHORIZATION_APPROVE_PATH = `${DEVICE_AUTHORIZATION_BASE_PATH}/authorizations/approve`;
 const DEVICE_AUTHORIZATION_DENY_PATH = `${DEVICE_AUTHORIZATION_BASE_PATH}/authorizations/deny`;
 
-export const deviceAuthorizationSessionViewSchema = deviceAuthorizationSessionSchema.omit({
-  deviceCode: true,
-  userCode: true,
+export const deviceAuthorizationSessionViewSchema = z.object({
+  status: deviceAuthorizationStatusSchema,
+  expiresAt: z.string(),
+  clientContext: deviceAuthorizationClientContextSchema.nullable().optional(),
 });
 
 export type DeviceAuthorizationSessionView = z.infer<typeof deviceAuthorizationSessionViewSchema>;

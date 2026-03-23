@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useInsforge } from '@insforge/react';
 import { ErrorCard } from '../components/ErrorCard';
@@ -43,13 +43,11 @@ export function DeviceAuthorizePage() {
     }
   }, [searchParams]);
 
-  const consentPath = useMemo(() => buildDeviceConsentPath(userCode), [userCode]);
-
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const normalizedUserCode = normalizeUserCodeInput(userCode);
-    if (!normalizedUserCode) {
+    const validatedUserCode = normalizeUserCodeInput(userCode);
+    if (!validatedUserCode) {
       setErrorMessage('Enter the device code shown on your terminal.');
       return;
     }
@@ -58,7 +56,7 @@ export function DeviceAuthorizePage() {
     setErrorMessage('');
 
     try {
-      const session = await lookupDeviceAuthorization(normalizedUserCode);
+      const session = await lookupDeviceAuthorization(validatedUserCode);
       if (INVALID_DEVICE_AUTHORIZATION_STATUSES.includes(session.status)) {
         throw new Error('This device code is no longer valid.');
       }
@@ -69,7 +67,9 @@ export function DeviceAuthorizePage() {
         Boolean(browserSession && typeof browserSession === 'object' && browserSession.accessToken);
 
       navigate(
-        hasBrowserSession ? consentPath : buildDeviceSignInPath(normalizedUserCode),
+        hasBrowserSession
+          ? buildDeviceConsentPath(validatedUserCode)
+          : buildDeviceSignInPath(validatedUserCode),
         { replace: true }
       );
     } catch (error) {

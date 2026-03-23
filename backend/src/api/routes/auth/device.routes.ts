@@ -6,6 +6,7 @@ import {
   denyDeviceAuthorizationRequestSchema,
   exchangeDeviceAuthorizationRequestSchema,
   type CreateDeviceAuthorizationResponse,
+  type DeviceAuthorizationSessionSchema,
 } from '@insforge/shared-schemas';
 import { DeviceAuthorizationService } from '@/services/auth/device-authorization.service.js';
 import { AuthService } from '@/services/auth/auth.service.js';
@@ -54,6 +55,25 @@ function buildDeviceAuthorizationResponse(
     expiresIn,
     interval: session.pollIntervalSeconds,
   });
+}
+
+type PublicDeviceAuthorizationLookupResponse = Pick<
+  DeviceAuthorizationSessionSchema,
+  'status' | 'expiresAt' | 'clientContext'
+>;
+
+type DeviceAuthorizationLookupSession = NonNullable<
+  Awaited<ReturnType<typeof deviceAuthorizationService.findByUserCode>>
+>;
+
+function buildPublicDeviceAuthorizationLookupResponse(
+  session: DeviceAuthorizationLookupSession
+): PublicDeviceAuthorizationLookupResponse {
+  return {
+    status: session.status,
+    expiresAt: session.expiresAt,
+    clientContext: session.clientContext ?? null,
+  };
 }
 
 function mapDeviceTokenError(error: unknown):
@@ -182,7 +202,7 @@ router.post(
         req.user.id
       );
 
-      successResponse(res, session);
+      successResponse(res, buildPublicDeviceAuthorizationLookupResponse(session));
     } catch (error) {
       next(error);
     }
@@ -208,7 +228,7 @@ router.post(
         throw new AppError('Device authorization not found', 404, ERROR_CODES.NOT_FOUND);
       }
 
-      successResponse(res, session);
+      successResponse(res, buildPublicDeviceAuthorizationLookupResponse(session));
     } catch (error) {
       next(error);
     }

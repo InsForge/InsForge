@@ -288,8 +288,9 @@ describe('device auth routes', () => {
 
       expect(result.status).toBe(200);
       expect(deviceAuthorizationServiceMock.findByUserCode).toHaveBeenCalledWith('ABCD-EFGH');
-      expect(result.body).toMatchObject({
+      expect(result.body).toEqual({
         status: 'pending_authorization',
+        expiresAt: expect.any(String),
         clientContext: {
           deviceName: 'my-vps',
         },
