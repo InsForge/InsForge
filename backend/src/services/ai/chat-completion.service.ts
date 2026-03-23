@@ -297,7 +297,7 @@ export class ChatCompletionService {
       };
 
       // Send request with automatic renewal and retry logic
-      const response = await this.openRouterProvider.sendRequest((client) =>
+      const { result: response } = await this.openRouterProvider.sendRequest((client) =>
         client.chat.completions.create(
           request as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming
         )
@@ -402,7 +402,7 @@ export class ChatCompletionService {
       };
 
       // Send request with automatic renewal and retry logic
-      const stream = await this.openRouterProvider.sendRequest((client) =>
+      const { result: stream } = await this.openRouterProvider.sendRequest((client) =>
         client.chat.completions.create(request as OpenAI.Chat.ChatCompletionCreateParamsStreaming)
       );
 

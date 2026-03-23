@@ -75,11 +75,11 @@ export class ImageGenerationService {
       };
 
       // Send request with automatic renewal and retry logic
-      const response = (await this.openRouterProvider.sendRequest((client) =>
+      const { result: response } = await this.openRouterProvider.sendRequest((client) =>
         client.chat.completions.create(
           request as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming
         )
-      )) as OpenAI.Chat.ChatCompletion;
+      );
 
       // Initialize the result
       const result: ImageGenerationResponse = {

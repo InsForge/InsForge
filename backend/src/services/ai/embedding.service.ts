@@ -29,7 +29,7 @@ export class EmbeddingService {
     try {
       // Send request with automatic renewal and retry logic (same pattern as chat-completion)
       const aiConfig = await this.aiConfigService.findByModelId(options.model);
-      const response = await this.openRouterProvider.sendRequest((client) =>
+      const { result: response } = await this.openRouterProvider.sendRequest((client) =>
         client.embeddings.create({
           model: options.model,
           input: options.input,
