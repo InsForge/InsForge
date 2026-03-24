@@ -34,10 +34,7 @@ computeRouter.post(
         );
       }
 
-      const projectId = req.query.project_id as string | undefined;
-      if (!projectId) {
-        throw new AppError('project_id query param is required', 400, ERROR_CODES.INVALID_INPUT);
-      }
+      const projectId = (req.query.project_id as string) || 'default';
 
       const container = await computeService.createContainer({
         ...validation.data,
@@ -58,10 +55,7 @@ computeRouter.post(
  */
 computeRouter.get('/', verifyAdmin, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const projectId = req.query.project_id as string | undefined;
-    if (!projectId) {
-      throw new AppError('project_id query param is required', 400, ERROR_CODES.INVALID_INPUT);
-    }
+    const projectId = (req.query.project_id as string) || 'default';
 
     const containers = await computeService.getContainers(projectId);
     successResponse(res, containers);

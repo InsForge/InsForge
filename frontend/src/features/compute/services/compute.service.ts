@@ -20,10 +20,9 @@ export interface GetLogsResponse {
 }
 
 export class ComputeService {
-  async listContainers(projectId?: string): Promise<ListContainersResponse> {
-    const query = projectId ? `?project_id=${projectId}` : '';
+  async listContainers(projectId: string = 'default'): Promise<ListContainersResponse> {
     const response: ListContainersResponse = await apiClient.request(
-      `/compute/containers${query}`,
+      `/compute/containers?project_id=${projectId}`,
       {
         headers: apiClient.withAccessToken(),
       }
@@ -40,8 +39,8 @@ export class ComputeService {
     return response;
   }
 
-  async createContainer(data: CreateContainerRequest): Promise<ContainerSchema> {
-    const response: ContainerSchema = await apiClient.request('/compute/containers', {
+  async createContainer(data: CreateContainerRequest, projectId: string = 'default'): Promise<ContainerSchema> {
+    const response: ContainerSchema = await apiClient.request(`/compute/containers?project_id=${projectId}`, {
       method: 'POST',
       headers: apiClient.withAccessToken(),
       body: JSON.stringify(data),
