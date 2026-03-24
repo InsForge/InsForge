@@ -18,8 +18,7 @@ Create a new user account with email and password.
 - `email` (string, required) - User's email address
 - `password` (string, required) - User's password
 - `name` (string, optional) - User's display name
-- `options` (object, optional) - Additional options
-  - `emailRedirectTo` (string, optional) - Custom URL to redirect to after email verification. It's a fallback if you didn't set default redirect URL configured in your dashboard.
+- `verifyEmailUrl` (string, optional) - Used for link-based email verification. The email link opens this URL with the verification `token` in the query string so your app can verify the email itself. Required when `verifyEmailMethod` is set to `link`.
 
 ### Returns
 
@@ -29,7 +28,6 @@ Create a new user account with email and password.
     user?: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata },
     accessToken: string | null,
     requireEmailVerification?: boolean,
-    redirectTo?: string,
     csrfToken?: string | null
   } | null,
   error: Error | null
@@ -37,7 +35,7 @@ Create a new user account with email and password.
 ```
 
 <Note>
-  When `requireEmailVerification` is true, `accessToken` will be null until the user verifies their email. InsForge sends a verification email with either a link or a 6-digit code, based on your dashboard configuration (`verifyEmailMethod`). For code verification, implement a page that prompts the user to enter the code (see [verifyEmail()](#verifyemail)). For link verification, redirect users to the sign-in page—the insforge backend handles verification automatically when the link is clicked.
+  When `requireEmailVerification` is true, `accessToken` will be null until the user verifies their email. InsForge sends a verification email with either a link or a 6-digit code, based on your dashboard configuration (`verifyEmailMethod`). For code verification, implement a page that prompts the user to enter the code (see [verifyEmail()](#verifyemail)). For link verification, `verifyEmailUrl` must point at your app's verify-email page, and that page should call `verifyEmail()` with the `token` from the URL.
 </Note>
 
 ### Example
@@ -47,11 +45,12 @@ const { data, error } = await insforge.auth.signUp({
   email: 'user@example.com',
   password: 'secure_password123',
   name: 'John Doe',
+  verifyEmailUrl: 'http://localhost:3000/verify-email',
 });
 
 if (data?.requireEmailVerification) {
   // For code verification: redirect to page where user enters the 6-digit code
-  // For link verification: redirect to sign-in page to await email link click
+  // For link verification: wait for the user to click the email link
   console.log('Please verify your email');
 } else if (data?.accessToken) {
   // User is signed in (email verification disabled)
@@ -79,7 +78,6 @@ if (data?.requireEmailVerification) {
     },
     "requireEmailVerification": true,
     "accessToken": null,
-    "redirectTo": "https://app.example.com/verify-email",
     "csrfToken": null
   },
   "error": null
@@ -104,7 +102,6 @@ Sign in an existing user with email and password.
   data: {
     user: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata },
     accessToken: string,
-    redirectTo?: string,
     csrfToken?: string | null
   } | null,
   error: Error | null
@@ -121,10 +118,6 @@ const { data, error } = await insforge.auth.signInWithPassword({
 
 if (data) {
   console.log('Signed in as:', data.user.email);
-  // Optional: redirect to configured URL
-  if (data.redirectTo) {
-    window.location.href = data.redirectTo;
-  }
 }
 ```
 
@@ -147,7 +140,6 @@ if (data) {
       "metadata": {}
     },
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "redirectTo": "https://app.example.com/dashboard",
     "csrfToken": "5758d38259fb..."
   },
   "error": null
@@ -176,8 +168,8 @@ Start OAuth authentication flow with configured providers (built-in providers li
 ```
 
 <Note>
-  After OAuth redirect, SDK automatically detects callback parameters and saves session. No manual
-  handling needed.
+  After OAuth redirect, SDK automatically detects the callback `insforge_code`, exchanges it for a
+  session, and saves the session automatically.
 </Note>
 
 ### Example
@@ -440,8 +432,7 @@ Resend email verification when the previous OTP has expired or was not received.
 ### Parameters
 
 - `email` (string, required) - User's email address
-- `options` (object, optional) - Additional options
-  - `emailRedirectTo` (string, optional) - Custom URL to redirect to after email verification. It's a fallback if you didn't set default redirect URL configured in your dashboard.
+- `verifyEmailUrl` (string, optional) - Used for link-based email verification. The email link opens this URL with the verification `token` in the query string so your app can verify the email itself. Required when `verifyEmailMethod` is set to `link`.
 
 ### Returns
 
@@ -457,6 +448,7 @@ Resend email verification when the previous OTP has expired or was not received.
 ```javascript
 const { data, error } = await insforge.auth.resendVerificationEmail({
   email: 'user@example.com',
+  verifyEmailUrl: 'http://localhost:3000/verify-email',
 });
 
 if (data?.success) {
@@ -497,8 +489,7 @@ Successfully verified users will receive a session token.
 {
   data: {
     accessToken: string,
-    user: { id, email, emailVerified, ... },
-    redirectTo?: string
+    user: { id, email, emailVerified, ... }
   } | null,
   error: Error | null
 }
@@ -534,8 +525,7 @@ if (data) {
       "id": "usr_abc123",
       "email": "user@example.com",
       "emailVerified": true
-    },
-    "redirectTo": "https://app.example.com/dashboard"
+    }
   },
   "error": null
 }
@@ -545,7 +535,7 @@ if (data) {
 
 ## sendResetPasswordEmail()
 
-Send password reset email using the method configured in auth settings (`resetPasswordMethod`). When method is `code`, sends a 6-digit numeric code for two-step flow. When method is `link`, sends a magic link.
+Send password reset email using the method configured in auth settings (`resetPasswordMethod`). When method is `code`, sends a 6-digit numeric code for two-step flow. When method is `link`, sends a magic link directly to your reset-password page.
 
 <Note>
   This endpoint prevents user enumeration by returning success even if the email doesn't exist.
@@ -554,6 +544,7 @@ Send password reset email using the method configured in auth settings (`resetPa
 ### Parameters
 
 - `email` (string, required) - User's email address
+- `resetPasswordUrl` (string, optional) - Used for link-based password reset. The magic link opens this URL with the reset `token` in the query string so your app can render its own reset-password page. Required when `resetPasswordMethod` is set to `link`.
 
 ### Returns
 
@@ -569,6 +560,7 @@ Send password reset email using the method configured in auth settings (`resetPa
 ```javascript
 const { data, error } = await insforge.auth.sendResetPasswordEmail({
   email: 'user@example.com',
+  resetPasswordUrl: 'http://localhost:3000/reset-password',
 });
 
 if (data?.success) {
@@ -646,7 +638,7 @@ if (data) {
 ## resetPassword()
 
 Reset user password with a token. The token can be:
-- **Magic link token**: 64-character hex token from `sendResetPasswordEmail` when method is `link`
+- **Magic link token**: Provided in the reset page URL from `sendResetPasswordEmail` when method is `link`
 - **Reset token**: From `exchangeResetPasswordToken` after code verification when method is `code`
 
 ### Parameters
@@ -658,7 +650,7 @@ Reset user password with a token. The token can be:
 
 ```typescript
 {
-  data: { message: string, redirectTo?: string } | null,
+  data: { message: string } | null,
   error: Error | null
 }
 ```
@@ -672,10 +664,10 @@ const { data, error } = await insforge.auth.resetPassword({
   otp: resetToken, // Token from exchangeResetPasswordToken
 });
 
-// Link method flow: token from URL params
+// Link method flow: token from the reset page URL
 const { data, error } = await insforge.auth.resetPassword({
   newPassword: 'newSecurePassword123',
-  otp: 'a1b2c3d4e5f6...', // 64-character token from magic link URL
+  otp: 'a1b2c3d4e5f6...', // Token from the magic link URL
 });
 
 if (data) {
@@ -688,8 +680,7 @@ if (data) {
 ```json
 {
   "data": {
-    "message": "Password reset successfully",
-    "redirectTo": "https://app.example.com/login"
+    "message": "Password reset successfully"
   },
   "error": null
 }

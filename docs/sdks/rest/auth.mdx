@@ -44,6 +44,7 @@ POST /api/auth/users
 | `email` | string | Yes | User email address |
 | `password` | string | Yes | Password (must meet configured requirements) |
 | `name` | string | No | User display name |
+| `verifyEmailUrl` | string | No | Used for link-based email verification. The email link opens this URL with the verification `token` in the query string so your app can verify the email itself. Required when `verifyEmailMethod` is `link`. |
 
 ### Example (Web Client)
 
@@ -53,7 +54,8 @@ curl -X POST "https://your-app.insforge.app/api/auth/users" \
   -d '{
     "email": "user@example.com",
     "password": "securepassword123",
-    "name": "John Doe"
+    "name": "John Doe",
+    "verifyEmailUrl": "http://localhost:3000/verify-email"
   }'
 ```
 
@@ -65,7 +67,8 @@ curl -X POST "https://your-app.insforge.app/api/auth/users?client_type=mobile" \
   -d '{
     "email": "user@example.com",
     "password": "securepassword123",
-    "name": "John Doe"
+    "name": "John Doe",
+    "verifyEmailUrl": "myapp://verify-email"
   }'
 ```
 
@@ -421,13 +424,17 @@ POST /api/auth/email/send-verification
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `email` | string | Yes | User email address |
+| `verifyEmailUrl` | string | No | Used for link-based email verification. The email link opens this URL with the verification `token` in the query string so your app can verify the email itself. Required when `verifyEmailMethod` is `link`. |
 
 ### Example
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/email/send-verification" \
   -H "Content-Type: application/json" \
-  -d '{"email": "user@example.com"}'
+  -d '{
+    "email": "user@example.com",
+    "verifyEmailUrl": "http://localhost:3000/verify-email"
+  }'
 ```
 
 ### Response
@@ -523,13 +530,17 @@ POST /api/auth/email/send-reset-password
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `email` | string | Yes | User email address |
+| `resetPasswordUrl` | string | No | Used for link-based password reset. The magic link opens this URL with the reset `token` in the query string so your app can render its own reset-password page. Required when `resetPasswordMethod` is `link`. |
 
 ### Example
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/email/send-reset-password" \
   -H "Content-Type: application/json" \
-  -d '{"email": "user@example.com"}'
+  -d '{
+    "email": "user@example.com",
+    "resetPasswordUrl": "http://localhost:3000/reset-password"
+  }'
 ```
 
 ### Exchange Code for Token (Code Method Only)
@@ -576,7 +587,7 @@ POST /api/auth/email/reset-password
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `newPassword` | string | Yes | New password |
-| `otp` | string | Yes | Reset token (from exchange endpoint or magic link) |
+| `otp` | string | Yes | Reset token from either the code exchange endpoint or the magic link URL |
 
 ### Example
 
@@ -676,7 +687,7 @@ The `insforge_code` is a temporary authorization code that must be exchanged for
 
 ### Exchange Code for Tokens
 
-Exchange the authorization code for access and refresh tokens (PKCE flow).
+Exchange the authorization code for access and refresh tokens.
 
 ```
 POST /api/auth/oauth/exchange
@@ -719,8 +730,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/oauth/exchange?client_type=
     "updatedAt": "2024-01-15T10:30:00Z"
   },
   "accessToken": "eyJhbGciOiJIUzI1NiIs...",
-  "refreshToken": "eyJhbGciOiJIUzI1NiIs...",
-  "redirectTo": "https://myapp.com/dashboard"
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
 }
 ```
 

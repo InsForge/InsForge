@@ -178,22 +178,8 @@ router.put('/config', verifyAdmin, async (req: AuthRequest, res: Response, next:
 router.post('/users', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const clientType = parseClientType(req.query.client_type);
-
-    const validationResult = createUserRequestSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      throw new AppError(
-        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
-        400,
-        ERROR_CODES.INVALID_INPUT
-      );
-    }
-
-    const { email, password, name, options } = validationResult.data;
-    const result: CreateUserResponse = await authService.register(email, password, name, options);
-
-    // If the request is from a project_admin, do not set refresh token cookie or return session
-    // tokens, so the admin's session is not overwritten when adding a user (works with multiple admins).
     let adminCreatingUser = false;
+
     try {
       const token = extractBearerToken(req.headers.authorization);
       if (token) {
@@ -206,6 +192,24 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
         error: error instanceof Error ? error.message : 'unknown',
       });
     }
+
+    const validationResult = createUserRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      throw new AppError(
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const { email, password, name, verifyEmailUrl } = validationResult.data;
+    const result: CreateUserResponse = await authService.register(
+      email,
+      password,
+      name,
+      verifyEmailUrl,
+      { isAdminCreation: adminCreatingUser }
+    );
 
     // Set refresh token based on client type (skip when admin is adding a user)
     if (result.accessToken && result.user && !adminCreatingUser) {
@@ -667,7 +671,7 @@ router.post(
         );
       }
 
-      const { email, options } = validationResult.data;
+      const { email, verifyEmailUrl } = validationResult.data;
 
       // Get auth config to determine verification method
       const authConfig = await authConfigService.getAuthConfig();
@@ -676,14 +680,22 @@ router.post(
       // Note: User enumeration is prevented at service layer
       // Service returns gracefully (no error) if user not found
       if (method === 'link') {
-        const redirectTo = options?.emailRedirectTo;
-
-        if (redirectTo && !(await authConfigService.validateRedirectUrl(redirectTo))) {
-          logger.warn('Redirect URL is not whitelisted for verification email', { redirectTo });
-          throw new AppError('Redirect URL is not whitelisted', 400, ERROR_CODES.INVALID_INPUT);
+        if (!verifyEmailUrl) {
+          throw new AppError(
+            'verifyEmailUrl is required when link-based email verification is enabled',
+            400,
+            ERROR_CODES.INVALID_INPUT
+          );
         }
 
-        await authService.sendVerificationEmailWithLink(email, redirectTo);
+        if (!(await authConfigService.validateRedirectUrl(verifyEmailUrl))) {
+          logger.warn('Verify email URL is not whitelisted for verification email', {
+            verifyEmailUrl,
+          });
+          throw new AppError('verifyEmailUrl is not whitelisted', 400, ERROR_CODES.INVALID_INPUT);
+        }
+
+        await authService.sendVerificationEmailWithLink(email, verifyEmailUrl);
       } else {
         await authService.sendVerificationEmailWithCode(email);
       }
@@ -788,7 +800,7 @@ router.post(
         );
       }
 
-      const { email } = validationResult.data;
+      const { email, resetPasswordUrl } = validationResult.data;
 
       // Get auth config to determine reset password method
       const authConfig = await authConfigService.getAuthConfig();
@@ -797,7 +809,22 @@ router.post(
       // Note: User enumeration is prevented at service layer
       // Service returns gracefully (no error) if user not found
       if (method === 'link') {
-        await authService.sendResetPasswordEmailWithLink(email);
+        if (!resetPasswordUrl) {
+          throw new AppError(
+            'resetPasswordUrl is required when link-based password reset is enabled',
+            400,
+            ERROR_CODES.INVALID_INPUT
+          );
+        }
+
+        if (!(await authConfigService.validateRedirectUrl(resetPasswordUrl))) {
+          logger.warn('Reset password URL is not whitelisted for password reset email', {
+            resetPasswordUrl,
+          });
+          throw new AppError('resetPasswordUrl is not whitelisted', 400, ERROR_CODES.INVALID_INPUT);
+        }
+
+        await authService.sendResetPasswordEmailWithLink(email, resetPasswordUrl);
       } else {
         await authService.sendResetPasswordEmailWithCode(email);
       }
@@ -857,12 +884,12 @@ router.post(
 
 // POST /api/auth/email/reset-password - Reset password with token
 // Token can be:
-// - Magic link token (from send-reset-password endpoint when method is 'link')
-// - Reset token (from exchange-reset-password-token endpoint after code verification)
+// - Magic link token from send-reset-password when method is 'link'
+// - Reset token from exchange-reset-password-token after code verification
 // Both use RESET_PASSWORD purpose and are verified the same way
 // Flow:
 //   Code: send-reset-password → exchange-reset-password-token → reset-password (with resetToken)
-//   Link: send-reset-password → reset-password (with link token)
+//   Link: send-reset-password → reset-password page → reset-password (with link token)
 router.post(
   '/email/reset-password',
   verifyOTPLimiter,
@@ -885,7 +912,7 @@ router.post(
         otp
       );
 
-      successResponse(res, result); // Return message with optional redirectTo
+      successResponse(res, result);
     } catch (error) {
       next(error);
     }
