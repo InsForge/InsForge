@@ -10,9 +10,9 @@ interface ModelRowProps {
 
 export function ModelRow({ model, isEnabled, requests, onToggle }: ModelRowProps) {
   return (
-    <div className="grid grid-cols-6 gap-x-2.5 h-12 items-center px-4 border-b border-[var(--alpha-8)] last:border-b-0">
+    <div className="grid grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_1fr_1fr] gap-x-2.5 h-12 items-center px-4 border-b border-[var(--alpha-8)] last:border-b-0">
       {/* Model with Toggle */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 min-w-0">
         <Switch checked={isEnabled} onCheckedChange={() => onToggle(model.modelId, isEnabled)} />
         <span className="text-sm text-foreground truncate" title={model.modelName}>
           {model.modelName}
