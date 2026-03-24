@@ -105,6 +105,9 @@ COPY --from=prod-deps /app/node_modules ./node_modules
 # Compiled output: server.js + frontend/ static files
 COPY --from=build /app/dist ./dist
 
+# Runtime docs for /api/docs endpoints and documentation assets
+COPY --from=build /app/docs ./docs
+
 # Migration runtime: tsx resolves @/* aliases via tsconfig.json,
 # node-pg-migrate reads .sql files from backend/src/
 COPY --from=build /app/backend/src ./backend/src
