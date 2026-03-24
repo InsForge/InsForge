@@ -29,8 +29,8 @@ export type DeviceAuthorizationSessionView = z.infer<typeof deviceAuthorizationS
 export function normalizeUserCodeInput(value: string): string {
   const cleaned = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
-  if (cleaned.length === 8) {
-    return `${cleaned.slice(0, 4)}-${cleaned.slice(4)}`;
+  if (cleaned.length === 10) {
+    return `${cleaned.slice(0, 5)}-${cleaned.slice(5)}`;
   }
 
   return value.toUpperCase().trim();
@@ -77,9 +77,10 @@ async function postDeviceAuthorizationSession(
 }
 
 export function lookupDeviceAuthorization(
-  userCode: string
+  userCode: string,
+  accessToken?: string
 ): Promise<DeviceAuthorizationSessionView> {
-  return postDeviceAuthorizationSession(DEVICE_AUTHORIZATION_LOOKUP_PATH, userCode);
+  return postDeviceAuthorizationSession(DEVICE_AUTHORIZATION_LOOKUP_PATH, userCode, accessToken);
 }
 
 export function approveDeviceAuthorization(

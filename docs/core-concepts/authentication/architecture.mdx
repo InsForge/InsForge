@@ -123,7 +123,8 @@ sequenceDiagram
 ```
 
 - `POST /api/auth/device/authorizations` returns `deviceCode`, `userCode`, `verificationUri`, `verificationUriComplete`, `expiresIn`, and `interval`.
-- `POST /api/auth/device/authorizations/lookup` exposes only `status`, `expiresAt`, and `clientContext`.
+- `POST /api/auth/device/authorizations/lookup` exposes only `status` and `expiresAt` to unauthenticated browsers.
+- An authenticated lookup binds the session to the signed-in user and includes `clientContext` for the consent page.
 - `POST /api/auth/device/authorizations/approve` and `/deny` are browser-only actions that reuse the existing sign-in flow.
 - `POST /api/auth/device/token` exchanges an approved device code for the standard non-web session payload, including `refreshToken`.
 

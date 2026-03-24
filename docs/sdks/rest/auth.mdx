@@ -835,9 +835,9 @@ curl -X POST "https://your-app.insforge.app/api/auth/device/authorizations" \
 ```json
 {
   "deviceCode": "device-code-123",
-  "userCode": "ABCD-EFGH",
+  "userCode": "ABCDE-FGHIJ",
   "verificationUri": "https://your-app.insforge.app/auth/device",
-  "verificationUriComplete": "https://your-app.insforge.app/auth/device?user_code=ABCD-EFGH",
+  "verificationUriComplete": "https://your-app.insforge.app/auth/device?user_code=ABCDE-FGHIJ",
   "expiresIn": 900,
   "interval": 5
 }
@@ -861,7 +861,7 @@ POST /api/auth/device/authorizations/lookup
 curl -X POST "https://your-app.insforge.app/api/auth/device/authorizations/lookup" \
   -H "Content-Type: application/json" \
   -d '{
-    "userCode": "ABCD-EFGH"
+    "userCode": "ABCDE-FGHIJ"
   }'
 ```
 
@@ -870,17 +870,12 @@ curl -X POST "https://your-app.insforge.app/api/auth/device/authorizations/looku
 ```json
 {
   "status": "pending_authorization",
-  "expiresAt": "2026-03-24T00:15:00.000Z",
-  "clientContext": {
-    "deviceName": "my-vps",
-    "hostname": "vps-01",
-    "platform": "linux-x64"
-  }
+  "expiresAt": "2026-03-24T00:15:00.000Z"
 }
 ```
 
 <Note>
-The public lookup response only exposes `status`, `expiresAt`, and `clientContext`.
+The public lookup response exposes only `status` and `expiresAt`. When the browser is already authenticated, the same endpoint also binds the device authorization to that signed-in user and includes `clientContext` for the consent page.
 </Note>
 
 ### Approve Device Authorization

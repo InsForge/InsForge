@@ -112,14 +112,14 @@ export function DeviceAuthorizePage() {
           name="device-code"
           value={userCode}
           onChange={(event) => setUserCode(normalizeUserCodeInput(event.target.value))}
-          placeholder="ABCD-EFGH"
+          placeholder="ABCDE-FGHIJ"
           autoCapitalize="characters"
           autoComplete="one-time-code"
           spellCheck={false}
           className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-lg tracking-[0.3em] uppercase text-slate-950 outline-none transition placeholder:tracking-normal placeholder:normal-case placeholder:text-slate-400 focus:border-slate-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white dark:focus:border-white"
         />
         <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-          Paste the 8-character code and we will verify it before opening consent.
+          Paste the 10-character code and we will verify it before opening consent.
         </p>
 
         {errorMessage ? (

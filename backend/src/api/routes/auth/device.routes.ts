@@ -15,7 +15,7 @@ import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { errorResponse, successResponse } from '@/utils/response.js';
 import { getApiBaseUrl } from '@/utils/environment.js';
-import { verifyToken, type AuthRequest } from '@/api/middlewares/auth.js';
+import { extractBearerToken, verifyToken, type AuthRequest } from '@/api/middlewares/auth.js';
 import {
   deviceAuthorizationCreationLimiter,
   deviceAuthorizationPollingLimiter,
@@ -56,23 +56,57 @@ function buildDeviceAuthorizationResponse(
   });
 }
 
-type PublicDeviceAuthorizationLookupResponse = Pick<
+type DeviceAuthorizationLookupResponse = Pick<
   DeviceAuthorizationSessionSchema,
-  'status' | 'expiresAt' | 'clientContext'
->;
+  'status' | 'expiresAt'
+> &
+  Partial<Pick<DeviceAuthorizationSessionSchema, 'clientContext'>>;
 
 type DeviceAuthorizationLookupSession = NonNullable<
   Awaited<ReturnType<typeof deviceAuthorizationService.findByUserCode>>
 >;
 
-function buildPublicDeviceAuthorizationLookupResponse(
-  session: DeviceAuthorizationLookupSession
-): PublicDeviceAuthorizationLookupResponse {
-  return {
+function buildDeviceAuthorizationLookupResponse(
+  session: DeviceAuthorizationLookupSession,
+  includeClientContext = false
+): DeviceAuthorizationLookupResponse {
+  const response: DeviceAuthorizationLookupResponse = {
     status: session.status,
     expiresAt: session.expiresAt,
-    clientContext: session.clientContext ?? null,
   };
+
+  if (includeClientContext) {
+    response.clientContext = session.clientContext ?? null;
+  }
+
+  return response;
+}
+
+function resolveLookupUser(req: Request): AuthRequest['user'] | null {
+  const token = extractBearerToken(req.headers.authorization);
+  if (!token) {
+    return null;
+  }
+
+  try {
+    const payload = tokenManager.verifyToken(token);
+
+    if (!payload.role) {
+      throw new AppError('Invalid token: missing role', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
+    }
+
+    return {
+      id: payload.sub,
+      email: payload.email,
+      role: payload.role,
+    };
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    throw new AppError('Invalid token', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
+  }
 }
 
 function mapDeviceTokenError(
@@ -207,7 +241,7 @@ router.post(
         req.user.id
       );
 
-      successResponse(res, buildPublicDeviceAuthorizationLookupResponse(session));
+      successResponse(res, buildDeviceAuthorizationLookupResponse(session, true));
     } catch (error) {
       next(error);
     }
@@ -230,14 +264,18 @@ router.post(
         );
       }
 
-      const session = await deviceAuthorizationService.findByUserCode(
-        validationResult.data.userCode
-      );
+      const lookupUser = resolveLookupUser(req);
+      const session = lookupUser
+        ? await deviceAuthorizationService.markAuthenticated(
+            validationResult.data.userCode,
+            lookupUser.id
+          )
+        : await deviceAuthorizationService.findByUserCode(validationResult.data.userCode);
       if (!session) {
         throw new AppError('Device authorization not found', 404, ERROR_CODES.NOT_FOUND);
       }
 
-      successResponse(res, buildPublicDeviceAuthorizationLookupResponse(session));
+      successResponse(res, buildDeviceAuthorizationLookupResponse(session, Boolean(lookupUser)));
     } catch (error) {
       next(error);
     }
@@ -270,7 +308,7 @@ router.post(
         req.user.id
       );
 
-      successResponse(res, buildPublicDeviceAuthorizationLookupResponse(session));
+      successResponse(res, buildDeviceAuthorizationLookupResponse(session, true));
     } catch (error) {
       next(error);
     }

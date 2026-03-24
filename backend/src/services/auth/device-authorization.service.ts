@@ -42,6 +42,10 @@ export type DeviceAuthorizationCreatedSession = DeviceAuthorizationSessionView &
 
 const DEFAULT_EXPIRES_IN_MS = 15 * 60 * 1000;
 const DEFAULT_POLL_INTERVAL_SECONDS = 5;
+const USER_CODE_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+const USER_CODE_SEGMENT_LENGTH = 5;
+const USER_CODE_LENGTH = USER_CODE_SEGMENT_LENGTH * 2;
+const CREATE_DEVICE_AUTHORIZATION_MAX_ATTEMPTS = 5;
 
 export class DeviceAuthorizationService {
   private static instance: DeviceAuthorizationService;
@@ -70,8 +74,22 @@ export class DeviceAuthorizationService {
   }
 
   private generateUserCode(): string {
-    const raw = generateSecureToken(4).toUpperCase();
-    return `${raw.slice(0, 4)}-${raw.slice(4, 8)}`;
+    let raw = '';
+
+    for (let index = 0; index < USER_CODE_LENGTH; index += 1) {
+      raw += USER_CODE_ALPHABET[crypto.randomInt(0, USER_CODE_ALPHABET.length)];
+    }
+
+    return `${raw.slice(0, USER_CODE_SEGMENT_LENGTH)}-${raw.slice(USER_CODE_SEGMENT_LENGTH)}`;
+  }
+
+  private isUniqueViolation(error: unknown): boolean {
+    return (
+      !!error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      (error as { code?: string }).code === '23505'
+    );
   }
 
   private normalizeClientContext(
@@ -260,61 +278,75 @@ export class DeviceAuthorizationService {
   async create(
     input: CreateDeviceAuthorizationRequest
   ): Promise<DeviceAuthorizationCreatedSession> {
-    try {
+    const expiresAt = new Date(Date.now() + DEFAULT_EXPIRES_IN_MS).toISOString();
+    const clientContext = this.normalizeClientContext(input);
+
+    for (let attempt = 1; attempt <= CREATE_DEVICE_AUTHORIZATION_MAX_ATTEMPTS; attempt += 1) {
       const deviceCode = generateSecureToken(32);
       const userCode = this.generateUserCode();
-      const expiresAt = new Date(Date.now() + DEFAULT_EXPIRES_IN_MS).toISOString();
-      const clientContext = this.normalizeClientContext(input);
 
-      const result = await this.getPool().query(
-        `INSERT INTO auth.device_authorizations (
-           device_code_hash,
-           user_code_hash,
-           status,
-           expires_at,
-           poll_interval_seconds,
-           client_context
-         )
-         VALUES ($1, $2, 'pending_authorization', $3, $4, $5::jsonb)
-         RETURNING
-           id,
-           device_code_hash,
-           user_code_hash,
-           status,
-           expires_at,
-           poll_interval_seconds,
-           approved_by_user_id,
-           consumed_at,
-           client_context,
-           created_at,
-           updated_at`,
-        [
-          this.hashCode(deviceCode),
-          this.hashCode(userCode),
-          expiresAt,
-          DEFAULT_POLL_INTERVAL_SECONDS,
-          clientContext ? JSON.stringify(clientContext) : null,
-        ]
-      );
+      try {
+        const result = await this.getPool().query(
+          `INSERT INTO auth.device_authorizations (
+             device_code_hash,
+             user_code_hash,
+             status,
+             expires_at,
+             poll_interval_seconds,
+             client_context
+           )
+           VALUES ($1, $2, 'pending_authorization', $3, $4, $5::jsonb)
+           RETURNING
+             id,
+             device_code_hash,
+             user_code_hash,
+             status,
+             expires_at,
+             poll_interval_seconds,
+             approved_by_user_id,
+             consumed_at,
+             client_context,
+             created_at,
+             updated_at`,
+          [
+            this.hashCode(deviceCode),
+            this.hashCode(userCode),
+            expiresAt,
+            DEFAULT_POLL_INTERVAL_SECONDS,
+            clientContext ? JSON.stringify(clientContext) : null,
+          ]
+        );
 
-      const row = result.rows[0] as DeviceAuthorizationRow | undefined;
-      if (!row) {
+        const row = result.rows[0] as DeviceAuthorizationRow | undefined;
+        if (!row) {
+          throw new AppError(
+            'Failed to create device authorization',
+            500,
+            ERROR_CODES.INTERNAL_ERROR
+          );
+        }
+
+        return { ...this.toPublicSession(this.cloneRow(row)), deviceCode, userCode };
+      } catch (error) {
+        if (error instanceof AppError) {
+          throw error;
+        }
+
+        if (this.isUniqueViolation(error) && attempt < CREATE_DEVICE_AUTHORIZATION_MAX_ATTEMPTS) {
+          logger.warn('Device authorization code collision detected; retrying', { attempt });
+          continue;
+        }
+
+        logger.error('Failed to create device authorization', { error, attempt });
         throw new AppError(
           'Failed to create device authorization',
           500,
           ERROR_CODES.INTERNAL_ERROR
         );
       }
-
-      return { ...this.toPublicSession(this.cloneRow(row)), deviceCode, userCode };
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-
-      logger.error('Failed to create device authorization', { error });
-      throw new AppError('Failed to create device authorization', 500, ERROR_CODES.INTERNAL_ERROR);
     }
+
+    throw new AppError('Failed to create device authorization', 500, ERROR_CODES.INTERNAL_ERROR);
   }
 
   async findByUserCode(userCode: string): Promise<DeviceAuthorizationSessionView | null> {

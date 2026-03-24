@@ -37,6 +37,7 @@ export function DeviceConsentPage() {
   );
   const queryAccessToken = searchParams.get('access_token');
   const [accessToken, setAccessToken] = useState<string | null>(queryAccessToken);
+  const [authChecked, setAuthChecked] = useState(Boolean(queryAccessToken));
   const [authorization, setAuthorization] = useState<DeviceAuthorizationSessionView | null>(null);
   const [loadingAuthorization, setLoadingAuthorization] = useState(true);
   const [actionState, setActionState] = useState<'idle' | 'approving' | 'denying'>('idle');
@@ -49,6 +50,7 @@ export function DeviceConsentPage() {
     async function resolveSessionToken() {
       if (queryAccessToken) {
         setAccessToken(queryAccessToken);
+        setAuthChecked(true);
         return;
       }
 
@@ -63,6 +65,7 @@ export function DeviceConsentPage() {
 
       if (session && typeof session === 'object' && session.accessToken) {
         setAccessToken(session.accessToken);
+        setAuthChecked(true);
         return;
       }
 
@@ -80,6 +83,10 @@ export function DeviceConsentPage() {
     let cancelled = false;
 
     async function loadAuthorization() {
+      if (!authChecked) {
+        return;
+      }
+
       if (!userCode) {
         setErrorMessage('Missing device code.');
         setLoadingAuthorization(false);
@@ -90,7 +97,7 @@ export function DeviceConsentPage() {
       setErrorMessage('');
 
       try {
-        const session = await lookupDeviceAuthorization(userCode);
+        const session = await lookupDeviceAuthorization(userCode, accessToken ?? undefined);
         if (cancelled) {
           return;
         }
@@ -115,7 +122,7 @@ export function DeviceConsentPage() {
     return () => {
       cancelled = true;
     };
-  }, [userCode]);
+  }, [accessToken, authChecked, userCode]);
 
   const clientContext = authorization?.clientContext ?? null;
   const canAct = Boolean(accessToken) && Boolean(authorization) && actionState === 'idle';

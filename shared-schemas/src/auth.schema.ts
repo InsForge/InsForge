@@ -29,7 +29,7 @@ export const deviceAuthorizationDeviceCodeSchema = z.string().min(1);
 
 export const deviceAuthorizationUserCodeSchema = z
   .string()
-  .regex(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/, 'Invalid user code format');
+  .regex(/^[A-Z0-9]{5}-[A-Z0-9]{5}$/, 'Invalid user code format');
 
 export const deviceAuthorizationStatusSchema = z.enum([
   'pending_authorization',

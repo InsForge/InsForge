@@ -304,8 +304,35 @@ describe('DeviceAuthorizationService', () => {
     });
 
     expect(session.status).toBe('pending_authorization');
-    expect(session.userCode).toMatch(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+    expect(session.userCode).toMatch(/^[A-Z0-9]{5}-[A-Z0-9]{5}$/);
     expect(session.deviceCode).toHaveLength(64);
+  });
+
+  it('retries with a new user code when the insert hits a unique constraint collision', async () => {
+    const rows = new Map<string, DeviceAuthorizationRow>();
+    const handler = createQueryHandler(rows);
+    let insertAttempts = 0;
+
+    mockPool.query.mockImplementation(async (sql: string, params: unknown[]) => {
+      if (
+        sql.startsWith('INSERT INTO auth.device_authorizations') &&
+        insertAttempts++ === 0
+      ) {
+        const error = new Error('duplicate key value violates unique constraint') as Error & {
+          code?: string;
+        };
+        error.code = '23505';
+        throw error;
+      }
+
+      return handler(sql, params);
+    });
+
+    const service = DeviceAuthorizationService.getInstance();
+    const session = await service.create({});
+
+    expect(session.userCode).toMatch(/^[A-Z0-9]{5}-[A-Z0-9]{5}$/);
+    expect(insertAttempts).toBe(2);
   });
 
   it('expires stale records before mutating them', async () => {

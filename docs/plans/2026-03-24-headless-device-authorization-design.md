@@ -92,9 +92,9 @@ Example response:
 ```json
 {
   "deviceCode": "high-entropy-secret",
-  "userCode": "ABCD-EFGH",
+  "userCode": "ABCDE-FGHIJ",
   "verificationUri": "https://your-instance.com/auth/device",
-  "verificationUriComplete": "https://your-instance.com/auth/device?user_code=ABCD-EFGH",
+  "verificationUriComplete": "https://your-instance.com/auth/device?user_code=ABCDE-FGHIJ",
   "expiresIn": 900,
   "interval": 5
 }
@@ -173,6 +173,7 @@ The device authorization flow must not create a second login UI stack.
 ### Code handling
 
 - `user_code` is not a credential.
+- Unauthenticated `user_code` lookup must not expose `client_context`.
 - `device_code` is the only exchange credential.
 - The browser must never see `device_code`.
 - The backend should store code digests instead of plaintext where practical.

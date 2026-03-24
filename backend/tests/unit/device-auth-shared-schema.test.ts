@@ -30,14 +30,14 @@ describe('device auth shared schemas', () => {
   it('accepts device authorization creation responses', () => {
     const result = createDeviceAuthorizationResponseSchema.parse({
       deviceCode: 'secret-device-code',
-      userCode: 'ABCD-EFGH',
+      userCode: 'ABCDE-FGHIJ',
       verificationUri: 'https://example.com/auth/device',
-      verificationUriComplete: 'https://example.com/auth/device?user_code=ABCD-EFGH',
+      verificationUriComplete: 'https://example.com/auth/device?user_code=ABCDE-FGHIJ',
       expiresIn: 900,
       interval: 5,
     });
 
-    expect(result.userCode).toBe('ABCD-EFGH');
+    expect(result.userCode).toBe('ABCDE-FGHIJ');
   });
 
   it('rejects malformed user codes in device authorization responses', () => {

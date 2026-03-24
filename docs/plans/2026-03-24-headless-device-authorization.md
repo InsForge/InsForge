@@ -44,9 +44,9 @@ it('accepts the device authorization response shape', () => {
   expect(
     createDeviceAuthorizationResponseSchema.parse({
       deviceCode: 'secret',
-      userCode: 'ABCD-EFGH',
+      userCode: 'ABCDE-FGHIJ',
       verificationUri: 'https://example.com/auth/device',
-      verificationUriComplete: 'https://example.com/auth/device?user_code=ABCD-EFGH',
+      verificationUriComplete: 'https://example.com/auth/device?user_code=ABCDE-FGHIJ',
       expiresIn: 900,
       interval: 5,
     })
@@ -290,8 +290,8 @@ Create `auth/src/pages/DeviceAuthorizePage.test.tsx` that asserts:
 
 ```tsx
 it('prefills the user code from the query string', () => {
-  renderWithRouter('/auth/device?user_code=ABCD-EFGH');
-  expect(screen.getByDisplayValue('ABCD-EFGH')).toBeInTheDocument();
+  renderWithRouter('/auth/device?user_code=ABCDE-FGHIJ');
+  expect(screen.getByDisplayValue('ABCDE-FGHIJ')).toBeInTheDocument();
 });
 
 it('shows a confirm button after the user is authenticated', async () => {
