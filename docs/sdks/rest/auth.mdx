@@ -741,44 +741,6 @@ curl -X POST "https://your-app.insforge.app/api/auth/oauth/exchange?client_type=
 
 ---
 
-### OAuth via Auth Component (Sign-In Page)
-
-You can also use the hosted sign-in page for OAuth authentication, which follows the same PKCE flow.
-
-```
-GET /{baseURL}/auth/sign-in
-```
-
-### Query Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `redirect` | string | Yes | URL-encoded redirect URI |
-| `client_type` | string | No | Client type: `web` (default), `mobile`, `desktop`, or `server` |
-| `code_challenge` | string | Yes | PKCE code challenge |
-
-### Example
-
-```bash
-# URL-encode the redirect URI
-REDIRECT_URI=$(python3 -c "import urllib.parse; print(urllib.parse.quote('https://myapp.com/callback'))")
-
-# Open in browser or WebView
-open "https://your-app.insforge.app/auth/sign-in?redirect=$REDIRECT_URI&client_type=mobile&code_challenge=$CODE_CHALLENGE"
-```
-
-### Callback
-
-After successful authentication, the user will be redirected to your redirect URI with an authorization code:
-
-```
-https://myapp.com/callback?insforge_code=abc123...
-```
-
-Then exchange the code for tokens using `/api/auth/oauth/exchange` as described above.
-
----
-
 ### Complete OAuth Flow Example (Non-Web)
 
 ```swift
