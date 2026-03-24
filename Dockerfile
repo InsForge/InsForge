@@ -34,7 +34,6 @@ COPY package-lock.json ./package-lock.json
 
 COPY backend/package.json     ./backend/package.json
 COPY frontend/package.json    ./frontend/package.json
-COPY auth/package.json        ./auth/package.json
 COPY shared-schemas/package.json ./shared-schemas/package.json
 COPY ui/package.json          ./ui/package.json
 
@@ -60,7 +59,7 @@ COPY . .
 ARG VITE_API_BASE_URL
 ARG VITE_PUBLIC_POSTHOG_KEY
 
-# Build order: ui → backend → frontend → auth
+# Build order: ui → backend → frontend
 RUN npm run build
 
 
@@ -76,7 +75,6 @@ COPY package-lock.json ./package-lock.json
 
 COPY backend/package.json     ./backend/package.json
 COPY frontend/package.json    ./frontend/package.json
-COPY auth/package.json        ./auth/package.json
 COPY shared-schemas/package.json ./shared-schemas/package.json
 COPY ui/package.json          ./ui/package.json
 
@@ -104,7 +102,7 @@ WORKDIR /app
 # Production node_modules (hoisted by npm workspaces)
 COPY --from=prod-deps /app/node_modules ./node_modules
 
-# Compiled output: server.js + frontend/ + auth/ static files
+# Compiled output: server.js + frontend/ static files
 COPY --from=build /app/dist ./dist
 
 # Migration runtime: tsx resolves @/* aliases via tsconfig.json,
