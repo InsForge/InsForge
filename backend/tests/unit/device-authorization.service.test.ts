@@ -314,10 +314,7 @@ describe('DeviceAuthorizationService', () => {
     let insertAttempts = 0;
 
     mockPool.query.mockImplementation(async (sql: string, params: unknown[]) => {
-      if (
-        sql.startsWith('INSERT INTO auth.device_authorizations') &&
-        insertAttempts++ === 0
-      ) {
+      if (sql.startsWith('INSERT INTO auth.device_authorizations') && insertAttempts++ === 0) {
         const error = new Error('duplicate key value violates unique constraint') as Error & {
           code?: string;
         };
