@@ -32,7 +32,7 @@ export const createUserRequestSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
   name: nameSchema.optional(),
-  verifyEmailUrl: z.string().url().optional(),
+  redirectTo: z.string().url().optional(),
 });
 
 /**
@@ -88,39 +88,24 @@ export const updateProfileRequestSchema = z.object({
  */
 export const sendVerificationEmailRequestSchema = z.object({
   email: emailSchema,
-  verifyEmailUrl: z.string().url().optional(),
+  redirectTo: z.string().url().optional(),
 });
 
 /**
- * POST /api/auth/email/verify - Verify email with OTP
- * Uses verifyEmailMethod from auth config to determine verification type:
- * - 'code': expects email + 6-digit numeric code
- * - 'link': expects 64-char hex token only
+ * POST /api/auth/email/verify - Verify email with a 6-digit code
+ * Link verification uses GET /api/auth/email/verify-link instead.
  */
-export const verifyEmailRequestSchema = z
-  .union([
-    z.object({
-      email: emailSchema,
-      otp: z.string().regex(/^\d{6}$/, 'OTP code must be a 6-digit numeric code'),
-    }),
-    z.object({
-      email: emailSchema.optional(),
-      otp: z
-        .string()
-        .regex(/^[a-fA-F0-9]{64}$/, 'OTP token must be a 64-character hexadecimal token'),
-    }),
-  ])
-  .transform((data) => ({
-    email: data.email,
-    otp: data.otp,
-  }));
+export const verifyEmailRequestSchema = z.object({
+  email: emailSchema,
+  otp: z.string().regex(/^\d{6}$/, 'OTP code must be a 6-digit numeric code'),
+});
 
 /**
  * POST /api/auth/email/send-reset-password - Send reset password email (code or link based on config)
  */
 export const sendResetPasswordEmailRequestSchema = z.object({
   email: emailSchema,
-  resetPasswordUrl: z.string().url().optional(),
+  redirectTo: z.string().url().optional(),
 });
 
 /**
@@ -366,7 +351,7 @@ export const getPublicAuthConfigResponseSchema = z.object({
     id: true,
     updatedAt: true,
     createdAt: true,
-    redirectUrlWhitelist: true,
+    allowedRedirectUrls: true,
   }).shape,
 });
 

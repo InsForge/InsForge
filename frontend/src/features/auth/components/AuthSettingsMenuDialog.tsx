@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Lock, Mail, Settings, Plus, Trash2, AlertTriangle } from 'lucide-react';
+import { Lock, Mail, Settings, Plus, X } from 'lucide-react';
 import {
   Button,
   Checkbox,
@@ -29,7 +29,6 @@ import {
 } from '@insforge/ui';
 import {
   updateAuthConfigRequestSchema,
-  redirectUrlWhitelistRegex,
   type AuthConfigSchema,
   type UpdateAuthConfigRequest,
 } from '@insforge/shared-schemas';
@@ -53,7 +52,7 @@ const defaultValues: UpdateAuthConfigRequest = {
   requireSpecialChar: false,
   verifyEmailMethod: 'code',
   resetPasswordMethod: 'code',
-  redirectUrlWhitelist: [],
+  allowedRedirectUrls: [],
 };
 
 const toFormValues = (config?: AuthConfigSchema): UpdateAuthConfigRequest => {
@@ -70,7 +69,7 @@ const toFormValues = (config?: AuthConfigSchema): UpdateAuthConfigRequest => {
     requireSpecialChar: config.requireSpecialChar,
     verifyEmailMethod: config.verifyEmailMethod,
     resetPasswordMethod: config.resetPasswordMethod,
-    redirectUrlWhitelist: config.redirectUrlWhitelist ?? [],
+    allowedRedirectUrls: config.allowedRedirectUrls ?? [],
   };
 };
 
@@ -111,10 +110,55 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
   });
 
   const requireEmailVerification = form.watch('requireEmailVerification');
+  const allowedRedirectUrls = form.watch('allowedRedirectUrls') || [];
+  const visibleAllowedRedirectUrls = allowedRedirectUrls.length > 0 ? allowedRedirectUrls : [''];
 
   const resetForm = useCallback(() => {
     form.reset(toFormValues(config));
   }, [config, form]);
+
+  const updateAllowedRedirectUrls = useCallback(
+    (nextAllowedRedirectUrls: string[]) => {
+      form.setValue('allowedRedirectUrls', nextAllowedRedirectUrls, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    },
+    [form]
+  );
+
+  const handleAllowedRedirectUrlChange = useCallback(
+    (index: number, value: string) => {
+      const nextAllowedRedirectUrls =
+        allowedRedirectUrls.length > 0 ? [...allowedRedirectUrls] : [''];
+      nextAllowedRedirectUrls[index] = value;
+      updateAllowedRedirectUrls(nextAllowedRedirectUrls);
+    },
+    [allowedRedirectUrls, updateAllowedRedirectUrls]
+  );
+
+  const handleRemoveAllowedRedirectUrl = useCallback(
+    (index: number) => {
+      const nextAllowedRedirectUrls = [...allowedRedirectUrls];
+      nextAllowedRedirectUrls.splice(index, 1);
+      updateAllowedRedirectUrls(nextAllowedRedirectUrls);
+    },
+    [allowedRedirectUrls, updateAllowedRedirectUrls]
+  );
+
+  const handleAddAllowedRedirectUrl = useCallback(async () => {
+    if (allowedRedirectUrls.length === 0) {
+      updateAllowedRedirectUrls(['']);
+      return;
+    }
+
+    const isValid = await form.trigger('allowedRedirectUrls');
+    if (!isValid) {
+      return;
+    }
+
+    updateAllowedRedirectUrls([...allowedRedirectUrls, '']);
+  }, [allowedRedirectUrls, form, updateAllowedRedirectUrls]);
 
   useEffect(() => {
     if (open) {
@@ -132,9 +176,14 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
   };
 
   const handleSubmit = () => {
-    void form.handleSubmit((data) => {
-      updateConfig(data);
-    })();
+    void form.handleSubmit(
+      (data) => {
+        updateConfig(data);
+      },
+      () => {
+        showToast('Please fix the highlighted errors before saving changes.', 'error');
+      }
+    )();
   };
 
   const sectionTitle = useMemo(() => {
@@ -147,7 +196,7 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
     return 'General';
   }, [activeSection]);
 
-  const saveDisabled = !form.formState.isDirty || isUpdating;
+  const saveDisabled = !form.formState.isDirty || !form.formState.isValid || isUpdating;
 
   return (
     <MenuDialog open={open} onOpenChange={handleOpenChange}>
@@ -209,63 +258,34 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                 {activeSection === 'general' && (
                   <>
                     <SettingRow
-                      label="Redirect URL Whitelist"
-                      description={
-                        <div>
-                          <p>
-                            Allowed URLs for authentication redirects. If empty, all URLs are
-                            allowed.
-                          </p>
-                          {((form.watch('redirectUrlWhitelist') || []) as string[]).length ===
-                            0 && (
-                            <div className="mt-1.5 flex items-center gap-1.5 text-destructive">
-                              <AlertTriangle className="h-3.5 w-3.5" />
-                              <span className="text-[12px] font-medium leading-[16px]">
-                                Insecure and discouraged for production.
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      }
+                      label="Allowed Redirect URLs"
+                      description="Allowed URLs for authentication redirects. If empty, all URLs are allowed."
                     >
                       <div className="flex flex-col gap-2">
-                        {(form.watch('redirectUrlWhitelist') || []).map((url, index) => {
-                          const urlErrors = form.formState.errors.redirectUrlWhitelist;
+                        {visibleAllowedRedirectUrls.map((url, index) => {
+                          const urlErrors = form.formState.errors.allowedRedirectUrls;
                           const itemError = Array.isArray(urlErrors) ? urlErrors[index] : undefined;
 
                           return (
                             <div key={index} className="flex flex-col gap-1">
-                              <div className="flex gap-2">
+                              <div className="flex w-full items-center gap-1.5">
                                 <Input
                                   value={url}
-                                  onChange={(e) => {
-                                    const newList = [
-                                      ...(form.getValues('redirectUrlWhitelist') || []),
-                                    ];
-                                    newList[index] = e.target.value;
-                                    form.setValue('redirectUrlWhitelist', newList, {
-                                      shouldDirty: true,
-                                    });
-                                  }}
+                                  onChange={(e) =>
+                                    handleAllowedRedirectUrlChange(index, e.target.value)
+                                  }
                                   placeholder="https://example.com"
                                   className={itemError ? 'border-destructive' : ''}
                                 />
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="icon"
-                                  onClick={() => {
-                                    const newList = [
-                                      ...(form.getValues('redirectUrlWhitelist') || []),
-                                    ];
-                                    newList.splice(index, 1);
-                                    form.setValue('redirectUrlWhitelist', newList, {
-                                      shouldDirty: true,
-                                    });
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                {visibleAllowedRedirectUrls.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveAllowedRedirectUrl(index)}
+                                    className="flex size-8 shrink-0 items-center justify-center rounded border border-[var(--alpha-8)] bg-card text-muted-foreground hover:text-foreground"
+                                  >
+                                    <X className="size-4" />
+                                  </button>
+                                )}
                               </div>
                               {itemError && (
                                 <p className="pt-1 text-xs text-destructive">
@@ -275,29 +295,14 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                             </div>
                           );
                         })}
-                        <Button
+                        <button
                           type="button"
-                          variant="outline"
-                          size="sm"
-                          className="self-start"
-                          onClick={() => {
-                            const newList = [...(form.getValues('redirectUrlWhitelist') || [])];
-                            const hasInvalid = newList.some(
-                              (val) => !redirectUrlWhitelistRegex.test(val)
-                            );
-                            if (hasInvalid) {
-                              showToast(
-                                'Please fix or fill existing invalid URLs before adding a new one.',
-                                'error'
-                              );
-                              return;
-                            }
-                            newList.push('');
-                            form.setValue('redirectUrlWhitelist', newList, { shouldDirty: true });
-                          }}
+                          className="flex h-8 items-center gap-0.5 self-end rounded border border-[var(--alpha-8)] bg-card px-1.5 text-sm font-medium text-foreground"
+                          onClick={() => void handleAddAllowedRedirectUrl()}
                         >
-                          <Plus className="mr-2 h-4 w-4" /> Add URL
-                        </Button>
+                          <Plus className="size-5" />
+                          <span className="px-1">Add URL</span>
+                        </button>
                       </div>
                     </SettingRow>
                   </>
@@ -387,7 +392,7 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                     </SettingRow>
 
                     <SettingRow label="Password Strength Requirements">
-                      <div className="flex flex-col gap-3 pt-1">
+                      <div className="flex flex-col gap-3 pt-1 pb-8">
                         <Controller
                           name="requireNumber"
                           control={form.control}

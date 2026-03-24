@@ -39,6 +39,7 @@ export interface VerifyOTPResult {
   success: boolean;
   email: string;
   purpose: OTPPurpose;
+  redirectTo?: string | null;
 }
 
 /**
@@ -101,7 +102,10 @@ export class AuthOTPService {
   async createEmailOTP(
     email: string,
     purpose: OTPPurpose,
-    otpType: OTPType = OTPType.NUMERIC_CODE
+    otpType: OTPType = OTPType.NUMERIC_CODE,
+    options?: {
+      redirectTo?: string | null;
+    }
   ): Promise<CreateOTPResult> {
     try {
       // Generate token based on type
@@ -126,15 +130,16 @@ export class AuthOTPService {
       // Upsert token record - insert or update if email+purpose combination already exists
       // This ensures only one active token per email/purpose (replaces any existing token)
       await this.getPool().query(
-        `INSERT INTO auth.email_otps (email, purpose, otp_hash, expires_at, consumed_at)
-         VALUES ($1, $2, $3, $4, NULL)
+        `INSERT INTO auth.email_otps (email, purpose, otp_hash, expires_at, consumed_at, redirect_to)
+         VALUES ($1, $2, $3, $4, NULL, $5)
          ON CONFLICT (email, purpose)
          DO UPDATE SET
            otp_hash = EXCLUDED.otp_hash,
            expires_at = EXCLUDED.expires_at,
+           redirect_to = EXCLUDED.redirect_to,
            consumed_at = NULL,
            updated_at = NOW()`,
-        [email, purpose, otpHash, expiresAt]
+        [email, purpose, otpHash, expiresAt, options?.redirectTo ?? null]
       );
 
       logger.info('Email verification token created successfully', {
@@ -183,7 +188,7 @@ export class AuthOTPService {
 
       // Lookup by email and lock the row
       const result = await client.query(
-        `SELECT id, email, purpose, otp_hash, expires_at, consumed_at
+        `SELECT id, email, purpose, otp_hash, expires_at, consumed_at, redirect_to
          FROM auth.email_otps
          WHERE email = $1 AND purpose = $2
          FOR UPDATE`,
@@ -231,6 +236,7 @@ export class AuthOTPService {
         success: true,
         email: otpRecord.email,
         purpose: otpRecord.purpose,
+        redirectTo: otpRecord.redirect_to,
       };
     } catch (error) {
       if (shouldManageTransaction) {
@@ -278,7 +284,7 @@ export class AuthOTPService {
 
       // Direct lookup by hash - O(1) with index on otp_hash
       const result = await client.query(
-        `SELECT id, email, purpose, otp_hash, expires_at, consumed_at
+        `SELECT id, email, purpose, otp_hash, expires_at, consumed_at, redirect_to
          FROM auth.email_otps
          WHERE purpose = $1
            AND otp_hash = $2
@@ -317,6 +323,7 @@ export class AuthOTPService {
         success: true,
         email: otpRecord.email,
         purpose: otpRecord.purpose,
+        redirectTo: otpRecord.redirect_to,
       };
     } catch (error) {
       if (shouldManageTransaction) {
@@ -385,12 +392,13 @@ export class AuthOTPService {
       // Step 3: Insert the new token (replaces the consumed numeric code)
       // Uses upsert to overwrite the consumed code record with the new token
       await client.query(
-        `INSERT INTO auth.email_otps (email, purpose, otp_hash, expires_at, consumed_at)
-         VALUES ($1, $2, $3, $4, NULL)
+        `INSERT INTO auth.email_otps (email, purpose, otp_hash, expires_at, consumed_at, redirect_to)
+         VALUES ($1, $2, $3, $4, NULL, NULL)
          ON CONFLICT (email, purpose)
          DO UPDATE SET
            otp_hash = EXCLUDED.otp_hash,
            expires_at = EXCLUDED.expires_at,
+           redirect_to = EXCLUDED.redirect_to,
            consumed_at = NULL,
            updated_at = NOW()`,
         [email, purpose, tokenHash, expiresAt]
@@ -419,6 +427,45 @@ export class AuthOTPService {
       if (shouldManageTransaction) {
         client.release();
       }
+    }
+  }
+
+  /**
+   * Resolve a link token to its associated metadata without consuming it.
+   * This lets backend-owned action routes determine the validated redirect
+   * destination before the browser is sent back to the app.
+   */
+  async getEmailOTPContextByToken(purpose: OTPPurpose, token: string): Promise<VerifyOTPResult> {
+    try {
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      const result = await this.getPool().query(
+        `SELECT email, purpose, redirect_to
+         FROM auth.email_otps
+         WHERE purpose = $1
+           AND otp_hash = $2
+           AND expires_at > NOW()
+           AND consumed_at IS NULL
+         LIMIT 1`,
+        [purpose, tokenHash]
+      );
+
+      if (result.rows.length === 0) {
+        throw new AppError('Invalid or expired verification token', 400, ERROR_CODES.INVALID_INPUT);
+      }
+
+      return {
+        success: true,
+        email: result.rows[0].email,
+        purpose: result.rows[0].purpose,
+        redirectTo: result.rows[0].redirect_to,
+      };
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      logger.error('Failed to resolve hash token context', { error, purpose });
+      throw new AppError('Failed to resolve verification token', 500, ERROR_CODES.INTERNAL_ERROR);
     }
   }
 }

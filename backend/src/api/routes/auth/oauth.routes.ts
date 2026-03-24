@@ -271,7 +271,11 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
     }
 
     if (!(await authConfigService.validateRedirectUrl(redirectUri))) {
-      throw new AppError('Redirect URI is not whitelisted', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError(
+        'Redirect URI is not in allowed redirect URLs',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
     }
 
     const jwtPayload = {
@@ -354,8 +358,14 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
     }
 
     if (redirectUri && !(await authConfigService.validateRedirectUrl(redirectUri))) {
-      logger.warn('Redirect URI is not whitelisted in shared callback', { redirectUri });
-      throw new AppError('Redirect URI is not whitelisted', 400, ERROR_CODES.INVALID_INPUT);
+      logger.warn('Redirect URI is not in allowed redirect URLs in shared callback', {
+        redirectUri,
+      });
+      throw new AppError(
+        'Redirect URI is not in allowed redirect URLs',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
     }
 
     if (!codeChallenge) {
@@ -455,8 +465,12 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
     }
 
     if (!(await authConfigService.validateRedirectUrl(redirectUri))) {
-      logger.warn('Redirect URI is not whitelisted in callback', { redirectUri });
-      throw new AppError('Redirect URI is not whitelisted', 400, ERROR_CODES.INVALID_INPUT);
+      logger.warn('Redirect URI is not in allowed redirect URLs in callback', { redirectUri });
+      throw new AppError(
+        'Redirect URI is not in allowed redirect URLs',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
     }
 
     if (!codeChallenge) {
