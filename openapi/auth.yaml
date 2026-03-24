@@ -149,14 +149,6 @@ paths:
                     type: boolean
                   requireSpecialChar:
                     type: boolean
-                  verifyEmailRedirectTo:
-                    type: string
-                    nullable: true
-                    description: URL to redirect users after successful email verification (if not set, shows default success page)
-                  resetPasswordRedirectTo:
-                    type: string
-                    nullable: true
-                    description: URL to redirect users after successful password reset (if not set, shows default success page)
                   verifyEmailMethod:
                     type: string
                     enum: [code, link]
@@ -165,7 +157,7 @@ paths:
                     type: string
                     enum: [code, link]
                     description: Method for password reset (code = 6-digit OTP + exchange flow, link = magic link)
-                  redirectUrlWhitelist:
+                  allowedRedirectUrls:
                     type: array
                     items:
                       type: string
@@ -209,14 +201,6 @@ paths:
                   type: boolean
                 requireSpecialChar:
                   type: boolean
-                verifyEmailRedirectTo:
-                  type: string
-                  nullable: true
-                  description: URL to redirect users after successful email verification (if not set, shows default success page)
-                resetPasswordRedirectTo:
-                  type: string
-                  nullable: true
-                  description: URL to redirect users after successful password reset (if not set, shows default success page)
                 verifyEmailMethod:
                   type: string
                   enum: [code, link]
@@ -225,7 +209,7 @@ paths:
                   type: string
                   enum: [code, link]
                   description: Method for password reset (code = 6-digit OTP + exchange flow, link = magic link)
-                redirectUrlWhitelist:
+                allowedRedirectUrls:
                   type: array
                   items:
                     type: string
@@ -255,21 +239,13 @@ paths:
                     type: boolean
                   requireSpecialChar:
                     type: boolean
-                  verifyEmailRedirectTo:
-                    type: string
-                    nullable: true
-                    description: URL to redirect users after successful email verification (if not set, shows default success page)
-                  resetPasswordRedirectTo:
-                    type: string
-                    nullable: true
-                    description: URL to redirect users after successful password reset (if not set, shows default success page)
                   verifyEmailMethod:
                     type: string
                     enum: [code, link]
                   resetPasswordMethod:
                     type: string
                     enum: [code, link]
-                  redirectUrlWhitelist:
+                  allowedRedirectUrls:
                     type: array
                     items:
                       type: string
@@ -325,6 +301,10 @@ paths:
                 name:
                   type: string
                   example: John Doe
+                redirectTo:
+                  type: string
+                  format: uri
+                  description: Used for link-based email verification. The email link always opens an InsForge backend endpoint first; after the token is verified, InsForge redirects the browser to this URL.
       responses:
         '200':
           description: User created successfully
@@ -350,10 +330,6 @@ paths:
                   requireEmailVerification:
                     type: boolean
                     description: Whether email verification is required before login
-                  redirectTo:
-                    type: string
-                    format: uri
-                    description: Optional URL to redirect user after registration (only present if email verification not required)
         '400':
           description: Invalid request
         '409':
@@ -531,10 +507,6 @@ paths:
                     type: string
                     nullable: true
                     description: Refresh token for mobile/desktop/server clients (null for web clients)
-                  redirectTo:
-                    type: string
-                    format: uri
-                    description: Optional URL to redirect user after login (if configured)
         '401':
           description: Invalid credentials
         '403':
@@ -758,7 +730,7 @@ paths:
   /api/auth/email/send-verification:
     post:
       summary: Send email verification (code or link based on config)
-      description: Send email verification using the method configured in auth settings (verifyEmailMethod). When method is 'code', sends a 6-digit numeric code. When method is 'link', sends a magic link. Prevents user enumeration by returning success even if email doesn't exist.
+      description: Send email verification using the method configured in auth settings (verifyEmailMethod). When method is 'code', sends a 6-digit numeric code. When method is 'link', sends a browser verification link that goes through an InsForge backend endpoint first. Prevents user enumeration by returning success even if email doesn't exist.
       tags:
         - Client
       requestBody:
@@ -774,6 +746,10 @@ paths:
                   type: string
                   format: email
                   example: user@example.com
+                redirectTo:
+                  type: string
+                  format: uri
+                  description: Used for link-based email verification. The email link always opens an InsForge backend endpoint first; after the token is verified, InsForge redirects the browser to this URL.
       responses:
         '202':
           description: Verification email sent (if email exists). Message varies based on configured method.
@@ -790,19 +766,40 @@ paths:
         '400':
           description: Invalid request
 
+  /api/auth/email/verify-link:
+    get:
+      summary: Verify email from browser link click
+      description: |
+        Browser-oriented link verification flow.
+
+        This endpoint is intended for users clicking verification links in email.
+        It validates the token on the backend and redirects the browser to the
+        stored, validated `redirectTo` URL with the verification result.
+      tags:
+        - Client
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+          description: 64-character email verification token from the email link
+      responses:
+        '302':
+          description: Browser redirected to the stored redirect URL
+        '400':
+          description: Invalid verification token or redirect target
+
   /api/auth/email/verify:
     post:
-      summary: Verify email with code or link
+      summary: Verify email with code
       description: |
-        Verify email address using the method configured in auth settings (verifyEmailMethod):
-        - Code verification: Provide both `email` and `otp` (6-digit numeric code)
-        - Link verification: Provide only `otp` (64-character hex token from magic link)
+        Verify email address with a 6-digit code.
 
         Successfully verified users will receive a session token.
 
-        The email verification link sent to users always points to the backend API endpoint.
-        If `verifyEmailRedirectTo` is configured, the backend will redirect to that URL after successful verification.
-        Otherwise, a default success page is displayed.
+        Browser email clicks should use `GET /api/auth/email/verify-link`.
+        `POST /api/auth/email/verify` is the JSON API for 6-digit code submission.
       tags:
         - Client
       parameters:
@@ -823,16 +820,17 @@ paths:
             schema:
               type: object
               required:
+                - email
                 - otp
               properties:
                 email:
                   type: string
                   format: email
-                  description: Required for numeric code verification, omit for magic link verification
+                  description: User email address
                   example: user@example.com
                 otp:
                   type: string
-                  description: Either a 6-digit numeric code or a 64-character hex token from magic link
+                  description: 6-digit verification code
                   example: "123456"
       responses:
         '200':
@@ -855,10 +853,6 @@ paths:
                     type: string
                     nullable: true
                     description: Refresh token for mobile/desktop/server clients (null for web clients)
-                  redirectTo:
-                    type: string
-                    format: uri
-                    description: Optional URL to redirect user after verification (only present if configured)
         '400':
           description: Invalid verification code or token
         '401':
@@ -867,7 +861,7 @@ paths:
   /api/auth/email/send-reset-password:
     post:
       summary: Send password reset (code or link based on config)
-      description: Send password reset email using the method configured in auth settings (resetPasswordMethod). When method is 'code', sends a 6-digit numeric code for two-step flow. When method is 'link', sends a magic link. Prevents user enumeration by returning success even if email doesn't exist.
+      description: Send password reset email using the method configured in auth settings (resetPasswordMethod). When method is 'code', sends a 6-digit numeric code for two-step flow. When method is 'link', sends a browser reset link that goes through an InsForge backend endpoint first. Prevents user enumeration by returning success even if email doesn't exist.
       tags:
         - Client
       requestBody:
@@ -883,6 +877,10 @@ paths:
                   type: string
                   format: email
                   example: user@example.com
+                redirectTo:
+                  type: string
+                  format: uri
+                  description: Used for link-based password reset. The email link always opens an InsForge backend endpoint first; InsForge then redirects the browser to this URL with the reset token in the query string.
       responses:
         '202':
           description: Password reset email sent (if email exists). Message varies based on configured method.
@@ -907,7 +905,7 @@ paths:
         1. Verify the 6-digit code sent to user's email
         2. Return a reset token that can be used to actually reset the password
 
-        This endpoint is not used when resetPasswordMethod is 'link' (magic link flow is direct).
+        This endpoint is not used when resetPasswordMethod is 'link', because the browser reset-link flow uses the emailed link token directly.
       tags:
         - Client
       requestBody:
@@ -948,6 +946,30 @@ paths:
         '401':
           description: Invalid or expired code
 
+  /api/auth/email/reset-password-link:
+    get:
+      summary: Open password reset flow from browser link click
+      description: |
+        Browser-oriented password reset link flow.
+
+        This endpoint is intended for users clicking password reset links in email.
+        It validates the token on the backend and redirects the browser to the
+        stored, validated `redirectTo` URL with the reset token in the query string.
+      tags:
+        - Client
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+          description: 64-character password reset token from the email link
+      responses:
+        '302':
+          description: Browser redirected to the stored redirect URL
+        '400':
+          description: Invalid reset token or redirect target
+
   /api/auth/email/reset-password:
     post:
       summary: Reset password with token
@@ -960,7 +982,7 @@ paths:
 
         Flow summary:
         - Code method: send-reset-password → exchange-reset-password-token → reset-password (with resetToken)
-        - Link method: send-reset-password → reset-password (with link token directly)
+        - Link method: send-reset-password → GET /api/auth/email/reset-password-link → reset-password
       tags:
         - Client
       requestBody:

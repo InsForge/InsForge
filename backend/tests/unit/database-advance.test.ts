@@ -125,7 +125,7 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
     test('blocks DELETE on other auth schema tables', () => {
       const queries = [
         'DELETE FROM auth.user_providers WHERE id = $1',
-        'DELETE FROM auth.configs WHERE id = $1',
+        'DELETE FROM auth.config WHERE id = $1',
         'DELETE FROM auth.oauth_configs WHERE id = $1',
       ];
 
@@ -135,7 +135,7 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
     });
 
     test('blocks TRUNCATE on other auth schema tables', () => {
-      const queries = ['TRUNCATE TABLE auth.user_providers', 'TRUNCATE auth.configs'];
+      const queries = ['TRUNCATE TABLE auth.user_providers', 'TRUNCATE auth.config'];
 
       queries.forEach((query) => {
         expect(() => service.sanitizeQuery(query)).toThrow(AppError);
@@ -145,7 +145,7 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
     test('blocks DROP operations on other auth schema tables', () => {
       const queries = [
         'DROP TABLE auth.user_providers',
-        'DROP INDEX auth.configs_key_idx',
+        'DROP INDEX auth.config_key_idx',
         'DROP FUNCTION auth.some_function()',
         'DROP VIEW auth.user_view',
         'DROP SEQUENCE auth.user_id_seq',
@@ -163,7 +163,7 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
       const queries = [
         'SELECT * FROM auth.email_otps',
         'SELECT * FROM auth.user_providers',
-        'SELECT * FROM auth.configs',
+        'SELECT * FROM auth.config',
       ];
 
       queries.forEach((query) => {

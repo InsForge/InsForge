@@ -44,6 +44,7 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { EmailService } from '@/services/email/email.service.js';
 import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
 import { AppleOAuthProvider } from '@/providers/oauth/apple.provider.js';
+import { getApiBaseUrl } from '@/utils/environment.js';
 
 /**
  * Simplified JWT-based auth service
@@ -106,11 +107,14 @@ export class AuthService {
   }
 
   /**
-   * Build an app-owned auth link without breaking existing query params or fragments.
+   * Build a backend-owned email link for browser-based auth flows.
    */
-  private buildAppLink(baseUrl: string, paramName: string, paramValue: string): string {
-    const url = new URL(baseUrl);
-    url.searchParams.set(paramName, paramValue);
+  private buildEmailLink(
+    pathname: '/api/auth/email/verify-link' | '/api/auth/email/reset-password-link',
+    token: string
+  ): string {
+    const url = new URL(pathname, getApiBaseUrl());
+    url.searchParams.set('token', token);
     return url.toString();
   }
 
@@ -122,7 +126,7 @@ export class AuthService {
     email: string,
     password: string,
     name?: string,
-    verifyEmailUrl?: string,
+    redirectTo?: string,
     options?: {
       isAdminCreation?: boolean;
     }
@@ -145,16 +149,20 @@ export class AuthService {
     }
 
     if (requiresVerifyEmailLink) {
-      if (!verifyEmailUrl) {
+      if (!redirectTo) {
         throw new AppError(
-          'verifyEmailUrl is required when link-based email verification is enabled',
+          'redirectTo is required when link-based email verification is enabled',
           400,
           ERROR_CODES.INVALID_INPUT
         );
       }
 
-      if (!(await authConfigService.validateRedirectUrl(verifyEmailUrl))) {
-        throw new AppError('verifyEmailUrl is not whitelisted', 400, ERROR_CODES.INVALID_INPUT);
+      if (!(await authConfigService.validateRedirectUrl(redirectTo))) {
+        throw new AppError(
+          'redirectTo is not in allowed redirect URLs',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
       }
     }
 
@@ -194,9 +202,9 @@ export class AuthService {
     if (emailAuthConfig.requireEmailVerification) {
       try {
         if (emailAuthConfig.verifyEmailMethod === 'link') {
-          if (isAdminCreation && !verifyEmailUrl) {
+          if (isAdminCreation && !redirectTo) {
             logger.info(
-              'Skipping verification email during admin user creation without verifyEmailUrl',
+              'Skipping verification email during admin user creation without redirectTo',
               {
                 email,
               }
@@ -207,14 +215,14 @@ export class AuthService {
             };
           }
 
-          if (!verifyEmailUrl) {
+          if (!redirectTo) {
             throw new AppError(
-              'verifyEmailUrl is required when link-based email verification is enabled',
+              'redirectTo is required when link-based email verification is enabled',
               400,
               ERROR_CODES.INVALID_INPUT
             );
           }
-          await this.sendVerificationEmailWithLink(email, verifyEmailUrl);
+          await this.sendVerificationEmailWithLink(email, redirectTo);
         } else {
           await this.sendVerificationEmailWithCode(email);
         }
@@ -318,9 +326,10 @@ export class AuthService {
   /**
    * Send verification email with clickable link
    * Creates a long cryptographic token and sends it via email as a clickable link
-   * The link contains the token and points directly to the app-owned verify page
+   * The link points to a backend-owned action endpoint, which verifies the
+   * token first and only then redirects the browser to the app.
    */
-  async sendVerificationEmailWithLink(email: string, verifyEmailUrl: string): Promise<void> {
+  async sendVerificationEmailWithLink(email: string, redirectTo: string): Promise<void> {
     // Check if user exists
     const pool = this.getPool();
     const result = await pool.query('SELECT * FROM auth.users WHERE email = $1', [email]);
@@ -336,10 +345,11 @@ export class AuthService {
     const { otp: token } = await otpService.createEmailOTP(
       email,
       OTPPurpose.VERIFY_EMAIL,
-      OTPType.HASH_TOKEN
+      OTPType.HASH_TOKEN,
+      { redirectTo }
     );
 
-    const linkUrl = this.buildAppLink(verifyEmailUrl, 'token', token);
+    const linkUrl = this.buildEmailLink('/api/auth/email/verify-link', token);
 
     // Send email with verification link
     const emailService = EmailService.getInstance();
@@ -507,7 +517,7 @@ export class AuthService {
    * Creates a long cryptographic token and sends it via email as a clickable link
    * The link contains only the token (no email) for better privacy and security
    */
-  async sendResetPasswordEmailWithLink(email: string, resetPasswordUrl: string): Promise<void> {
+  async sendResetPasswordEmailWithLink(email: string, redirectTo: string): Promise<void> {
     // Check if user exists
     const pool = this.getPool();
     const result = await pool.query('SELECT * FROM auth.users WHERE email = $1', [email]);
@@ -523,10 +533,11 @@ export class AuthService {
     const { otp: token } = await otpService.createEmailOTP(
       email,
       OTPPurpose.RESET_PASSWORD,
-      OTPType.HASH_TOKEN
+      OTPType.HASH_TOKEN,
+      { redirectTo }
     );
 
-    const linkUrl = this.buildAppLink(resetPasswordUrl, 'token', token);
+    const linkUrl = this.buildEmailLink('/api/auth/email/reset-password-link', token);
 
     // Send email with password reset link
     const emailService = EmailService.getInstance();

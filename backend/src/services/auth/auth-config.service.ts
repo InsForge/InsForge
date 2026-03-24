@@ -44,7 +44,7 @@ export class AuthConfigService {
           require_special_char as "requireSpecialChar",
           verify_email_method as "verifyEmailMethod",
           reset_password_method as "resetPasswordMethod"
-         FROM auth.configs
+         FROM auth.config
          LIMIT 1`
       );
 
@@ -91,10 +91,10 @@ export class AuthConfigService {
           require_special_char as "requireSpecialChar",
           verify_email_method as "verifyEmailMethod",
           reset_password_method as "resetPasswordMethod",
-          redirect_url_whitelist as "redirectUrlWhitelist",
+          allowed_redirect_urls as "allowedRedirectUrls",
           created_at as "createdAt",
           updated_at as "updatedAt"
-         FROM auth.configs
+         FROM auth.config
          LIMIT 1`
       );
 
@@ -112,7 +112,7 @@ export class AuthConfigService {
           requireSpecialChar: false,
           verifyEmailMethod: 'code' as const,
           resetPasswordMethod: 'code' as const,
-          redirectUrlWhitelist: [],
+          allowedRedirectUrls: [],
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -138,15 +138,18 @@ export class AuthConfigService {
     try {
       await client.query('BEGIN');
 
-      // Ensure config exists and lock row to prevent concurrent modifications
-      const existingResult = await client.query('SELECT id FROM auth.configs LIMIT 1 FOR UPDATE');
+      // Ensure the singleton config row exists before we try to lock and update it.
+      await client.query('INSERT INTO auth.config DEFAULT VALUES ON CONFLICT DO NOTHING');
+
+      // Lock the singleton row to prevent concurrent modifications.
+      const existingResult = await client.query('SELECT id FROM auth.config LIMIT 1 FOR UPDATE');
 
       if (!existingResult.rows.length) {
         // Config doesn't exist, rollback and throw error
         // The migration should have created the default config
         await client.query('ROLLBACK');
         throw new AppError(
-          'Authentication configuration not found. Please run migrations.',
+          'Authentication configuration not found.',
           500,
           ERROR_CODES.INTERNAL_ERROR
         );
@@ -197,9 +200,9 @@ export class AuthConfigService {
         values.push(input.resetPasswordMethod);
       }
 
-      if (input.redirectUrlWhitelist !== undefined) {
-        updates.push(`redirect_url_whitelist = $${paramCount++}::TEXT[]`);
-        values.push(input.redirectUrlWhitelist);
+      if (input.allowedRedirectUrls !== undefined) {
+        updates.push(`allowed_redirect_urls = $${paramCount++}::TEXT[]`);
+        values.push(input.allowedRedirectUrls);
       }
 
       if (!updates.length) {
@@ -212,7 +215,7 @@ export class AuthConfigService {
       updates.push('updated_at = NOW()');
 
       const result = await client.query(
-        `UPDATE auth.configs
+        `UPDATE auth.config
          SET ${updates.join(', ')}
          RETURNING
            id,
@@ -224,7 +227,7 @@ export class AuthConfigService {
            require_special_char as "requireSpecialChar",
            verify_email_method as "verifyEmailMethod",
            reset_password_method as "resetPasswordMethod",
-           redirect_url_whitelist as "redirectUrlWhitelist",
+           allowed_redirect_urls as "allowedRedirectUrls",
            created_at as "createdAt",
            updated_at as "updatedAt"`,
         values
@@ -267,13 +270,13 @@ export class AuthConfigService {
   }
 
   /**
-   * Validates a redirect URL against the server's configured whitelist
+   * Validates a redirect URL against the server's configured allowed redirect URLs
    */
   async validateRedirectUrl(urlStr: string): Promise<boolean> {
     const config = await this.getAuthConfig();
-    const whitelist = config.redirectUrlWhitelist;
+    const allowedRedirectUrls = config.allowedRedirectUrls;
 
-    if (!whitelist || whitelist.length === 0) {
+    if (!allowedRedirectUrls || allowedRedirectUrls.length === 0) {
       return true;
     }
 
@@ -289,7 +292,7 @@ export class AuthConfigService {
       return false;
     }
 
-    return whitelist.some((item) => {
+    return allowedRedirectUrls.some((item) => {
       if (!item.includes('*.')) {
         return this.normalizeUrl(item) === targetUrl;
       }

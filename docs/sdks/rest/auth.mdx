@@ -44,7 +44,7 @@ POST /api/auth/users
 | `email` | string | Yes | User email address |
 | `password` | string | Yes | Password (must meet configured requirements) |
 | `name` | string | No | User display name |
-| `verifyEmailUrl` | string | No | Used for link-based email verification. The email link opens this URL with the verification `token` in the query string so your app can verify the email itself. Required when `verifyEmailMethod` is `link`. |
+| `redirectTo` | string | No | Used for link-based email verification. The email link always opens an InsForge backend endpoint first; after the token is verified, InsForge redirects the browser to this URL with the verification result. Required when `verifyEmailMethod` is `link`. |
 
 ### Example (Web Client)
 
@@ -55,7 +55,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/users" \
     "email": "user@example.com",
     "password": "securepassword123",
     "name": "John Doe",
-    "verifyEmailUrl": "http://localhost:3000/verify-email"
+    "redirectTo": "http://localhost:3000/verify-email"
   }'
 ```
 
@@ -68,7 +68,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/users?client_type=mobile" \
     "email": "user@example.com",
     "password": "securepassword123",
     "name": "John Doe",
-    "verifyEmailUrl": "myapp://verify-email"
+    "redirectTo": "myapp://verify-email"
   }'
 ```
 
@@ -424,7 +424,7 @@ POST /api/auth/email/send-verification
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `email` | string | Yes | User email address |
-| `verifyEmailUrl` | string | No | Used for link-based email verification. The email link opens this URL with the verification `token` in the query string so your app can verify the email itself. Required when `verifyEmailMethod` is `link`. |
+| `redirectTo` | string | No | Used for link-based email verification. The email link always opens an InsForge backend endpoint first; after the token is verified, InsForge redirects the browser to this URL with the verification result. Required when `verifyEmailMethod` is `link`. |
 
 ### Example
 
@@ -433,7 +433,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/email/send-verification" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com",
-    "verifyEmailUrl": "http://localhost:3000/verify-email"
+    "redirectTo": "http://localhost:3000/verify-email"
   }'
 ```
 
@@ -462,8 +462,16 @@ POST /api/auth/email/verify
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `email` | string | For code method | User email address |
-| `otp` | string | Yes | 6-digit code or 64-char token from link |
+| `email` | string | Yes | User email address |
+| `otp` | string | Yes | 6-digit verification code |
+
+For link-based verification, email clicks use:
+
+```
+GET /api/auth/email/verify-link?token=...
+```
+
+That browser-oriented GET flow verifies the token on the backend and redirects to the stored `redirectTo` URL. `POST /api/auth/email/verify` is the JSON API for 6-digit code submission.
 
 ### Example (Web Client)
 
@@ -530,7 +538,7 @@ POST /api/auth/email/send-reset-password
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `email` | string | Yes | User email address |
-| `resetPasswordUrl` | string | No | Used for link-based password reset. The magic link opens this URL with the reset `token` in the query string so your app can render its own reset-password page. Required when `resetPasswordMethod` is `link`. |
+| `redirectTo` | string | No | Used for link-based password reset. The email link always opens an InsForge backend endpoint first; InsForge then redirects the browser to this URL with the reset `token` in the query string so your app can render its own reset-password page. Required when `resetPasswordMethod` is `link`. |
 
 ### Example
 
@@ -539,7 +547,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/email/send-reset-password" 
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com",
-    "resetPasswordUrl": "http://localhost:3000/reset-password"
+    "redirectTo": "http://localhost:3000/reset-password"
   }'
 ```
 
@@ -581,6 +589,14 @@ curl -X POST "https://your-app.insforge.app/api/auth/email/exchange-reset-passwo
 ```
 POST /api/auth/email/reset-password
 ```
+
+For link-based password reset, email clicks use:
+
+```
+GET /api/auth/email/reset-password-link?token=...
+```
+
+That browser-oriented GET flow validates the token on the backend and redirects to the stored `redirectTo` URL with the reset token in the query string. `POST /api/auth/email/reset-password` remains the JSON API that accepts the new password.
 
 ### Request Body
 
@@ -864,7 +880,7 @@ curl "https://your-app.insforge.app/api/auth/config" \
   "requireSpecialChar": false,
   "verifyEmailMethod": "code",
   "resetPasswordMethod": "link",
-  "redirectUrlWhitelist": ["https://myapp.com/dashboard", "https://*.myapp.com"],
+  "allowedRedirectUrls": ["https://myapp.com/dashboard", "https://*.myapp.com"],
   "createdAt": "2024-01-15T10:30:00Z",
   "updatedAt": "2024-01-15T10:30:00Z"
 }
@@ -890,7 +906,7 @@ PUT /api/auth/config
 | `requireSpecialChar` | boolean | No | Require special characters in password |
 | `verifyEmailMethod` | string | No | Email verification method (`code` or `link`) |
 | `resetPasswordMethod` | string | No | Password reset method (`code` or `link`) |
-| `redirectUrlWhitelist` | array | No | List of allowed redirect URLs (supports wildcards like `*.domain.com`) |
+| `allowedRedirectUrls` | array | No | List of allowed redirect URLs (supports wildcards like `*.domain.com`) |
 
 #### Example
 

@@ -18,7 +18,7 @@ Create a new user account with email and password.
 - `email` (string, required) - User's email address
 - `password` (string, required) - User's password
 - `name` (string, optional) - User's display name
-- `verifyEmailUrl` (string, optional) - Used for link-based email verification. The email link opens this URL with the verification `token` in the query string so your app can verify the email itself. Required when `verifyEmailMethod` is set to `link`.
+- `redirectTo` (string, optional) - Used for link-based email verification. The email link always opens an InsForge backend endpoint first; after the token is verified, InsForge redirects the browser to this URL with the verification result. Required when `verifyEmailMethod` is set to `link`.
 
 ### Returns
 
@@ -35,7 +35,7 @@ Create a new user account with email and password.
 ```
 
 <Note>
-  When `requireEmailVerification` is true, `accessToken` will be null until the user verifies their email. InsForge sends a verification email with either a link or a 6-digit code, based on your dashboard configuration (`verifyEmailMethod`). For code verification, implement a page that prompts the user to enter the code (see [verifyEmail()](#verifyemail)). For link verification, `verifyEmailUrl` must point at your app's verify-email page, and that page should call `verifyEmail()` with the `token` from the URL.
+  When `requireEmailVerification` is true, `accessToken` will be null until the user verifies their email. InsForge sends a verification email with either a link or a 6-digit code, based on your dashboard configuration (`verifyEmailMethod`). For code verification, implement a page that prompts the user to enter the code (see [verifyEmail()](#verifyemail)). For link verification, provide a `redirectTo` URL that should receive the browser after InsForge verifies the token.
 </Note>
 
 ### Example
@@ -45,7 +45,7 @@ const { data, error } = await insforge.auth.signUp({
   email: 'user@example.com',
   password: 'secure_password123',
   name: 'John Doe',
-  verifyEmailUrl: 'http://localhost:3000/verify-email',
+  redirectTo: 'http://localhost:3000/verify-email',
 });
 
 if (data?.requireEmailVerification) {
@@ -423,7 +423,7 @@ const { data, error } = await insforge.auth.setProfile({
 
 ## resendVerificationEmail()
 
-Resend email verification when the previous OTP has expired or was not received. Uses the method configured in auth settings (`verifyEmailMethod`). When method is `code`, sends a 6-digit numeric code. When method is `link`, sends a magic link.
+Resend email verification when the previous OTP has expired or was not received. Uses the method configured in auth settings (`verifyEmailMethod`). When method is `code`, sends a 6-digit numeric code. When method is `link`, sends a browser verification link that goes through an InsForge backend endpoint first.
 
 <Note>
   This endpoint prevents user enumeration by returning success even if the email doesn't exist.
@@ -432,7 +432,7 @@ Resend email verification when the previous OTP has expired or was not received.
 ### Parameters
 
 - `email` (string, required) - User's email address
-- `verifyEmailUrl` (string, optional) - Used for link-based email verification. The email link opens this URL with the verification `token` in the query string so your app can verify the email itself. Required when `verifyEmailMethod` is set to `link`.
+- `redirectTo` (string, optional) - Used for link-based email verification. The email link always opens an InsForge backend endpoint first; after the token is verified, InsForge redirects the browser to this URL with the verification result. Required when `verifyEmailMethod` is set to `link`.
 
 ### Returns
 
@@ -448,7 +448,7 @@ Resend email verification when the previous OTP has expired or was not received.
 ```javascript
 const { data, error } = await insforge.auth.resendVerificationEmail({
   email: 'user@example.com',
-  verifyEmailUrl: 'http://localhost:3000/verify-email',
+  redirectTo: 'http://localhost:3000/verify-email',
 });
 
 if (data?.success) {
@@ -472,16 +472,16 @@ if (data?.success) {
 
 ## verifyEmail()
 
-Verify email address using the method configured in auth settings (`verifyEmailMethod`):
-- **Code verification**: Provide both `email` and `otp` (6-digit numeric code)
-- **Link verification**: Provide only `otp` (64-character hex token from magic link)
+Verify an email address with a 6-digit code.
+
+For link-based verification, users should click the email link, which opens `GET /api/auth/email/verify-link` in the browser.
 
 Successfully verified users will receive a session token.
 
 ### Parameters
 
-- `email` (string, optional) - User's email address (required for code verification)
-- `otp` (string, required) - 6-digit code or 64-character token from magic link
+- `email` (string, required) - User's email address
+- `otp` (string, required) - 6-digit verification code
 
 ### Returns
 
@@ -498,16 +498,9 @@ Successfully verified users will receive a session token.
 ### Example
 
 ```javascript
-// Code verification (when verifyEmailMethod is 'code')
 const { data, error } = await insforge.auth.verifyEmail({
   email: 'user@example.com',
   otp: '123456',
-});
-
-// Link verification (when verifyEmailMethod is 'link')
-// Token is extracted from the magic link URL
-const { data, error } = await insforge.auth.verifyEmail({
-  otp: 'a1b2c3d4e5f6...', // 64-character token from URL
 });
 
 if (data) {
@@ -535,7 +528,7 @@ if (data) {
 
 ## sendResetPasswordEmail()
 
-Send password reset email using the method configured in auth settings (`resetPasswordMethod`). When method is `code`, sends a 6-digit numeric code for two-step flow. When method is `link`, sends a magic link directly to your reset-password page.
+Send password reset email using the method configured in auth settings (`resetPasswordMethod`). When method is `code`, sends a 6-digit numeric code for two-step flow. When method is `link`, sends a browser reset link that goes through an InsForge backend endpoint first.
 
 <Note>
   This endpoint prevents user enumeration by returning success even if the email doesn't exist.
@@ -544,7 +537,7 @@ Send password reset email using the method configured in auth settings (`resetPa
 ### Parameters
 
 - `email` (string, required) - User's email address
-- `resetPasswordUrl` (string, optional) - Used for link-based password reset. The magic link opens this URL with the reset `token` in the query string so your app can render its own reset-password page. Required when `resetPasswordMethod` is set to `link`.
+- `redirectTo` (string, optional) - Used for link-based password reset. The email link always opens an InsForge backend endpoint first; InsForge then redirects the browser to this URL with the reset `token` in the query string so your app can render its own reset-password page. Required when `resetPasswordMethod` is set to `link`.
 
 ### Returns
 
@@ -560,7 +553,7 @@ Send password reset email using the method configured in auth settings (`resetPa
 ```javascript
 const { data, error } = await insforge.auth.sendResetPasswordEmail({
   email: 'user@example.com',
-  resetPasswordUrl: 'http://localhost:3000/reset-password',
+  redirectTo: 'http://localhost:3000/reset-password',
 });
 
 if (data?.success) {
@@ -587,7 +580,7 @@ if (data?.success) {
 Exchange a 6-digit reset password code for a reset token. This is step 1 of the two-step password reset flow (only used when `resetPasswordMethod` is `code`).
 
 <Note>
-  This endpoint is not used when `resetPasswordMethod` is `link` (magic link flow is direct).
+  This endpoint is not used when `resetPasswordMethod` is `link`, because the browser reset-link flow uses the emailed link token directly.
 </Note>
 
 ### Parameters

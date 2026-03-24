@@ -234,7 +234,11 @@ router.get('/:key', async (req: Request, res: Response, next: NextFunction) => {
     }
 
     if (!(await authConfigService.validateRedirectUrl(redirectUri))) {
-      throw new AppError('Redirect URL is not whitelisted', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError(
+        'Redirect URL is not in allowed redirect URLs',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
     }
 
     const state = jwt.sign(
@@ -286,7 +290,11 @@ router.get('/:key/callback', async (req: Request, res: Response, next: NextFunct
     }
 
     if (!(await authConfigService.validateRedirectUrl(stateData.redirectUri))) {
-      throw new AppError('Redirect URL is not whitelisted', 400, ERROR_CODES.INVALID_INPUT);
+      throw new AppError(
+        'Redirect URL is not in allowed redirect URLs',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
     }
     if (!stateData.codeChallenge) {
       throw new AppError('code_challenge is required in state', 400, ERROR_CODES.INVALID_INPUT);

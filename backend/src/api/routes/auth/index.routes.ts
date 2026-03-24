@@ -1,6 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { AuthService } from '@/services/auth/auth.service.js';
 import { AuthConfigService } from '@/services/auth/auth-config.service.js';
+import { AuthOTPService, OTPPurpose } from '@/services/auth/auth-otp.service.js';
 import { AuditService } from '@/services/logs/audit.service.js';
 import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from '@/api/middlewares/error.js';
@@ -57,11 +59,162 @@ import logger from '@/utils/logger.js';
 const router = Router();
 const authService = AuthService.getInstance();
 const authConfigService = AuthConfigService.getInstance();
+const authOTPService = AuthOTPService.getInstance();
 const auditService = AuditService.getInstance();
+
+const emailLinkRequestSchema = z.object({
+  token: z.string().regex(/^[a-fA-F0-9]{64}$/, 'token must be a 64-character hexadecimal token'),
+});
+
+function buildRedirectUrl(baseUrl: string, params: Record<string, string>): string {
+  const url = new URL(baseUrl);
+  Object.entries(params).forEach(([key, value]) => {
+    url.searchParams.set(key, value);
+  });
+  return url.toString();
+}
 
 // Mount OAuth routes
 router.use('/oauth/custom', customOAuthRouter);
 router.use('/oauth', oauthRouter);
+
+// GET /api/auth/email/verify-link - Browser-based link verification flow
+// This endpoint is meant for email clicks. It verifies the link token on the backend
+// and then redirects the browser to the stored, validated redirectTo URL.
+// POST /api/auth/email/verify below remains the JSON API for OTP/code submissions.
+router.get('/email/verify-link', async (req: Request, res: Response, next: NextFunction) => {
+  let redirectTo: string | null | undefined;
+  try {
+    const validationResult = emailLinkRequestSchema.safeParse(req.query);
+    if (!validationResult.success) {
+      throw new AppError(
+        validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const { token } = validationResult.data;
+    const context = await authOTPService.getEmailOTPContextByToken(OTPPurpose.VERIFY_EMAIL, token);
+    redirectTo = context.redirectTo;
+
+    if (!redirectTo) {
+      throw new AppError(
+        'No redirect target configured for this verification link',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    if (!(await authConfigService.validateRedirectUrl(redirectTo))) {
+      throw new AppError(
+        'redirectTo is not in allowed redirect URLs',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    await authService.verifyEmailWithToken(token);
+
+    return res.redirect(
+      buildRedirectUrl(redirectTo, {
+        insforge_status: 'success',
+        insforge_type: 'verify_email',
+      })
+    );
+  } catch (error) {
+    if (redirectTo) {
+      try {
+        if (await authConfigService.validateRedirectUrl(redirectTo)) {
+          const message = error instanceof Error ? error.message : 'Authentication action failed';
+          return res.redirect(
+            buildRedirectUrl(redirectTo, {
+              insforge_status: 'error',
+              insforge_type: 'verify_email',
+              insforge_error: message,
+            })
+          );
+        }
+      } catch {
+        // Fall back to the standard error handler if redirect generation fails.
+      }
+    }
+
+    next(error);
+  }
+});
+
+// GET /api/auth/email/reset-password-link - Browser-based link reset flow
+// This endpoint is meant for email clicks. It validates the link token on the backend
+// and then redirects the browser to the stored, validated redirectTo URL.
+// POST /api/auth/email/reset-password below remains the JSON API that accepts a new password.
+router.get(
+  '/email/reset-password-link',
+  async (req: Request, res: Response, next: NextFunction) => {
+    let redirectTo: string | null | undefined;
+
+    try {
+      const validationResult = emailLinkRequestSchema.safeParse(req.query);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const { token } = validationResult.data;
+      const context = await authOTPService.getEmailOTPContextByToken(
+        OTPPurpose.RESET_PASSWORD,
+        token
+      );
+      redirectTo = context.redirectTo;
+
+      if (!redirectTo) {
+        throw new AppError(
+          'No redirect target configured for this reset link',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      if (!(await authConfigService.validateRedirectUrl(redirectTo))) {
+        throw new AppError(
+          'redirectTo is not in allowed redirect URLs',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      return res.redirect(
+        buildRedirectUrl(redirectTo, {
+          token,
+          insforge_status: 'ready',
+          insforge_type: 'reset_password',
+        })
+      );
+    } catch (error) {
+      if (redirectTo) {
+        try {
+          if (await authConfigService.validateRedirectUrl(redirectTo)) {
+            const message = error instanceof Error ? error.message : 'Authentication action failed';
+            return res.redirect(
+              buildRedirectUrl(redirectTo, {
+                insforge_status: 'error',
+                insforge_type: 'reset_password',
+                insforge_error: message,
+              })
+            );
+          }
+        } catch {
+          // Fall back to the standard error handler if redirect generation fails.
+        }
+      }
+
+      next(error);
+    }
+  }
+);
 
 // Public Authentication Configuration Routes
 // GET /api/auth/public-config - Get all public authentication configuration (public endpoint)
@@ -202,12 +355,12 @@ router.post('/users', async (req: Request, res: Response, next: NextFunction) =>
       );
     }
 
-    const { email, password, name, verifyEmailUrl } = validationResult.data;
+    const { email, password, name, redirectTo } = validationResult.data;
     const result: CreateUserResponse = await authService.register(
       email,
       password,
       name,
-      verifyEmailUrl,
+      redirectTo,
       { isAdminCreation: adminCreatingUser }
     );
 
@@ -671,7 +824,7 @@ router.post(
         );
       }
 
-      const { email, verifyEmailUrl } = validationResult.data;
+      const { email, redirectTo } = validationResult.data;
 
       // Get auth config to determine verification method
       const authConfig = await authConfigService.getAuthConfig();
@@ -680,22 +833,26 @@ router.post(
       // Note: User enumeration is prevented at service layer
       // Service returns gracefully (no error) if user not found
       if (method === 'link') {
-        if (!verifyEmailUrl) {
+        if (!redirectTo) {
           throw new AppError(
-            'verifyEmailUrl is required when link-based email verification is enabled',
+            'redirectTo is required when link-based email verification is enabled',
             400,
             ERROR_CODES.INVALID_INPUT
           );
         }
 
-        if (!(await authConfigService.validateRedirectUrl(verifyEmailUrl))) {
-          logger.warn('Verify email URL is not whitelisted for verification email', {
-            verifyEmailUrl,
+        if (!(await authConfigService.validateRedirectUrl(redirectTo))) {
+          logger.warn('Redirect URL is not in allowed redirect URLs for verification email', {
+            redirectTo,
           });
-          throw new AppError('verifyEmailUrl is not whitelisted', 400, ERROR_CODES.INVALID_INPUT);
+          throw new AppError(
+            'redirectTo is not in allowed redirect URLs',
+            400,
+            ERROR_CODES.INVALID_INPUT
+          );
         }
 
-        await authService.sendVerificationEmailWithLink(email, verifyEmailUrl);
+        await authService.sendVerificationEmailWithLink(email, redirectTo);
       } else {
         await authService.sendVerificationEmailWithCode(email);
       }
@@ -720,10 +877,9 @@ router.post(
   }
 );
 
-// POST /api/auth/email/verify - Verify email with OTP
-// Uses verifyEmailMethod from auth config to determine verification type:
-// - 'code': expects email + 6-digit numeric code
-// - 'link': expects 64-char hex token only
+// POST /api/auth/email/verify - JSON API for email verification code submissions
+// This endpoint is only for programmatic clients and manual 6-digit code entry.
+// Browser email clicks should use GET /api/auth/email/verify-link above instead.
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
 router.post(
   '/email/verify',
@@ -743,26 +899,7 @@ router.post(
 
       const { email, otp } = validationResult.data;
 
-      // Get auth config to determine verification method
-      const authConfig = await authConfigService.getAuthConfig();
-      const method = authConfig.verifyEmailMethod;
-
-      let result: VerifyEmailResponse;
-
-      if (method === 'link') {
-        // Link verification: otp is 64-char hex token
-        result = await authService.verifyEmailWithToken(otp);
-      } else {
-        // Code verification: requires email + 6-digit code
-        if (!email) {
-          throw new AppError(
-            'Email is required for code verification',
-            400,
-            ERROR_CODES.INVALID_INPUT
-          );
-        }
-        result = await authService.verifyEmailWithCode(email, otp);
-      }
+      const result: VerifyEmailResponse = await authService.verifyEmailWithCode(email, otp);
 
       // Set refresh token based on client type
       const tokenManager = TokenManager.getInstance();
@@ -800,7 +937,7 @@ router.post(
         );
       }
 
-      const { email, resetPasswordUrl } = validationResult.data;
+      const { email, redirectTo } = validationResult.data;
 
       // Get auth config to determine reset password method
       const authConfig = await authConfigService.getAuthConfig();
@@ -809,22 +946,26 @@ router.post(
       // Note: User enumeration is prevented at service layer
       // Service returns gracefully (no error) if user not found
       if (method === 'link') {
-        if (!resetPasswordUrl) {
+        if (!redirectTo) {
           throw new AppError(
-            'resetPasswordUrl is required when link-based password reset is enabled',
+            'redirectTo is required when link-based password reset is enabled',
             400,
             ERROR_CODES.INVALID_INPUT
           );
         }
 
-        if (!(await authConfigService.validateRedirectUrl(resetPasswordUrl))) {
-          logger.warn('Reset password URL is not whitelisted for password reset email', {
-            resetPasswordUrl,
+        if (!(await authConfigService.validateRedirectUrl(redirectTo))) {
+          logger.warn('Redirect URL is not in allowed redirect URLs for password reset email', {
+            redirectTo,
           });
-          throw new AppError('resetPasswordUrl is not whitelisted', 400, ERROR_CODES.INVALID_INPUT);
+          throw new AppError(
+            'redirectTo is not in allowed redirect URLs',
+            400,
+            ERROR_CODES.INVALID_INPUT
+          );
         }
 
-        await authService.sendResetPasswordEmailWithLink(email, resetPasswordUrl);
+        await authService.sendResetPasswordEmailWithLink(email, redirectTo);
       } else {
         await authService.sendResetPasswordEmailWithCode(email);
       }
@@ -882,14 +1023,12 @@ router.post(
   }
 );
 
-// POST /api/auth/email/reset-password - Reset password with token
+// POST /api/auth/email/reset-password - JSON API to submit a new password
 // Token can be:
-// - Magic link token from send-reset-password when method is 'link'
+// - Link token returned to the app via GET /api/auth/email/reset-password-link
 // - Reset token from exchange-reset-password-token after code verification
-// Both use RESET_PASSWORD purpose and are verified the same way
-// Flow:
-//   Code: send-reset-password → exchange-reset-password-token → reset-password (with resetToken)
-//   Link: send-reset-password → reset-password page → reset-password (with link token)
+// Both use RESET_PASSWORD purpose and are verified the same way.
+// Browser email clicks should use GET /api/auth/email/reset-password-link above instead.
 router.post(
   '/email/reset-password',
   verifyOTPLimiter,
