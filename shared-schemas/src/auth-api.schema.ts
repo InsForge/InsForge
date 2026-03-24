@@ -26,22 +26,13 @@ export const paginationSchema = z.object({
 });
 
 /**
- * Shared options for auth requests (extensible for future parameters)
- */
-export const authOptionsSchema = z
-  .object({
-    emailRedirectTo: z.string().url().optional(),
-  })
-  .optional();
-
-/**
  * POST /api/auth/users - Create user
  */
 export const createUserRequestSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
   name: nameSchema.optional(),
-  options: authOptionsSchema,
+  verifyEmailUrl: z.string().url().optional(),
 });
 
 /**
@@ -97,7 +88,7 @@ export const updateProfileRequestSchema = z.object({
  */
 export const sendVerificationEmailRequestSchema = z.object({
   email: emailSchema,
-  options: authOptionsSchema,
+  verifyEmailUrl: z.string().url().optional(),
 });
 
 /**
@@ -107,19 +98,29 @@ export const sendVerificationEmailRequestSchema = z.object({
  * - 'link': expects 64-char hex token only
  */
 export const verifyEmailRequestSchema = z
-  .object({
-    email: emailSchema.optional(),
-    otp: z.string().min(1),
-  })
-  .refine((data) => data.email || data.otp, {
-    message: 'Either email or otp must be provided',
-  });
+  .union([
+    z.object({
+      email: emailSchema,
+      otp: z.string().regex(/^\d{6}$/, 'OTP code must be a 6-digit numeric code'),
+    }),
+    z.object({
+      email: emailSchema.optional(),
+      otp: z
+        .string()
+        .regex(/^[a-fA-F0-9]{64}$/, 'OTP token must be a 64-character hexadecimal token'),
+    }),
+  ])
+  .transform((data) => ({
+    email: data.email,
+    otp: data.otp,
+  }));
 
 /**
  * POST /api/auth/email/send-reset-password - Send reset password email (code or link based on config)
  */
 export const sendResetPasswordEmailRequestSchema = z.object({
   email: emailSchema,
+  resetPasswordUrl: z.string().url().optional(),
 });
 
 /**
@@ -149,40 +150,34 @@ export const resetPasswordRequestSchema = z.object({
 
 /**
  * Response for POST /api/auth/users
- * Includes optional redirectTo URL when user is successfully registered and email verification is not required
  * For mobile/desktop clients: refreshToken is returned in body instead of cookie
  */
 export const createUserResponseSchema = z.object({
   user: userSchema.optional(),
   accessToken: z.string().nullable(),
   requireEmailVerification: z.boolean().optional(),
-  redirectTo: z.string().url().optional(),
   csrfToken: z.string().nullable().optional(),
   refreshToken: z.string().optional(), // For mobile/desktop clients (no cookies)
 });
 
 /**
  * Response for POST /api/auth/sessions
- * Includes user and access token, plus optional redirectTo URL for frontend navigation
  * For mobile/desktop clients: refreshToken is returned in body instead of cookie
  */
 export const createSessionResponseSchema = z.object({
   user: userSchema,
   accessToken: z.string(),
-  redirectTo: z.string().url().optional(),
   csrfToken: z.string().nullable().optional(),
   refreshToken: z.string().optional(), // For mobile/desktop clients (no cookies)
 });
 
 /**
  * Response for POST /api/auth/email/verify
- * Includes user and access token, plus optional redirectTo URL for frontend navigation
  * For mobile/desktop clients: refreshToken is returned in body instead of cookie
  */
 export const verifyEmailResponseSchema = z.object({
   user: userSchema,
   accessToken: z.string(),
-  redirectTo: z.string().url().optional(),
   csrfToken: z.string().nullable().optional(),
   refreshToken: z.string().optional(), // For mobile/desktop clients (no cookies)
 });
@@ -320,7 +315,6 @@ export const oAuthInitRequestSchema = z.object({
 
 /**
  * POST /api/auth/oauth/exchange - Exchange OAuth code for tokens
- * Used in PKCE flow to exchange an authorization code for tokens
  * Note: code_verifier uses snake_case as per OAuth 2.0 PKCE specification (RFC 7636)
  */
 export const oAuthCodeExchangeRequestSchema = z.object({
@@ -393,9 +387,6 @@ export const authErrorResponseSchema = z.object({
 // ============================================================================
 // Type exports
 // ============================================================================
-
-// Shared options type
-export type AuthOptions = z.infer<typeof authOptionsSchema>;
 
 // Request types for type-safe request handling
 export type CreateUserRequest = z.infer<typeof createUserRequestSchema>;
