@@ -864,8 +864,6 @@ curl "https://your-app.insforge.app/api/auth/config" \
   "requireSpecialChar": false,
   "verifyEmailMethod": "code",
   "resetPasswordMethod": "link",
-  "verifyEmailRedirectTo": "https://myapp.com/verify-success",
-  "resetPasswordRedirectTo": "https://myapp.com/reset-success",
   "redirectUrlWhitelist": ["https://myapp.com/dashboard", "https://*.myapp.com"],
   "createdAt": "2024-01-15T10:30:00Z",
   "updatedAt": "2024-01-15T10:30:00Z"
@@ -892,8 +890,6 @@ PUT /api/auth/config
 | `requireSpecialChar` | boolean | No | Require special characters in password |
 | `verifyEmailMethod` | string | No | Email verification method (`code` or `link`) |
 | `resetPasswordMethod` | string | No | Password reset method (`code` or `link`) |
-| `verifyEmailRedirectTo` | string | No | Redirect URL after email verification |
-| `resetPasswordRedirectTo` | string | No | Redirect URL after password reset |
 | `redirectUrlWhitelist` | array | No | List of allowed redirect URLs (supports wildcards like `*.domain.com`) |
 
 #### Example
