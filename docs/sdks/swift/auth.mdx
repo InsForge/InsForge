@@ -80,13 +80,13 @@ func handleVerifyEmail(email: String, code: String) async {
     }
 }
 
-// Called when user requests a new verification code
+// Called when user requests a new verification email
 func handleResendCode(email: String) async {
     do {
         try await insforge.auth.resendVerificationEmail(email: email)
-        showMessage("Verification code sent to \(email)")
+        showMessage("Verification email sent to \(email)")
     } catch {
-        showError("Failed to resend verification code")
+        showError("Failed to resend verification email")
     }
 }
 ```
@@ -111,7 +111,7 @@ This indicates that verification via option 2 or 3 is required before the user c
 | Method | Description |
 |--------|-------------|
 | `verifyEmail(email:code:)` | Verify email with 6-digit code |
-| `resendVerificationEmail(email:)` | Resend verification code to email |
+| `resendVerificationEmail(email:)` | Resend verification email |
 
 ---
 

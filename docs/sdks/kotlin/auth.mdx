@@ -83,13 +83,13 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    // Resend verification code
+    // Resend verification email
     suspend fun resendVerificationCode(email: String) {
         try {
             client.auth.resendVerificationEmail(email = email)
             // Show success message
         } catch (e: InsforgeHttpException) {
-            _uiState.value = AuthUiState.Error("Failed to resend code")
+            _uiState.value = AuthUiState.Error("Failed to resend verification email")
         }
     }
 }
@@ -123,7 +123,7 @@ This indicates that verification via option 2 or 3 is required before the user c
 | Method | Description |
 |--------|-------------|
 | `verifyEmail(email, code)` | Verify email with 6-digit code |
-| `resendVerificationEmail(email)` | Resend verification code to email |
+| `resendVerificationEmail(email)` | Resend verification email |
 
 ---
 
