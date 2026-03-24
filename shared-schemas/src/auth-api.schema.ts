@@ -11,6 +11,8 @@ import {
   authConfigSchema,
   customOAuthConfigSchema,
   customOAuthKeySchema,
+  deviceAuthorizationDeviceCodeSchema,
+  deviceAuthorizationUserCodeSchema,
 } from './auth.schema';
 
 // ============================================================================
@@ -67,6 +69,34 @@ export const refreshSessionRequestSchema = z.object({
 
 export const exchangeAdminSessionRequestSchema = z.object({
   code: z.string(),
+});
+
+export const createDeviceAuthorizationRequestSchema = z.object({
+  deviceName: z.string().min(1).optional(),
+  hostname: z.string().min(1).optional(),
+  platform: z.string().min(1).optional(),
+});
+
+export const createDeviceAuthorizationResponseSchema = z.object({
+  deviceCode: deviceAuthorizationDeviceCodeSchema,
+  userCode: deviceAuthorizationUserCodeSchema,
+  verificationUri: z.string().url(),
+  verificationUriComplete: z.string().url(),
+  expiresIn: z.number().int().positive(),
+  interval: z.number().int().positive(),
+});
+
+export const approveDeviceAuthorizationRequestSchema = z.object({
+  userCode: deviceAuthorizationUserCodeSchema,
+});
+
+export const denyDeviceAuthorizationRequestSchema = z.object({
+  userCode: deviceAuthorizationUserCodeSchema,
+});
+
+export const exchangeDeviceAuthorizationRequestSchema = z.object({
+  deviceCode: deviceAuthorizationDeviceCodeSchema,
+  grantType: z.literal('urn:ietf:params:oauth:grant-type:device_code'),
 });
 
 /**
@@ -198,6 +228,10 @@ export const refreshSessionResponseSchema = z.object({
   user: userSchema,
   csrfToken: z.string().optional(), // For web clients (cookie-based)
   refreshToken: z.string().optional(), // For mobile/desktop clients (no cookies)
+});
+
+export const exchangeDeviceAuthorizationSuccessResponseSchema = createSessionResponseSchema.extend({
+  refreshToken: z.string().min(1, 'refreshToken is required'),
 });
 
 /**
@@ -390,6 +424,13 @@ export const authErrorResponseSchema = z.object({
   nextActions: z.string().optional(),
 });
 
+export const deviceAuthorizationPendingErrorSchema = z.object({
+  error: z.literal('authorization_pending'),
+  message: z.string(),
+  statusCode: z.literal(428),
+  nextActions: z.string().optional(),
+});
+
 // ============================================================================
 // Type exports
 // ============================================================================
@@ -401,6 +442,19 @@ export type AuthOptions = z.infer<typeof authOptionsSchema>;
 export type CreateUserRequest = z.infer<typeof createUserRequestSchema>;
 export type CreateSessionRequest = z.infer<typeof createSessionRequestSchema>;
 export type CreateAdminSessionRequest = z.infer<typeof createAdminSessionRequestSchema>;
+export type CreateDeviceAuthorizationRequest = z.infer<
+  typeof createDeviceAuthorizationRequestSchema
+>;
+export type CreateDeviceAuthorizationResponse = z.infer<
+  typeof createDeviceAuthorizationResponseSchema
+>;
+export type ApproveDeviceAuthorizationRequest = z.infer<
+  typeof approveDeviceAuthorizationRequestSchema
+>;
+export type DenyDeviceAuthorizationRequest = z.infer<typeof denyDeviceAuthorizationRequestSchema>;
+export type ExchangeDeviceAuthorizationRequest = z.infer<
+  typeof exchangeDeviceAuthorizationRequestSchema
+>;
 export type RefreshSessionRequest = z.infer<typeof refreshSessionRequestSchema>;
 export type ListUsersRequest = z.infer<typeof listUsersRequestSchema>;
 export type DeleteUsersRequest = z.infer<typeof deleteUsersRequestSchema>;
@@ -426,6 +480,9 @@ export type ExchangeResetPasswordTokenResponse = z.infer<
   typeof exchangeResetPasswordTokenResponseSchema
 >;
 export type RefreshSessionResponse = z.infer<typeof refreshSessionResponseSchema>;
+export type ExchangeDeviceAuthorizationSuccessResponse = z.infer<
+  typeof exchangeDeviceAuthorizationSuccessResponseSchema
+>;
 export type ResetPasswordResponse = z.infer<typeof resetPasswordResponseSchema>;
 export type CreateAdminSessionResponse = z.infer<typeof createAdminSessionResponseSchema>;
 export type GetCurrentSessionResponse = z.infer<typeof getCurrentSessionResponseSchema>;
@@ -438,6 +495,7 @@ export type GetAuthConfigResponse = z.infer<typeof getAuthConfigResponseSchema>;
 export type GetPublicAuthConfigResponse = z.infer<typeof getPublicAuthConfigResponseSchema>;
 
 export type AuthErrorResponse = z.infer<typeof authErrorResponseSchema>;
+export type DeviceAuthorizationPendingError = z.infer<typeof deviceAuthorizationPendingErrorSchema>;
 
 // ============================================================================
 // Custom OAuth Configuration Management schemas

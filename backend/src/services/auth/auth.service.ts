@@ -46,6 +46,7 @@ import { ERROR_CODES } from '@/types/error-constants.js';
 import { EmailService } from '@/services/email/email.service.js';
 import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
 import { AppleOAuthProvider } from '@/providers/oauth/apple.provider.js';
+import { DeviceAuthorizationService } from './device-authorization.service.js';
 
 /**
  * Simplified JWT-based auth service
@@ -105,6 +106,10 @@ export class AuthService {
       this.pool = dbManager.getPool();
     }
     return this.pool;
+  }
+
+  private toISOString(value: string | Date): string {
+    return value instanceof Date ? value.toISOString() : value;
   }
 
   /**
@@ -596,6 +601,36 @@ export class AuthService {
     } finally {
       client.release();
     }
+  }
+
+  private async mintSessionForUserId(userId: string): Promise<CreateSessionResponse> {
+    const dbUser = await this.getUserById(userId);
+    if (!dbUser) {
+      throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
+    }
+
+    const user = this.transformUserRecordToSchema(dbUser);
+    const role = dbUser.is_project_admin ? 'project_admin' : 'authenticated';
+    const accessToken = this.tokenManager.generateAccessToken({
+      sub: user.id,
+      email: user.email,
+      role,
+    });
+
+    return {
+      user,
+      accessToken,
+    };
+  }
+
+  /**
+   * Exchange an approved device authorization for the standard session payload
+   */
+  async exchangeApprovedDeviceAuthorization(deviceCode: string): Promise<CreateSessionResponse> {
+    const deviceAuthorizationService = DeviceAuthorizationService.getInstance();
+    return deviceAuthorizationService.exchangeApproved(deviceCode, (userId) =>
+      this.mintSessionForUserId(userId)
+    );
   }
 
   /**
@@ -1158,8 +1193,8 @@ export class AuthService {
       id: dbUser.id,
       email: dbUser.email,
       emailVerified: dbUser.email_verified,
-      createdAt: dbUser.created_at,
-      updatedAt: dbUser.updated_at,
+      createdAt: this.toISOString(dbUser.created_at),
+      updatedAt: this.toISOString(dbUser.updated_at),
       providers: providers,
       profile: dbUser.profile,
       metadata: dbUser.metadata,

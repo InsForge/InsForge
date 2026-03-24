@@ -14,6 +14,7 @@ import {
 } from '@/api/middlewares/auth.js';
 import oauthRouter from './oauth.routes.js';
 import customOAuthRouter from './custom-oauth.routes.js';
+import deviceRouter from './device.routes.js';
 import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-limiters.js';
 import {
   REFRESH_TOKEN_COOKIE_NAME,
@@ -62,6 +63,7 @@ const auditService = AuditService.getInstance();
 // Mount OAuth routes
 router.use('/oauth/custom', customOAuthRouter);
 router.use('/oauth', oauthRouter);
+router.use('/device', deviceRouter);
 
 // Public Authentication Configuration Routes
 // GET /api/auth/public-config - Get all public authentication configuration (public endpoint)

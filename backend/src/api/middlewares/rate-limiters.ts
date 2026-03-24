@@ -42,6 +42,12 @@ export function destroyEmailCooldownInterval(): void {
   emailCooldowns.clear();
 }
 
+function createRateLimitHandler(message: string, statusCode: number, code: string) {
+  return (_req: Request, _res: Response, next: NextFunction) => {
+    next(new AppError(message, statusCode, code));
+  };
+}
+
 /**
  * Per-IP rate limiter for email otp requests
  * Prevents brute-force attacks, resource exhaustion, and enumeration from single IP
@@ -141,3 +147,64 @@ export const sendEmailOTPLimiter = [
  * Only per-IP limit, no per-email limit (to allow legitimate retries)
  */
 export const verifyOTPLimiter = [verifyOTPRateLimiter];
+
+/**
+ * Device authorization creation limiter
+ * Prevents excessive session creation from a single IP
+ */
+export const deviceAuthorizationCreationLimiter = [
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: createRateLimitHandler(
+      'Too many device authorization creation requests from this IP. Please try again later.',
+      429,
+      ERROR_CODES.TOO_MANY_REQUESTS
+    ),
+    skipSuccessfulRequests: false,
+    skipFailedRequests: false,
+  }),
+];
+
+/**
+ * Device authorization user-code submission limiter
+ * Prevents brute-force guesses of user codes from a single IP
+ */
+export const deviceAuthorizationUserCodeLimiter = [
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: createRateLimitHandler(
+      'Too many device authorization code submissions from this IP. Please try again later.',
+      429,
+      ERROR_CODES.TOO_MANY_REQUESTS
+    ),
+    skipSuccessfulRequests: false,
+    skipFailedRequests: false,
+  }),
+];
+
+/**
+ * Device authorization polling limiter
+ * Converts aggressive polling into a protocol-level slow_down signal
+ */
+export const deviceAuthorizationPollingLimiter = [
+  rateLimit({
+    windowMs: 10 * 1000,
+    max: 2,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req: Request) => `${req.ip}:${String(req.body?.deviceCode ?? '')}`,
+    handler: createRateLimitHandler(
+      'Slow down polling this device authorization.',
+      400,
+      'slow_down'
+    ),
+    skipSuccessfulRequests: false,
+    skipFailedRequests: false,
+  }),
+];

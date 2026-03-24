@@ -25,6 +25,32 @@ export const roleSchema = z.enum(['anon', 'authenticated', 'project_admin']);
 
 export const verificationMethodSchema = z.enum(['code', 'link']);
 
+export const deviceAuthorizationDeviceCodeSchema = z
+  .string()
+  .length(64, 'Invalid device code length')
+  .regex(/^[A-Fa-f0-9]{64}$/, 'Invalid device code format');
+
+export const deviceAuthorizationUserCodeSchema = z
+  .string()
+  .regex(/^[A-Z0-9]{5}-[A-Z0-9]{5}$/, 'Invalid user code format');
+
+export const deviceAuthorizationStatusSchema = z.enum([
+  'pending_authorization',
+  'authenticated',
+  'approved',
+  'denied',
+  'expired',
+  'consumed',
+]);
+
+export const deviceAuthorizationClientContextSchema = z
+  .object({
+    deviceName: z.string().min(1).optional(),
+    hostname: z.string().min(1).optional(),
+    platform: z.string().min(1).optional(),
+  })
+  .passthrough();
+
 /**
  * User profile schema with default fields and passthrough for custom fields
  * Note: Using snake_case for fields as they are stored directly in PostgreSQL JSONB
@@ -109,6 +135,20 @@ export const authConfigSchema = z.object({
   updatedAt: z.string(), // PostgreSQL timestamp
 });
 
+export const deviceAuthorizationSessionSchema = z.object({
+  id: z.string().uuid(),
+  deviceCode: deviceAuthorizationDeviceCodeSchema,
+  userCode: deviceAuthorizationUserCodeSchema,
+  status: deviceAuthorizationStatusSchema,
+  expiresAt: z.string(),
+  pollIntervalSeconds: z.number().int().positive(),
+  approvedByUserId: userIdSchema.nullable().optional(),
+  consumedAt: z.string().nullable().optional(),
+  clientContext: deviceAuthorizationClientContextSchema.nullable().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
 /**
  * JWT token payload schema
  */
@@ -129,6 +169,15 @@ export type EmailSchema = z.infer<typeof emailSchema>;
 export type PasswordSchema = z.infer<typeof passwordSchema>;
 export type RoleSchema = z.infer<typeof roleSchema>;
 export type VerificationMethodSchema = z.infer<typeof verificationMethodSchema>;
+export type DeviceAuthorizationDeviceCodeSchema = z.infer<
+  typeof deviceAuthorizationDeviceCodeSchema
+>;
+export type DeviceAuthorizationUserCodeSchema = z.infer<typeof deviceAuthorizationUserCodeSchema>;
+export type DeviceAuthorizationStatusSchema = z.infer<typeof deviceAuthorizationStatusSchema>;
+export type DeviceAuthorizationClientContextSchema = z.infer<
+  typeof deviceAuthorizationClientContextSchema
+>;
+export type DeviceAuthorizationSessionSchema = z.infer<typeof deviceAuthorizationSessionSchema>;
 export type ProfileSchema = z.infer<typeof profileSchema>;
 export type UserSchema = z.infer<typeof userSchema>;
 export type TokenPayloadSchema = z.infer<typeof tokenPayloadSchema>;

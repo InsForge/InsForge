@@ -800,6 +800,165 @@ refreshToken = response.refreshToken  // Persist securely
 
 ---
 
+## Device Authorization
+
+Headless clients can start a short-lived device authorization session and complete it through the current built-in auth app's device-code entry and consent pages at `/auth/device` and `/auth/device/consent`. If the browser is not already signed in, the flow continues through the existing `/auth/sign-in` route before returning to consent. This release is instance-scoped only: it does not support `client_id`, `scope`, a registration flow, or multi-instance SSO.
+
+### Create Device Authorization
+
+```
+POST /api/auth/device/authorizations
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `deviceName` | string | No | Human-readable device label |
+| `hostname` | string | No | Hostname reported by the device |
+| `platform` | string | No | Platform string reported by the device |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/device/authorizations" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "deviceName": "my-vps",
+    "hostname": "vps-01",
+    "platform": "linux-x64"
+  }'
+```
+
+### Response
+
+```json
+{
+  "deviceCode": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "userCode": "ABCDE-FGHIJ",
+  "verificationUri": "https://your-app.insforge.app/auth/device",
+  "verificationUriComplete": "https://your-app.insforge.app/auth/device?user_code=ABCDE-FGHIJ",
+  "expiresIn": 900,
+  "interval": 5
+}
+```
+
+### Lookup Device Authorization
+
+```
+POST /api/auth/device/authorizations/lookup
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `userCode` | string | Yes | Code entered by the user in the browser |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/device/authorizations/lookup" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userCode": "ABCDE-FGHIJ"
+  }'
+```
+
+### Response
+
+```json
+{
+  "status": "pending_authorization",
+  "expiresAt": "2026-03-24T00:15:00.000Z"
+}
+```
+
+<Note>
+The public lookup response exposes only `status` and `expiresAt`. When the browser is already authenticated, the same endpoint also binds the device authorization to that signed-in user and includes `clientContext` for the consent page.
+</Note>
+
+### Approve Device Authorization
+
+```
+POST /api/auth/device/authorizations/approve
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `userCode` | string | Yes | Code entered by the user in the browser |
+
+This endpoint requires an authenticated browser session. It returns the minimal lookup view after approval.
+
+### Deny Device Authorization
+
+```
+POST /api/auth/device/authorizations/deny
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `userCode` | string | Yes | Code entered by the user in the browser |
+
+This endpoint requires an authenticated browser session. It returns the minimal lookup view after denial.
+
+### Exchange Device Authorization
+
+```
+POST /api/auth/device/token
+```
+
+### Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `deviceCode` | string | Yes | Device code returned from create |
+| `grantType` | string | Yes | Must be `urn:ietf:params:oauth:grant-type:device_code` |
+
+### Example
+
+```bash
+curl -X POST "https://your-app.insforge.app/api/auth/device/token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "deviceCode": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "grantType": "urn:ietf:params:oauth:grant-type:device_code"
+  }'
+```
+
+### Response
+
+```json
+{
+  "user": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "email": "device-user@example.com",
+    "emailVerified": true,
+    "providers": ["email"],
+    "createdAt": "2026-03-24T00:00:00.000Z",
+    "updatedAt": "2026-03-24T00:00:00.000Z"
+  },
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+### Error States
+
+| Endpoint | Error | HTTP | Meaning |
+|----------|-------|------|---------|
+| `POST /api/auth/device/authorizations/lookup` | `NOT_FOUND` | 404 | The `userCode` does not match an active authorization session |
+| `POST /api/auth/device/token` | `authorization_pending` | 428 | The authorization has not been approved yet |
+| `POST /api/auth/device/token` | `slow_down` | 429 | The client is polling too quickly |
+| `POST /api/auth/device/token` | `access_denied` | 403 | The user denied the request |
+| `POST /api/auth/device/token` | `expired_token` | 400 | The authorization expired before exchange |
+| `POST /api/auth/device/token` | `already_used` | 400 | The authorization was already exchanged |
+| `POST /api/auth/device/authorizations/approve` | `AUTH_UNAUTHORIZED` | 401 | The browser session is not signed in |
+
 ## Public Configuration
 
 Get public authentication settings (no auth required).

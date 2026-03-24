@@ -97,6 +97,37 @@ sequenceDiagram
     API-->>Client: {user, accessToken}
 ```
 
+### Device Authorization Flow
+
+Headless clients use an instance-scoped device authorization session and complete login through the current built-in auth app's device-code entry and consent pages at `/auth/device` and `/auth/device/consent`. If the browser is not already signed in, the flow continues through the existing `/auth/sign-in` route before returning to consent. This first release does not add `client_id`, `scope`, a registration flow, or multi-instance SSO.
+
+```mermaid
+sequenceDiagram
+    participant HeadlessClient
+    participant Browser
+    participant API
+    participant DB
+
+    HeadlessClient->>API: POST /api/auth/device/authorizations
+    API->>DB: Create device authorization session
+    DB-->>API: deviceCode, userCode, expiresAt, clientContext
+    API-->>HeadlessClient: deviceCode, userCode, verificationUri, verificationUriComplete, expiresIn, interval
+
+    Browser->>API: GET /auth/device?user_code=...
+    Browser->>API: GET /auth/device/consent?user_code=...
+    Browser->>API: POST /api/auth/device/authorizations/lookup
+    Browser->>API: POST /api/auth/device/authorizations/approve or /deny
+
+    HeadlessClient->>API: POST /api/auth/device/token
+    API-->>HeadlessClient: standard non-web session payload + refreshToken
+```
+
+- `POST /api/auth/device/authorizations` returns `deviceCode`, `userCode`, `verificationUri`, `verificationUriComplete`, `expiresIn`, and `interval`.
+- `POST /api/auth/device/authorizations/lookup` exposes only `status` and `expiresAt` to unauthenticated browsers.
+- An authenticated lookup binds the session to the signed-in user and includes `clientContext` for the consent page.
+- `POST /api/auth/device/authorizations/approve` and `/deny` are browser-only actions that reuse the existing sign-in flow.
+- `POST /api/auth/device/token` exchanges an approved device code for the standard non-web session payload, including `refreshToken`.
+
 ## JWT Token Structure
 
 ### Token Payload
@@ -329,4 +360,3 @@ For web applications, we also provide pre-built authentication UI components:
     Build your own
   </Card>
 </CardGroup>
-
