@@ -310,73 +310,9 @@ do {
 
 ---
 
-## signInWithDefaultView()
-
-InsForge provides a hosted authentication page that supports:
-- **OAuth Providers**: Google, GitHub, Discord, LinkedIn, Facebook, Instagram, TikTok, Apple, X (Twitter), Spotify, Microsoft
-- **Email + Password**: Traditional email/password authentication
-
-This approach simplifies authentication by letting InsForge handle the UI and OAuth flows.
-
-<Note>
-For direct OAuth provider authentication without the hosted page, use [signInWithOAuthView()](#signinwithoauthview) instead.
-</Note>
-
-### Parameters
-
-- `redirectTo` (String) - Callback URL where InsForge will redirect after authentication
-
-### Returns
-
-```swift
-AuthResponse
-```
-
-Returns `AuthResponse` containing the authenticated user and session tokens.
-
-### Implementation
-
-InsForge SDK supports two callback URL methods:
-
-1. **Custom URL Scheme** - Simple, recommended for development and macOS desktop apps
-2. **Universal Links (iOS) / App Links (Android)** - Recommended for production mobile apps
-
-#### Option 1: Custom URL Scheme (Recommended for Development)
-
-##### Configuration
-
-**macOS / iOS (Info.plist)**:
-```xml
-<key>CFBundleURLTypes</key>
-<array>
-    <dict>
-        <key>CFBundleURLSchemes</key>
-        <array>
-            <string>yourapp</string>
-        </array>
-        <key>CFBundleURLName</key>
-        <string>com.yourcompany.yourapp</string>
-    </dict>
-</array>
-```
-
-**Usage**:
-```swift
-let response = try await client.auth.signInWithDefaultView(
-    redirectTo: "yourapp://auth/callback"
-)
-print("Authenticated: \(response.user.email)")
-```
-
-#### Option 2: Universal Links / App Links (Recommended for Production)
-
-You can find the documentation for setting up Universal Links / App Links from Apple and Google.
-
----
-
 ## signInWithOAuthView()
 
-Sign in directly with a specific OAuth provider. Unlike `signInWithDefaultView()` which shows a hosted page with all authentication options, this method opens the OAuth provider's authentication page directly.
+Sign in directly with a specific OAuth provider. This method opens the OAuth provider's authentication page directly.
 
 On iOS 12+ and macOS 10.15+, the SDK uses `ASWebAuthenticationSession` to present an in-app authentication browser with automatic callback handling.
 
@@ -473,7 +409,7 @@ struct LoginView: View {
 
 ### URL Scheme Configuration
 
-The callback URL configuration is the same as `signInWithDefaultView()`. 
+Use the same callback URL setup described for your OAuth app flow above.
 
 ---
 

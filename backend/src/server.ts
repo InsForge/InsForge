@@ -256,18 +256,6 @@ export async function createApp() {
     }
   });
 
-  // Serve auth app
-  const authAppPath = path.join(__dirname, 'auth');
-  if (fs.existsSync(authAppPath)) {
-    app.use('/auth', express.static(authAppPath));
-    app.get('/auth*', (_req: Request, res: Response) => {
-      res.sendFile(path.join(authAppPath, 'index.html'));
-    });
-  } else {
-    const authAppUrl = process.env.AUTH_APP_URL || 'http://localhost:7132';
-    logger.info('Auth app not built, proxying to development server', { authAppUrl });
-  }
-
   // Redirect root to dashboard login (only for non-insforge cloud environments)
   if (!isCloudEnvironment()) {
     app.get('/', (_req: Request, res: Response) => {
