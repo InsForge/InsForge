@@ -127,10 +127,9 @@ describe('DeviceAuthorizePage', () => {
     } as Response);
 
     await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith(
-        '/auth/device/consent?user_code=ABCD-EFGH',
-        { replace: true }
-      );
+      expect(navigateMock).toHaveBeenCalledWith('/auth/device/consent?user_code=ABCD-EFGH', {
+        replace: true,
+      });
     });
   });
 });

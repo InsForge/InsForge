@@ -4,11 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppError } from '../../src/api/middlewares/error.js';
 import { ERROR_CODES } from '../../src/types/error-constants.js';
 
-const {
-  authServiceMock,
-  deviceAuthorizationServiceMock,
-  tokenManagerMock,
-} = vi.hoisted(() => {
+const { authServiceMock, deviceAuthorizationServiceMock, tokenManagerMock } = vi.hoisted(() => {
   const authServiceMock = {
     exchangeApprovedDeviceAuthorization: vi.fn(),
   };
@@ -150,11 +146,7 @@ async function createServer(): Promise<ServerHandle> {
   };
 }
 
-async function postJsonWithHeaders(
-  url: string,
-  body: unknown,
-  headers: HeadersInit = {}
-) {
+async function postJsonWithHeaders(url: string, body: unknown, headers: HeadersInit = {}) {
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -351,31 +343,28 @@ describe('device auth routes', () => {
     ['access_denied', 403, ERROR_CODES.AUTH_DEVICE_AUTHORIZATION_DENIED],
     ['expired_token', 400, ERROR_CODES.AUTH_DEVICE_AUTHORIZATION_EXPIRED],
     ['already_used', 400, ERROR_CODES.AUTH_DEVICE_AUTHORIZATION_CONSUMED],
-  ])(
-    'maps %s to the protocol error shape',
-    async (error, statusCode, code) => {
-      authServiceMock.exchangeApprovedDeviceAuthorization.mockRejectedValue(
-        new AppError(`Device authorization ${error}`, statusCode, code)
-      );
+  ])('maps %s to the protocol error shape', async (error, statusCode, code) => {
+    authServiceMock.exchangeApprovedDeviceAuthorization.mockRejectedValue(
+      new AppError(`Device authorization ${error}`, statusCode, code)
+    );
 
-      const server = await createServer();
+    const server = await createServer();
 
-      try {
-        const result = await postJson(`${server.baseUrl}/api/auth/device/token`, {
-          deviceCode: 'device-code-123',
-          grantType: 'urn:insforge:params:oauth:grant-type:device_code',
-        });
+    try {
+      const result = await postJson(`${server.baseUrl}/api/auth/device/token`, {
+        deviceCode: 'device-code-123',
+        grantType: 'urn:insforge:params:oauth:grant-type:device_code',
+      });
 
-        expect(result.status).toBe(statusCode);
-        expect(result.body).toMatchObject({
-          error,
-          statusCode,
-        });
-      } finally {
-        await server.close();
-      }
+      expect(result.status).toBe(statusCode);
+      expect(result.body).toMatchObject({
+        error,
+        statusCode,
+      });
+    } finally {
+      await server.close();
     }
-  );
+  });
 
   it('approves a device authorization with the authenticated user', async () => {
     const server = await createServer();

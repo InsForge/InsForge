@@ -86,7 +86,11 @@ function createQueryHandler(rows: Map<string, DeviceAuthorizationRow>) {
 
     if (sql.includes("SET status = 'authenticated'")) {
       const row = rows.get(String(params[0]));
-      if (!row || row.status !== 'pending_authorization' || new Date(row.expires_at).getTime() <= Date.now()) {
+      if (
+        !row ||
+        row.status !== 'pending_authorization' ||
+        new Date(row.expires_at).getTime() <= Date.now()
+      ) {
         return { rows: [], rowCount: 0 };
       }
 
@@ -177,9 +181,7 @@ function installQueryMock(rows: Map<string, DeviceAuthorizationRow>) {
   mockPool.query.mockImplementation(handler);
 }
 
-function cloneRows(
-  rows: Map<string, DeviceAuthorizationRow>
-): Map<string, DeviceAuthorizationRow> {
+function cloneRows(rows: Map<string, DeviceAuthorizationRow>): Map<string, DeviceAuthorizationRow> {
   const clonedRows = new Map<string, DeviceAuthorizationRow>();
   const seen = new WeakMap<DeviceAuthorizationRow, DeviceAuthorizationRow>();
 

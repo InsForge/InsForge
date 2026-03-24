@@ -11,6 +11,11 @@ POLL_INTERVAL_SECONDS=5
 MAX_WAIT_SECONDS=900
 MAX_ATTEMPTS=$((MAX_WAIT_SECONDS / POLL_INTERVAL_SECONDS))
 
+if [ "${CI:-}" = "true" ] || [ ! -t 0 ]; then
+  echo "Skipping manual device authorization smoke test in non-interactive mode."
+  exit 0
+fi
+
 echo "🧪 Starting device authorization flow smoke test..."
 
 create_response="$(curl -sS -X POST "$API_BASE/auth/device/authorizations" \
