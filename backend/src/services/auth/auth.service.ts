@@ -108,6 +108,10 @@ export class AuthService {
     return this.pool;
   }
 
+  private toISOString(value: string | Date): string {
+    return value instanceof Date ? value.toISOString() : value;
+  }
+
   /**
    * User registration
    * Otherwise, returns user with access token for immediate login
@@ -1189,8 +1193,8 @@ export class AuthService {
       id: dbUser.id,
       email: dbUser.email,
       emailVerified: dbUser.email_verified,
-      createdAt: dbUser.created_at,
-      updatedAt: dbUser.updated_at,
+      createdAt: this.toISOString(dbUser.created_at),
+      updatedAt: this.toISOString(dbUser.updated_at),
       providers: providers,
       profile: dbUser.profile,
       metadata: dbUser.metadata,

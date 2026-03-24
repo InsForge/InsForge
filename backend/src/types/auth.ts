@@ -8,8 +8,8 @@ export interface UserRecord {
   email_verified: boolean;
   is_project_admin: boolean;
   is_anonymous: boolean;
-  created_at: string;
-  updated_at: string;
+  created_at: string | Date;
+  updated_at: string | Date;
   password?: string;
   providers?: string;
 }

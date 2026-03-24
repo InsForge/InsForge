@@ -109,8 +109,8 @@ describe('device auth session exchange', () => {
           email_verified: true,
           is_project_admin: false,
           is_anonymous: false,
-          created_at: '2026-03-24T00:00:00.000Z',
-          updated_at: '2026-03-24T00:00:00.000Z',
+          created_at: new Date('2026-03-24T00:00:00.000Z'),
+          updated_at: new Date('2026-03-24T00:00:00.000Z'),
           password: 'hashed-password',
           providers: 'email',
         };
@@ -128,6 +128,8 @@ describe('device auth session exchange', () => {
       accessToken: 'access-token-123',
       user: {
         email: 'device-user@example.com',
+        createdAt: '2026-03-24T00:00:00.000Z',
+        updatedAt: '2026-03-24T00:00:00.000Z',
       },
     });
     expect(session).not.toHaveProperty('refreshToken');
