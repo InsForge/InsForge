@@ -25,7 +25,10 @@ export const roleSchema = z.enum(['anon', 'authenticated', 'project_admin']);
 
 export const verificationMethodSchema = z.enum(['code', 'link']);
 
-export const deviceAuthorizationDeviceCodeSchema = z.string().min(1);
+export const deviceAuthorizationDeviceCodeSchema = z
+  .string()
+  .length(64, 'Invalid device code length')
+  .regex(/^[A-Fa-f0-9]{64}$/, 'Invalid device code format');
 
 export const deviceAuthorizationUserCodeSchema = z
   .string()

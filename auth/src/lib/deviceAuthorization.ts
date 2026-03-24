@@ -33,7 +33,7 @@ export function normalizeUserCodeInput(value: string): string {
     return `${cleaned.slice(0, 5)}-${cleaned.slice(5)}`;
   }
 
-  return value.toUpperCase().trim();
+  return cleaned;
 }
 
 export function buildDeviceConsentPath(userCode: string): string {

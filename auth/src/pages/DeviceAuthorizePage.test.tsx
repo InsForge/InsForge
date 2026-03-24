@@ -62,12 +62,11 @@ describe('DeviceAuthorizePage', () => {
           method: 'POST',
         })
       );
+      expect(navigateMock).toHaveBeenCalledWith(
+        '/auth/sign-in?redirect=%2Fauth%2Fdevice%2Fconsent%3Fuser_code%3DABCDE-FGHIJ',
+        { replace: true }
+      );
     });
-
-    expect(navigateMock).toHaveBeenCalledWith(
-      '/auth/sign-in?redirect=%2Fauth%2Fdevice%2Fconsent%3Fuser_code%3DABCDE-FGHIJ',
-      { replace: true }
-    );
   });
 
   it('navigates with the code that was validated even if the field changes before lookup resolves', async () => {
@@ -79,9 +78,7 @@ describe('DeviceAuthorizePage', () => {
         })
     );
     isSignedInMock.mockReturnValue(true);
-    getSessionMock.mockResolvedValue({
-      accessToken: 'access-token-123',
-    });
+    getSessionMock.mockRejectedValue(new Error('getSession should not run for signed-in browsers'));
 
     render(
       <MemoryRouter initialEntries={['/auth/device?user_code=abcde-fghij']}>

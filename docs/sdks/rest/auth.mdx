@@ -834,7 +834,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/device/authorizations" \
 
 ```json
 {
-  "deviceCode": "device-code-123",
+  "deviceCode": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
   "userCode": "ABCDE-FGHIJ",
   "verificationUri": "https://your-app.insforge.app/auth/device",
   "verificationUriComplete": "https://your-app.insforge.app/auth/device?user_code=ABCDE-FGHIJ",
@@ -917,7 +917,7 @@ POST /api/auth/device/token
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `deviceCode` | string | Yes | Device code returned from create |
-| `grantType` | string | Yes | Must be `urn:insforge:params:oauth:grant-type:device_code` |
+| `grantType` | string | Yes | Must be `urn:ietf:params:oauth:grant-type:device_code` |
 
 ### Example
 
@@ -925,8 +925,8 @@ POST /api/auth/device/token
 curl -X POST "https://your-app.insforge.app/api/auth/device/token" \
   -H "Content-Type: application/json" \
   -d '{
-    "deviceCode": "device-code-123",
-    "grantType": "urn:insforge:params:oauth:grant-type:device_code"
+    "deviceCode": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "grantType": "urn:ietf:params:oauth:grant-type:device_code"
   }'
 ```
 

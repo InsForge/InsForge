@@ -132,7 +132,7 @@ Example request:
 ```json
 {
   "deviceCode": "high-entropy-secret",
-  "grantType": "urn:insforge:params:oauth:grant-type:device_code"
+  "grantType": "urn:ietf:params:oauth:grant-type:device_code"
 }
 ```
 

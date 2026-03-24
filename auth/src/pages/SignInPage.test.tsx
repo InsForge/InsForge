@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildSessionRedirectUrl } from '../lib/sessionRedirect';
 
-describe('SignInPage', () => {
+describe('buildSessionRedirectUrl', () => {
   it('preserves the consent redirect query string when appending session tokens', () => {
     const redirectUrl = buildSessionRedirectUrl(
       '/auth/device/consent?user_code=ABCDE-FGHIJ',
@@ -26,6 +26,7 @@ describe('SignInPage', () => {
     expect(url.searchParams.get('access_token')).toBe('access-token-123');
     expect(url.searchParams.get('user_id')).toBe('11111111-1111-1111-1111-111111111111');
     expect(url.searchParams.get('email')).toBe('user@example.com');
+    expect(url.searchParams.get('name')).toBe('Jane Doe');
     expect(url.searchParams.get('csrf_token')).toBe('csrf-token-123');
   });
 });

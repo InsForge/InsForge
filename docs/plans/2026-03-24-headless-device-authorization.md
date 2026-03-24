@@ -201,7 +201,7 @@ it('returns authorization_pending while approval is missing', async () => {
     .post('/api/auth/device/token')
     .send({
       deviceCode: create.body.deviceCode,
-      grantType: 'urn:insforge:params:oauth:grant-type:device_code',
+      grantType: 'urn:ietf:params:oauth:grant-type:device_code',
     });
 
   expect(response.status).toBe(428);

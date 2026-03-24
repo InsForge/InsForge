@@ -155,7 +155,7 @@ Device authorization endpoints return direct JSON payloads instead of the `succe
 **Success Response (200):**
 ```json
 {
-  "deviceCode": "device-code-123",
+  "deviceCode": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
   "userCode": "ABCDE-FGHIJ",
   "verificationUri": "https://your-app.insforge.app/auth/device",
   "verificationUriComplete": "https://your-app.insforge.app/auth/device?user_code=ABCDE-FGHIJ",

@@ -5,8 +5,11 @@ import {
   createDeviceAuthorizationResponseSchema,
   denyDeviceAuthorizationRequestSchema,
   exchangeDeviceAuthorizationRequestSchema,
+  exchangeDeviceAuthorizationSuccessResponseSchema,
 } from '@insforge/shared-schemas';
 import { deviceAuthorizationStatusSchema } from '@insforge/shared-schemas';
+
+const DEVICE_CODE = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
 describe('device auth shared schemas', () => {
   it('accepts device authorization creation payloads', () => {
@@ -29,7 +32,7 @@ describe('device auth shared schemas', () => {
 
   it('accepts device authorization creation responses', () => {
     const result = createDeviceAuthorizationResponseSchema.parse({
-      deviceCode: 'secret-device-code',
+      deviceCode: DEVICE_CODE,
       userCode: 'ABCDE-FGHIJ',
       verificationUri: 'https://example.com/auth/device',
       verificationUriComplete: 'https://example.com/auth/device?user_code=ABCDE-FGHIJ',
@@ -43,7 +46,7 @@ describe('device auth shared schemas', () => {
   it('rejects malformed user codes in device authorization responses', () => {
     expect(() =>
       createDeviceAuthorizationResponseSchema.parse({
-        deviceCode: 'secret-device-code',
+        deviceCode: DEVICE_CODE,
         userCode: 'bad-code',
         verificationUri: 'https://example.com/auth/device',
         verificationUriComplete: 'https://example.com/auth/device?user_code=bad-code',
@@ -55,11 +58,11 @@ describe('device auth shared schemas', () => {
 
   it('accepts device authorization exchange payloads', () => {
     const result = exchangeDeviceAuthorizationRequestSchema.parse({
-      deviceCode: 'secret-device-code',
-      grantType: 'urn:insforge:params:oauth:grant-type:device_code',
+      deviceCode: DEVICE_CODE,
+      grantType: 'urn:ietf:params:oauth:grant-type:device_code',
     });
 
-    expect(result.deviceCode).toBe('secret-device-code');
+    expect(result.deviceCode).toBe(DEVICE_CODE);
   });
 
   it('rejects malformed user codes in approve or deny payloads', () => {
@@ -79,8 +82,34 @@ describe('device auth shared schemas', () => {
   it('rejects invalid grant types in device authorization exchange payloads', () => {
     expect(() =>
       exchangeDeviceAuthorizationRequestSchema.parse({
-        deviceCode: 'secret-device-code',
+        deviceCode: DEVICE_CODE,
         grantType: 'wrong-grant-type',
+      })
+    ).toThrow();
+  });
+
+  it('rejects malformed device codes in exchange payloads', () => {
+    expect(() =>
+      exchangeDeviceAuthorizationRequestSchema.parse({
+        deviceCode: 'secret-device-code',
+        grantType: 'urn:ietf:params:oauth:grant-type:device_code',
+      })
+    ).toThrow();
+  });
+
+  it('requires refreshToken in the device authorization exchange response', () => {
+    expect(() =>
+      exchangeDeviceAuthorizationSuccessResponseSchema.parse({
+        accessToken: 'access-token-123',
+        user: {
+          id: '11111111-1111-1111-1111-111111111111',
+          email: 'user@example.com',
+          emailVerified: true,
+          createdAt: '2026-03-24T00:00:00.000Z',
+          updatedAt: '2026-03-24T00:00:00.000Z',
+          profile: null,
+          metadata: null,
+        },
       })
     ).toThrow();
   });

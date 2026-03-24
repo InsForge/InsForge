@@ -4,6 +4,7 @@ import {
   createDeviceAuthorizationRequestSchema,
   createDeviceAuthorizationResponseSchema,
   denyDeviceAuthorizationRequestSchema,
+  exchangeDeviceAuthorizationSuccessResponseSchema,
   exchangeDeviceAuthorizationRequestSchema,
   type CreateDeviceAuthorizationResponse,
   type DeviceAuthorizationSessionSchema,
@@ -199,10 +200,13 @@ router.post(
       );
       const refreshToken = tokenManager.generateRefreshToken(session.user.id);
 
-      successResponse(res, {
-        ...session,
-        refreshToken,
-      });
+      successResponse(
+        res,
+        exchangeDeviceAuthorizationSuccessResponseSchema.parse({
+          ...session,
+          refreshToken,
+        })
+      );
     } catch (error) {
       const mapped = mapDeviceTokenError(error);
       if (mapped) {

@@ -61,7 +61,7 @@ export function DeviceAuthorizePage() {
         throw new Error('This device code is no longer valid.');
       }
 
-      const browserSession = getSession ? await getSession() : null;
+      const browserSession = isSignedIn || !getSession ? null : await getSession();
       const hasBrowserSession =
         Boolean(isSignedIn) ||
         Boolean(browserSession && typeof browserSession === 'object' && browserSession.accessToken);

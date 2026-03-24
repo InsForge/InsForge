@@ -96,7 +96,7 @@ export const denyDeviceAuthorizationRequestSchema = z.object({
 
 export const exchangeDeviceAuthorizationRequestSchema = z.object({
   deviceCode: deviceAuthorizationDeviceCodeSchema,
-  grantType: z.literal('urn:insforge:params:oauth:grant-type:device_code'),
+  grantType: z.literal('urn:ietf:params:oauth:grant-type:device_code'),
 });
 
 /**
@@ -230,7 +230,9 @@ export const refreshSessionResponseSchema = z.object({
   refreshToken: z.string().optional(), // For mobile/desktop clients (no cookies)
 });
 
-export const exchangeDeviceAuthorizationSuccessResponseSchema = createSessionResponseSchema;
+export const exchangeDeviceAuthorizationSuccessResponseSchema = createSessionResponseSchema.extend({
+  refreshToken: z.string().min(1, 'refreshToken is required'),
+});
 
 /**
  * Response for POST /api/auth/email/exchange-reset-password-token

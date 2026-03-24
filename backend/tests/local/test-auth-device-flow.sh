@@ -6,10 +6,20 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "$SCRIPT_DIR/../test-config.sh"
 
 API_BASE="$TEST_API_BASE"
-DEVICE_GRANT_TYPE="urn:insforge:params:oauth:grant-type:device_code"
-POLL_INTERVAL_SECONDS=5
-MAX_WAIT_SECONDS=900
-MAX_ATTEMPTS=$((MAX_WAIT_SECONDS / POLL_INTERVAL_SECONDS))
+DEVICE_GRANT_TYPE="urn:ietf:params:oauth:grant-type:device_code"
+DEFAULT_POLL_INTERVAL_SECONDS=5
+DEFAULT_MAX_WAIT_SECONDS=900
+
+read_positive_integer() {
+  local value="$1"
+  local fallback="$2"
+
+  if [[ "$value" =~ ^[1-9][0-9]*$ ]]; then
+    echo "$value"
+  else
+    echo "$fallback"
+  fi
+}
 
 if [ "${CI:-}" = "true" ] || [ ! -t 0 ]; then
   echo "Skipping manual device authorization smoke test in non-interactive mode."
@@ -26,6 +36,8 @@ device_code="$(echo "$create_response" | jq -r '.deviceCode // empty')"
 user_code="$(echo "$create_response" | jq -r '.userCode // empty')"
 verification_uri="$(echo "$create_response" | jq -r '.verificationUri // empty')"
 verification_uri_complete="$(echo "$create_response" | jq -r '.verificationUriComplete // empty')"
+poll_interval_seconds="$(read_positive_integer "$(echo "$create_response" | jq -r '.interval // empty')" "$DEFAULT_POLL_INTERVAL_SECONDS")"
+expires_in_seconds="$(read_positive_integer "$(echo "$create_response" | jq -r '.expiresIn // empty')" "$DEFAULT_MAX_WAIT_SECONDS")"
 
 if [ -z "$device_code" ] || [ -z "$user_code" ] || [ -z "$verification_uri_complete" ]; then
   echo "❌ Failed to create a device authorization session"
@@ -43,10 +55,11 @@ echo "Manual step: approve the device in the browser before continuing."
 read -r -p "Press Enter once the browser confirmation is complete..." _
 
 attempt=1
-sleep_seconds="$POLL_INTERVAL_SECONDS"
+sleep_seconds="$poll_interval_seconds"
+deadline_epoch=$(( $(date +%s) + expires_in_seconds ))
 
-while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
-  echo "Polling device token endpoint (attempt $attempt/$MAX_ATTEMPTS)..."
+while [ "$(date +%s)" -lt "$deadline_epoch" ]; do
+  echo "Polling device token endpoint (attempt $attempt)..."
 
   token_response="$(curl -sS -X POST "$API_BASE/auth/device/token" \
     -H "Content-Type: application/json" \
@@ -66,7 +79,7 @@ while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
       ;;
     slow_down)
       echo "Server requested slower polling."
-      sleep_seconds=10
+      sleep_seconds=$((sleep_seconds + 5))
       ;;
     access_denied|expired_token|already_used)
       echo "Device authorization failed: $error"

@@ -425,7 +425,7 @@ describe('DeviceAuthorizationService', () => {
     const service = DeviceAuthorizationService.getInstance();
     const created = await service.create({});
 
-    await service.deny(created.userCode);
+    await service.deny(created.userCode, '22222222-2222-2222-2222-222222222222');
 
     const storedRow = Array.from(rows.values())[0];
     expect(storedRow).toBeDefined();

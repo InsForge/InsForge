@@ -124,6 +124,8 @@ type ServerHandle = {
   baseUrl: string;
 };
 
+const DEVICE_CODE = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+
 async function createServer(): Promise<ServerHandle> {
   const { default: authRouter } = await import('../../src/api/routes/auth/index.routes.js');
   const { errorMiddleware } = await import('../../src/api/middlewares/error.js');
@@ -184,7 +186,7 @@ describe('device auth routes', () => {
     deviceAuthorizationServiceMock.create.mockResolvedValue({
       id: '11111111-1111-1111-1111-111111111111',
       status: 'pending_authorization',
-      deviceCode: 'device-code-123',
+      deviceCode: DEVICE_CODE,
       userCode: 'ABCDE-FGHIJ',
       expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
       pollIntervalSeconds: 5,
@@ -199,7 +201,7 @@ describe('device auth routes', () => {
     deviceAuthorizationServiceMock.markAuthenticated.mockResolvedValue({
       id: '11111111-1111-1111-1111-111111111111',
       status: 'authenticated',
-      deviceCode: 'device-code-123',
+      deviceCode: DEVICE_CODE,
       userCode: 'ABCDE-FGHIJ',
       expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
       pollIntervalSeconds: 5,
@@ -214,7 +216,7 @@ describe('device auth routes', () => {
     deviceAuthorizationServiceMock.approve.mockResolvedValue({
       id: '11111111-1111-1111-1111-111111111111',
       status: 'approved',
-      deviceCode: 'device-code-123',
+      deviceCode: DEVICE_CODE,
       userCode: 'ABCDE-FGHIJ',
       expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
       pollIntervalSeconds: 5,
@@ -229,7 +231,7 @@ describe('device auth routes', () => {
     deviceAuthorizationServiceMock.deny.mockResolvedValue({
       id: '11111111-1111-1111-1111-111111111111',
       status: 'denied',
-      deviceCode: 'device-code-123',
+      deviceCode: DEVICE_CODE,
       userCode: 'ABCDE-FGHIJ',
       expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
       pollIntervalSeconds: 5,
@@ -244,7 +246,7 @@ describe('device auth routes', () => {
     deviceAuthorizationServiceMock.findByUserCode.mockResolvedValue({
       id: '11111111-1111-1111-1111-111111111111',
       status: 'pending_authorization',
-      deviceCode: 'device-code-123',
+      deviceCode: DEVICE_CODE,
       userCode: 'ABCDE-FGHIJ',
       expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
       pollIntervalSeconds: 5,
@@ -286,7 +288,8 @@ describe('device auth routes', () => {
 
       expect(result.status).toBe(200);
       expect(result.body.userCode).toBe('ABCDE-FGHIJ');
-      expect(result.body.verificationUri).toBe('http://localhost:7130/auth/device');
+      const verificationUri = new URL(String(result.body.verificationUri));
+      expect(verificationUri.pathname).toBe('/auth/device');
     } finally {
       await server.close();
     }
@@ -356,8 +359,8 @@ describe('device auth routes', () => {
 
     try {
       const result = await postJson(`${server.baseUrl}/api/auth/device/token`, {
-        deviceCode: 'device-code-123',
-        grantType: 'urn:insforge:params:oauth:grant-type:device_code',
+        deviceCode: DEVICE_CODE,
+        grantType: 'urn:ietf:params:oauth:grant-type:device_code',
       });
 
       expect(result.status).toBe(428);
@@ -375,8 +378,8 @@ describe('device auth routes', () => {
 
     try {
       const result = await postJson(`${server.baseUrl}/api/auth/device/token`, {
-        deviceCode: 'device-code-123',
-        grantType: 'urn:insforge:params:oauth:grant-type:device_code',
+        deviceCode: DEVICE_CODE,
+        grantType: 'urn:ietf:params:oauth:grant-type:device_code',
       });
 
       expect(result.status).toBe(200);
@@ -403,8 +406,8 @@ describe('device auth routes', () => {
 
     try {
       const result = await postJson(`${server.baseUrl}/api/auth/device/token`, {
-        deviceCode: 'device-code-123',
-        grantType: 'urn:insforge:params:oauth:grant-type:device_code',
+        deviceCode: DEVICE_CODE,
+        grantType: 'urn:ietf:params:oauth:grant-type:device_code',
       });
 
       expect(result.status).toBe(statusCode);

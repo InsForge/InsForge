@@ -172,7 +172,7 @@ else
                     echo "Response: $approve_body"
                     track_test_failure
                 else
-                    device_token_response="$(http_json_request POST "$API_BASE/auth/device/token" '{"deviceCode":"'$device_code'","grantType":"urn:insforge:params:oauth:grant-type:device_code"}')"
+                    device_token_response="$(http_json_request POST "$API_BASE/auth/device/token" '{"deviceCode":"'$device_code'","grantType":"urn:ietf:params:oauth:grant-type:device_code"}')"
                     device_token_status="${device_token_response%%$'\n'*}"
                     device_token_body="${device_token_response#*$'\n'}"
 
@@ -191,7 +191,7 @@ else
                         else
                             print_success "Device authorization exchange returned access and refresh tokens"
 
-                            repeat_token_response="$(http_json_request POST "$API_BASE/auth/device/token" '{"deviceCode":"'$device_code'","grantType":"urn:insforge:params:oauth:grant-type:device_code"}')"
+                            repeat_token_response="$(http_json_request POST "$API_BASE/auth/device/token" '{"deviceCode":"'$device_code'","grantType":"urn:ietf:params:oauth:grant-type:device_code"}')"
                             repeat_token_status="${repeat_token_response%%$'\n'*}"
                             repeat_token_body="${repeat_token_response#*$'\n'}"
 

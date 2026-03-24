@@ -35,9 +35,8 @@ export function DeviceConsentPage() {
     () => normalizeUserCodeInput(searchParams.get('user_code') || ''),
     [searchParams]
   );
-  const queryAccessToken = searchParams.get('access_token');
-  const [accessToken, setAccessToken] = useState<string | null>(queryAccessToken);
-  const [authChecked, setAuthChecked] = useState(Boolean(queryAccessToken));
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [authorization, setAuthorization] = useState<DeviceAuthorizationSessionView | null>(null);
   const [loadingAuthorization, setLoadingAuthorization] = useState(true);
   const [actionState, setActionState] = useState<'idle' | 'approving' | 'denying'>('idle');
@@ -48,25 +47,25 @@ export function DeviceConsentPage() {
     let cancelled = false;
 
     async function resolveSessionToken() {
-      if (queryAccessToken) {
-        setAccessToken(queryAccessToken);
-        setAuthChecked(true);
-        return;
-      }
-
       if (!isLoaded) {
         return;
       }
 
-      const session = getSession ? await getSession() : null;
-      if (cancelled) {
-        return;
-      }
+      try {
+        const session = getSession ? await getSession() : null;
+        if (cancelled) {
+          return;
+        }
 
-      if (session && typeof session === 'object' && session.accessToken) {
-        setAccessToken(session.accessToken);
-        setAuthChecked(true);
-        return;
+        if (session && typeof session === 'object' && session.accessToken) {
+          setAccessToken(session.accessToken);
+          setAuthChecked(true);
+          return;
+        }
+      } catch {
+        if (cancelled) {
+          return;
+        }
       }
 
       void navigate(buildDeviceSignInPath(userCode), { replace: true });
@@ -77,7 +76,7 @@ export function DeviceConsentPage() {
     return () => {
       cancelled = true;
     };
-  }, [getSession, isLoaded, navigate, queryAccessToken, userCode]);
+  }, [getSession, isLoaded, navigate, userCode]);
 
   useEffect(() => {
     let cancelled = false;
