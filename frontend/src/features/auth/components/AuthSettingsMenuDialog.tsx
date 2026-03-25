@@ -110,8 +110,15 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
   });
 
   const requireEmailVerification = form.watch('requireEmailVerification');
-  const allowedRedirectUrls = form.watch('allowedRedirectUrls') || [];
-  const visibleAllowedRedirectUrls = allowedRedirectUrls.length > 0 ? allowedRedirectUrls : [''];
+  const watchedAllowedRedirectUrls = form.watch('allowedRedirectUrls');
+  const allowedRedirectUrls = useMemo(
+    () => watchedAllowedRedirectUrls ?? [],
+    [watchedAllowedRedirectUrls]
+  );
+  const visibleAllowedRedirectUrls = useMemo(
+    () => (allowedRedirectUrls.length > 0 ? allowedRedirectUrls : ['']),
+    [allowedRedirectUrls]
+  );
 
   const resetForm = useCallback(() => {
     form.reset(toFormValues(config));
