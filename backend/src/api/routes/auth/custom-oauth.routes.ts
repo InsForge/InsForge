@@ -332,7 +332,10 @@ router.get('/:key/callback', async (req: Request, res: Response, next: NextFunct
         const stateData = jwt.verify(req.query.state as string, validateJwtSecret()) as {
           redirectUri?: string;
         };
-        if (stateData.redirectUri) {
+        if (
+          stateData.redirectUri &&
+          (await authConfigService.validateRedirectUrl(stateData.redirectUri))
+        ) {
           const errorUrl = new URL(stateData.redirectUri);
           errorUrl.searchParams.set('error', 'Authentication failed');
           return res.redirect(errorUrl.toString());

@@ -84,7 +84,7 @@ class AuthViewModel : ViewModel() {
     }
 
     // Resend verification email
-    suspend fun resendVerificationCode(email: String) {
+    suspend fun resendVerificationEmail(email: String) {
         try {
             client.auth.resendVerificationEmail(email = email)
             // Show success message
@@ -290,6 +290,8 @@ fun startGoogleLogin() {
 
 ```kotlin
 class AuthCallbackActivity : AppCompatActivity() {
+    // Example: read the shared InsForge client from your Application class.
+    private val client by lazy { (application as MyApp).insforgeClient }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -328,6 +330,8 @@ class AuthCallbackActivity : AppCompatActivity() {
     }
 }
 ```
+
+`client` should come from the same shared InsForge client instance you use elsewhere in the app, such as an `Application` singleton or your DI container.
 
 ---
 

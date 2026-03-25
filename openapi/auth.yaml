@@ -304,7 +304,12 @@ paths:
                 redirectTo:
                   type: string
                   format: uri
-                  description: Used for link-based email verification. The email link always opens an InsForge backend endpoint first; after the token is verified, InsForge redirects the browser to this URL. This URL must be included in allowedRedirectUrls. Recommended: use your app's sign-in page.
+                  description: >-
+                    Used for link-based email verification. The email link always
+                    opens an InsForge backend endpoint first; after the token is
+                    verified, InsForge redirects the browser to this URL. This URL
+                    must be included in allowedRedirectUrls. Recommended: use your
+                    app's sign-in page.
       responses:
         '200':
           description: User created successfully
@@ -756,7 +761,12 @@ paths:
                 redirectTo:
                   type: string
                   format: uri
-                  description: Used for link-based email verification. The email link always opens an InsForge backend endpoint first; after the token is verified, InsForge redirects the browser to this URL. This URL must be included in allowedRedirectUrls. Recommended: use your app's sign-in page.
+                  description: >-
+                    Used for link-based email verification. The email link always
+                    opens an InsForge backend endpoint first; after the token is
+                    verified, InsForge redirects the browser to this URL. This URL
+                    must be included in allowedRedirectUrls. Recommended: use your
+                    app's sign-in page.
       responses:
         '202':
           description: Verification email sent (if email exists). Message varies based on configured method.
@@ -899,7 +909,13 @@ paths:
                 redirectTo:
                   type: string
                   format: uri
-                  description: Used for link-based password reset. The email link always opens an InsForge backend endpoint first; InsForge then redirects the browser to this URL with the reset token in the query string. This URL must be included in allowedRedirectUrls. Recommended: use your app's dedicated reset-password page.
+                  description: >-
+                    Used for link-based password reset. The email link always
+                    opens an InsForge backend endpoint first; InsForge then
+                    redirects the browser to this URL with the reset token in
+                    the query string. This URL must be included in
+                    allowedRedirectUrls. Recommended: use your app's dedicated
+                    reset-password page.
       responses:
         '202':
           description: Password reset email sent (if email exists). Message varies based on configured method.

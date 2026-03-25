@@ -2,6 +2,12 @@
 -- and persist per-request redirect targets for email OTP flows.
 ALTER TABLE IF EXISTS auth.configs RENAME TO config;
 
+-- Keep the trigger name aligned with the renamed auth.config table.
+DROP TRIGGER IF EXISTS update_configs_updated_at ON auth.config;
+CREATE TRIGGER update_config_updated_at
+BEFORE UPDATE ON auth.config
+FOR EACH ROW EXECUTE FUNCTION system.update_updated_at();
+
 -- Add allowed_redirect_urls column to auth.config
 -- Default is an empty array to maintain permissive fallback
 ALTER TABLE auth.config

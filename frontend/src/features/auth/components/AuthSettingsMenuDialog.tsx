@@ -87,9 +87,9 @@ function SettingRow({ label, description, children }: SettingRowProps) {
           <p className="text-sm leading-5 text-foreground">{label}</p>
         </div>
         {description && (
-          <p className="pt-1 pb-2 text-[13px] leading-[18px] text-muted-foreground">
+          <div className="pt-1 pb-2 text-[13px] leading-[18px] text-muted-foreground">
             {description}
-          </p>
+          </div>
         )}
       </div>
       <div className="min-w-0 flex-1">{children}</div>
@@ -266,7 +266,7 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                   <>
                     <SettingRow
                       label="Allowed Redirect URLs"
-                      description="Allowed URLs for authentication redirects. If empty, all URLs are allowed."
+                      description="Allowed URLs for authentication redirects. If empty, all URLs are allowed. This is convenient for development but insecure for production."
                     >
                       <div className="flex flex-col gap-2">
                         {visibleAllowedRedirectUrls.map((url, index) => {

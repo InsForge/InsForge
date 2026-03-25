@@ -912,6 +912,13 @@ curl "https://your-app.insforge.app/api/auth/config" \
 }
 ```
 
+`allowedRedirectUrls` entries are matched against the full `redirectTo` value, including scheme, host, optional port, and path.
+
+- Exact entries must match exactly, such as `https://myapp.com/dashboard`.
+- Wildcards are supported only in the host portion, such as `https://*.myapp.com/callback`.
+- Deep links are allowed when explicitly listed, such as `com.example.app:/oauth2redirect` or `myapp://auth/callback`.
+- If `allowedRedirectUrls` is empty, InsForge allows all redirects for developer convenience. This is insecure for production and should be avoided outside local development.
+
 ### Update Auth Configuration
 
 Update authentication settings (admin only).
@@ -932,7 +939,7 @@ PUT /api/auth/config
 | `requireSpecialChar` | boolean | No | Require special characters in password |
 | `verifyEmailMethod` | string | No | Email verification method (`code` or `link`) |
 | `resetPasswordMethod` | string | No | Password reset method (`code` or `link`) |
-| `allowedRedirectUrls` | array | No | List of allowed redirect URLs (supports wildcards like `*.domain.com`) |
+| `allowedRedirectUrls` | array | No | List of allowed redirect URLs. Entries are matched against the full `redirectTo` value. Exact URLs must match exactly, host wildcards such as `https://*.domain.com/callback` are supported, and custom deep links such as `com.example.app:/oauth2redirect` are allowed when explicitly listed. If empty, all redirects are allowed, which is insecure for production. |
 
 #### Example
 

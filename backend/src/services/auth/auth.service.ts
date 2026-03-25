@@ -135,10 +135,10 @@ export class AuthService {
     const authConfigService = AuthConfigService.getInstance();
     const emailAuthConfig = await authConfigService.getAuthConfig();
     const isAdminCreation = options?.isAdminCreation ?? false;
-    const requiresVerifyEmailLink =
-      emailAuthConfig.requireEmailVerification &&
-      emailAuthConfig.verifyEmailMethod === 'link' &&
-      !isAdminCreation;
+    const requiresEmailVerification = emailAuthConfig.requireEmailVerification;
+    const usesVerifyEmailLink =
+      emailAuthConfig.requireEmailVerification && emailAuthConfig.verifyEmailMethod === 'link';
+    const shouldSendVerificationEmail = requiresEmailVerification && !isAdminCreation;
 
     if (!validatePassword(password, emailAuthConfig)) {
       throw new AppError(
@@ -148,7 +148,7 @@ export class AuthService {
       );
     }
 
-    if (requiresVerifyEmailLink) {
+    if (usesVerifyEmailLink && shouldSendVerificationEmail) {
       if (!redirectTo) {
         throw new AppError(
           'redirectTo is required when link-based email verification is enabled',
@@ -166,6 +166,9 @@ export class AuthService {
         );
       }
     }
+
+    const verifiedRedirectTo =
+      usesVerifyEmailLink && shouldSendVerificationEmail ? redirectTo : null;
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const userId = crypto.randomUUID();
@@ -200,30 +203,20 @@ export class AuthService {
     }
     const user = this.transformUserRecordToSchema(dbUser);
 
-    if (emailAuthConfig.requireEmailVerification) {
-      try {
-        if (emailAuthConfig.verifyEmailMethod === 'link') {
-          if (isAdminCreation && !redirectTo) {
-            logger.info(
-              'Skipping verification email during admin user creation without redirectTo',
-              {
-                email,
-              }
-            );
-            return {
-              accessToken: null,
-              requireEmailVerification: true,
-            };
-          }
+    if (requiresEmailVerification) {
+      if (!shouldSendVerificationEmail) {
+        logger.info('Skipping verification email during admin user creation', {
+          email,
+        });
+        return {
+          accessToken: null,
+          requireEmailVerification: true,
+        };
+      }
 
-          if (!redirectTo) {
-            throw new AppError(
-              'redirectTo is required when link-based email verification is enabled',
-              400,
-              ERROR_CODES.INVALID_INPUT
-            );
-          }
-          await this.sendVerificationEmailWithLink(email, redirectTo);
+      try {
+        if (verifiedRedirectTo) {
+          await this.sendVerificationEmailWithLink(email, verifiedRedirectTo);
         } else {
           await this.sendVerificationEmailWithCode(email);
         }

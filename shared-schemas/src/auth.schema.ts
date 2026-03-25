@@ -91,7 +91,7 @@ export const oAuthConfigSchema = z.object({
 });
 
 export const allowedRedirectUrlsRegex =
-  /^(?:(https?:\/\/)(?:(?:\*\.)?(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}|localhost)(?::\d+)?(?:\/.*)?|[a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^\s/]+(?:\/.*)?)$/;
+  /^(?:(?:https?:\/\/)(?:(?:\*\.)?[^\s/:?#]+|\[[0-9A-Fa-f:.]+\])(?::\d+)?(?:\/[^\s]*)?|(?!(?:https?|javascript|data|file|vbscript):)[a-zA-Z][a-zA-Z0-9+.-]*:(?:\/\/[^\s/]+(?:\/[^\s]*)?|\/[^\s]*))$/i;
 
 // Email authentication configuration schema
 export const authConfigSchema = z.object({
