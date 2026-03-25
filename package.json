@@ -100,6 +100,8 @@
   "author": "InsForge",
   "license": "Apache-2.0",
   "overrides": {
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "undici": ">=6.24.0",
+    "fast-xml-parser": ">=5.5.7"
   }
 }
