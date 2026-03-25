@@ -121,7 +121,7 @@ COPY --from=build /app/package.json ./package.json
 RUN npm install -g "tsx@^4.7.1" && npm cache clean --force
 
 # Run as non-root using the built-in node user (uid 1000)
-RUN mkdir -p /data && chown -R node:node /app /data
+RUN mkdir -p /data /insforge-storage /insforge-logs && chown -R node:node /app /data /insforge-storage /insforge-logs
 USER node
 
 EXPOSE 7130 7131
