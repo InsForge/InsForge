@@ -136,6 +136,11 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
 
   const handleAllowedRedirectUrlChange = useCallback(
     (index: number, value: string) => {
+      if (allowedRedirectUrls.length === 0 && value === '') {
+        updateAllowedRedirectUrls([]);
+        return;
+      }
+
       const nextAllowedRedirectUrls =
         allowedRedirectUrls.length > 0 ? [...allowedRedirectUrls] : [''];
       nextAllowedRedirectUrls[index] = value;
