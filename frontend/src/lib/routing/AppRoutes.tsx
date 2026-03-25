@@ -16,6 +16,7 @@ import FunctionsPage from '@/features/functions/pages/FunctionsPage';
 import SecretsPage from '@/features/functions/pages/SecretsPage';
 import SchedulesPage from '@/features/functions/pages/SchedulesPage';
 import AIPage from '@/features/ai/pages/AIPage';
+import AIUsagePage from '@/features/ai/pages/AIUsagePage';
 import RealtimeChannelsPage from '@/features/realtime/pages/RealtimeChannelsPage';
 import RealtimeMessagesPage from '@/features/realtime/pages/RealtimeMessagesPage';
 import RealtimePermissionsPage from '@/features/realtime/pages/RealtimePermissionsPage';
@@ -98,6 +99,7 @@ export function AppRoutes() {
                 <Route path="/dashboard/functions/schedules" element={<SchedulesPage />} />
                 <Route path="/dashboard/visualizer" element={<VisualizerPage />} />
                 <Route path="/dashboard/ai" element={<AIPage />} />
+                <Route path="/dashboard/ai/usage" element={<AIUsagePage />} />
                 <Route
                   path="/dashboard/realtime"
                   element={<Navigate to="/dashboard/realtime/channels" replace />}

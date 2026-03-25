@@ -43,6 +43,7 @@ export const aiUsageRecordSchema = aiUsageDataSchema.extend({
   provider: z.string().nullable(),
   inputModality: z.array(modalitySchema).nullable(),
   outputModality: z.array(modalitySchema).nullable(),
+  usageType: z.string().optional(),
 });
 
 export const aiUsageSummarySchema = z.object({
@@ -51,6 +52,8 @@ export const aiUsageSummarySchema = z.object({
   totalTokens: z.number(),
   totalImageCount: z.number(),
   totalRequests: z.number(),
+  embeddingRequests: z.number().optional(),
+  embeddingTokens: z.number().optional(),
 });
 
 // Export types
