@@ -81,6 +81,7 @@ InsForge supports both `code` and `link` methods for email verification and pass
 - `code` method: user receives a 6-digit code and submits it through the app.
 - `link` method: user clicks an email link that always opens an InsForge backend endpoint first.
 - `redirectTo` must be included in `allowedRedirectUrls` before link-based flows can use it.
+- If `allowedRedirectUrls` is empty, InsForge allows all redirects for smoother development UX. Do not rely on that behavior in production.
 
 For link-based email verification:
 

@@ -161,7 +161,7 @@ paths:
                     type: array
                     items:
                       type: string
-                    description: List of allowed URLs for authentication redirects
+                    description: List of allowed URLs for authentication redirects. If empty, all redirects are allowed for smoother development UX. This is not recommended in production.
                   createdAt:
                     type: string
                     format: date-time
@@ -213,7 +213,7 @@ paths:
                   type: array
                   items:
                     type: string
-                  description: List of allowed URLs for authentication redirects
+                  description: List of allowed URLs for authentication redirects. If empty, all redirects are allowed for smoother development UX. This is not recommended in production.
       responses:
         '200':
           description: Configuration updated successfully
@@ -249,7 +249,7 @@ paths:
                     type: array
                     items:
                       type: string
-                    description: List of allowed URLs for authentication redirects
+                    description: List of allowed URLs for authentication redirects. If empty, all redirects are allowed for smoother development UX. This is not recommended in production.
                   createdAt:
                     type: string
                     format: date-time
