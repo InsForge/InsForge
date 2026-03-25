@@ -108,9 +108,10 @@ router.get('/email/verify-link', async (req: Request, res: Response, next: NextF
 
     if (!(await authConfigService.validateRedirectUrl(redirectTo))) {
       throw new AppError(
-        'redirectTo is not in allowed redirect URLs',
+        `${redirectTo} is not in the allowed redirect URLs`,
         400,
-        ERROR_CODES.INVALID_INPUT
+        ERROR_CODES.INVALID_INPUT,
+        'Please add this URL to the allowed redirect URLs in the authentication configuration.'
       );
     }
 
@@ -180,9 +181,10 @@ router.get(
 
       if (!(await authConfigService.validateRedirectUrl(redirectTo))) {
         throw new AppError(
-          'redirectTo is not in allowed redirect URLs',
+          `${redirectTo} is not in the allowed redirect URLs`,
           400,
-          ERROR_CODES.INVALID_INPUT
+          ERROR_CODES.INVALID_INPUT,
+          'Please add this URL to the allowed redirect URLs in the authentication configuration.'
         );
       }
 
@@ -846,9 +848,10 @@ router.post(
             redirectTo,
           });
           throw new AppError(
-            'redirectTo is not in allowed redirect URLs',
+            `${redirectTo} is not in the allowed redirect URLs`,
             400,
-            ERROR_CODES.INVALID_INPUT
+            ERROR_CODES.INVALID_INPUT,
+            'Please add this URL to the allowed redirect URLs in the authentication configuration.'
           );
         }
 
@@ -959,9 +962,10 @@ router.post(
             redirectTo,
           });
           throw new AppError(
-            'redirectTo is not in allowed redirect URLs',
+            `${redirectTo} is not in the allowed redirect URLs`,
             400,
-            ERROR_CODES.INVALID_INPUT
+            ERROR_CODES.INVALID_INPUT,
+            'Please add this URL to the allowed redirect URLs in the authentication configuration.'
           );
         }
 

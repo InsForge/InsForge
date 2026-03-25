@@ -235,9 +235,10 @@ router.get('/:key', async (req: Request, res: Response, next: NextFunction) => {
 
     if (!(await authConfigService.validateRedirectUrl(redirectUri))) {
       throw new AppError(
-        'Redirect URL is not in allowed redirect URLs',
+        `${redirectUri} is not in the allowed redirect URLs`,
         400,
-        ERROR_CODES.INVALID_INPUT
+        ERROR_CODES.INVALID_INPUT,
+        'Please add this URL to the allowed redirect URLs in the authentication configuration.'
       );
     }
 
@@ -291,9 +292,10 @@ router.get('/:key/callback', async (req: Request, res: Response, next: NextFunct
 
     if (!(await authConfigService.validateRedirectUrl(stateData.redirectUri))) {
       throw new AppError(
-        'Redirect URL is not in allowed redirect URLs',
+        `${stateData.redirectUri} is not in the allowed redirect URLs`,
         400,
-        ERROR_CODES.INVALID_INPUT
+        ERROR_CODES.INVALID_INPUT,
+        'Please add this URL to the allowed redirect URLs in the authentication configuration.'
       );
     }
     if (!stateData.codeChallenge) {
