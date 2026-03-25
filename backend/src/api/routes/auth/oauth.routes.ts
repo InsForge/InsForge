@@ -13,6 +13,7 @@ import { setRefreshTokenCookie } from '@/utils/cookies.js';
 import { parseClientType } from '@/utils/utils.js';
 import logger from '@/utils/logger.js';
 import jwt from 'jsonwebtoken';
+
 import {
   createOAuthConfigRequestSchema,
   updateOAuthConfigRequestSchema,
@@ -263,11 +264,19 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
 
     const { redirect_uri, code_challenge } = queryValidation.data;
     const validatedProvider = providerValidation.data;
-    const authConfig = await authConfigService.getAuthConfig();
-    const redirectUri = authConfig.signInRedirectTo || redirect_uri;
+    const redirectUri = redirect_uri;
 
     if (!redirectUri) {
       throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
+    if (!(await authConfigService.validateRedirectUrl(redirectUri))) {
+      throw new AppError(
+        `${redirectUri} is not in the allowed redirect URLs`,
+        400,
+        ERROR_CODES.INVALID_INPUT,
+        'Please add this URL to the allowed redirect URLs in the authentication configuration.'
+      );
     }
 
     const jwtPayload = {
@@ -306,6 +315,8 @@ router.get('/:provider', async (req: Request, res: Response, next: NextFunction)
 
 // GET /api/auth/oauth/shared/callback/:state - Shared callback for OAuth providers
 router.get('/shared/callback/:state', async (req: Request, res: Response, next: NextFunction) => {
+  let redirectUri: string | undefined;
+
   try {
     const { state } = req.params;
     const { success, error, payload } = req.query;
@@ -315,7 +326,6 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       throw new AppError('State parameter is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
-    let redirectUri: string;
     let provider: string;
     let codeChallenge: string;
     try {
@@ -348,6 +358,18 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       throw new AppError('redirectUri is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
+    if (redirectUri && !(await authConfigService.validateRedirectUrl(redirectUri))) {
+      logger.warn('Redirect URI is not in allowed redirect URLs in shared callback', {
+        redirectUri,
+      });
+      throw new AppError(
+        `${redirectUri} is not in the allowed redirect URLs`,
+        400,
+        ERROR_CODES.INVALID_INPUT,
+        'Please add this URL to the allowed redirect URLs in the authentication configuration.'
+      );
+    }
+
     if (!codeChallenge) {
       throw new AppError('code_challenge is required in state', 400, ERROR_CODES.INVALID_INPUT);
     }
@@ -360,29 +382,42 @@ router.get('/shared/callback/:state', async (req: Request, res: Response, next: 
       return res.redirect(errorUrl.toString());
     }
 
-    if (!payload) {
-      throw new AppError('No payload provided in callback', 400, ERROR_CODES.INVALID_INPUT);
+    try {
+      if (!payload) {
+        throw new AppError('No payload provided in callback', 400, ERROR_CODES.INVALID_INPUT);
+      }
+
+      const payloadData = JSON.parse(
+        Buffer.from(payload as string, 'base64').toString('utf8')
+      ) as Record<string, unknown>;
+
+      // Handle shared callback - transforms payload and creates/finds user
+      const result = await authService.handleSharedCallback(validatedProvider, payloadData);
+
+      // Create exchange code for PKCE flow (instead of exposing tokens in URL)
+      // Only store minimal data - user and token are fetched fresh on exchange
+      const exchangeCode = oAuthPKCEService.createCode({
+        userId: result.user.id,
+        codeChallenge,
+        provider: validatedProvider,
+      });
+
+      // Redirect with only the exchange code (no sensitive tokens in URL)
+      const successUrl = new URL(redirectUri);
+      successUrl.searchParams.set('insforge_code', exchangeCode);
+      return res.redirect(successUrl.toString());
+    } catch (error) {
+      logger.error('Shared OAuth callback completion error', {
+        error: error instanceof Error ? error.message : error,
+        stack: error instanceof Error ? error.stack : undefined,
+        provider: validatedProvider,
+      });
+
+      const errorMessage = error instanceof Error ? error.message : 'OAuth Authentication Failed';
+      const errorUrl = new URL(redirectUri);
+      errorUrl.searchParams.set('error', errorMessage);
+      return res.redirect(errorUrl.toString());
     }
-
-    const payloadData = JSON.parse(
-      Buffer.from(payload as string, 'base64').toString('utf8')
-    ) as Record<string, unknown>;
-
-    // Handle shared callback - transforms payload and creates/finds user
-    const result = await authService.handleSharedCallback(validatedProvider, payloadData);
-
-    // Create exchange code for PKCE flow (instead of exposing tokens in URL)
-    // Only store minimal data - user/token/redirectTo are fetched fresh on exchange
-    const exchangeCode = oAuthPKCEService.createCode({
-      userId: result.user.id,
-      codeChallenge,
-      provider: validatedProvider,
-    });
-
-    // Redirect with only the exchange code (no sensitive tokens in URL)
-    const successUrl = new URL(redirectUri);
-    successUrl.searchParams.set('insforge_code', exchangeCode);
-    res.redirect(successUrl.toString());
   } catch (error) {
     logger.error('Shared OAuth callback error', { error });
     next(error);
@@ -431,6 +466,16 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
       throw new AppError('redirectUri is required', 400, ERROR_CODES.INVALID_INPUT);
     }
 
+    if (!(await authConfigService.validateRedirectUrl(redirectUri))) {
+      logger.warn('Redirect URI is not in allowed redirect URLs in callback', { redirectUri });
+      throw new AppError(
+        `${redirectUri} is not in the allowed redirect URLs`,
+        400,
+        ERROR_CODES.INVALID_INPUT,
+        'Please add this URL to the allowed redirect URLs in the authentication configuration.'
+      );
+    }
+
     if (!codeChallenge) {
       throw new AppError('code_challenge is required in state', 400, ERROR_CODES.INVALID_INPUT);
     }
@@ -455,7 +500,7 @@ const handleOAuthCallback = async (req: Request, res: Response, next: NextFuncti
       });
 
       // Create exchange code for PKCE flow (instead of exposing tokens in URL)
-      // Only store minimal data - user/token/redirectTo are fetched fresh on exchange
+      // Only store minimal data - user and token are fetched fresh on exchange
       const exchangeCode = oAuthPKCEService.createCode({
         userId: result.user.id,
         codeChallenge,
@@ -495,7 +540,7 @@ router.get('/:provider/callback', handleOAuthCallback);
 // POST /api/auth/oauth/:provider/callback - OAuth provider callback (Apple uses POST with form_post)
 router.post('/:provider/callback', handleOAuthCallback);
 
-// POST /api/auth/oauth/exchange - Exchange code for tokens (PKCE flow)
+// POST /api/auth/oauth/exchange - Exchange OAuth code for tokens (PKCE flow)
 // Query params: client_type (optional) - 'web' (default), 'mobile', 'desktop', or 'server'
 router.post('/exchange', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -511,16 +556,12 @@ router.post('/exchange', async (req: Request, res: Response, next: NextFunction)
     }
 
     const { code, code_verifier } = validationResult.data;
-
-    // Exchange code for tokens with PKCE validation (fetches user fresh from DB)
     const result = await oAuthPKCEService.exchangeCode(code, code_verifier);
 
-    // Set refresh token based on client type
     const tokenManager = TokenManager.getInstance();
     const refreshToken = tokenManager.generateRefreshToken(result.user.id);
 
     if (clientType === 'web') {
-      // Web clients: use httpOnly cookie + CSRF token
       setRefreshTokenCookie(res, refreshToken);
       const csrfToken = tokenManager.generateCsrfToken(refreshToken);
 
@@ -528,16 +569,12 @@ router.post('/exchange', async (req: Request, res: Response, next: NextFunction)
         accessToken: result.accessToken,
         user: result.user,
         csrfToken,
-        redirectTo: result.redirectTo,
       });
     } else {
-      // Non-web clients (mobile, desktop, server): return refresh token in response body.
-      // Server clients cannot rely on browser cookies, so they follow the native-app flow.
       successResponse(res, {
         accessToken: result.accessToken,
         user: result.user,
         refreshToken,
-        redirectTo: result.redirectTo,
       });
     }
   } catch (error) {

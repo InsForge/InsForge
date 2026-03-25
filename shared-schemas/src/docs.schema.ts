@@ -46,8 +46,6 @@ export const docTypeSchema = z
     'storage-sdk',
     'functions-sdk',
     'ai-integration-sdk',
-    'auth-components-react',
-    'auth-components-nextjs',
     'real-time',
     'deployment',
   ])
@@ -59,8 +57,6 @@ export const docTypeSchema = z
       "storage-sdk" (file storage),
       "functions-sdk" (edge functions),
       "auth-sdk" (direct SDK methods for custom auth flows),
-      "auth-components-react" (authentication components for React+Vite applications),
-      "auth-components-nextjs" (authentication components for Next.js applications),
       "ai-integration-sdk" (AI features),
       "real-time" (real-time pub/sub through WebSockets),
       "deployment" (deploy frontend applications via MCP tool)

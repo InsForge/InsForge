@@ -13,7 +13,6 @@ import type {
   CreateAdminSessionResponse,
   AuthMetadataSchema,
   OAuthProvidersSchema,
-  AuthOptions,
 } from '@insforge/shared-schemas';
 import { OAuthConfigService } from '@/services/auth/oauth-config.service.js';
 import { CustomOAuthConfigService } from '@/services/auth/custom-oauth-config.service.js';
@@ -40,12 +39,12 @@ import {
   OAuthUserData,
 } from '@/types/auth.js';
 import { ADMIN_ID } from '@/utils/constants.js';
-import { getApiBaseUrl } from '@/utils/environment.js';
 import { AppError } from '@/api/middlewares/error.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { EmailService } from '@/services/email/email.service.js';
 import { XOAuthProvider } from '@/providers/oauth/x.provider.js';
 import { AppleOAuthProvider } from '@/providers/oauth/apple.provider.js';
+import { getApiBaseUrl } from '@/utils/environment.js';
 
 /**
  * Simplified JWT-based auth service
@@ -108,6 +107,18 @@ export class AuthService {
   }
 
   /**
+   * Build a backend-owned email link for browser-based auth flows.
+   */
+  private buildEmailLink(
+    pathname: '/api/auth/email/verify-link' | '/api/auth/email/reset-password-link',
+    token: string
+  ): string {
+    const url = new URL(pathname, getApiBaseUrl());
+    url.searchParams.set('token', token);
+    return url.toString();
+  }
+
+  /**
    * User registration
    * Otherwise, returns user with access token for immediate login
    */
@@ -115,11 +126,19 @@ export class AuthService {
     email: string,
     password: string,
     name?: string,
-    options?: AuthOptions
+    redirectTo?: string,
+    options?: {
+      isAdminCreation?: boolean;
+    }
   ): Promise<CreateUserResponse> {
     // Get email auth configuration and validate password
     const authConfigService = AuthConfigService.getInstance();
     const emailAuthConfig = await authConfigService.getAuthConfig();
+    const isAdminCreation = options?.isAdminCreation ?? false;
+    const requiresEmailVerification = emailAuthConfig.requireEmailVerification;
+    const usesVerifyEmailLink =
+      emailAuthConfig.requireEmailVerification && emailAuthConfig.verifyEmailMethod === 'link';
+    const shouldSendVerificationEmail = requiresEmailVerification && !isAdminCreation;
 
     if (!validatePassword(password, emailAuthConfig)) {
       throw new AppError(
@@ -128,6 +147,28 @@ export class AuthService {
         ERROR_CODES.INVALID_INPUT
       );
     }
+
+    if (usesVerifyEmailLink && shouldSendVerificationEmail) {
+      if (!redirectTo) {
+        throw new AppError(
+          'redirectTo is required when link-based email verification is enabled',
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      if (!(await authConfigService.validateRedirectUrl(redirectTo))) {
+        throw new AppError(
+          `${redirectTo} is not in the allowed redirect URLs`,
+          400,
+          ERROR_CODES.INVALID_INPUT,
+          'Please add this URL to the allowed redirect URLs in the authentication configuration.'
+        );
+      }
+    }
+
+    const verifiedRedirectTo =
+      usesVerifyEmailLink && shouldSendVerificationEmail ? redirectTo : null;
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const userId = crypto.randomUUID();
@@ -162,11 +203,20 @@ export class AuthService {
     }
     const user = this.transformUserRecordToSchema(dbUser);
 
-    if (emailAuthConfig.requireEmailVerification) {
+    if (requiresEmailVerification) {
+      if (!shouldSendVerificationEmail) {
+        logger.info('Skipping verification email during admin user creation', {
+          email,
+        });
+        return {
+          accessToken: null,
+          requireEmailVerification: true,
+        };
+      }
+
       try {
-        if (emailAuthConfig.verifyEmailMethod === 'link') {
-          const redirectTo = emailAuthConfig.signInRedirectTo || options?.emailRedirectTo;
-          await this.sendVerificationEmailWithLink(email, redirectTo);
+        if (verifiedRedirectTo) {
+          await this.sendVerificationEmailWithLink(email, verifiedRedirectTo);
         } else {
           await this.sendVerificationEmailWithCode(email);
         }
@@ -190,7 +240,6 @@ export class AuthService {
       user,
       accessToken,
       requireEmailVerification: false,
-      redirectTo: emailAuthConfig.signInRedirectTo || undefined,
     };
   }
 
@@ -229,11 +278,9 @@ export class AuthService {
       role: 'authenticated',
     });
 
-    // Include redirect URL if configured
     const response: CreateSessionResponse = {
       user,
       accessToken,
-      redirectTo: emailAuthConfig.signInRedirectTo || undefined,
     };
 
     return response;
@@ -273,9 +320,10 @@ export class AuthService {
   /**
    * Send verification email with clickable link
    * Creates a long cryptographic token and sends it via email as a clickable link
-   * The link contains only the token (no email) for better privacy and security
+   * The link points to a backend-owned action endpoint, which verifies the
+   * token first and only then redirects the browser to the app.
    */
-  async sendVerificationEmailWithLink(email: string, emailRedirectTo?: string): Promise<void> {
+  async sendVerificationEmailWithLink(email: string, redirectTo: string): Promise<void> {
     // Check if user exists
     const pool = this.getPool();
     const result = await pool.query('SELECT * FROM auth.users WHERE email = $1', [email]);
@@ -291,12 +339,11 @@ export class AuthService {
     const { otp: token } = await otpService.createEmailOTP(
       email,
       OTPPurpose.VERIFY_EMAIL,
-      OTPType.HASH_TOKEN
+      OTPType.HASH_TOKEN,
+      { redirectTo }
     );
 
-    // Build verification link URL using backend API endpoint
-    // Include redirectTo parameter if provided
-    const linkUrl = `${getApiBaseUrl()}/auth/verify-email?token=${token}${emailRedirectTo ? `&redirectTo=${encodeURIComponent(emailRedirectTo)}` : ''}`;
+    const linkUrl = this.buildEmailLink('/api/auth/email/verify-link', token);
 
     // Send email with verification link
     const emailService = EmailService.getInstance();
@@ -355,14 +402,9 @@ export class AuthService {
         role: 'authenticated',
       });
 
-      // Get redirect URL from auth config if configured
-      const authConfigService = AuthConfigService.getInstance();
-      const emailAuthConfig = await authConfigService.getAuthConfig();
-
       return {
         user,
         accessToken,
-        redirectTo: emailAuthConfig.signInRedirectTo || undefined,
       };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -421,14 +463,9 @@ export class AuthService {
         role: 'authenticated',
       });
 
-      // Get redirect URL from auth config if configured
-      const authConfigService = AuthConfigService.getInstance();
-      const emailAuthConfig = await authConfigService.getAuthConfig();
-
       return {
         user,
         accessToken,
-        redirectTo: emailAuthConfig.signInRedirectTo || undefined,
       };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -474,7 +511,7 @@ export class AuthService {
    * Creates a long cryptographic token and sends it via email as a clickable link
    * The link contains only the token (no email) for better privacy and security
    */
-  async sendResetPasswordEmailWithLink(email: string): Promise<void> {
+  async sendResetPasswordEmailWithLink(email: string, redirectTo: string): Promise<void> {
     // Check if user exists
     const pool = this.getPool();
     const result = await pool.query('SELECT * FROM auth.users WHERE email = $1', [email]);
@@ -490,11 +527,11 @@ export class AuthService {
     const { otp: token } = await otpService.createEmailOTP(
       email,
       OTPPurpose.RESET_PASSWORD,
-      OTPType.HASH_TOKEN
+      OTPType.HASH_TOKEN,
+      { redirectTo }
     );
 
-    // Build password reset link URL using backend API endpoint
-    const linkUrl = `${getApiBaseUrl()}/auth/reset-password?token=${token}`;
+    const linkUrl = this.buildEmailLink('/api/auth/email/reset-password-link', token);
 
     // Send email with password reset link
     const emailService = EmailService.getInstance();

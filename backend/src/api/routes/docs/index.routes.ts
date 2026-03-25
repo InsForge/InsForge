@@ -98,10 +98,6 @@ const LEGACY_DOCS_MAP: Record<DocTypeSchema, string> = {
   instructions: 'insforge-instructions-sdk.md',
   'db-sdk': 'sdks/typescript/database.mdx',
   'auth-sdk': 'sdks/typescript/auth.mdx',
-  // UI Components - Framework-specific
-  'auth-components-react': 'sdks/typescript/ui-components/react.mdx',
-  'auth-components-nextjs': 'sdks/typescript/ui-components/nextjs.mdx',
-  // 'auth-components-react-router': 'sdks/typescript/ui-components/react-router.mdx',
   'storage-sdk': 'sdks/typescript/storage.mdx',
   'functions-sdk': 'sdks/typescript/functions.mdx',
   'ai-integration-sdk': 'sdks/typescript/ai.mdx',

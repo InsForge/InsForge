@@ -58,7 +58,6 @@ services:
     ports:
       - "7130:7130"
       - "7131:7131"
-      - "7132:7132"
     environment:
       - PORT=7130
       - PROJECT_ROOT=/app
@@ -97,8 +96,6 @@ services:
       - LOGS_DIR=/insforge-logs
       # Storage directory (for local file storage when S3 is not configured)
       - STORAGE_DIR=/insforge-storage
-      # Auth app URL for development proxy
-      - AUTH_APP_URL=http://localhost:7132
     restart: unless-stopped
     volumes:
       - storage-data:/insforge-storage
