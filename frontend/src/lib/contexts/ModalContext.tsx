@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 
-type SettingsTab = 'info' | 'compute' | 'connect';
+type SettingsTab = 'info' | 'compute' | 'connect' | 'rate-limits';
 
 interface ModalContextType {
   isConnectDialogOpen: boolean;

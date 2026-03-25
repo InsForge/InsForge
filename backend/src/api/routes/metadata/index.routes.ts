@@ -9,10 +9,18 @@ import { verifyAdmin, AuthRequest } from '@/api/middlewares/auth.js';
 import { successResponse } from '@/utils/response.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
 import { AppError } from '@/api/middlewares/error.js';
-import type { AppMetadataSchema, ProjectIdResponse } from '@insforge/shared-schemas';
+import {
+  type AppMetadataSchema,
+  type ProjectIdResponse,
+  updateApiRateLimitConfigRequestSchema,
+} from '@insforge/shared-schemas';
 import { SecretService } from '@/services/secrets/secret.service.js';
 import { DatabaseManager } from '@/infra/database/database.manager.js';
 import { CloudDatabaseProvider } from '@/providers/database/cloud.provider.js';
+import { AuditService } from '@/services/logs/audit.service.js';
+import { ApiRateLimitConfigService } from '@/services/config/api-rate-limit-config.service.js';
+import { applyApiRateLimitConfig, clearRateLimitState } from '@/api/middlewares/rate-limiters.js';
+import logger from '@/utils/logger.js';
 
 const router = Router();
 const authService = AuthService.getInstance();
@@ -22,6 +30,8 @@ const realtimeChannelService = RealtimeChannelService.getInstance();
 const dbManager = DatabaseManager.getInstance();
 const dbAdvanceService = DatabaseAdvanceService.getInstance();
 const aiConfigService = AIConfigService.getInstance();
+const auditService = AuditService.getInstance();
+const apiRateLimitConfigService = ApiRateLimitConfigService.getInstance();
 
 router.use(verifyAdmin);
 
@@ -161,6 +171,55 @@ router.get('/database-password', async (_req: AuthRequest, res: Response, next: 
     const cloudDbProvider = CloudDatabaseProvider.getInstance();
     const passwordInfo = await cloudDbProvider.getDatabasePassword();
     successResponse(res, passwordInfo);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get persisted API rate-limit configuration
+router.get('/rate-limits', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const config = await apiRateLimitConfigService.getApiRateLimitConfig();
+    successResponse(res, config);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Update persisted API rate-limit configuration
+router.put('/rate-limits', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const validation = updateApiRateLimitConfigRequestSchema.safeParse(req.body);
+    if (!validation.success) {
+      throw new AppError(
+        validation.error.issues
+          .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+          .join(', '),
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const config = await apiRateLimitConfigService.updateApiRateLimitConfig(validation.data);
+    applyApiRateLimitConfig(config);
+    clearRateLimitState();
+
+    try {
+      await auditService.log({
+        actor: req.user?.email || 'api-key',
+        action: 'UPDATE_API_RATE_LIMIT_CONFIG',
+        module: 'SETTINGS',
+        details: { updatedFields: Object.keys(validation.data) },
+        ip_address: req.ip,
+      });
+    } catch (auditError) {
+      logger.error('Failed to write audit log for API rate limit config update', {
+        auditError,
+        actor: req.user?.email || 'api-key',
+      });
+    }
+
+    successResponse(res, config);
   } catch (error) {
     next(error);
   }

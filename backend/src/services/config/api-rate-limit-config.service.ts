@@ -1,0 +1,162 @@
+import { Pool, PoolClient } from 'pg';
+import { DatabaseManager } from '@/infra/database/database.manager.js';
+import { AppError } from '@/api/middlewares/error.js';
+import { ERROR_CODES } from '@/types/error-constants.js';
+import logger from '@/utils/logger.js';
+import type {
+  ApiRateLimitConfigSchema,
+  UpdateApiRateLimitConfigRequest,
+} from '@insforge/shared-schemas';
+
+const DEFAULT_API_RATE_LIMIT_CONFIG: Omit<
+  ApiRateLimitConfigSchema,
+  'id' | 'createdAt' | 'updatedAt'
+> = {
+  overallApiMaxRequests: 3000,
+  overallApiWindowMinutes: 15,
+  sendEmailOtpMaxRequests: 5,
+  sendEmailOtpWindowMinutes: 15,
+  verifyOtpMaxRequests: 10,
+  verifyOtpWindowMinutes: 15,
+  emailCooldownSeconds: 60,
+};
+
+export class ApiRateLimitConfigService {
+  private static instance: ApiRateLimitConfigService;
+  private pool: Pool | null = null;
+
+  private constructor() {
+    logger.info('ApiRateLimitConfigService initialized');
+  }
+
+  public static getInstance(): ApiRateLimitConfigService {
+    if (!ApiRateLimitConfigService.instance) {
+      ApiRateLimitConfigService.instance = new ApiRateLimitConfigService();
+    }
+    return ApiRateLimitConfigService.instance;
+  }
+
+  private getPool(): Pool {
+    if (!this.pool) {
+      this.pool = DatabaseManager.getInstance().getPool();
+    }
+    return this.pool;
+  }
+
+  async getApiRateLimitConfig(): Promise<ApiRateLimitConfigSchema> {
+    try {
+      const result = await this.getPool().query(
+        `SELECT
+          id,
+          overall_api_max_requests as "overallApiMaxRequests",
+          overall_api_window_minutes as "overallApiWindowMinutes",
+          send_email_otp_max_requests as "sendEmailOtpMaxRequests",
+          send_email_otp_window_minutes as "sendEmailOtpWindowMinutes",
+          verify_otp_max_requests as "verifyOtpMaxRequests",
+          verify_otp_window_minutes as "verifyOtpWindowMinutes",
+          email_cooldown_seconds as "emailCooldownSeconds",
+          created_at::text as "createdAt",
+          updated_at::text as "updatedAt"
+         FROM system.api_rate_limit_config
+         LIMIT 1`
+      );
+
+      if (!result.rows.length) {
+        logger.warn('No API rate limit config found, returning default fallback values');
+        return this.buildFallbackConfig();
+      }
+
+      return result.rows[0];
+    } catch (error) {
+      logger.error('Failed to get API rate limit config, returning default fallback values', {
+        error,
+      });
+      return this.buildFallbackConfig();
+    }
+  }
+
+  async updateApiRateLimitConfig(
+    input: UpdateApiRateLimitConfigRequest
+  ): Promise<ApiRateLimitConfigSchema> {
+    let client: PoolClient | null = null;
+    try {
+      client = await this.getPool().connect();
+      await client.query('BEGIN');
+      const result = await client.query(
+        `INSERT INTO system.api_rate_limit_config (
+           overall_api_max_requests,
+           overall_api_window_minutes,
+           send_email_otp_max_requests,
+           send_email_otp_window_minutes,
+           verify_otp_max_requests,
+           verify_otp_window_minutes,
+           email_cooldown_seconds
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT ((1))
+         DO UPDATE SET
+           overall_api_max_requests = EXCLUDED.overall_api_max_requests,
+           overall_api_window_minutes = EXCLUDED.overall_api_window_minutes,
+           send_email_otp_max_requests = EXCLUDED.send_email_otp_max_requests,
+           send_email_otp_window_minutes = EXCLUDED.send_email_otp_window_minutes,
+           verify_otp_max_requests = EXCLUDED.verify_otp_max_requests,
+           verify_otp_window_minutes = EXCLUDED.verify_otp_window_minutes,
+           email_cooldown_seconds = EXCLUDED.email_cooldown_seconds,
+           updated_at = NOW()
+         RETURNING
+           id,
+           overall_api_max_requests as "overallApiMaxRequests",
+           overall_api_window_minutes as "overallApiWindowMinutes",
+           send_email_otp_max_requests as "sendEmailOtpMaxRequests",
+           send_email_otp_window_minutes as "sendEmailOtpWindowMinutes",
+           verify_otp_max_requests as "verifyOtpMaxRequests",
+           verify_otp_window_minutes as "verifyOtpWindowMinutes",
+           email_cooldown_seconds as "emailCooldownSeconds",
+           created_at::text as "createdAt",
+           updated_at::text as "updatedAt"`,
+        [
+          input.overallApiMaxRequests,
+          input.overallApiWindowMinutes,
+          input.sendEmailOtpMaxRequests,
+          input.sendEmailOtpWindowMinutes,
+          input.verifyOtpMaxRequests,
+          input.verifyOtpWindowMinutes,
+          input.emailCooldownSeconds,
+        ]
+      );
+
+      await client.query('COMMIT');
+      logger.info('API rate limit config updated', input);
+      return result.rows[0];
+    } catch (error) {
+      try {
+        if (client) {
+          await client.query('ROLLBACK');
+        }
+      } catch (rollbackError) {
+        logger.error('Rollback failed', { rollbackError });
+      }
+
+      logger.error('Failed to update API rate limit config', { error });
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new AppError(
+        'Failed to update API rate limit configuration',
+        500,
+        ERROR_CODES.INTERNAL_ERROR
+      );
+    } finally {
+      client?.release();
+    }
+  }
+
+  private buildFallbackConfig(): ApiRateLimitConfigSchema {
+    return {
+      id: '00000000-0000-0000-0000-000000000000',
+      ...DEFAULT_API_RATE_LIMIT_CONFIG,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+}

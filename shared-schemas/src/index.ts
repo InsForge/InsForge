@@ -13,6 +13,8 @@ export * from './logs.schema';
 export * from './logs-api.schema';
 export * from './functions.schema';
 export * from './functions-api.schema';
+export * from './rate-limit.schema';
+export * from './rate-limit-api.schema';
 export * from './cloud-events.schema';
 export * from './realtime.schema';
 export * from './realtime-api.schema';
