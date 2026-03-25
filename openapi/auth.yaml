@@ -304,7 +304,7 @@ paths:
                 redirectTo:
                   type: string
                   format: uri
-                  description: Used for link-based email verification. The email link always opens an InsForge backend endpoint first; after the token is verified, InsForge redirects the browser to this URL.
+                  description: Used for link-based email verification. The email link always opens an InsForge backend endpoint first; after the token is verified, InsForge redirects the browser to this URL. This URL must be included in allowedRedirectUrls. Recommended: use your app's sign-in page.
       responses:
         '200':
           description: User created successfully
@@ -593,7 +593,14 @@ paths:
   /api/auth/sessions/current:
     get:
       summary: Get current user
-      description: Returns the currently authenticated user's basic info from JWT token
+      description: |
+        Returns the currently authenticated user's basic info from the access token.
+
+        This endpoint does not refresh expired access tokens by itself.
+        For browser apps using the TypeScript SDK, call `auth.getCurrentUser()`
+        during startup. The SDK will use the httpOnly refresh cookie automatically
+        when it can refresh the session. Server, mobile, and other non-browser
+        clients should call `/api/auth/refresh` explicitly.
       tags:
         - Client
       security:
@@ -749,7 +756,7 @@ paths:
                 redirectTo:
                   type: string
                   format: uri
-                  description: Used for link-based email verification. The email link always opens an InsForge backend endpoint first; after the token is verified, InsForge redirects the browser to this URL.
+                  description: Used for link-based email verification. The email link always opens an InsForge backend endpoint first; after the token is verified, InsForge redirects the browser to this URL. This URL must be included in allowedRedirectUrls. Recommended: use your app's sign-in page.
       responses:
         '202':
           description: Verification email sent (if email exists). Message varies based on configured method.
@@ -775,6 +782,17 @@ paths:
         This endpoint is intended for users clicking verification links in email.
         It validates the token on the backend and redirects the browser to the
         stored, validated `redirectTo` URL with the verification result.
+
+        Redirect query params:
+        - Success: `insforge_status=success&insforge_type=verify_email`
+        - Error: `insforge_status=error&insforge_type=verify_email&insforge_error=...`
+        - `insforge_status`: `success` or `error`
+        - `insforge_type`: always `verify_email`
+        - `insforge_error`: present only on error, human-readable message
+
+        Recommended handling: use your sign-in page as `redirectTo`. When the
+        redirect arrives with `insforge_status=success`, show a confirmation message
+        and ask the user to sign in with their email and password.
       tags:
         - Client
       parameters:
@@ -830,6 +848,7 @@ paths:
                   example: user@example.com
                 otp:
                   type: string
+                  pattern: '^\d{6}$'
                   description: 6-digit verification code
                   example: "123456"
       responses:
@@ -880,7 +899,7 @@ paths:
                 redirectTo:
                   type: string
                   format: uri
-                  description: Used for link-based password reset. The email link always opens an InsForge backend endpoint first; InsForge then redirects the browser to this URL with the reset token in the query string.
+                  description: Used for link-based password reset. The email link always opens an InsForge backend endpoint first; InsForge then redirects the browser to this URL with the reset token in the query string. This URL must be included in allowedRedirectUrls. Recommended: use your app's dedicated reset-password page.
       responses:
         '202':
           description: Password reset email sent (if email exists). Message varies based on configured method.
@@ -924,6 +943,7 @@ paths:
                   example: user@example.com
                 code:
                   type: string
+                  pattern: '^\d{6}$'
                   description: 6-digit numeric code from email
                   example: "123456"
       responses:
@@ -955,6 +975,17 @@ paths:
         This endpoint is intended for users clicking password reset links in email.
         It validates the token on the backend and redirects the browser to the
         stored, validated `redirectTo` URL with the reset token in the query string.
+
+        Redirect query params:
+        - Ready: `token=...&insforge_status=ready&insforge_type=reset_password`
+        - Error: `insforge_status=error&insforge_type=reset_password&insforge_error=...`
+        - `token`: present only when `insforge_status=ready`
+        - `insforge_status`: `ready` or `error`
+        - `insforge_type`: always `reset_password`
+        - `insforge_error`: present only on error, human-readable message
+
+        Your app should render the reset-password form only when `insforge_status=ready`
+        and `token` is present.
       tags:
         - Client
       parameters:

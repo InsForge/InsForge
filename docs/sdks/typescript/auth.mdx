@@ -18,7 +18,7 @@ Create a new user account with email and password.
 - `email` (string, required) - User's email address
 - `password` (string, required) - User's password
 - `name` (string, optional) - User's display name
-- `redirectTo` (string, optional) - Used for link-based email verification. The email link always opens an InsForge backend endpoint first; after the token is verified, InsForge redirects the browser to this URL with the verification result. Required when `verifyEmailMethod` is set to `link`.
+- `redirectTo` (string, optional) - Used for link-based email verification. The email link always opens an InsForge backend endpoint first; after the token is verified, InsForge redirects the browser to this URL with the verification result. Required when `verifyEmailMethod` is set to `link`. This URL must be included in `allowedRedirectUrls`. Recommended: use your app's sign-in page.
 
 ### Returns
 
@@ -35,7 +35,7 @@ Create a new user account with email and password.
 ```
 
 <Note>
-  When `requireEmailVerification` is true, `accessToken` will be null until the user verifies their email. InsForge sends a verification email with either a link or a 6-digit code, based on your dashboard configuration (`verifyEmailMethod`). For code verification, implement a page that prompts the user to enter the code (see [verifyEmail()](#verifyemail)). For link verification, provide a `redirectTo` URL that should receive the browser after InsForge verifies the token.
+  When `requireEmailVerification` is true, `accessToken` will be null until the user verifies their email. InsForge sends a verification email with either a link or a 6-digit code, based on your dashboard configuration (`verifyEmailMethod`). For code verification, implement a page that prompts the user to enter the code (see [verifyEmail()](#verifyemail)). For link verification, provide a `redirectTo` URL that should receive the browser after InsForge verifies the token. Recommended: use your sign-in page as `redirectTo`, then show a success message and ask the user to sign in with their email and password.
 </Note>
 
 ### Example
@@ -45,7 +45,7 @@ const { data, error } = await insforge.auth.signUp({
   email: 'user@example.com',
   password: 'secure_password123',
   name: 'John Doe',
-  redirectTo: 'http://localhost:3000/verify-email',
+  redirectTo: 'http://localhost:3000/sign-in',
 });
 
 if (data?.requireEmailVerification) {
@@ -241,9 +241,13 @@ const { error } = await insforge.auth.signOut();
 
 ---
 
-## getCurrentSession()
+## getCurrentUser()
 
-Get the current session. If no active session exists, attempts to refresh using the httpOnly cookie. Call this on app initialization to restore user sessions automatically.
+Get the currently signed-in user.
+
+For browser apps, call `auth.getCurrentUser()` during startup. If a valid httpOnly refresh cookie is present, the SDK will refresh the session automatically before returning the user.
+
+For server mode, call `refreshSession({ refreshToken })` explicitly when you need to refresh an expired access token.
 
 ### Parameters
 
@@ -254,11 +258,7 @@ None
 ```typescript
 {
   data: {
-    session: {
-      accessToken: string,
-      user: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata },
-      expiresAt?: Date
-    } | null
+    user: { id, email, emailVerified, providers, createdAt, updatedAt, profile, metadata } | null
   },
   error: Error | null
 }
@@ -267,16 +267,10 @@ None
 ### Example
 
 ```javascript
-const { data, error } = await insforge.auth.getCurrentSession();
+const { data, error } = await insforge.auth.getCurrentUser();
 
-if (data.session) {
-  console.log('Token:', data.session.accessToken);
-  console.log('User:', data.session.user.email);
-
-  // Check if session is expired
-  if (data.session.expiresAt && new Date() > data.session.expiresAt) {
-    console.log('Session expired');
-  }
+if (data.user) {
+  console.log('User:', data.user.email);
 }
 ```
 
@@ -285,22 +279,18 @@ if (data.session) {
 ```json
 {
   "data": {
-    "session": {
-      "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-      "expiresAt": "2024-01-22T10:00:00.000Z",
-      "user": {
-        "id": "usr_abc123",
-        "email": "user@example.com",
-        "emailVerified": true,
-        "createdAt": "2024-01-15T10:00:00Z",
-        "updatedAt": "2024-01-15T10:00:00Z",
-        "providers": ["email"],
-        "profile": {
-          "name": "John Doe",
-          "avatar_url": "https://example.com/avatar.jpg"
-        },
-        "metadata": {}
-      }
+    "user": {
+      "id": "usr_abc123",
+      "email": "user@example.com",
+      "emailVerified": true,
+      "createdAt": "2024-01-15T10:00:00Z",
+      "updatedAt": "2024-01-15T10:00:00Z",
+      "providers": ["email"],
+      "profile": {
+        "name": "John Doe",
+        "avatar_url": "https://example.com/avatar.jpg"
+      },
+      "metadata": {}
     }
   },
   "error": null
@@ -432,7 +422,7 @@ Resend email verification when the previous OTP has expired or was not received.
 ### Parameters
 
 - `email` (string, required) - User's email address
-- `redirectTo` (string, optional) - Used for link-based email verification. The email link always opens an InsForge backend endpoint first; after the token is verified, InsForge redirects the browser to this URL with the verification result. Required when `verifyEmailMethod` is set to `link`.
+- `redirectTo` (string, optional) - Used for link-based email verification. The email link always opens an InsForge backend endpoint first; after the token is verified, InsForge redirects the browser to this URL with the verification result. Required when `verifyEmailMethod` is set to `link`. This URL must be included in `allowedRedirectUrls`. Recommended: use your app's sign-in page.
 
 ### Returns
 
@@ -448,7 +438,7 @@ Resend email verification when the previous OTP has expired or was not received.
 ```javascript
 const { data, error } = await insforge.auth.resendVerificationEmail({
   email: 'user@example.com',
-  redirectTo: 'http://localhost:3000/verify-email',
+  redirectTo: 'http://localhost:3000/sign-in',
 });
 
 if (data?.success) {
@@ -476,7 +466,17 @@ Verify an email address with a 6-digit code.
 
 For link-based verification, users should click the email link, which opens `GET /api/auth/email/verify-link` in the browser.
 
-Successfully verified users will receive a session token.
+Successfully verified users who use this code endpoint will receive a session token.
+
+For link-based verification, your frontend should handle the browser redirect like this:
+
+- Success: `?insforge_status=success&insforge_type=verify_email`
+- Error: `?insforge_status=error&insforge_type=verify_email&insforge_error=...`
+- `insforge_status`: Result of the browser link flow. For verification, values are `success` or `error`.
+- `insforge_type`: Flow identifier. For verification links this is always `verify_email`.
+- `insforge_error`: Present only when `insforge_status=error`. Human-readable error message for display or logging.
+
+Recommended handling: use your sign-in page as `redirectTo`. When `insforge_status=success`, show a confirmation message and ask the user to sign in with their email and password.
 
 ### Parameters
 
@@ -537,7 +537,7 @@ Send password reset email using the method configured in auth settings (`resetPa
 ### Parameters
 
 - `email` (string, required) - User's email address
-- `redirectTo` (string, optional) - Used for link-based password reset. The email link always opens an InsForge backend endpoint first; InsForge then redirects the browser to this URL with the reset `token` in the query string so your app can render its own reset-password page. Required when `resetPasswordMethod` is set to `link`.
+- `redirectTo` (string, optional) - Used for link-based password reset. The email link always opens an InsForge backend endpoint first; InsForge then redirects the browser to this URL with the reset `token` in the query string so your app can render its own reset-password page. Required when `resetPasswordMethod` is set to `link`. This URL must be included in `allowedRedirectUrls`. Recommended: use your app's dedicated reset-password page.
 
 ### Returns
 
@@ -638,6 +638,17 @@ Reset user password with a token. The token can be:
 
 - `newPassword` (string, required) - New password for the user
 - `otp` (string, required) - Reset token or magic link token
+
+For link-based password reset, your frontend should handle the browser redirect like this:
+
+- Ready to reset: `?token=...&insforge_status=ready&insforge_type=reset_password`
+- Error: `?insforge_status=error&insforge_type=reset_password&insforge_error=...`
+- `token`: Present only when `insforge_status=ready`. Pass this value to `resetPassword({ otp })`.
+- `insforge_status`: Result of the browser link flow. For reset links, values are `ready` or `error`.
+- `insforge_type`: Flow identifier. For reset links this is always `reset_password`.
+- `insforge_error`: Present only when `insforge_status=error`. Human-readable error message for display or logging.
+
+Only render the reset-password form when `insforge_status=ready` and `token` is present.
 
 ### Returns
 

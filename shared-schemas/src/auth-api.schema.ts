@@ -27,6 +27,7 @@ export const paginationSchema = z.object({
 
 /**
  * POST /api/auth/users - Create user
+ * redirectTo is used only for link-based email verification and must be allowlisted.
  */
 export const createUserRequestSchema = z.object({
   email: emailSchema,
@@ -85,6 +86,7 @@ export const updateProfileRequestSchema = z.object({
 
 /**
  * POST /api/auth/email/send-verification - Send verification email (code or link based on config)
+ * redirectTo is used only for link-based email verification and must be allowlisted.
  */
 export const sendVerificationEmailRequestSchema = z.object({
   email: emailSchema,
@@ -94,6 +96,7 @@ export const sendVerificationEmailRequestSchema = z.object({
 /**
  * POST /api/auth/email/verify - Verify email with a 6-digit code
  * Link verification uses GET /api/auth/email/verify-link instead.
+ * The link flow redirects with insforge_status / insforge_type query params and does not create a frontend session.
  */
 export const verifyEmailRequestSchema = z.object({
   email: emailSchema,
@@ -102,6 +105,7 @@ export const verifyEmailRequestSchema = z.object({
 
 /**
  * POST /api/auth/email/send-reset-password - Send reset password email (code or link based on config)
+ * redirectTo is used only for link-based password reset and must be allowlisted.
  */
 export const sendResetPasswordEmailRequestSchema = z.object({
   email: emailSchema,
@@ -114,7 +118,7 @@ export const sendResetPasswordEmailRequestSchema = z.object({
  */
 export const exchangeResetPasswordTokenRequestSchema = z.object({
   email: emailSchema,
-  code: z.string().min(1),
+  code: z.string().regex(/^\d{6}$/, 'Reset password code must be a 6-digit numeric code'),
 });
 
 /**
@@ -123,6 +127,7 @@ export const exchangeResetPasswordTokenRequestSchema = z.object({
  * - Magic link token (from send-reset-password endpoint when method is 'link')
  * - Reset token (from exchange-reset-password-token endpoint after code verification)
  * Both use RESET_PASSWORD purpose and are verified the same way
+ * The link flow redirects with token / insforge_status / insforge_type query params.
  */
 export const resetPasswordRequestSchema = z.object({
   newPassword: passwordSchema,

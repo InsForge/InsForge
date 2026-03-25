@@ -443,8 +443,6 @@ export class AuthOTPService {
          FROM auth.email_otps
          WHERE purpose = $1
            AND otp_hash = $2
-           AND expires_at > NOW()
-           AND consumed_at IS NULL
          LIMIT 1`,
         [purpose, tokenHash]
       );
