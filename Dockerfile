@@ -37,6 +37,7 @@ COPY frontend/package.json    ./frontend/package.json
 COPY auth/package.json        ./auth/package.json
 COPY shared-schemas/package.json ./shared-schemas/package.json
 COPY ui/package.json          ./ui/package.json
+COPY docs /app/docs
 
 # Strip prepare/build scripts from shared-schemas to prevent tsc
 # from running during install (source files aren't copied yet).
@@ -112,6 +113,7 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/backend/src ./backend/src
 COPY --from=build /app/backend/tsconfig.json ./backend/tsconfig.json
 COPY --from=build /app/shared-schemas/src ./shared-schemas/src
+COPY --from=build /app/docs ./docs
 
 # Package manifests for npm scripts
 COPY --from=build /app/backend/package.json ./backend/package.json
