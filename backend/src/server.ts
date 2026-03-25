@@ -36,6 +36,8 @@ import { initSqlParser } from '@/utils/sql-parser.js';
 import { FunctionService } from '@/services/functions/function.service.js';
 import packageJson from '../../package.json';
 import { schedulesRouter } from '@/api/routes/schedules/index.routes.js';
+import { computeRouter } from '@/api/routes/compute/index.routes.js';
+import { ComputeService } from '@/services/compute/compute.service.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -190,6 +192,7 @@ export async function createApp() {
   apiRouter.use('/email', emailRouter);
   apiRouter.use('/deployments', deploymentsRouter);
   apiRouter.use('/schedules', schedulesRouter);
+  apiRouter.use('/compute/containers', computeRouter);
 
   // Mount all API routes under /api prefix
   app.use('/api', apiRouter);
@@ -318,6 +321,14 @@ async function initializeServer() {
     // Initialize RealtimeManager (pg_notify listener)
     const realtimeManager = RealtimeManager.getInstance();
     await realtimeManager.initialize();
+
+    // Initialize ComputeService (non-blocking, logs on failure)
+    const computeService = ComputeService.getInstance();
+    computeService.initialize().catch((err) => {
+      logger.error('Failed to initialize ComputeService', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
 
     // Sync existing functions to Deno Subhosting (non-blocking)
     const functionService = FunctionService.getInstance();

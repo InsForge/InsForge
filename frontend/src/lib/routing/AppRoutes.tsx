@@ -30,6 +30,7 @@ import DeploymentLogsPage from '@/features/deployments/pages/DeploymentLogsPage'
 import DeploymentOverviewPage from '@/features/deployments/pages/DeploymentOverviewPage';
 import DeploymentEnvVarsPage from '@/features/deployments/pages/DeploymentEnvVarsPage';
 import DeploymentDomainsPage from '@/features/deployments/pages/DeploymentDomainsPage';
+import ComputePage from '@/features/compute/pages/ComputePage';
 
 export function AppRoutes() {
   return (
@@ -119,6 +120,7 @@ export function AppRoutes() {
                 <Route path="/dashboard/deployments/logs" element={<DeploymentLogsPage />} />
                 <Route path="/dashboard/deployments/env-vars" element={<DeploymentEnvVarsPage />} />
                 <Route path="/dashboard/deployments/domains" element={<DeploymentDomainsPage />} />
+                <Route path="/dashboard/compute" element={<ComputePage />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </Layout>
