@@ -1,0 +1,7 @@
+services:
+  postgres:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
