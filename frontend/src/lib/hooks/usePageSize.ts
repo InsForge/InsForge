@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 
-const PAGE_SIZE_OPTIONS = [50, 100, 250, 500, 1000];
+const PAGE_SIZE_OPTIONS = [50, 100, 250, 500];
 const DEFAULT_PAGE_SIZE = 50;
 const STORAGE_KEY_PREFIX = 'insforge-page-size';
 

@@ -13,7 +13,7 @@ import {
 } from '../components';
 import { formatTime } from '@/lib/utils/utils';
 import { LogSchema } from '@insforge/shared-schemas';
-import { LOGS_PAGE_SIZE } from '../helpers';
+import { usePageSize } from '@/lib/hooks/usePageSize';
 
 type FunctionLogType = 'runtime' | 'build';
 
@@ -22,6 +22,11 @@ const SOURCE_NAME = 'function.logs';
 export default function FunctionLogsPage() {
   const [activeTab, setActiveTab] = useState<FunctionLogType>('runtime');
   const [selectedLog, setSelectedLog] = useState<LogSchema | null>(null);
+  const {
+    pageSize,
+    pageSizeOptions,
+    onPageSizeChange: handlePageSizeChange,
+  } = usePageSize('function-logs');
 
   const {
     logs,
@@ -36,7 +41,7 @@ export default function FunctionLogsPage() {
     isLoading: logsLoading,
     error: logsError,
     getSeverity,
-  } = useLogs(SOURCE_NAME);
+  } = useLogs(SOURCE_NAME, pageSize);
 
   useEffect(() => {
     setSelectedLog(null);
@@ -147,9 +152,15 @@ export default function FunctionLogsPage() {
             loading={logsLoading}
             currentPage={currentPage}
             totalPages={totalPages}
-            pageSize={LOGS_PAGE_SIZE}
+            pageSize={pageSize}
+            pageSizeOptions={pageSizeOptions}
             totalRecords={filteredLogs.length}
             onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              handlePageSizeChange(newSize);
+              setCurrentPage(1);
+            }}
+            paginationRecordLabel="logs"
             selectedRowId={selectedLog?.id ?? null}
             onRowClick={handleRowClick}
             gridContainerClassName="border-t border-[var(--alpha-8)]"

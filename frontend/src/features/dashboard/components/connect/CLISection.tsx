@@ -1,5 +1,5 @@
 import { CopyButton } from '@insforge/ui';
-import { CLI_VERIFY_CONNECTION_PROMPT } from '../constants';
+import { CLI_VERIFY_CONNECTION_PROMPT } from './constants';
 import { useProjectId } from '@/lib/hooks/useMetadata';
 import { cn } from '@/lib/utils/utils';
 

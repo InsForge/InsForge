@@ -13,6 +13,7 @@ import { LOGS_PAGE_SIZE } from '../helpers';
 interface UseMcpUsageOptions {
   successFilter?: boolean | null;
   limit?: number;
+  pageSize?: number;
 }
 
 /**
@@ -26,7 +27,7 @@ interface UseMcpUsageOptions {
  *
  */
 export function useMcpUsage(options: UseMcpUsageOptions = {}) {
-  const { successFilter = true, limit = 200 } = options;
+  const { successFilter = true, limit = 200, pageSize = LOGS_PAGE_SIZE } = options;
 
   // Hooks
   const { isAuthenticated } = useAuth();
@@ -66,15 +67,15 @@ export function useMcpUsage(options: UseMcpUsageOptions = {}) {
   // Reset page when search changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery]);
+  }, [searchQuery, pageSize]);
 
   // Calculate pagination
   const totalPages = useMemo(
-    () => Math.ceil(filteredRecords.length / LOGS_PAGE_SIZE),
-    [filteredRecords.length]
+    () => Math.ceil(filteredRecords.length / pageSize),
+    [filteredRecords.length, pageSize]
   );
-  const startIndex = useMemo(() => (currentPage - 1) * LOGS_PAGE_SIZE, [currentPage]);
-  const endIndex = useMemo(() => startIndex + LOGS_PAGE_SIZE, [startIndex]);
+  const startIndex = useMemo(() => (currentPage - 1) * pageSize, [currentPage, pageSize]);
+  const endIndex = useMemo(() => startIndex + pageSize, [startIndex, pageSize]);
   const paginatedRecords = useMemo(
     () => filteredRecords.slice(startIndex, endIndex),
     [filteredRecords, startIndex, endIndex]
@@ -126,7 +127,7 @@ export function useMcpUsage(options: UseMcpUsageOptions = {}) {
     currentPage,
     setCurrentPage,
     totalPages,
-    pageSize: LOGS_PAGE_SIZE,
+    pageSize,
 
     // Loading states
     isLoading,

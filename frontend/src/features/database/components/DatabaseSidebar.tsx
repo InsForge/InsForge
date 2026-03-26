@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { ArrowLeft, Database, MoreVertical, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Database, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Link, useMatch, useNavigate } from 'react-router-dom';
 import EmptyBoxSvg from '@/assets/images/empty_box.svg?react';
 import {
@@ -85,7 +85,6 @@ function DatabaseStudioSidebarItem({ label, href, sectionEnd }: DatabaseStudioSi
         <Link to={href} className="flex min-w-0 flex-1 items-center px-2">
           <p className={cn('truncate text-sm leading-5', isSelected && 'text-inherit')}>{label}</p>
         </Link>
-        {isSelected && <MoreVertical className="h-4 w-4 shrink-0 text-muted-foreground" />}
       </div>
 
       {sectionEnd && <div className="my-1.5 h-px w-full bg-alpha-8" />}

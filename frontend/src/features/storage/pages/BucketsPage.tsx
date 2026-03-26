@@ -5,7 +5,7 @@ import PencilIcon from '@/assets/icons/pencil.svg?react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import { useStorage } from '@/features/storage/hooks/useStorage';
 import { StorageSidebar } from '@/features/storage/components/StorageSidebar';
-import { StorageManager } from '@/features/storage/components/StorageManager';
+import { StorageDataGrid } from '@/features/storage/components/StorageDataGrid';
 import { BucketFormDialog } from '@/features/storage/components/BucketFormDialog';
 
 import { useConfirm } from '@/lib/hooks/useConfirm';
@@ -35,7 +35,7 @@ interface BucketFormState {
   isPublic: boolean;
 }
 
-export default function StoragePage() {
+export default function BucketsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedBucketFromQuery = searchParams.get('bucket')?.trim();
   const [searchValue, setSearchValue] = useState('');
@@ -429,7 +429,7 @@ export default function StoragePage() {
                 </Alert>
               )}
 
-              <StorageManager
+              <StorageDataGrid
                 bucketName={selectedBucket}
                 fileCount={bucketStats?.[selectedBucket]?.fileCount || 0}
                 searchQuery={searchQuery}

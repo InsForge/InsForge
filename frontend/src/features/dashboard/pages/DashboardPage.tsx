@@ -35,7 +35,7 @@ import { useMcpUsage } from '@/features/logs/hooks/useMcpUsage';
 import { useModal } from '@/lib/contexts/ModalContext';
 import { getBackendUrl, isIframe, isInsForgeCloudProject } from '@/lib/utils/utils';
 import { useUsers } from '@/features/auth';
-import { CLISection, MCPSection } from '@/features/connect';
+import { CLISection, MCPSection } from '@/features/dashboard/components/connect';
 const REGION_COUNTRY_CODE_MAP: Record<string, 'us' | 'de' | 'sg'> = {
   'us-test': 'us',
   'us-east': 'us',

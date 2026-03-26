@@ -7,6 +7,5 @@ export {
   StorageDataGrid,
   type StorageDataGridProps,
 } from './StorageDataGrid';
-export { StorageManager } from './StorageManager';
 export { StorageSidebar } from './StorageSidebar';
 export { useUploadToast } from './UploadToast';

@@ -16,7 +16,7 @@ import LogsPage from '@/features/logs/pages/LogsPage';
 import FunctionLogsPage from '@/features/logs/pages/FunctionLogsPage';
 import MCPLogsPage from '@/features/logs/pages/MCPLogsPage';
 import StorageLayout from '@/features/storage/components/StorageLayout';
-import StoragePage from '@/features/storage/pages/StoragePage';
+import BucketsPage from '@/features/storage/pages/BucketsPage';
 import VisualizerLayout from '@/features/visualizer/components/VisualizerLayout';
 import VisualizerPage from '@/features/visualizer/pages/VisualizerPage';
 import FunctionsLayout from '@/features/functions/components/FunctionsLayout';
@@ -87,7 +87,7 @@ export function AppRoutes() {
                   <Route index element={<SQLEditorPage />} />
                 </Route>
                 <Route path="/dashboard/storage" element={<StorageLayout />}>
-                  <Route index element={<StoragePage />} />
+                  <Route index element={<BucketsPage />} />
                 </Route>
                 <Route path="/dashboard/logs" element={<LogsLayout />}>
                   <Route index element={<Navigate to="MCP" replace />} />
