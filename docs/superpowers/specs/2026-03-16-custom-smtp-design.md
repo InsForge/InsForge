@@ -66,7 +66,6 @@ Singleton enforced via unique index on constant expression (same pattern as `aut
 | `{{ code }}` | 6-digit OTP code | verification-code, reset-password-code |
 | `{{ link }}` | Verification/reset URL | verification-link, reset-password-link |
 | `{{ email }}` | Recipient email address | All templates |
-| `{{ app_name }}` | Project name | All templates |
 
 ### Default Templates
 

@@ -67,7 +67,7 @@ export default function EmailPage() {
                 templates={templates}
                 isLoading={isTemplatesLoading}
                 isUpdating={isTemplatesUpdating}
-                onSave={updateTemplate}
+                onSave={(params, options) => updateTemplate(params, options)}
               />
             </div>
           </fieldset>

@@ -7,7 +7,10 @@ interface EmailTemplateCardProps {
   templates: EmailTemplateSchema[];
   isLoading: boolean;
   isUpdating: boolean;
-  onSave: (params: { type: string; data: UpdateEmailTemplateRequest }) => void;
+  onSave: (
+    params: { type: string; data: UpdateEmailTemplateRequest },
+    options?: { onSuccess?: () => void }
+  ) => void;
 }
 
 const TEMPLATE_INFO: Record<string, { title: string; description: string }> = {
@@ -113,8 +116,10 @@ export function EmailTemplateCard({
     if (!selectedType) {
       return;
     }
-    onSave({ type: selectedType, data: { subject, bodyHtml } });
-    setIsDirty(false);
+    onSave(
+      { type: selectedType, data: { subject, bodyHtml } },
+      { onSuccess: () => setIsDirty(false) }
+    );
   };
 
   const handleCancel = () => {

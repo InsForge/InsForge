@@ -27,12 +27,6 @@ function formatFromAddress(name: string, email: string): string {
   return `"${safeName}" <${email}>`;
 }
 
-/** Map auth-service variable names to template placeholders */
-const VARIABLE_ALIASES: Record<string, string> = {
-  token: 'code',
-  magic_link: 'link',
-};
-
 export class SmtpEmailProvider implements EmailProvider {
   supportsTemplates(): boolean {
     return true;
@@ -116,19 +110,8 @@ export class SmtpEmailProvider implements EmailProvider {
     const config = await this.getRequiredConfig();
     const emailTemplate = await EmailTemplateService.getInstance().getTemplate(template);
 
-    // Map auth service variable names to template placeholders, keeping originals
-    const mappedVariables: Record<string, string> = {};
-    if (variables) {
-      for (const [key, value] of Object.entries(variables)) {
-        mappedVariables[key] = value;
-        if (VARIABLE_ALIASES[key]) {
-          mappedVariables[VARIABLE_ALIASES[key]] = value;
-        }
-      }
-    }
-
     // System variables (name, email) override user-supplied to prevent spoofing
-    const allVariables: Record<string, string> = { ...mappedVariables, name, email };
+    const allVariables: Record<string, string> = { ...variables, name, email };
 
     await this.send(
       config,

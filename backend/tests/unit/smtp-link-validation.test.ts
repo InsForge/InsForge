@@ -67,7 +67,7 @@ describe('SmtpEmailProvider — link URL validation', () => {
 
   it('allows https:// links in templates', async () => {
     await provider.sendWithTemplate('user@example.com', 'App', 'email-verification-link', {
-      magic_link: 'https://example.com/verify?token=abc123',
+      link: 'https://example.com/verify?token=abc123',
     });
 
     const html = sendMailMock.mock.calls[0][0].html;
@@ -76,7 +76,7 @@ describe('SmtpEmailProvider — link URL validation', () => {
 
   it('allows http:// links in templates', async () => {
     await provider.sendWithTemplate('user@example.com', 'App', 'email-verification-link', {
-      magic_link: 'http://localhost:3000/verify?token=abc123',
+      link: 'http://localhost:3000/verify?token=abc123',
     });
 
     const html = sendMailMock.mock.calls[0][0].html;
@@ -85,7 +85,7 @@ describe('SmtpEmailProvider — link URL validation', () => {
 
   it('rejects javascript: URIs and renders # instead', async () => {
     await provider.sendWithTemplate('user@example.com', 'App', 'email-verification-link', {
-      magic_link: 'javascript:alert(document.cookie)',
+      link: 'javascript:alert(document.cookie)',
     });
 
     const html = sendMailMock.mock.calls[0][0].html;
@@ -95,7 +95,7 @@ describe('SmtpEmailProvider — link URL validation', () => {
 
   it('rejects data: URIs and renders # instead', async () => {
     await provider.sendWithTemplate('user@example.com', 'App', 'email-verification-link', {
-      magic_link: 'data:text/html,<script>alert(1)</script>',
+      link: 'data:text/html,<script>alert(1)</script>',
     });
 
     const html = sendMailMock.mock.calls[0][0].html;
@@ -105,7 +105,7 @@ describe('SmtpEmailProvider — link URL validation', () => {
 
   it('rejects empty string links and renders # instead', async () => {
     await provider.sendWithTemplate('user@example.com', 'App', 'email-verification-link', {
-      magic_link: '',
+      link: '',
     });
 
     const html = sendMailMock.mock.calls[0][0].html;
@@ -114,7 +114,7 @@ describe('SmtpEmailProvider — link URL validation', () => {
 
   it('rejects vbscript: URIs and renders # instead', async () => {
     await provider.sendWithTemplate('user@example.com', 'App', 'email-verification-link', {
-      magic_link: 'vbscript:MsgBox("XSS")',
+      link: 'vbscript:MsgBox("XSS")',
     });
 
     const html = sendMailMock.mock.calls[0][0].html;
