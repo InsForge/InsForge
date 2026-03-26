@@ -13,7 +13,7 @@ import {
 } from '@/components';
 import { useIndexes } from '../hooks/useDatabase';
 import { SQLModal, SQLCellButton } from '../components/SQLModal';
-import { DatabaseStudioMenuPanel } from '../components/DatabaseSecondaryMenu';
+import { DatabaseStudioSidebarPanel } from '../components/DatabaseSidebar';
 import type { DatabaseIndexesResponse } from '@insforge/shared-schemas';
 
 interface IndexRow extends DataGridRowType {
@@ -144,7 +144,7 @@ export default function IndexesPage() {
   if (error) {
     return (
       <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
-        <DatabaseStudioMenuPanel
+        <DatabaseStudioSidebarPanel
           onBack={() =>
             void navigate('/dashboard/database/tables', { state: { slideFromStudio: true } })
           }
@@ -161,7 +161,7 @@ export default function IndexesPage() {
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <DatabaseStudioMenuPanel
+      <DatabaseStudioSidebarPanel
         onBack={() =>
           void navigate('/dashboard/database/tables', { state: { slideFromStudio: true } })
         }

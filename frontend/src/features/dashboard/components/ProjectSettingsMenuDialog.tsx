@@ -34,7 +34,7 @@ import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
 import { useModal } from '@/lib/contexts/ModalContext';
 import { cn, compareVersions, isIframe, isInsForgeCloudProject } from '@/lib/utils/utils';
-import { MCPSection, CLISection, ConnectionStringSection } from '@/features/connect';
+import { MCPSection, CLISection, ConnectionStringSection } from './connect';
 import { postMessageToParent } from '@/lib/utils/cloudMessaging';
 import { metadataService } from '@/lib/services/metadata.service';
 
@@ -43,7 +43,7 @@ type TabType = 'info' | 'compute' | 'connect';
 const INFO_FIELD_CLASS =
   'flex h-8 w-full items-center rounded border border-[var(--alpha-12)] bg-[var(--alpha-4)] px-2.5 text-sm leading-5 text-foreground';
 
-export default function SettingsMenuDialog() {
+export default function ProjectSettingsMenuDialog() {
   const { isSettingsDialogOpen, settingsDefaultTab, closeSettingsDialog } = useModal();
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [isVersionOutdated, setIsVersionOutdated] = useState(false);
@@ -513,9 +513,9 @@ export default function SettingsMenuDialog() {
                       </div>
                       <div className="flex min-w-0 flex-1 items-start justify-end gap-1.5">
                         <Button
-                          variant="secondary"
+                          variant="destructive"
                           onClick={() => void handleDeleteProject()}
-                          className="h-8 rounded border-[var(--alpha-8)] bg-card px-3 text-sm font-medium"
+                          className="h-8 rounded px-3 text-sm font-medium"
                         >
                           Delete Project
                         </Button>

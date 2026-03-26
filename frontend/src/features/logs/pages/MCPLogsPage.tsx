@@ -3,8 +3,14 @@ import { EmptyState, TableHeader } from '@/components';
 import { LogsDataGrid, type LogsColumnDef } from '../components';
 import { useMcpUsage } from '../hooks/useMcpUsage';
 import { formatTime } from '@/lib/utils/utils';
+import { usePageSize } from '@/lib/hooks/usePageSize';
 
 export default function MCPLogsPage() {
+  const {
+    pageSize,
+    pageSizeOptions,
+    onPageSizeChange: handlePageSizeChange,
+  } = usePageSize('mcp-logs');
   const {
     records: mcpLogs,
     searchQuery: mcpSearchQuery,
@@ -16,7 +22,7 @@ export default function MCPLogsPage() {
     filteredRecordsCount: mcpFilteredRecordsCount,
     isLoading: mcpLoading,
     error: mcpError,
-  } = useMcpUsage({ successFilter: null });
+  } = useMcpUsage({ successFilter: null, pageSize });
 
   const mcpColumns: LogsColumnDef[] = useMemo(
     () => [
@@ -68,8 +74,14 @@ export default function MCPLogsPage() {
             currentPage={mcpCurrentPage}
             totalPages={mcpTotalPages}
             pageSize={mcpPageSize}
+            pageSizeOptions={pageSizeOptions}
             totalRecords={mcpFilteredRecordsCount}
             onPageChange={setMcpCurrentPage}
+            onPageSizeChange={(newSize) => {
+              handlePageSizeChange(newSize);
+              setMcpCurrentPage(1);
+            }}
+            paginationRecordLabel="logs"
             gridContainerClassName="border-t border-[var(--alpha-8)]"
             emptyState={
               <div className="text-[13px] text-muted-foreground">

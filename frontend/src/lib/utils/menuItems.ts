@@ -17,97 +17,19 @@ import {
 } from 'lucide-react';
 import { postMessageToParent } from './cloudMessaging';
 
-export interface SecondaryMenuItem {
-  id: string;
-  label: string;
-  href: string;
-  sectionEnd?: boolean; // Add support for separator after the item
-}
-
 export interface PrimaryMenuItem {
   id: string;
   label: string;
   href: string;
   icon: LucideIcon;
-  secondaryMenu?: SecondaryMenuItem[];
   onClick?: () => void;
   external?: boolean;
   sectionEnd?: boolean;
 }
 
-export const databaseSecondaryMenuItems: SecondaryMenuItem[] = [
-  {
-    id: 'database-tables',
-    label: 'Tables',
-    href: '/dashboard/database/tables',
-    sectionEnd: true,
-  },
-  {
-    id: 'indexes',
-    label: 'Indexes',
-    href: '/dashboard/database/indexes',
-  },
-  {
-    id: 'functions',
-    label: 'Functions',
-    href: '/dashboard/database/functions',
-  },
-  {
-    id: 'triggers',
-    label: 'Triggers',
-    href: '/dashboard/database/triggers',
-  },
-  {
-    id: 'policies',
-    label: 'Policies',
-    href: '/dashboard/database/policies',
-  },
-  {
-    id: 'sql-editor',
-    label: 'SQL Editor',
-    href: '/dashboard/sql-editor',
-  },
-  {
-    id: 'templates',
-    label: 'Templates',
-    href: '/dashboard/database/templates',
-    sectionEnd: true,
-  },
-];
-
-export const databaseStudioMenuItems: SecondaryMenuItem[] = [
-  {
-    id: 'indexes',
-    label: 'Indexes',
-    href: '/dashboard/database/indexes',
-  },
-  {
-    id: 'triggers',
-    label: 'Triggers',
-    href: '/dashboard/database/triggers',
-  },
-  {
-    id: 'functions',
-    label: 'Functions',
-    href: '/dashboard/database/functions',
-  },
-  {
-    id: 'policies',
-    label: 'Policies',
-    href: '/dashboard/database/policies',
-    sectionEnd: true,
-  },
-  {
-    id: 'templates',
-    label: 'Templates',
-    href: '/dashboard/database/templates',
-  },
-];
-
 /**
  * Static menu items configuration
- * Primary menu items appear as icons in the left sidebar
- * Secondary menu items appear in a collapsed sidebar when a primary item is selected
+ * Primary menu items appear in the app sidebar
  */
 export const staticMenuItems: PrimaryMenuItem[] = [
   {
@@ -119,27 +41,14 @@ export const staticMenuItems: PrimaryMenuItem[] = [
   {
     id: 'authentication',
     label: 'Authentication',
-    href: '/dashboard/authentication/users',
+    href: '/dashboard/authentication',
     icon: Lock,
-    secondaryMenu: [
-      {
-        id: 'users-list',
-        label: 'Users',
-        href: '/dashboard/authentication/users',
-      },
-      {
-        id: 'auth-methods',
-        label: 'Auth Methods',
-        href: '/dashboard/authentication/auth-methods',
-      },
-    ],
   },
   {
     id: 'database',
     label: 'Database',
     href: '/dashboard/database',
     icon: Database,
-    secondaryMenu: databaseSecondaryMenuItems,
   },
   {
     id: 'storage',
@@ -159,46 +68,12 @@ export const staticMenuItems: PrimaryMenuItem[] = [
     label: 'Functions',
     href: '/dashboard/functions',
     icon: Code2,
-    secondaryMenu: [
-      {
-        id: 'functions-list',
-        label: 'Edge Functions',
-        href: '/dashboard/functions/list',
-      },
-      {
-        id: 'secrets',
-        label: 'Secrets',
-        href: '/dashboard/functions/secrets',
-      },
-      {
-        id: 'schedules',
-        label: 'Schedules',
-        href: '/dashboard/functions/schedules',
-      },
-    ],
   },
   {
     id: 'realtime',
     label: 'Realtime',
     href: '/dashboard/realtime',
     icon: Radio,
-    secondaryMenu: [
-      {
-        id: 'channels',
-        label: 'Channels',
-        href: '/dashboard/realtime/channels',
-      },
-      {
-        id: 'messages',
-        label: 'Messages',
-        href: '/dashboard/realtime/messages',
-      },
-      {
-        id: 'permissions',
-        label: 'Permissions',
-        href: '/dashboard/realtime/permissions',
-      },
-    ],
   },
   {
     id: 'ai',
@@ -255,26 +130,4 @@ export const deploymentsMenuItem: PrimaryMenuItem = {
   label: 'Deployments',
   href: '/dashboard/deployments',
   icon: Rocket,
-  secondaryMenu: [
-    {
-      id: 'deployment-overview',
-      label: 'Overview',
-      href: '/dashboard/deployments/overview',
-    },
-    {
-      id: 'deployment-logs',
-      label: 'Deployment Logs',
-      href: '/dashboard/deployments/logs',
-    },
-    {
-      id: 'deployment-env-vars',
-      label: 'Environment Variables',
-      href: '/dashboard/deployments/env-vars',
-    },
-    {
-      id: 'deployment-domains',
-      label: 'Domains',
-      href: '/dashboard/deployments/domains',
-    },
-  ],
 };

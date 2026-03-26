@@ -1,15 +1,37 @@
-import { useMemo } from 'react';
-import { Button } from '@insforge/ui';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { Button, ConfirmDialog } from '@insforge/ui';
 import {
+  ConnectCTA,
   DataGrid,
   type DataGridProps,
+  DataGridEmptyState,
+  EmptyState,
+  ErrorState,
+  LoadingState,
   type RenderCellProps,
   type DataGridColumn,
   type DataGridRowType,
 } from '@/components';
-import { Download, Eye, Trash2, Image, FileText, Music, Video, Archive, File } from 'lucide-react';
+import {
+  Download,
+  Eye,
+  Trash2,
+  Image,
+  FileText,
+  Music,
+  Video,
+  Archive,
+  File,
+  Folder,
+} from 'lucide-react';
 import { StorageFileSchema } from '@insforge/shared-schemas';
 import { cn, formatTime } from '@/lib/utils/utils';
+import { useStorage } from '@/features/storage/hooks/useStorage';
+import { FilePreviewDialog } from './FilePreviewDialog';
+import { useConfirm } from '@/lib/hooks/useConfirm';
+import { useToast } from '@/lib/hooks/useToast';
+import { SortColumn } from 'react-data-grid';
+import { usePageSize } from '@/lib/hooks/usePageSize';
 
 // Create a type that makes StorageFileSchema compatible with DataGridRowType
 // This allows StorageFileSchema to be used with the generic DataGrid while maintaining type safety
@@ -217,22 +239,20 @@ export function createStorageColumns(
   return columns;
 }
 
-// Storage-specific DataGrid props
-export interface StorageDataGridProps extends Omit<DataGridProps<StorageDataGridRow>, 'columns'> {
+interface StorageFilesGridProps extends Omit<DataGridProps<StorageDataGridRow>, 'columns'> {
   onPreview?: (file: StorageFileSchema) => void;
   onDownload?: (file: StorageFileSchema) => void;
   onDelete?: (file: StorageFileSchema) => void;
   isDownloading?: (key: string) => boolean;
 }
 
-// Specialized DataGrid for storage files
-export function StorageDataGrid({
+function StorageFilesGrid({
   onPreview,
   onDownload,
   onDelete,
   isDownloading,
   ...props
-}: StorageDataGridProps) {
+}: StorageFilesGridProps) {
   const columns = useMemo(
     () => createStorageColumns(onPreview, onDownload, onDelete, isDownloading),
     [onPreview, onDownload, onDelete, isDownloading]
@@ -257,5 +277,218 @@ export function StorageDataGrid({
       paginationRecordLabel="files"
       rowKeyGetter={(row) => row.key}
     />
+  );
+}
+
+export interface StorageDataGridProps {
+  bucketName: string;
+  fileCount: number;
+  searchQuery: string;
+  selectedFiles: Set<string>;
+  onSelectedFilesChange: (selectedFiles: Set<string>) => void;
+  isRefreshing?: boolean;
+}
+
+export function StorageDataGrid({
+  bucketName,
+  searchQuery,
+  fileCount,
+  selectedFiles,
+  onSelectedFilesChange,
+  isRefreshing = false,
+}: StorageDataGridProps) {
+  const [downloadingFiles, setDownloadingFiles] = useState<Set<string>>(new Set());
+  const [previewFile, setPreviewFile] = useState<StorageFileSchema | null>(null);
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+  const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
+  const { showToast } = useToast();
+  const { confirm, confirmDialogProps } = useConfirm();
+  const [currentPage, setCurrentPage] = useState(1);
+  const {
+    pageSize,
+    pageSizeOptions,
+    onPageSizeChange: handlePageSizeChange,
+  } = usePageSize('storage');
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, bucketName]);
+
+  const { useListObjects, deleteObjects, downloadObject } = useStorage();
+  const {
+    data: objectsData,
+    isLoading: objectsLoading,
+    error: objectsError,
+  } = useListObjects(
+    bucketName,
+    {
+      limit: pageSize,
+      offset: (currentPage - 1) * pageSize,
+    },
+    searchQuery
+  );
+
+  const totalPages = useMemo(() => {
+    const total = objectsData?.pagination.total || fileCount;
+    return Math.ceil(total / pageSize);
+  }, [objectsData?.pagination.total, fileCount, pageSize]);
+
+  const processedFiles = useMemo(() => {
+    let files = objectsData?.objects || [];
+
+    if (sortColumns.length) {
+      const sortColumn = sortColumns[0];
+      files = [...files].sort((a, b) => {
+        const aValue = a[sortColumn.columnKey as keyof StorageFileSchema];
+        const bValue = b[sortColumn.columnKey as keyof StorageFileSchema];
+
+        if (aValue === bValue) {
+          return 0;
+        }
+        if (aValue === null || aValue === undefined) {
+          return 1;
+        }
+        if (bValue === null || bValue === undefined) {
+          return -1;
+        }
+
+        const result = aValue < bValue ? -1 : 1;
+        return sortColumn.direction === 'ASC' ? result : -result;
+      });
+    }
+
+    return files;
+  }, [objectsData?.objects, sortColumns]);
+
+  const handleDownload = useCallback(
+    async (file: StorageFileSchema) => {
+      setDownloadingFiles((prev) => new Set(prev).add(file.key));
+      try {
+        const blob = await downloadObject(bucketName, file.key);
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.key.split('/').pop() || file.key;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } catch (error) {
+        showToast('Download failed', 'error');
+        console.error(error);
+      } finally {
+        setDownloadingFiles((prev) => {
+          const next = new Set(prev);
+          next.delete(file.key);
+          return next;
+        });
+      }
+    },
+    [bucketName, downloadObject, showToast]
+  );
+
+  const handlePreview = useCallback((file: StorageFileSchema) => {
+    setPreviewFile(file);
+    setShowPreviewDialog(true);
+  }, []);
+
+  const handleDelete = useCallback(
+    async (file: StorageFileSchema) => {
+      const confirmOptions = {
+        title: 'Delete File',
+        description: 'Are you sure you want to delete this file? This action cannot be undone.',
+        confirmText: 'Delete',
+        destructive: true,
+      };
+
+      const shouldDelete = await confirm(confirmOptions);
+
+      if (shouldDelete) {
+        deleteObjects({ bucket: bucketName, keys: [file.key] });
+      }
+    },
+    [bucketName, confirm, deleteObjects]
+  );
+
+  const isDownloading = useCallback(
+    (key: string) => {
+      return downloadingFiles.has(key);
+    },
+    [downloadingFiles]
+  );
+
+  if (!bucketName) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <EmptyState
+          icon={Folder}
+          title="No Bucket Selected"
+          description="Select a bucket from the sidebar to view its files"
+        />
+      </div>
+    );
+  }
+
+  if (objectsLoading) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <LoadingState />
+      </div>
+    );
+  }
+
+  if (objectsError) {
+    return (
+      <div className="p-6">
+        <ErrorState error={objectsError} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative flex flex-1 flex-col overflow-hidden">
+      <div className="flex-1 overflow-hidden">
+        <StorageFilesGrid
+          data={processedFiles}
+          loading={objectsLoading}
+          isRefreshing={isRefreshing}
+          totalRecords={objectsData?.pagination.total || fileCount}
+          selectedRows={selectedFiles}
+          onSelectedRowsChange={onSelectedFilesChange}
+          sortColumns={sortColumns}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          pageSizeOptions={pageSizeOptions}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            handlePageSizeChange(newSize);
+            setCurrentPage(1);
+          }}
+          onSortColumnsChange={setSortColumns}
+          onPreview={handlePreview}
+          onDownload={(file) => void handleDownload(file)}
+          onDelete={(file) => void handleDelete(file)}
+          isDownloading={isDownloading}
+          emptyState={
+            <div className="flex flex-col items-center">
+              <DataGridEmptyState
+                message={searchQuery ? 'No files match your search criteria' : 'No files found'}
+              />
+              {!searchQuery && <ConnectCTA />}
+            </div>
+          }
+        />
+      </div>
+
+      <ConfirmDialog {...confirmDialogProps} />
+
+      <FilePreviewDialog
+        open={showPreviewDialog}
+        onOpenChange={setShowPreviewDialog}
+        file={previewFile}
+        bucket={bucketName}
+      />
+    </div>
   );
 }

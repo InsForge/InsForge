@@ -271,7 +271,7 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                   <>
                     <SettingRow
                       label="Allowed Redirect URLs"
-                      description="Allowed URLs for authentication redirects. If empty, all URLs are allowed. This is convenient for development but insecure for production."
+                      description="Allowed redirect destinations for auth flows. Leave empty to allow all URLs."
                     >
                       <div className="flex flex-col gap-2">
                         {visibleAllowedRedirectUrls.map((url, index) => {
@@ -289,7 +289,7 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                                   placeholder="https://example.com"
                                   className={itemError ? 'border-destructive' : ''}
                                 />
-                                {visibleAllowedRedirectUrls.length > 1 && (
+                                {allowedRedirectUrls.length > 0 && (
                                   <button
                                     type="button"
                                     onClick={() => handleRemoveAllowedRedirectUrl(index)}

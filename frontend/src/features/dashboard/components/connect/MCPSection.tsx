@@ -11,7 +11,7 @@ import {
 import { CursorDeeplinkGenerator } from './mcp/CursorDeeplinkGenerator';
 import { QoderDeeplinkGenerator } from './mcp/QoderDeeplinkGenerator';
 import { MCP_AGENTS, GenerateInstallCommand, createMCPConfig, type MCPAgent } from './mcp/helpers';
-import { MCP_VERIFY_CONNECTION_PROMPT } from '../constants';
+import { MCP_VERIFY_CONNECTION_PROMPT } from './constants';
 import { cn } from '@/lib/utils/utils';
 
 interface MCPSectionProps {

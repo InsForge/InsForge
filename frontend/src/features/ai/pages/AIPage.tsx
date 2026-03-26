@@ -13,7 +13,7 @@ import {
   type SortField,
   type SortDirection,
 } from '../helpers';
-import { ModelRow, GatewayConfigDialog } from '../components';
+import { GatewayConfigDialog, ModelRow } from '../components';
 import type { AIModelSchema } from '@insforge/shared-schemas';
 
 export default function AIPage() {
@@ -38,7 +38,7 @@ export default function AIPage() {
   const [activeTab, setActiveTab] = useState<string>('');
   const [sortField, setSortField] = useState<SortField>('inputPrice');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [gatewayConfigOpen, setGatewayConfigOpen] = useState(false);
+  const [aiSettingsOpen, setAISettingsOpen] = useState(false);
 
   // Set default active tab when providers are loaded
   useEffect(() => {
@@ -166,7 +166,7 @@ export default function AIPage() {
               </div>
               <Button
                 variant="secondary"
-                onClick={() => setGatewayConfigOpen(true)}
+                onClick={() => setAISettingsOpen(true)}
                 className="h-9 rounded px-2 text-foreground"
               >
                 <Settings className="h-5 w-5 stroke-[1.7]" />
@@ -281,7 +281,7 @@ export default function AIPage() {
       <ConfirmDialog {...confirmDialogProps} />
 
       {/* Gateway Credentials Dialog */}
-      <GatewayConfigDialog open={gatewayConfigOpen} onOpenChange={setGatewayConfigOpen} />
+      <GatewayConfigDialog open={aiSettingsOpen} onOpenChange={setAISettingsOpen} />
     </div>
   );
 }

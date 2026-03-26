@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
 import { ThemeProvider } from '@/lib/contexts/ThemeContext';
-import { ConnectDialog } from '@/features/connect';
-import { SettingsMenuDialog } from '@/features/dashboard/components';
+import { ConnectDialog } from '@/features/dashboard/components/connect';
+import { ProjectSettingsMenuDialog } from '@/features/dashboard/components';
 import { isIframe } from '@/lib/utils/utils';
 
 interface LayoutProps {
@@ -30,7 +30,7 @@ export default function Layout({ children }: LayoutProps) {
         </div>
       </div>
       <ConnectDialog />
-      <SettingsMenuDialog />
+      <ProjectSettingsMenuDialog />
     </ThemeProvider>
   );
 }

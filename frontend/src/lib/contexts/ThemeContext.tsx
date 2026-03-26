@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { LOCAL_STORAGE_KEYS } from '@/lib/utils/constants';
+import { getLocalStorageItem, setLocalStorageItem } from '@/lib/utils/local-storage';
 
 type Theme = 'light' | 'dark' | 'system';
 type ResolvedTheme = 'light' | 'dark';
@@ -11,8 +13,6 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
-
-const STORAGE_KEY = 'insforge-theme';
 
 function getSystemTheme(): ResolvedTheme {
   if (typeof window === 'undefined') {
@@ -37,19 +37,18 @@ interface ThemeProviderProps {
 export function ThemeProvider({
   children,
   forcedTheme,
-  storageKey = STORAGE_KEY,
+  storageKey = LOCAL_STORAGE_KEYS.theme,
 }: ThemeProviderProps) {
   const [theme, setThemeState] = useState<Theme>(() => {
     if (forcedTheme) {
       return forcedTheme;
     }
 
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(storageKey);
-      if (stored === 'light' || stored === 'dark' || stored === 'system') {
-        return stored;
-      }
+    const stored = getLocalStorageItem(storageKey);
+    if (stored === 'light' || stored === 'dark' || stored === 'system') {
+      return stored;
     }
+
     return 'system';
   });
 
@@ -97,7 +96,7 @@ export function ThemeProvider({
     }
 
     setThemeState(newTheme);
-    localStorage.setItem(storageKey, newTheme);
+    setLocalStorageItem(storageKey, newTheme);
   };
 
   const toggleTheme = () => {

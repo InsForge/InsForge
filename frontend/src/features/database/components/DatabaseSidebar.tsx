@@ -1,19 +1,52 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { ArrowLeft, Database, MoreVertical, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Database, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Link, useMatch, useNavigate } from 'react-router-dom';
 import EmptyBoxSvg from '@/assets/images/empty_box.svg?react';
 import {
-  SecondaryMenu,
-  type SecondaryMenuActionButton,
-  type SecondaryMenuItemAction,
-  type SecondaryMenuListItem,
-} from '@/components/layout/SecondaryMenu';
+  FeatureSidebar,
+  type FeatureSidebarActionButton,
+  type FeatureSidebarItemAction,
+  type FeatureSidebarListItem,
+} from '@/components';
 import { ScrollArea } from '@/components/radix/ScrollArea';
-import { databaseStudioMenuItems } from '@/lib/utils/menuItems';
 import { cn } from '@/lib/utils/utils';
 import { Button } from '@insforge/ui';
 
-export interface DatabaseSecondaryMenuProps {
+const DATABASE_STUDIO_SIDEBAR_ITEMS: Array<{
+  id: string;
+  label: string;
+  href: string;
+  sectionEnd?: boolean;
+}> = [
+  {
+    id: 'indexes',
+    label: 'Indexes',
+    href: '/dashboard/database/indexes',
+  },
+  {
+    id: 'triggers',
+    label: 'Triggers',
+    href: '/dashboard/database/triggers',
+  },
+  {
+    id: 'functions',
+    label: 'Functions',
+    href: '/dashboard/database/functions',
+  },
+  {
+    id: 'policies',
+    label: 'Policies',
+    href: '/dashboard/database/policies',
+    sectionEnd: true,
+  },
+  {
+    id: 'templates',
+    label: 'Templates',
+    href: '/dashboard/database/templates',
+  },
+];
+
+export interface DatabaseSidebarProps {
   tables: string[];
   selectedTable?: string;
   onTableSelect: (tableName: string) => void;
@@ -25,17 +58,17 @@ export interface DatabaseSecondaryMenuProps {
   animateToMode?: 'tables' | 'studio';
 }
 
-export interface DatabaseStudioMenuPanelProps {
+export interface DatabaseStudioSidebarPanelProps {
   onBack: () => void;
 }
 
-interface DatabaseStudioMenuItemProps {
+interface DatabaseStudioSidebarItemProps {
   label: string;
   href: string;
   sectionEnd?: boolean;
 }
 
-function DatabaseStudioMenuItem({ label, href, sectionEnd }: DatabaseStudioMenuItemProps) {
+function DatabaseStudioSidebarItem({ label, href, sectionEnd }: DatabaseStudioSidebarItemProps) {
   const match = useMatch({ path: href, end: false });
   const isSelected = !!match;
 
@@ -52,7 +85,6 @@ function DatabaseStudioMenuItem({ label, href, sectionEnd }: DatabaseStudioMenuI
         <Link to={href} className="flex min-w-0 flex-1 items-center px-2">
           <p className={cn('truncate text-sm leading-5', isSelected && 'text-inherit')}>{label}</p>
         </Link>
-        {isSelected && <MoreVertical className="h-4 w-4 shrink-0 text-muted-foreground" />}
       </div>
 
       {sectionEnd && <div className="my-1.5 h-px w-full bg-alpha-8" />}
@@ -62,7 +94,7 @@ function DatabaseStudioMenuItem({ label, href, sectionEnd }: DatabaseStudioMenuI
 
 const STUDIO_MENU_TRANSITION_MS = 260;
 
-export function DatabaseStudioMenuPanel({ onBack }: DatabaseStudioMenuPanelProps) {
+export function DatabaseStudioSidebarPanel({ onBack }: DatabaseStudioSidebarPanelProps) {
   return (
     <aside className="h-full w-60 flex flex-col border-r border-border bg-semantic-1 flex-shrink-0">
       <div className="p-3">
@@ -78,8 +110,8 @@ export function DatabaseStudioMenuPanel({ onBack }: DatabaseStudioMenuPanelProps
 
       <ScrollArea className="flex-1 px-3 pb-2">
         <div className="flex flex-col gap-1.5">
-          {databaseStudioMenuItems.map((item) => (
-            <DatabaseStudioMenuItem
+          {DATABASE_STUDIO_SIDEBAR_ITEMS.map((item) => (
+            <DatabaseStudioSidebarItem
               key={item.id}
               label={item.label}
               href={item.href}
@@ -92,7 +124,7 @@ export function DatabaseStudioMenuPanel({ onBack }: DatabaseStudioMenuPanelProps
   );
 }
 
-export function DatabaseSecondaryMenu({
+export function DatabaseSidebar({
   tables,
   selectedTable,
   onTableSelect,
@@ -102,7 +134,7 @@ export function DatabaseSecondaryMenu({
   onDeleteTable,
   initialMode = 'tables',
   animateToMode,
-}: DatabaseSecondaryMenuProps) {
+}: DatabaseSidebarProps) {
   const navigate = useNavigate();
   const [mode, setMode] = useState<'tables' | 'studio'>(initialMode);
   const showEmptyState = tables.length === 0;
@@ -130,13 +162,13 @@ export function DatabaseSecondaryMenu({
     };
   }, [animateToMode, initialMode]);
 
-  const tableMenuItems: SecondaryMenuListItem[] = tables.map((table) => ({
+  const tableMenuItems: FeatureSidebarListItem[] = tables.map((table) => ({
     id: table,
     label: table,
     onClick: () => onTableSelect(table),
   }));
 
-  const actionButtons: SecondaryMenuActionButton[] = [
+  const actionButtons: FeatureSidebarActionButton[] = [
     ...(onNewTable
       ? [
           {
@@ -163,8 +195,8 @@ export function DatabaseSecondaryMenu({
     },
   ];
 
-  const getItemActions = (item: SecondaryMenuListItem): SecondaryMenuItemAction[] => {
-    const actions: SecondaryMenuItemAction[] = [];
+  const getItemActions = (item: FeatureSidebarListItem): FeatureSidebarItemAction[] => {
+    const actions: FeatureSidebarItemAction[] = [];
 
     if (onEditTable) {
       actions.push({
@@ -197,7 +229,7 @@ export function DatabaseSecondaryMenu({
         )}
       >
         <div className="h-full w-1/2">
-          <SecondaryMenu
+          <FeatureSidebar
             title="Database"
             items={tableMenuItems}
             activeItemId={selectedTable}
@@ -240,7 +272,7 @@ export function DatabaseSecondaryMenu({
         </div>
 
         <div className="h-full w-1/2">
-          <DatabaseStudioMenuPanel onBack={() => setMode('tables')} />
+          <DatabaseStudioSidebarPanel onBack={() => setMode('tables')} />
         </div>
       </div>
     </div>

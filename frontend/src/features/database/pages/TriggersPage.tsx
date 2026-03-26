@@ -13,7 +13,7 @@ import {
 } from '@/components';
 import { useTriggers } from '../hooks/useDatabase';
 import { SQLModal, SQLCellButton } from '../components/SQLModal';
-import { DatabaseStudioMenuPanel } from '../components/DatabaseSecondaryMenu';
+import { DatabaseStudioSidebarPanel } from '../components/DatabaseSidebar';
 import type { DatabaseTriggersResponse } from '@insforge/shared-schemas';
 
 interface TriggerRow extends DataGridRowType {
@@ -146,7 +146,7 @@ export default function TriggersPage() {
   if (error) {
     return (
       <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
-        <DatabaseStudioMenuPanel
+        <DatabaseStudioSidebarPanel
           onBack={() =>
             void navigate('/dashboard/database/tables', { state: { slideFromStudio: true } })
           }
@@ -163,7 +163,7 @@ export default function TriggersPage() {
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <DatabaseStudioMenuPanel
+      <DatabaseStudioSidebarPanel
         onBack={() =>
           void navigate('/dashboard/database/tables', { state: { slideFromStudio: true } })
         }
