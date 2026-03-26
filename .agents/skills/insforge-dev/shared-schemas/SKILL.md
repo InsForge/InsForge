@@ -21,7 +21,7 @@ Use this skill for `shared-schemas/` work in the InsForge repository.
    - Remember that this package is not only for the repo's backend and frontend. It is also consumed by other InsForge tooling, including MCP and SDK code that may live outside this repository.
 
 2. Keep schemas organized by domain.
-   - Follow the existing `*-schema.ts` and `*-api.schema.ts` split when it fits the current package pattern.
+   - Follow the existing `*.schema.ts` and `*-api.schema.ts` split when it fits the current package pattern.
    - Keep `shared-schemas/src/index.ts` aligned with the intended public API.
    - Treat exported names and schema shapes as a public contract surface, not just an internal refactor target.
 
