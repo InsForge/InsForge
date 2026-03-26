@@ -73,7 +73,7 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
   const menuItemBaseClasses = (isActive: boolean) =>
     cn(
       'group flex items-center rounded transition-colors',
-      isCollapsed ? 'h-8 w-9 justify-center p-1.5' : 'h-8 w-full gap-1 p-1.5',
+      isCollapsed ? 'h-8 w-full justify-start p-1.5' : 'h-8 w-full gap-1 p-1.5',
       isActive
         ? 'bg-toast text-foreground'
         : 'text-muted-foreground hover:bg-alpha-4 hover:text-foreground'
