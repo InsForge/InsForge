@@ -1,7 +1,7 @@
-import { DatabaseSecondaryMenu, type DatabaseSecondaryMenuProps } from './DatabaseSecondaryMenu';
+import { DatabaseSidebar, type DatabaseSidebarProps } from './DatabaseSidebar';
 
-export type TableSidebarProps = DatabaseSecondaryMenuProps;
+export type TableSidebarProps = DatabaseSidebarProps;
 
 export function TableSidebar(props: TableSidebarProps) {
-  return <DatabaseSecondaryMenu {...props} />;
+  return <DatabaseSidebar {...props} />;
 }

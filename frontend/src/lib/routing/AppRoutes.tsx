@@ -3,19 +3,29 @@ import { RequireAuth } from '@/lib/routing/RequireAuth';
 import Layout from '@/components/layout/Layout';
 import LoginPage from '@/features/login/pages/LoginPage';
 import CloudLoginPage from '@/features/login/pages/CloudLoginPage';
+import DashboardLayout from '@/features/dashboard/components/DashboardLayout';
 import DashboardPage from '@/features/dashboard/pages/DashboardPage';
+import DatabaseLayout from '@/features/database/components/DatabaseLayout';
+import SQLEditorLayout from '@/features/database/components/SQLEditorLayout';
 import TablesPage from '@/features/database/pages/TablesPage';
+import AuthenticationLayout from '@/features/auth/components/AuthenticationLayout';
 import UsersPage from '@/features/auth/pages/UsersPage';
 import AuthMethodsPage from '@/features/auth/pages/AuthMethodsPage';
+import LogsLayout from '@/features/logs/components/LogsLayout';
 import LogsPage from '@/features/logs/pages/LogsPage';
 import FunctionLogsPage from '@/features/logs/pages/FunctionLogsPage';
 import MCPLogsPage from '@/features/logs/pages/MCPLogsPage';
+import StorageLayout from '@/features/storage/components/StorageLayout';
 import StoragePage from '@/features/storage/pages/StoragePage';
+import VisualizerLayout from '@/features/visualizer/components/VisualizerLayout';
 import VisualizerPage from '@/features/visualizer/pages/VisualizerPage';
+import FunctionsLayout from '@/features/functions/components/FunctionsLayout';
 import FunctionsPage from '@/features/functions/pages/FunctionsPage';
 import SecretsPage from '@/features/functions/pages/SecretsPage';
 import SchedulesPage from '@/features/functions/pages/SchedulesPage';
+import AILayout from '@/features/ai/components/AILayout';
 import AIPage from '@/features/ai/pages/AIPage';
+import RealtimeLayout from '@/features/realtime/components/RealtimeLayout';
 import RealtimeChannelsPage from '@/features/realtime/pages/RealtimeChannelsPage';
 import RealtimeMessagesPage from '@/features/realtime/pages/RealtimeMessagesPage';
 import RealtimePermissionsPage from '@/features/realtime/pages/RealtimePermissionsPage';
@@ -26,6 +36,7 @@ import TriggersPage from '@/features/database/pages/TriggersPage';
 import PoliciesPage from '@/features/database/pages/PoliciesPage';
 import TemplatesPage from '@/features/database/pages/TemplatesPage';
 import AuditsPage from '@/features/logs/pages/AuditsPage';
+import DeploymentsLayout from '@/features/deployments/components/DeploymentsLayout';
 import DeploymentLogsPage from '@/features/deployments/pages/DeploymentLogsPage';
 import DeploymentOverviewPage from '@/features/deployments/pages/DeploymentOverviewPage';
 import DeploymentEnvVarsPage from '@/features/deployments/pages/DeploymentEnvVarsPage';
@@ -43,7 +54,9 @@ export function AppRoutes() {
             <Layout>
               <Routes>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/dashboard" element={<DashboardLayout />}>
+                  <Route index element={<DashboardPage />} />
+                </Route>
                 <Route
                   path="/dashboard/users"
                   element={<Navigate to="/dashboard/authentication/users" replace />}
@@ -52,73 +65,62 @@ export function AppRoutes() {
                   path="/dashboard/tables"
                   element={<Navigate to="/dashboard/database/tables" replace />}
                 />
-                <Route
-                  path="/dashboard/authentication"
-                  element={<Navigate to="/dashboard/authentication/users" replace />}
-                />
-                <Route path="/dashboard/authentication/users" element={<UsersPage />} />
-                <Route
-                  path="/dashboard/authentication/auth-methods"
-                  element={<AuthMethodsPage />}
-                />
-                <Route
-                  path="/dashboard/authentication/config"
-                  element={<AuthMethodsPage openSettingsOnMount={true} />}
-                />
-                <Route
-                  path="/dashboard/database"
-                  element={<Navigate to="/dashboard/database/tables" replace />}
-                />
-                <Route path="/dashboard/database/tables" element={<TablesPage />} />
-                <Route path="/dashboard/database/indexes" element={<IndexesPage />} />
-                <Route path="/dashboard/database/functions" element={<DatabaseFunctionsPage />} />
-                <Route path="/dashboard/database/triggers" element={<TriggersPage />} />
-                <Route path="/dashboard/database/policies" element={<PoliciesPage />} />
-                <Route
-                  path="/dashboard/database/sql-editor"
-                  element={<Navigate to="/dashboard/sql-editor" replace />}
-                />
-                <Route path="/dashboard/sql-editor" element={<SQLEditorPage />} />
-                <Route path="/dashboard/database/templates" element={<TemplatesPage />} />
-                <Route path="/dashboard/storage" element={<StoragePage />} />
-                <Route
-                  path="/dashboard/logs"
-                  element={<Navigate to="/dashboard/logs/MCP" replace />}
-                />
-                <Route path="/dashboard/logs/MCP" element={<MCPLogsPage />} />
-                <Route path="/dashboard/logs/audits" element={<AuditsPage />} />
-                <Route path="/dashboard/logs/function.logs" element={<FunctionLogsPage />} />
-                <Route path="/dashboard/logs/:source" element={<LogsPage />} />
-                <Route
-                  path="/dashboard/functions"
-                  element={<Navigate to="/dashboard/functions/list" replace />}
-                />
-                <Route path="/dashboard/functions/list" element={<FunctionsPage />} />
-                <Route path="/dashboard/functions/secrets" element={<SecretsPage />} />
-                <Route path="/dashboard/functions/schedules" element={<SchedulesPage />} />
-                <Route path="/dashboard/visualizer" element={<VisualizerPage />} />
-                <Route path="/dashboard/ai" element={<AIPage />} />
-                <Route
-                  path="/dashboard/realtime"
-                  element={<Navigate to="/dashboard/realtime/channels" replace />}
-                />
-                <Route path="/dashboard/realtime/channels" element={<RealtimeChannelsPage />} />
-                <Route path="/dashboard/realtime/messages" element={<RealtimeMessagesPage />} />
-                <Route
-                  path="/dashboard/realtime/permissions"
-                  element={<RealtimePermissionsPage />}
-                />
-                <Route
-                  path="/dashboard/deployments"
-                  element={<Navigate to="/dashboard/deployments/overview" replace />}
-                />
-                <Route
-                  path="/dashboard/deployments/overview"
-                  element={<DeploymentOverviewPage />}
-                />
-                <Route path="/dashboard/deployments/logs" element={<DeploymentLogsPage />} />
-                <Route path="/dashboard/deployments/env-vars" element={<DeploymentEnvVarsPage />} />
-                <Route path="/dashboard/deployments/domains" element={<DeploymentDomainsPage />} />
+                <Route path="/dashboard/authentication" element={<AuthenticationLayout />}>
+                  <Route index element={<Navigate to="users" replace />} />
+                  <Route path="users" element={<UsersPage />} />
+                  <Route path="auth-methods" element={<AuthMethodsPage />} />
+                </Route>
+                <Route path="/dashboard/database" element={<DatabaseLayout />}>
+                  <Route index element={<Navigate to="tables" replace />} />
+                  <Route path="tables" element={<TablesPage />} />
+                  <Route path="indexes" element={<IndexesPage />} />
+                  <Route path="functions" element={<DatabaseFunctionsPage />} />
+                  <Route path="triggers" element={<TriggersPage />} />
+                  <Route path="policies" element={<PoliciesPage />} />
+                  <Route
+                    path="sql-editor"
+                    element={<Navigate to="/dashboard/sql-editor" replace />}
+                  />
+                  <Route path="templates" element={<TemplatesPage />} />
+                </Route>
+                <Route path="/dashboard/sql-editor" element={<SQLEditorLayout />}>
+                  <Route index element={<SQLEditorPage />} />
+                </Route>
+                <Route path="/dashboard/storage" element={<StorageLayout />}>
+                  <Route index element={<StoragePage />} />
+                </Route>
+                <Route path="/dashboard/logs" element={<LogsLayout />}>
+                  <Route index element={<Navigate to="MCP" replace />} />
+                  <Route path="MCP" element={<MCPLogsPage />} />
+                  <Route path="audits" element={<AuditsPage />} />
+                  <Route path="function.logs" element={<FunctionLogsPage />} />
+                  <Route path=":source" element={<LogsPage />} />
+                </Route>
+                <Route path="/dashboard/functions" element={<FunctionsLayout />}>
+                  <Route index element={<Navigate to="list" replace />} />
+                  <Route path="list" element={<FunctionsPage />} />
+                  <Route path="secrets" element={<SecretsPage />} />
+                  <Route path="schedules" element={<SchedulesPage />} />
+                </Route>
+                <Route path="/dashboard/visualizer" element={<VisualizerLayout />}>
+                  <Route index element={<VisualizerPage />} />
+                </Route>
+                <Route path="/dashboard/ai" element={<AILayout />}>
+                  <Route index element={<AIPage />} />
+                </Route>
+                <Route path="/dashboard/realtime" element={<RealtimeLayout />}>
+                  <Route index element={<Navigate to="channels" replace />} />
+                  <Route path="channels" element={<RealtimeChannelsPage />} />
+                  <Route path="messages" element={<RealtimeMessagesPage />} />
+                  <Route path="permissions" element={<RealtimePermissionsPage />} />
+                </Route>
+                <Route path="/dashboard/deployments" element={<DeploymentsLayout />}>
+                  <Route index element={<Navigate to="overview" replace />} />
+                  <Route path="overview" element={<DeploymentOverviewPage />} />
+                  <Route path="logs" element={<DeploymentLogsPage />} />
+                  <Route path="env-vars" element={<DeploymentEnvVarsPage />} />
+                  <Route path="domains" element={<DeploymentDomainsPage />} />
+                </Route>
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </Layout>

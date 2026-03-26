@@ -4,3 +4,4 @@ export { SeverityFilterDropdown } from './SeverityFilterDropdown';
 export { LogDetailPanel } from './LogDetailPanel';
 export { FunctionLogsTabs, type FunctionLogType } from './FunctionLogsTabs';
 export { BuildLogsView } from './BuildLogsView';
+export { LogsSidebar } from './LogsSidebar';

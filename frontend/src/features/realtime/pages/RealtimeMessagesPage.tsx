@@ -1,11 +1,10 @@
 import { useState, useCallback, useRef } from 'react';
-import { ChevronRight, Settings } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import RefreshIcon from '@/assets/icons/refresh.svg?react';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import { Skeleton, PaginationControls, TableHeader } from '@/components';
 import { useRealtimeMessages } from '../hooks/useRealtimeMessages';
 import { MessageRow } from '../components/MessageRow';
-import { RealtimeSettingsMenuDialog } from '../components/RealtimeSettingsMenuDialog';
 import RealtimeEmptyState from '../components/RealtimeEmptyState';
 import type { RealtimeMessage } from '../services/realtime.service';
 
@@ -14,7 +13,6 @@ export default function RealtimeMessagesPage() {
   const [selectedMessage, setSelectedMessage] = useState<RealtimeMessage | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isScrolled, setIsScrolled] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const handleScroll = useCallback(() => {
@@ -145,26 +143,6 @@ export default function RealtimeMessagesPage() {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-
-            {/* Settings Dialog Trigger */}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Realtime settings"
-                    onClick={() => setIsSettingsOpen(true)}
-                    className="h-8 w-8 rounded p-1.5 text-muted-foreground hover:bg-[var(--alpha-4)] active:bg-[var(--alpha-8)]"
-                  >
-                    <Settings className="h-5 w-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" align="center">
-                  <p>Settings</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
           </div>
         }
         searchValue={searchQuery}
@@ -244,8 +222,6 @@ export default function RealtimeMessagesPage() {
           />
         </div>
       )}
-      {/* Settings Dialog */}
-      <RealtimeSettingsMenuDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
     </div>
   );
 }

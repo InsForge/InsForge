@@ -1,15 +1,14 @@
 import { useMemo } from 'react';
-import { useLogSources } from '@/features/logs/hooks/useLogSources';
-import { PrimaryMenu } from './PrimaryMenu';
-import { SecondaryMenu } from './SecondaryMenu';
+import { Link, useLocation, matchPath } from 'react-router-dom';
+import { ExternalLink, PanelLeftOpen, PanelRightOpen } from 'lucide-react';
+import { cn, isInsForgeCloudProject } from '@/lib/utils/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@insforge/ui';
 import {
   staticMenuItems,
   settingsMenuItem,
   deploymentsMenuItem,
   type PrimaryMenuItem,
 } from '@/lib/utils/menuItems';
-import { useLocation, matchPath } from 'react-router-dom';
-import { isInsForgeCloudProject } from '@/lib/utils/utils';
 import { useModal } from '@/lib/contexts/ModalContext';
 
 interface AppSidebarProps extends React.HTMLAttributes<HTMLElement> {
@@ -19,7 +18,6 @@ interface AppSidebarProps extends React.HTMLAttributes<HTMLElement> {
 
 export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebarProps) {
   const { pathname } = useLocation();
-  const { menuItems: logsMenuItems, isLoading: logsLoading } = useLogSources();
   const { openSettingsDialog } = useModal();
 
   const isCloud = isInsForgeCloudProject();
@@ -61,37 +59,169 @@ export default function AppSidebar({ isCollapsed, onToggleCollapse }: AppSidebar
         return false;
       }
 
-      // Keep Authentication menu active for all authentication pages.
-      if (item.id === 'authentication') {
-        return !!matchPath({ path: '/dashboard/authentication', end: false }, pathname);
-      }
-
-      const hasSecondaryMenu = !!item.secondaryMenu || item.id === 'logs';
-      return matchPath({ path: item.href, end: !hasSecondaryMenu }, pathname);
+      const shouldMatchExactly = item.href === '/dashboard';
+      return !!matchPath({ path: item.href, end: shouldMatchExactly }, pathname);
     });
   }, [mainMenuItems, bottomMenuItems, pathname]);
 
-  // Get secondary menu items (special case for logs)
-  const secondaryMenuItems = activeMenu?.id === 'logs' ? logsMenuItems : activeMenu?.secondaryMenu;
-  const isLoading = activeMenu?.id === 'logs' ? logsLoading : false;
-  const hideSecondaryMenu =
-    activeMenu?.id === 'database' &&
-    !!matchPath({ path: '/dashboard/database', end: false }, pathname);
+  const handleToggleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onToggleCollapse();
+  };
+
+  const menuItemBaseClasses = (isActive: boolean) =>
+    cn(
+      'group flex items-center rounded transition-colors',
+      isCollapsed ? 'h-8 w-9 justify-center p-1.5' : 'h-8 w-full gap-1 p-1.5',
+      isActive
+        ? 'bg-toast text-foreground'
+        : 'text-muted-foreground hover:bg-alpha-4 hover:text-foreground'
+    );
+
+  const MenuItemLabel = ({ label, isActive }: { label: string; isActive: boolean }) => (
+    <span
+      className={cn(
+        'min-w-0 truncate px-2 text-sm font-normal leading-5',
+        isActive ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'
+      )}
+    >
+      {label}
+    </span>
+  );
+
+  const MenuItemIcon = ({ item, isActive }: { item: PrimaryMenuItem; isActive: boolean }) => (
+    <item.icon
+      className={cn(
+        'h-5 w-5 shrink-0',
+        isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
+      )}
+    />
+  );
+
+  const MenuItem = ({ item, isBottom = false }: { item: PrimaryMenuItem; isBottom?: boolean }) => {
+    const isActive = item.id === activeMenu?.id;
+    const itemClasses = menuItemBaseClasses(isActive);
+
+    const content = (
+      <>
+        <MenuItemIcon item={item} isActive={isActive} />
+        {!isCollapsed && <MenuItemLabel label={item.label} isActive={isActive} />}
+        {!isCollapsed && isBottom && item.external && (
+          <ExternalLink className="ml-auto h-4 w-4 text-muted-foreground" />
+        )}
+      </>
+    );
+
+    if (item.onClick || item.external) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              className={itemClasses}
+              onClick={
+                item.onClick || (item.external ? () => window.open(item.href, '_blank') : undefined)
+              }
+            >
+              {content}
+            </button>
+          </TooltipTrigger>
+          {isCollapsed && (
+            <TooltipContent side="right">
+              <div className="flex items-center gap-2">
+                <p>{item.label}</p>
+                {item.external && <ExternalLink className="h-3 w-3" />}
+              </div>
+            </TooltipContent>
+          )}
+        </Tooltip>
+      );
+    }
+
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Link to={item.href} className={itemClasses}>
+            {content}
+          </Link>
+        </TooltipTrigger>
+        {isCollapsed && (
+          <TooltipContent side="right">
+            <p>{item.label}</p>
+          </TooltipContent>
+        )}
+      </Tooltip>
+    );
+  };
+
+  const ToggleButton = ({ compact = false }: { compact?: boolean }) => (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={handleToggleClick}
+          className={cn(
+            'flex items-center justify-center rounded text-muted-foreground transition-colors hover:bg-alpha-8 hover:text-foreground',
+            compact ? 'h-6 w-6' : 'h-9 w-9 p-1.5'
+          )}
+        >
+          {isCollapsed ? (
+            <PanelLeftOpen className="h-5 w-5" />
+          ) : (
+            <PanelRightOpen className="h-5 w-5" />
+          )}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="right">
+        <p>{isCollapsed ? 'Expand' : 'Collapse'}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+
+  const bottomItemsList = bottomMenuItems ?? [];
+  const useInlineToggle = !isCollapsed && bottomItemsList.length === 1;
 
   return (
-    <div className="flex h-full">
-      <PrimaryMenu
-        items={mainMenuItems}
-        bottomItems={bottomMenuItems}
-        activeItemId={activeMenu?.id}
-        isCollapsed={isCollapsed}
-        onToggleCollapse={onToggleCollapse}
-      />
+    <TooltipProvider disableHoverableContent delayDuration={300}>
+      <aside
+        className={cn(
+          'bg-semantic-2 border-r border-border h-full flex flex-col flex-shrink-0 px-2 pt-3 pb-2',
+          'transition-[width] duration-300 ease-in-out overflow-hidden',
+          isCollapsed ? 'w-[52px]' : 'w-[200px]'
+        )}
+      >
+        <nav className="flex min-h-0 w-full flex-col gap-1.5 overflow-y-auto overflow-x-hidden">
+          {mainMenuItems.map((item) => (
+            <div key={item.id}>
+              <MenuItem item={item} />
+              {item.sectionEnd && <div className="my-1.5 h-px w-full bg-alpha-8" />}
+            </div>
+          ))}
+        </nav>
 
-      {/* Render the secondary menu - always visible when there are items */}
-      {secondaryMenuItems && activeMenu && !hideSecondaryMenu && (
-        <SecondaryMenu title={activeMenu.label} items={secondaryMenuItems} loading={isLoading} />
-      )}
-    </div>
+        <div className="flex-1" />
+
+        <div className={cn('w-full', isCollapsed ? 'space-y-2' : 'space-y-1.5')}>
+          {useInlineToggle ? (
+            <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <MenuItem item={bottomItemsList[0]} isBottom />
+              </div>
+              <ToggleButton compact />
+            </div>
+          ) : (
+            <>
+              {bottomItemsList.map((item) => (
+                <MenuItem key={item.id} item={item} isBottom />
+              ))}
+              <div className={cn('flex', isCollapsed ? 'justify-center' : 'justify-start')}>
+                <ToggleButton compact={!isCollapsed} />
+              </div>
+            </>
+          )}
+        </div>
+      </aside>
+    </TooltipProvider>
   );
 }

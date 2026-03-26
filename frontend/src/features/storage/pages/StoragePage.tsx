@@ -7,7 +7,6 @@ import { useStorage } from '@/features/storage/hooks/useStorage';
 import { StorageSidebar } from '@/features/storage/components/StorageSidebar';
 import { StorageManager } from '@/features/storage/components/StorageManager';
 import { BucketFormDialog } from '@/features/storage/components/BucketFormDialog';
-import { StorageSettingsMenuDialog } from '@/features/storage/components/StorageSettingsMenuDialog';
 
 import { useConfirm } from '@/lib/hooks/useConfirm';
 import { useToast } from '@/lib/hooks/useToast';
@@ -45,7 +44,6 @@ export default function StoragePage() {
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [storageSettingsOpen, setStorageSettingsOpen] = useState(false);
   // Bucket form state
   const [bucketFormOpen, setBucketFormOpen] = useState(false);
   const [bucketFormState, setBucketFormState] = useState<BucketFormState>({
@@ -317,7 +315,6 @@ export default function StoragePage() {
         }}
         onEditBucket={handleEditBucket}
         onDeleteBucket={(bucketName) => void handleDeleteBucket(bucketName)}
-        onSettings={() => setStorageSettingsOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -464,10 +461,6 @@ export default function StoragePage() {
           }
         }}
       />
-
-      {/* Storage Settings Dialog */}
-      <StorageSettingsMenuDialog open={storageSettingsOpen} onOpenChange={setStorageSettingsOpen} />
-
       {/* Confirm Dialog */}
       <ConfirmDialog {...confirmDialogProps} />
     </div>

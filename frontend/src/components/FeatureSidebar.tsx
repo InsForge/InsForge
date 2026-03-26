@@ -3,7 +3,6 @@ import { Link, useMatch } from 'react-router-dom';
 import { LucideIcon, MoreVertical } from 'lucide-react';
 import { cn } from '@/lib/utils/utils';
 import { ScrollArea } from '@/components/radix/ScrollArea';
-import { SecondaryMenuItem as SecondaryMenuItemType } from '@/lib/utils/menuItems';
 import {
   Button,
   DropdownMenu,
@@ -13,23 +12,23 @@ import {
   SearchInput,
 } from '@insforge/ui';
 
-interface SecondaryMenuProps {
+interface FeatureSidebarProps {
   title: string;
-  items: SecondaryMenuListItem[];
+  items: FeatureSidebarListItem[];
   loading?: boolean;
-  headerButtons?: SecondaryMenuHeaderButton[];
-  actionButtons?: SecondaryMenuActionButton[];
+  headerButtons?: FeatureSidebarHeaderButton[];
+  actionButtons?: FeatureSidebarActionButton[];
   emptyState?: ReactNode;
   activeItemId?: string | null;
   showSearch?: boolean;
   searchPlaceholder?: string;
   onSearchChange?: (value: string) => void;
   showItemMenuButton?: boolean;
-  onItemMenuClick?: (item: SecondaryMenuListItem) => void;
-  itemActions?: (item: SecondaryMenuListItem) => SecondaryMenuItemAction[];
+  onItemMenuClick?: (item: FeatureSidebarListItem) => void;
+  itemActions?: (item: FeatureSidebarListItem) => FeatureSidebarItemAction[];
 }
 
-export interface SecondaryMenuHeaderButton {
+export interface FeatureSidebarHeaderButton {
   id: string;
   label: string;
   icon: LucideIcon;
@@ -37,7 +36,7 @@ export interface SecondaryMenuHeaderButton {
   disabled?: boolean;
 }
 
-export interface SecondaryMenuActionButton {
+export interface FeatureSidebarActionButton {
   id: string;
   label: string;
   icon?: LucideIcon;
@@ -45,34 +44,37 @@ export interface SecondaryMenuActionButton {
   disabled?: boolean;
 }
 
-export interface SecondaryMenuItemAction {
+export interface FeatureSidebarItemAction {
   id: string;
   label: string;
   icon?: LucideIcon;
   destructive?: boolean;
-  onClick: (item: SecondaryMenuListItem) => void;
+  onClick: (item: FeatureSidebarListItem) => void;
 }
 
-export type SecondaryMenuListItem = Omit<SecondaryMenuItemType, 'href'> & {
+export interface FeatureSidebarListItem {
+  id: string;
+  label: string;
   href?: string;
+  sectionEnd?: boolean;
   onClick?: () => void;
-};
+}
 
-interface SecondaryMenuItemProps {
-  item: SecondaryMenuListItem;
+interface FeatureSidebarItemProps {
+  item: FeatureSidebarListItem;
   activeItemId?: string | null;
   showItemMenuButton?: boolean;
-  onItemMenuClick?: (item: SecondaryMenuListItem) => void;
-  itemActions?: (item: SecondaryMenuListItem) => SecondaryMenuItemAction[];
+  onItemMenuClick?: (item: FeatureSidebarListItem) => void;
+  itemActions?: (item: FeatureSidebarListItem) => FeatureSidebarItemAction[];
 }
 
-function SecondaryMenuItem({
+function FeatureSidebarItemRow({
   item,
   activeItemId,
   showItemMenuButton,
   onItemMenuClick,
   itemActions,
-}: SecondaryMenuItemProps) {
+}: FeatureSidebarItemProps) {
   // Each item determines its own active state using React Router's useMatch
   const match = useMatch({ path: item.href ?? '/__secondary_menu_no_match__', end: false });
   const hasExternalActiveItem = activeItemId !== null && activeItemId !== undefined;
@@ -172,7 +174,7 @@ function SecondaryMenuItem({
   );
 }
 
-export function SecondaryMenu({
+export function FeatureSidebar({
   title,
   items,
   loading,
@@ -186,7 +188,7 @@ export function SecondaryMenu({
   showItemMenuButton = false,
   onItemMenuClick,
   itemActions,
-}: SecondaryMenuProps) {
+}: FeatureSidebarProps) {
   const [searchValue, setSearchValue] = useState('');
   const hasSearchQuery = showSearch && searchValue.trim().length > 0;
 
@@ -278,15 +280,15 @@ export function SecondaryMenu({
             ))}
           </div>
         ) : filteredItems.length === 0 ? (
-          hasSearchQuery || !emptyState ? (
+          hasSearchQuery ? (
             <div className="px-2 py-1 text-sm text-muted-foreground">No results found</div>
           ) : (
-            emptyState
+            (emptyState ?? null)
           )
         ) : (
           <div className="flex flex-col gap-1.5">
             {filteredItems.map((item) => (
-              <SecondaryMenuItem
+              <FeatureSidebarItemRow
                 key={item.id}
                 item={item}
                 activeItemId={activeItemId}

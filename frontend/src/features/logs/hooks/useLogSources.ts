@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import type { FeatureSidebarListItem } from '@/components';
 import { logService } from '../services/log.service';
 import type { LogSourceSchema } from '@insforge/shared-schemas';
-import type { SecondaryMenuItem } from '@/lib/utils/menuItems';
 
 export function useLogSources() {
   const [selectedSource, setSelectedSource] = useState<string | null>(() => {
@@ -37,7 +37,7 @@ export function useLogSources() {
   const sourceNames = useMemo(() => sources?.map((s) => s.name) || [], [sources]);
 
   // Menu items for sidebar navigation
-  const menuItems: SecondaryMenuItem[] = useMemo(
+  const menuItems: FeatureSidebarListItem[] = useMemo(
     () => [
       {
         id: 'mcp-logs',

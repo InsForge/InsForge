@@ -1,7 +1,16 @@
 // datagrid & cell editor components
 export * from './datagrid';
 
-// layout/menu components
+// shared components
+export {
+  FeatureSidebar,
+  type FeatureSidebarActionButton,
+  type FeatureSidebarHeaderButton,
+  type FeatureSidebarItemAction,
+  type FeatureSidebarListItem,
+} from './FeatureSidebar';
+
+// layout components
 export * from './layout';
 
 // Core radix/ui components

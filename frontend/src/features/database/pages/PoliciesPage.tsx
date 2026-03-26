@@ -13,7 +13,7 @@ import {
 } from '@/components';
 import { usePolicies } from '../hooks/useDatabase';
 import { SQLModal, SQLCellButton } from '../components/SQLModal';
-import { DatabaseStudioMenuPanel } from '../components/DatabaseSecondaryMenu';
+import { DatabaseStudioSidebarPanel } from '../components/DatabaseSidebar';
 import type { DatabasePoliciesResponse } from '@insforge/shared-schemas';
 
 interface PolicyRow extends DataGridRowType {
@@ -153,7 +153,7 @@ export default function PoliciesPage() {
   if (error) {
     return (
       <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
-        <DatabaseStudioMenuPanel
+        <DatabaseStudioSidebarPanel
           onBack={() =>
             void navigate('/dashboard/database/tables', { state: { slideFromStudio: true } })
           }
@@ -170,7 +170,7 @@ export default function PoliciesPage() {
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden bg-[rgb(var(--semantic-1))]">
-      <DatabaseStudioMenuPanel
+      <DatabaseStudioSidebarPanel
         onBack={() =>
           void navigate('/dashboard/database/tables', { state: { slideFromStudio: true } })
         }
