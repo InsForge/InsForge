@@ -183,6 +183,16 @@ export function verifyToken(req: AuthRequest, _res: Response, next: NextFunction
       );
     }
 
+    // Reject anon tokens — they are public keys and must not access authenticated endpoints
+    if (payload.role === 'anon') {
+      throw new AppError(
+        'Authenticated access required',
+        403,
+        ERROR_CODES.AUTH_UNAUTHORIZED,
+        NEXT_ACTION.CHECK_TOKEN
+      );
+    }
+
     // Set user info on request
     setRequestUser(req, payload);
 
