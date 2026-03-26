@@ -10,6 +10,11 @@ coverage/
 *.db-wal
 CLAUDE.md
 .claude/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/insforge-dev/
+!.agents/skills/insforge-dev/**
 deno.lock
 better-auth/
 .mcp.json
