@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { LOCAL_STORAGE_KEYS } from '@/lib/utils/constants';
+import {
+  getLocalStorageJSON,
+  removeLocalStorageItem,
+  setLocalStorageJSON,
+} from '@/lib/utils/local-storage';
 
-const STORAGE_KEY = 'insforge.database.tables.preferences.v1';
 const STORAGE_SAVE_DEBOUNCE_MS = 300;
 
 export type TableColumnWidths = Record<string, number>;
@@ -48,36 +53,23 @@ function sanitizePreferences(value: unknown): DatabaseGridPreferences {
 }
 
 function loadPreferences(): DatabaseGridPreferences {
-  if (typeof window === 'undefined') {
-    return createEmptyPreferences();
-  }
-
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) {
+    const parsed = getLocalStorageJSON<unknown>(LOCAL_STORAGE_KEYS.databaseTablePreferences);
+    if (!parsed) {
       return createEmptyPreferences();
     }
 
-    const parsed = JSON.parse(stored) as unknown;
     return sanitizePreferences(parsed);
   } catch (error) {
     console.error('Failed to load database grid preferences from localStorage:', error);
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // Ignore cleanup errors and keep UI functional.
-    }
+    removeLocalStorageItem(LOCAL_STORAGE_KEYS.databaseTablePreferences);
     return createEmptyPreferences();
   }
 }
 
 function savePreferences(preferences: DatabaseGridPreferences): void {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
+    setLocalStorageJSON(LOCAL_STORAGE_KEYS.databaseTablePreferences, preferences);
   } catch (error) {
     console.error('Failed to save database grid preferences to localStorage:', error);
   }

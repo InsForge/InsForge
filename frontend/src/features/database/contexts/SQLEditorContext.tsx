@@ -1,4 +1,11 @@
 import { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
+import { LOCAL_STORAGE_KEYS } from '@/lib/utils/constants';
+import {
+  getLocalStorageItem,
+  getLocalStorageJSON,
+  setLocalStorageItem,
+  setLocalStorageJSON,
+} from '@/lib/utils/local-storage';
 
 export interface SQLTab {
   id: string;
@@ -23,8 +30,6 @@ interface SQLEditorProviderProps {
   children: ReactNode;
 }
 
-const STORAGE_KEY = 'sql-editor-tabs';
-const ACTIVE_TAB_KEY = 'sql-editor-active-tab';
 const DEBOUNCE_DELAY = 500; // Save after 500ms of inactivity
 
 let tabCounter = 1;
@@ -32,9 +37,8 @@ let tabCounter = 1;
 // Load tabs from localStorage
 function loadTabsFromStorage(): SQLTab[] {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const tabs = JSON.parse(stored) as SQLTab[];
+    const tabs = getLocalStorageJSON<SQLTab[]>(LOCAL_STORAGE_KEYS.sqlEditorTabs);
+    if (tabs) {
       // Update tabCounter to be higher than any existing tab number
       tabs.forEach((tab) => {
         const match = tab.name.match(/Query (\d+)/);
@@ -65,7 +69,7 @@ function getDefaultTabs(): SQLTab[] {
 
 function loadActiveTabFromStorage(): string {
   try {
-    const stored = localStorage.getItem(ACTIVE_TAB_KEY);
+    const stored = getLocalStorageItem(LOCAL_STORAGE_KEYS.sqlEditorActiveTab);
     return stored || 'tab-1';
   } catch (error) {
     console.error('Failed to load active tab from localStorage:', error);
@@ -88,7 +92,7 @@ export function SQLEditorProvider({ children }: SQLEditorProviderProps) {
     }
     saveTimeoutRef.current = setTimeout(() => {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(tabsToSave));
+        setLocalStorageJSON(LOCAL_STORAGE_KEYS.sqlEditorTabs, tabsToSave);
       } catch (error) {
         console.error('Failed to save tabs to localStorage:', error);
       }
@@ -98,7 +102,7 @@ export function SQLEditorProvider({ children }: SQLEditorProviderProps) {
   // Save active tab immediately (no debounce needed for this)
   useEffect(() => {
     try {
-      localStorage.setItem(ACTIVE_TAB_KEY, activeTabId);
+      setLocalStorageItem(LOCAL_STORAGE_KEYS.sqlEditorActiveTab, activeTabId);
     } catch (error) {
       console.error('Failed to save active tab to localStorage:', error);
     }
@@ -115,7 +119,7 @@ export function SQLEditorProvider({ children }: SQLEditorProviderProps) {
         clearTimeout(saveTimeoutRef.current);
         // Flush the pending save to avoid data loss
         try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(tabsRef.current));
+          setLocalStorageJSON(LOCAL_STORAGE_KEYS.sqlEditorTabs, tabsRef.current);
         } catch (error) {
           console.error('Failed to save tabs to localStorage:', error);
         }
