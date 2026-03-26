@@ -183,16 +183,6 @@ export function verifyToken(req: AuthRequest, _res: Response, next: NextFunction
       );
     }
 
-    // Reject anon tokens — they are public keys and must not access authenticated endpoints
-    if (payload.role === 'anon') {
-      throw new AppError(
-        'Authenticated access required',
-        403,
-        ERROR_CODES.AUTH_UNAUTHORIZED,
-        NEXT_ACTION.CHECK_TOKEN
-      );
-    }
-
     // Set user info on request
     setRequestUser(req, payload);
 
@@ -260,9 +250,26 @@ export async function verifyCloudBackend(req: AuthRequest, _res: Response, next:
  * Apply as router-level middleware before verifyUser on AI routes.
  */
 export async function checkAnonAccess(req: AuthRequest, _res: Response, next: NextFunction) {
+  // Check if the request is using an API key (anon access via SDK)
   const apiKey = extractApiKey(req);
+
+  // Also check if the request is using an anon JWT token
+  let isAnonJwt = false;
   if (!apiKey) {
-    return next(); // JWT request — skip check
+    const token = extractBearerToken(req.headers.authorization);
+    if (token) {
+      try {
+        const payload = tokenManager.verifyToken(token);
+        isAnonJwt = payload.role === 'anon';
+      } catch {
+        // Invalid token — let verifyUser handle the error
+      }
+    }
+  }
+
+  // If neither an API key nor an anon JWT, this is an authenticated user — skip check
+  if (!apiKey && !isAnonJwt) {
+    return next();
   }
 
   try {
