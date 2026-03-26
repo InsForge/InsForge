@@ -31,7 +31,9 @@ export class EmailService {
   private async resolveProvider(): Promise<[EmailProvider, RawSmtpConfig | null]> {
     try {
       const smtpConfig = await SmtpConfigService.getInstance().getRawSmtpConfig();
-      if (smtpConfig) return [this.smtpProvider, smtpConfig];
+      if (smtpConfig) {
+        return [this.smtpProvider, smtpConfig];
+      }
     } catch (error) {
       logger.warn('Error checking SMTP config, falling back to cloud provider', {
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -45,7 +47,9 @@ export class EmailService {
   // -------------------------------------------------------------------------
 
   private checkMinInterval(email: string, minIntervalSeconds: number): void {
-    if (minIntervalSeconds <= 0) return;
+    if (minIntervalSeconds <= 0) {
+      return;
+    }
 
     const now = Date.now();
     const lastSent = this.lastEmailSentAt.get(email);
@@ -67,7 +71,9 @@ export class EmailService {
     if (this.lastEmailSentAt.size > 10000) {
       const cutoff = Date.now() - minIntervalSeconds * 2000;
       for (const [key, ts] of this.lastEmailSentAt) {
-        if (ts < cutoff) this.lastEmailSentAt.delete(key);
+        if (ts < cutoff) {
+          this.lastEmailSentAt.delete(key);
+        }
       }
     }
   }
@@ -84,11 +90,15 @@ export class EmailService {
   ): Promise<void> {
     const [provider, smtpConfig] = await this.resolveProvider();
 
-    if (smtpConfig) this.checkMinInterval(email, smtpConfig.minIntervalSeconds);
+    if (smtpConfig) {
+      this.checkMinInterval(email, smtpConfig.minIntervalSeconds);
+    }
 
     await provider.sendWithTemplate(email, name, template, variables);
 
-    if (smtpConfig) this.recordEmailSent(email, smtpConfig.minIntervalSeconds);
+    if (smtpConfig) {
+      this.recordEmailSent(email, smtpConfig.minIntervalSeconds);
+    }
   }
 
   public async sendRaw(options: SendRawEmailRequest): Promise<void> {

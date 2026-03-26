@@ -41,8 +41,12 @@ PRIVATE_IP_RANGES.addSubnet('fec0::', 10, 'ipv6');
 PRIVATE_IP_RANGES.addSubnet('fc00::', 7, 'ipv6');
 
 export function isPrivateIp(ip: string): boolean {
-  if (net.isIPv4(ip)) return PRIVATE_IP_RANGES.check(ip, 'ipv4');
-  if (net.isIPv6(ip)) return PRIVATE_IP_RANGES.check(ip, 'ipv6');
+  if (net.isIPv4(ip)) {
+    return PRIVATE_IP_RANGES.check(ip, 'ipv4');
+  }
+  if (net.isIPv6(ip)) {
+    return PRIVATE_IP_RANGES.check(ip, 'ipv6');
+  }
   return false;
 }
 
@@ -51,8 +55,12 @@ export function isPrivateIp(ip: string): boolean {
 // ---------------------------------------------------------------------------
 
 function toISOString(value: unknown): string {
-  if (value instanceof Date) return value.toISOString();
-  if (typeof value === 'string') return value;
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
   return new Date().toISOString();
 }
 
@@ -130,7 +138,9 @@ export class SmtpConfigService {
   }
 
   private getDecryptedPassword(passwordEncrypted: string): string | null {
-    if (!passwordEncrypted) return null;
+    if (!passwordEncrypted) {
+      return null;
+    }
     try {
       return EncryptionManager.decrypt(passwordEncrypted);
     } catch (error) {
@@ -164,10 +174,14 @@ export class SmtpConfigService {
       const result = await this.getPool().query(
         `SELECT ${SMTP_CONFIG_COLUMNS} FROM auth.smtp_configs LIMIT 1`
       );
-      if (!result.rows.length) return null;
+      if (!result.rows.length) {
+        return null;
+      }
 
       const row = result.rows[0];
-      if (!row.enabled) return null;
+      if (!row.enabled) {
+        return null;
+      }
 
       const password = this.getDecryptedPassword(row.password_encrypted);
       if (password === null) {
@@ -247,7 +261,9 @@ export class SmtpConfigService {
     } catch (error) {
       await client.query('ROLLBACK');
       logger.error('Failed to upsert SMTP config', { error });
-      if (error instanceof AppError) throw error;
+      if (error instanceof AppError) {
+        throw error;
+      }
       throw new AppError('Failed to update SMTP configuration', 500, ERROR_CODES.INTERNAL_ERROR);
     } finally {
       client.release();
@@ -318,7 +334,9 @@ export class SmtpConfigService {
         );
       }
     } catch (error) {
-      if (error instanceof AppError) throw error;
+      if (error instanceof AppError) {
+        throw error;
+      }
       // DNS resolution failure is fine — transporter.verify() will catch it
     }
   }

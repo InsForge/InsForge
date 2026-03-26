@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { isPrivateIp } from '../../src/services/email/smtp-config.service';
 
 // ---------------------------------------------------------------------------

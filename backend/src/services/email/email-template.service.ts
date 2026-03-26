@@ -9,8 +9,12 @@ import type { EmailTemplateSchema, UpdateEmailTemplateRequest } from '@insforge/
  * Normalize a pg timestamp value to an ISO string
  */
 function toISOString(value: unknown): string {
-  if (value instanceof Date) return value.toISOString();
-  if (typeof value === 'string') return value;
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
   return new Date().toISOString();
 }
 
