@@ -42,6 +42,8 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.GHCR_REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
+          flavor: |
+            suffix=-amd64
           tags: |
             type=ref,event=tag
             type=raw,value=${{ github.event.inputs.test_tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
@@ -89,6 +91,8 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.GHCR_REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
+          flavor: |
+            suffix=-arm64
           tags: |
             type=ref,event=tag
             type=raw,value=${{ github.event.inputs.test_tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
@@ -139,7 +143,7 @@ jobs:
           for TAG in $(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n'); do
             docker buildx imagetools create \
               --tag "${TAG}" \
-              "${TAG}" "${TAG}"
+              "${TAG}-amd64" "${TAG}-arm64"
           done
 
   push-to-ecr:
