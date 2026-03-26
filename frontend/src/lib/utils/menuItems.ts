@@ -132,6 +132,11 @@ export const staticMenuItems: PrimaryMenuItem[] = [
         label: 'Auth Methods',
         href: '/dashboard/authentication/auth-methods',
       },
+      {
+        id: 'email',
+        label: 'Email',
+        href: '/dashboard/authentication/email',
+      },
     ],
   },
   {
