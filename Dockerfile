@@ -34,16 +34,17 @@ COPY package-lock.json ./package-lock.json
 
 COPY backend/package.json     ./backend/package.json
 COPY frontend/package.json    ./frontend/package.json
-COPY shared-schemas/package.json ./shared-schemas/package.json
-COPY ui/package.json          ./ui/package.json
+COPY packages/dashboard/package.json ./packages/dashboard/package.json
+COPY packages/shared-schemas/package.json ./packages/shared-schemas/package.json
+COPY packages/ui/package.json ./packages/ui/package.json
 
 # Strip prepare/build scripts from shared-schemas to prevent tsc
 # from running during install (source files aren't copied yet).
 # The actual build happens in the build stage with full source.
 RUN apk add --no-cache jq && \
     jq 'del(.scripts.prepare, .scripts.build)' \
-      shared-schemas/package.json > shared-schemas/package.json.tmp && \
-    mv shared-schemas/package.json.tmp shared-schemas/package.json
+      packages/shared-schemas/package.json > packages/shared-schemas/package.json.tmp && \
+    mv packages/shared-schemas/package.json.tmp packages/shared-schemas/package.json
 
 RUN npm ci && npm cache clean --force
 
@@ -75,16 +76,17 @@ COPY package-lock.json ./package-lock.json
 
 COPY backend/package.json     ./backend/package.json
 COPY frontend/package.json    ./frontend/package.json
-COPY shared-schemas/package.json ./shared-schemas/package.json
-COPY ui/package.json          ./ui/package.json
+COPY packages/dashboard/package.json ./packages/dashboard/package.json
+COPY packages/shared-schemas/package.json ./packages/shared-schemas/package.json
+COPY packages/ui/package.json ./packages/ui/package.json
 
 # Strip prepare/build scripts from shared-schemas to prevent tsc
 # from running during install (tsc is a devDependency, not available here).
 # The compiled output comes from the build stage instead.
 RUN apk add --no-cache jq && \
     jq 'del(.scripts.prepare, .scripts.build)' \
-      shared-schemas/package.json > shared-schemas/package.json.tmp && \
-    mv shared-schemas/package.json.tmp shared-schemas/package.json
+      packages/shared-schemas/package.json > packages/shared-schemas/package.json.tmp && \
+    mv packages/shared-schemas/package.json.tmp packages/shared-schemas/package.json
 
 RUN npm ci --omit=dev && npm cache clean --force
 
