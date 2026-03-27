@@ -1,0 +1,242 @@
+---
+title: "External JWT Providers"
+description: "Accept third-party JWTs from Clerk, Auth0, Firebase Auth, and other identity providers for InsForge database access and RLS."
+---
+
+## Overview
+
+External JWT providers let you use a third-party identity provider (Clerk, Auth0, Firebase Auth, etc.) as the authentication source while still leveraging InsForge's database, RLS, and API features. Users authenticated by the external provider never need to exist in InsForge's native `auth.users` table.
+
+When a request arrives with a JWT from a configured external provider, InsForge:
+
+1. Detects the token is not a native InsForge JWT
+2. Matches the `iss` (issuer) claim to a registered provider
+3. Verifies the signature using the provider's JWKS endpoint
+4. Validates `iss`, `aud`, and `exp` claims
+5. Extracts user identity via configurable claim mappings
+6. Re-signs the claims as an InsForge-compatible JWT for PostgREST / RLS
+
+Native InsForge auth continues to work unchanged. External JWT verification only runs as a fallback when native verification fails.
+
+## Platform Rule: User ID Types
+
+InsForge has two ways to identify users in RLS policies, depending on the authentication source:
+
+| Auth source | Default helper | Return type | User ID column type |
+|---|---|---|---|
+| **Native InsForge auth** | `auth.uid()` / `uid()` | `uuid` | `UUID` |
+| **External providers** (Clerk, Auth0, etc.) | `auth.uid_text()` / `uid_text()` | `text` | `TEXT` |
+
+<Warning>
+The existing `uid()` function casts the JWT `sub` claim to `uuid`. If the external provider uses non-UUID subject IDs (most do), `uid()` will throw a PostgreSQL cast error. **Always use `uid_text()` for external auth unless you have confirmed the provider's `sub` claim is UUID-formatted.**
+</Warning>
+
+### When to use which helper
+
+| Scenario | Helper | Column type |
+|---|---|---|
+| Native InsForge auth only | `auth.uid()` | `UUID REFERENCES auth.users(id)` |
+| External auth with non-UUID IDs (Clerk, Auth0, most providers) | `auth.uid_text()` | `TEXT NOT NULL` |
+| External auth with UUID-compatible IDs (rare) | `auth.uid()` | `UUID NOT NULL` |
+| Mixed native + external auth | `auth.uid_text()` | `TEXT NOT NULL` |
+
+## Setup
+
+### 1. Configure your identity provider
+
+In your external provider (e.g., Clerk), create a JWT template that includes at minimum:
+- `sub` -- a stable user identifier
+- `email` -- the user's email address
+- `iss` -- the issuer URL
+- `aud` (optional) -- an audience claim scoped to your InsForge project
+
+Note the **JWKS endpoint URL** from your provider. Common examples:
+- **Clerk**: `https://<your-clerk-domain>/.well-known/jwks.json`
+- **Auth0**: `https://<your-tenant>.auth0.com/.well-known/jwks.json`
+- **Firebase Auth**: `https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com`
+
+### 2. Register the provider in InsForge
+
+Use the admin API to create an external JWT provider:
+
+```bash
+curl -X POST https://your-project.insforge.dev/api/auth/jwt-providers \
+  -H "Authorization: Bearer <admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Clerk Production",
+    "provider_key": "clerk",
+    "issuer": "https://your-clerk-domain.clerk.accounts.dev",
+    "audience": "your-insforge-project",
+    "jwks_url": "https://your-clerk-domain.clerk.accounts.dev/.well-known/jwks.json",
+    "claim_mappings": {
+      "sub": "sub",
+      "email": "email"
+    },
+    "subject_type": "text",
+    "default_role": "authenticated"
+  }'
+```
+
+### 3. Use the external JWT in requests
+
+Pass the JWT from your external provider as a standard Bearer token:
+
+```bash
+curl https://your-project.insforge.dev/api/database/records/todos \
+  -H "Authorization: Bearer <clerk-jwt>"
+```
+
+InsForge automatically detects, verifies, and normalizes the token.
+
+## Configuration Reference
+
+| Field | Required | Default | Description |
+|---|---|---|---|
+| `name` | Yes | -- | Human-readable display name |
+| `provider_key` | Yes | -- | Unique slug (lowercase, alphanumeric, hyphens, underscores) |
+| `issuer` | Yes | -- | Expected `iss` claim value |
+| `audience` | No | `null` | Expected `aud` claim value. If set, tokens without a matching audience are rejected. |
+| `jwks_url` | Yes | -- | HTTPS URL to the provider's JWKS endpoint (localhost allowed for development) |
+| `claim_mappings` | No | `{"sub":"sub","email":"email"}` | Maps external claims to InsForge fields. Supports dot-notation for nested claims (e.g., `"user_metadata.email"`). |
+| `default_role` | No | `authenticated` | Role assigned to external users. One of `anon`, `authenticated`, `project_admin`. |
+| `subject_type` | No | `text` | Expected format of the `sub` claim. `"text"` for arbitrary string IDs (Clerk, Auth0), `"uuid"` for UUID-formatted IDs. When set to `uuid`, InsForge validates the claim format at verification time. |
+| `is_enabled` | No | `true` | Whether this provider is actively accepting tokens. |
+
+### About `subject_type`
+
+The `subject_type` field documents what format the provider's `sub` claim uses. It has two effects:
+
+1. **Validation**: When set to `"uuid"`, InsForge rejects tokens whose `sub` is not a valid UUID at verification time, rather than letting them fail later in a RLS policy.
+2. **Guidance**: It signals to developers which RLS helper to use — `uid()` for `uuid`, `uid_text()` for `text`.
+
+Most external providers use string-format IDs, so the default is `"text"`.
+
+## Admin API Endpoints
+
+All endpoints require admin authentication (`Authorization: Bearer <admin-token>` or API key).
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/auth/jwt-providers` | List all external JWT providers |
+| `GET` | `/api/auth/jwt-providers/:key` | Get a specific provider |
+| `POST` | `/api/auth/jwt-providers` | Create a new provider |
+| `PATCH` | `/api/auth/jwt-providers/:key` | Update a provider |
+| `DELETE` | `/api/auth/jwt-providers/:key` | Delete a provider |
+
+## RLS Examples
+
+### Clerk (text subject IDs)
+
+Clerk uses string IDs like `user_2xPnG8KxVQr`. Use `uid_text()` and `TEXT` columns.
+
+```sql
+-- Schema
+create table public.todos (
+  id uuid primary key default gen_random_uuid(),
+  owner_id text not null,  -- Clerk user ID: "user_2xPnG8K..."
+  title text not null,
+  completed boolean default false
+);
+
+-- RLS
+alter table public.todos enable row level security;
+
+create policy "Users can manage own todos"
+  on public.todos
+  for all
+  to authenticated
+  using (owner_id = auth.uid_text())
+  with check (owner_id = auth.uid_text());
+```
+
+Provider config:
+```json
+{
+  "provider_key": "clerk",
+  "issuer": "https://your-domain.clerk.accounts.dev",
+  "jwks_url": "https://your-domain.clerk.accounts.dev/.well-known/jwks.json",
+  "subject_type": "text"
+}
+```
+
+### Auth0 (text subject IDs)
+
+Auth0 uses pipe-delimited IDs like `auth0|507f1f77bcf86cd799439011`. Use `uid_text()` and `TEXT` columns.
+
+```sql
+-- Schema
+create table public.documents (
+  id uuid primary key default gen_random_uuid(),
+  author_id text not null,  -- Auth0 user ID: "auth0|507f1f77..."
+  title text not null,
+  content text
+);
+
+-- RLS
+alter table public.documents enable row level security;
+
+create policy "Authors can manage own documents"
+  on public.documents
+  for all
+  to authenticated
+  using (author_id = auth.uid_text())
+  with check (author_id = auth.uid_text());
+```
+
+Provider config:
+```json
+{
+  "provider_key": "auth0",
+  "issuer": "https://your-tenant.auth0.com/",
+  "jwks_url": "https://your-tenant.auth0.com/.well-known/jwks.json",
+  "subject_type": "text"
+}
+```
+
+### UUID-compatible external provider (rare)
+
+If your external provider guarantees UUID-formatted `sub` claims (e.g., a custom identity service), you can use `subject_type: "uuid"` and standard UUID columns:
+
+```sql
+create table public.items (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null,  -- UUID-format external user ID
+  name text not null
+);
+
+alter table public.items enable row level security;
+
+create policy "Owner access"
+  on public.items
+  for all
+  to authenticated
+  using (owner_id = auth.uid())
+  with check (owner_id = auth.uid());
+```
+
+Provider config:
+```json
+{
+  "provider_key": "custom-idp",
+  "issuer": "https://idp.example.com",
+  "jwks_url": "https://idp.example.com/.well-known/jwks.json",
+  "subject_type": "uuid"
+}
+```
+
+<Note>
+Setting `subject_type: "uuid"` causes InsForge to validate the `sub` format at token verification time. Tokens with non-UUID `sub` values will be rejected immediately with a clear error, rather than failing silently in RLS policies.
+</Note>
+
+## Security
+
+- **Signature verification**: All external JWTs are verified against the provider's JWKS endpoint. Only asymmetric algorithms (RS256, RS384, RS512, ES256, ES384, ES512, PS256, PS384, PS512) are accepted.
+- **Issuer validation**: The `iss` claim must exactly match the configured issuer.
+- **Audience validation**: If `audience` is configured, the `aud` claim must match.
+- **Expiration**: Standard `exp` claim validation is enforced by the `jose` library.
+- **Subject validation**: When `subject_type` is `uuid`, the `sub` claim is validated as a UUID before acceptance.
+- **JWKS caching**: Keys are cached with automatic rotation support (30s cooldown, 10m max cache age).
+- **HTTPS required**: JWKS URLs must use HTTPS in production (localhost is exempted for development).
+- **No shared secrets**: External providers use asymmetric keys (JWKS), never the InsForge `JWT_SECRET`.
+- **Header preservation**: The original external JWT in the `Authorization` header is preserved through the middleware chain. The re-signed InsForge token used for PostgREST forwarding is stored separately and only used for database requests.

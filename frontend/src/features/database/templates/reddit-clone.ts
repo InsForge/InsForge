@@ -421,6 +421,9 @@ CREATE INDEX idx_community_members_user ON community_members(user_id);
 -- =======================
 -- ROW LEVEL SECURITY (RLS)
 -- =======================
+-- NOTE: These policies use auth.uid() (UUID) for native InsForge auth.
+-- If using an external JWT provider (Clerk, Auth0, etc.), use auth.uid_text()
+-- with TEXT columns instead. See: /core-concepts/authentication/external-jwt-providers
 
 -- Enable RLS
 ALTER TABLE communities ENABLE ROW LEVEL SECURITY;

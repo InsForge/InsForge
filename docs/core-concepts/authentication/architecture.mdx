@@ -335,6 +335,33 @@ async function validateToken(token) {
 | `GITHUB_CLIENT_SECRET` | GitHub OAuth secret | Secret string |
 | `TOKEN_EXPIRY` | Token lifetime | 7d, 24h, 3600 |
 
+## External JWT Providers
+
+In addition to native authentication, InsForge can accept JWTs from external identity providers like Clerk, Auth0, and Firebase Auth. See the [External JWT Providers](/core-concepts/authentication/external-jwt-providers) guide for full setup instructions.
+
+### RLS Helpers for External Auth
+
+InsForge provides two helper functions for use in RLS policies:
+
+| Function | Returns | Use with |
+|---|---|---|
+| `auth.uid()` | `uuid` | Native InsForge auth (user IDs are always UUIDs) |
+| `auth.uid_text()` | `text` | External providers (user IDs may be arbitrary strings) |
+
+If you are using an external provider, use `auth.uid_text()` in your RLS policies and `TEXT` columns for user-linked fields. The existing `auth.uid()` function is unchanged and continues to work for native auth.
+
+```sql
+-- For external auth (Clerk, Auth0, etc.)
+create policy "Owner access" on public.todos
+  for all to authenticated
+  using (owner_id = auth.uid_text());
+
+-- For native InsForge auth only
+create policy "Owner access" on public.todos
+  for all to authenticated
+  using (owner_id = auth.uid());
+```
+
 ## SDK References
 
 Choose the authentication SDK guide for your platform:

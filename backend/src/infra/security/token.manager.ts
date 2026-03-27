@@ -191,6 +191,22 @@ export class TokenManager {
   }
 
   /**
+   * Generate an InsForge-compatible access token for an externally authenticated user.
+   * This re-signs verified external claims so PostgREST can read them via
+   * request.jwt.claim.sub / .email / .role for RLS enforcement.
+   */
+  generateExternalUserToken(payload: {
+    sub: string;
+    email: string;
+    role: 'anon' | 'authenticated' | 'project_admin';
+  }): string {
+    return jwt.sign(payload, JWT_SECRET, {
+      algorithm: 'HS256',
+      expiresIn: ACCESS_TOKEN_EXPIRES_IN,
+    });
+  }
+
+  /**
    * Generate CSRF token derived from refresh token using HMAC
    */
   generateCsrfToken(refreshToken: string): string {

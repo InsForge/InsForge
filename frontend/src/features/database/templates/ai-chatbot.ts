@@ -285,6 +285,9 @@ CREATE INDEX idx_prompts_public ON prompts(is_public) WHERE is_public = TRUE;
 -- =======================
 -- ROW LEVEL SECURITY (RLS)
 -- =======================
+-- NOTE: These policies use auth.uid() (UUID) for native InsForge auth.
+-- If using an external JWT provider (Clerk, Auth0, etc.), use auth.uid_text()
+-- with TEXT columns instead. See: /core-concepts/authentication/external-jwt-providers
 
 -- Enable RLS on all tables
 ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;

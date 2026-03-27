@@ -3,6 +3,7 @@ import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from './error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
+import { ExternalJwtService } from '@/services/auth/external-jwt.service.js';
 import { RoleSchema } from '@insforge/shared-schemas';
 
 export interface AuthRequest extends Request {
@@ -14,10 +15,13 @@ export interface AuthRequest extends Request {
   authenticated?: boolean;
   apiKey?: string;
   projectId?: string;
+  /** Re-signed InsForge JWT for PostgREST forwarding (set when external JWT is used) */
+  postgrestToken?: string;
 }
 
 const tokenManager = TokenManager.getInstance();
 const secretService = SecretService.getInstance();
+const externalJwtService = ExternalJwtService.getInstance();
 
 // Helper function to extract Bearer token (exported for optional auth checks)
 export function extractBearerToken(authHeader: string | undefined): string | null {
@@ -154,10 +158,11 @@ export async function verifyApiKey(req: AuthRequest, _res: Response, next: NextF
 }
 
 /**
- * Core token verification middleware that handles JWT tokens
- * Sets req.user with the authenticated user information
+ * Core token verification middleware that handles JWT tokens.
+ * Tries native InsForge JWT first; on failure, falls back to external JWT providers.
+ * Sets req.user with the authenticated user information.
  */
-export function verifyToken(req: AuthRequest, _res: Response, next: NextFunction) {
+export async function verifyToken(req: AuthRequest, _res: Response, next: NextFunction) {
   try {
     const token = extractBearerToken(req.headers.authorization);
     if (!token) {
@@ -169,23 +174,48 @@ export function verifyToken(req: AuthRequest, _res: Response, next: NextFunction
       );
     }
 
-    // Verify JWT token
-    const payload = tokenManager.verifyToken(token);
-
-    // Validate token has a role
-    if (!payload.role) {
-      throw new AppError(
-        'Invalid token: missing role',
-        401,
-        ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-        NEXT_ACTION.CHECK_TOKEN
-      );
+    // 1. Try native InsForge JWT verification
+    let nativeError: unknown = null;
+    try {
+      const payload = tokenManager.verifyToken(token);
+      if (payload.role) {
+        setRequestUser(req, payload);
+        return next();
+      }
+    } catch (error) {
+      nativeError = error;
     }
 
-    // Set user info on request
-    setRequestUser(req, payload);
+    // 2. Fallback: try external JWT providers
+    const externalUser = await externalJwtService.verifyExternalToken(token);
+    if (externalUser) {
+      setRequestUser(req, {
+        sub: externalUser.id,
+        email: externalUser.email,
+        role: externalUser.role,
+      });
 
-    next();
+      // Re-sign as InsForge JWT for PostgREST forwarding.
+      // Stored in a dedicated field — the original Authorization header is preserved.
+      req.postgrestToken = tokenManager.generateExternalUserToken({
+        sub: externalUser.id,
+        email: externalUser.email,
+        role: externalUser.role,
+      });
+
+      return next();
+    }
+
+    // 3. Both failed — throw the original native error or a generic one
+    if (nativeError instanceof AppError) {
+      throw nativeError;
+    }
+    throw new AppError(
+      'Invalid token',
+      401,
+      ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+      NEXT_ACTION.CHECK_TOKEN
+    );
   } catch (error) {
     if (error instanceof AppError) {
       next(error);

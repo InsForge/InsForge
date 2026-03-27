@@ -81,6 +81,7 @@ const forwardToPostgrest = async (req: AuthRequest, res: Response, next: NextFun
       headers: req.headers as Record<string, string | string[] | undefined>,
       body: ['POST', 'PUT', 'PATCH'].includes(req.method) ? body : undefined,
       apiKey: extractApiKey(req) ?? undefined,
+      postgrestToken: req.postgrestToken,
     });
 
     // Forward response headers

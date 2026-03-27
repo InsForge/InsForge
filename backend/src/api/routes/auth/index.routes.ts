@@ -16,6 +16,7 @@ import {
 } from '@/api/middlewares/auth.js';
 import oauthRouter from './oauth.routes.js';
 import customOAuthRouter from './custom-oauth.routes.js';
+import externalJwtRouter from './external-jwt.routes.js';
 import { sendEmailOTPLimiter, verifyOTPLimiter } from '@/api/middlewares/rate-limiters.js';
 import {
   REFRESH_TOKEN_COOKIE_NAME,
@@ -77,6 +78,9 @@ function buildRedirectUrl(baseUrl: string, params: Record<string, string>): stri
 // Mount OAuth routes
 router.use('/oauth/custom', customOAuthRouter);
 router.use('/oauth', oauthRouter);
+
+// Mount external JWT provider routes
+router.use('/jwt-providers', externalJwtRouter);
 
 // GET /api/auth/email/verify-link - Browser-based link verification flow
 // This endpoint is meant for email clicks. It verifies the link token on the backend

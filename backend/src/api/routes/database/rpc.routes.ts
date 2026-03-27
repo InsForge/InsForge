@@ -45,6 +45,7 @@ const forwardRpcToPostgrest = async (req: AuthRequest, res: Response, next: Next
       headers: req.headers as Record<string, string | string[] | undefined>,
       body: req.body,
       apiKey: extractApiKey(req) ?? undefined,
+      postgrestToken: req.postgrestToken,
     });
 
     const headers = PostgrestProxyService.filterHeaders(result.headers);

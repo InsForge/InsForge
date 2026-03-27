@@ -42,6 +42,8 @@ export interface ProxyRequest {
   headers?: Record<string, string | string[] | undefined>;
   body?: unknown;
   apiKey?: string;
+  /** Re-signed InsForge JWT for external auth users. Takes priority over the incoming Authorization header. */
+  postgrestToken?: string;
 }
 
 export interface ProxyResponse {
@@ -119,6 +121,9 @@ export class PostgrestProxyService {
       if (isValid) {
         axiosConfig.headers.authorization = `Bearer ${this.adminToken}`;
       }
+    } else if (request.postgrestToken) {
+      // Use re-signed InsForge token for external auth users
+      axiosConfig.headers.authorization = `Bearer ${request.postgrestToken}`;
     }
 
     if (request.body !== undefined) {
