@@ -9,7 +9,11 @@ coverage/
 *.db-shm
 *.db-wal
 CLAUDE.md
-.claude/
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/insforge-dev/
+!.claude/skills/insforge-dev/**
 .agents/*
 !.agents/skills/
 .agents/skills/*
