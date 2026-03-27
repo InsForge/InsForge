@@ -100,7 +100,11 @@ RUN apk add --no-cache tini
 WORKDIR /app
 
 # Run as non-root using the built-in node user (uid 1000)
-RUN mkdir -p /data /insforge-storage /insforge-logs && chown node:node /data /insforge-storage /insforge-logs
+# /data: database dir (matches DatabaseManager default)
+# /app/insforge-storage, /app/insforge-logs: app defaults for standalone docker run
+# /insforge-storage, /insforge-logs: docker-compose volume mount points (overridden via STORAGE_DIR/LOGS_DIR env vars)
+RUN mkdir -p /data /app/insforge-storage /app/insforge-logs /insforge-storage /insforge-logs && \
+    chown node:node /data /app/insforge-storage /app/insforge-logs /insforge-storage /insforge-logs
 
 # tsx is a devDependency but required at runtime for migrate:bootstrap
 RUN npm install -g "tsx@^4.7.1" && npm cache clean --force
