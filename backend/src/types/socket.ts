@@ -12,6 +12,10 @@ export enum ServerEvents {
   MCP_CONNECTED = 'mcp:connected',
   // Realtime events
   REALTIME_ERROR = 'realtime:error',
+  // Presence events
+  PRESENCE_SYNC = 'presence:sync',
+  PRESENCE_JOIN = 'presence:join',
+  PRESENCE_LEAVE = 'presence:leave',
 }
 
 /**

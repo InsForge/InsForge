@@ -151,3 +151,50 @@ export const socketMessageSchema = z
   .passthrough();
 
 export type SocketMessage = z.infer<typeof socketMessageSchema>;
+
+// ============================================================================
+// Presence Schemas
+// ============================================================================
+
+/**
+ * A member present in a realtime channel.
+ * Presence is ephemeral — tracked in-memory, not persisted to the database.
+ */
+export const presenceMemberSchema = z.object({
+  presenceId: z.string().uuid(),
+  userId: z.string().optional(),
+  role: z.string().optional(),
+  joinedAt: z.string().datetime(),
+});
+
+export type PresenceMember = z.infer<typeof presenceMemberSchema>;
+
+/**
+ * Payload for presence:sync — full member list sent to a newly subscribed client
+ */
+export const presenceSyncPayloadSchema = z.object({
+  channel: z.string().min(1),
+  members: z.array(presenceMemberSchema),
+});
+
+export type PresenceSyncPayload = z.infer<typeof presenceSyncPayloadSchema>;
+
+/**
+ * Payload for presence:join — broadcast when a new client subscribes
+ */
+export const presenceJoinPayloadSchema = z.object({
+  channel: z.string().min(1),
+  member: presenceMemberSchema,
+});
+
+export type PresenceJoinPayload = z.infer<typeof presenceJoinPayloadSchema>;
+
+/**
+ * Payload for presence:leave — broadcast when a client unsubscribes or disconnects
+ */
+export const presenceLeavePayloadSchema = z.object({
+  channel: z.string().min(1),
+  member: presenceMemberSchema,
+});
+
+export type PresenceLeavePayload = z.infer<typeof presenceLeavePayloadSchema>;
