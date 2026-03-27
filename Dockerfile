@@ -99,30 +99,39 @@ RUN apk add --no-cache tini
 
 WORKDIR /app
 
-# Production node_modules (hoisted by npm workspaces)
-COPY --from=prod-deps /app/node_modules ./node_modules
-
-# Compiled output: server.js + frontend/ static files
-COPY --from=build /app/dist ./dist
-
-# Runtime docs for /api/docs endpoints and documentation assets
-COPY --from=build /app/docs ./docs
-
-# Migration runtime: tsx resolves @/* aliases via tsconfig.json,
-# node-pg-migrate reads .sql files from backend/src/
-COPY --from=build /app/backend/src ./backend/src
-COPY --from=build /app/backend/tsconfig.json ./backend/tsconfig.json
-COPY --from=build /app/shared-schemas/src ./shared-schemas/src
-
-# Package manifests for npm scripts
-COPY --from=build /app/backend/package.json ./backend/package.json
-COPY --from=build /app/package.json ./package.json
+# Run as non-root using the built-in node user (uid 1000)
+# /data: database dir (matches DatabaseManager default)
+# /app/insforge-storage, /app/insforge-logs: app defaults for standalone docker run
+# /insforge-storage, /insforge-logs: docker-compose volume mount points (overridden via STORAGE_DIR/LOGS_DIR env vars)
+RUN mkdir -p /data /app/insforge-storage /app/insforge-logs /insforge-storage /insforge-logs && \
+    chown node:node /data /app/insforge-storage /app/insforge-logs /insforge-storage /insforge-logs
 
 # tsx is a devDependency but required at runtime for migrate:bootstrap
 RUN npm install -g "tsx@^4.7.1" && npm cache clean --force
 
-# Run as non-root using the built-in node user (uid 1000)
-RUN mkdir -p /data /insforge-storage /insforge-logs && chown -R node:node /app /data /insforge-storage /insforge-logs
+# --- Stable layers first (change only when dependencies change) ---
+
+# Production node_modules (hoisted by npm workspaces)
+COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
+
+# --- Volatile layers last (change every release) ---
+
+# Compiled output: server.js + frontend/ static files
+COPY --from=build --chown=node:node /app/dist ./dist
+
+# Runtime docs for /api/docs endpoints and documentation assets
+COPY --from=build --chown=node:node /app/docs ./docs
+
+# Migration runtime: tsx resolves @/* aliases via tsconfig.json,
+# node-pg-migrate reads .sql files from backend/src/
+COPY --from=build --chown=node:node /app/backend/src ./backend/src
+COPY --from=build --chown=node:node /app/backend/tsconfig.json ./backend/tsconfig.json
+COPY --from=build --chown=node:node /app/shared-schemas/src ./shared-schemas/src
+
+# Package manifests for npm scripts
+COPY --from=build --chown=node:node /app/backend/package.json ./backend/package.json
+COPY --from=build --chown=node:node /app/package.json ./package.json
+
 USER node
 
 EXPOSE 7130 7131
