@@ -638,15 +638,47 @@ export class AuthService {
   /**
    * Admin login (validates against env variables only)
    */
-  adminLogin(email: string, password: string): CreateAdminSessionResponse {
-    // Simply validate against environment variables
+  async adminLogin(email: string, password: string): Promise<CreateAdminSessionResponse> {
+    // Keep the bootstrap admin as the emergency access path.
     if (email !== this.adminEmail || password !== this.adminPassword) {
-      throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      const dbUser = await this.getUserByEmail(email);
+
+      if (
+        !dbUser ||
+        !dbUser.password ||
+        !dbUser.is_project_admin ||
+        dbUser.is_anonymous ||
+        !(await bcrypt.compare(password, dbUser.password))
+      ) {
+        throw new AppError('Invalid admin credentials', 401, ERROR_CODES.AUTH_UNAUTHORIZED);
+      }
+
+      const authConfigService = AuthConfigService.getInstance();
+      const emailAuthConfig = await authConfigService.getAuthConfig();
+
+      if (emailAuthConfig.requireEmailVerification && !dbUser.email_verified) {
+        throw new AppError(
+          'Email verification required',
+          403,
+          ERROR_CODES.FORBIDDEN,
+          'Please verify your email address before logging in'
+        );
+      }
+
+      const user = this.transformUserRecordToSchema(dbUser);
+      const accessToken = this.tokenManager.generateAccessToken({
+        sub: user.id,
+        email: user.email,
+        role: 'project_admin',
+      });
+
+      return {
+        user,
+        accessToken,
+      };
     }
 
-    // Use a fixed admin ID for the system administrator
-
-    // Return admin user with JWT token (24h expiration) - no database interaction
+    // Return bootstrap admin with JWT token (24h expiration)
     const accessToken = this.tokenManager.generateAccessToken({
       sub: ADMIN_ID,
       email,
@@ -658,6 +690,8 @@ export class AuthService {
         id: ADMIN_ID,
         email: email,
         emailVerified: true,
+        isProjectAdmin: true,
+        adminSource: 'bootstrap',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         profile: { name: 'Administrator' },
@@ -690,6 +724,8 @@ export class AuthService {
           id: ADMIN_ID,
           email: email as string,
           emailVerified: true,
+          isProjectAdmin: true,
+          adminSource: 'bootstrap',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           profile: { name: 'Administrator' },
@@ -869,6 +905,8 @@ export class AuthService {
         id: userId,
         email,
         emailVerified: true,
+        isProjectAdmin: false,
+        adminSource: 'user',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         profile: { name: userName, avatar_url: avatarUrl },
@@ -1195,6 +1233,8 @@ export class AuthService {
       id: dbUser.id,
       email: dbUser.email,
       emailVerified: dbUser.email_verified,
+      isProjectAdmin: dbUser.is_project_admin,
+      adminSource: dbUser.id === ADMIN_ID ? 'bootstrap' : 'user',
       createdAt: dbUser.created_at,
       updatedAt: dbUser.updated_at,
       providers: providers,
@@ -1209,7 +1249,8 @@ export class AuthService {
   async listUsers(
     limit: number,
     offset: number,
-    search?: string
+    search?: string,
+    roleFilter: 'users' | 'admins' | 'all' = 'users'
   ): Promise<{ users: UserSchema[]; total: number }> {
     const pool = this.getPool();
     let query = `
@@ -1227,9 +1268,15 @@ export class AuthService {
         STRING_AGG(a.provider, ',') as providers
       FROM auth.users u
       LEFT JOIN auth.user_providers a ON u.id = a.user_id
-      WHERE u.is_project_admin = false AND u.is_anonymous = false
+      WHERE u.is_anonymous = false
     `;
     const params: (string | number)[] = [];
+
+    if (roleFilter === 'users') {
+      query += ' AND u.is_project_admin = false';
+    } else if (roleFilter === 'admins') {
+      query += ' AND u.is_project_admin = true';
+    }
 
     if (search) {
       query += ` AND (u.email LIKE $1 OR u.profile->>'name' LIKE $2)`;
@@ -1246,9 +1293,15 @@ export class AuthService {
     const users = dbUsers.map((dbUser) => this.transformUserRecordToSchema(dbUser));
 
     // Get total count (exclude admins and anonymous users)
-    let countQuery =
-      'SELECT COUNT(*) as count FROM auth.users WHERE is_project_admin = false AND is_anonymous = false';
+    let countQuery = 'SELECT COUNT(*) as count FROM auth.users WHERE is_anonymous = false';
     const countParams: string[] = [];
+
+    if (roleFilter === 'users') {
+      countQuery += ' AND is_project_admin = false';
+    } else if (roleFilter === 'admins') {
+      countQuery += ' AND is_project_admin = true';
+    }
+
     if (search) {
       countQuery += ` AND (email LIKE $1 OR profile->>'name' LIKE $2)`;
       countParams.push(`%${search}%`, `%${search}%`);
@@ -1335,5 +1388,65 @@ export class AuthService {
     );
 
     return result.rowCount || 0;
+  }
+
+  /**
+   * Promote or demote a user to project admin.
+   */
+  async setProjectAdminStatus(userId: string, isProjectAdmin: boolean): Promise<UserSchema> {
+    if (userId === ADMIN_ID && !isProjectAdmin) {
+      throw new AppError('Bootstrap admin cannot be demoted', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
+    const existingUser = await this.getUserById(userId);
+    if (!existingUser) {
+      throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
+    }
+
+    if (isProjectAdmin && existingUser.is_anonymous) {
+      throw new AppError(
+        'Anonymous users cannot be promoted to admin',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    if (isProjectAdmin && !existingUser.password) {
+      throw new AppError(
+        'Users without a password cannot be promoted to admin',
+        400,
+        ERROR_CODES.INVALID_INPUT
+      );
+    }
+
+    const pool = this.getPool();
+    const result = await pool.query(
+      `UPDATE auth.users
+       SET is_project_admin = $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING
+         id,
+         email,
+         profile,
+         metadata,
+         email_verified,
+         is_project_admin,
+         is_anonymous,
+         created_at,
+         updated_at,
+         password`,
+      [isProjectAdmin, userId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
+    }
+
+    const updatedUser = await this.getUserById(userId);
+    if (!updatedUser) {
+      throw new AppError('User not found', 404, ERROR_CODES.NOT_FOUND);
+    }
+
+    return this.transformUserRecordToSchema(updatedUser);
   }
 }

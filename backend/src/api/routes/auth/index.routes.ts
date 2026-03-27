@@ -31,6 +31,7 @@ import {
   refreshSessionRequestSchema,
   deleteUsersRequestSchema,
   listUsersRequestSchema,
+  updateUserAdminStatusRequestSchema,
   sendVerificationEmailRequestSchema,
   verifyEmailRequestSchema,
   sendResetPasswordEmailRequestSchema,
@@ -47,6 +48,7 @@ import {
   type GetProfileResponse,
   type ListUsersResponse,
   type DeleteUsersResponse,
+  type UpdateUserAdminStatusResponse,
   type GetPublicAuthConfigResponse,
   exchangeAdminSessionRequestSchema,
   type GetAuthConfigResponse,
@@ -644,7 +646,7 @@ router.post('/admin/sessions/exchange', async (req: Request, res: Response, next
 });
 
 // POST /api/auth/admin/sessions - Create admin session (web only)
-router.post('/admin/sessions', (req: Request, res: Response, next: NextFunction) => {
+router.post('/admin/sessions', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validationResult = createAdminSessionRequestSchema.safeParse(req.body);
     if (!validationResult.success) {
@@ -656,7 +658,7 @@ router.post('/admin/sessions', (req: Request, res: Response, next: NextFunction)
     }
 
     const { email, password } = validationResult.data;
-    const result: CreateAdminSessionResponse = authService.adminLogin(email, password);
+    const result: CreateAdminSessionResponse = await authService.adminLogin(email, password);
 
     // Set refresh token as httpOnly cookie + CSRF token for web clients
     const tokenManager = TokenManager.getInstance();
@@ -701,22 +703,29 @@ router.get('/users', verifyAdmin, async (req: Request, res: Response, next: Next
   try {
     const queryValidation = listUsersRequestSchema.safeParse(req.query);
     const queryParams = queryValidation.success ? queryValidation.data : req.query;
-    const { limit = '10', offset = '0', search } = queryParams || {};
+    const { limit = '10', offset = '0', search, roleFilter = 'users' } = queryParams || {};
 
-    const parsedLimit = Math.max(1, parseInt(limit as string) || 10);
-    const parsedOffset = Math.max(0, parseInt(offset as string) || 0);
+    const parsedLimit = Number.parseInt(String(limit), 10);
+    const parsedOffset = Number.parseInt(String(offset), 10);
+    const validatedLimit = Number.isNaN(parsedLimit) ? 10 : Math.max(1, parsedLimit);
+    const validatedOffset = Number.isNaN(parsedOffset) ? 0 : Math.max(0, parsedOffset);
+    const validatedRoleFilter =
+      roleFilter === 'admins' || roleFilter === 'all' || roleFilter === 'users'
+        ? roleFilter
+        : 'users';
 
     const { users, total } = await authService.listUsers(
-      parsedLimit,
-      parsedOffset,
-      search as string | undefined
+      validatedLimit,
+      validatedOffset,
+      search as string | undefined,
+      validatedRoleFilter
     );
 
     const response: ListUsersResponse = {
       data: users,
       pagination: {
-        offset: parsedOffset,
-        limit: parsedLimit,
+        offset: validatedOffset,
+        limit: validatedLimit,
         total: total,
       },
     };
@@ -726,6 +735,66 @@ router.get('/users', verifyAdmin, async (req: Request, res: Response, next: Next
     next(error);
   }
 });
+
+router.patch(
+  '/users/:userId/admin',
+  verifyAdmin,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const userIdValidation = userIdSchema.safeParse(req.params.userId);
+      if (!userIdValidation.success) {
+        throw new AppError('Invalid user ID format', 400, ERROR_CODES.INVALID_INPUT);
+      }
+
+      const validationResult = updateUserAdminStatusRequestSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        throw new AppError(
+          validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '),
+          400,
+          ERROR_CODES.INVALID_INPUT
+        );
+      }
+
+      const user = await authService.setProjectAdminStatus(
+        userIdValidation.data,
+        validationResult.data.isProjectAdmin
+      );
+
+      try {
+        await auditService.log({
+          actor: req.user?.email || 'api-key',
+          action: 'UPDATE_USER_ADMIN_STATUS',
+          module: 'AUTH',
+          details: {
+            userId: userIdValidation.data,
+            email: user.email,
+            isProjectAdmin: validationResult.data.isProjectAdmin,
+            adminSource: user.adminSource,
+          },
+          ip_address: req.ip,
+        });
+      } catch (auditError) {
+        logger.warn('Failed to create audit log for admin status change', {
+          error: auditError instanceof Error ? auditError.message : String(auditError),
+          targetUserId: userIdValidation.data,
+        });
+      }
+
+      const socket = SocketManager.getInstance();
+      socket.broadcastToRoom(
+        'role:project_admin',
+        ServerEvents.DATA_UPDATE,
+        { resource: DataUpdateResourceType.USERS },
+        'system'
+      );
+
+      const response: UpdateUserAdminStatusResponse = { user };
+      successResponse(res, response);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 // GET /api/auth/users/:userId - Get specific user (admin only)
 router.get(
