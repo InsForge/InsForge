@@ -1,0 +1,41 @@
+@import '../rdg.css';
+
+.if-dashboard {
+  min-height: 100%;
+  color: #111827;
+  background:
+    radial-gradient(circle at top, rgba(16, 185, 129, 0.08), transparent 28%),
+    linear-gradient(180deg, #f7faf9 0%, #eef4f1 100%);
+}
+
+.if-dashboard__placeholder {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 3rem;
+}
+
+.if-dashboard__eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #047857;
+}
+
+.if-dashboard__title {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.1;
+}
+
+.if-dashboard__description {
+  margin: 0;
+  max-width: 42rem;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #4b5563;
+}
