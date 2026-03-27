@@ -3,6 +3,7 @@ import { TokenManager } from '@/infra/security/token.manager.js';
 import { AppError } from './error.js';
 import { ERROR_CODES, NEXT_ACTION } from '@/types/error-constants.js';
 import { SecretService } from '@/services/secrets/secret.service.js';
+import { AIAccessConfigService } from '@/services/ai/ai-access-config.service.js';
 import { RoleSchema } from '@insforge/shared-schemas';
 
 export interface AuthRequest extends Request {
@@ -240,4 +241,52 @@ export async function verifyCloudBackend(req: AuthRequest, _res: Response, next:
       );
     }
   }
+}
+
+/**
+ * Checks the per-project `allow_anon_ai_access` flag.
+ * When the flag is `false`, requests using an API key (anon token)
+ * are rejected with 403. JWT requests pass through unchanged.
+ * Apply as router-level middleware before verifyUser on AI routes.
+ */
+export async function checkAnonAccess(req: AuthRequest, _res: Response, next: NextFunction) {
+  // Check if the request is using an API key (anon access via SDK)
+  const apiKey = extractApiKey(req);
+
+  // Also check if the request is using an anon JWT token
+  let isAnonJwt = false;
+  if (!apiKey) {
+    const token = extractBearerToken(req.headers.authorization);
+    if (token) {
+      try {
+        const payload = tokenManager.verifyToken(token);
+        isAnonJwt = payload.role === 'anon';
+      } catch {
+        // Invalid token — let verifyUser handle the error
+      }
+    }
+  }
+
+  // If neither an API key nor an anon JWT, this is an authenticated user — skip check
+  if (!apiKey && !isAnonJwt) {
+    return next();
+  }
+
+  try {
+    const aiAccessConfigService = AIAccessConfigService.getInstance();
+    const allowed = await aiAccessConfigService.isAnonAiAccessAllowed();
+    if (!allowed) {
+      return next(
+        new AppError(
+          'Anonymous access to AI endpoints is disabled for this project',
+          403,
+          ERROR_CODES.AUTH_UNAUTHORIZED,
+          NEXT_ACTION.CHECK_TOKEN
+        )
+      );
+    }
+  } catch (error) {
+    return next(error);
+  }
+  next();
 }
