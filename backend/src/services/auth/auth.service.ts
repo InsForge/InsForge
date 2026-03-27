@@ -293,7 +293,10 @@ export class AuthService {
   async sendVerificationEmailWithCode(email: string): Promise<void> {
     // Check if user exists
     const pool = this.getPool();
-    const result = await pool.query('SELECT * FROM auth.users WHERE email = $1', [email]);
+    const result = await pool.query(
+      'SELECT * FROM auth.users WHERE email = $1 AND is_project_admin = false',
+      [email]
+    );
     const dbUser = result.rows[0];
     if (!dbUser) {
       // Silently succeed to prevent user enumeration
@@ -326,7 +329,10 @@ export class AuthService {
   async sendVerificationEmailWithLink(email: string, redirectTo: string): Promise<void> {
     // Check if user exists
     const pool = this.getPool();
-    const result = await pool.query('SELECT * FROM auth.users WHERE email = $1', [email]);
+    const result = await pool.query(
+      'SELECT * FROM auth.users WHERE email = $1 AND is_project_admin = false',
+      [email]
+    );
     const dbUser = result.rows[0];
     if (!dbUser) {
       // Silently succeed to prevent user enumeration
@@ -482,7 +488,10 @@ export class AuthService {
   async sendResetPasswordEmailWithCode(email: string): Promise<void> {
     // Check if user exists
     const pool = this.getPool();
-    const result = await pool.query('SELECT * FROM auth.users WHERE email = $1', [email]);
+    const result = await pool.query(
+      'SELECT * FROM auth.users WHERE email = $1 AND is_project_admin = false',
+      [email]
+    );
     const dbUser = result.rows[0];
     if (!dbUser) {
       // Silently succeed to prevent user enumeration
@@ -514,7 +523,10 @@ export class AuthService {
   async sendResetPasswordEmailWithLink(email: string, redirectTo: string): Promise<void> {
     // Check if user exists
     const pool = this.getPool();
-    const result = await pool.query('SELECT * FROM auth.users WHERE email = $1', [email]);
+    const result = await pool.query(
+      'SELECT * FROM auth.users WHERE email = $1 AND is_project_admin = false',
+      [email]
+    );
     const dbUser = result.rows[0];
     if (!dbUser) {
       // Silently succeed to prevent user enumeration
@@ -762,9 +774,10 @@ export class AuthService {
     }
 
     // If not found by provider_id, try to find by email in _user table
-    const existingUserResult = await pool.query('SELECT * FROM auth.users WHERE email = $1', [
-      email,
-    ]);
+    const existingUserResult = await pool.query(
+      'SELECT * FROM auth.users WHERE email = $1 AND is_project_admin = false',
+      [email]
+    );
     const existingUser = existingUserResult.rows[0];
 
     if (existingUser) {
@@ -1114,7 +1127,7 @@ export class AuthService {
         STRING_AGG(a.provider, ',') as providers
       FROM auth.users u
       LEFT JOIN auth.user_providers a ON u.id = a.user_id
-      WHERE u.email = $1
+      WHERE u.email = $1 AND u.is_project_admin = false
       GROUP BY u.id
     `,
       [email]
