@@ -17,11 +17,11 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@insforge/shared-schemas": ["../shared-schemas/src/index.ts"],
-      "@insforge/ui": ["../ui/src/index.ts"]
+      "@insforge/dashboard": ["../packages/dashboard/src"],
+      "@insforge/shared-schemas": ["../packages/shared-schemas/src"],
+      "@insforge/ui": ["../packages/ui/src"]
     }
   },
-  "include": ["src", "src/vite-env.d.ts", "../shared-schemas", "../ui"],
+  "include": ["src", "../packages/dashboard"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
