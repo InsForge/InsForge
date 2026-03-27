@@ -5,8 +5,8 @@
 REVOKE EXECUTE ON FUNCTION schedules.encrypt_headers(p_headers jsonb) FROM public;
 REVOKE EXECUTE ON FUNCTION schedules.decrypt_headers(p_encrypted_headers text) FROM public;
 
-ALTER FUNCTION schedules.encrypt_headers(p_headers jsonb) SET search_path = '';
-ALTER FUNCTION schedules.decrypt_headers(p_encrypted_headers text) SET search_path = '';
+ALTER FUNCTION schedules.encrypt_headers(p_headers jsonb) SET search_path = pg_catalog, public;
+ALTER FUNCTION schedules.decrypt_headers(p_encrypted_headers text) SET search_path = pg_catalog, public;
 
 -- Wrap auth.uid() in subquery so it is evaluated once per query instead of once per row
 DROP POLICY IF EXISTS "Users can update own profile" ON auth.users;
