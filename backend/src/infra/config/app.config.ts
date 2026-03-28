@@ -27,6 +27,20 @@ export interface AppConfig {
     organizationId: string;
     domain: string;
   };
+  compute: {
+    enabled: boolean;
+    provider: string;
+    awsRegion: string;
+    ecsClusterArn: string;
+    albListenerArn: string;
+    ecrRegistry: string;
+    codebuildProject: string;
+    vpcId: string;
+    subnetIds: string[];
+    securityGroupId: string;
+    domain: string;
+    executionRoleArn: string;
+  };
 }
 
 export const config: AppConfig = {
@@ -57,5 +71,19 @@ export const config: AppConfig = {
     token: process.env.DENO_SUBHOSTING_TOKEN || '',
     organizationId: process.env.DENO_SUBHOSTING_ORG_ID || '',
     domain: 'functions.insforge.app',
+  },
+  compute: {
+    enabled: process.env.COMPUTE_ENABLED === 'true',
+    provider: process.env.COMPUTE_PROVIDER || 'aws_fargate',
+    awsRegion: process.env.COMPUTE_AWS_REGION || 'us-east-1',
+    ecsClusterArn: process.env.COMPUTE_ECS_CLUSTER_ARN || '',
+    albListenerArn: process.env.COMPUTE_ALB_LISTENER_ARN || '',
+    ecrRegistry: process.env.COMPUTE_ECR_REGISTRY || '',
+    codebuildProject: process.env.COMPUTE_CODEBUILD_PROJECT || '',
+    vpcId: process.env.COMPUTE_VPC_ID || '',
+    subnetIds: (process.env.COMPUTE_SUBNET_IDS || '').split(',').filter(Boolean),
+    securityGroupId: process.env.COMPUTE_SECURITY_GROUP_ID || '',
+    domain: process.env.COMPUTE_DOMAIN || 'compute.insforge.app',
+    executionRoleArn: process.env.COMPUTE_EXECUTION_ROLE_ARN || '',
   },
 };

@@ -41,6 +41,7 @@ import DeploymentLogsPage from '@/features/deployments/pages/DeploymentLogsPage'
 import DeploymentOverviewPage from '@/features/deployments/pages/DeploymentOverviewPage';
 import DeploymentEnvVarsPage from '@/features/deployments/pages/DeploymentEnvVarsPage';
 import DeploymentDomainsPage from '@/features/deployments/pages/DeploymentDomainsPage';
+import ComputePage from '@/features/compute/pages/ComputePage';
 
 export function AppRoutes() {
   return (
@@ -114,6 +115,7 @@ export function AppRoutes() {
                   <Route path="messages" element={<RealtimeMessagesPage />} />
                   <Route path="permissions" element={<RealtimePermissionsPage />} />
                 </Route>
+                <Route path="/dashboard/compute" element={<ComputePage />} />
                 <Route path="/dashboard/deployments" element={<DeploymentsLayout />}>
                   <Route index element={<Navigate to="overview" replace />} />
                   <Route path="overview" element={<DeploymentOverviewPage />} />
