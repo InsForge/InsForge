@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { deploymentSchema } from './deployments.schema';
+import { deploymentSchema } from './deployments.schema.js';
 
 export const projectSettingsSchema = z.object({
   buildCommand: z.string().nullable().optional(),

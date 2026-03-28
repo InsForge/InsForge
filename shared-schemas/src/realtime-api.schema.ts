@@ -3,7 +3,7 @@ import {
   realtimeChannelSchema,
   realtimeConfigSchema,
   realtimeMessageSchema,
-} from './realtime.schema';
+} from './realtime.schema.js';
 
 // ============================================================================
 // Channel CRUD Schemas

@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { storageBucketSchema } from './storage.schema';
-import { realtimeChannelSchema } from './realtime.schema';
-import { realtimePermissionsResponseSchema } from './realtime-api.schema';
-import { getPublicAuthConfigResponseSchema } from './auth-api.schema';
+import { storageBucketSchema } from './storage.schema.js';
+import { realtimeChannelSchema } from './realtime.schema.js';
+import { realtimePermissionsResponseSchema } from './realtime-api.schema.js';
+import { getPublicAuthConfigResponseSchema } from './auth-api.schema.js';
 
 export const authMetadataSchema = getPublicAuthConfigResponseSchema;
 

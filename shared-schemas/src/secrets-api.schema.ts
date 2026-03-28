@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { secretSchema } from './secrets.schema';
+import { secretSchema } from './secrets.schema.js';
 
 // GET /secrets - List all secrets
 export const listSecretsResponseSchema = z.object({
