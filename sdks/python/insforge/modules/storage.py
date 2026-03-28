@@ -39,9 +39,12 @@ class StorageBucket:
             key: str = (strategy or {}).get("key", clean)
 
             if method == "presigned":
+                # S3 presigned POST: multipart/form-data with strategy fields + file content
                 import httpx
+                fields: dict[str, Any] = (strategy or {}).get("fields") or {}
+                files = {"file": (key, data, content_type)}
                 async with httpx.AsyncClient() as client:
-                    resp = await client.put(upload_url, content=data, headers={"Content-Type": content_type})
+                    resp = await client.post(upload_url, data=fields, files=files)
                     resp.raise_for_status()
                 # Confirm if needed
                 if (strategy or {}).get("confirmRequired"):
@@ -49,14 +52,12 @@ class StorageBucket:
                     confirm_path = confirm_url.replace(self._http._base_url, "")
                     result = await self._http.post(confirm_path, {"size": len(data), "contentType": content_type})
                     return {"data": result, "error": None}
+                return {"data": {"key": key}, "error": None}
             else:
-                # Direct upload
-                result = await self._http.upload(
-                    f"{self._base()}/objects/{key}", data, content_type
-                )
+                # Direct upload: use uploadUrl from strategy (has the URL-encoded key)
+                direct_path = upload_url.replace(self._http._base_url, "") or f"{self._base()}/objects/{key}"
+                result = await self._http.upload(direct_path, data, content_type)
                 return {"data": result, "error": None}
-
-            return {"data": {"key": key}, "error": None}
         except InsForgeError as e:
             return {"data": None, "error": e}
 
