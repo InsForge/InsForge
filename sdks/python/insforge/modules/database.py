@@ -1,8 +1,7 @@
 """Database module - PostgREST-style query builder."""
 from __future__ import annotations
 
-from typing import Any, Literal
-from urllib.parse import urlencode
+from typing import Any
 
 from insforge.errors import InsForgeError
 from insforge.lib.http_client import HttpClient
@@ -133,10 +132,14 @@ class QueryBuilder:
     async def update(self, values: dict[str, Any]) -> dict[str, Any]:
         """Update records matching the current filters."""
         try:
+            params: dict[str, Any] = {}
+            for f in self._filters:
+                col, expr = f.split("=", 1)
+                params[col] = expr
             data = await self._http.patch(
                 f"/api/database/records/{self._table}",
                 values,
-                headers={"filters": "&".join(self._filters)} if self._filters else None,
+                params=params or None,
             )
             return {"data": data, "error": None}
         except InsForgeError as e:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
 import httpx
@@ -88,8 +87,8 @@ class HttpClient:
     async def put(self, path: str, body: Any = None, *, headers: dict[str, str] | None = None) -> Any:
         return await self._request("PUT", path, json_body=body, headers=headers)
 
-    async def patch(self, path: str, body: Any = None, *, headers: dict[str, str] | None = None) -> Any:
-        return await self._request("PATCH", path, json_body=body, headers=headers)
+    async def patch(self, path: str, body: Any = None, *, params: dict[str, Any] | None = None, headers: dict[str, str] | None = None) -> Any:
+        return await self._request("PATCH", path, json_body=body, params=params, headers=headers)
 
     async def delete(self, path: str, *, params: dict[str, Any] | None = None, headers: dict[str, str] | None = None) -> Any:
         return await self._request("DELETE", path, params=params, headers=headers)

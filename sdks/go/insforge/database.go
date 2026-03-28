@@ -161,6 +161,20 @@ func (q *QueryBuilder) Offset(n int) *QueryBuilder {
 	return q
 }
 
+func (q *QueryBuilder) buildFilterParams() url.Values {
+	p := url.Values{}
+	for _, f := range q.filters {
+		idx := 0
+		for idx < len(f) && f[idx] != '=' {
+			idx++
+		}
+		if idx < len(f) {
+			p.Set(f[:idx], f[idx+1:])
+		}
+	}
+	return p
+}
+
 func (q *QueryBuilder) buildParams() url.Values {
 	p := url.Values{}
 	p.Set("select", q.selectCols)
@@ -208,7 +222,12 @@ func (q *QueryBuilder) Insert(ctx context.Context, records interface{}) Result[i
 
 // Update updates records matching current filters with the given values.
 func (q *QueryBuilder) Update(ctx context.Context, values map[string]interface{}) Result[interface{}] {
-	raw, err := q.http.patch(ctx, "/api/database/records/"+q.table, values, nil)
+	path := "/api/database/records/" + q.table
+	params := q.buildFilterParams()
+	if len(params) > 0 {
+		path += "?" + params.Encode()
+	}
+	raw, err := q.http.patch(ctx, path, values, nil)
 	if err != nil {
 		return fail[interface{}](err)
 	}

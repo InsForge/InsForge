@@ -6,19 +6,19 @@ import "fmt"
 type InsForgeError struct {
 	Message     string `json:"message"`
 	StatusCode  int    `json:"statusCode"`
-	Error       string `json:"error"`
+	Code        string `json:"error"`
 	NextActions string `json:"nextActions,omitempty"`
 }
 
 func (e *InsForgeError) Error() string {
-	if e.Error != "" {
-		return fmt.Sprintf("InsForgeError[%d %s]: %s", e.StatusCode, e.Error, e.Message)
+	if e.Code != "" {
+		return fmt.Sprintf("InsForgeError[%d %s]: %s", e.StatusCode, e.Code, e.Message)
 	}
 	return fmt.Sprintf("InsForgeError[%d]: %s", e.StatusCode, e.Message)
 }
 
 func newError(message, code string, statusCode int) *InsForgeError {
-	return &InsForgeError{Message: message, StatusCode: statusCode, Error: code}
+	return &InsForgeError{Message: message, StatusCode: statusCode, Code: code}
 }
 
 func errorFromBody(body map[string]interface{}, statusCode int) *InsForgeError {
@@ -28,7 +28,7 @@ func errorFromBody(body map[string]interface{}, statusCode int) *InsForgeError {
 		msg, _ := v["message"].(string)
 		code, _ := v["code"].(string)
 		details, _ := v["details"].(string)
-		return &InsForgeError{Message: msg, StatusCode: statusCode, Error: code, NextActions: details}
+		return &InsForgeError{Message: msg, StatusCode: statusCode, Code: code, NextActions: details}
 	case string:
 		return &InsForgeError{Message: v, StatusCode: statusCode}
 	default:
