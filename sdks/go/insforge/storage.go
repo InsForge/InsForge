@@ -136,8 +136,9 @@ func (b *StorageBucket) UploadReader(ctx context.Context, path string, r io.Read
 func (b *StorageBucket) Download(ctx context.Context, path string) Result[[]byte] {
 	clean := strings.TrimLeft(path, "/")
 
-	// Try download strategy first
-	stratRaw, err := b.http.post(ctx, b.base()+"/objects/"+clean+"/download-strategy", map[string]interface{}{}, nil)
+	// Get download strategy
+	stratRaw, err := b.http.post(ctx, b.base()+"/objects/"+clean+"/download-strategy",
+		map[string]interface{}{"expiresIn": 3600}, nil)
 	if err != nil {
 		// Fallback: direct download
 		data, derr := b.http.downloadBytes(ctx, b.base()+"/objects/"+clean)
@@ -148,26 +149,39 @@ func (b *StorageBucket) Download(ctx context.Context, path string) Result[[]byte
 	}
 
 	strategy, _ := stratRaw.(map[string]interface{})
-	downloadURL, _ := strategy["downloadUrl"].(string)
+	method, _ := strategy["method"].(string)
+	downloadURL, _ := strategy["url"].(string)
 
-	if downloadURL != "" && !strings.HasPrefix(downloadURL, b.http.baseURL) {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
-		if err != nil {
-			return fail[[]byte](err)
-		}
-		resp, err := b.http.client.Do(req)
-		if err != nil {
-			return fail[[]byte](err)
-		}
-		defer resp.Body.Close()
-		data, err := io.ReadAll(resp.Body)
+	if downloadURL == "" {
+		data, err := b.http.downloadBytes(ctx, b.base()+"/objects/"+clean)
 		if err != nil {
 			return fail[[]byte](err)
 		}
 		return ok(data)
 	}
 
-	data, err := b.http.downloadBytes(ctx, b.base()+"/objects/"+clean)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
+	if err != nil {
+		return fail[[]byte](err)
+	}
+	// For direct downloads, include auth headers
+	if method == "direct" {
+		if token := b.http.authToken(); token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		for k, v := range b.http.headers {
+			req.Header.Set(k, v)
+		}
+	}
+	resp, err := b.http.client.Do(req)
+	if err != nil {
+		return fail[[]byte](err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return fail[[]byte](&InsForgeError{StatusCode: resp.StatusCode, Message: "download failed"})
+	}
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fail[[]byte](err)
 	}

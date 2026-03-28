@@ -67,14 +67,24 @@ class StorageBucket:
         try:
             # Get download strategy
             strategy = await self._http.post(
-                f"{self._base()}/objects/{clean}/download-strategy", {}
+                f"{self._base()}/objects/{clean}/download-strategy",
+                {"expiresIn": 3600},
             )
-            download_url: str = (strategy or {}).get("downloadUrl", "")
+            method: str = (strategy or {}).get("method", "direct")
+            download_url: str = (strategy or {}).get("url", "")
 
-            if download_url and not download_url.startswith(self._http._base_url):
+            if method == "presigned" and download_url:
                 import httpx
                 async with httpx.AsyncClient() as client:
                     resp = await client.get(download_url)
+                    resp.raise_for_status()
+                    return {"data": resp.content, "error": None}
+            elif download_url:
+                # Direct download: use auth headers
+                import httpx
+                headers = self._http._build_headers()
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(download_url, headers=headers)
                     resp.raise_for_status()
                     return {"data": resp.content, "error": None}
             else:
