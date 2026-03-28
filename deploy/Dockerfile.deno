@@ -1,0 +1,2 @@
+FROM denoland/deno:alpine-2.0.6
+COPY functions /app/functions
