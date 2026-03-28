@@ -14,6 +14,7 @@ import {
   Settings,
   Rocket,
   SquarePen,
+  Container,
 } from 'lucide-react';
 import { postMessageToParent } from './cloudMessaging';
 
@@ -80,6 +81,12 @@ export const staticMenuItems: PrimaryMenuItem[] = [
     label: 'Model Gateway',
     href: '/dashboard/ai',
     icon: Sparkles,
+  },
+  {
+    id: 'compute',
+    label: 'Compute',
+    href: '/dashboard/compute',
+    icon: Container,
     sectionEnd: true,
   },
   {
