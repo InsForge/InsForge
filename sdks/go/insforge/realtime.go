@@ -74,8 +74,7 @@ func (r *Realtime) GetSubscribedChannels() []string {
 func (r *Realtime) Connect(ctx context.Context) error {
 	base := r.http.baseURL
 	wsBase := strings.Replace(strings.Replace(base, "https://", "wss://", 1), "http://", "ws://", 1)
-	token := r.http.authToken()
-	rawURL := fmt.Sprintf("%s/socket.io/?EIO=4&transport=websocket&token=%s", wsBase, token)
+	rawURL := fmt.Sprintf("%s/socket.io/?EIO=4&transport=websocket", wsBase)
 
 	dialer := websocket.Dialer{HandshakeTimeout: 10 * time.Second}
 	header := http.Header{}
@@ -91,8 +90,14 @@ func (r *Realtime) Connect(ctx context.Context) error {
 		return &InsForgeError{Message: "failed to read EIO open: " + err.Error()}
 	}
 
-	// Send SIO CONNECT
-	if err := conn.WriteMessage(websocket.TextMessage, []byte(eioMessage+sioConnect)); err != nil {
+	// Send SIO CONNECT with auth payload (backend reads socket.handshake.auth.token)
+	token := r.http.authToken()
+	connectMsg := eioMessage + sioConnect
+	if token != "" {
+		authPayload, _ := json.Marshal(map[string]string{"token": token})
+		connectMsg += string(authPayload)
+	}
+	if err := conn.WriteMessage(websocket.TextMessage, []byte(connectMsg)); err != nil {
 		return &InsForgeError{Message: "failed to send SIO connect: " + err.Error()}
 	}
 

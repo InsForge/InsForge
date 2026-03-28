@@ -61,19 +61,17 @@ class Realtime:
         ws_base = base.replace("https://", "wss://").replace("http://", "ws://")
         token = self._http._access_token or self._http._anon_key or ""
 
-        url = (
-            f"{ws_base}/socket.io/?EIO=4&transport=websocket"
-            f"&token={token}"
-        )
+        url = f"{ws_base}/socket.io/?EIO=4&transport=websocket"
 
         self._ws = await websockets.connect(url, open_timeout=10)
         self._connected = True
-        # Socket.IO handshake: receive OPEN
-        raw = await self._ws.recv()
+        # Socket.IO handshake: receive EIO OPEN
+        await self._ws.recv()
         # Start background receive loop
         self._recv_task = asyncio.create_task(self._recv_loop())
-        # Send Socket.IO CONNECT
-        await self._ws.send(f"{self.EIO_MESSAGE}{self.SIO_CONNECT}")
+        # Send Socket.IO CONNECT with auth payload
+        auth = json.dumps({"token": token}) if token else ""
+        await self._ws.send(f"{self.EIO_MESSAGE}{self.SIO_CONNECT}{auth}")
 
     async def disconnect(self) -> None:
         """Close the WebSocket connection."""
