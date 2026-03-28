@@ -60,7 +60,7 @@ COPY . .
 ARG VITE_API_BASE_URL
 ARG VITE_PUBLIC_POSTHOG_KEY
 
-# Build order: ui → backend → frontend
+# Build order: shared packages → backend → frontend
 RUN npm run build
 
 
@@ -128,7 +128,13 @@ COPY --from=build --chown=node:node /app/docs ./docs
 # node-pg-migrate reads .sql files from backend/src/
 COPY --from=build --chown=node:node /app/backend/src ./backend/src
 COPY --from=build --chown=node:node /app/backend/tsconfig.json ./backend/tsconfig.json
-COPY --from=build --chown=node:node /app/shared-schemas/src ./shared-schemas/src
+
+# Workspace packages needed at runtime:
+# - shared-schemas: backend bootstrap/migrations resolve source via tsconfig paths
+# - package.json + dist keep workspace links in node_modules valid
+COPY --from=build --chown=node:node /app/packages/shared-schemas/package.json ./packages/shared-schemas/package.json
+COPY --from=build --chown=node:node /app/packages/shared-schemas/dist ./packages/shared-schemas/dist
+COPY --from=build --chown=node:node /app/packages/shared-schemas/src ./packages/shared-schemas/src
 
 # Package manifests for npm scripts
 COPY --from=build --chown=node:node /app/backend/package.json ./backend/package.json
