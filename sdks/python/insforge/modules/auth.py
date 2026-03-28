@@ -118,11 +118,11 @@ class Auth:
 
     async def refresh_session(self, refresh_token: str | None = None) -> dict[str, Any]:
         """Refresh the current session. Optionally pass a refresh token."""
-        body: dict[str, Any] = {}
+        body: dict[str, Any] | None = None
         if refresh_token:
-            body["refreshToken"] = refresh_token
+            body = {"refreshToken": refresh_token}
         try:
-            data = await self._http.post("/api/auth/refresh", body or None)
+            data = await self._http.post("/api/auth/refresh", body)
             token = (data or {}).get("accessToken")
             if token:
                 self._http.set_access_token(token)

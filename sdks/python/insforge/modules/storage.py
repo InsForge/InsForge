@@ -60,6 +60,8 @@ class StorageBucket:
                 return {"data": result, "error": None}
         except InsForgeError as e:
             return {"data": None, "error": e}
+        except Exception as e:
+            return {"data": None, "error": InsForgeError(str(e))}
 
     async def download(self, path: str) -> dict[str, Any]:
         """Download a file from the bucket. Returns raw bytes in data."""
@@ -92,6 +94,8 @@ class StorageBucket:
                 return {"data": content, "error": None}
         except InsForgeError as e:
             return {"data": None, "error": e}
+        except Exception as e:
+            return {"data": None, "error": InsForgeError(str(e))}
 
     async def list(
         self,
