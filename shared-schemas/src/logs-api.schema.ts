@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { auditLogSchema, logSchema } from './logs.schema';
+import { auditLogSchema, logSchema } from './logs.schema.js';
 
 export const getAuditLogsRequestSchema = z.object({
   limit: z.number().default(100),

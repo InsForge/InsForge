@@ -11,7 +11,7 @@ import {
   authConfigSchema,
   customOAuthConfigSchema,
   customOAuthKeySchema,
-} from './auth.schema';
+} from './auth.schema.js';
 
 // ============================================================================
 // Common schemas
