@@ -47,7 +47,7 @@ func (b *StorageBucket) Upload(ctx context.Context, path string, data []byte, co
 
 	// Request upload strategy
 	stratRaw, err := b.http.post(ctx, b.base()+"/upload-strategy", map[string]interface{}{
-		"key": clean, "mimeType": contentType,
+		"filename": clean, "contentType": contentType, "size": len(data),
 	}, nil)
 	if err != nil {
 		return fail[interface{}](err)
@@ -80,7 +80,7 @@ func (b *StorageBucket) Upload(ctx context.Context, path string, data []byte, co
 		if confirmReq {
 			confirmURL, _ := strategy["confirmUrl"].(string)
 			confirmPath := strings.Replace(confirmURL, b.http.baseURL, "", 1)
-			raw, err := b.http.post(ctx, confirmPath, map[string]interface{}{"key": key}, nil)
+			raw, err := b.http.post(ctx, confirmPath, map[string]interface{}{"size": len(data), "contentType": contentType}, nil)
 			if err != nil {
 				return fail[interface{}](err)
 			}

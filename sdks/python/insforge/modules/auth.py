@@ -196,10 +196,20 @@ class Auth:
     # Config
     # ------------------------------------------------------------------ #
 
+    async def exchange_reset_password_token(self, token: str) -> dict[str, Any]:
+        """Exchange a password reset token (from the reset link) for a short-lived OTP."""
+        try:
+            data = await self._http.post(
+                "/api/auth/email/exchange-reset-password-token", {"token": token}
+            )
+            return _ok(data)
+        except InsForgeError as e:
+            return _err(e)
+
     async def get_public_auth_config(self) -> dict[str, Any]:
         """Fetch the public auth configuration (OAuth providers, password rules, etc.)."""
         try:
-            data = await self._http.get("/api/auth/config/public")
+            data = await self._http.get("/api/auth/public-config")
             return _ok(data)
         except InsForgeError as e:
             return _err(e)

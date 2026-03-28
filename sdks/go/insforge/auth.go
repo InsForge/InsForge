@@ -202,9 +202,21 @@ func (a *Auth) ResetPassword(ctx context.Context, newPassword, otp string) Resul
 	return ok(m)
 }
 
+// ExchangeResetPasswordToken exchanges a password reset link token for a short-lived OTP.
+func (a *Auth) ExchangeResetPasswordToken(ctx context.Context, token string) Result[map[string]interface{}] {
+	raw, err := a.http.post(ctx, "/api/auth/email/exchange-reset-password-token", map[string]interface{}{
+		"token": token,
+	}, nil)
+	if err != nil {
+		return fail[map[string]interface{}](err)
+	}
+	m, _ := raw.(map[string]interface{})
+	return ok(m)
+}
+
 // GetPublicAuthConfig returns the public authentication configuration.
 func (a *Auth) GetPublicAuthConfig(ctx context.Context) Result[map[string]interface{}] {
-	raw, err := a.http.get(ctx, "/api/auth/config/public", nil, nil)
+	raw, err := a.http.get(ctx, "/api/auth/public-config", nil, nil)
 	if err != nil {
 		return fail[map[string]interface{}](err)
 	}

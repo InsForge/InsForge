@@ -26,15 +26,12 @@ class StorageBucket:
         data: bytes,
         *,
         content_type: str = "application/octet-stream",
-        metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Upload a file to the bucket at the given path."""
         clean = path.lstrip("/")
         try:
             # Request upload strategy
-            body: dict[str, Any] = {"key": clean, "mimeType": content_type}
-            if metadata:
-                body["metadata"] = metadata
+            body: dict[str, Any] = {"filename": clean, "contentType": content_type, "size": len(data)}
             strategy = await self._http.post(f"{self._base()}/upload-strategy", body)
 
             method = (strategy or {}).get("method", "direct")
@@ -50,7 +47,7 @@ class StorageBucket:
                 if (strategy or {}).get("confirmRequired"):
                     confirm_url: str = (strategy or {}).get("confirmUrl", "")
                     confirm_path = confirm_url.replace(self._http._base_url, "")
-                    result = await self._http.post(confirm_path, {"key": key})
+                    result = await self._http.post(confirm_path, {"size": len(data), "contentType": content_type})
                     return {"data": result, "error": None}
             else:
                 # Direct upload
