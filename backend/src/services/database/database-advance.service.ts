@@ -9,7 +9,7 @@ import {
 } from '@insforge/shared-schemas';
 import logger from '@/utils/logger.js';
 import { ERROR_CODES } from '@/types/error-constants.js';
-import { parseSQLStatements, checkAuthSchemaOperations } from '@/utils/sql-parser.js';
+import { parseSQLStatements, checkAuthSchemaOperations, checkSystemSchemaOperations } from '@/utils/sql-parser.js';
 import { validateTableName } from '@/utils/validations.js';
 import pgFormat from 'pg-format';
 import { parse } from 'csv-parse/sync';
@@ -103,6 +103,15 @@ export class DatabaseAdvanceService {
         query: query.substring(0, 100),
       });
       throw new AppError(authError, 403, ERROR_CODES.FORBIDDEN);
+    }
+
+    // Block DDL/DML on internal system schema
+    const systemError = checkSystemSchemaOperations(query);
+    if (systemError) {
+      logger.warn('Blocked operation on system schema', {
+        query: query.substring(0, 100),
+      });
+      throw new AppError(systemError, 403, ERROR_CODES.FORBIDDEN);
     }
 
     return query;
