@@ -120,6 +120,12 @@ func (q *QueryBuilder) ILike(col, pattern string) *QueryBuilder {
 	return q
 }
 
+// Is adds an IS filter (e.g. IS NULL, IS TRUE).
+func (q *QueryBuilder) Is(col string, val interface{}) *QueryBuilder {
+	q.filters = append(q.filters, fmt.Sprintf("%s=is.%v", col, val))
+	return q
+}
+
 // In adds an IN filter.
 func (q *QueryBuilder) In(col string, values ...interface{}) *QueryBuilder {
 	s := ""

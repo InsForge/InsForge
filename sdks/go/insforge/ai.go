@@ -207,7 +207,7 @@ type ImageGenerationRequest struct {
 
 // Generate creates images from a text prompt.
 func (i *ImagesClient) Generate(ctx context.Context, req ImageGenerationRequest) Result[interface{}] {
-	raw, err := i.http.post(ctx, "/api/ai/images/generate", req, nil)
+	raw, err := i.http.post(ctx, "/api/ai/image/generation", req, nil)
 	if err != nil {
 		return fail[interface{}](err)
 	}

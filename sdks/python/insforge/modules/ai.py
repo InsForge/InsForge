@@ -135,7 +135,7 @@ class Images:
             body["size"] = size
         if images:
             body["images"] = images
-        return await self._http.post("/api/ai/images/generate", body)
+        return await self._http.post("/api/ai/image/generation", body)
 
 
 class AI:
