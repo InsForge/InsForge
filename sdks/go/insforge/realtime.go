@@ -52,6 +52,19 @@ func (r *Realtime) IsConnected() bool {
 	return r.connected
 }
 
+// ConnectionState returns the current connection state: "connected", "connecting", or "disconnected".
+func (r *Realtime) ConnectionState() string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.connected {
+		return "connected"
+	}
+	if r.conn != nil {
+		return "connecting"
+	}
+	return "disconnected"
+}
+
 // SocketID returns the Socket.IO session ID if connected.
 func (r *Realtime) SocketID() string {
 	r.mu.RLock()
@@ -190,11 +203,21 @@ func (r *Realtime) On(event string, cb EventCallback) {
 	r.listeners[event] = append(r.listeners[event], cb)
 }
 
-// Off removes a handler. Pass nil to remove all handlers for the event.
+// Off removes all handlers for the given event.
 func (r *Realtime) Off(event string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.listeners, event)
+}
+
+// Once registers a one-time handler that is removed after it fires once.
+func (r *Realtime) Once(event string, cb EventCallback) {
+	var wrapper EventCallback
+	wrapper = func(data interface{}) {
+		cb(data)
+		r.Off(event)
+	}
+	r.On(event, wrapper)
 }
 
 func (r *Realtime) emit(event string, data interface{}) {
