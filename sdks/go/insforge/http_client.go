@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -17,6 +18,7 @@ type httpClient struct {
 	baseURL     string
 	anonKey     string
 	accessToken string
+	mu          sync.RWMutex
 	headers     map[string]string
 	client      *http.Client
 }
@@ -31,10 +33,14 @@ func newHTTPClient(baseURL, anonKey string, headers map[string]string) *httpClie
 }
 
 func (c *httpClient) setAccessToken(token string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.accessToken = token
 }
 
 func (c *httpClient) authToken() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	if c.accessToken != "" {
 		return c.accessToken
 	}

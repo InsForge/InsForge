@@ -28,6 +28,7 @@ type Realtime struct {
 	http        *httpClient
 	conn        *websocket.Conn
 	mu          sync.RWMutex
+	writeMu     sync.Mutex // protects WebSocket writes
 	listeners   map[string][]EventCallback
 	subscribed  map[string]struct{}
 	connected   bool
@@ -110,8 +111,11 @@ func (r *Realtime) Connect(ctx context.Context) error {
 		authPayload, _ := json.Marshal(map[string]string{"token": token})
 		connectMsg += string(authPayload)
 	}
-	if err := conn.WriteMessage(websocket.TextMessage, []byte(connectMsg)); err != nil {
-		return &InsForgeError{Message: "failed to send SIO connect: " + err.Error()}
+	r.writeMu.Lock()
+	writeErr := conn.WriteMessage(websocket.TextMessage, []byte(connectMsg))
+	r.writeMu.Unlock()
+	if writeErr != nil {
+		return &InsForgeError{Message: "failed to send SIO connect: " + writeErr.Error()}
 	}
 
 	r.mu.Lock()
@@ -150,7 +154,10 @@ func (r *Realtime) Subscribe(ctx context.Context, channel string) (map[string]in
 
 	payload, _ := json.Marshal([]interface{}{"realtime:subscribe", map[string]interface{}{"channel": channel}})
 	msg := fmt.Sprintf("%s%s%d%s", eioMessage, sioEvent, id, string(payload))
-	if err := r.conn.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
+	r.writeMu.Lock()
+	err := r.conn.WriteMessage(websocket.TextMessage, []byte(msg))
+	r.writeMu.Unlock()
+	if err != nil {
 		return nil, &InsForgeError{Message: "subscribe write failed: " + err.Error()}
 	}
 
@@ -174,7 +181,10 @@ func (r *Realtime) Subscribe(ctx context.Context, channel string) (map[string]in
 func (r *Realtime) Unsubscribe(channel string) error {
 	payload, _ := json.Marshal([]interface{}{"realtime:unsubscribe", map[string]interface{}{"channel": channel}})
 	msg := fmt.Sprintf("%s%s%s", eioMessage, sioEvent, string(payload))
-	if err := r.conn.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
+	r.writeMu.Lock()
+	err := r.conn.WriteMessage(websocket.TextMessage, []byte(msg))
+	r.writeMu.Unlock()
+	if err != nil {
 		return err
 	}
 	r.mu.Lock()
@@ -193,7 +203,10 @@ func (r *Realtime) Publish(ctx context.Context, channel, event string, payload i
 	data, _ := json.Marshal([]interface{}{"realtime:publish", map[string]interface{}{
 		"channel": channel, "event": event, "payload": payload,
 	}})
-	return r.conn.WriteMessage(websocket.TextMessage, []byte(eioMessage+sioEvent+string(data)))
+	r.writeMu.Lock()
+	err := r.conn.WriteMessage(websocket.TextMessage, []byte(eioMessage+sioEvent+string(data)))
+	r.writeMu.Unlock()
+	return err
 }
 
 // On registers a handler for the given event.

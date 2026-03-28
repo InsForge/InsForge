@@ -113,6 +113,9 @@ func (c *ChatCompletionsClient) CreateStream(ctx context.Context, req ChatComple
 		if token := c.http.authToken(); token != "" {
 			httpReq.Header.Set("Authorization", "Bearer "+token)
 		}
+		for k, v := range c.http.headers {
+			httpReq.Header.Set(k, v)
+		}
 
 		resp, err := c.http.client.Do(httpReq)
 		if err != nil {
