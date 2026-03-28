@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { aiConfigurationSchema, aiUsageRecordSchema, modalitySchema } from './ai.schema';
+import { aiConfigurationSchema, aiUsageRecordSchema, modalitySchema } from './ai.schema.js';
 
 // ============= Chat Completion Schemas =============
 

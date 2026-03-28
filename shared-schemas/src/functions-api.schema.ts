@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { functionSchema } from './functions.schema';
+import { functionSchema } from './functions.schema.js';
 
 export const uploadFunctionRequestSchema = z.object({
   name: z.string().min(1, 'Name is required'),

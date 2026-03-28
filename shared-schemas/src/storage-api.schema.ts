@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { storageConfigSchema, storageFileSchema } from './storage.schema';
+import { storageConfigSchema, storageFileSchema } from './storage.schema.js';
 
 export const createBucketRequestSchema = z.object({
   bucketName: z.string().min(1, 'Bucket name cannot be empty'),
