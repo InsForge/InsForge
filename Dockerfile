@@ -34,16 +34,17 @@ COPY package-lock.json ./package-lock.json
 
 COPY backend/package.json     ./backend/package.json
 COPY frontend/package.json    ./frontend/package.json
-COPY shared-schemas/package.json ./shared-schemas/package.json
-COPY ui/package.json          ./ui/package.json
+COPY packages/dashboard/package.json ./packages/dashboard/package.json
+COPY packages/shared-schemas/package.json ./packages/shared-schemas/package.json
+COPY packages/ui/package.json ./packages/ui/package.json
 
 # Strip prepare/build scripts from shared-schemas to prevent tsc
 # from running during install (source files aren't copied yet).
 # The actual build happens in the build stage with full source.
 RUN apk add --no-cache jq && \
     jq 'del(.scripts.prepare, .scripts.build)' \
-      shared-schemas/package.json > shared-schemas/package.json.tmp && \
-    mv shared-schemas/package.json.tmp shared-schemas/package.json
+      packages/shared-schemas/package.json > packages/shared-schemas/package.json.tmp && \
+    mv packages/shared-schemas/package.json.tmp packages/shared-schemas/package.json
 
 RUN npm ci && npm cache clean --force
 
@@ -59,7 +60,7 @@ COPY . .
 ARG VITE_API_BASE_URL
 ARG VITE_PUBLIC_POSTHOG_KEY
 
-# Build order: ui → backend → frontend
+# Build order: shared packages → backend → frontend
 RUN npm run build
 
 
@@ -75,16 +76,17 @@ COPY package-lock.json ./package-lock.json
 
 COPY backend/package.json     ./backend/package.json
 COPY frontend/package.json    ./frontend/package.json
-COPY shared-schemas/package.json ./shared-schemas/package.json
-COPY ui/package.json          ./ui/package.json
+COPY packages/dashboard/package.json ./packages/dashboard/package.json
+COPY packages/shared-schemas/package.json ./packages/shared-schemas/package.json
+COPY packages/ui/package.json ./packages/ui/package.json
 
 # Strip prepare/build scripts from shared-schemas to prevent tsc
 # from running during install (tsc is a devDependency, not available here).
 # The compiled output comes from the build stage instead.
 RUN apk add --no-cache jq && \
     jq 'del(.scripts.prepare, .scripts.build)' \
-      shared-schemas/package.json > shared-schemas/package.json.tmp && \
-    mv shared-schemas/package.json.tmp shared-schemas/package.json
+      packages/shared-schemas/package.json > packages/shared-schemas/package.json.tmp && \
+    mv packages/shared-schemas/package.json.tmp packages/shared-schemas/package.json
 
 RUN npm ci --omit=dev && npm cache clean --force
 
@@ -126,7 +128,13 @@ COPY --from=build --chown=node:node /app/docs ./docs
 # node-pg-migrate reads .sql files from backend/src/
 COPY --from=build --chown=node:node /app/backend/src ./backend/src
 COPY --from=build --chown=node:node /app/backend/tsconfig.json ./backend/tsconfig.json
-COPY --from=build --chown=node:node /app/shared-schemas/src ./shared-schemas/src
+
+# Workspace packages needed at runtime:
+# - shared-schemas: backend bootstrap/migrations resolve source via tsconfig paths
+# - package.json + dist keep workspace links in node_modules valid
+COPY --from=build --chown=node:node /app/packages/shared-schemas/package.json ./packages/shared-schemas/package.json
+COPY --from=build --chown=node:node /app/packages/shared-schemas/dist ./packages/shared-schemas/dist
+COPY --from=build --chown=node:node /app/packages/shared-schemas/src ./packages/shared-schemas/src
 
 # Package manifests for npm scripts
 COPY --from=build --chown=node:node /app/backend/package.json ./backend/package.json
