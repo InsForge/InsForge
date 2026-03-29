@@ -8,7 +8,7 @@ function getDeploymentFailureMessage(buildLogs?: string[]): string {
   const logs = buildLogs?.map((log) => log.trim()).filter(Boolean) ?? [];
 
   const explicitError =
-    logs.find((log) => log.toLowerCase().includes('[error]')) ?? logs.at(-1) ?? null;
+    logs.find((log) => log.toLowerCase().includes('[error]')) ?? logs[logs.length - 1] ?? null;
 
   if (!explicitError) {
     return 'Function saved, but deployment failed.';
