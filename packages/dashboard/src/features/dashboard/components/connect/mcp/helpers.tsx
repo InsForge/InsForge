@@ -16,9 +16,9 @@ import WindsurfLogo from '../../../../../assets/logos/windsurf.svg?react';
 import ClineLogo from '../../../../../assets/logos/cline.svg?react';
 import QoderLogo from '../../../../../assets/logos/qoder.svg?react';
 import CopilotLogo from '../../../../../assets/logos/copilot.svg?react';
-import AntigravityLogo from '../../../../../assets/logos/antigravity.svg?react';
+import AntigravityLogo from '../../../../../assets/logos/antigravity.png';
 import OpenAILogo from '../../../../../assets/logos/openai.svg?react';
-import KiroLogo from '../../../../../assets/logos/kiro.svg?react';
+import KiroLogo from '../../../../../assets/logos/kiro.png';
 import RooCodeLogo from '../../../../../assets/logos/roo_code.svg?react';
 import OpenCodeLogo from '../../../../../assets/logos/opencode.svg?react';
 import { getBackendUrl } from '../../../../../lib/utils/utils';
@@ -83,7 +83,7 @@ export const MCP_AGENTS: MCPAgent[] = [
     id: 'antigravity',
     slug: 'google-antigravity',
     displayName: 'Antigravity',
-    logo: <AntigravityLogo className="w-5 h-5 dark:text-white" />,
+    logo: <img src={AntigravityLogo} alt="Antigravity" className="h-5 w-5 object-contain" />,
   },
   {
     id: 'codex',
@@ -95,7 +95,7 @@ export const MCP_AGENTS: MCPAgent[] = [
     id: 'kiro',
     slug: 'kiro',
     displayName: 'Kiro',
-    logo: <KiroLogo className="w-5 h-5 dark:text-white" />,
+    logo: <img src={KiroLogo} alt="Kiro" className="h-5 w-5 object-contain" />,
   },
   {
     id: 'opencode',
