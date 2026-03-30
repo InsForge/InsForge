@@ -14,10 +14,12 @@ export default function ComputePage() {
     isLoadingContainers,
     isCreating,
     isUpdating,
+    isDeleting,
     isDeploying,
     selectContainer,
     createContainer,
     updateContainer,
+    deleteContainer,
     deploy,
     rollback,
   } = useCompute();
@@ -34,10 +36,14 @@ export default function ComputePage() {
               deployments={deployments}
               isUpdating={isUpdating}
               isDeploying={isDeploying}
+              isDeleting={isDeleting}
               onBack={() => selectContainer(null)}
               onUpdate={updateContainer}
               onDeploy={(id) => void deploy(id)}
               onRollback={(cId, dId) => void rollback(cId, dId)}
+              onDelete={(id) => {
+                void deleteContainer(id).then(() => selectContainer(null));
+              }}
             />
           </div>
         </div>

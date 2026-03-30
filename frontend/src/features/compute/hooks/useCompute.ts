@@ -120,6 +120,7 @@ export function useCompute() {
     isLoadingDeployments,
     isCreating: createContainerMutation.isPending,
     isUpdating: updateContainerMutation.isPending,
+    isDeleting: deleteContainerMutation.isPending,
     isDeploying: deployMutation.isPending,
 
     containersError,

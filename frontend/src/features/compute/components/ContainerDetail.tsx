@@ -4,8 +4,9 @@ import type {
   ContainerDeploymentSchema,
   UpdateContainerRequest,
 } from '@insforge/shared-schemas';
-import { Button, Badge, Tabs, Tab } from '@insforge/ui';
-import { ArrowLeft, Rocket, ExternalLink } from 'lucide-react';
+import { Button, Badge, Tabs, Tab, ConfirmDialog } from '@insforge/ui';
+import { ArrowLeft, Rocket, ExternalLink, Trash2 } from 'lucide-react';
+import { useConfirm } from '@/lib/hooks/useConfirm';
 import { EnvVarsTab } from './EnvVarsTab';
 import { DeploymentsTab } from './DeploymentsTab';
 
@@ -14,10 +15,12 @@ interface ContainerDetailProps {
   deployments: ContainerDeploymentSchema[];
   isUpdating: boolean;
   isDeploying: boolean;
+  isDeleting: boolean;
   onBack: () => void;
   onUpdate: (id: string, data: UpdateContainerRequest) => Promise<unknown>;
   onDeploy: (containerId: string) => void;
   onRollback: (containerId: string, deploymentId: string) => void;
+  onDelete: (containerId: string) => void;
 }
 
 export function ContainerDetail({
@@ -25,12 +28,15 @@ export function ContainerDetail({
   deployments,
   isUpdating,
   isDeploying,
+  isDeleting,
   onBack,
   onUpdate,
   onDeploy,
   onRollback,
+  onDelete,
 }: ContainerDetailProps) {
   const [activeTab, setActiveTab] = useState('overview');
+  const { confirm, confirmDialogProps } = useConfirm();
 
   const handleSaveEnvVars = (vars: { key: string; value: string }[]) => {
     const envVars = Object.fromEntries(vars.map((v) => [v.key, v.value]));
@@ -72,8 +78,29 @@ export function ContainerDetail({
             <Rocket className="w-3.5 h-3.5 mr-1" />
             {isDeploying ? 'Deploying...' : 'Deploy'}
           </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={isDeleting}
+            onClick={() => {
+              void confirm({
+                title: 'Delete Container',
+                description: `Are you sure you want to delete "${container.name}"? This will tear down all associated cloud resources and cannot be undone.`,
+                confirmText: 'Delete',
+                cancelText: 'Cancel',
+              }).then((confirmed) => {
+                if (confirmed) {
+                  onDelete(container.id);
+                }
+              });
+            }}
+          >
+            <Trash2 className="w-3.5 h-3.5 mr-1" />
+            {isDeleting ? 'Deleting...' : 'Delete'}
+          </Button>
         </div>
       </div>
+      <ConfirmDialog {...confirmDialogProps} />
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
