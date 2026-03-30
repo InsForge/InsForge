@@ -213,8 +213,8 @@ export function checkAuthSchemaOperations(query: string): string | null {
 
     return null; // No dangerous operations found
   } catch (parseError) {
-    logger.warn('SQL parse error in checkAuthSchemaOperations, letting query through:', parseError);
-    return null;
+    logger.warn('SQL parse error in checkAuthSchemaOperations, rejecting query:', parseError);
+    return 'Query could not be parsed and was rejected for security reasons.';
   }
 }
 
