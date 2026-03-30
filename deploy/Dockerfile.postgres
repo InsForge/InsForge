@@ -1,0 +1,4 @@
+FROM ghcr.io/insforge/postgres:v15.13.2
+COPY deploy/docker-init/db/postgresql.conf /etc/postgresql/postgresql.conf
+COPY deploy/docker-init/db/db-init.sql /docker-entrypoint-initdb.d/01-init.sql
+COPY deploy/docker-init/db/jwt.sql /docker-entrypoint-initdb.d/02-jwt.sql
