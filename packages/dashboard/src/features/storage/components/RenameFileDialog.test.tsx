@@ -1,5 +1,27 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('@insforge/ui', () => ({
+  Dialog: ({ open, children }: { open: boolean; children: ReactNode }) =>
+    open ? <div>{children}</div> : null,
+  DialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2>,
+  DialogDescription: ({ children }: { children: ReactNode }) => <p>{children}</p>,
+  DialogBody: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogFooter: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogCloseButton: (props: ButtonHTMLAttributes<HTMLButtonElement>) => (
+    <button type="button" {...props}>
+      Close
+    </button>
+  ),
+  Button: ({ children, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) => (
+    <button {...props}>{children}</button>
+  ),
+  Input: (props: InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
+}));
+
 import { RenameFileDialog } from './RenameFileDialog';
 
 describe('RenameFileDialog', () => {
