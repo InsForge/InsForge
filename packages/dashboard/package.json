@@ -1,6 +1,6 @@
 {
   "name": "@insforge/dashboard",
-  "version": "0.0.0-dev.1",
+  "version": "0.0.0-dev.2",
   "description": "Shared InsForge dashboard package for self-hosting and cloud-hosting hosts",
   "license": "Apache-2.0",
   "type": "module",
