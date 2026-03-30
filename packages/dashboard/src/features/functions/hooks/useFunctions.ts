@@ -6,9 +6,9 @@ import { useToast } from '../../../lib/hooks/useToast';
 
 function getDeploymentFailureMessage(buildLogs?: string[]): string {
   const logs = buildLogs?.map((log) => log.trim()).filter(Boolean) ?? [];
+  const lastLog = logs.length > 0 ? logs[logs.length - 1] : null;
 
-  const explicitError =
-    logs.find((log) => log.toLowerCase().includes('[error]')) ?? logs.at(-1) ?? null;
+  const explicitError = logs.find((log) => log.toLowerCase().includes('[error]')) ?? lastLog;
 
   if (!explicitError) {
     return 'Function saved, but deployment failed.';
