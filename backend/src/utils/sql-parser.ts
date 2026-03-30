@@ -240,11 +240,6 @@ function getSchemaFromNameList(items: Array<Record<string, unknown>>): string | 
 export function checkSystemSchemaOperations(query: string): string | null {
   const isSystem = (s: string | null): boolean => s?.toLowerCase() === 'system';
 
-  // Block set_config('search_path', ...) which bypasses VariableSetStmt detection
-  if (/set_config\s*\(\s*'search_path'/i.test(query)) {
-    return 'Modifying search_path is not allowed.';
-  }
-
   try {
     const { stmts } = parseSync(query);
 
@@ -257,6 +252,39 @@ export function checkSystemSchemaOperations(query: string): string | null {
         const name = (data.name as string) ?? '';
         if (name.toLowerCase() === 'search_path') {
           return 'Modifying search_path is not allowed.';
+        }
+      }
+
+      // Block SELECT set_config('search_path', ...) via AST
+      if (stmtType === 'SelectStmt') {
+        const targetList = (data.targetList as Array<Record<string, unknown>>) ?? [];
+        for (const target of targetList) {
+          const resTarget = target.ResTarget as Record<string, unknown> | undefined;
+          const val = resTarget?.val as Record<string, unknown> | undefined;
+          const funcCall = val?.FuncCall as Record<string, unknown> | undefined;
+          if (!funcCall) {
+            continue;
+          }
+
+          const funcnameParts = (funcCall.funcname as Array<Record<string, unknown>>) ?? [];
+          const lastPart = funcnameParts[funcnameParts.length - 1];
+          const funcName =
+            (
+              (lastPart?.String as Record<string, unknown> | undefined)?.sval as string | undefined
+            )?.toLowerCase() ?? '';
+
+          if (funcName === 'set_config') {
+            const args = (funcCall.args as Array<Record<string, unknown>>) ?? [];
+            const firstArg = args[0] as Record<string, unknown> | undefined;
+            const constNode = firstArg?.A_Const as Record<string, unknown> | undefined;
+            const configName = (
+              (constNode?.sval as Record<string, unknown> | undefined)?.sval as string | undefined
+            )?.toLowerCase();
+
+            if (configName === 'search_path') {
+              return 'Modifying search_path is not allowed.';
+            }
+          }
         }
       }
 

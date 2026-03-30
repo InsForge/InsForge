@@ -98,6 +98,12 @@ describe('checkSystemSchemaOperations', () => {
     ).not.toBeNull();
   });
 
+  it('blocks set_config search_path with dollar-quoting', () => {
+    expect(
+      checkSystemSchemaOperations("SELECT set_config($$search_path$$, 'system', true)")
+    ).not.toBeNull();
+  });
+
   it('blocks ALTER FUNCTION on system schema', () => {
     const query = 'ALTER FUNCTION system.update_updated_at() SECURITY DEFINER';
     expect(checkSystemSchemaOperations(query)).not.toBeNull();
