@@ -73,4 +73,20 @@ describe('LocalStorageProvider - deleteBucket', () => {
       'Bucket name contains invalid characters'
     );
   });
+
+  it('renames an existing object on disk', async () => {
+    const bucket = 'testBucket';
+    const originalKey = 'folder/photo.png';
+    const renamedKey = 'folder/cover.png';
+    const originalPath = path.join(baseDir, bucket, originalKey);
+    const renamedPath = path.join(baseDir, bucket, renamedKey);
+
+    await fs.mkdir(path.dirname(originalPath), { recursive: true });
+    await fs.writeFile(originalPath, Buffer.from('hello world'));
+
+    await provider.renameObject(bucket, originalKey, renamedKey);
+
+    await expect(fs.access(originalPath)).rejects.toThrow();
+    await expect(fs.readFile(renamedPath, 'utf8')).resolves.toBe('hello world');
+  });
 });

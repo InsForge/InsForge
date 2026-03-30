@@ -116,6 +116,21 @@ export const storageService = {
     );
   },
 
+  async renameObject(
+    bucketName: string,
+    objectKey: string,
+    newName: string
+  ): Promise<StorageFileSchema> {
+    return apiClient.request(
+      `/storage/buckets/${encodeURIComponent(bucketName)}/objects/${encodeURIComponent(objectKey)}`,
+      {
+        method: 'PATCH',
+        headers: apiClient.withAccessToken(),
+        body: JSON.stringify({ newName }),
+      }
+    );
+  },
+
   async deleteObjects(
     bucketName: string,
     objectKeys: string[]

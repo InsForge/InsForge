@@ -3,6 +3,7 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  CopyObjectCommand,
   ListObjectsV2Command,
   DeleteObjectsCommand,
   HeadObjectCommand,
@@ -122,6 +123,30 @@ export class S3StorageProvider implements StorageProvider {
       Key: this.getS3Key(bucket, key),
     });
     await this.s3Client.send(command);
+  }
+
+  async renameObject(bucket: string, oldKey: string, newKey: string): Promise<void> {
+    if (!this.s3Client) {
+      throw new Error('S3 client not initialized');
+    }
+
+    const sourceKey = this.getS3Key(bucket, oldKey);
+    const destinationKey = this.getS3Key(bucket, newKey);
+
+    const copyCommand = new CopyObjectCommand({
+      Bucket: this.s3Bucket,
+      CopySource: `${this.s3Bucket}/${sourceKey}`,
+      Key: destinationKey,
+    });
+
+    await this.s3Client.send(copyCommand);
+
+    const deleteCommand = new DeleteObjectCommand({
+      Bucket: this.s3Bucket,
+      Key: sourceKey,
+    });
+
+    await this.s3Client.send(deleteCommand);
   }
 
   async createBucket(_bucket: string): Promise<void> {
