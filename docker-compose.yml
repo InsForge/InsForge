@@ -3,7 +3,6 @@ version: '3.8'
 services:
   postgres:
     image: ghcr.io/insforge/postgres:v15.13.2
-    container_name: insforge-postgres
     command: postgres -c config_file=/etc/postgresql/postgresql.conf -c app.encryption_key='${ENCRYPTION_KEY:-${JWT_SECRET:-dev-secret-please-change-in-production}}'
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
@@ -15,7 +14,7 @@ services:
       - ./deploy/docker-init/db/jwt.sql:/docker-entrypoint-initdb.d/02-jwt.sql
       - ./deploy/docker-init/db/postgresql.conf:/etc/postgresql/postgresql.conf
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     security_opt:
       - no-new-privileges:true
     networks:
@@ -28,7 +27,6 @@ services:
 
   postgrest:
     image: postgrest/postgrest:v12.2.12
-    container_name: insforge-postgrest
     restart: unless-stopped
     environment:
       # POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -43,7 +41,7 @@ services:
       PGRST_DB_CHANNEL_ENABLED: true
       PGRST_DB_CHANNEL: pgrst
     ports:
-      - "5430:3000"
+      - "${POSTGREST_PORT:-5430}:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -58,14 +56,14 @@ services:
       dockerfile: Dockerfile
       target: dev
     image: insforge-dev
-    container_name: insforge
     working_dir: /app
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - "7130:7130"
-      - "7131:7131"
+      - "${APP_PORT:-7130}:7130"
+      - "${AUTH_PORT:-7131}:7131"
+      - "${UI_PORT:-7132}:7132"
     environment:
       - PORT=7130
       - PROJECT_ROOT=/app
@@ -153,13 +151,12 @@ services:
   # Deno serverless runtime for edge functions
   deno:
     image: denoland/deno:alpine-2.0.6
-    container_name: insforge-deno
     working_dir: /app
     depends_on:
       - postgres
       - postgrest
     ports:
-      - "7133:7133"
+      - "${DENO_PORT:-7133}:7133"
     environment:
       - PORT=7133
       - DENO_ENV=${DENO_ENV:-development}
@@ -194,7 +191,6 @@ services:
 
   # Vector.dev for log collection and shipping
   vector:
-    container_name: insforge-vector
     image: timberio/vector:0.28.1-alpine
     restart: unless-stopped
     depends_on:
