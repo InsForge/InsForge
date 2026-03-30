@@ -20,17 +20,17 @@ Authorization: Bearer your-jwt-token-or-anon-key
 
 For admin endpoints:
 ```bash
-Authorization: Bearer admin-jwt-token-Or-API-Key
+Authorization: Bearer admin-jwt-token-or-api-key
 ```
 
 ---
 
 ## Invoke Function
 
-Execute a deployed function.
+Execute a deployed function using any HTTP method (GET, POST, PUT, PATCH, DELETE, etc.). The server preserves and forwards the caller's original method to the function runtime.
 
 ```
-POST /functions/{slug}
+ANY /functions/{slug}
 ```
 
 <Note>

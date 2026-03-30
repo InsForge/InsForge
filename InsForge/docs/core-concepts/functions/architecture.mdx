@@ -164,10 +164,10 @@ Functions receive the user's auth token via the `Authorization` header. Inside t
 3. **Automatic Scaling**: Deno Subhosting handles scaling and isolate management
 
 **Self-Hosted:**
-1. **Worker Pooling**: Workers are created on-demand
-2. **Code Caching**: Function code cached in memory
-3. **Secret Caching**: Decrypted secrets cached per execution
-4. **SDK Reuse**: SDK client created once per worker
+1. **On-Demand Workers**: A new worker is created per invocation and terminated after completion/timeout
+2. **Keep Function Logic Lean**: Minimize startup work inside handlers to reduce per-request overhead
+3. **Runtime Health**: Monitor runtime availability and latency to avoid proxy failures
+4. **Scale Host Resources**: Concurrency is bounded by host CPU/memory in self-hosted mode
 
 ## Best Practices
 
