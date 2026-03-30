@@ -1,20 +1,27 @@
 import { useEffect, useState } from 'react';
+import { Settings } from 'lucide-react';
 import {
   Button,
-  Dialog,
-  DialogBody,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  MenuDialog,
+  MenuDialogBody,
+  MenuDialogCloseButton,
+  MenuDialogContent,
+  MenuDialogFooter,
+  MenuDialogHeader,
+  MenuDialogMain,
+  MenuDialogNav,
+  MenuDialogNavItem,
+  MenuDialogNavList,
+  MenuDialogSideNav,
+  MenuDialogSideNavHeader,
+  MenuDialogSideNavTitle,
+  MenuDialogTitle,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@insforge/ui';
-import { Label } from '@/components';
 import { useRealtimeConfig } from '../hooks/useRealtimeConfig';
 
 interface RealtimeSettingsMenuDialogProps {
@@ -23,6 +30,30 @@ interface RealtimeSettingsMenuDialogProps {
 }
 
 type RetentionOption = string;
+
+interface SettingRowProps {
+  label: string;
+  description?: React.ReactNode;
+  children: React.ReactNode;
+}
+
+function SettingRow({ label, description, children }: SettingRowProps) {
+  return (
+    <div className="flex w-full items-start gap-6">
+      <div className="w-[260px] shrink-0">
+        <div className="py-1.5">
+          <p className="text-sm leading-5 text-foreground">{label}</p>
+        </div>
+        {description && (
+          <div className="pt-1 pb-2 text-[13px] leading-[18px] text-muted-foreground">
+            {description}
+          </div>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  );
+}
 
 function toRetentionOption(retentionDays: number | null): RetentionOption {
   return retentionDays === null ? 'never' : String(retentionDays);
@@ -80,71 +111,84 @@ export function RealtimeSettingsMenuDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent showCloseButton={canClose}>
-        <DialogHeader>
-          <DialogTitle>Realtime Settings</DialogTitle>
-          <DialogDescription>
-            Configure how long realtime messages are retained before pruning.
-          </DialogDescription>
-        </DialogHeader>
+    <MenuDialog open={open} onOpenChange={handleOpenChange}>
+      <MenuDialogContent>
+        <MenuDialogSideNav>
+          <MenuDialogSideNavHeader>
+            <MenuDialogSideNavTitle>Realtime Settings</MenuDialogSideNavTitle>
+          </MenuDialogSideNavHeader>
+          <MenuDialogNav>
+            <MenuDialogNavList>
+              <MenuDialogNavItem icon={<Settings className="h-5 w-5" />} active={true}>
+                General
+              </MenuDialogNavItem>
+            </MenuDialogNavList>
+          </MenuDialogNav>
+        </MenuDialogSideNav>
 
-        <DialogBody className="gap-4">
+        <MenuDialogMain>
+          <MenuDialogHeader>
+            <MenuDialogTitle>General</MenuDialogTitle>
+            <MenuDialogCloseButton className="ml-auto" />
+          </MenuDialogHeader>
+
           {!isLoaded ? (
-            <div className="flex min-h-[92px] items-center justify-center text-sm text-muted-foreground">
-              {isLoading && !error ? 'Loading configuration...' : 'Unable to load configuration.'}
-            </div>
+            <MenuDialogBody>
+              <div className="flex min-h-[92px] items-center justify-center text-sm text-muted-foreground">
+                {isLoading && !error ? 'Loading configuration...' : 'Unable to load configuration.'}
+              </div>
+            </MenuDialogBody>
           ) : (
-            <div className="flex gap-6 items-center">
-              <div className="w-[200px] shrink-0">
-                <Label htmlFor="retention-days" className="leading-5 text-foreground">
-                  Message Retention
-                </Label>
-                <p className="mt-1 whitespace-nowrap text-[13px] leading-[18px] text-muted-foreground">
-                  How long messages are kept before pruning.
-                </p>
-              </div>
-              <div className="min-w-0 flex-1 flex justify-end">
-                <Select
-                  value={retentionDays ?? undefined}
-                  onValueChange={setRetentionDays}
-                  disabled={isSelectDisabled}
+            <>
+              <MenuDialogBody>
+                <SettingRow
+                  label="Message Retention"
+                  description="How long messages are kept before pruning."
                 >
-                  <SelectTrigger id="retention-days" className="h-9 w-[180px] max-w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="30">30 days</SelectItem>
-                    <SelectItem value="90">90 days</SelectItem>
-                    <SelectItem value="180">180 days</SelectItem>
-                    <SelectItem value="never">Never</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-        </DialogBody>
+                  <div className="flex justify-end">
+                    <Select
+                      value={retentionDays ?? undefined}
+                      onValueChange={setRetentionDays}
+                      disabled={isSelectDisabled}
+                    >
+                      <SelectTrigger id="retention-days" className="h-9 w-[180px] max-w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="30">30 days</SelectItem>
+                        <SelectItem value="90">90 days</SelectItem>
+                        <SelectItem value="180">180 days</SelectItem>
+                        <SelectItem value="never">Never</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </SettingRow>
+              </MenuDialogBody>
 
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => handleOpenChange(false)}
-            disabled={!canClose}
-            className="h-8 rounded px-3"
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={!isLoaded || isUpdating || !hasChanges}
-            className="h-8 rounded px-3"
-          >
-            {isUpdating ? 'Saving...' : 'Save Changes'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+              <MenuDialogFooter>
+                {hasChanges && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => handleOpenChange(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => void handleSave()}
+                      disabled={!isLoaded || isUpdating || !hasChanges}
+                    >
+                      {isUpdating ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                  </>
+                )}
+              </MenuDialogFooter>
+            </>
+          )}
+        </MenuDialogMain>
+      </MenuDialogContent>
+    </MenuDialog>
   );
 }

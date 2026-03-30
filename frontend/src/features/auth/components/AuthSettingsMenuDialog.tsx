@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Lock, Mail, Settings } from 'lucide-react';
+import { Lock, Mail, Settings, Plus, X } from 'lucide-react';
 import {
   Button,
   Checkbox,
@@ -33,6 +33,7 @@ import {
   type UpdateAuthConfigRequest,
 } from '@insforge/shared-schemas';
 import { useAuthConfig } from '@/features/auth/hooks/useAuthConfig';
+import { useToast } from '@/lib/hooks/useToast';
 import { isInsForgeCloudProject } from '@/lib/utils/utils';
 
 interface AuthSettingsMenuDialogProps {
@@ -51,7 +52,7 @@ const defaultValues: UpdateAuthConfigRequest = {
   requireSpecialChar: false,
   verifyEmailMethod: 'code',
   resetPasswordMethod: 'code',
-  signInRedirectTo: null,
+  allowedRedirectUrls: [],
 };
 
 const toFormValues = (config?: AuthConfigSchema): UpdateAuthConfigRequest => {
@@ -68,13 +69,13 @@ const toFormValues = (config?: AuthConfigSchema): UpdateAuthConfigRequest => {
     requireSpecialChar: config.requireSpecialChar,
     verifyEmailMethod: config.verifyEmailMethod,
     resetPasswordMethod: config.resetPasswordMethod,
-    signInRedirectTo: config.signInRedirectTo ?? null,
+    allowedRedirectUrls: config.allowedRedirectUrls ?? [],
   };
 };
 
 interface SettingRowProps {
   label: string;
-  description?: string;
+  description?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -86,9 +87,9 @@ function SettingRow({ label, description, children }: SettingRowProps) {
           <p className="text-sm leading-5 text-foreground">{label}</p>
         </div>
         {description && (
-          <p className="pt-1 pb-2 text-[13px] leading-[18px] text-muted-foreground">
+          <div className="pt-1 pb-2 text-[13px] leading-[18px] text-muted-foreground">
             {description}
-          </p>
+          </div>
         )}
       </div>
       <div className="min-w-0 flex-1">{children}</div>
@@ -100,17 +101,76 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
   const isCloudProject = isInsForgeCloudProject();
   const [activeSection, setActiveSection] = useState<AuthSettingsSection>('general');
   const { config, isLoading, isUpdating, updateConfig } = useAuthConfig();
+  const { showToast } = useToast();
 
   const form = useForm<UpdateAuthConfigRequest>({
     resolver: zodResolver(updateAuthConfigRequestSchema),
     defaultValues,
+    mode: 'onChange',
   });
 
   const requireEmailVerification = form.watch('requireEmailVerification');
+  const watchedAllowedRedirectUrls = form.watch('allowedRedirectUrls');
+  const allowedRedirectUrls = useMemo(
+    () => watchedAllowedRedirectUrls ?? [],
+    [watchedAllowedRedirectUrls]
+  );
+  const visibleAllowedRedirectUrls = useMemo(
+    () => (allowedRedirectUrls.length > 0 ? allowedRedirectUrls : ['']),
+    [allowedRedirectUrls]
+  );
 
   const resetForm = useCallback(() => {
     form.reset(toFormValues(config));
   }, [config, form]);
+
+  const updateAllowedRedirectUrls = useCallback(
+    (nextAllowedRedirectUrls: string[]) => {
+      form.setValue('allowedRedirectUrls', nextAllowedRedirectUrls, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    },
+    [form]
+  );
+
+  const handleAllowedRedirectUrlChange = useCallback(
+    (index: number, value: string) => {
+      if (allowedRedirectUrls.length === 0 && value === '') {
+        updateAllowedRedirectUrls([]);
+        return;
+      }
+
+      const nextAllowedRedirectUrls =
+        allowedRedirectUrls.length > 0 ? [...allowedRedirectUrls] : [''];
+      nextAllowedRedirectUrls[index] = value;
+      updateAllowedRedirectUrls(nextAllowedRedirectUrls);
+    },
+    [allowedRedirectUrls, updateAllowedRedirectUrls]
+  );
+
+  const handleRemoveAllowedRedirectUrl = useCallback(
+    (index: number) => {
+      const nextAllowedRedirectUrls = [...allowedRedirectUrls];
+      nextAllowedRedirectUrls.splice(index, 1);
+      updateAllowedRedirectUrls(nextAllowedRedirectUrls);
+    },
+    [allowedRedirectUrls, updateAllowedRedirectUrls]
+  );
+
+  const handleAddAllowedRedirectUrl = useCallback(async () => {
+    if (allowedRedirectUrls.length === 0) {
+      updateAllowedRedirectUrls(['']);
+      return;
+    }
+
+    const isValid = await form.trigger('allowedRedirectUrls');
+    if (!isValid) {
+      return;
+    }
+
+    updateAllowedRedirectUrls([...allowedRedirectUrls, '']);
+  }, [allowedRedirectUrls, form, updateAllowedRedirectUrls]);
 
   useEffect(() => {
     if (open) {
@@ -128,9 +188,14 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
   };
 
   const handleSubmit = () => {
-    void form.handleSubmit((data) => {
-      updateConfig(data);
-    })();
+    void form.handleSubmit(
+      (data) => {
+        updateConfig(data);
+      },
+      () => {
+        showToast('Please fix the highlighted errors before saving changes.', 'error');
+      }
+    )();
   };
 
   const sectionTitle = useMemo(() => {
@@ -143,7 +208,7 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
     return 'General';
   }, [activeSection]);
 
-  const saveDisabled = !form.formState.isDirty || isUpdating;
+  const saveDisabled = !form.formState.isDirty || !form.formState.isValid || isUpdating;
 
   return (
     <MenuDialog open={open} onOpenChange={handleOpenChange}>
@@ -203,23 +268,56 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
             >
               <MenuDialogBody>
                 {activeSection === 'general' && (
-                  <SettingRow
-                    label="Redirect URL After Sign In"
-                    description="Your app url after successful authentication"
-                  >
-                    <Input
-                      type="url"
-                      placeholder="https://yourapp.com/dashboard"
-                      {...form.register('signInRedirectTo')}
-                      className={form.formState.errors.signInRedirectTo ? 'border-destructive' : ''}
-                    />
-                    {form.formState.errors.signInRedirectTo && (
-                      <p className="pt-1 text-xs text-destructive">
-                        {form.formState.errors.signInRedirectTo.message ||
-                          'Please enter a valid URL'}
-                      </p>
-                    )}
-                  </SettingRow>
+                  <>
+                    <SettingRow
+                      label="Allowed Redirect URLs"
+                      description="Allowed redirect destinations for auth flows. Leave empty to allow all URLs."
+                    >
+                      <div className="flex flex-col gap-2">
+                        {visibleAllowedRedirectUrls.map((url, index) => {
+                          const urlErrors = form.formState.errors.allowedRedirectUrls;
+                          const itemError = Array.isArray(urlErrors) ? urlErrors[index] : undefined;
+
+                          return (
+                            <div key={index} className="flex flex-col gap-1">
+                              <div className="flex w-full items-center gap-1.5">
+                                <Input
+                                  value={url}
+                                  onChange={(e) =>
+                                    handleAllowedRedirectUrlChange(index, e.target.value)
+                                  }
+                                  placeholder="https://example.com"
+                                  className={itemError ? 'border-destructive' : ''}
+                                />
+                                {allowedRedirectUrls.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveAllowedRedirectUrl(index)}
+                                    className="flex size-8 shrink-0 items-center justify-center rounded border border-[var(--alpha-8)] bg-card text-muted-foreground hover:text-foreground"
+                                  >
+                                    <X className="size-4" />
+                                  </button>
+                                )}
+                              </div>
+                              {itemError && (
+                                <p className="pt-1 text-xs text-destructive">
+                                  {itemError.message || 'Invalid URL'}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                        <button
+                          type="button"
+                          className="flex h-8 items-center gap-0.5 self-end rounded border border-[var(--alpha-8)] bg-card px-1.5 text-sm font-medium text-foreground"
+                          onClick={() => void handleAddAllowedRedirectUrl()}
+                        >
+                          <Plus className="size-5" />
+                          <span className="px-1">Add URL</span>
+                        </button>
+                      </div>
+                    </SettingRow>
+                  </>
                 )}
 
                 {activeSection === 'email-verification' && (
@@ -306,7 +404,7 @@ export function AuthSettingsMenuDialog({ open, onOpenChange }: AuthSettingsMenuD
                     </SettingRow>
 
                     <SettingRow label="Password Strength Requirements">
-                      <div className="flex flex-col gap-3 pt-1">
+                      <div className="flex flex-col gap-3 pt-1 pb-8">
                         <Controller
                           name="requireNumber"
                           control={form.control}

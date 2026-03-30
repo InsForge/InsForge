@@ -124,7 +124,7 @@ async function seedDefaultAuthConfig(): Promise<void> {
   const client = await pool.connect();
 
   try {
-    const result = await client.query('SELECT COUNT(*) as count FROM auth.configs');
+    const result = await client.query('SELECT COUNT(*) as count FROM auth.config');
     const hasConfig = result.rows.length > 0 && Number(result.rows[0].count) > 0;
 
     if (hasConfig) {
@@ -139,7 +139,7 @@ async function seedDefaultAuthConfig(): Promise<void> {
 
     // Table is empty - this is first startup, insert default cloud configuration
     await client.query(
-      `INSERT INTO auth.configs (
+      `INSERT INTO auth.config (
         require_email_verification,
         password_min_length,
         require_number,

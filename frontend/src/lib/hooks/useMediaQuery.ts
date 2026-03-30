@@ -12,11 +12,11 @@ export function useMediaQuery(
   { defaultValue = false, initializeWithValue = true }: UseMediaQueryOptions = {}
 ): boolean {
   const getMatches = useCallback(
-    (query: string): boolean => {
+    (nextQuery: string): boolean => {
       if (IS_SERVER) {
         return defaultValue;
       }
-      return window.matchMedia(query).matches;
+      return window.matchMedia(nextQuery).matches;
     },
     [defaultValue]
   );
@@ -28,7 +28,6 @@ export function useMediaQuery(
     return defaultValue;
   });
 
-  // Handles the change event of the media query.
   const handleChange = useCallback(() => {
     setMatches(getMatches(query));
   }, [getMatches, query]);
@@ -36,10 +35,8 @@ export function useMediaQuery(
   useLayoutEffect(() => {
     const matchMedia = window.matchMedia(query);
 
-    // Triggered at the first client-side load and if query changes
     handleChange();
 
-    // Use deprecated `addListener` and `removeListener` to support Safari < 14
     if (matchMedia.addListener) {
       matchMedia.addListener(handleChange);
     } else {

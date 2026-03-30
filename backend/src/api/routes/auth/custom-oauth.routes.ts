@@ -228,10 +228,18 @@ router.get('/:key', async (req: Request, res: Response, next: NextFunction) => {
     }
 
     const { redirect_uri, code_challenge } = queryValidation.data;
-    const authConfig = await authConfigService.getAuthConfig();
-    const redirectUri = authConfig.signInRedirectTo || redirect_uri;
+    const redirectUri = redirect_uri;
     if (!redirectUri) {
       throw new AppError('Redirect URI is required', 400, ERROR_CODES.INVALID_INPUT);
+    }
+
+    if (!(await authConfigService.validateRedirectUrl(redirectUri))) {
+      throw new AppError(
+        `${redirectUri} is not in the allowed redirect URLs`,
+        400,
+        ERROR_CODES.INVALID_INPUT,
+        'Please add this URL to the allowed redirect URLs in the authentication configuration.'
+      );
     }
 
     const state = jwt.sign(
@@ -281,6 +289,15 @@ router.get('/:key/callback', async (req: Request, res: Response, next: NextFunct
     if (!stateData.redirectUri) {
       throw new AppError('redirectUri is required in state', 400, ERROR_CODES.INVALID_INPUT);
     }
+
+    if (!(await authConfigService.validateRedirectUrl(stateData.redirectUri))) {
+      throw new AppError(
+        `${stateData.redirectUri} is not in the allowed redirect URLs`,
+        400,
+        ERROR_CODES.INVALID_INPUT,
+        'Please add this URL to the allowed redirect URLs in the authentication configuration.'
+      );
+    }
     if (!stateData.codeChallenge) {
       throw new AppError('code_challenge is required in state', 400, ERROR_CODES.INVALID_INPUT);
     }
@@ -315,7 +332,10 @@ router.get('/:key/callback', async (req: Request, res: Response, next: NextFunct
         const stateData = jwt.verify(req.query.state as string, validateJwtSecret()) as {
           redirectUri?: string;
         };
-        if (stateData.redirectUri) {
+        if (
+          stateData.redirectUri &&
+          (await authConfigService.validateRedirectUrl(stateData.redirectUri))
+        ) {
           const errorUrl = new URL(stateData.redirectUri);
           errorUrl.searchParams.set('error', 'Authentication failed');
           return res.redirect(errorUrl.toString());

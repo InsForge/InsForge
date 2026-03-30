@@ -12,11 +12,12 @@ import {
 } from '../components';
 import { formatTime } from '@/lib/utils/utils';
 import { LogSchema } from '@insforge/shared-schemas';
-import { LOGS_PAGE_SIZE } from '../helpers';
+import { usePageSize } from '@/lib/hooks/usePageSize';
 
 export default function LogsPage() {
   const { source = 'insforge.logs' } = useParams<{ source?: string }>();
   const [selectedLog, setSelectedLog] = useState<LogSchema | null>(null);
+  const { pageSize, pageSizeOptions, onPageSizeChange: handlePageSizeChange } = usePageSize('logs');
 
   const {
     logs,
@@ -31,7 +32,7 @@ export default function LogsPage() {
     isLoading: logsLoading,
     error: logsError,
     getSeverity,
-  } = useLogs(source);
+  } = useLogs(source, pageSize);
 
   useEffect(() => {
     setSeverityFilter(['error', 'warning', 'informational']);
@@ -128,9 +129,15 @@ export default function LogsPage() {
             loading={logsLoading}
             currentPage={currentPage}
             totalPages={totalPages}
-            pageSize={LOGS_PAGE_SIZE}
+            pageSize={pageSize}
+            pageSizeOptions={pageSizeOptions}
             totalRecords={filteredLogs.length}
             onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              handlePageSizeChange(newSize);
+              setCurrentPage(1);
+            }}
+            paginationRecordLabel="logs"
             selectedRowId={selectedLog?.id ?? null}
             onRowClick={handleRowClick}
             gridContainerClassName="border-t border-[var(--alpha-8)]"

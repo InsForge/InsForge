@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { scheduleSchema, scheduleLogSchema } from './schedules.schema';
+import { scheduleSchema, scheduleLogSchema } from './schedules.schema.js';
 
 const cronScheduleSchema = z.string().refine(
   (value) => {

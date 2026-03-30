@@ -1,19 +1,6 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
-import {
-  MoreHorizontal,
-  Plus,
-  Trash2,
-  Pencil,
-  Mail,
-  ChevronDown,
-  Settings,
-  KeyRound,
-} from 'lucide-react';
-import {
-  AuthSettingsMenuDialog,
-  OAuthConfigDialog,
-  CustomOAuthConfigDialog,
-} from '@/features/auth/components';
+import { useState, useCallback, useMemo } from 'react';
+import { MoreHorizontal, Plus, Trash2, Pencil, Mail, ChevronDown, KeyRound } from 'lucide-react';
+import { OAuthConfigDialog, CustomOAuthConfigDialog } from '@/features/auth/components';
 import { useOAuthConfig } from '@/features/auth/hooks/useOAuthConfig';
 import { useCustomOAuthConfig } from '@/features/auth/hooks/useCustomOAuthConfig';
 import { useConfirm } from '@/lib/hooks/useConfirm';
@@ -30,16 +17,11 @@ import {
 import type { OAuthProvidersSchema, CustomOAuthConfigSchema } from '@insforge/shared-schemas';
 import { oauthProviders, type OAuthProviderInfo } from '@/features/auth/helpers';
 
-interface AuthMethodsPageProps {
-  openSettingsOnMount?: boolean;
-}
-
-export default function AuthMethodsPage({ openSettingsOnMount = false }: AuthMethodsPageProps) {
+export default function AuthMethodsPage() {
   const [selectedProvider, setSelectedProvider] = useState<OAuthProviderInfo>();
   const [selectedCustomProvider, setSelectedCustomProvider] = useState<CustomOAuthConfigSchema>();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCustomDialogOpen, setIsCustomDialogOpen] = useState(false);
-  const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const { confirm, confirmDialogProps } = useConfirm();
   const {
     isLoadingConfigs,
@@ -130,12 +112,6 @@ export default function AuthMethodsPage({ openSettingsOnMount = false }: AuthMet
     void refetchCustomConfigs();
   }, [refetchConfigs, refetchCustomConfigs]);
 
-  useEffect(() => {
-    if (openSettingsOnMount) {
-      setIsSettingsDialogOpen(true);
-    }
-  }, [openSettingsOnMount]);
-
   if (isLoadingConfigs || isLoadingCustomConfigs) {
     return (
       <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[rgb(var(--semantic-1))]">
@@ -152,14 +128,6 @@ export default function AuthMethodsPage({ openSettingsOnMount = false }: AuthMet
         <div className="mx-auto flex w-full max-w-[1024px] items-center justify-between gap-3">
           <h1 className="text-2xl font-medium leading-8 text-foreground">Auth Methods</h1>
           <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              className="h-9 rounded px-2 text-foreground"
-              onClick={() => setIsSettingsDialogOpen(true)}
-            >
-              <Settings className="h-5 w-5 stroke-[1.7]" />
-              <span className="px-1">Settings</span>
-            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="secondary" className="h-9 rounded px-2 text-foreground">
@@ -334,10 +302,6 @@ export default function AuthMethodsPage({ openSettingsOnMount = false }: AuthMet
         isOpen={isDialogOpen}
         onClose={handleCloseDialog}
         onSuccess={handleSuccess}
-      />
-      <AuthSettingsMenuDialog
-        open={isSettingsDialogOpen}
-        onOpenChange={(open) => setIsSettingsDialogOpen(open)}
       />
       <CustomOAuthConfigDialog
         isOpen={isCustomDialogOpen}

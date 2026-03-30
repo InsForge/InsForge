@@ -44,6 +44,7 @@ POST /api/auth/users
 | `email` | string | Yes | User email address |
 | `password` | string | Yes | Password (must meet configured requirements) |
 | `name` | string | No | User display name |
+| `redirectTo` | string | No | Used for link-based email verification. The email link always opens an InsForge backend endpoint first; after the token is verified, InsForge redirects the browser to this URL with the verification result. Required when `verifyEmailMethod` is `link`. This URL must be included in `allowedRedirectUrls`. Recommended: use your app's sign-in page. |
 
 ### Example (Web Client)
 
@@ -53,7 +54,8 @@ curl -X POST "https://your-app.insforge.app/api/auth/users" \
   -d '{
     "email": "user@example.com",
     "password": "securepassword123",
-    "name": "John Doe"
+    "name": "John Doe",
+    "redirectTo": "http://localhost:3000/sign-in"
   }'
 ```
 
@@ -65,7 +67,8 @@ curl -X POST "https://your-app.insforge.app/api/auth/users?client_type=mobile" \
   -d '{
     "email": "user@example.com",
     "password": "securepassword123",
-    "name": "John Doe"
+    "name": "John Doe",
+    "redirectTo": "myapp://sign-in"
   }'
 ```
 
@@ -313,6 +316,12 @@ curl -X POST "https://your-app.insforge.app/api/auth/logout"
 
 Get the currently authenticated user's info from JWT token.
 
+This REST endpoint does not refresh expired access tokens by itself.
+
+- For raw REST clients, call `POST /api/auth/refresh` when needed.
+- For browser apps using the TypeScript SDK, call `auth.getCurrentUser()` during startup. The SDK will use the httpOnly refresh cookie automatically when it can refresh the session.
+- This automatic refresh behavior is browser-only. Server, mobile, and other non-browser clients should refresh explicitly.
+
 ```
 GET /api/auth/sessions/current
 ```
@@ -421,13 +430,17 @@ POST /api/auth/email/send-verification
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `email` | string | Yes | User email address |
+| `redirectTo` | string | No | Used for link-based email verification. The email link always opens an InsForge backend endpoint first; after the token is verified, InsForge redirects the browser to this URL with the verification result. Required when `verifyEmailMethod` is `link`. This URL must be included in `allowedRedirectUrls`. Recommended: use your app's sign-in page. |
 
 ### Example
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/email/send-verification" \
   -H "Content-Type: application/json" \
-  -d '{"email": "user@example.com"}'
+  -d '{
+    "email": "user@example.com",
+    "redirectTo": "http://localhost:3000/sign-in"
+  }'
 ```
 
 ### Response
@@ -455,8 +468,26 @@ POST /api/auth/email/verify
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `email` | string | For code method | User email address |
-| `otp` | string | Yes | 6-digit code or 64-char token from link |
+| `email` | string | Yes | User email address |
+| `otp` | string | Yes | 6-digit verification code |
+
+For link-based verification, email clicks use:
+
+```
+GET /api/auth/email/verify-link?token=...
+```
+
+That browser-oriented GET flow verifies the token on the backend and redirects to the stored `redirectTo` URL. `POST /api/auth/email/verify` is the JSON API for 6-digit code submission.
+
+Handle the browser redirect like this:
+
+- Success: `?insforge_status=success&insforge_type=verify_email`
+- Error: `?insforge_status=error&insforge_type=verify_email&insforge_error=...`
+- `insforge_status`: Result of the browser link flow. For verification, values are `success` or `error`.
+- `insforge_type`: Flow identifier. For verification links this is always `verify_email`.
+- `insforge_error`: Present only when `insforge_status=error`. Human-readable error message for display or logging.
+- Recommended handling: use your sign-in page as `redirectTo`. When `insforge_status=success`, show a confirmation message and ask the user to sign in with their email and password.
+- If `redirectTo` is not allowlisted, InsForge returns a `400` error whose message includes the rejected URL and whose `nextActions` tells you to add it to `allowedRedirectUrls`.
 
 ### Example (Web Client)
 
@@ -523,13 +554,17 @@ POST /api/auth/email/send-reset-password
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `email` | string | Yes | User email address |
+| `redirectTo` | string | No | Used for link-based password reset. The email link always opens an InsForge backend endpoint first; InsForge then redirects the browser to this URL with the reset `token` in the query string so your app can render its own reset-password page. Required when `resetPasswordMethod` is `link`. This URL must be included in `allowedRedirectUrls`. Recommended: use your app's dedicated reset-password page. |
 
 ### Example
 
 ```bash
 curl -X POST "https://your-app.insforge.app/api/auth/email/send-reset-password" \
   -H "Content-Type: application/json" \
-  -d '{"email": "user@example.com"}'
+  -d '{
+    "email": "user@example.com",
+    "redirectTo": "http://localhost:3000/reset-password"
+  }'
 ```
 
 ### Exchange Code for Token (Code Method Only)
@@ -571,12 +606,30 @@ curl -X POST "https://your-app.insforge.app/api/auth/email/exchange-reset-passwo
 POST /api/auth/email/reset-password
 ```
 
+For link-based password reset, email clicks use:
+
+```
+GET /api/auth/email/reset-password-link?token=...
+```
+
+That browser-oriented GET flow validates the token on the backend and redirects to the stored `redirectTo` URL with the reset token in the query string. `POST /api/auth/email/reset-password` remains the JSON API that accepts the new password.
+
+Handle the browser redirect like this:
+
+- Ready to reset: `?token=...&insforge_status=ready&insforge_type=reset_password`
+- Error: `?insforge_status=error&insforge_type=reset_password&insforge_error=...`
+- `token`: Present only when `insforge_status=ready`. Pass this value to `POST /api/auth/email/reset-password` as `otp`.
+- `insforge_status`: Result of the browser link flow. For reset links, values are `ready` or `error`.
+- `insforge_type`: Flow identifier. For reset links this is always `reset_password`.
+- `insforge_error`: Present only when `insforge_status=error`. Human-readable error message for display or logging.
+- Your app should only render the reset-password form when `insforge_status=ready` and `token` is present.
+
 ### Request Body
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `newPassword` | string | Yes | New password |
-| `otp` | string | Yes | Reset token (from exchange endpoint or magic link) |
+| `otp` | string | Yes | Reset token from either the code exchange endpoint or the magic link URL |
 
 ### Example
 
@@ -676,7 +729,7 @@ The `insforge_code` is a temporary authorization code that must be exchanged for
 
 ### Exchange Code for Tokens
 
-Exchange the authorization code for access and refresh tokens (PKCE flow).
+Exchange the authorization code for access and refresh tokens.
 
 ```
 POST /api/auth/oauth/exchange
@@ -719,8 +772,7 @@ curl -X POST "https://your-app.insforge.app/api/auth/oauth/exchange?client_type=
     "updatedAt": "2024-01-15T10:30:00Z"
   },
   "accessToken": "eyJhbGciOiJIUzI1NiIs...",
-  "refreshToken": "eyJhbGciOiJIUzI1NiIs...",
-  "redirectTo": "https://myapp.com/dashboard"
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
 }
 ```
 
@@ -728,44 +780,6 @@ curl -X POST "https://your-app.insforge.app/api/auth/oauth/exchange?client_type=
 - For **web clients**: The `refreshToken` will be `null` and a `csrfToken` is returned instead. The refresh token is stored in an httpOnly cookie.
 - For **non-web clients** (`mobile`, `desktop`, `server`): A `refreshToken` is returned directly. Store it securely.
 </Note>
-
----
-
-### OAuth via Auth Component (Sign-In Page)
-
-You can also use the hosted sign-in page for OAuth authentication, which follows the same PKCE flow.
-
-```
-GET /{baseURL}/auth/sign-in
-```
-
-### Query Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `redirect` | string | Yes | URL-encoded redirect URI |
-| `client_type` | string | No | Client type: `web` (default), `mobile`, `desktop`, or `server` |
-| `code_challenge` | string | Yes | PKCE code challenge |
-
-### Example
-
-```bash
-# URL-encode the redirect URI
-REDIRECT_URI=$(python3 -c "import urllib.parse; print(urllib.parse.quote('https://myapp.com/callback'))")
-
-# Open in browser or WebView
-open "https://your-app.insforge.app/auth/sign-in?redirect=$REDIRECT_URI&client_type=mobile&code_challenge=$CODE_CHALLENGE"
-```
-
-### Callback
-
-After successful authentication, the user will be redirected to your redirect URI with an authorization code:
-
-```
-https://myapp.com/callback?insforge_code=abc123...
-```
-
-Then exchange the code for tokens using `/api/auth/oauth/exchange` as described above.
 
 ---
 
@@ -892,13 +906,18 @@ curl "https://your-app.insforge.app/api/auth/config" \
   "requireSpecialChar": false,
   "verifyEmailMethod": "code",
   "resetPasswordMethod": "link",
-  "verifyEmailRedirectTo": "https://myapp.com/verify-success",
-  "resetPasswordRedirectTo": "https://myapp.com/reset-success",
-  "signInRedirectTo": "https://myapp.com/dashboard",
+  "allowedRedirectUrls": ["https://myapp.com/dashboard", "https://*.myapp.com"],
   "createdAt": "2024-01-15T10:30:00Z",
   "updatedAt": "2024-01-15T10:30:00Z"
 }
 ```
+
+`allowedRedirectUrls` entries are matched against the full `redirectTo` value, including scheme, host, optional port, and path.
+
+- Exact entries must match exactly, such as `https://myapp.com/dashboard`.
+- Wildcards are supported only in the host portion, such as `https://*.myapp.com/callback`.
+- Deep links are allowed when explicitly listed, such as `com.example.app:/oauth2redirect` or `myapp://auth/callback`.
+- If `allowedRedirectUrls` is empty, InsForge allows all redirects for developer convenience. This is insecure for production and should be avoided outside local development.
 
 ### Update Auth Configuration
 
@@ -920,9 +939,7 @@ PUT /api/auth/config
 | `requireSpecialChar` | boolean | No | Require special characters in password |
 | `verifyEmailMethod` | string | No | Email verification method (`code` or `link`) |
 | `resetPasswordMethod` | string | No | Password reset method (`code` or `link`) |
-| `verifyEmailRedirectTo` | string | No | Redirect URL after email verification |
-| `resetPasswordRedirectTo` | string | No | Redirect URL after password reset |
-| `signInRedirectTo` | string | No | Redirect URL after sign in |
+| `allowedRedirectUrls` | array | No | List of allowed redirect URLs. Entries are matched against the full `redirectTo` value. Exact URLs must match exactly, host wildcards such as `https://*.domain.com/callback` are supported, and custom deep links such as `com.example.app:/oauth2redirect` are allowed when explicitly listed. If empty, all redirects are allowed, which is insecure for production. |
 
 #### Example
 

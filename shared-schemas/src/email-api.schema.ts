@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { emailSchema } from './auth.schema';
+import { emailSchema } from './auth.schema.js';
 
 const emailOrEmails = z.union([
   emailSchema,

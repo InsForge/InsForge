@@ -851,21 +851,26 @@ export class VercelProvider {
   }
 
   /**
-   * Upload multiple files to Vercel in parallel
+   * Upload multiple files to Vercel with limited concurrency
    */
   async uploadFiles(
     files: Array<{ path: string; content: Buffer }>
   ): Promise<Array<{ file: string; sha: string; size: number }>> {
-    const uploadPromises = files.map(async ({ path, content }) => {
-      const sha = await this.uploadFile(content);
-      return {
-        file: path,
-        sha,
-        size: content.length,
-      };
-    });
+    const maxConcurrency = 10;
+    const results: Array<{ file: string; sha: string; size: number }> = [];
 
-    return Promise.all(uploadPromises);
+    for (let i = 0; i < files.length; i += maxConcurrency) {
+      const batch = files.slice(i, i + maxConcurrency);
+      const batchResults = await Promise.all(
+        batch.map(async ({ path, content }) => {
+          const sha = await this.uploadFile(content);
+          return { file: path, sha, size: content.length };
+        })
+      );
+      results.push(...batchResults);
+    }
+
+    return results;
   }
 
   /**

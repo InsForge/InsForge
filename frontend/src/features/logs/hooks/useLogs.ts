@@ -6,7 +6,7 @@ import { LOGS_PAGE_SIZE, SeverityType } from '../helpers';
 
 const FETCH_SIZE = 200;
 
-export function useLogs(source: string) {
+export function useLogs(source: string, pageSize: number = LOGS_PAGE_SIZE) {
   const [searchQuery, setSearchQuery] = useState('');
   const [severityFilter, setSeverityFilter] = useState<string[]>([
     'error',
@@ -50,7 +50,7 @@ export function useLogs(source: string) {
   // Reset page when search, severity filter, or source changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, severityFilter, source]);
+  }, [searchQuery, severityFilter, source, pageSize]);
 
   // Load more older logs
   const loadMoreLogs = useCallback(async () => {
@@ -117,11 +117,11 @@ export function useLogs(source: string) {
 
   // Calculate pagination
   const totalPages = useMemo(
-    () => Math.ceil(filteredLogs.length / LOGS_PAGE_SIZE),
-    [filteredLogs.length]
+    () => Math.ceil(filteredLogs.length / pageSize),
+    [filteredLogs.length, pageSize]
   );
-  const startIndex = useMemo(() => (currentPage - 1) * LOGS_PAGE_SIZE, [currentPage]);
-  const endIndex = useMemo(() => startIndex + LOGS_PAGE_SIZE, [startIndex]);
+  const startIndex = useMemo(() => (currentPage - 1) * pageSize, [currentPage, pageSize]);
+  const endIndex = useMemo(() => startIndex + pageSize, [startIndex, pageSize]);
   const paginatedLogs = useMemo(
     () => filteredLogs.slice(startIndex, endIndex),
     [filteredLogs, startIndex, endIndex]

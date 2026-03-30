@@ -155,7 +155,7 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
               <MenuDialogBody>
                 <SettingRow
                   label="Maximum Upload Size"
-                  description="Files exceeding this limit will be rejected. Range: 1–200 MB."
+                  description="Files exceeding this limit will be rejected."
                 >
                   <Controller
                     name="maxFileSizeMb"
@@ -182,11 +182,6 @@ export function StorageSettingsMenuDialog({ open, onOpenChange }: StorageSetting
                           <p className="pt-1 text-xs text-destructive">
                             {form.formState.errors.maxFileSizeMb.message ||
                               'Must be between 1 and 200 MB'}
-                          </p>
-                        )}
-                        {!form.formState.errors.maxFileSizeMb && config && (
-                          <p className="pt-1 text-xs text-muted-foreground">
-                            Effective limit: {config.maxFileSizeMb} MB
                           </p>
                         )}
                       </>

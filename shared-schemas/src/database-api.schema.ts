@@ -7,7 +7,7 @@ import {
   databaseIndexSchema,
   databasePolicySchema,
   databaseTriggerSchema,
-} from './database.schema';
+} from './database.schema.js';
 
 export const createTableRequestSchema = tableSchema
   .pick({
