@@ -81,6 +81,7 @@ export async function createApp() {
     cors({
       origin: true, // Allow all origins (matches Better Auth's trustedOrigins: ['*'])
       credentials: true, // Allow cookies/credentials
+      exposedHeaders: ['Content-Range', 'Preference-Applied'],
     })
   );
   app.use(cookieParser()); // Parse cookies for refresh token handling
