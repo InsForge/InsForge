@@ -12,3 +12,11 @@ export function useDashboardHost() {
   }
   return value;
 }
+
+export function useIsCloudHostingMode() {
+  return useDashboardHost().mode === 'cloud-hosting';
+}
+
+export function useIsEmbeddedDashboard() {
+  return useIsCloudHostingMode();
+}

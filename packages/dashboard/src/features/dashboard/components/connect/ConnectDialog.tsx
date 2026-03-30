@@ -18,6 +18,7 @@ import { ConnectionStringSection } from './ConnectionStringSection';
 import { CLISection } from './CLISection';
 import { useApiKey } from '../../../../lib/hooks/useMetadata';
 import { useAnonToken } from '../../../auth/hooks/useAnonToken';
+import { useIsEmbeddedDashboard } from '../../../../lib/config/DashboardHostContext';
 import { cn, getBackendUrl, isIframe, isInsForgeCloudProject } from '../../../../lib/utils/utils';
 import { parseCloudEvent } from '../../../../lib/utils/cloudMessaging';
 import { useModal } from '../../../../lib/hooks/useModal';
@@ -41,8 +42,9 @@ const CONNECT_TABS: ConnectTab[] = [
 
 export function ConnectDialog() {
   const { isConnectDialogOpen, setConnectDialogOpen } = useModal();
+  const isEmbeddedDashboard = useIsEmbeddedDashboard();
   const isCloudProject = isInsForgeCloudProject();
-  const canShowCli = isCloudProject && isIframe();
+  const canShowCli = isCloudProject && (isIframe() || isEmbeddedDashboard);
   const [activeTab, setActiveTab] = useState<ConnectTabId>(canShowCli ? 'cli' : 'mcp');
 
   const { apiKey, isLoading: isApiKeyLoading } = useApiKey();

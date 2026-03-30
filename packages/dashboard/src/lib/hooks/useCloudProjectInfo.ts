@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useDashboardHost } from '../config/DashboardHostContext';
 import { isIframe, isInsForgeCloudProject } from '../utils/utils';
 import { parseCloudEvent, postMessageToParent } from '../utils/cloudMessaging';
 
@@ -64,6 +65,16 @@ function requestCloudProjectInfo(timeoutMs: number): Promise<CloudProjectInfo> {
 }
 
 export function useCloudProjectInfo(options?: UseCloudProjectInfoOptions) {
+  const host = useDashboardHost();
+  const hostProjectInfo: CloudProjectInfo = host.project
+    ? {
+        name: host.project.name,
+        latestVersion: host.project.latestVersion ?? undefined,
+        instanceType: host.project.instanceType,
+        region: host.project.region,
+      }
+    : {};
+  const shouldUseHostProjectInfo = host.mode === 'cloud-hosting';
   const shouldFetchFromCloud = (options?.enabled ?? true) && isInsForgeCloudProject() && isIframe();
 
   const {
@@ -79,6 +90,15 @@ export function useCloudProjectInfo(options?: UseCloudProjectInfoOptions) {
     gcTime: 30 * 60 * 1000, // 30 minutes
     refetchOnWindowFocus: false,
   });
+
+  if (shouldUseHostProjectInfo) {
+    return {
+      projectInfo: hostProjectInfo,
+      isLoading: false,
+      error: null,
+      refetch: async () => ({ data: hostProjectInfo }),
+    };
+  }
 
   return {
     projectInfo,
