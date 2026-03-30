@@ -219,6 +219,131 @@ export function checkAuthSchemaOperations(query: string): string | null {
 }
 
 /**
+ * Extract the schema name from a libpg-query name list (array of String nodes).
+ * For qualified names like schema.object, returns the first element (the schema).
+ * Returns null only when there is no valid name to extract.
+ */
+function getSchemaFromNameList(items: Array<Record<string, unknown>>): string | null {
+  if (items.length < 1) {
+    return null;
+  }
+  const first = items[0];
+  return ((first.String as Record<string, unknown> | undefined)?.sval as string) ?? null;
+}
+
+/**
+ * Check if a query contains dangerous operations on the system schema.
+ * Blocks CREATE/ALTER/DROP FUNCTION, CREATE TRIGGER referencing system functions,
+ * DROP/CREATE TABLE/ALTER TABLE, DELETE, and TRUNCATE on the system schema.
+ * Returns an error message if blocked, null if allowed.
+ */
+export function checkSystemSchemaOperations(query: string): string | null {
+  const isSystem = (s: string | null): boolean => s?.toLowerCase() === 'system';
+
+  try {
+    const { stmts } = parseSync(query);
+
+    for (const stmtWrapper of stmts) {
+      const stmt = stmtWrapper.stmt as Record<string, unknown>;
+      const [stmtType, data] = Object.entries(stmt)[0] as [string, Record<string, unknown>];
+
+      // CREATE [OR REPLACE] FUNCTION system.*
+      if (stmtType === 'CreateFunctionStmt') {
+        const funcname = (data.funcname as Array<Record<string, unknown>>) ?? [];
+        if (funcname.length > 1 && isSystem(getSchemaFromNameList(funcname))) {
+          return 'Modifying functions in the "system" schema is not allowed.';
+        }
+      }
+
+      // ALTER FUNCTION system.*
+      if (stmtType === 'AlterFunctionStmt') {
+        const func = data.func as Record<string, unknown> | undefined;
+        const objname = (func?.objname as Array<Record<string, unknown>>) ?? [];
+        if (objname.length > 1 && isSystem(getSchemaFromNameList(objname))) {
+          return 'Altering functions in the "system" schema is not allowed.';
+        }
+      }
+
+      // CREATE TRIGGER ... EXECUTE FUNCTION system.*
+      if (stmtType === 'CreateTrigStmt') {
+        const funcname = (data.funcname as Array<Record<string, unknown>>) ?? [];
+        if (funcname.length > 1 && isSystem(getSchemaFromNameList(funcname))) {
+          return 'Creating triggers that reference "system" schema functions is not allowed.';
+        }
+      }
+
+      // DROP FUNCTION/TABLE/SCHEMA/etc on system
+      if (stmtType === 'DropStmt') {
+        const objects = (data.objects as Array<unknown>) ?? [];
+        for (const obj of objects) {
+          if (typeof obj !== 'object' || obj === null) {
+            continue;
+          }
+          const o = obj as Record<string, unknown>;
+          let schema: string | null = null;
+
+          if (o.String) {
+            // DROP SCHEMA system
+            schema = ((o.String as Record<string, unknown>).sval as string) ?? null;
+          } else if (o.List) {
+            // DROP TABLE system.foo
+            const items =
+              ((o.List as Record<string, unknown>).items as Array<Record<string, unknown>>) ?? [];
+            if (items.length > 1) {
+              schema = getSchemaFromNameList(items);
+            }
+          } else if (o.ObjectWithArgs) {
+            // DROP FUNCTION system.foo(...)
+            const objname =
+              ((o.ObjectWithArgs as Record<string, unknown>).objname as Array<
+                Record<string, unknown>
+              >) ?? [];
+            if (objname.length > 1) {
+              schema = getSchemaFromNameList(objname);
+            }
+          }
+
+          if (isSystem(schema)) {
+            return 'DROP operations on the "system" schema are not allowed.';
+          }
+        }
+      }
+
+      // CREATE TABLE / ALTER TABLE system.*
+      if (stmtType === 'CreateStmt' || stmtType === 'AlterTableStmt') {
+        const relation = data.relation as Record<string, unknown> | undefined;
+        if (isSystem(getSchemaName(relation))) {
+          return 'DDL operations on the "system" schema are not allowed.';
+        }
+      }
+
+      // DELETE FROM system.*
+      if (stmtType === 'DeleteStmt') {
+        const relation = data.relation as Record<string, unknown> | undefined;
+        if (isSystem(getSchemaName(relation))) {
+          return 'DELETE operations on the "system" schema are not allowed.';
+        }
+      }
+
+      // TRUNCATE system.*
+      if (stmtType === 'TruncateStmt') {
+        const relations = (data.relations as Array<Record<string, unknown>>) ?? [];
+        for (const relation of relations) {
+          if (isSystem(getSchemaName(relation))) {
+            return 'TRUNCATE operations on the "system" schema are not allowed.';
+          }
+        }
+      }
+    }
+
+    return null;
+  } catch (parseError) {
+    logger.warn('SQL parse error in checkSystemSchemaOperations, rejecting query:', parseError);
+    return 'Query could not be parsed and was rejected for security reasons.';
+  }
+}
+
+/**
  * Parse a SQL string into individual statements, properly handling:
  * - String literals with embedded semicolons
  * - Escaped quotes
