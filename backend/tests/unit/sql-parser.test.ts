@@ -96,9 +96,7 @@ describe('checkSystemSchemaOperations', () => {
   });
 
   it('blocks DROP FUNCTION on system schema', () => {
-    expect(
-      checkSystemSchemaOperations('DROP FUNCTION system.update_updated_at()')
-    ).not.toBeNull();
+    expect(checkSystemSchemaOperations('DROP FUNCTION system.update_updated_at()')).not.toBeNull();
   });
 
   it('blocks DROP TABLE on system schema', () => {
@@ -107,6 +105,14 @@ describe('checkSystemSchemaOperations', () => {
 
   it('blocks DROP SCHEMA system', () => {
     expect(checkSystemSchemaOperations('DROP SCHEMA system CASCADE')).not.toBeNull();
+  });
+
+  it('blocks DROP TYPE on system schema', () => {
+    expect(checkSystemSchemaOperations('DROP TYPE system.my_type')).not.toBeNull();
+  });
+
+  it('blocks DROP DOMAIN on system schema', () => {
+    expect(checkSystemSchemaOperations('DROP DOMAIN system.my_domain')).not.toBeNull();
   });
 
   it('blocks CREATE TABLE on system schema', () => {

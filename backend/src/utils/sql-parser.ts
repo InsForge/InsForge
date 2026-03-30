@@ -301,6 +301,14 @@ export function checkSystemSchemaOperations(query: string): string | null {
             if (objname.length > 1) {
               schema = getSchemaFromNameList(objname);
             }
+          } else if (o.TypeName) {
+            // DROP TYPE/DOMAIN system.foo
+            const names =
+              ((o.TypeName as Record<string, unknown>).names as Array<Record<string, unknown>>) ??
+              [];
+            if (names.length > 1) {
+              schema = getSchemaFromNameList(names);
+            }
           }
 
           if (isSystem(schema)) {

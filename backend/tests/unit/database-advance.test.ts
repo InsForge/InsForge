@@ -346,6 +346,16 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
       expect(() => service.sanitizeQuery(query)).toThrow(AppError);
     });
 
+    test('blocks DROP TYPE on system schema', () => {
+      const query = 'DROP TYPE system.my_type';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks DROP DOMAIN on system schema', () => {
+      const query = 'DROP DOMAIN system.my_domain';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
     test('blocks DELETE on system schema', () => {
       const query = "DELETE FROM system.secrets WHERE key = 'test'";
       expect(() => service.sanitizeQuery(query)).toThrow(AppError);
