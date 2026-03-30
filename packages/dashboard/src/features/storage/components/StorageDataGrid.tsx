@@ -15,6 +15,7 @@ import {
 import {
   Download,
   Eye,
+  Pencil,
   Trash2,
   Image,
   FileText,
@@ -28,6 +29,7 @@ import { StorageFileSchema } from '@insforge/shared-schemas';
 import { cn, formatTime } from '../../../lib/utils/utils';
 import { useStorage } from '../hooks/useStorage';
 import { FilePreviewDialog } from './FilePreviewDialog';
+import { RenameFileDialog } from './RenameFileDialog';
 import { useConfirm } from '../../../lib/hooks/useConfirm';
 import { useToast } from '../../../lib/hooks/useToast';
 import { SortColumn } from 'react-data-grid';
@@ -129,6 +131,7 @@ const UploadedAtRenderer = ({ row, column }: RenderCellProps<StorageDataGridRow>
 export function createStorageColumns(
   onPreview?: (file: StorageFileSchema) => void,
   onDownload?: (file: StorageFileSchema) => void,
+  onRename?: (file: StorageFileSchema) => void,
   onDelete?: (file: StorageFileSchema) => void,
   isDownloading?: (key: string) => boolean
 ): DataGridColumn<StorageDataGridRow>[] {
@@ -172,12 +175,12 @@ export function createStorageColumns(
   ];
 
   // Add actions column if any handlers are provided
-  if (onPreview || onDownload || onDelete) {
+  if (onPreview || onDownload || onRename || onDelete) {
     columns.push({
       key: 'actions',
       name: '',
-      minWidth: 108,
-      maxWidth: 108,
+      minWidth: 136,
+      maxWidth: 136,
       resizable: false,
       sortable: false,
       renderCell: ({ row }: RenderCellProps<StorageDataGridRow>) => {
@@ -216,6 +219,20 @@ export function createStorageColumns(
                 <Download className="h-5 w-5 stroke-[1.5]" />
               </Button>
             )}
+            {onRename && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 rounded p-0 text-muted-foreground hover:bg-[var(--alpha-4)] hover:text-foreground active:bg-[var(--alpha-8)]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRename(row as StorageFileSchema);
+                }}
+                title="Rename file"
+              >
+                <Pencil className="h-4 w-4 stroke-[1.5]" />
+              </Button>
+            )}
             {onDelete && (
               <Button
                 variant="ghost"
@@ -242,6 +259,7 @@ export function createStorageColumns(
 interface StorageFilesGridProps extends Omit<DataGridProps<StorageDataGridRow>, 'columns'> {
   onPreview?: (file: StorageFileSchema) => void;
   onDownload?: (file: StorageFileSchema) => void;
+  onRename?: (file: StorageFileSchema) => void;
   onDelete?: (file: StorageFileSchema) => void;
   isDownloading?: (key: string) => boolean;
 }
@@ -249,13 +267,14 @@ interface StorageFilesGridProps extends Omit<DataGridProps<StorageDataGridRow>, 
 function StorageFilesGrid({
   onPreview,
   onDownload,
+  onRename,
   onDelete,
   isDownloading,
   ...props
 }: StorageFilesGridProps) {
   const columns = useMemo(
-    () => createStorageColumns(onPreview, onDownload, onDelete, isDownloading),
-    [onPreview, onDownload, onDelete, isDownloading]
+    () => createStorageColumns(onPreview, onDownload, onRename, onDelete, isDownloading),
+    [onPreview, onDownload, onRename, onDelete, isDownloading]
   );
 
   // Ensure each row has an id for selection
@@ -299,7 +318,9 @@ export function StorageDataGrid({
 }: StorageDataGridProps) {
   const [downloadingFiles, setDownloadingFiles] = useState<Set<string>>(new Set());
   const [previewFile, setPreviewFile] = useState<StorageFileSchema | null>(null);
+  const [renameFile, setRenameFile] = useState<StorageFileSchema | null>(null);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [sortColumns, setSortColumns] = useState<SortColumn[]>([]);
   const { showToast } = useToast();
   const { confirm, confirmDialogProps } = useConfirm();
@@ -314,7 +335,8 @@ export function StorageDataGrid({
     setCurrentPage(1);
   }, [searchQuery, bucketName]);
 
-  const { useListObjects, deleteObjects, downloadObject } = useStorage();
+  const { useListObjects, deleteObjects, downloadObject, renameObject, isRenamingObject } =
+    useStorage();
   const {
     data: objectsData,
     isLoading: objectsLoading,
@@ -392,6 +414,26 @@ export function StorageDataGrid({
     setShowPreviewDialog(true);
   }, []);
 
+  const handleRename = useCallback((file: StorageFileSchema) => {
+    setRenameFile(file);
+    setShowRenameDialog(true);
+  }, []);
+
+  const handleRenameSubmit = useCallback(
+    async (newName: string) => {
+      if (!renameFile) {
+        return;
+      }
+
+      await renameObject({
+        bucket: bucketName,
+        key: renameFile.key,
+        newName,
+      });
+    },
+    [bucketName, renameFile, renameObject]
+  );
+
   const handleDelete = useCallback(
     async (file: StorageFileSchema) => {
       const confirmOptions = {
@@ -468,6 +510,7 @@ export function StorageDataGrid({
           onSortColumnsChange={setSortColumns}
           onPreview={handlePreview}
           onDownload={(file) => void handleDownload(file)}
+          onRename={handleRename}
           onDelete={(file) => void handleDelete(file)}
           isDownloading={isDownloading}
           emptyState={
@@ -488,6 +531,19 @@ export function StorageDataGrid({
         onOpenChange={setShowPreviewDialog}
         file={previewFile}
         bucket={bucketName}
+      />
+
+      <RenameFileDialog
+        open={showRenameDialog}
+        onOpenChange={(open) => {
+          setShowRenameDialog(open);
+          if (!open) {
+            setRenameFile(null);
+          }
+        }}
+        file={renameFile}
+        onRename={handleRenameSubmit}
+        isRenaming={isRenamingObject}
       />
     </div>
   );
