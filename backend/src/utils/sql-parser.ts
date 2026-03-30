@@ -240,6 +240,11 @@ function getSchemaFromNameList(items: Array<Record<string, unknown>>): string | 
 export function checkSystemSchemaOperations(query: string): string | null {
   const isSystem = (s: string | null): boolean => s?.toLowerCase() === 'system';
 
+  // Block set_config('search_path', ...) which bypasses VariableSetStmt detection
+  if (/set_config\s*\(\s*'search_path'/i.test(query)) {
+    return 'Modifying search_path is not allowed.';
+  }
+
   try {
     const { stmts } = parseSync(query);
 
