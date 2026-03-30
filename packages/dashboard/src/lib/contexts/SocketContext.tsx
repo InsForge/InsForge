@@ -2,7 +2,6 @@ import {
   createContext,
   useContext,
   useEffect,
-  useEffectEvent,
   useRef,
   useState,
   useCallback,
@@ -218,7 +217,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
   }, [disconnect]);
 
   // Send onboarding success only on first MCP connection
-  const onMcpConnectedSuccess = useEffectEvent((toolName: string) => {
+  const onMcpConnectedSuccess = useCallback((toolName: string) => {
     if (mcpUsageCount === 0) {
       postMessageToParent({ type: 'ONBOARDING_SUCCESS' });
 
@@ -227,7 +226,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
         tool_name: toolName,
       });
     }
-  });
+  }, [mcpUsageCount]);
 
   // Register business event handlers when socket is connected
   useEffect(() => {
@@ -329,7 +328,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
       socket.off(ServerEvents.DATA_UPDATE, handleDataUpdate);
       socket.off(ServerEvents.MCP_CONNECTED, handleMcpConnected);
     };
-  }, [state.isConnected, queryClient]);
+  }, [state.isConnected, queryClient, onMcpConnectedSuccess]);
 
   // Context value
   const contextValue = useMemo<SocketContextValue>(

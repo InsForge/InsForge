@@ -24,6 +24,7 @@ import {
 } from '@insforge/ui';
 import type { InstanceInfoEvent } from '@insforge/shared-schemas';
 import { useApiKey } from '../../../lib/hooks/useMetadata';
+import { useDashboardHost, useIsEmbeddedDashboard } from '../../../lib/config/DashboardHostContext';
 import { useHealth } from '../../../lib/hooks/useHealth';
 import {
   CLOUD_PROJECT_INFO_QUERY_KEY,
@@ -50,6 +51,8 @@ const INFO_FIELD_CLASS =
   'flex h-8 w-full items-center rounded border border-[var(--alpha-12)] bg-[var(--alpha-4)] px-2.5 text-sm leading-5 text-foreground';
 
 export default function ProjectSettingsMenuDialog() {
+  const host = useDashboardHost();
+  const isEmbeddedDashboard = useIsEmbeddedDashboard();
   const { isSettingsDialogOpen, settingsDefaultTab, closeSettingsDialog } = useModal();
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [isVersionOutdated, setIsVersionOutdated] = useState(false);
@@ -71,6 +74,7 @@ export default function ProjectSettingsMenuDialog() {
 
   const isCloud = isInsForgeCloudProject();
   const isInIframe = isIframe();
+  const canUseCloudHost = isCloud && (isInIframe || isEmbeddedDashboard);
   const projectUrl = useMemo(() => `${getBackendUrl().replace(/\/$/, '')}/`, []);
 
   const maskedApiKey = apiKey ? `ik_${'*'.repeat(22)}` : 'ik_**********************';
@@ -128,7 +132,7 @@ export default function ProjectSettingsMenuDialog() {
       const nextTab: TabType =
         settingsDefaultTab === 'connect'
           ? 'connect'
-          : settingsDefaultTab === 'compute' && isCloud && isInIframe
+          : settingsDefaultTab === 'compute' && canUseCloudHost
             ? 'compute'
             : 'info';
 
@@ -137,8 +141,8 @@ export default function ProjectSettingsMenuDialog() {
       setProjectNameInitialValue(cloudProjectName);
       setIsProjectNameFocused(false);
 
-      if (isCloud && isInIframe) {
-        postMessageToParent({ type: 'REQUEST_INSTANCE_INFO' }, '*');
+      if (canUseCloudHost) {
+        void requestInstanceInfo();
       }
       return;
     }
@@ -147,7 +151,7 @@ export default function ProjectSettingsMenuDialog() {
     setIsChangingInstanceType(false);
     setIsProjectNameFocused(false);
     setSelectedInstanceType(null);
-  }, [isSettingsDialogOpen, settingsDefaultTab, projectInfo.name, isCloud, isInIframe]);
+  }, [canUseCloudHost, isSettingsDialogOpen, projectInfo.name, settingsDefaultTab]);
 
   useEffect(() => {
     if (!isCloud || !isInIframe) {
@@ -208,7 +212,7 @@ export default function ProjectSettingsMenuDialog() {
   }, [version, latestVersion]);
 
   useEffect(() => {
-    if (!isSettingsDialogOpen || !isCloud || !isInIframe || isProjectInfoLoading) {
+    if (!isSettingsDialogOpen || !canUseCloudHost || isProjectInfoLoading) {
       return;
     }
 
@@ -221,13 +225,32 @@ export default function ProjectSettingsMenuDialog() {
     setProjectNameInitialValue(cloudProjectName);
   }, [
     isSettingsDialogOpen,
-    isCloud,
-    isInIframe,
+    canUseCloudHost,
     isProjectInfoLoading,
     isProjectNameDirty,
     isProjectNameFocused,
     projectInfo.name,
   ]);
+
+  async function requestInstanceInfo() {
+    if (host.mode === 'cloud-hosting' && host.onRequestInstanceInfo) {
+      try {
+        const nextInstanceInfo = await host.onRequestInstanceInfo();
+        setInstanceInfo(nextInstanceInfo);
+        setSelectedInstanceType(null);
+      } catch (error) {
+        showToast(
+          error instanceof Error ? error.message : 'Failed to load compute options',
+          'error'
+        );
+      }
+      return;
+    }
+
+    if (isInIframe) {
+      postMessageToParent({ type: 'REQUEST_INSTANCE_INFO' }, '*');
+    }
+  }
 
   const handleDeleteProject = async () => {
     const confirmed = await confirm({
@@ -242,10 +265,30 @@ export default function ProjectSettingsMenuDialog() {
       return;
     }
 
+    if (host.mode === 'cloud-hosting' && host.onDeleteProject) {
+      try {
+        await host.onDeleteProject();
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : 'Failed to delete project', 'error');
+      }
+      return;
+    }
+
     postMessageToParent({ type: 'DELETE_PROJECT' }, '*');
   };
 
-  const handleUpdateVersion = () => {
+  const handleUpdateVersion = async () => {
+    if (host.mode === 'cloud-hosting' && host.onUpdateVersion) {
+      setIsUpdatingVersion(true);
+      try {
+        await host.onUpdateVersion();
+      } catch (error) {
+        setIsUpdatingVersion(false);
+        showToast(error instanceof Error ? error.message : 'Failed to update project version', 'error');
+      }
+      return;
+    }
+
     postMessageToParent({ type: 'UPDATE_PROJECT_VERSION' }, '*');
   };
 
@@ -254,20 +297,29 @@ export default function ProjectSettingsMenuDialog() {
     setIsProjectNameFocused(false);
   };
 
-  const handleSaveProjectName = () => {
+  const handleSaveProjectName = async () => {
     const nextProjectName = projectName.trim();
 
     if (!isProjectNameDirty || !nextProjectName) {
       return;
     }
 
-    postMessageToParent(
-      {
-        type: 'UPDATE_PROJECT_NAME',
-        name: nextProjectName,
-      },
-      '*'
-    );
+    if (host.mode === 'cloud-hosting' && host.onRenameProject) {
+      try {
+        await host.onRenameProject(nextProjectName);
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : 'Failed to update project name', 'error');
+        return;
+      }
+    } else {
+      postMessageToParent(
+        {
+          type: 'UPDATE_PROJECT_NAME',
+          name: nextProjectName,
+        },
+        '*'
+      );
+    }
 
     queryClient.setQueryData<CloudProjectInfo>(CLOUD_PROJECT_INFO_QUERY_KEY, (previous = {}) => ({
       ...previous,
@@ -308,7 +360,7 @@ export default function ProjectSettingsMenuDialog() {
     }
   };
 
-  const handleChangeInstanceType = () => {
+  const handleChangeInstanceType = async () => {
     if (
       !instanceInfo ||
       !selectedInstanceType ||
@@ -322,6 +374,37 @@ export default function ProjectSettingsMenuDialog() {
       'Project is updating compute size, please wait a few seconds and refresh the page.',
       'success'
     );
+
+    if (host.mode === 'cloud-hosting' && host.onRequestInstanceTypeChange) {
+      try {
+        const result = await host.onRequestInstanceTypeChange(selectedInstanceType);
+        setIsChangingInstanceType(false);
+
+        if (result.success) {
+          const nextInstanceType = result.instanceType ?? selectedInstanceType;
+          if (result.instanceType) {
+            setInstanceInfo((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    currentInstanceType: nextInstanceType,
+                  }
+                : prev
+            );
+          }
+          setSelectedInstanceType(null);
+          void requestInstanceInfo();
+          return;
+        }
+
+        showToast(result.error || 'Failed to update compute size', 'error');
+      } catch (error) {
+        setIsChangingInstanceType(false);
+        showToast(error instanceof Error ? error.message : 'Failed to update compute size', 'error');
+      }
+      return;
+    }
+
     postMessageToParent(
       {
         type: 'REQUEST_INSTANCE_TYPE_CHANGE',
@@ -363,13 +446,13 @@ export default function ProjectSettingsMenuDialog() {
                 >
                   Connect
                 </MenuDialogNavItem>
-                {isCloud && isInIframe && (
+                {canUseCloudHost && (
                   <MenuDialogNavItem
                     icon={<HardDrive className="size-5" />}
                     active={activeTab === 'compute'}
                     onClick={() => {
                       setActiveTab('compute');
-                      postMessageToParent({ type: 'REQUEST_INSTANCE_INFO' }, '*');
+                      void requestInstanceInfo();
                     }}
                   >
                     Compute & Disk
@@ -401,14 +484,14 @@ export default function ProjectSettingsMenuDialog() {
                         </div>
                         <div className="flex min-w-0 flex-1 items-start gap-1.5">
                           <Input
-                            value={isInIframe && isProjectInfoLoading ? 'Loading...' : projectName}
+                            value={canUseCloudHost && isProjectInfoLoading ? 'Loading...' : projectName}
                             onChange={(event) => setProjectName(event.target.value)}
                             onFocus={() => setIsProjectNameFocused(true)}
                             onBlur={() => setIsProjectNameFocused(false)}
-                            disabled={isInIframe && isProjectInfoLoading}
+                            disabled={canUseCloudHost && isProjectInfoLoading}
                             className={cn(
                               'h-8',
-                              isInIframe && isProjectInfoLoading && 'animate-pulse cursor-wait'
+                              canUseCloudHost && isProjectInfoLoading && 'animate-pulse cursor-wait'
                             )}
                           />
                         </div>
@@ -496,9 +579,9 @@ export default function ProjectSettingsMenuDialog() {
                           </p>
                         )}
                       </div>
-                      {isCloud && isInIframe && isVersionOutdated && (
+                      {canUseCloudHost && isVersionOutdated && (
                         <Button
-                          onClick={handleUpdateVersion}
+                          onClick={() => void handleUpdateVersion()}
                           disabled={isUpdatingVersion}
                           className="h-8 rounded px-3 text-sm font-medium"
                         >
@@ -512,7 +595,7 @@ export default function ProjectSettingsMenuDialog() {
                     <div className="h-px w-full bg-[var(--alpha-8)]" />
                   </div>
 
-                  {isCloud && isInIframe && (
+                  {canUseCloudHost && (
                     <div className="flex items-start gap-6">
                       <div className="w-[200px] shrink-0">
                         <p className="py-1.5 text-sm leading-5 text-foreground">Delete Project</p>
@@ -533,7 +616,7 @@ export default function ProjectSettingsMenuDialog() {
 
               {activeTab === 'connect' && (
                 <div className="flex w-full flex-col">
-                  {isCloud && isInIframe && (
+                  {canUseCloudHost && (
                     <>
                       <div className="flex items-start gap-6">
                         <div className="w-[200px] shrink-0">
@@ -596,7 +679,7 @@ export default function ProjectSettingsMenuDialog() {
                 </div>
               )}
 
-              {activeTab === 'compute' && isCloud && isInIframe && (
+              {activeTab === 'compute' && canUseCloudHost && (
                 <div className="flex w-full flex-col gap-4">
                   {!instanceInfo ? (
                     <div className={cn(INFO_FIELD_CLASS, 'justify-between')}>
@@ -613,7 +696,11 @@ export default function ProjectSettingsMenuDialog() {
                             <Button
                               type="button"
                               className="h-8 rounded px-3 text-sm font-medium"
-                              onClick={() => postMessageToParent({ type: 'SHOW_PLAN_MODAL' }, '*')}
+                              onClick={() =>
+                                host.mode === 'cloud-hosting' && host.onNavigateToSubscription
+                                  ? host.onNavigateToSubscription()
+                                  : postMessageToParent({ type: 'SHOW_PLAN_MODAL' }, '*')
+                              }
                             >
                               Upgrade Plan
                             </Button>

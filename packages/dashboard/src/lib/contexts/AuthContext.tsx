@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useQueryClient } from '@tanstack/react-query';
 import { loginService } from '../../features/login/services/login.service';
 import { partnershipService } from '../../features/login/services/partnership.service';
+import { useDashboardHost } from '../config/DashboardHostContext';
 import { apiClient } from '../api/client';
 import { postMessageToParent } from '../utils/cloudMessaging';
 import { isInsForgeCloudProject, isIframe } from '../utils/utils';
@@ -35,6 +36,7 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const host = useDashboardHost();
   const [user, setUser] = useState<UserSchema | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -168,7 +170,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Persistent AUTHORIZATION_CODE listener for cloud projects
   useEffect(() => {
-    if (!isInsForgeCloudProject()) {
+    if (host.mode === 'cloud-hosting' || !isInsForgeCloudProject()) {
       return;
     }
 
@@ -197,12 +199,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [handleAuthorizationCode]);
+  }, [handleAuthorizationCode, host.mode]);
 
   // Access token refresh handler
   useEffect(() => {
     const handleRefreshAccessToken = (): Promise<boolean> => {
-      if (isIframe()) {
+      if (host.mode === 'cloud-hosting' && host.auth.strategy === 'authorization-code') {
+        return host.auth
+          .getAuthorizationCode()
+          .then((code) => loginWithAuthorizationCode(code))
+          .catch(() => false);
+      } else if (isIframe()) {
         // In iframe: request new auth code from parent, persistent listener will handle it
         return requestAuthorizationCodeFromParent();
       } else {
@@ -220,7 +227,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         pendingRefreshRef.current = null;
       }
     };
-  }, [requestAuthorizationCodeFromParent]);
+  }, [host, loginWithAuthorizationCode, requestAuthorizationCodeFromParent]);
 
   const checkAuthStatus = useCallback(async () => {
     try {
