@@ -247,6 +247,14 @@ export function checkSystemSchemaOperations(query: string): string | null {
       const stmt = stmtWrapper.stmt as Record<string, unknown>;
       const [stmtType, data] = Object.entries(stmt)[0] as [string, Record<string, unknown>];
 
+      // Block SET search_path (could be used to bypass schema-qualified checks)
+      if (stmtType === 'VariableSetStmt') {
+        const name = (data.name as string) ?? '';
+        if (name.toLowerCase() === 'search_path') {
+          return 'Modifying search_path is not allowed.';
+        }
+      }
+
       // CREATE [OR REPLACE] FUNCTION system.*
       if (stmtType === 'CreateFunctionStmt') {
         const funcname = (data.funcname as Array<Record<string, unknown>>) ?? [];
@@ -264,8 +272,12 @@ export function checkSystemSchemaOperations(query: string): string | null {
         }
       }
 
-      // CREATE TRIGGER ... EXECUTE FUNCTION system.*
+      // CREATE TRIGGER ... ON system.* / EXECUTE FUNCTION system.*
       if (stmtType === 'CreateTrigStmt') {
+        const relation = data.relation as Record<string, unknown> | undefined;
+        if (isSystem(getSchemaName(relation))) {
+          return 'Creating triggers on "system" schema tables is not allowed.';
+        }
         const funcname = (data.funcname as Array<Record<string, unknown>>) ?? [];
         if (funcname.length > 1 && isSystem(getSchemaFromNameList(funcname))) {
           return 'Creating triggers that reference "system" schema functions is not allowed.';
@@ -322,6 +334,22 @@ export function checkSystemSchemaOperations(query: string): string | null {
         const relation = data.relation as Record<string, unknown> | undefined;
         if (isSystem(getSchemaName(relation))) {
           return 'DDL operations on the "system" schema are not allowed.';
+        }
+      }
+
+      // INSERT INTO system.*
+      if (stmtType === 'InsertStmt') {
+        const relation = data.relation as Record<string, unknown> | undefined;
+        if (isSystem(getSchemaName(relation))) {
+          return 'INSERT operations on the "system" schema are not allowed.';
+        }
+      }
+
+      // UPDATE system.*
+      if (stmtType === 'UpdateStmt') {
+        const relation = data.relation as Record<string, unknown> | undefined;
+        if (isSystem(getSchemaName(relation))) {
+          return 'UPDATE operations on the "system" schema are not allowed.';
         }
       }
 

@@ -84,6 +84,14 @@ describe('checkSystemSchemaOperations', () => {
     expect(checkSystemSchemaOperations(query)).not.toBeNull();
   });
 
+  it('blocks SET search_path', () => {
+    expect(checkSystemSchemaOperations('SET search_path TO system, public')).not.toBeNull();
+  });
+
+  it('blocks SET search_path (case-insensitive)', () => {
+    expect(checkSystemSchemaOperations('SET SEARCH_PATH TO public')).not.toBeNull();
+  });
+
   it('blocks ALTER FUNCTION on system schema', () => {
     const query = 'ALTER FUNCTION system.update_updated_at() SECURITY DEFINER';
     expect(checkSystemSchemaOperations(query)).not.toBeNull();
@@ -92,6 +100,12 @@ describe('checkSystemSchemaOperations', () => {
   it('blocks CREATE TRIGGER referencing system schema function', () => {
     const query =
       'CREATE TRIGGER t BEFORE UPDATE ON my_table FOR EACH ROW EXECUTE FUNCTION system.update_updated_at()';
+    expect(checkSystemSchemaOperations(query)).not.toBeNull();
+  });
+
+  it('blocks CREATE TRIGGER on system schema table', () => {
+    const query =
+      'CREATE TRIGGER t BEFORE UPDATE ON system.secrets FOR EACH ROW EXECUTE FUNCTION public.my_func()';
     expect(checkSystemSchemaOperations(query)).not.toBeNull();
   });
 
@@ -124,6 +138,18 @@ describe('checkSystemSchemaOperations', () => {
   it('blocks ALTER TABLE on system schema', () => {
     expect(
       checkSystemSchemaOperations('ALTER TABLE system.secrets ADD COLUMN foo TEXT')
+    ).not.toBeNull();
+  });
+
+  it('blocks INSERT on system schema', () => {
+    expect(
+      checkSystemSchemaOperations("INSERT INTO system.secrets (key, value) VALUES ('a', 'b')")
+    ).not.toBeNull();
+  });
+
+  it('blocks UPDATE on system schema', () => {
+    expect(
+      checkSystemSchemaOperations("UPDATE system.secrets SET value = 'x' WHERE key = 'a'")
     ).not.toBeNull();
   });
 

@@ -310,8 +310,19 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
       expect(() => service.sanitizeQuery(query)).toThrow(/system/i);
     });
 
+    test('blocks SET search_path', () => {
+      const query = 'SET search_path TO system, public';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
     test('blocks ALTER FUNCTION on system schema', () => {
       const query = 'ALTER FUNCTION system.update_updated_at() SECURITY DEFINER';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks CREATE TRIGGER on system schema table', () => {
+      const query =
+        'CREATE TRIGGER t BEFORE UPDATE ON system.secrets FOR EACH ROW EXECUTE FUNCTION public.my_func()';
       expect(() => service.sanitizeQuery(query)).toThrow(AppError);
     });
 
@@ -353,6 +364,16 @@ describe('DatabaseAdvanceService - sanitizeQuery', () => {
 
     test('blocks DROP DOMAIN on system schema', () => {
       const query = 'DROP DOMAIN system.my_domain';
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks INSERT on system schema', () => {
+      const query = "INSERT INTO system.secrets (key, value) VALUES ('a', 'b')";
+      expect(() => service.sanitizeQuery(query)).toThrow(AppError);
+    });
+
+    test('blocks UPDATE on system schema', () => {
+      const query = "UPDATE system.secrets SET value = 'x' WHERE key = 'a'";
       expect(() => service.sanitizeQuery(query)).toThrow(AppError);
     });
 
